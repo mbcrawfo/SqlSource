@@ -1,0 +1,10 @@
+{
+  "Version": "v4.0.2",
+  "Exclude": [
+    "\\.md$",
+    "packages\\.lock\\.json$",
+    "^dotnet-tools\\.json$",
+    "^\\.claude/",
+    "^\\.superpowers/"
+  ]
+}

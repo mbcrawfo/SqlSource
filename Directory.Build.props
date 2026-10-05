@@ -1,0 +1,40 @@
+<Project>
+    <PropertyGroup>
+        <LangVersion>preview</LangVersion>
+        <ImplicitUsings>disable</ImplicitUsings>
+        <Nullable>enable</Nullable>
+        <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+        <AnalysisLevel>latest-all</AnalysisLevel>
+        <!-- Unused usings (IDE0005) are only reported at build when the documentation file is generated. -->
+        <GenerateDocumentationFile>true</GenerateDocumentationFile>
+        <!-- GitHub Actions sets CI, so every dotnet command on a runner restores from the lock files. -->
+        <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+        <!--
+            A finding listed here stays a visible warning and does not fail the build.  The root .editorconfig cannot
+            say that: its "warning" is promoted to an error, and NuGet's findings never reach it.  A finding that
+            should not be reported at all is turned off there, never with NoWarn.
+
+            CS0618: "Type or member is obsolete": Just because something is obsolete doesn't mean we can stop using it
+                immediately.
+            NU190x: "NuGet audit warnings": Need to know about them, but they should not block the build.
+            NU1510: "Library pruning warnings": .NET 10 pruning suggestions should not block build.
+            S125: "Code should not be commented out": Makes it very annoying to test and develop iteratively.
+        -->
+        <WarningsNotAsErrors>$(WarningsNotAsErrors);CS0618;NU1901;NU1902;NU1903;NU1904;NU1510;S125</WarningsNotAsErrors>
+        <Copyright>Copyright © $([System.DateTime]::Now.ToString('yyyy')) Michael Crawford</Copyright>
+        <AssemblyVersion>0.1.0.0</AssemblyVersion>
+        <InformationalVersion>0.1.0.0</InformationalVersion>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Roslynator.Analyzers">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+        </PackageReference>
+        <PackageReference Include="SonarAnalyzer.CSharp">
+            <PrivateAssets>all</PrivateAssets>
+            <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+        </PackageReference>
+    </ItemGroup>
+</Project>
