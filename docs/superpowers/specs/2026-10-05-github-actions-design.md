@@ -23,6 +23,7 @@ Give the repository continuous integration and a release path:
 | Publish guard | GitHub environment `nuget`, limited to `main` and `v*` tags, no approval step | The nuget.org policy is bound to the environment, so a run from another branch cannot obtain a key |
 | GitHub Release | Created for each tag release | A changelog page per version at no ongoing cost |
 | Sharing logic between workflows | Reusable workflow `build.yml` | One definition, every check a visible step, linted by `tools/actionlint.sh` |
+| Required status check | One aggregate job named `ci` at the end of `ci.yml` | The ruleset names one check, and jobs can be added or renamed without changing it |
 
 ## Out of scope
 
@@ -104,6 +105,7 @@ Triggers: `pull_request` targeting `main`, and `push` to `main`.  A newer run fo
 
 - `build` calls `build.yml`.  `version-suffix` is `pr-<number>.<run number>` for a pull request and `beta.<run number>` for a push.
 - `coverage-comment` runs after `build` succeeds, for pull requests only, with `pull-requests: write`.  It is skipped when the head repository is a fork and when the actor is Dependabot, because those runs get a read-only token.  It downloads the `coverage` artifact and uses the `gh` CLI to create the coverage comment, or to update the existing one, which it finds by a hidden HTML marker.  It never checks out code.
+- `ci` is the last job and the only one to require in the `main` ruleset.  It needs every other job, runs even when one of them failed, and fails if any of them failed or was cancelled.  A skipped job does not fail it, because `coverage-comment` is skipped on pushes and on fork pull requests.  It always runs because GitHub treats a skipped required check as passing.  A job added to `ci.yml` later is added to its `needs`.
 
 ### `publish.yml`
 
@@ -136,6 +138,7 @@ Already in place, and recorded in `README.md` for reference:
 - When adding an action, look up its latest release and pin that.  Do not copy a SHA from another repository or from memory.
 - `publish.yml` keeps its file name, and its publish job keeps the `nuget` environment: both are part of the nuget.org policy.  The login and push stay in that file.
 - The check steps in `build.yml` mirror `pre-commit-validation.sh`.  A check added to one is added to the other in the same commit.
+- The `ci` job in `ci.yml` is the required status check.  It keeps its name, and every job added to `ci.yml` is added to its `needs`.
 - Version values reach MSBuild as job-level environment variables, not as `-p:` flags.
 - The maintenance footer, because the file names files.
 
@@ -160,6 +163,6 @@ Pull requests from forks and from Dependabot get no coverage comment, because th
 - `./pre-commit-validation.sh` exits zero on the finished tree.  Its actionlint step covers the three new workflows.
 - `dotnet msbuild -getProperty` on `src/SqlSource/SqlSource.csproj` returns the versions in the scheme table for each case: local, pull request, `main` and tag.
 - `dotnet pack` produces a `.nupkg` whose only assembly is `analyzers/dotnet/cs/SqlSource.dll`, with no `lib/` folder and no dependencies, and the DLL carries the expected assembly, file and informational versions.
-- On the pull request that adds the workflows, `ci.yml` runs: every check passes, the job summary shows test results and coverage, the `packages` and `coverage` artifacts exist, and the coverage comment appears and is updated in place by a second push.
+- On the pull request that adds the workflows, `ci.yml` runs: every check passes, the job summary shows test results and coverage, the `packages` and `coverage` artifacts exist, the coverage comment appears and is updated in place by a second run, and the `ci` job reports success.
 - After the merge, the `main` run produces a `-beta.<run>` package artifact.
 - `publish.yml` cannot run until it is on `main`.  Its first test is a manual beta push after the merge; the tag path is first exercised by the first release.
