@@ -2,12 +2,13 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0001`
+Next id: `TD-0002`
 
 ## Active items
 
 | ID | Status | Added | Impact | Description |
 |----|----|----|----|----|
+| [TD-0001](TD-0001-generator-not-run-on-roslyn-floor.md) | Open | 2026-10-05 | Medium | No test runs the generator on Roslyn 4.8.0, the oldest supported host |
 
 ## Columns
 
