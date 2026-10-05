@@ -6,7 +6,10 @@ These apply to all development in this project.
 
 1. **Document deferred work.**  Any work that is not implemented as planned must be documented in `docs/deferred`, in the same PR that defers it.
 2. **Document tech debt.**  Any problem identified and not resolved, or any intentional choice that is known to be sub-optimal, must be documented in `docs/tech-debt`, in the same PR that discovers or introduces it.
-3. **Keep the README current.**  `README.md` lists the tools a developer must install and how to build and test the project locally.  A change that adds, removes or re-pins a required tool, or that changes how the project is built, tested, checked or packed, updates `README.md` in the same PR.
+3. **Keep the docs current, each in its own place.**  A change that makes one of these documents wrong updates it in the same PR.
+   - `README.md` is for people who use the library: what it does, what it supports, how to install it and how to use it.  A change to behaviour a user can see, or to the supported environments, updates it.  Nothing about developing or releasing the project belongs there; link to the other two documents.  It is also packed as the package readme shown on nuget.org, so its links must be absolute URLs.
+   - `CONTRIBUTING.md` is for people who work on the project: the tools a developer must install, how to build, test, check and pack locally, and what CI runs.  A change that adds, removes or re-pins a required tool, or that changes how the project is built, tested, checked or packed, updates it.
+   - `docs/publishing.md` covers the version scheme, the release procedure and the configuration outside the repository that releasing depends on.  A change to any of those updates it.
 4. **Rebase only.  Never merge.**  `main` has a linear history and the repository allows only "Rebase and merge": each commit of a pull request lands on `main` as itself.  Never merge `main` into a branch, by hand (`git merge`, or `git pull` without `--rebase`) or through a tool that does it for you.  A merge commit makes the pull request unmergeable, and a conflict resolved inside one is lost when the commits are replayed.  Bring a branch up to date with `git fetch origin` and `git rebase origin/main`, resolve each conflict in the commit that causes it, and push with `--force-with-lease`, never `--force`.  Ask the user before any force-push.  If a merge is already in progress, abort it (`git merge --abort`) and rebase.
 
 ## Commits
@@ -17,7 +20,7 @@ Every commit must pass `./pre-commit-validation.sh`.  In Claude Code this is enf
 2. **Fix first, commit in a separate command.**  The hook runs before the command starts and checks the working tree as it is at that moment, not the staged content.  A command such as `./format.sh && git commit` is validated before `format.sh` has run.
 3. **Never work around the hook.**  Do not reach `git commit` through an alias, a wrapper, a line continuation or any other spelling the hook does not match, and do not edit the hook or `.claude/settings.json` to get a commit through.  If a check is wrong, tell the user.
 4. **Expect it to fire on the phrase, not the intent.**  Matching is textual, so a command that only mentions `git commit` inside a quoted string, or runs `git commit-tree` or `git commit-graph`, is validated too and is blocked when the tree fails.  Keep the phrase out of commands that do not commit.
-5. **It needs the full toolchain.**  The commit is blocked when Docker is not running, when `jq` is not installed, or when the local tools have not been restored.  Fix the environment; see `README.md`.
+5. **It needs the full toolchain.**  The commit is blocked when Docker is not running, when `jq` is not installed, or when the local tools have not been restored.  Fix the environment; see `CONTRIBUTING.md`.
 
 ## Pull requests
 
