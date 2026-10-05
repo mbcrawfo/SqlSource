@@ -27,7 +27,7 @@
         <!--
             VersionPrefix is the only version number edited by hand.  The workflows supply BuildNumber and
             VersionSuffix as environment variables, which MSBuild reads as properties.  Away from CI the suffix is
-            "dev".  The SDK composes the package and informational versions.  See "Versioning" in README.md.
+            "dev".  The SDK composes the package and informational versions.  See docs/publishing.md.
         -->
         <VersionPrefix>0.1.0</VersionPrefix>
         <BuildNumber Condition="'$(BuildNumber)' == ''">0</BuildNumber>
