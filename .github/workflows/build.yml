@@ -1,0 +1,111 @@
+# Runs every check, builds, tests, packs and reports coverage.  Called by ci.yml and publish.yml.
+# The check steps mirror pre-commit-validation.sh: a check added to one is added to the other in the same commit.
+name: Build
+
+on:
+  workflow_call:
+    inputs:
+      version-suffix:
+        description: Prerelease suffix of the package version.  Empty for a release build.
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+env:
+  SOLUTION: SqlSource.slnx
+  CONFIGURATION: Release
+  DOTNET_NOLOGO: 'true'
+
+jobs:
+  build:
+    name: Check, build, test and pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      # MSBuild reads environment variables as properties, so every dotnet command in this job sees the same version.
+      BuildNumber: ${{ github.run_number }}
+      VersionSuffix: ${{ inputs.version-suffix }}
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore packages
+        run: dotnet restore "$SOLUTION"
+
+      # Every check runs even when an earlier one failed, so that one run reports every problem.
+      - name: Check formatting
+        if: ${{ !cancelled() }}
+        run: ./format.sh --check
+
+      - name: Check .editorconfig
+        if: ${{ !cancelled() }}
+        run: tools/editorconfig-checker.sh
+
+      - name: Lint shell scripts
+        if: ${{ !cancelled() }}
+        run: tools/shellcheck.sh
+
+      - name: Check shell script formatting
+        if: ${{ !cancelled() }}
+        run: tools/shfmt.sh --check
+
+      - name: Lint workflows
+        if: ${{ !cancelled() }}
+        run: tools/actionlint.sh
+
+      - name: Build
+        id: build
+        if: ${{ !cancelled() }}
+        run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION" --no-restore
+
+      - name: Test
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: >-
+          dotnet test --solution "$SOLUTION" --configuration "$CONFIGURATION" --no-build
+          --results-directory artifacts/test-results
+          --coverage --coverage-output-format cobertura
+          --report-github
+
+      - name: Report coverage
+        id: coverage
+        if: ${{ !cancelled() && hashFiles('artifacts/test-results/*.cobertura.xml') != '' }}
+        run: |
+          dotnet reportgenerator \
+              '-reports:artifacts/test-results/*.cobertura.xml' \
+              -targetdir:artifacts/coverage \
+              '-reporttypes:Html;Cobertura;MarkdownSummaryGithub' \
+              '-assemblyfilters:+SqlSource'
+          cat artifacts/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload coverage
+        if: ${{ !cancelled() && steps.coverage.outcome == 'success' }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: artifacts/coverage
+          if-no-files-found: error
+
+      - name: Pack
+        run: dotnet pack "$SOLUTION" --configuration "$CONFIGURATION" --no-build --output artifacts/packages
+
+      - name: Upload packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: packages
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error
