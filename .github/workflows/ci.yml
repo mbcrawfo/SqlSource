@@ -60,10 +60,16 @@ jobs:
               printf '\nThe full report is the coverage artifact of [this run](%s).\n' "$RUN_URL"
           } > comment.md
 
-          comment_id="$(
-              gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate \
-                  --jq '.[] | select(.body | startswith("<!-- sqlsource-coverage -->")) | .id' | head -n 1
+          # Only a comment this workflow wrote is updated: anyone can post a comment that starts with the marker.
+          # The lookup is not piped, so that a failed request stops the step instead of creating a second comment.
+          comment_ids="$(
+              gh api "repos/$REPO/issues/$PR_NUMBER/comments" --paginate --jq '
+                  .[]
+                  | select(.user.login == "github-actions[bot]")
+                  | select(.body | startswith("<!-- sqlsource-coverage -->"))
+                  | .id'
           )"
+          comment_id="${comment_ids%%$'\n'*}"
 
           if [[ -n "$comment_id" ]]; then
               gh api --method PATCH "repos/$REPO/issues/comments/$comment_id" --field body=@comment.md > /dev/null
