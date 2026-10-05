@@ -39,7 +39,7 @@ Run every check before committing:
 ./pre-commit-validation.sh
 ```
 
-It verifies formatting, runs the linters, builds the solution and runs the tests.  It never rewrites files, runs every step even when one fails, and ends with a summary of what passed and failed.
+It verifies formatting, runs the linters, builds the solution and runs the tests.  It never rewrites files, runs every step even when one fails (the tests are skipped if the build fails), and ends with a summary of what passed and failed.
 
 Both `pre-commit-validation.sh` and `format.sh --check` restore packages in locked mode, as CI does, so a `packages.lock.json` that no longer matches its project fails the check.  After changing a package reference or version, update the lock files and commit them:
 

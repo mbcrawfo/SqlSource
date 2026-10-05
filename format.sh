@@ -22,11 +22,10 @@ if [[ $# -eq 0 ]]; then
 fi
 
 # Every check runs, so that one run reports every problem.
-# Restoring in locked mode makes a stale packages.lock.json a reported failure.  Without it the restore inside
-# dotnet format would rewrite the lock file and the check would pass.
+# Locked mode makes the restore inside dotnet format fail on a stale packages.lock.json.  Without it that restore
+# would rewrite the lock file and the check would pass.
 export RestoreLockedMode=true
 status=0
-dotnet restore "$SOLUTION" || status=1
 dotnet format style "$SOLUTION" --verify-no-changes || status=1
 dotnet format analyzers "$SOLUTION" --verify-no-changes || status=1
 dotnet csharpier check . || status=1
