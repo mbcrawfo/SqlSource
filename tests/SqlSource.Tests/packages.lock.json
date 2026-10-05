@@ -2,6 +2,12 @@
   "version": 2,
   "dependencies": {
     "net10.0": {
+      "GitHubActionsTestLogger": {
+        "type": "Direct",
+        "requested": "[3.0.5, )",
+        "resolved": "3.0.5",
+        "contentHash": "LM5IKPSylMYp42YC9bnL+JNUnQUS2y9TgoFLjnqeXLpDvqeyiTVc9fSh6m1KzhgLCKLGtUkpZxk9xI9/PHFaiw=="
+      },
       "Microsoft.CodeAnalysis.CSharp": {
         "type": "Direct",
         "requested": "[5.9.0, )",
@@ -10,6 +16,17 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.Analyzers": "5.9.0-1.26328.17",
           "Microsoft.CodeAnalysis.Common": "[5.9.0]"
+        }
+      },
+      "Microsoft.Testing.Extensions.CodeCoverage": {
+        "type": "Direct",
+        "requested": "[18.11.2, )",
+        "resolved": "18.11.2",
+        "contentHash": "bT6awBEUR+fjPpeLAN++4qx5q0sgA9SeJt6QfijnFFPxNSr68BYsYFMQH8L8kY6vMJd3fuvFAFBht4JtWQcWtQ==",
+        "dependencies": {
+          "Microsoft.DiaSymReader": "2.2.10",
+          "Microsoft.Extensions.DependencyModel": "10.0.10",
+          "Microsoft.Testing.Platform": "2.4.0"
         }
       },
       "Roslynator.Analyzers": {
@@ -74,6 +91,16 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.Analyzers": "5.9.0-1.26328.17"
         }
+      },
+      "Microsoft.DiaSymReader": {
+        "type": "Transitive",
+        "resolved": "2.2.10",
+        "contentHash": "zmGsm6b2y3STDa/Of7rdkkfTDV8VuGB8aCqIkLoJIQh5tL78K3zJ8OUyFKnfsaORXmGr9iOKwDkZfUjeXi+CwA=="
+      },
+      "Microsoft.Extensions.DependencyModel": {
+        "type": "Transitive",
+        "resolved": "10.0.10",
+        "contentHash": "rfZA1RjR021RPqSmIPovfz2aOd79TGqJ9BengbjnzIISOVwjLmuSDnhCMmiY/1c6iYvGolQ1iNGzkav0u11XEA=="
       },
       "Microsoft.Testing.Extensions.Telemetry": {
         "type": "Transitive",
