@@ -1,0 +1,88 @@
+# Publishes to nuget.org through trusted publishing: a release from a v* tag, or a beta from a manual run on main.
+# The file name and the nuget environment are part of the nuget.org policy.  Do not rename either.
+name: Publish
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    if: ${{ github.ref_type == 'tag' || github.ref == 'refs/heads/main' }}
+    uses: ./.github/workflows/build.yml
+    with:
+      # The empty string must be the last operand: `cond && '' || x` always yields x.
+      version-suffix: ${{ github.ref_type != 'tag' && format('beta.{0}', github.run_number) || '' }}
+
+  publish:
+    name: Push to nuget.org
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: nuget
+    permissions:
+      id-token: write
+    steps:
+      - name: Download the package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: packages
+          path: packages
+
+      - name: Check that the package matches the tag
+        if: ${{ github.ref_type == 'tag' }}
+        env:
+          TAG: ${{ github.ref_name }}
+        run: |
+          shopt -s nullglob
+          expected="packages/SqlSource.${TAG#v}.nupkg"
+          found=(packages/*.nupkg)
+          if [[ ${#found[@]} -ne 1 || "${found[0]}" != "$expected" ]]; then
+              echo "::error::Tag $TAG needs exactly $expected, but the build produced: ${found[*]:-nothing}."
+              echo 'Set VersionPrefix in Directory.Build.props to the version in the tag.'
+              exit 1
+          fi
+
+      - name: Log in to nuget.org
+        id: login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      # --skip-duplicate makes a re-run after a partial failure safe.
+      - name: Push
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
+        run: >-
+          dotnet nuget push packages/*.nupkg
+          --api-key "$NUGET_API_KEY"
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+  release:
+    name: Create the GitHub release
+    needs: publish
+    if: ${{ github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Download the package
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: packages
+          path: packages
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: gh release create "$TAG" packages/*.nupkg --repo "$REPO" --title "$TAG" --generate-notes --verify-tag
