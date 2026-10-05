@@ -14,6 +14,10 @@ fi
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$repo_root"
 
+# Every restore below runs in locked mode, as it does in CI, so that a stale packages.lock.json fails the validation
+# instead of being rewritten by it.
+export RestoreLockedMode=true
+
 results=()
 failed=0
 
