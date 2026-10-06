@@ -24,15 +24,57 @@ public partial class BuildFileTests
     private static readonly XDocument Targets = Load("SqlSource.targets");
 
     [Fact]
-    public void Props_TokenValidationProperty_ReachesTheCompilerInEveryProject()
+    public void Props_PropertiesOfThePackage_ReachTheCompilerInEveryProject()
     {
-        var item = Props.Descendants("CompilerVisibleProperty").ShouldHaveSingleItem();
+        var items = Props.Descendants("CompilerVisibleProperty").ToList();
 
-        item.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("SqlSourceTokenValidation");
+        items
+            .Select(item => item.Attribute("Include").ShouldNotBeNull().Value)
+            .ShouldBe(["SqlSourceTokenValidation", "SqlSourceDialect"]);
 
         // A project that sets SqlSourceIncludeFiles to false lists its own .sql files, and still needs the
-        // property.  So nothing may put a condition on the item.
-        item.AncestorsAndSelf().SelectMany(element => element.Attributes("Condition")).ShouldBeEmpty();
+        // properties.  So nothing may put a condition on the items.
+        items.SelectMany(ConditionsAround).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Props_DialectMetadataOfASqlFile_ReachesTheCompilerInEveryProject()
+    {
+        var item = Props.Descendants("CompilerVisibleItemMetadata").ShouldHaveSingleItem();
+
+        item.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("AdditionalFiles");
+        item.Attribute("MetadataName").ShouldNotBeNull().Value.ShouldBe("SqlSourceDialect");
+        ConditionsAround(item).ShouldBeEmpty();
+    }
+
+    // The compiler reads a property, and the metadata of an item, from a file with one line for each.  A value on a
+    // line of its own would arrive empty.  SqlSource.Tests.csproj writes both of its dialects that way, so the
+    // end-to-end tests show the trimming at work; this pins that each value has it.
+    [Theory]
+    [InlineData("SqlSourceTokenValidation")]
+    [InlineData("SqlSourceDialect")]
+    public void Targets_PropertyOfThePackage_IsTrimmed(string property)
+    {
+        var element = Targets.Descendants(property).ShouldHaveSingleItem();
+
+        element.Value.ShouldBe($"$({property}.Trim())");
+        element
+            .Parent.ShouldNotBeNull()
+            .Attribute("Condition")
+            .ShouldNotBeNull()
+            .Value.ShouldBe($"'$({property})' != ''");
+    }
+
+    [Fact]
+    public void Targets_DialectMetadataOfEverySqlFile_IsTrimmed()
+    {
+        var item = Targets.Descendants("AdditionalFiles").ShouldHaveSingleItem();
+
+        item.Attribute("Update").ShouldNotBeNull().Value.ShouldBe("@(AdditionalFiles)");
+        item.Attribute("SqlSourceDialect")
+            .ShouldNotBeNull()
+            .Value.ShouldBe("$([System.String]::Copy('%(SqlSourceDialect)').Trim())");
+        ConditionsAround(item).ShouldBeEmpty();
     }
 
     [Fact]
@@ -64,6 +106,9 @@ public partial class BuildFileTests
         names.ShouldNotBeEmpty();
         names.ShouldAllBe(name => name.StartsWith(Prefix, StringComparison.Ordinal));
     }
+
+    private static IEnumerable<XAttribute> ConditionsAround(XElement element) =>
+        element.AncestorsAndSelf().SelectMany(ancestor => ancestor.Attributes("Condition"));
 
     private static XDocument Load(string file) => XDocument.Load(Path.Combine(AppContext.BaseDirectory, "build", file));
 

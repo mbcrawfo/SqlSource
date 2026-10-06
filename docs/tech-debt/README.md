@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0014`
+Next id: `TD-0015`
 
 ## Active items
 
@@ -17,6 +17,7 @@ Next id: `TD-0014`
 | [TD-0011](TD-0011-language-version-is-not-checked.md) | Open | 2026-10-06 | Low | A project that sets `LangVersion` below 12 gets compiler errors in generated code, not a diagnostic |
 | [TD-0012](TD-0012-token-method-shapes-are-compiled-but-not-run.md) | Open | 2026-10-06 | Low | A token-only query and one with more than seven tokens are compiled in tests and never run, and awkward token names are compiled as C# 12 only |
 | [TD-0013](TD-0013-sql-edit-reads-every-attributed-type-again.md) | Open | 2026-10-06 | Low | An edit to a `.sql` file makes the compiler read every attributed type again, because the attribute is added in a post-initialization step |
+| [TD-0014](TD-0014-every-sql-file-gets-a-section-in-the-compiler-configuration.md) | Open | 2026-10-06 | Low | Every `.sql` file of a project, used or not, adds a section to the configuration file the SDK writes for the compiler |
 
 ## Columns
 

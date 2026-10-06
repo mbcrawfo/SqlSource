@@ -84,6 +84,22 @@ public class EndToEndTests
     public void ProjectWithValidationOff_QueryWithTheDirective_ReturnsTheSqlForArgumentsWithText() =>
         TokenQueries.Checked("users", "id = @id").ShouldBe("SELECT id FROM users WHERE id = @id;");
 
+    // SqlSource.Tests.csproj sets the SqlSourceDialect property to postgres, on a line of its own.  ANSI would end the
+    // string at the quote after the backslash and take the rest of the line for a comment.
+    [Fact]
+    public void ProjectWithADialect_FileWithoutItsOwn_IsReadByTheDialectOfTheProject() =>
+        DialectQueries.ByProperty.ShouldBe("SELECT E'it'\n    '\\'s -- not a comment' AS note;");
+
+    // The item of ByMetadata.sql has SqlSourceDialect metadata, written over several lines.  That the file is read as
+    // MySQL shows the metadata reaching the generator through the MSBuild files the package ships, trimmed.
+    [Fact]
+    public void ProjectWithADialect_FileWithMetadata_IsReadByTheDialectOfItsItem() =>
+        DialectQueries.ByMetadata.ShouldBe("SELECT 'it\\'s' AS note, 5--3 AS eight;");
+
+    [Fact]
+    public void ProjectWithADialect_FileWithADirective_IsReadByTheDialectItNames() =>
+        DialectQueries.ByDirective.ShouldBe("SELECT [it's] FROM #orders;");
+
     [Fact]
     public void Method_Call_AllocatesTheStringItReturnsAndNothingElse()
     {
@@ -115,6 +131,7 @@ public class EndToEndTests
     [InlineData(typeof(Repository<>))]
     [InlineData(typeof(Outer.Counts))]
     [InlineData(typeof(TokenQueries))]
+    [InlineData(typeof(DialectQueries))]
     public void Attribute_IsNotInTheMetadataOfTheTypesThatCarryIt(Type type) =>
         type.GetCustomAttributesData()
             .Select(attribute => attribute.AttributeType.FullName)
