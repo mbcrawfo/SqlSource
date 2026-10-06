@@ -117,7 +117,8 @@ if dotnet build "$PROJECT" --nologo --verbosity quiet >"$work/rebuild.log" 2>&1;
     exit 1
 fi
 
-if ! grep -q "error CS0117: .*'$REMOVED_MEMBER'" "$work/rebuild.log"; then
+# No quotes around the member: the compiler writes them as its language does, "ByProperty" in German.
+if ! grep -q "error CS0117: .*$REMOVED_MEMBER" "$work/rebuild.log"; then
     cat "$work/rebuild.log" >&2
     echo "check-package-install: the build after $REMOVED was removed failed without reporting $REMOVED_MEMBER" >&2
     exit 1
