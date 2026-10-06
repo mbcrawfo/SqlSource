@@ -209,3 +209,7 @@ dotnet_diagnostic.CA1707.severity = none
 dotnet_diagnostic.CA1515.severity = none
 # CA2007 (ConfigureAwait): xUnit1030 forbids the call in a test.
 dotnet_diagnostic.CA2007.severity = none
+
+[src/SqlSource/Polyfills/*.cs]
+# IDE0130 (namespace matches folder): a polyfill must be in the namespace of the type it stands in for.
+dotnet_diagnostic.IDE0130.severity = none
