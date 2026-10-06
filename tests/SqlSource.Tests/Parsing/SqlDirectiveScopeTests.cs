@@ -189,7 +189,7 @@ public class SqlDirectiveScopeTests
         var errors = new List<SqlParseError>();
         foreach (var line in lines)
         {
-            var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line).Lexemes[0]);
+            var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0]);
             _ = marker.ShouldNotBeNull();
             scope.Read(line, marker.Value, errors);
         }

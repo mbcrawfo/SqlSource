@@ -21,7 +21,12 @@ internal static class SqlMarkerReader
     /// </summary>
     public static SqlMarker? Read(string text, SqlLexeme lexeme)
     {
-        if (lexeme.Kind != SqlLexemeKind.LineComment || !StartsLine(text, lexeme.Span.Start))
+        // A line comment can start with a # in some dialects.  A marker always starts with two dashes.
+        if (
+            lexeme.Kind != SqlLexemeKind.LineComment
+            || text[lexeme.Span.Start] != '-'
+            || !StartsLine(text, lexeme.Span.Start)
+        )
         {
             return null;
         }
