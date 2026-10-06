@@ -42,12 +42,18 @@ internal static class GeneratorHarness
         bool supportedFramework = true,
         LanguageVersion languageVersion = LanguageVersion.CSharp12,
         MetadataReference[]? references = null,
-        string? tokenValidation = null
+        string? tokenValidation = null,
+        string? dialect = null
     )
     {
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
-        var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), parseOptions, tokenValidation)
+        var options = new TestOptionsProvider(
+            tokenValidation,
+            dialect,
+            sqlFiles.Where(file => file.Dialect is not null).ToDictionary(file => file.Path, file => file.Dialect!)
+        );
+        var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), parseOptions, options)
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,
@@ -100,18 +106,18 @@ internal static class GeneratorHarness
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
         );
 
-    // Step tracking is on, so that a test can read why each step of the pipeline ran.  tokenValidation is the value
-    // of the project's SqlSourceTokenValidation property, and null is a project that does not set it.
+    // Step tracking is on, so that a test can read why each step of the pipeline ran.  Without options the project
+    // sets none of the package's properties and no file has metadata.
     public static GeneratorDriver CreateDriver(
         IEnumerable<AdditionalText> sqlFiles,
         CSharpParseOptions? parseOptions = null,
-        string? tokenValidation = null
+        TestOptionsProvider? options = null
     ) =>
         CSharpGeneratorDriver.Create(
             [new SqlSourceGenerator().AsSourceGenerator()],
             sqlFiles,
             parseOptions ?? ParseOptions,
-            new TestOptionsProvider(tokenValidation),
+            options ?? new TestOptionsProvider(null),
             new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true)
         );
 
@@ -149,7 +155,8 @@ internal static class GeneratorHarness
 
 internal sealed record SourceFile(string Path, string Text);
 
-internal sealed record SqlFile(string Path, string? Text)
+// Dialect is the SqlSourceDialect metadata of the file's AdditionalFiles item, and null is a file without it.
+internal sealed record SqlFile(string Path, string? Text, string? Dialect = null)
 {
     public AdditionalText ToAdditionalText() => new InMemoryAdditionalText(Path, Text);
 }

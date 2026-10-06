@@ -123,6 +123,8 @@ public class CachingTests
             TrackingNames.SqlPaths,
             TrackingNames.TypeFiles,
             TrackingNames.ClaimedPaths,
+            TrackingNames.ProjectDialect,
+            TrackingNames.FileDialect,
             TrackingNames.ParsedFile,
             TrackingNames.ParsedFiles,
             TrackingNames.TypeQueries,
@@ -223,16 +225,140 @@ public class CachingTests
         var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null)), compilation);
 
         AllReasons(result, TrackingNames.TokenValidation).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.FileDialect).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
+    [Fact]
+    public void Run_DialectPropertyChanged_ParsesOnlyTheFilesThatFallBackToIt()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var users = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1; # c\n");
+        var orderDialect = new Dictionary<string, string> { [_orders.Path] = "mssql" };
+        var driver = FirstRun(compilation, users, new TestOptionsProvider(null, null, orderDialect));
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null, "mysql", orderDialect)),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Modified]);
+        Reasons<FileDialect>(result, TrackingNames.FileDialect, file => file.File.Path)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Modified,
+                    [_orders.Path] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+
+        // MySQL reads the # as a comment, where ANSI kept it.
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("\"SELECT 1;\"");
+    }
+
+    [Fact]
+    public void Run_DialectMetadataOfOneFileChanged_ParsesOnlyThatFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var users = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1; # c\n");
+        var driver = FirstRun(
+            compilation,
+            users,
+            new TestOptionsProvider(null, null, new Dictionary<string, string> { [_users.Path] = "mssql" })
+        );
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(null, null, new Dictionary<string, string> { [_users.Path] = "mysql" })
+            ),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        Reasons<FileDialect>(result, TrackingNames.FileDialect, file => file.File.Path)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Modified,
+                    [_orders.Path] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+    }
+
+    [Fact]
+    public void Run_DialectChangedToOneThatReadsTheFilesTheSameWay_EmitsNothingAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRun(compilation);
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null, "postgres")),
+            compilation
+        );
+
+        // Every file was parsed again, under the new dialect, and gave an equal value.  So nothing after the parse
+        // ran.
+        AllReasons(result, TrackingNames.FileDialect)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
     private GeneratorDriver FirstRun(Compilation compilation) => FirstRun(compilation, _users);
 
-    private GeneratorDriver FirstRun(Compilation compilation, InMemoryAdditionalText users)
+    private GeneratorDriver FirstRun(
+        Compilation compilation,
+        InMemoryAdditionalText users,
+        TestOptionsProvider? options = null
+    )
     {
         var driver = GeneratorHarness
-            .CreateDriver([users, _orders])
+            .CreateDriver([users, _orders], options: options)
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         driver.GetRunResult().Diagnostics.ShouldBeEmpty();
         return driver;

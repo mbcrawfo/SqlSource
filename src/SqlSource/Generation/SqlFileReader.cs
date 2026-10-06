@@ -12,12 +12,25 @@ namespace SqlSource.Generation;
 /// </summary>
 internal static class SqlFileReader
 {
-    public static ParsedSqlFile Read(AdditionalText file, string normalizedPath, CancellationToken cancellationToken)
+    /// <summary>
+    /// Parses <paramref name="file" /> with the dialect that MSBuild gives it.  A <c>dialect=</c> directive in the
+    /// file replaces that dialect.
+    /// </summary>
+    public static ParsedSqlFile Read(FileDialect file, string normalizedPath, CancellationToken cancellationToken) =>
+        Read(file.File, normalizedPath, file.Dialect, file.InvalidValue, cancellationToken);
+
+    public static ParsedSqlFile Read(
+        AdditionalText file,
+        string normalizedPath,
+        SqlDialect dialect,
+        string? invalidDialect,
+        CancellationToken cancellationToken
+    )
     {
         // A file that cannot be read is parsed as empty, which reports that the query has no SQL.
         var text = file.GetText(cancellationToken) ?? SourceText.From(string.Empty);
         var fileName = SqlPath.GetFileName(file.Path);
-        var result = SqlFileParser.Parse(text.ToString(), fileName);
+        var result = SqlFileParser.Parse(text.ToString(), fileName, dialect);
 
         var errors = ImmutableArray.CreateBuilder<DiagnosticInfo>(result.Errors.Count);
         foreach (var error in result.Errors)
@@ -49,7 +62,8 @@ internal static class SqlFileReader
             normalizedPath,
             fileName,
             new EquatableArray<SqlQuery>(queries.ToImmutable()),
-            new EquatableArray<DiagnosticInfo>(errors.ToImmutable())
+            new EquatableArray<DiagnosticInfo>(errors.ToImmutable()),
+            invalidDialect
         );
     }
 }

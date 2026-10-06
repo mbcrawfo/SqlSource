@@ -153,10 +153,53 @@ public class SqlFileReaderTests
 
     private static SqlSegment Literal(string text) => new(SqlSegmentKind.Literal, text);
 
-    private static ParsedSqlFile Read(string? text, string path = Path) =>
+    [Fact]
+    public void Read_Dialect_IsTheDialectTheFileIsParsedWith()
+    {
+        const string Text = "-- name: A\nSELECT 'a\\'b' # c\n";
+
+        Read(Text, dialect: SqlDialect.MySql)
+            .Queries.ShouldHaveSingleItem()
+            .Segments.ShouldBe(TestModels.Array(Literal("SELECT 'a\\'b'")));
+        Read(Text).Errors.ShouldHaveSingleItem().Descriptor.ShouldBe(SqlDiagnostics.UnterminatedQuote);
+    }
+
+    [Fact]
+    public void Read_InvalidDialectOfTheFile_IsCarriedAndTheFileIsStillParsed()
+    {
+        var file = Read("SELECT 1;\n", invalidDialect: "pgsql");
+
+        file.InvalidDialect.ShouldBe("pgsql");
+        file.Queries.Count.ShouldBe(1);
+        Read("SELECT 1;\n").InvalidDialect.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Read_FileDialect_ReadsTheFileWithItsDialectAndCarriesItsInvalidValue()
+    {
+        var text = new InMemoryAdditionalText(Path, "SELECT 1 # c\n");
+
+        var file = SqlFileReader.Read(
+            new FileDialect(text, SqlDialect.MySql, "nope"),
+            "app/Repo/Users.sql",
+            TestContext.Current.CancellationToken
+        );
+
+        file.Queries.ShouldHaveSingleItem().Segments.ShouldBe(TestModels.Array(Literal("SELECT 1")));
+        file.InvalidDialect.ShouldBe("nope");
+    }
+
+    private static ParsedSqlFile Read(
+        string? text,
+        string path = Path,
+        SqlDialect dialect = SqlDialect.Ansi,
+        string? invalidDialect = null
+    ) =>
         SqlFileReader.Read(
             new InMemoryAdditionalText(path, text),
             SqlPath.Normalize(path)!,
+            dialect,
+            invalidDialect,
             TestContext.Current.CancellationToken
         );
 

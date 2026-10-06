@@ -15,6 +15,10 @@ internal static class TrackingNames
 
     public const string ClaimedPaths = nameof(ClaimedPaths);
 
+    public const string ProjectDialect = nameof(ProjectDialect);
+
+    public const string FileDialect = nameof(FileDialect);
+
     public const string ParsedFile = nameof(ParsedFile);
 
     public const string ParsedFiles = nameof(ParsedFiles);

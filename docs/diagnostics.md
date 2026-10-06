@@ -14,6 +14,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
 | [SQLSRC010](#sqlsrc010) | SqlSourceTokenValidation is not valid |
+| [SQLSRC011](#sqlsrc011) | SqlSourceDialect is not valid |
 | [SQLSRC101](#sqlsrc101) | Quote is not closed |
 | [SQLSRC102](#sqlsrc102) | Comment is not closed |
 | [SQLSRC103](#sqlsrc103) | Query name is not valid |
@@ -152,6 +153,29 @@ The MSBuild property `SqlSourceTokenValidation` decides whether the method of a 
 Set it to `false` to turn validation off for the project, or remove it to keep the default, which is to validate.  While the value is wrong the generated methods validate.
 
 The compiler hands a generator only the part of a value before the first `;` or `#`.  So `false;true` is read as `false` and is not reported, and `off;false` is reported as `off`.
+
+## SQLSRC011
+
+**SqlSourceDialect is not valid**
+
+`SqlSourceDialect` says which database a project's SQL is written for, so that SqlSource finds its comments and strings by that database's rules.  It is set as an MSBuild property for the project, or as metadata on the `AdditionalFiles` item of a `.sql` file, and one of the two has a value that is not a dialect.  The message quotes the value.
+
+The names are `ansi`, `mssql`, `postgres`, `mysql`, `mariadb`, `sqlite` and `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, and `postgresql` also means `postgres`.
+
+```xml
+<PropertyGroup>
+    <SqlSourceDialect>pgsql</SqlSourceDialect>
+</PropertyGroup>
+<ItemGroup>
+    <AdditionalFiles Update="Reporting/**/*.sql" SqlSourceDialect="sql server" />
+</ItemGroup>
+```
+
+The error has no file and line, because the compiler does not tell a generator where a property or the metadata of an item was set: look in the project file, in `Directory.Build.props`, and at a `-p:` argument of the build command.  It is reported once for each wrong value, however many files have it, and only for a `.sql` file that a type uses.
+
+Correct the name, or remove the setting to get the default, `ansi`.  While a value is wrong the files it covers are read as `ansi`; a file whose own metadata is wrong does not fall back to the project's property.
+
+The compiler hands a generator only the part of a value before the first `;` or `#`, as for [SQLSRC010](#sqlsrc010).
 
 ## SQLSRC101
 
