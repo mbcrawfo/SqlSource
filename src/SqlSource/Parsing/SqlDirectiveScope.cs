@@ -7,18 +7,59 @@ namespace SqlSource.Parsing;
 /// <summary>
 /// The directives given by the <c>-- SqlSource:</c> markers of one scope: a block, or a file's preamble.
 /// </summary>
-internal sealed class SqlDirectiveScope
+/// <param name="headerEnd">
+/// Where the file's header ends, as <see cref="SqlPreambleDialect.Apply" /> gives it.  A <c>dialect=</c> directive
+/// is accepted only before it.
+/// </param>
+internal sealed class SqlDirectiveScope(int headerEnd)
 {
     private const string KeepCommentsName = "keep-comments";
     private const string TokenValidationName = "token-validation";
     private const string NoTokenValidationName = "no-token-validation";
     private const string TokenIgnoreName = "token-ignore";
+    private const string DialectName = "dialect";
 
     public bool KeepComments { get; private set; }
 
     public bool? TokenValidation { get; private set; }
 
+    /// <summary>
+    /// The dialect that a <c>dialect=</c> directive of this scope names, or null.  It is already in effect by the
+    /// time the scope is read; it is kept here to find a second directive that names another.
+    /// </summary>
+    public SqlDialect? Dialect { get; private set; }
+
     public HashSet<string> IgnoredTokens { get; } = [];
+
+    /// <summary>
+    /// Finds the first <c>dialect=</c> directive of <paramref name="marker" /> that names a dialect.  Nothing is
+    /// allocated and nothing is reported.
+    /// </summary>
+    public static bool TryFindDialect(string text, SqlMarker marker, out SqlDialect dialect)
+    {
+        var start = marker.ValueSpan.Start;
+        var end = marker.ValueSpan.End;
+        var valueOffset = DialectName.Length + 1;
+        while (start < end)
+        {
+            var wordEnd = FindWordEnd(text, start, end);
+            if (
+                wordEnd - start >= valueOffset
+                && text[start + DialectName.Length] == '='
+                && string.Compare(text, start, DialectName, 0, DialectName.Length, StringComparison.OrdinalIgnoreCase)
+                    == 0
+                && SqlDialectName.TryParse(text.AsSpan(start + valueOffset, wordEnd - start - valueOffset), out dialect)
+            )
+            {
+                return true;
+            }
+
+            start = SkipWhiteSpace(text, wordEnd, end);
+        }
+
+        dialect = SqlDialect.Ansi;
+        return false;
+    }
 
     /// <summary>
     /// Applies the directives of one <c>-- SqlSource:</c> marker to this scope, adding any problems to
@@ -36,19 +77,30 @@ internal sealed class SqlDirectiveScope
         var end = marker.ValueSpan.End;
         while (start < end)
         {
-            var wordEnd = start;
-            while (wordEnd < end && !char.IsWhiteSpace(text[wordEnd]))
-            {
-                wordEnd++;
-            }
-
+            var wordEnd = FindWordEnd(text, start, end);
             Apply(text.Substring(start, wordEnd - start), TextSpan.FromBounds(start, wordEnd), errors);
-            start = wordEnd;
-            while (start < end && char.IsWhiteSpace(text[start]))
-            {
-                start++;
-            }
+            start = SkipWhiteSpace(text, wordEnd, end);
         }
+    }
+
+    private static int FindWordEnd(string text, int start, int end)
+    {
+        while (start < end && !char.IsWhiteSpace(text[start]))
+        {
+            start++;
+        }
+
+        return start;
+    }
+
+    private static int SkipWhiteSpace(string text, int start, int end)
+    {
+        while (start < end && char.IsWhiteSpace(text[start]))
+        {
+            start++;
+        }
+
+        return start;
     }
 
     private static bool Is(string name, string directive) =>
@@ -63,6 +115,10 @@ internal sealed class SqlDirectiveScope
         if (Is(name, TokenIgnoreName))
         {
             problem = ApplyTokenIgnore(value);
+        }
+        else if (Is(name, DialectName))
+        {
+            problem = ApplyDialect(value, span);
         }
         else if (Is(name, KeepCommentsName) || Is(name, TokenValidationName) || Is(name, NoTokenValidationName))
         {
@@ -87,6 +143,28 @@ internal sealed class SqlDirectiveScope
         }
 
         _ = IgnoredTokens.Add(value);
+        return null;
+    }
+
+    // The place is checked first: a directive in the wrong place is reported as that, whatever it names.
+    private SqlParseErrorKind? ApplyDialect(string? value, TextSpan span)
+    {
+        if (span.Start >= headerEnd)
+        {
+            return SqlParseErrorKind.MisplacedDialect;
+        }
+
+        if (!SqlDialectName.TryParse(value, out var dialect))
+        {
+            return SqlParseErrorKind.InvalidDirectiveValue;
+        }
+
+        if (Dialect is { } existing && existing != dialect)
+        {
+            return SqlParseErrorKind.ConflictingDirectives;
+        }
+
+        Dialect = dialect;
         return null;
     }
 

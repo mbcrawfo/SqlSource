@@ -16,19 +16,23 @@ internal static class SqlFileParser
     /// <summary>
     /// Parses <paramref name="text" />.  <paramref name="fileName" /> is the file's name with its extension and
     /// without a directory; it names the block of a file that has no <c>-- name:</c> marker.
+    /// <paramref name="dialect" /> is the dialect the project gives the file.  A <c>dialect=</c> directive in the
+    /// file's header replaces it for the text after the directive.
     /// </summary>
-    public static SqlFileParseResult Parse(string text, string fileName)
+    public static SqlFileParseResult Parse(string text, string fileName, SqlDialect dialect = SqlDialect.Ansi)
     {
-        var lexed = SqlLexer.Lex(text, SqlDialectRules.Ansi);
+        var lexer = new SqlLexer(text, SqlDialectRules.For(dialect));
+        var headerEnd = SqlPreambleDialect.Apply(lexer, text);
+        var lexed = lexer.ReadToEnd();
         return lexed.Error is null
-            ? new Parser(text, fileName, lexed.Lexemes).Run()
+            ? new Parser(text, fileName, lexed.Lexemes, headerEnd).Run()
             : new SqlFileParseResult(
                 EquatableArray<SqlBlock>.Empty,
                 new EquatableArray<SqlParseError>(ImmutableArray.Create(lexed.Error))
             );
     }
 
-    private sealed class Parser(string text, string fileName, EquatableArray<SqlLexeme> lexemes)
+    private sealed class Parser(string text, string fileName, EquatableArray<SqlLexeme> lexemes, int headerEnd)
     {
         private static readonly TextSpan FileStart = new(0, 0);
 
@@ -84,7 +88,7 @@ internal static class SqlFileParser
                 AddError(SqlParseErrorKind.InvalidFileName, FileStart, fileName);
             }
 
-            ReadBlock(name, FileStart, new SqlDirectiveScope(), 0, lexemes.Count);
+            ReadBlock(name, FileStart, new SqlDirectiveScope(headerEnd), 0, lexemes.Count);
         }
 
         private void ReadNamedBlocks(List<(int Index, SqlMarker Marker)> nameMarkers)
@@ -112,7 +116,7 @@ internal static class SqlFileParser
 
         private SqlDirectiveScope ReadPreamble(int end)
         {
-            var scope = new SqlDirectiveScope();
+            var scope = new SqlDirectiveScope(headerEnd);
             var sqlReported = false;
             for (var index = 0; index < end; index++)
             {
@@ -138,7 +142,7 @@ internal static class SqlFileParser
 
         private void ReadBlock(string name, TextSpan nameSpan, SqlDirectiveScope inherited, int start, int end)
         {
-            var scope = new SqlDirectiveScope();
+            var scope = new SqlDirectiveScope(headerEnd);
             var summary = new List<string>();
             var lastContent = FindLastContent(start, end);
             for (var index = start; index < end; index++)
