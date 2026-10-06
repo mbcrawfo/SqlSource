@@ -218,7 +218,7 @@ The owner accepted the epic's recommendations as written, and settled the two it
 
 **Diagnostics**
 
-- `EnforceExtendedAnalyzerRules` is on, so creating a `DiagnosticDescriptor` requires the analyzer release-tracking files, `AnalyzerReleases.Shipped.md` and `AnalyzerReleases.Unshipped.md` (rule RS2008).
+- The analyzer release-tracking files, `AnalyzerReleases.Shipped.md` and `AnalyzerReleases.Unshipped.md`, are a choice and not a requirement: RS2008, the rule that asks for them, is not reported for a generator project.  Once they are `AdditionalFiles` of the project, rules RS2000 to RS2007 fail the build when a descriptor and the files disagree.
 - All descriptors are errors.
 
 **Repository rules that bite in this phase**
