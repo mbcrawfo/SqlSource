@@ -111,7 +111,7 @@ Every generated member has XML documentation, so a consumer that treats CS1591 a
 
 - a `<summary>` taken from the block's `-- summary:` lines, or generated text that names the query and its file;
 - the SQL in `<remarks>`, inside `<code>`;
-- a `<param>` for each token parameter.
+- a `<param>` for each token parameter, and a `<returns>` on a method.
 
 ### Errors
 
@@ -287,6 +287,9 @@ The owner accepted five of the epic's seven recommendations as written and chang
 | Where the setting enters the pipeline | After a type's queries are selected, as a second input of emission | A change to the property emits each type again and parses nothing again |
 | The nullable context of a type's file | `#nullable enable`, always.  It does not follow the project's `Nullable` setting. | The compiler ignores that setting in a generated file |
 | README | A tokens section: the syntax, the generated method, validation and its three switches, `token-ignore`, and the trusted-fragments warning | The warning is a decided requirement |
+| Length arithmetic | A sum or a product of lengths is written inside `checked(...)`.  Added by the review of the phase. | Unchecked, a total above the largest `int` wraps around, and one that wraps to zero returns an empty string and no exception |
+| `<returns>` | The method's comment ends with `<returns>The SQL with each token replaced by its argument.</returns>`.  Added by the review of the phase. | IntelliSense shows it |
+| A method that hides an inherited virtual method | The type's file disables CS0114 beside CS0108.  Added by the review of the phase. | A method, unlike a constant, can have the signature of a virtual method of a base class, and the warning asks for a keyword nobody can add to generated code |
 
 ### Technical notes
 

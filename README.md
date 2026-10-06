@@ -86,13 +86,13 @@ Before the first `-- name:` line a file may hold comments, such as a licence hea
 
 A `-- summary:` line inside a query becomes the documentation of its member.  Several are joined with a space.  A query without one is documented with its name and its file.
 
-### What reaches the constant
+### What reaches the generated SQL
 
 - The `-- name:`, `-- summary:` and `-- SqlSource:` lines are removed.
 - Comments are removed: a line comment is deleted and a block comment becomes one space.  Lines left blank are removed.
 - Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.
 - Strings and quoted identifiers are copied exactly as written.
-- Line endings are always `\n`, so a constant does not depend on how the file was checked out.
+- Line endings are always `\n`, so the SQL does not depend on how the file was checked out.
 
 ### Directives
 
@@ -128,7 +128,7 @@ A misread has one of two results:
 - **A build error** that reports an unclosed quote or comment ([SQLSRC101](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc101), [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc102)) in SQL that is valid for your database.  The construct has to be rewritten; `preserve-comments` does not help.
 - **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed: `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `preserve-comments` on the query prevents the removal.
 
-If your SQL uses one of these constructs, check the generated constant: hover over the member, or read its documentation.
+If your SQL uses one of these constructs, check the generated SQL: hover over the member, or read its documentation.
 
 ## Tokens
 
@@ -151,8 +151,9 @@ var sql = Sql.ListFrom("users", "name DESC");
 - Names are case-sensitive: `{{Table}}` and `{{table}}` are two parameters.
 - A name that is used more than once is one parameter, and every occurrence is replaced.
 - A token is replaced wherever it is written, including inside a string or a quoted identifier.
-- Text of the same form that is not meant as a token stays in the SQL when a `token-ignore=name` directive lists its name.
-- The method allocates the string it returns and nothing else.
+- Braces around anything that is not a name, such as `{{table-name}}`, `{{1st}}` or `{{order by}}`, are not a token.  The text stays in the SQL as written, and nothing is reported.
+- Text that has the form of a token and is not meant as one stays in the SQL when a `token-ignore=name` directive lists its name.
+- After its first call, the method allocates the string it returns and nothing else.
 - A query that gains its first token changes from a constant to a method, so the code that uses it stops compiling until it passes the argument.
 
 **Tokens are for trusted text only.**  A token is replaced by string concatenation.  Nothing is escaped, quoted or checked for safety, so a value that a user can influence is a SQL injection.  Use a token for a fragment that your own code chooses, such as a table name from a fixed list, and a query parameter for every value.
