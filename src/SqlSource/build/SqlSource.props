@@ -11,4 +11,12 @@
     <ItemGroup Condition="'$(EnableDefaultSqlSourceItems)' != 'false'">
         <AdditionalFiles Include="**/*.sql" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
     </ItemGroup>
+    <!--
+        A source generator sees only the MSBuild properties that are listed here.  SqlSourceTokenValidation turns the
+        argument checks of the generated methods off for the project when it is false.  It is not under the condition
+        above: a project that lists its own .sql files still needs it.
+    -->
+    <ItemGroup>
+        <CompilerVisibleProperty Include="SqlSourceTokenValidation" />
+    </ItemGroup>
 </Project>
