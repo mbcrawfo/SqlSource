@@ -121,6 +121,7 @@ public class CachingTests
         [
             TrackingNames.TargetTypes,
             TrackingNames.SqlPaths,
+            TrackingNames.UnsupportedLanguageVersion,
             TrackingNames.TypeFiles,
             TrackingNames.ClaimedPaths,
             TrackingNames.ProjectDialect,

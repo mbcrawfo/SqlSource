@@ -11,6 +11,8 @@ internal static class TrackingNames
 
     public const string SupportedFramework = nameof(SupportedFramework);
 
+    public const string UnsupportedLanguageVersion = nameof(UnsupportedLanguageVersion);
+
     public const string TypeFiles = nameof(TypeFiles);
 
     public const string ClaimedPaths = nameof(ClaimedPaths);

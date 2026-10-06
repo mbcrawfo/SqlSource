@@ -55,10 +55,18 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             )
             .WithTrackingName(TrackingNames.SupportedFramework);
 
+        // The project's language version, which is the same value until the project's parse options change.
+        var unsupportedLanguageVersion = context
+            .ParseOptionsProvider.Select(static (options, _) => LanguageSupport.FindUnsupportedVersion(options))
+            .WithTrackingName(TrackingNames.UnsupportedLanguageVersion);
+
         var typeFiles = targetTypes
             .Combine(sqlPaths)
-            .Combine(isSupportedFramework)
-            .Select(static (input, _) => PathResolver.Resolve(input.Left.Left, input.Left.Right, input.Right))
+            .Combine(isSupportedFramework.Combine(unsupportedLanguageVersion))
+            .Select(
+                static (input, _) =>
+                    PathResolver.Resolve(input.Left.Left, input.Left.Right, input.Right.Left, input.Right.Right)
+            )
             .WithTrackingName(TrackingNames.TypeFiles);
 
         var claimedPaths = typeFiles

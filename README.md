@@ -309,7 +309,7 @@ Editing a `.sql` file is always picked up by the next build.  Deleting, renaming
 
 A project that uses SqlSource must target .NET 8 or later; the generated code relies on it, and an older target is reported as [SQLSRC003](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc003).
 
-The generated code is C# 12, the default language version of a project that targets .NET 8.  The language version is not checked: a project that sets `LangVersion` below 12 can get compiler errors inside generated code.
+The generated code is C# 12, the default language version of a project that targets .NET 8.  A project that sets `LangVersion` below 12 gets [SQLSRC012](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc012).
 
 The generator is compiled against Roslyn 4.8.0, so it loads in the .NET 8 SDK and later and in Visual Studio 2022 17.8 and later.  Older SDKs and IDEs are not supported.
 
