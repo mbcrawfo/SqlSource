@@ -12,11 +12,15 @@
         <AdditionalFiles Include="**/*.sql" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
     </ItemGroup>
     <!--
-        A source generator sees only the MSBuild properties that are listed here.  SqlSourceTokenValidation turns the
-        argument checks of the generated methods off for the project when it is false.  It is not under the condition
-        above: a project that lists its own .sql files still needs it.
+        A source generator sees only the MSBuild properties and the item metadata that are listed here.
+        SqlSourceTokenValidation turns the argument checks of the generated methods off for the project when it is
+        false.  SqlSourceDialect names the database whose rules the .sql files are read by: as a property for the
+        project, and as metadata of an AdditionalFiles item for one file or for the files of a glob.  None of this is
+        under the condition above: a project that lists its own .sql files still needs it.
     -->
     <ItemGroup>
         <CompilerVisibleProperty Include="SqlSourceTokenValidation" />
+        <CompilerVisibleProperty Include="SqlSourceDialect" />
+        <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="SqlSourceDialect" />
     </ItemGroup>
 </Project>

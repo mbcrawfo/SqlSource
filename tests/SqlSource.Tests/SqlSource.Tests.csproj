@@ -16,7 +16,17 @@
         <SqlSourceTokenValidation>
             false
         </SqlSourceTokenValidation>
+        <SqlSourceDialect>
+            postgres
+        </SqlSourceDialect>
     </PropertyGroup>
+    <ItemGroup>
+        <AdditionalFiles Update="EndToEnd/Dialects/ByMetadata.sql">
+            <SqlSourceDialect>
+                mysql
+            </SqlSourceDialect>
+        </AdditionalFiles>
+    </ItemGroup>
     <ItemGroup>
         <PackageReference Include="GitHubActionsTestLogger" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
