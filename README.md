@@ -90,8 +90,8 @@ A `-- summary:` line inside a query becomes the documentation of its member.  Se
 
 - The `-- name:`, `-- summary:` and `-- SqlSource:` lines are removed.
 - Comments are removed: a line comment is deleted and a block comment becomes one space.  Lines left blank are removed.
-- Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.
-- Strings and quoted identifiers are copied exactly as written.
+- Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.  So are MariaDB's `/*M! ... */` and Oracle's `--+ ...` when the dialect is theirs.
+- Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect (see Dialects, below).
 - Line endings are always `\n`, so the SQL does not depend on how the file was checked out.
 
 ### Directives
@@ -103,6 +103,7 @@ A `-- SqlSource:` line holds one or more directives, separated by spaces.  Insid
 | `keep-comments` | Comments and blank lines stay in the SQL |
 | `token-ignore=name` | `{{name}}` is literal text, not a token |
 | `token-validation`, `no-token-validation` | The query's method checks its arguments, or does not, whatever the project says (see Tokens, below) |
+| `dialect=name` | The file is read by the rules of that database (see Dialects, below).  Allowed only before the first `-- name:` line and before any SQL. |
 
 ```sql
 -- name: Report
@@ -110,23 +111,96 @@ A `-- SqlSource:` line holds one or more directives, separated by spaces.  Insid
 SELECT /* the database logs this comment */ id FROM users;
 ```
 
-### Dialect limits
+## Dialects
 
-SqlSource finds comments and strings with one set of rules for every database: ANSI SQL, plus the PostgreSQL and MySQL quoting forms that cannot be mistaken for anything else.  It reads the constructs below differently from the database they are written for.
+Databases disagree about where a comment or a string ends.  `'it\'s'` is one string in MySQL and an unclosed one in PostgreSQL; `#` starts a comment in MySQL and names a temporary table in SQL Server.  SqlSource removes comments, so it has to know which rules your SQL follows.  Tell it the dialect.
 
-| Construct | Dialect | How SqlSource reads it |
+| Dialect | Also accepted | Use it for |
 |----|----|----|
-| A backslash escape in a plain string, `'a\'b'` or `"a\"b"` | MySQL | The backslash is an ordinary character, so the string ends at the escaped quote |
-| A quote-operator literal, `q'[it's]'` | Oracle | An ordinary string that ends at the first quote inside it |
-| A bracketed identifier that contains a quote, `--` or `/*`, such as `[a'b]` | SQL Server | Plain text, so the quote opens a string and `--` starts a comment |
-| `--` with no whitespace after it, `5--3` | MySQL | A comment |
-| A `#` comment | MySQL | Plain text, so the comment stays in the SQL |
-| A `/*` inside a block comment | MySQL, Oracle, SQLite | A nested comment that needs its own `*/` |
+| `ansi` | | The default.  Any database without a dialect of its own, such as Db2. |
+| `mssql` | `sqlserver`, `tsql` | SQL Server, Azure SQL |
+| `postgres` | `postgresql` | PostgreSQL, DuckDB, CockroachDB |
+| `mysql` | | MySQL |
+| `mariadb` | | MariaDB |
+| `sqlite` | | SQLite |
+| `oracle` | | Oracle, Firebird |
+
+Names are not case-sensitive.
+
+### Setting the dialect
+
+For the project, with an MSBuild property:
+
+```xml
+<PropertyGroup>
+    <SqlSourceDialect>postgres</SqlSourceDialect>
+</PropertyGroup>
+```
+
+For some of its files, with metadata on their items.  Where two lines match a file, the later one wins:
+
+```xml
+<ItemGroup>
+    <AdditionalFiles Update="Reporting/**/*.sql" SqlSourceDialect="mssql" />
+</ItemGroup>
+```
+
+For one file, with a directive in the file:
+
+```sql
+-- SqlSource: dialect=mysql
+
+-- name: FindByNote
+SELECT id FROM notes WHERE body = 'it\'s here'; # MySQL reads this as a comment
+```
+
+The directive wins over the metadata, and the metadata over the property.  A file has one dialect:
+
+- The directive goes before the file's first `-- name:` line and before its first SQL.  Anywhere else it is the error [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc115).
+- It takes effect on the line after it.  Comments above it, such as a licence header, are read by the dialect that the metadata or the property gives.
+- A name that is not a dialect is an error: [SQLSRC011](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc011) in the property or the metadata, [SQLSRC111](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc111) in the directive.
+
+### What a dialect changes
+
+| | `ansi` | `mssql` | `postgres` | `mysql` | `mariadb` | `sqlite` | `oracle` |
+|----|----|----|----|----|----|----|----|
+| A backslash escapes in `'...'` and `"..."` | No | No | No | Yes | Yes | No | No |
+| A backslash escapes in `E'...'` | Yes | No | Yes | Yes | Yes | No | No |
+| `` `...` `` is a quoted identifier | Yes | No | No | Yes | Yes | Yes | No |
+| `[...]` is a quoted identifier | No | Yes | No | No | No | Yes | No |
+| `$tag$...$tag$` is a string | Yes | No | Yes | Yes | No | No | No |
+| `q'[...]'` is a string | No | No | No | No | No | No | Yes |
+| A `/*` inside a block comment needs its own `*/` | Yes | Yes | Yes | No | No | No | No |
+| `--` is a comment with no whitespace after it | Yes | Yes | Yes | No | No | Yes | Yes |
+| `#` starts a comment | No | No | No | Yes | Yes | No | No |
+| Kept as hints, besides `/*+ ... */` and `/*! ... */` | | | | | `/*M! ... */` | | `--+ ...` |
+
+Two details:
+
+- In `mssql` a `]]` inside brackets stands for one `]`.  In `sqlite` the first `]` ends the identifier.
+- In `postgres` an `E'...'` string that is continued on the next line, as PostgreSQL allows, is one string, and its second part takes backslash escapes too.
+
+Under `mysql` and `mariadb` a marker needs the space that those databases need: `-- name: GetUser` is a marker, and `--name: GetUser` is not a comment at all.
+
+### What is still read differently
+
+SqlSource reads these differently from the database, whatever the dialect:
+
+| Construct | Database | How SqlSource reads it |
+|----|----|----|
+| SQL written for the SQL modes `ANSI_QUOTES` or `NO_BACKSLASH_ESCAPES` | MySQL, MariaDB | As in the default mode: a backslash escapes in `'...'` and `"..."` |
+| A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */` | MySQL, MariaDB | The comment ends at the first `*/`.  Where the server ends it depends on the server's version. |
+| A comment between the parts of a continued `E'...'` string | PostgreSQL | The string ends before the comment, and the part after it is a plain string |
+| A bytes literal with a backslash escape, `b'\''` | CockroachDB | PostgreSQL's reading: a string that ends at the second quote |
+| A block comment that is still open at the end of the file | SQLite | The error [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc102) |
+| A client command that is not SQL: `DELIMITER`, `GO`, SQL*Plus `PROMPT` and `REM`, a psql `\` command | All | As SQL, so a quote in it can open a string |
+
+And `ansi` reads the SQL of every database by one set of rules, so it misreads each construct in the table above that it says No to and your database says Yes to.  The fix for those is to set the dialect.
 
 A misread has one of two results:
 
-- **A build error** that reports an unclosed quote or comment ([SQLSRC101](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc101), [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc102)) in SQL that is valid for your database.  The construct has to be rewritten; `keep-comments` does not help.
-- **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed: `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `keep-comments` on the query prevents the removal.
+- **A build error** that reports an unclosed quote or comment ([SQLSRC101](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc101), [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc102)) in SQL that is valid for your database.  `keep-comments` does not help.
+- **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed: under `ansi`, `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `keep-comments` on the query prevents the removal.
 
 If your SQL uses one of these constructs, check the generated SQL: hover over the member, or read its documentation.
 
@@ -212,6 +286,18 @@ To turn the default off and list the files yourself:
 ### Token validation
 
 `SqlSourceTokenValidation` turns the argument checks of the generated methods off for a project when it is `false`.  See Tokens, above.
+
+### Dialect
+
+`SqlSourceDialect` names the database whose rules the `.sql` files are read by.  It is a property for the project and metadata of an `AdditionalFiles` item for some of its files.  See Dialects, above.
+
+A project that lists its own files can give the metadata where it lists them:
+
+```xml
+<ItemGroup>
+    <AdditionalFiles Include="Queries/**/*.sql" SqlSourceDialect="postgres" />
+</ItemGroup>
+```
 
 ### Deleting or renaming a file
 
