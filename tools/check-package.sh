@@ -13,11 +13,13 @@ if [[ $# -gt 1 ]]; then
 fi
 
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$repo_root"
 
 if [[ $# -eq 1 ]]; then
-    directory="$1"
+    # Resolved before the working directory changes, so that a relative path means what the caller meant.
+    directory="$(cd "$1" && pwd)"
+    cd "$repo_root"
 else
+    cd "$repo_root"
     directory="$(mktemp -d)"
     trap 'rm -rf "$directory"' EXIT
     dotnet pack src/SqlSource/SqlSource.csproj --output "$directory" --nologo --verbosity quiet

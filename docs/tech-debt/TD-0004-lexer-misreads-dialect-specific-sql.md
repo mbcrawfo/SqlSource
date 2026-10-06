@@ -26,14 +26,13 @@ The epic decided on one conservative lexer with no dialect setting.  Each of the
 
 ## Impact
 
-Nothing reaches a user yet: the parser is not wired into the generator.  From phase 2 on, a user of one of these constructs gets either an error that names an unterminated quote in valid SQL, or a generated constant that is missing part of the query.  The second is silent at build time, though the truncated SQL will almost always fail when it runs.
+A user of one of these constructs gets either an error that names an unterminated quote or comment in valid SQL (`SQLSRC101`, `SQLSRC102`), or a generated constant that is missing part of the query.  The second is silent at build time, though the truncated SQL will almost always fail when it runs.  `README.md` lists the constructs and says which outcome `preserve-comments` helps with.
 
 ## Proposed fix
 
-1. Phase 2 lists these limits in `README.md`, and says which outcome `preserve-comments` helps with.
-2. Add a dialect setting.  The dialect-sensitive choices are already together in `SqlLexer`: comment nesting, backslash escapes, bracketed identifiers, `#` comments and the whitespace rule for `--` become flags chosen by the setting.
-3. Decide whether Oracle's `q'...'` form can be recognised without a setting, as `E'...'` is.  A `q` directly before a quote has no other meaning in the supported dialects, but that needs checking before it is relied on.
+1. Add a dialect setting.  The dialect-sensitive choices are already together in `SqlLexer`: comment nesting, backslash escapes, bracketed identifiers, `#` comments and the whitespace rule for `--` become flags chosen by the setting.
+2. Decide whether Oracle's `q'...'` form can be recognised without a setting, as `E'...'` is.  A `q` directly before a quote has no other meaning in the supported dialects, but that needs checking before it is relied on.
 
 ## Trigger
 
-Phase 2 writes the README section on the `.sql` file format.  A user reports one of these constructs.  A dialect setting is designed.
+A user reports one of these constructs.  A dialect setting is designed.

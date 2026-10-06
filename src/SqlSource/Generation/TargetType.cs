@@ -23,7 +23,7 @@ internal sealed record TargetType(
 )
 {
     /// <summary>
-    /// The name of the type itself, without the <c>@</c> of an escaped keyword.
+    /// The name of the type itself, as a value: without the <c>@</c> of an escaped keyword.
     /// </summary>
-    public string Name => Types[Types.Count - 1].PlainName;
+    public string Name => Types[Types.Count - 1].ValueName;
 }

@@ -92,9 +92,18 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
+        // Two types whose files would have names equal ignoring case.  Almost always none, so this value almost
+        // never changes and costs the steps after it nothing.
+        var ambiguousHintNames = typeFiles
+            .Select(static (type, _) => HintName.Create(type.Type))
+            .Collect()
+            .Select(static (names, _) => HintName.FindAmbiguous(names))
+            .WithTrackingName(TrackingNames.AmbiguousHintNames);
+
         var typeOutputs = typeFiles
             .Combine(parsedFiles)
-            .Select(static (input, _) => SelectFiles(input.Left, input.Right))
+            .Combine(ambiguousHintNames)
+            .Select(static (input, _) => SelectFiles(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.TypeQueries)
             .Select(static (queries, _) => TypeEmitter.Emit(queries))
             .WithTrackingName(TrackingNames.TypeOutput);
@@ -130,7 +139,11 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ToImmutableArray()
         );
 
-    private static TypeQueries SelectFiles(TypeFiles type, EquatableArray<ParsedSqlFile> parsedFiles)
+    private static TypeQueries SelectFiles(
+        TypeFiles type,
+        EquatableArray<ParsedSqlFile> parsedFiles,
+        EquatableArray<string> ambiguousHintNames
+    )
     {
         var files = ImmutableArray.CreateBuilder<ParsedSqlFile>(type.Files.Count);
         var index = 0;
@@ -149,6 +162,10 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         }
 
-        return new TypeQueries(type, new EquatableArray<ParsedSqlFile>(files.ToImmutable()));
+        return new TypeQueries(
+            type,
+            new EquatableArray<ParsedSqlFile>(files.ToImmutable()),
+            HintName.MakeUnique(HintName.Create(type.Type), ambiguousHintNames)
+        );
     }
 }

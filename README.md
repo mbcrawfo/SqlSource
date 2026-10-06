@@ -138,7 +138,7 @@ Every problem SqlSource finds is a build error with an id that starts `SQLSRC`. 
 
 ## MSBuild
 
-The package registers every `.sql` file of the project with the compiler as an `AdditionalFiles` item, which is how a source generator sees a file that is not C#.  The output and intermediate folders are left out.
+The package registers every `.sql` file under the project's folder with the compiler as an `AdditionalFiles` item, which is how a source generator sees a file that is not C#.  The output and intermediate folders are left out.  A `.sql` file outside the project's folder is not registered; list it yourself.
 
 To leave some files out:
 
@@ -159,13 +159,17 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
+### Deleting or renaming a file
+
+Editing a `.sql` file is always picked up by the next build.  Deleting, renaming or moving one is not: an incremental `dotnet build` can succeed with the old members still in place, because MSBuild does not notice that the list of files changed.  Run `dotnet build --no-incremental` afterwards.  A clean build, such as a CI build, is not affected.
+
 ## Supported environments
 
 A project that uses SqlSource must target .NET 8 or later; the generated code relies on it, and an older target is reported as [SQLSRC003](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc003).
 
 The generator is compiled against Roslyn 4.8.0, so it loads in the .NET 8 SDK and later and in Visual Studio 2022 17.8 and later.  Older SDKs and IDEs are not supported.
 
-This is what a project that *uses* the generator needs.  Working on the generator itself needs more; see [Contributing](#contributing).
+This is what a project that *uses* the generator needs.  Working on the generator itself needs more; see Contributing, below.
 
 ## Contributing
 

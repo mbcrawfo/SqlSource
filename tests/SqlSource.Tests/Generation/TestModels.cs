@@ -27,7 +27,7 @@ internal static class TestModels
     ) =>
         new(
             @namespace,
-            Array(types ?? [new TypeDeclaration("class", "UserRepository", string.Empty, 0)]),
+            Array(types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]),
             placement,
             path,
             filePath,

@@ -2,7 +2,9 @@
 
 ## Problem
 
-The generator adds `SqlQueriesAttribute` and `SqlQueriesMode` to every project that references it, as internal types in the namespace `SqlSource`; see [`AttributeSource`](../../src/SqlSource/Generation/AttributeSource.cs).  When project A uses SqlSource and declares `InternalsVisibleTo` for project B, and B uses SqlSource too, B sees two copies of each type: its own and A's.  The compiler picks B's own and reports warning CS0436 at every use of the attribute.  A project that sets `TreatWarningsAsErrors` then fails to build.
+The generator adds `SqlQueriesAttribute` and `SqlQueriesMode` to every project that references it, as internal types in the namespace `SqlSource`; see [`AttributeSource`](../../src/SqlSource/Generation/AttributeSource.cs).  When project A uses SqlSource and declares `InternalsVisibleTo` for project B, and B uses SqlSource too, B sees two copies of each type: its own and A's.  The compiler picks B's own and reports warning CS0436 at every use of `SqlQueries` and `SqlQueriesMode` in B's code.  A project that sets `TreatWarningsAsErrors` then fails to build.
+
+The generated file suppresses the warning for its own use of `SqlQueriesMode`, so a project B that references the package and never uses the attribute is not affected.
 
 ## Why it exists
 
@@ -10,7 +12,7 @@ The epic decided to generate the attribute instead of shipping it in a runtime a
 
 ## Impact
 
-A test project that has `InternalsVisibleTo` access to the project it tests is the usual way to meet this: if both use SqlSource, the test project gets CS0436 for each `[SqlQueries]`.  The workaround is `<NoWarn>$(NoWarn);CS0436</NoWarn>` in the second project, which also hides the warning for genuine conflicts.  Nothing in `README.md` mentions it.
+A test project that has `InternalsVisibleTo` access to the project it tests is the usual way to meet this: if both have attributed types, the test project gets CS0436 for each `[SqlQueries]` of its own.  The workaround is `<NoWarn>$(NoWarn);CS0436</NoWarn>` in the second project, which also hides the warning for genuine conflicts.  Nothing in `README.md` mentions it.
 
 ## Proposed fix
 

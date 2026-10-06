@@ -6,4 +6,5 @@ namespace SqlSource.Generation;
 /// </summary>
 /// <param name="Type">The type and the paths of its files.</param>
 /// <param name="Files">The type's files, in member order.</param>
-internal sealed record TypeQueries(TypeFiles Type, EquatableArray<ParsedSqlFile> Files);
+/// <param name="HintName">The name of the type's generated file.  Unique, ignoring case, in the compilation.</param>
+internal sealed record TypeQueries(TypeFiles Type, EquatableArray<ParsedSqlFile> Files, string HintName);

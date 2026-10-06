@@ -18,6 +18,40 @@ public class XmlDocWriterTests
     public void Escape_Text_ReplacesTheCharactersXmlReserves(string text, string expected) =>
         XmlDocWriter.Escape(text).ShouldBe(expected);
 
+    [Theory]
+    [InlineData("a\0b")]
+    [InlineData("a\u0001b")]
+    [InlineData("a\vb")]
+    [InlineData("a\fb")]
+    [InlineData("a\u001Ab")]
+    [InlineData("a\uFFFEb")]
+    [InlineData("a\uFFFFb")]
+    public void Escape_CharacterThatXmlCannotHold_BecomesTheReplacementCharacter(string text) =>
+        XmlDocWriter.Escape(text).ShouldBe("a\uFFFDb");
+
+    // A string with half of a surrogate pair cannot be written as an attribute argument: the compiler stores those as
+    // UTF-8, which has no form for it.
+    [Theory]
+    [InlineData(0xD800)]
+    [InlineData(0xDBFF)]
+    [InlineData(0xDC00)]
+    [InlineData(0xDFFF)]
+    public void Escape_SurrogateWithoutItsPair_BecomesTheReplacementCharacter(int surrogate)
+    {
+        var half = (char)surrogate;
+
+        XmlDocWriter.Escape("a" + half + "b").ShouldBe("a\uFFFDb");
+        XmlDocWriter.Escape("a" + half).ShouldBe("a\uFFFD");
+        XmlDocWriter.Escape(half + "\uD83D\uDE00").ShouldBe("\uFFFD\uD83D\uDE00");
+    }
+
+    [Theory]
+    [InlineData("a\tb")]
+    [InlineData("a\uD83D\uDE00b")]
+    [InlineData("a\uFFFDb")]
+    [InlineData("a\u0085\u2028b")]
+    public void Escape_CharacterThatXmlCanHold_IsKept(string text) => XmlDocWriter.Escape(text).ShouldBeSameAs(text);
+
     [Fact]
     public void Escape_TextWithNothingToEscape_IsTheSameString()
     {
