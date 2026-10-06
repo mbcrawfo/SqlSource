@@ -94,7 +94,8 @@ The [parser spec](2026-10-05-sql-parser-design.md) holds the full rules.  In out
 | `token-validation` | The generated method validates its parameters even when validation is off for the project |
 | `token-ignore=name` | `{{name}}` stays in the SQL as literal text |
 
-- Comments are stripped by one conservative lexer with no dialect setting.  Where dialects disagree it keeps the text, and where input is unbalanced it reports an error: a comment left in is harmless, SQL removed is a bug.  The dialect-sensitive choices sit in one place in the lexer so that a later dialect setting can become flags; no such setting is built now.
+- Comments are stripped by one conservative lexer with no dialect setting.  Its aim is to keep text where dialects disagree and to report an error where input is unbalanced: a comment left in is harmless, SQL removed is a bug.  It does not always meet that aim.  It misreads some constructs that are specific to one dialect, and a misread either reports an error for valid SQL or strips SQL as if it were a comment.  `docs/tech-debt/TD-0004-lexer-misreads-dialect-specific-sql.md` lists the constructs.  `preserve-comments` prevents the stripping and does not prevent the error.
+- The dialect-sensitive choices sit in one place in the lexer so that a later dialect setting can become flags; no such setting is built now.
 - A hint (`/*+ ... */` or `/*! ... */`) is never stripped, and is copied exactly as written apart from line endings, like a quoted region.  It can hold executable SQL.  This was settled by the review of phase 1, and replaces the parser spec's treatment of a hint as plain text.
 - Line endings in generated SQL are always `\n`, so the constants do not differ between checkouts.
 
