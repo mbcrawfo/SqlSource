@@ -13,6 +13,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC007](#sqlsrc007) | Type has a member named Sql |
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
+| [SQLSRC010](#sqlsrc010) | SqlSourceTokenValidation is not valid |
 | [SQLSRC101](#sqlsrc101) | Quote is not closed |
 | [SQLSRC102](#sqlsrc102) | Comment is not closed |
 | [SQLSRC103](#sqlsrc103) | Query name is not valid |
@@ -28,7 +29,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC113](#sqlsrc113) | Query has no SQL |
 | [SQLSRC114](#sqlsrc114) | Token name is a keyword |
 
-Ids below 100 are about the type that carries `[SqlQueries]`.  Ids from 101 are about the contents of a `.sql` file.
+Ids below 100 are about the type that carries `[SqlQueries]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
 ## SQLSRC001
 
@@ -134,6 +135,20 @@ SELECT 1;
 ```
 
 Rename the query.
+
+## SQLSRC010
+
+**SqlSourceTokenValidation is not valid**
+
+The MSBuild property `SqlSourceTokenValidation` decides whether the method of a query with tokens checks its arguments.  It accepts `true` and `false`, in any case, and the project gives it another value.  The error has no file and line, because the compiler does not tell a generator where a property was set: look in the project file, in `Directory.Build.props`, and at a `-p:` argument of the build command.
+
+```xml
+<PropertyGroup>
+    <SqlSourceTokenValidation>off</SqlSourceTokenValidation>
+</PropertyGroup>
+```
+
+Set it to `false` to turn validation off for the project, or remove it to keep the default, which is to validate.  While the value is wrong the generated methods validate.
 
 ## SQLSRC101
 

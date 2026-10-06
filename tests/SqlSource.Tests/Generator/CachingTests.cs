@@ -126,6 +126,7 @@ public class CachingTests
             TrackingNames.ParsedFile,
             TrackingNames.ParsedFiles,
             TrackingNames.TypeQueries,
+            TrackingNames.TokenValidation,
             TrackingNames.TypeOutput,
         ];
         foreach (var step in steps)
@@ -180,10 +181,58 @@ public class CachingTests
             .ShouldBe(IncrementalStepRunReason.Cached);
     }
 
-    private GeneratorDriver FirstRun(Compilation compilation)
+    [Fact]
+    public void Run_TokenValidationPropertyChanged_EmitsEveryTypeAgainAndParsesNoFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var users = new InMemoryAdditionalText(
+            _users.Path,
+            "-- name: GetUser\nSELECT 1;\n-- name: ListFrom\nSELECT * FROM {{table}};\n"
+        );
+        var driver = FirstRun(compilation, users);
+
+        var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider("false")), compilation);
+
+        AllReasons(result, TrackingNames.TokenValidation).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeQueries).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+
+        // Both types were emitted again.  Only the one with a method came out different.
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldNotContain("Throw");
+    }
+
+    [Fact]
+    public void Run_OptionsReplacedWithoutChangingTheProperty_EmitsNothingAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRun(compilation);
+
+        // What the IDE does when any other property or an .editorconfig changes: new options, the same value.
+        var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null)), compilation);
+
+        AllReasons(result, TrackingNames.TokenValidation).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    private GeneratorDriver FirstRun(Compilation compilation) => FirstRun(compilation, _users);
+
+    private GeneratorDriver FirstRun(Compilation compilation, InMemoryAdditionalText users)
     {
         var driver = GeneratorHarness
-            .CreateDriver([_users, _orders])
+            .CreateDriver([users, _orders])
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
         driver.GetRunResult().Diagnostics.ShouldBeEmpty();
         return driver;

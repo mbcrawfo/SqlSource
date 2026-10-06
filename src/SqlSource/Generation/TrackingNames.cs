@@ -23,5 +23,7 @@ internal static class TrackingNames
 
     public const string TypeQueries = nameof(TypeQueries);
 
+    public const string TokenValidation = nameof(TokenValidation);
+
     public const string TypeOutput = nameof(TypeOutput);
 }
