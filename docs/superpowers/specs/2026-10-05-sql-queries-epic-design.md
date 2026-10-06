@@ -183,7 +183,7 @@ The owner accepted the epic's recommendations as written, and settled the two it
 | Can a consumer change a diagnostic's severity? | No.  Every descriptor is tagged `NotConfigurable`. | Turning one off would hide the message while the members are still missing |
 | Diagnostic id ranges | `SQLSRC001` to `SQLSRC099` for usage, `SQLSRC101` and up for the `.sql` file | Each range has room to grow |
 | A list of diagnostics for users | `docs/diagnostics.md`, linked from the README and from each descriptor, and kept complete by a test | Ids are what a user sees in a build log |
-| The MSBuild file | `build/SqlSource.props`, with the opt-out property `EnableDefaultSqlSourceItems` | Verified: `bin/` and `obj/` are excluded, and a consumer can opt out by property or with `Remove` |
+| The MSBuild file | `build/SqlSource.props`, with the opt-out property `SqlSourceIncludeFiles` | Verified: `bin/` and `obj/` are excluded, and a consumer can opt out by property or with `Remove` |
 
 ### Technical notes
 
@@ -283,7 +283,7 @@ The owner accepted five of the epic's seven recommendations as written and chang
 | The language version of a type's file | **Changed from phase 2.**  C# 12 or later is a documented requirement and is not checked.  Phase 2 kept a type's file to C# 8. | The owner's decision.  A project that targets .NET 8 or later has C# 12 unless it lowers `LangVersion`. |
 | Value of `SqlSourceTokenValidation` | `true` and `false`, trimmed and compared ignoring case.  An empty or missing value means the default.  Any other value is the error `SQLSRC010`. | A typo should not silently change behaviour |
 | An invalid value | `SQLSRC010` has no location and is reported once for the compilation, whether or not a type carries the attribute.  Generation continues with validation on. | A generator cannot see where a property was set.  Emitting nothing would bury the one real error under an error for every use of a query. |
-| Where the property is declared | A `CompilerVisibleProperty` item in `build/SqlSource.props`, outside the condition on `EnableDefaultSqlSourceItems`.  `build/SqlSource.targets` trims the value. | The file already exists and is imported by every consumer.  A project that lists its own `.sql` files still needs the property.  The trim was added by the review of the phase: the compiler reads the value one line at a time, so an element written over several lines arrived empty and was taken for the default. |
+| Where the property is declared | A `CompilerVisibleProperty` item in `build/SqlSource.props`, outside the condition on `SqlSourceIncludeFiles`.  `build/SqlSource.targets` trims the value. | The file already exists and is imported by every consumer.  A project that lists its own `.sql` files still needs the property.  The trim was added by the review of the phase: the compiler reads the value one line at a time, so an element written over several lines arrived empty and was taken for the default. |
 | Where the setting enters the pipeline | After a type's queries are selected, as a second input of emission | A change to the property emits each type again and parses nothing again |
 | The nullable context of a type's file | `#nullable enable`, always.  It does not follow the project's `Nullable` setting. | The compiler ignores that setting in a generated file |
 | README | A tokens section: the syntax, the generated method, validation and its three switches, `token-ignore`, and the trusted-fragments warning | The warning is a decided requirement |
