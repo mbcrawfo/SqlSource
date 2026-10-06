@@ -40,7 +40,7 @@ To pick up a phase: run the brainstorming workflow with this outline as the brie
 | Phase | Status | Spec | Delivers |
 |----|----|----|----|
 | 1. SQL parser | Done | [sql-parser-design](2026-10-05-sql-parser-design.md) | The text of one `.sql` file becomes named blocks with their directives, summary, cleaned SQL and token segments, or a list of errors.  Pure code with no generator pipeline. |
-| 2. Constants | Designed | [sql-constants-design](2026-10-05-sql-constants-design.md) | The `[SqlQueries]` attribute and `SqlQueriesMode` enum, `.sql` discovery and `Path` resolution, type-shape checks, constant emission with XML docs, diagnostics located in the `.sql` file, and the MSBuild file in the package. |
+| 2. Constants | Done | [sql-constants-design](2026-10-05-sql-constants-design.md) | The `[SqlQueries]` attribute and `SqlQueriesMode` enum, `.sql` discovery and `Path` resolution, type-shape checks, constant emission with XML docs, diagnostics located in the `.sql` file, and the MSBuild file in the package. |
 | 3. Tokens | Not designed | - | Method emission with `string.Create`, parameter validation, and the `SqlSourceTokenValidation` MSBuild property. |
 
 Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 makes queries without tokens usable; until phase 3 lands, the generator skips a block that contains tokens.  Nothing is released before phase 3.
@@ -58,7 +58,7 @@ The phases are ordered parser first because the parser is the largest piece, has
 
 - The trigger is `SqlQueriesAttribute`, with a `Path` property and a mode of type `SqlQueriesMode`.
 - Both types are emitted by the generator as internal source.  The attribute is marked `[Conditional]`, so it is not applied in the consumer's metadata.  The enum cannot be: C# allows `[Conditional]` on attribute classes only.  Both declarations stay in the consumer's assembly as internal types.  The package stays a development dependency with nothing in `lib/`.  Shipping the types in a runtime assembly was rejected: it adds a second project and a runtime reference to manage.
-- Two projects that both use SqlSource, where one has `InternalsVisibleTo` the other, get warning CS0436, which is an error under `TreatWarningsAsErrors`.  The clean fix, `AddEmbeddedAttributeDefinition`, needs Roslyn 4.14, above the floor.  This is accepted, and phase 2 records it in `docs/tech-debt` with raising the floor to Roslyn 4.14 as its trigger.
+- Two projects that both use SqlSource, where one has `InternalsVisibleTo` the other, get warning CS0436, which is an error under `TreatWarningsAsErrors`.  The clean fix, `AddEmbeddedAttributeDefinition`, needs Roslyn 4.14, above the floor.  This is accepted, and `docs/tech-debt/TD-0006-attribute-conflicts-across-friend-assemblies.md` records it with raising the floor to Roslyn 4.14 as its trigger.
 - By default every `.sql` file in the folder of the `.cs` file that carries the attribute belongs to the type.  `Path` points at another folder or at one `.sql` file, relative to that `.cs` file.  For a partial type declared in several files, the file that carries the attribute is the one that counts.
 - A `Path` that matches nothing is an error.
 
