@@ -170,17 +170,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     )
     {
         var files = ImmutableArray.CreateBuilder<ParsedSqlFile>(type.Files.Count);
-        var index = 0;
 
-        // Both lists are in the same order, so one pass over the parsed files finds each of the type's.
+        // A search for each of the type's files, so that the cost does not grow with the files of other types.
         foreach (var path in type.Files)
         {
-            while (index < parsedFiles.Count && SqlPath.Comparer.Compare(parsedFiles[index].NormalizedPath, path) < 0)
-            {
-                index++;
-            }
-
-            if (index < parsedFiles.Count && SqlPath.Comparer.Equals(parsedFiles[index].NormalizedPath, path))
+            var index = SqlPath.IndexOf(parsedFiles, path, static file => file.NormalizedPath);
+            if (index >= 0)
             {
                 files.Add(parsedFiles[index]);
             }

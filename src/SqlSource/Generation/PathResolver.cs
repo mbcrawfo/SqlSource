@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using SqlSource.Diagnostics;
 
 namespace SqlSource.Generation;
@@ -13,7 +12,10 @@ internal static class PathResolver
     /// Resolves the type's <c>Path</c>.
     /// </summary>
     /// <param name="type">The type.</param>
-    /// <param name="sqlPaths">The project's <c>.sql</c> files as normalised paths, in member order.</param>
+    /// <param name="sqlPaths">
+    /// The project's <c>.sql</c> files as normalised paths, distinct and in the order of
+    /// <see cref="SqlPath.Comparer" />, which is also member order.
+    /// </param>
     /// <param name="isSupportedFramework">Whether the project targets a framework the generated code runs on.</param>
     public static TypeFiles Resolve(TargetType type, EquatableArray<string> sqlPaths, bool isSupportedFramework)
     {
@@ -56,9 +58,13 @@ internal static class PathResolver
             return ImmutableArray<string>.Empty;
         }
 
-        var isFile = type.Path is not null && SqlPath.IsSqlFile(type.Path);
-        return sqlPaths
-            .Where(path => SqlPath.Comparer.Equals(isFile ? path : SqlPath.GetFolder(path), target))
-            .ToImmutableArray();
+        if (type.Path is null || !SqlPath.IsSqlFile(type.Path))
+        {
+            return SqlPath.FindInFolder(sqlPaths, target);
+        }
+
+        // The path as the project lists it, which may differ from the target in case.
+        var index = SqlPath.IndexOf(sqlPaths, target, static path => path);
+        return index < 0 ? ImmutableArray<string>.Empty : ImmutableArray.Create(sqlPaths[index]);
     }
 }

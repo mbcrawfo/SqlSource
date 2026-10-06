@@ -95,6 +95,38 @@ public class PathResolverTests
         PathResolver.Resolve(type, paths, isSupportedFramework: true).Files.ShouldBe(["c:/app/repo/Users.sql"]);
     }
 
+    [Theory]
+    [InlineData("/UserRepository.cs", null)]
+    [InlineData("UserRepository.cs", null)]
+    [InlineData("/app/Repo/UserRepository.cs", "../..")]
+    public void Resolve_FolderThatIsTheRoot_TakesTheFilesWithNoFolder(string filePath, string? path)
+    {
+        var paths = TestModels.Array("app/Repo/Users.sql", "app/Root.sql", "Root.sql", "zeta.sql");
+
+        var result = PathResolver.Resolve(TestModels.Type(path, filePath: filePath), paths, isSupportedFramework: true);
+
+        result.Files.ShouldBe(["Root.sql", "zeta.sql"]);
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Resolve_FolderWhoseNeighboursStartWithItsName_TakesOnlyItsOwnFiles()
+    {
+        // In order: the names sort before and after the separator that follows the folder's own.
+        var paths = TestModels.Array(
+            "app/Repo-old/Users.sql",
+            "app/Repo.sql",
+            "app/Repo/Sub/Users.sql",
+            "app/Repo/Users.sql",
+            "app/Repo0/Users.sql",
+            "app/RepoArchive/Users.sql"
+        );
+
+        PathResolver
+            .Resolve(TestModels.Type(), paths, isSupportedFramework: true)
+            .Files.ShouldBe(["app/Repo/Users.sql"]);
+    }
+
     [Fact]
     public void Resolve_UnsupportedFramework_IsAnErrorAndTheFilesAreStillResolved()
     {
