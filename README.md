@@ -202,7 +202,7 @@ To turn the default off and list the files yourself:
 
 ```xml
 <PropertyGroup>
-    <EnableDefaultSqlSourceItems>false</EnableDefaultSqlSourceItems>
+    <SqlSourceIncludeFiles>false</SqlSourceIncludeFiles>
 </PropertyGroup>
 <ItemGroup>
     <AdditionalFiles Include="Queries/**/*.sql" />

@@ -2,13 +2,13 @@
     <!--
         Hands every .sql file of the project to the compiler, which is the only way a source generator can see one.
         NuGet imports this file into each project that references the package, before the project's own content, so a
-        project can remove files with <AdditionalFiles Remove="..." />.  A project that sets
-        EnableDefaultSqlSourceItems to false lists its .sql files as AdditionalFiles itself.
+        project can remove files with <AdditionalFiles Remove="..." />.  A project that sets SqlSourceIncludeFiles to
+        false lists its .sql files as AdditionalFiles itself.
 
         Items are evaluated after every property, so DefaultItemExcludes already holds the output and intermediate
         folders here, whatever the project sets them to.
     -->
-    <ItemGroup Condition="'$(EnableDefaultSqlSourceItems)' != 'false'">
+    <ItemGroup Condition="'$(SqlSourceIncludeFiles)' != 'false'">
         <AdditionalFiles Include="**/*.sql" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
     </ItemGroup>
     <!--
