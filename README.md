@@ -1,6 +1,6 @@
 # SqlSource
 
-A C# source generator that turns the queries in your `.sql` files into string constants.
+A C# source generator that turns the queries in your `.sql` files into string constants, and into methods where a query has replacement tokens.
 
 Keep SQL in `.sql` files, where your editor highlights it and your tools can run it:
 
@@ -33,8 +33,6 @@ A query that is renamed or removed is a compile error where it is used, and Inte
 
 SqlSource is in early development, and no version has been published to nuget.org.  It will be published as the `SqlSource` package.
 
-Queries become constants today.  A query that contains a `{{token}}` gets no member yet: tokens, which become the parameters of a generated method, are the next piece of work.
-
 ## Installation
 
 ```bash
@@ -64,15 +62,15 @@ The package is a development dependency.  It adds nothing to your application's 
 
 | Mode | Generated members | Used as |
 |----|----|----|
-| `SqlQueriesMode.Nested` | Public constants in a `private static class Sql` nested in the type | `Sql.GetUser`, inside the type only |
-| `SqlQueriesMode.Direct` | Public constants on the type itself | `UserQueries.GetUser`, wherever the type is visible |
+| `SqlQueriesMode.Nested` | Public members in a `private static class Sql` nested in the type | `Sql.GetUser`, inside the type only |
+| `SqlQueriesMode.Direct` | Public members on the type itself | `UserQueries.GetUser`, wherever the type is visible |
 
 ```csharp
 [SqlQueries(Mode = SqlQueriesMode.Direct)]
 public static partial class UserQueries;
 ```
 
-Each member is a `const string`, documented with the query's summary and its SQL.
+Each member is a `const string`, or a static method when the query has tokens (see Tokens, below).  Both are documented with the query's summary and its SQL.
 
 ## SQL files
 
@@ -104,7 +102,7 @@ A `-- SqlSource:` line holds one or more directives, separated by spaces.  Insid
 |----|----|
 | `preserve-comments` | Comments and blank lines stay in the SQL |
 | `token-ignore=name` | `{{name}}` is literal text, not a token |
-| `token-validation`, `no-token-validation` | Reserved for tokens.  They are accepted and have no effect yet. |
+| `token-validation`, `no-token-validation` | The query's method checks its arguments, or does not, whatever the project says (see Tokens, below) |
 
 ```sql
 -- name: Report
@@ -131,6 +129,57 @@ A misread has one of two results:
 - **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed: `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `preserve-comments` on the query prevents the removal.
 
 If your SQL uses one of these constructs, check the generated constant: hover over the member, or read its documentation.
+
+## Tokens
+
+A query parameter such as `@id` cannot stand for a table name, a list of columns or a whole clause.  A token can: `{{name}}` in a query is replaced with text that the caller supplies.
+
+```sql
+-- name: ListFrom
+-- summary: Lists the rows of one table.
+SELECT id, name FROM {{table}} ORDER BY {{orderBy}};
+```
+
+A query with a token is a static method, not a constant.  The method has one `string` parameter for each token name, in the order the names first appear, and returns the SQL with every token replaced:
+
+```csharp
+var sql = Sql.ListFrom("users", "name DESC");
+// SELECT id, name FROM users ORDER BY name DESC;
+```
+
+- A token's name is a C# identifier that is not a reserved keyword; a keyword is the error [SQLSRC114](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc114).  Spaces and tabs inside the braces are ignored.
+- Names are case-sensitive: `{{Table}}` and `{{table}}` are two parameters.
+- A name that is used more than once is one parameter, and every occurrence is replaced.
+- A token is replaced wherever it is written, including inside a string or a quoted identifier.
+- Text of the same form that is not meant as a token stays in the SQL when a `token-ignore=name` directive lists its name.
+- The method allocates the string it returns and nothing else.
+- A query that gains its first token changes from a constant to a method, so the code that uses it stops compiling until it passes the argument.
+
+**Tokens are for trusted text only.**  A token is replaced by string concatenation.  Nothing is escaped, quoted or checked for safety, so a value that a user can influence is a SQL injection.  Use a token for a fragment that your own code chooses, such as a table name from a fixed list, and a query parameter for every value.
+
+### Validation
+
+By default the method checks each argument with `ArgumentException.ThrowIfNullOrWhiteSpace`: null throws `ArgumentNullException`, and an empty or blank string throws `ArgumentException`.  The check is that a value is present, not that it is safe.
+
+An empty fragment can be what you want, for an optional clause for example, so the check can be turned off.  Three switches decide, and the first one that applies wins:
+
+1. A `-- SqlSource: token-validation` or `-- SqlSource: no-token-validation` directive inside the query.
+2. The same directive before the first `-- name:` line, which covers every query in the file.
+3. The MSBuild property `SqlSourceTokenValidation`, which covers the project.  It accepts `true` and `false`; any other value is the error [SQLSRC010](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc010).
+
+```xml
+<PropertyGroup>
+    <SqlSourceTokenValidation>false</SqlSourceTokenValidation>
+</PropertyGroup>
+```
+
+```sql
+-- name: ListFiltered
+-- SqlSource: no-token-validation
+SELECT id, name FROM users {{whereClause}};
+```
+
+With validation off the method checks nothing.  An empty argument leaves nothing where its token was, and a null argument throws `NullReferenceException`.
 
 ## Errors
 
@@ -159,6 +208,10 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
+### Token validation
+
+`SqlSourceTokenValidation` turns the argument checks of the generated methods off for a project when it is `false`.  See Tokens, above.
+
 ### Deleting or renaming a file
 
 Editing a `.sql` file is always picked up by the next build.  Deleting, renaming or moving one is not: an incremental `dotnet build` can succeed with the old members still in place, because MSBuild does not notice that the list of files changed.  Run `dotnet build --no-incremental` afterwards.  A clean build, such as a CI build, is not affected.
@@ -166,6 +219,8 @@ Editing a `.sql` file is always picked up by the next build.  Deleting, renaming
 ## Supported environments
 
 A project that uses SqlSource must target .NET 8 or later; the generated code relies on it, and an older target is reported as [SQLSRC003](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc003).
+
+The generated code is C# 12, the default language version of a project that targets .NET 8.  The language version is not checked: a project that sets `LangVersion` below 12 can get compiler errors inside generated code.
 
 The generator is compiled against Roslyn 4.8.0, so it loads in the .NET 8 SDK and later and in Visual Studio 2022 17.8 and later.  Older SDKs and IDEs are not supported.
 

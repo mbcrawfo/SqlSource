@@ -27,13 +27,11 @@ public partial class UserRepository
 
 ## How to read this document
 
-Phase 3 has not been through its own design.  This outline records what was settled while the epic and the earlier phases were designed, so that whoever designs a later phase starts from it and does not reopen it.  Each statement about a later phase is one of three kinds:
+Every phase has been through its own design.  This outline records what was settled while the epic and its phases were designed.  Each statement about a phase is one of three kinds:
 
 - **Decided.**  Agreed with the project owner.  A phase spec may add detail and must not contradict it.  Changing one means asking the owner and updating this outline.
-- **Recommended.**  The epic designer's proposal for a question that was raised and not settled.  It is a starting point for the phase's design, not an agreement.
+- **Recommended.**  The epic designer's proposal for a question that was raised and not settled.  None remain: each was settled in its phase's design, and is recorded under "Settled in the phase design".
 - **Technical notes.**  Facts about Roslyn, MSBuild and this repository that constrain the design.  Verify them against the code before relying on them.
-
-To pick up a phase: run the brainstorming workflow with this outline as the brief, settle the recommended items with the owner, write the phase spec in this folder, and update the phase table below in the same pull request.
 
 ## Phases
 
@@ -41,9 +39,9 @@ To pick up a phase: run the brainstorming workflow with this outline as the brie
 |----|----|----|----|
 | 1. SQL parser | Done | [sql-parser-design](2026-10-05-sql-parser-design.md) | The text of one `.sql` file becomes named blocks with their directives, summary, cleaned SQL and token segments, or a list of errors.  Pure code with no generator pipeline. |
 | 2. Constants | Done | [sql-constants-design](2026-10-05-sql-constants-design.md) | The `[SqlQueries]` attribute and `SqlQueriesMode` enum, `.sql` discovery and `Path` resolution, type-shape checks, constant emission with XML docs, diagnostics located in the `.sql` file, and the MSBuild file in the package. |
-| 3. Tokens | Not designed | - | Method emission with `string.Create`, parameter validation, and the `SqlSourceTokenValidation` MSBuild property. |
+| 3. Tokens | Done | [sql-tokens-design](2026-10-06-sql-tokens-design.md) | Method emission with `string.Create`, parameter validation, and the `SqlSourceTokenValidation` MSBuild property. |
 
-Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 makes queries without tokens usable; until phase 3 lands, the generator skips a block that contains tokens.  Nothing is released before phase 3.
+Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 makes queries without tokens usable, and skips a block that contains tokens.  Phase 3 gives such a block its method.  Nothing was released before phase 3.
 
 The phases are ordered parser first because the parser is the largest piece, has no dependency on Roslyn's pipeline, and can be tested completely by itself.  A thin end-to-end slice was considered and not chosen.
 
@@ -52,6 +50,7 @@ The phases are ordered parser first because the parser is the largest piece, has
 ### Consumers
 
 - Generated code targets .NET 8 and later.  A project that targets an older framework gets a diagnostic, not output that fails to compile.  The floor comes from the generated code: `ArgumentException.ThrowIfNullOrWhiteSpace` needs .NET 8, and `string.Create` with a span callback needs .NET Core 2.1.
+- The generated code of a type is C# 12, the default language version of a project that targets .NET 8.  This is a documented requirement and is not checked; `docs/tech-debt/TD-0011-language-version-is-not-checked.md` records that.  It was settled in the phase 3 design.
 - The host floor is unchanged: Roslyn 4.8.0, the .NET 8 SDK and Visual Studio 2022 17.8.
 
 ### The attribute
@@ -269,16 +268,24 @@ The owner accepted the epic's recommendations as written, and settled the two it
 - **Documentation.**  The method gets the same `<summary>` and `<remarks>` as a constant, plus a `<param>` for each parameter.
 - **Adding a token changes the member.**  A query that gains its first token changes from a constant to a method, which breaks its callers at compile time.  This is expected.
 
-### Recommended
+### Settled in the phase design
 
-| Question | Recommendation | Reason |
+The owner accepted five of the epic's seven recommendations as written and changed two.  The rest were settled in the [phase spec](2026-10-06-sql-tokens-design.md).  All of these are now decided.
+
+| Question | Decision | Reason |
 |----|----|----|
-| Which `string.Create` overload | `string.Create<TState>(int length, TState state, SpanAction<char, TState> action)`.  The length is the sum of the literal lengths plus the length of each parameter times its number of occurrences.  The state is a tuple of the parameters and the callback is a `static` lambda. | It allocates exactly the final string.  The interpolated-string overload builds in a pooled buffer first. |
-| Copying segments | Copy each literal and each parameter into the span in order, advancing a position | Direct, and no formatting is involved |
-| Names of generated locals and lambda parameters | Choose names that are not token names of that query, for example by adding a suffix until unique | Any identifier can be a token name, so no fixed name is safe |
-| A null argument when validation is off | Still throw, with `ArgumentNullException.ThrowIfNull` | The parameter type is non-nullable `string`.  Turning validation off is about empty and whitespace fragments. |
-| Value of `SqlSourceTokenValidation` | `true` and `false`, compared case-insensitively.  An empty or missing value means the default.  Any other value is an error. | A typo should not silently change behaviour |
-| Where the property is declared | A `CompilerVisibleProperty` item in the MSBuild file that phase 2 ships | The file already exists and is imported by every consumer |
+| Which `string.Create` overload | `string.Create<TState>(int length, TState state, SpanAction<char, TState> action)`.  The length is the sum of the literal lengths plus the length of each parameter times its number of occurrences.  The callback is a `static` lambda. | It allocates exactly the final string.  The interpolated-string overload builds in a pooled buffer first. |
+| The state | A tuple of the parameters, read by position (`Item1`).  A query with one token passes the parameter itself. | `Item2`, `Rest` and `ToString` are valid token names and are not valid element names.  A tuple of one element cannot be written. |
+| Copying segments | Copy each literal and each parameter into the span in order, moving the span past what was copied | Direct, and no formatting is involved |
+| Names of the lambda's parameters | `span` and `state`, with a number added until the name is not a token name of that query | Any identifier can be a token name, so no fixed name is safe |
+| How framework members are written | `global::System.ArgumentException`, and the keyword `string` | `System` and `String` are valid token names |
+| A null argument when validation is off | **Changed from the recommendation.**  Nothing is checked.  The method has no validation code, and a null argument fails with a `NullReferenceException`.  The epic recommended `ArgumentNullException.ThrowIfNull`. | The owner's decision: off means off |
+| The language version of a type's file | **Changed from phase 2.**  C# 12 or later is a documented requirement and is not checked.  Phase 2 kept a type's file to C# 8. | The owner's decision.  A project that targets .NET 8 or later has C# 12 unless it lowers `LangVersion`. |
+| Value of `SqlSourceTokenValidation` | `true` and `false`, trimmed and compared ignoring case.  An empty or missing value means the default.  Any other value is the error `SQLSRC010`. | A typo should not silently change behaviour |
+| An invalid value | `SQLSRC010` has no location and is reported once for the compilation, whether or not a type carries the attribute.  Generation continues with validation on. | A generator cannot see where a property was set.  Emitting nothing would bury the one real error under an error for every use of a query. |
+| Where the property is declared | A `CompilerVisibleProperty` item in `build/SqlSource.props`, outside the condition on `EnableDefaultSqlSourceItems` | The file already exists and is imported by every consumer.  A project that lists its own `.sql` files still needs the property. |
+| Where the setting enters the pipeline | After a type's queries are selected, as a second input of emission | A change to the property emits each type again and parses nothing again |
+| The nullable context of a type's file | `#nullable enable`, always.  It does not follow the project's `Nullable` setting. | The compiler ignores that setting in a generated file |
 | README | A tokens section: the syntax, the generated method, validation and its three switches, `token-ignore`, and the trusted-fragments warning | The warning is a decided requirement |
 
 ### Technical notes
@@ -286,7 +293,7 @@ The owner accepted the epic's recommendations as written, and settled the two it
 - An MSBuild property reaches a generator only when it is listed as a `CompilerVisibleProperty`.  It is then read from `AnalyzerConfigOptionsProvider.GlobalOptions` under the key `build_property.SqlSourceTokenValidation`.
 - A driver test supplies the property through a test implementation of `AnalyzerConfigOptionsProvider`.  The test project, which uses a `ProjectReference`, gets it only if it imports the package's MSBuild file.
 - For up to four parts `string.Concat` also makes a single allocation.  `string.Create` is the stated requirement and gives one code path for any number of parts.
-- A `static` lambda needs C# 9 and a tuple state needs `System.ValueTuple`.  Both are present for any .NET 8 consumer on its default language version.
+- A `static` lambda needs C# 9, the caller-expression default that gives a validation exception its parameter name needs C# 10, and a tuple state needs `System.ValueTuple`.  All are present for any .NET 8 consumer on its default language version, C# 12.
 - Token names are case-sensitive, so `{{Table}}` and `{{table}}` are two parameters.  Reserved keywords never arrive as token names; the parser rejects them.
 
 ### Testing
@@ -294,6 +301,7 @@ The owner accepted the epic's recommendations as written, and settled the two it
 - **Generator driver tests:** one token, several tokens, a repeated token, both modes, validation on and off through each of the three switches and their precedence, and an invalid property value.
 - **End-to-end tests:** call the generated methods in `tests/SqlSource.Tests` and assert on the returned string and on the exceptions.
 - **Replacement:** phase 2's test that a query with tokens gets no member is replaced by the method tests.
+- **The property, end to end:** `tests/SqlSource.Tests` sets `SqlSourceTokenValidation` to `false`, so a query there without a directive shows the property reaching the generator through the MSBuild file that ships, and a query under `token-validation` shows the directive beating it.
 
 ### Documentation
 
