@@ -2,11 +2,11 @@
 
 ## Problem
 
-The file generated for a type is C# 12.  The method that [`MethodWriter`](../../src/SqlSource/Generation/MethodWriter.cs) writes for a query with tokens uses a `static` lambda (C# 9) and relies on `CallerArgumentExpression` (C# 10) for the parameter name in the exception that validation throws.  The file's `#nullable enable` needs C# 8.
+The file generated for a type may use C# 12.  Today it needs less: the method that [`MethodWriter`](../../src/SqlSource/Generation/MethodWriter.cs) writes for a query with tokens uses a `static` lambda (C# 9), and the file's `#nullable enable` needs C# 8.
 
 Nothing checks the language version of the project that uses the generator.  A project that targets .NET 8 or later and sets `LangVersion` below 12 gets what the compiler makes of it:
 
-- C# 9: no error, and a validation exception whose `ParamName` is null, because the compiler does not fill in the caller expression;
+- C# 9 to 11: nothing goes wrong today.  A validation exception still names its parameter, because the compiler fills in the caller expression at any language version.  That holds only until generated code uses a newer feature, which the documented requirement allows.
 - C# 8: error CS8400 at the lambda of every query with tokens;
 - below C# 8: error CS8370 at `#nullable enable` in every type's file, as before tokens were added.
 
@@ -16,7 +16,7 @@ C# 12 is the default language version of a project that targets .NET 8, which is
 
 ## Impact
 
-Low.  An affected project gets errors that point into generated code and do not name the cause, or, on C# 9, an exception that does not name its parameter.  The README states the requirement under "Supported environments".
+Low.  An affected project gets errors that point into generated code and do not name the cause.  The README states the requirement under "Supported environments".
 
 ## Proposed fix
 

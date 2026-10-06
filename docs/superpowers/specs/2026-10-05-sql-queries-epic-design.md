@@ -293,7 +293,7 @@ The owner accepted five of the epic's seven recommendations as written and chang
 - An MSBuild property reaches a generator only when it is listed as a `CompilerVisibleProperty`.  It is then read from `AnalyzerConfigOptionsProvider.GlobalOptions` under the key `build_property.SqlSourceTokenValidation`.
 - A driver test supplies the property through a test implementation of `AnalyzerConfigOptionsProvider`.  The test project, which uses a `ProjectReference`, gets it only if it imports the package's MSBuild file.
 - For up to four parts `string.Concat` also makes a single allocation.  `string.Create` is the stated requirement and gives one code path for any number of parts.
-- A `static` lambda needs C# 9, the caller-expression default that gives a validation exception its parameter name needs C# 10, and a tuple state needs `System.ValueTuple`.  All are present for any .NET 8 consumer on its default language version, C# 12.
+- A `static` lambda needs C# 9 and a tuple state needs `System.ValueTuple`.  Both are present for any .NET 8 consumer on its default language version, C# 12.  The caller-expression default that gives a validation exception its parameter name is filled in by the compiler at any language version; this was checked with a C# 9 project.
 - Token names are case-sensitive, so `{{Table}}` and `{{table}}` are two parameters.  Reserved keywords never arrive as token names; the parser rejects them.
 
 ### Testing
