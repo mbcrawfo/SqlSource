@@ -1,6 +1,6 @@
 # AGENTS.md - .github
 
-GitHub Actions workflows.  `workflows/ci.yml` and `workflows/publish.yml` both call the reusable `workflows/build.yml`.
+GitHub Actions workflows.  `workflows/ci.yml` and `workflows/publish.yml` both call the reusable `workflows/build.yml`.  `workflows/coverage-comment.yml` runs after `workflows/ci.yml`.
 
 ## Actions
 
@@ -22,6 +22,13 @@ GitHub Actions workflows.  `workflows/ci.yml` and `workflows/publish.yml` both c
 - **`workflows/publish.yml` keeps its file name, and its `publish` job keeps `environment: nuget`.**  The nuget.org trusted publishing policy names both; renaming either stops publishing.  The `NuGet/login` and push steps stay in that file, not in a reusable workflow.
 - **The check steps in `workflows/build.yml` mirror `pre-commit-validation.sh`.**  A check added to or removed from one is added to or removed from the other in the same commit.  A check that needs the .NET SDK goes in the `build` job; one that needs only Docker goes in the `lint` job.  The two jobs run side by side and neither `needs` the other, so the `packages` artifact can exist in a run whose lint failed.  Anything that consumes it must `needs` the whole `build.yml` call, as `publish.yml` does, never a single job inside it.
 - **The `ci` job in `workflows/ci.yml` is the required status check.**  Keep its name.  Add every new job in `ci.yml` to its `needs`.  It must keep `if: ${{ always() }}`: a skipped required check counts as passing.
+- **`workflows/coverage-comment.yml` holds a write token and handles data a fork controls.**  It is triggered by `workflow_run`, so it runs as it is on `main`, for every pull request, forks included.
+  - Never add a checkout of the pull request's head to it, and never build, restore or run anything the pull request supplies.
+  - It reads one file of the `coverage` artifact as text.  Keep it that way: do not extract the archive to disk, and do not drop the size and heading checks.
+  - Pass every value from the event to the script through `env:`.  The head branch name is chosen by the fork; an expression inside `run:` would execute it.
+  - Find the pull request from the event, never from the artifact.
+  - It is bound to three names: `name: CI` in `workflows/ci.yml`, the `coverage` artifact that `workflows/build.yml` uploads, and `SummaryGithub.md` inside it.  Change one and change the workflow in the same commit.
+  - It cannot run from a branch.  A change to it is first exercised by the next pull request after it reaches `main`.
 - **Version values reach MSBuild as the job-level environment variables `BuildNumber` and `VersionSuffix`**, not as `-p:` flags, so that the format check, build, test and pack steps cannot disagree.
 - **An expression cannot yield an empty string from the middle of `&&`/`||`.**  `cond && '' || x` always yields `x`.  Put the empty string last, as `publish.yml` does.
 - Files here are limited to 120 characters per line.  Fold long commands with `>-` or `\`.

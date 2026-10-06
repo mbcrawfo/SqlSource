@@ -99,10 +99,13 @@ The scripts in `tools/` each run a linter from a pinned Docker image:
 
 | Workflow | Runs on | Does |
 |----|----|----|
-| `ci.yml` | Pull requests to `main`, pushes to `main` | Calls `build.yml`, posts the coverage report as a pull request comment, and ends with the `ci` job |
-| `build.yml` | Called by the other two | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, `dotnet pack`, and the package check |
+| `ci.yml` | Pull requests to `main`, pushes to `main` | Calls `build.yml` and ends with the `ci` job |
+| `build.yml` | Called by `ci.yml` and `publish.yml` | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, `dotnet pack`, and the package check |
 | `publish.yml` | `v*` tags, manual runs on `main` | Calls `build.yml`, pushes the package to nuget.org, and creates a GitHub release for a tag |
+| `coverage-comment.yml` | A successful `ci.yml` run for a pull request | Posts the coverage report as a comment on the pull request, or updates the comment it posted before |
 
-Each run uploads two artifacts: `packages`, the `.nupkg`, and `coverage`, the HTML, Cobertura and markdown reports.  The test results and the coverage summary are also in the run's job summary.  Pull requests from forks and from Dependabot get no coverage comment; see `docs/tech-debt/TD-0002-no-coverage-comment-on-fork-pull-requests.md`.
+Each run uploads two artifacts: `packages`, the `.nupkg`, and `coverage`, the HTML, Cobertura and markdown reports.  The test results and the coverage summary are also in the run's job summary.
+
+`coverage-comment.yml` always runs as it is on `main`, never as a pull request changes it.  A change to it takes effect, and can first be tried, after it is merged.
 
 The `ci` job succeeds only when every other job in `ci.yml` succeeded or was skipped.  It is the one status check to require in the `main` ruleset.
