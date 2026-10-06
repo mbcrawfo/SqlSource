@@ -72,6 +72,21 @@ public class AttributeConflictTests
         build.ShouldBeEmpty();
     }
 
+    // The compiler's error is the whole story: the conflict is not reported next to it.
+    [Theory]
+    [InlineData("[SqlQueries(1)]", "CS1729 /app/Repo/Sample.cs(2,2)-(2,15)")]
+    [InlineData("[SqlQueries(Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,13)-(2,20)")]
+    public async Task Build_AttributeThatDoesNotCompile_HasItsErrorAndNoConflict(string attribute, string error)
+    {
+        var source = $"using SqlSource;\n{attribute}\ninternal partial class Sample {{ }}";
+
+        var compilerAlone = await GeneratorHarness.BuildAsync(source, [Users], [Other()], packageAnalyzers: false);
+        var build = await GeneratorHarness.BuildAsync(source, [Users], [Other()]);
+
+        Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,12)", error], true);
+        Places(build).ShouldBe([error]);
+    }
+
     // A type that the project and the other one both declare by hand is a conflict that the user has to know about,
     // whatever its name.
     [Theory]

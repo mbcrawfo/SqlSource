@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SqlSource.Generation;
@@ -46,7 +47,7 @@ public sealed class AttributeConflictSuppressor : DiagnosticSuppressor
     }
 
     // The warning is at a name that the compiler bound to the project's own type.  In an attribute that name binds to
-    // a constructor.
+    // a constructor, and to none when the arguments fit no constructor: the type is then that of the candidates.
     private static INamedTypeSymbol? UsedType(SuppressionAnalysisContext context, Diagnostic diagnostic)
     {
         if (diagnostic.Location.SourceTree is not { } tree)
@@ -57,7 +58,8 @@ public sealed class AttributeConflictSuppressor : DiagnosticSuppressor
         // An attribute without arguments spans the same text as its name, and the name is the inner node.
         var node = tree.GetRoot(context.CancellationToken)
             .FindNode(diagnostic.Location.SourceSpan, getInnermostNodeForTie: true);
-        var symbol = context.GetSemanticModel(tree).GetSymbolInfo(node, context.CancellationToken).Symbol;
+        var info = context.GetSemanticModel(tree).GetSymbolInfo(node, context.CancellationToken);
+        var symbol = info.Symbol ?? info.CandidateSymbols.FirstOrDefault();
         return symbol as INamedTypeSymbol ?? (symbol as IMethodSymbol)?.ContainingType;
     }
 }
