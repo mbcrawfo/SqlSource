@@ -33,8 +33,9 @@
     </ItemGroup>
     <ItemGroup>
         <None Include="../../README.md" Pack="true" PackagePath="/" Visible="false" />
-        <!-- NuGet imports build/<package id>.props into every project that references the package. -->
+        <!-- NuGet imports build/<package id>.props and .targets into every project that references the package. -->
         <None Include="build/SqlSource.props" Pack="true" PackagePath="build" />
+        <None Include="build/SqlSource.targets" Pack="true" PackagePath="build" />
         <None
             Include="$(OutputPath)$(AssemblyName).dll"
             Pack="true"
