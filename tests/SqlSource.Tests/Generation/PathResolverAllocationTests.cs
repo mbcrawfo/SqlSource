@@ -25,18 +25,20 @@ public class PathResolverAllocationTests
         const int Iterations = 20;
         var type = TestModels.Type();
         var paths = CreatePaths();
-        PathResolver.Resolve(type, paths, isSupportedFramework: true).Files.Count.ShouldBe(OwnFiles);
+        PathResolver
+            .Resolve(type, paths, isSupportedFramework: true, unsupportedLanguageVersion: null)
+            .Files.Count.ShouldBe(OwnFiles);
 
         // The first calls pay for one-off work: JIT compilation and static initialisers.
         for (var iteration = 0; iteration < Iterations; iteration++)
         {
-            _ = PathResolver.Resolve(type, paths, isSupportedFramework: true);
+            _ = PathResolver.Resolve(type, paths, isSupportedFramework: true, unsupportedLanguageVersion: null);
         }
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var iteration = 0; iteration < Iterations; iteration++)
         {
-            _ = PathResolver.Resolve(type, paths, isSupportedFramework: true);
+            _ = PathResolver.Resolve(type, paths, isSupportedFramework: true, unsupportedLanguageVersion: null);
         }
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;

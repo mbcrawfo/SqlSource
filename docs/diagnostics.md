@@ -15,6 +15,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
 | [SQLSRC010](#sqlsrc010) | SqlSourceTokenValidation is not valid |
 | [SQLSRC011](#sqlsrc011) | SqlSourceDialect is not valid |
+| [SQLSRC012](#sqlsrc012) | Language version is not supported |
 | [SQLSRC101](#sqlsrc101) | Quote is not closed |
 | [SQLSRC102](#sqlsrc102) | Comment is not closed |
 | [SQLSRC103](#sqlsrc103) | Query name is not valid |
@@ -176,6 +177,23 @@ The error has no file and line, because the compiler does not tell a generator w
 Correct the name, or remove the setting to get the default, `ansi`.  While a value is wrong the files it covers are read as `ansi`; a file whose own metadata is wrong does not fall back to the project's property.
 
 The compiler hands a generator only the part of a value before the first `;` or `#`, as for [SQLSRC010](#sqlsrc010).
+
+## SQLSRC012
+
+**Language version is not supported**
+
+The code SqlSource generates for a type is C# 12, the default language version of a project that targets .NET 8, and the project sets `LangVersion` to an older one.  The message quotes the version the project uses.
+
+```xml
+<PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>10</LangVersion>
+</PropertyGroup>
+```
+
+Remove `LangVersion` to get the default of the target framework, or set it to `12` or later.  It can be set in the project file, in `Directory.Build.props`, and by a `-p:` argument of the build command.
+
+The error is reported at each `[SqlQueries]` attribute, and no type gets members until it is fixed.  A project that targets a framework older than .NET 8 has an older language version by default; it gets [SQLSRC003](#sqlsrc003) and not this error, because targeting .NET 8 fixes both.
 
 ## SQLSRC101
 

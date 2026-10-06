@@ -20,7 +20,12 @@ public class PathResolverTests
     [Fact]
     public void Resolve_NoPath_TakesTheFilesInTheFolderOfTheSourceFileAndNotItsSubfolders()
     {
-        var result = PathResolver.Resolve(TestModels.Type(), SqlPaths, isSupportedFramework: true);
+        var result = PathResolver.Resolve(
+            TestModels.Type(),
+            SqlPaths,
+            isSupportedFramework: true,
+            unsupportedLanguageVersion: null
+        );
 
         result.Files.ShouldBe(["app/Repo/Count.sql", "app/Repo/Users.sql"]);
         result.Diagnostics.ShouldBeEmpty();
@@ -33,7 +38,12 @@ public class PathResolverTests
     [InlineData("./../Repo/../Queries")]
     public void Resolve_FolderPath_TakesTheFilesInThatFolder(string path)
     {
-        var result = PathResolver.Resolve(TestModels.Type(path), SqlPaths, isSupportedFramework: true);
+        var result = PathResolver.Resolve(
+            TestModels.Type(path),
+            SqlPaths,
+            isSupportedFramework: true,
+            unsupportedLanguageVersion: null
+        );
 
         result.Files.ShouldBe(["app/Queries/Orders.sql", "app/Queries/Users.sql"]);
         result.Diagnostics.ShouldBeEmpty();
@@ -48,7 +58,12 @@ public class PathResolverTests
     [InlineData("/Users.sql", "app/Repo/Users.sql")]
     public void Resolve_FilePath_TakesThatFile(string path, string expected)
     {
-        var result = PathResolver.Resolve(TestModels.Type(path), SqlPaths, isSupportedFramework: true);
+        var result = PathResolver.Resolve(
+            TestModels.Type(path),
+            SqlPaths,
+            isSupportedFramework: true,
+            unsupportedLanguageVersion: null
+        );
 
         result.Files.ShouldBe([expected]);
         result.Diagnostics.ShouldBeEmpty();
@@ -64,7 +79,12 @@ public class PathResolverTests
     [InlineData(" ")]
     public void Resolve_PathThatMatchesNothing_IsAnErrorAtTheAttribute(string path)
     {
-        var result = PathResolver.Resolve(TestModels.Type(path), SqlPaths, isSupportedFramework: true);
+        var result = PathResolver.Resolve(
+            TestModels.Type(path),
+            SqlPaths,
+            isSupportedFramework: true,
+            unsupportedLanguageVersion: null
+        );
 
         result.Files.ShouldBeEmpty();
         result.Diagnostics.ShouldBe([
@@ -78,7 +98,12 @@ public class PathResolverTests
     [InlineData("")]
     public void Resolve_NoPathAndNoSqlFileInTheFolder_IsAnErrorAtTheAttribute(string filePath)
     {
-        var result = PathResolver.Resolve(TestModels.Type(filePath: filePath), SqlPaths, isSupportedFramework: true);
+        var result = PathResolver.Resolve(
+            TestModels.Type(filePath: filePath),
+            SqlPaths,
+            isSupportedFramework: true,
+            unsupportedLanguageVersion: null
+        );
 
         result.Files.ShouldBeEmpty();
         result.Diagnostics.ShouldBe([
@@ -92,7 +117,9 @@ public class PathResolverTests
         var type = TestModels.Type(filePath: "C:\\App\\REPO\\UserRepository.cs");
         var paths = TestModels.Array("c:/app/repo/Users.sql", "c:/app/repo2/Users.sql");
 
-        PathResolver.Resolve(type, paths, isSupportedFramework: true).Files.ShouldBe(["c:/app/repo/Users.sql"]);
+        PathResolver
+            .Resolve(type, paths, isSupportedFramework: true, unsupportedLanguageVersion: null)
+            .Files.ShouldBe(["c:/app/repo/Users.sql"]);
     }
 
     [Theory]
@@ -103,7 +130,12 @@ public class PathResolverTests
     {
         var paths = TestModels.Array("app/Repo/Users.sql", "app/Root.sql", "Root.sql", "zeta.sql");
 
-        var result = PathResolver.Resolve(TestModels.Type(path, filePath: filePath), paths, isSupportedFramework: true);
+        var result = PathResolver.Resolve(
+            TestModels.Type(path, filePath: filePath),
+            paths,
+            isSupportedFramework: true,
+            unsupportedLanguageVersion: null
+        );
 
         result.Files.ShouldBe(["Root.sql", "zeta.sql"]);
         result.Diagnostics.ShouldBeEmpty();
@@ -123,16 +155,54 @@ public class PathResolverTests
         );
 
         PathResolver
-            .Resolve(TestModels.Type(), paths, isSupportedFramework: true)
+            .Resolve(TestModels.Type(), paths, isSupportedFramework: true, unsupportedLanguageVersion: null)
             .Files.ShouldBe(["app/Repo/Users.sql"]);
     }
 
     [Fact]
     public void Resolve_UnsupportedFramework_IsAnErrorAndTheFilesAreStillResolved()
     {
-        var result = PathResolver.Resolve(TestModels.Type("Users.sql"), SqlPaths, isSupportedFramework: false);
+        var result = PathResolver.Resolve(
+            TestModels.Type("Users.sql"),
+            SqlPaths,
+            isSupportedFramework: false,
+            unsupportedLanguageVersion: null
+        );
 
         result.Files.ShouldBe(["app/Repo/Users.sql"]);
+        result.Diagnostics.ShouldBe([
+            DiagnosticInfo.Create(SqlDiagnostics.UnsupportedTargetFramework, TestModels.AttributeLocation),
+        ]);
+    }
+
+    [Fact]
+    public void Resolve_UnsupportedLanguageVersion_IsAnErrorAndTheFilesAreStillResolved()
+    {
+        var result = PathResolver.Resolve(
+            TestModels.Type("Users.sql"),
+            SqlPaths,
+            isSupportedFramework: true,
+            unsupportedLanguageVersion: "11.0"
+        );
+
+        result.Files.ShouldBe(["app/Repo/Users.sql"]);
+        result.Diagnostics.ShouldBe([
+            DiagnosticInfo.Create(SqlDiagnostics.UnsupportedLanguageVersion, TestModels.AttributeLocation, "11.0"),
+        ]);
+    }
+
+    // A project on an older framework has an older language by default.  Targeting .NET 8 fixes both, so the
+    // framework is the one problem to report.
+    [Fact]
+    public void Resolve_UnsupportedFrameworkAndLanguageVersion_ReportsTheFrameworkOnly()
+    {
+        var result = PathResolver.Resolve(
+            TestModels.Type("Users.sql"),
+            SqlPaths,
+            isSupportedFramework: false,
+            unsupportedLanguageVersion: "7.3"
+        );
+
         result.Diagnostics.ShouldBe([
             DiagnosticInfo.Create(SqlDiagnostics.UnsupportedTargetFramework, TestModels.AttributeLocation),
         ]);
@@ -144,7 +214,12 @@ public class PathResolverTests
         var declared = DiagnosticInfo.Create(SqlDiagnostics.TypeNotPartial, TestModels.AttributeLocation, "Repo");
         var type = TestModels.Type("Missing", diagnostics: [declared]);
 
-        var result = PathResolver.Resolve(type, SqlPaths, isSupportedFramework: false);
+        var result = PathResolver.Resolve(
+            type,
+            SqlPaths,
+            isSupportedFramework: false,
+            unsupportedLanguageVersion: null
+        );
 
         result.Type.ShouldBeSameAs(type);
         result.Diagnostics.ShouldBe([
@@ -157,6 +232,18 @@ public class PathResolverTests
     [Fact]
     public void Resolve_SameInputs_GiveEqualResults() =>
         PathResolver
-            .Resolve(TestModels.Type("../Queries"), SqlPaths, isSupportedFramework: true)
-            .ShouldBe(PathResolver.Resolve(TestModels.Type("../Queries"), SqlPaths, isSupportedFramework: true));
+            .Resolve(
+                TestModels.Type("../Queries"),
+                SqlPaths,
+                isSupportedFramework: true,
+                unsupportedLanguageVersion: null
+            )
+            .ShouldBe(
+                PathResolver.Resolve(
+                    TestModels.Type("../Queries"),
+                    SqlPaths,
+                    isSupportedFramework: true,
+                    unsupportedLanguageVersion: null
+                )
+            );
 }

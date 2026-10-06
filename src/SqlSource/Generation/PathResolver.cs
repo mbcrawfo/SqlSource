@@ -17,13 +17,33 @@ internal static class PathResolver
     /// <see cref="SqlPath.Comparer" />, which is also member order.
     /// </param>
     /// <param name="isSupportedFramework">Whether the project targets a framework the generated code runs on.</param>
-    public static TypeFiles Resolve(TargetType type, EquatableArray<string> sqlPaths, bool isSupportedFramework)
+    /// <param name="unsupportedLanguageVersion">
+    /// The project's language version when it does not compile the generated code, and null otherwise.
+    /// </param>
+    public static TypeFiles Resolve(
+        TargetType type,
+        EquatableArray<string> sqlPaths,
+        bool isSupportedFramework,
+        string? unsupportedLanguageVersion
+    )
     {
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         diagnostics.AddRange(type.Diagnostics);
         if (!isSupportedFramework)
         {
             diagnostics.Add(DiagnosticInfo.Create(SqlDiagnostics.UnsupportedTargetFramework, type.AttributeLocation));
+        }
+        else if (unsupportedLanguageVersion is not null)
+        {
+            // Only for a supported framework: an older one has an older language by default, and targeting .NET 8
+            // fixes both.
+            diagnostics.Add(
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.UnsupportedLanguageVersion,
+                    type.AttributeLocation,
+                    unsupportedLanguageVersion
+                )
+            );
         }
 
         var files = FindFiles(type, sqlPaths);

@@ -1,3 +1,4 @@
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using Xunit;
 
@@ -136,6 +137,77 @@ public class TypeDiagnosticsTests
             ],
             ignoreOrder: true
         );
+        run.Sources.Keys.ShouldBe([AttributeOnly]);
+    }
+
+    [Theory]
+    [InlineData(LanguageVersion.CSharp7_3, "7.3")]
+    [InlineData(LanguageVersion.CSharp8, "8.0")]
+    [InlineData(LanguageVersion.CSharp9, "9.0")]
+    [InlineData(LanguageVersion.CSharp11, "11.0")]
+    public void Run_ProjectOnALanguageVersionOlderThanCSharp12_IsAnErrorAtEachAttribute(
+        LanguageVersion languageVersion,
+        string version
+    )
+    {
+        var run = GeneratorHarness.Run(
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    """
+                    using SqlSource;
+                    namespace App
+                    {
+                        [SqlQueries]
+                        public partial class First { }
+                        [SqlQueries(Mode = SqlQueriesMode.Direct)]
+                        public partial class Second { }
+                    }
+                    """
+                ),
+            ],
+            [Users],
+            languageVersion: languageVersion
+        );
+
+        run.Diagnostics.ShouldBe(
+            [
+                "SQLSRC012 /app/Repo/Sample.cs(4,6)-(4,16): SqlSource generates C# 12 code, and this project's "
+                    + $"language version is {version}",
+                "SQLSRC012 /app/Repo/Sample.cs(6,6)-(6,46): SqlSource generates C# 12 code, and this project's "
+                    + $"language version is {version}",
+            ],
+            ignoreOrder: true
+        );
+        run.Sources.Keys.ShouldBe([AttributeOnly]);
+
+        // Nothing was generated for the types, so the compiler has no generated code to reject.
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_ProjectOnAnOlderFrameworkAndLanguageVersion_ReportsTheFrameworkOnly()
+    {
+        var run = GeneratorHarness.Run(
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    """
+                    using SqlSource;
+                    [SqlQueries]
+                    public partial class Sample { }
+                    """
+                ),
+            ],
+            [Users],
+            supportedFramework: false,
+            languageVersion: LanguageVersion.CSharp7_3
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC003 /app/Repo/Sample.cs(2,2)-(2,12): SqlSource generates code for .NET 8 and later, and this "
+                + "project targets an older framework",
+        ]);
         run.Sources.Keys.ShouldBe([AttributeOnly]);
     }
 

@@ -141,6 +141,17 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor UnsupportedLanguageVersion = new(
+        id: "SQLSRC012",
+        title: "Language version is not supported",
+        messageFormat: "SqlSource generates C# 12 code, and this project's language version is {0}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc012",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -325,6 +336,7 @@ internal static class SqlDiagnostics
             QueryNamedLikeContainingType,
             InvalidTokenValidation,
             InvalidDialect,
+            UnsupportedLanguageVersion,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,
