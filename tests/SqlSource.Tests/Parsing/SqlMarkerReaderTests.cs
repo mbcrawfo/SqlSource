@@ -52,11 +52,33 @@ public class SqlMarkerReaderTests
     [InlineData("$$\n-- name: A\n$$")]
     public void Read_AnythingElse_IsNotAMarker(string text) => Markers(text).ShouldBeEmpty();
 
+    // A # comment is a line comment in MySQL and MariaDB.  A marker starts with two dashes, there as everywhere.
+    [Theory]
+    [InlineData("# name: A")]
+    [InlineData("#-name: A")]
+    [InlineData("## summary: x")]
+    [InlineData("#  SqlSource: keep-comments")]
+    public void Read_HashComment_IsNotAMarker(string text) => Markers(text, SqlDialectRules.MySql).ShouldBeEmpty();
+
+    // MySQL and MariaDB read two dashes as a comment only when whitespace follows them.
+    [Fact]
+    public void Read_TwoDashesWithoutWhitespaceInMySql_IsNotAMarker()
+    {
+        Markers("--name: A\nSELECT 1", SqlDialectRules.MySql).ShouldBeEmpty();
+        Markers("-- name: A\nSELECT 1", SqlDialectRules.MySql).ShouldBe(["Name:A"]);
+        Markers("--\tname: A\nSELECT 1", SqlDialectRules.MariaDb).ShouldBe(["Name:A"]);
+    }
+
+    // Oracle's line hint is kept in the SQL, so it is never a marker.
+    [Fact]
+    public void Read_LineHintOfOracle_IsNotAMarker() =>
+        Markers("--+ name: A\nSELECT 1", SqlDialectRules.Oracle).ShouldBeEmpty();
+
     [Fact]
     public void Read_Marker_ReportsTheCommentAndTheTrimmedValue()
     {
         const string Text = "SELECT 1\n  -- name:  GetUser  \nSELECT 2";
-        var lexeme = SqlLexer.Lex(Text).Lexemes[1];
+        var lexeme = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes[1];
 
         var marker = SqlMarkerReader.Read(Text, lexeme);
 
@@ -70,15 +92,17 @@ public class SqlMarkerReaderTests
     {
         const string Text = "-- name:  ";
 
-        var marker = SqlMarkerReader.Read(Text, SqlLexer.Lex(Text).Lexemes[0]);
+        var marker = SqlMarkerReader.Read(Text, SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes[0]);
 
         _ = marker.ShouldNotBeNull();
         marker.Value.ValueSpan.IsEmpty.ShouldBeTrue();
     }
 
-    private static string[] Markers(string text)
+    private static string[] Markers(string text) => Markers(text, SqlDialectRules.Ansi);
+
+    private static string[] Markers(string text, SqlDialectRules rules)
     {
-        var lexed = SqlLexer.Lex(text);
+        var lexed = SqlLexer.Lex(text, rules);
         lexed.Error.ShouldBeNull();
         return
         [

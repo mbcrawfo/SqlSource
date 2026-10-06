@@ -19,7 +19,7 @@ internal static class SqlFileParser
     /// </summary>
     public static SqlFileParseResult Parse(string text, string fileName)
     {
-        var lexed = SqlLexer.Lex(text);
+        var lexed = SqlLexer.Lex(text, SqlDialectRules.Ansi);
         return lexed.Error is null
             ? new Parser(text, fileName, lexed.Lexemes).Run()
             : new SqlFileParseResult(

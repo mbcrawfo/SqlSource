@@ -100,7 +100,7 @@ public class SqlTextBuilderTests
     public void Build_LexemeRange_UsesOnlyThatRange()
     {
         const string Text = "A\n-- name: X\nB\n";
-        var lexemes = SqlLexer.Lex(Text).Lexemes;
+        var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
 
         SqlTextBuilder.Build(Text, lexemes, 0, 1, keepComments: false).Text.ShouldBe("A");
         SqlTextBuilder.Build(Text, lexemes, 2, 3, keepComments: false).Text.ShouldBe("B");
@@ -112,7 +112,7 @@ public class SqlTextBuilderTests
     public void ToSourceSpan_SpanInBuiltText_MapsToTheSameTextInTheFile(bool keepComments)
     {
         const string Text = "-- c\r\n/* x */ SELECT {{a}} -- d\r\n\r\n-- summary: s\r\n  FROM {{b}}";
-        var lexemes = SqlLexer.Lex(Text).Lexemes;
+        var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
 
         var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, keepComments);
 
@@ -135,7 +135,7 @@ public class SqlTextBuilderTests
             "  -- lead\r\n\r\n-- summary: s\r\nSELECT 'a  \r\n\r\n b', /* c */ x   \r\n"
             + "\t-- SqlSource: token-ignore=q\r\n"
             + "\r\n  /*+ h\r\n  i */ FROM t -- d  \r\n   \r\nWHERE {{y}} = $$ z\n $$  \r\n";
-        var lexemes = SqlLexer.Lex(Text).Lexemes;
+        var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
 
         var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, keepComments);
 
@@ -153,9 +153,25 @@ public class SqlTextBuilderTests
         }
     }
 
-    private static string Build(string text, bool keepComments = false)
+    [Theory]
+    [InlineData("SELECT 1 # c\n# d\nFROM t # e", false, "SELECT 1\nFROM t")]
+    [InlineData("SELECT 1 # c\n# d\nFROM t # e", true, "SELECT 1 # c\n# d\nFROM t # e")]
+    public void Build_HashCommentOfMySql_IsTreatedAsALineComment(string text, bool keepComments, string expected) =>
+        Build(text, keepComments, SqlDialectRules.MySql).ShouldBe(expected);
+
+    [Fact]
+    public void Build_LineHintOfOracle_IsCopiedAsWritten() =>
+        Build("SELECT --+ FULL(e)  \n  1 -- c\nFROM e", rules: SqlDialectRules.Oracle)
+            .ShouldBe("SELECT --+ FULL(e)  \n  1\nFROM e");
+
+    [Fact]
+    public void Build_HintOfMariaDb_IsCopiedAsWritten() =>
+        Build("SELECT /*M! SQL_NO_CACHE */ 1 /* c */", rules: SqlDialectRules.MariaDb)
+            .ShouldBe("SELECT /*M! SQL_NO_CACHE */ 1");
+
+    private static string Build(string text, bool keepComments = false, SqlDialectRules? rules = null)
     {
-        var lexed = SqlLexer.Lex(text);
+        var lexed = SqlLexer.Lex(text, rules ?? SqlDialectRules.Ansi);
         lexed.Error.ShouldBeNull();
         return SqlTextBuilder.Build(text, lexed.Lexemes, 0, lexed.Lexemes.Count, keepComments).Text;
     }
