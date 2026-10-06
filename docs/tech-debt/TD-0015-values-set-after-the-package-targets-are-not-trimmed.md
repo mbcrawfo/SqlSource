@@ -16,12 +16,11 @@ A property function in the package's targets is the only place the package can c
 
 ## Impact
 
-Low.  In the first two cases a value written over several lines is taken as not set, with no diagnostic: the file is read by the project's dialect or as `ansi`, and token validation stays on.  A value written on one line is not affected, and that is the form `README.md` shows.  The third case is reported, as `SQLSRC011`, with a confusing value.
+Low.  In the first two cases a value written over several lines is taken as not set, with no diagnostic: the file is read by the project's dialect or as `ansi`, and token validation stays on.  A value written on one line is not affected; `README.md` shows that form and says where the other one fails.  The third case is reported, as `SQLSRC011`, with a confusing value.
 
 ## Proposed fix
 
-1. Move the trims into a target that runs before `GenerateMSBuildEditorConfigFileCore`, which is the target that writes the file the compiler reads.  That sees every property and every item, wherever it was set.  It has to be shown to run in a design-time build, which is how an IDE gets the values, before the evaluation-time trim is removed.
-2. Until then, say in `README.md` that a value in `Directory.Build.targets` goes on one line.
+Move the trims into a target that runs before `GenerateMSBuildEditorConfigFileCore`, which is the target that writes the file the compiler reads.  That sees every property and every item, wherever it was set.  It has to be shown to run in a design-time build, which is how an IDE gets the values, before the evaluation-time trim is removed.  The paragraph about one line in the "Dialect" section of `README.md` goes when this is done.
 
 ## Trigger
 
