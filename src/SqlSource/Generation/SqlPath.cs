@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Text;
 
 namespace SqlSource.Generation;
@@ -97,17 +98,26 @@ internal static class SqlPath
     /// Whether <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, holds
     /// <paramref name="normalizedPath" />.
     /// </summary>
-    public static bool Contains(EquatableArray<string> sortedPaths, string normalizedPath)
+    public static bool Contains(EquatableArray<string> sortedPaths, string normalizedPath) =>
+        IndexOf(sortedPaths, normalizedPath, static path => path) >= 0;
+
+    /// <summary>
+    /// The index in <paramref name="sortedItems" />, which is ordered by <see cref="Comparer" /> on the path that
+    /// <paramref name="getPath" /> gives, of the item whose path is <paramref name="normalizedPath" />.  Negative
+    /// when there is none.
+    /// </summary>
+    public static int IndexOf<T>(EquatableArray<T> sortedItems, string normalizedPath, Func<T, string> getPath)
+        where T : IEquatable<T>
     {
         var low = 0;
-        var high = sortedPaths.Count - 1;
+        var high = sortedItems.Count - 1;
         while (low <= high)
         {
             var middle = low + ((high - low) / 2);
-            var order = Comparer.Compare(sortedPaths[middle], normalizedPath);
+            var order = Comparer.Compare(getPath(sortedItems[middle]), normalizedPath);
             if (order == 0)
             {
-                return true;
+                return middle;
             }
 
             if (order < 0)
@@ -120,6 +130,89 @@ internal static class SqlPath
             }
         }
 
-        return false;
+        return -1;
+    }
+
+    /// <summary>
+    /// The paths of <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, that are files of
+    /// <paramref name="normalizedFolder" /> itself and not of a folder inside it, in the same order.
+    /// </summary>
+    /// <remarks>
+    /// The order puts everything under a folder together, and the files of its subfolders among its own.  So this
+    /// searches for the first path under the folder and walks from there, and steps over a subfolder with another
+    /// search.  It costs the folder's own files and subfolders, not the number of paths, and compares in place.
+    /// </remarks>
+    public static ImmutableArray<string> FindInFolder(EquatableArray<string> sortedPaths, string normalizedFolder)
+    {
+        // Where the name of a file of the folder starts.  The root has no separator after it.
+        var nameStart = normalizedFolder.Length == 0 ? 0 : normalizedFolder.Length + 1;
+        ImmutableArray<string>.Builder? files = null;
+
+        var index = Seek(sortedPaths, 0, normalizedFolder, normalizedFolder.Length, past: false);
+        while (index < sortedPaths.Count)
+        {
+            var path = sortedPaths[index];
+            if (CompareToFolder(path, normalizedFolder, normalizedFolder.Length) != 0)
+            {
+                break;
+            }
+
+            var subfolderEnd = path.IndexOf(Separator, nameStart);
+            if (subfolderEnd < 0)
+            {
+                (files ??= ImmutableArray.CreateBuilder<string>()).Add(path);
+                index++;
+            }
+            else
+            {
+                index = Seek(sortedPaths, index + 1, path, subfolderEnd, past: true);
+            }
+        }
+
+        return files?.ToImmutable() ?? ImmutableArray<string>.Empty;
+    }
+
+    // The first index from start of a path that does not sort before the paths under the folder or, when past is
+    // set, that sorts after them.  The folder is the first folderLength characters of folder.
+    private static int Seek(EquatableArray<string> sortedPaths, int start, string folder, int folderLength, bool past)
+    {
+        var low = start;
+        var high = sortedPaths.Count;
+        while (low < high)
+        {
+            var middle = low + ((high - low) / 2);
+            var order = CompareToFolder(sortedPaths[middle], folder, folderLength);
+            if (order < 0 || (past && order == 0))
+            {
+                low = middle + 1;
+            }
+            else
+            {
+                high = middle;
+            }
+        }
+
+        return low;
+    }
+
+    // Zero when the path is under the folder, at any depth.  Otherwise negative or positive as the path sorts before
+    // or after everything that is.  The folder is the first folderLength characters of folder, and nothing is copied.
+    private static int CompareToFolder(string path, string folder, int folderLength)
+    {
+        if (folderLength == 0)
+        {
+            return 0;
+        }
+
+        var order = string.Compare(path, 0, folder, 0, folderLength, StringComparison.OrdinalIgnoreCase);
+        if (order != 0)
+        {
+            return order;
+        }
+
+        // The path starts with the folder's name, and what follows decides.  Nothing, and the path is that name
+        // alone, which sorts first.  Otherwise the next character against the separator: ignoring case moves no
+        // character onto the separator or across it, so the two compare as they are.
+        return path.Length == folderLength ? -1 : path[folderLength].CompareTo(Separator);
     }
 }
