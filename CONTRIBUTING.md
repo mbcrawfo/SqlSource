@@ -36,7 +36,7 @@ The solution has two test projects:
 
 A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both, so it may use only Roslyn API that 4.8.0 has, and the C# it hands to the compiler is C# 12 at most.
 
-`tests/SqlSource.Tests` also uses the generator the way a consumer does: the types in `EndToEnd/` are compiled with the generator loaded, and the project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.
+`tests/SqlSource.Tests` also uses the generator the way a consumer does: the types in `EndToEnd/` are compiled with the generator loaded, and the project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  It gets them by path and the generator through a project reference; `tools/check-package-install.sh`, under Package below, is what installs the packed package.
 
 ### Coverage
 
@@ -64,6 +64,14 @@ tools/check-package.sh artifacts/packages
 
 This checks what the package holds: the generator under `analyzers/`, `build/SqlSource.props` and `build/SqlSource.targets`, the readme, and nothing under `lib/`.  Without an argument it packs into a temporary folder first.
 
+```bash
+tools/check-package-install.sh artifacts/packages
+```
+
+This installs the package the way a consumer does.  It copies the project in `tools/package-install` to a temporary folder outside the repository, adds the package to it with `dotnet add package` from a feed that holds nothing else, builds and runs it, and compares what it prints with `tools/package-install/expected-output.txt`.  The project uses a constant, a method with tokens, `SqlSourceTokenValidation` and `SqlSourceDialect`, so it fails when the generator or either MSBuild file does not reach a consumer.  Without an argument the script packs first, as the other does.
+
+A change to what the package gives a consumer through its MSBuild files adds a line to `tools/package-install/Program.cs` and to the expected output.
+
 ## Checks
 
 Run every check before committing:
@@ -72,7 +80,7 @@ Run every check before committing:
 ./pre-commit-validation.sh
 ```
 
-It verifies formatting, runs the linters, builds the solution, runs the tests and checks the package.  It never rewrites files, runs every step even when one fails (the tests and the package check are skipped if the build fails), and ends with a summary of what passed and failed.
+It verifies formatting, runs the linters, builds the solution, runs the tests, checks the package and installs it into a project.  It never rewrites files, runs every step even when one fails (the tests and the two package checks are skipped if the build fails), and ends with a summary of what passed and failed.
 
 Both `pre-commit-validation.sh` and `format.sh --check` restore packages in locked mode, as CI does, so a `packages.lock.json` that no longer matches its project fails the check.  After changing a package reference or version, update the lock files and commit them:
 
@@ -84,7 +92,7 @@ dotnet restore SqlSource.slnx
 |----|----|
 | `format.sh` | Builds the generator, which `dotnet format` needs in order to compile the test project, then rewrites C# and project files: `dotnet format style`, `dotnet format analyzers`, then CSharpier |
 | `format.sh --check` | Reports what `format.sh` would change, and rewrites nothing |
-| `pre-commit-validation.sh` | `format.sh --check`, the four linters below, the build, the tests and `tools/check-package.sh` |
+| `pre-commit-validation.sh` | `format.sh --check`, the four linters below, the build, the tests, `tools/check-package.sh` and `tools/check-package-install.sh` |
 
 The scripts in `tools/` each run a linter from a pinned Docker image:
 
@@ -100,7 +108,7 @@ The scripts in `tools/` each run a linter from a pinned Docker image:
 | Workflow | Runs on | Does |
 |----|----|----|
 | `ci.yml` | Pull requests to `main`, pushes to `main` | Calls `build.yml` and ends with the `ci` job |
-| `build.yml` | Called by `ci.yml` and `publish.yml` | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, `dotnet pack`, and the package check |
+| `build.yml` | Called by `ci.yml` and `publish.yml` | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, `dotnet pack`, and the two package checks |
 | `publish.yml` | `v*` tags, manual runs on `main` | Calls `build.yml`, pushes the package to nuget.org, and creates a GitHub release for a tag |
 | `coverage-comment.yml` | A successful `ci.yml` run for a pull request | Posts the coverage report as a comment on the pull request, or updates the comment it posted before |
 

@@ -10,7 +10,7 @@ Found in the review of phase 2, with the .NET SDK 10.0.401, by deleting a `.sql`
 
 ## Why it exists
 
-The fix is a second MSBuild file in the package that hooks a target whose name starts with an underscore, which the SDK is free to rename.  It was not verified in the review, and it cannot be regression-tested until a test installs the package; see [TD-0008](TD-0008-package-is-not-installed-in-a-test.md).
+The fix hooks a target whose name starts with an underscore, which the SDK is free to rename.  It was not verified in the review, and nothing installed the package then, so it could not be regression-tested.  [`tools/check-package-install.sh`](../../tools/check-package-install.sh) installs it now, and is where that test goes.
 
 ## Impact
 
@@ -18,7 +18,7 @@ A developer who deletes or renames a `.sql` file sees a green local build with s
 
 ## Proposed fix
 
-Ship `build/SqlSource.targets` with a target that runs before `_GenerateCompileDependencyCache` and adds the `.sql` `AdditionalFiles` to the `CoreCompileCache` item, so that the list of files becomes part of the hash:
+Add a target to [`build/SqlSource.targets`](../../src/SqlSource/build/SqlSource.targets) that runs before `_GenerateCompileDependencyCache` and adds the `.sql` `AdditionalFiles` to the `CoreCompileCache` item, so that the list of files becomes part of the hash:
 
 ```xml
 <Target Name="SqlSourceTrackSqlFiles" BeforeTargets="_GenerateCompileDependencyCache">
@@ -28,8 +28,8 @@ Ship `build/SqlSource.targets` with a target that runs before `_GenerateCompileD
 </Target>
 ```
 
-Check it against the oldest supported SDK, 8.0, and add the case to the package-install test.  Remove the paragraph about it from `README.md`.
+Check it against the oldest supported SDK, 8.0, and add the case to `tools/check-package-install.sh`: after the first build, delete a `.sql` file whose query the project uses, build again without `--no-incremental`, and expect the build to fail.  Remove the paragraph about it from `README.md`.
 
 ## Trigger
 
-Before the first release to nuget.org.  TD-0008 is resolved.
+Before the first release to nuget.org.

@@ -1,0 +1,25 @@
+using System;
+using Consumer;
+
+// tools/check-package-install.sh compares what this prints with expected-output.txt.
+
+// A constant: the generator was loaded, and the package handed the .sql files to the compiler.
+Console.WriteLine($"constant: {Queries.GetUser}");
+
+// The project turns token validation off.  With it on, the empty argument throws.
+Console.WriteLine($"validation off: {Queries.ListUsers("users", "")}");
+
+// A directive turns it back on for this query.
+try
+{
+    _ = Queries.ListChecked("users", "");
+    Console.WriteLine("validation on: nothing was thrown");
+}
+catch (ArgumentException exception)
+{
+    Console.WriteLine($"validation on: {exception.GetType().Name} for {exception.ParamName}");
+}
+
+// The project's dialect is postgres, and the item of ByMetadata.sql says mysql.
+Console.WriteLine($"dialect of the project: {Queries.ByProperty}");
+Console.WriteLine($"dialect of the item: {Queries.ByMetadata}");

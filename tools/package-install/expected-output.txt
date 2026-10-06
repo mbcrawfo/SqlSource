@@ -1,0 +1,6 @@
+constant: SELECT id, name FROM users WHERE id = @id;
+validation off: SELECT id, name FROM users ;
+validation on: ArgumentException for whereClause
+dialect of the project: SELECT E'it'
+    '\'s -- not a comment' AS note;
+dialect of the item: SELECT 'it\'s' AS note, 5--3 AS eight;

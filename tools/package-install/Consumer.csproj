@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The project that tools/check-package-install.sh installs the packed package into.  It is never built here: the
+        script copies this folder out of the repository first, so that nothing of the repository's own build applies,
+        and adds the package reference with "dotnet add package", as a consumer does.
+
+        The target framework is the one the SDK pinned in global.json brings its own reference assemblies for, so that
+        the restore needs no package feed other than the folder that holds the package.
+    -->
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net10.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+        <!--
+            Each value is on a line of its own on purpose.  The compiler would read that as empty, and the package's
+            build/SqlSource.targets is what trims it.
+        -->
+        <SqlSourceTokenValidation>
+            false
+        </SqlSourceTokenValidation>
+        <SqlSourceDialect>
+            postgres
+        </SqlSourceDialect>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- The item exists here only because NuGet imported the package's build/SqlSource.props before this. -->
+        <AdditionalFiles Update="Queries/ByMetadata.sql">
+            <SqlSourceDialect>
+                mysql
+            </SqlSourceDialect>
+        </AdditionalFiles>
+    </ItemGroup>
+</Project>

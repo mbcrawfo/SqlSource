@@ -12,7 +12,6 @@ Next id: `TD-0016`
 | [TD-0004](TD-0004-lexer-misreads-dialect-specific-sql.md) | Open | 2026-10-05 | Low | A few constructs are misread whatever the dialect: MySQL's SQL modes, a versioned comment that holds `*/` in a string, a comment inside a continued PostgreSQL string |
 | [TD-0006](TD-0006-attribute-conflicts-across-friend-assemblies.md) | Open | 2026-10-05 | Medium | Two projects that share internals and both use SqlSource get warning CS0436 for the generated attribute |
 | [TD-0007](TD-0007-sql-files-that-differ-only-by-case.md) | Open | 2026-10-05 | Low | Two `.sql` files whose paths differ only by case are treated as one, and the second is ignored |
-| [TD-0008](TD-0008-package-is-not-installed-in-a-test.md) | Open | 2026-10-05 | Medium | No test installs the packed package into a project and builds it |
 | [TD-0009](TD-0009-removed-sql-file-does-not-trigger-a-rebuild.md) | Open | 2026-10-06 | Medium | Deleting or renaming a `.sql` file does not trigger an incremental rebuild, so the old members stay until a full build |
 | [TD-0012](TD-0012-token-method-shapes-are-compiled-but-not-run.md) | Open | 2026-10-06 | Low | A token-only query and one with more than seven tokens are compiled in tests and never run, and awkward token names are compiled as C# 12 only |
 | [TD-0013](TD-0013-sql-edit-reads-every-attributed-type-again.md) | Open | 2026-10-06 | Low | An edit to a `.sql` file makes the compiler read every attributed type again, because the attribute is added in a post-initialization step |
