@@ -1,4 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The generator comes from a project reference, which does not bring the package's MSBuild file.  Importing the
+        real one means the end-to-end tests exercise what ships.
+    -->
+    <Import Project="../../src/SqlSource/build/SqlSource.props" />
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Exe</OutputType>
