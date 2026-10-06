@@ -84,7 +84,7 @@ The [parser spec](2026-10-05-sql-parser-design.md) holds the full rules.  In out
 - Three markers are recognised, each a line comment that starts its line, matched case-insensitively and always removed from the SQL: `-- name:`, `-- summary:` and `-- SqlSource:`.
 - `-- name:` starts a named block that runs to the next name marker or the end of the file.  A file with no name marker is one block named after the file.
 - Before the first name marker, comments and `-- SqlSource:` directives are allowed and the directives apply to every block.  SQL there is an error.
-- A `-- summary:` or `-- SqlSource:` marker at the end of a block, with no SQL after it before the next name marker or the end of the file, is to be an error.  The parser does not report it yet: it accepts the marker and applies it to that block.  This is parser work, tracked in `docs/tech-debt/TD-0005-markers-at-the-end-of-a-block-are-accepted.md`, and is to be done before phase 2 documents the file format.
+- A `-- summary:` or `-- SqlSource:` marker comes before the SQL it describes.  One at the end of a block, with no SQL after it before the next name marker or the end of the file, is the error `MarkerAtEndOfBlock`.  This holds for every block, including the last one in a file and the single block of a file with no name marker.  The rule was added after the parser spec was written, so that a marker written above a name marker cannot silently apply to the block before it.
 - Directives:
 
 | Directive | Effect |

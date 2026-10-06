@@ -23,11 +23,11 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_FileWithoutNameMarker_ReadsSummaryAndDirectivesAnywhere()
+    public void Parse_FileWithoutNameMarker_ReadsSummaryAndDirectivesBeforeAndAmongItsSql()
     {
         const string Text =
-            "SELECT 1 -- c\n-- summary: First.\nFROM t\n-- SqlSource: preserve-comments no-token-validation\n"
-            + "-- summary: Second.\n";
+            "-- summary: First.\nSELECT 1 -- c\n-- SqlSource: preserve-comments no-token-validation\n"
+            + "-- summary: Second.\nFROM t\n";
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
@@ -236,10 +236,53 @@ public class SqlFileParserTests
     public void Parse_BlockHoldingOnlyAHint_IsNotEmpty() =>
         Sql(Blocks("-- name: A\n/*+ H */").ShouldHaveSingleItem()).ShouldBe("/*+ H */");
 
+    [Theory]
+    [InlineData("-- name: A\nSELECT 1\n\n-- summary: Loads B.\n-- name: B\nSELECT 2", "-- summary: Loads B.")]
+    [InlineData(
+        "-- name: A\nSELECT 1\n  -- SqlSource: token-ignore=x\n-- name: B\nSELECT 2",
+        "-- SqlSource: token-ignore=x"
+    )]
+    [InlineData("-- name: A\nSELECT 1\n-- summary: last", "-- summary: last")]
+    [InlineData("SELECT 1\n-- SqlSource: preserve-comments\n", "-- SqlSource: preserve-comments")]
+    [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- a comment\n/* another */\n", "-- summary: s")]
+    [InlineData("-- name: A\nSELECT 1\n-- SqlSource: bogus", "-- SqlSource: bogus")]
+    [InlineData("-- name: A\nSELECT 1\n-- summary:", "-- summary:")]
+    public void Parse_MarkerAfterTheLastSqlOfItsBlock_IsAnErrorAtTheMarker(string text, string marker) =>
+        Errors(text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.MarkerAtEndOfBlock, SpanOf(text, marker))]);
+
+    [Fact]
+    public void Parse_SeveralMarkersAfterTheLastSqlOfABlock_AreEachAnError()
+    {
+        const string Text =
+            "-- name: A\nSELECT 1\n-- SqlSource: no-token-validation\n-- summary: s\n-- name: B\nSELECT 2";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.MarkerAtEndOfBlock,
+                    SpanOf(Text, "-- SqlSource: no-token-validation")
+                ),
+                SqlParseError.Create(SqlParseErrorKind.MarkerAtEndOfBlock, SpanOf(Text, "-- summary: s")),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- SqlSource: no-token-validation\nFROM t", "SELECT 1\nFROM t")]
+    [InlineData("-- name: A\n-- summary: s\n-- SqlSource: no-token-validation\n/*+ H */", "/*+ H */")]
+    [InlineData("-- name: A\n-- summary: s\n-- SqlSource: no-token-validation\n'x'\n-- c", "'x'")]
+    public void Parse_MarkerWithSqlAfterItInItsBlock_IsAccepted(string text, string expectedSql)
+    {
+        var block = Blocks(text).ShouldHaveSingleItem();
+
+        block.Summary.ShouldBe("s");
+        block.TokenValidation.ShouldBe(false);
+        Sql(block).ShouldBe(expectedSql);
+    }
+
     [Fact]
     public void Parse_SummaryMarkers_AreJoinedWithOneSpace()
     {
-        const string Text = "-- name: A\n-- summary: One.\nSELECT 1\n-- summary:\n-- summary:   Two.  \n";
+        const string Text = "-- name: A\n-- summary: One.\n-- summary:\n-- summary:   Two.  \nSELECT 1\n";
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 

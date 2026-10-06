@@ -30,6 +30,11 @@ internal enum SqlParseErrorKind
     /// <summary>There is a <c>-- summary:</c> marker before the first name marker.  No argument.</summary>
     SummaryBeforeFirstName,
 
+    /// <summary>
+    /// A <c>-- summary:</c> or <c>-- SqlSource:</c> marker has no SQL after it in its block.  No argument.
+    /// </summary>
+    MarkerAtEndOfBlock,
+
     /// <summary>A directive is not recognised.  Argument: the directive as written.</summary>
     UnknownDirective,
 
