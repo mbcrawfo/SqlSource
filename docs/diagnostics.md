@@ -287,7 +287,7 @@ Move the marker below the `-- name:` marker of the query it describes, or delete
 
 **Directive is not known**
 
-A `-- SqlSource:` marker holds a word that is not a directive.  The directives are `keep-comments`, `token-validation`, `no-token-validation` and `token-ignore=name`.
+A `-- SqlSource:` marker holds a word that is not a directive.  The directives are `keep-comments`, `token-validation`, `no-token-validation`, `token-ignore=name` and `dialect=name`.
 
 ```sql
 -- SqlSource: keep-comment
@@ -368,6 +368,8 @@ A `dialect` directive sets the dialect of a whole file, and it changes how the t
 -- SqlSource: dialect=mysql
 SELECT 1;
 ```
+
+A directive after the last SQL of its query is reported twice: as this error, and as [SQLSRC108](#sqlsrc108).
 
 Move the directive to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
 

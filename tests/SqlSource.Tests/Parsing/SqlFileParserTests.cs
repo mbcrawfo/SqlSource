@@ -528,6 +528,23 @@ public class SqlFileParserTests
         error.Span.Start.ShouldBe(text.LastIndexOf("dialect=", StringComparison.Ordinal));
     }
 
+    // A marker after the last SQL of its block is reported as that.  A dialect directive in it is reported as
+    // misplaced too, so that the user learns at once that it belongs at the top of the file.
+    [Theory]
+    [InlineData("SELECT 1;\n-- SqlSource: dialect=mysql\n")]
+    [InlineData("-- name: A\nSELECT 1;\n-- SqlSource: keep-comments dialect=nope\n")]
+    [InlineData("-- name: A\nSELECT 1;\n-- SqlSource: DIALECT\n-- name: B\nSELECT 2;\n")]
+    public void Parse_DialectDirectiveAfterTheLastSqlOfItsBlock_IsMisplacedAsWellAsAtTheEndOfItsBlock(string text)
+    {
+        var errors = Errors(text);
+
+        errors
+            .Select(static error => error.Kind)
+            .ShouldBe([SqlParseErrorKind.MarkerAtEndOfBlock, SqlParseErrorKind.MisplacedDialect]);
+        errors[0].Span.Start.ShouldBe(text.IndexOf("-- SqlSource:", StringComparison.Ordinal));
+        errors[1].Span.Start.ShouldBe(text.IndexOf("dialect", StringComparison.OrdinalIgnoreCase));
+    }
+
     // A misplaced directive does not change how the file is read: the # would be a comment under MySQL.
     [Fact]
     public void Parse_MisplacedDialectDirective_IsNotApplied() =>

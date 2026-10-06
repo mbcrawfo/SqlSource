@@ -304,6 +304,21 @@ public class SqlDirectiveScopeTests
         dialect.ShouldBe(SqlDialect.Ansi);
     }
 
+    [Fact]
+    public void ReportMisplacedDialects_Marker_ReportsEachDialectDirectiveWhateverItNamesAndNothingElse()
+    {
+        const string Line = "-- SqlSource: keep-comments dialect=mysql bogus DIALECT dialect=nope dialects=x";
+        var errors = new List<SqlParseError>();
+
+        SqlDirectiveScope.ReportMisplacedDialects(Line, Marker(Line), errors);
+
+        errors.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, SpanOf(Line, "dialect=mysql"), "dialect=mysql"),
+            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, SpanOf(Line, "DIALECT"), "DIALECT"),
+            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, SpanOf(Line, "dialect=nope"), "dialect=nope"),
+        ]);
+    }
+
     private static (SqlDirectiveScope Scope, List<SqlParseError> Errors) Read(params string[] lines) =>
         Read(int.MaxValue, lines);
 
