@@ -43,7 +43,7 @@ To pick up a phase: run the brainstorming workflow with this outline as the brie
 | 2. Constants | Designed | [sql-constants-design](2026-10-05-sql-constants-design.md) | The `[SqlQueries]` attribute and `SqlQueriesMode` enum, `.sql` discovery and `Path` resolution, type-shape checks, constant emission with XML docs, diagnostics located in the `.sql` file, and the MSBuild file in the package. |
 | 3. Tokens | Not designed | - | Method emission with `string.Create`, parameter validation, and the `SqlSourceTokenValidation` MSBuild property. |
 
-Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 makes queries without tokens usable; until phase 3 lands, the generator reports a block that contains tokens as an error.
+Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 makes queries without tokens usable; until phase 3 lands, the generator skips a block that contains tokens.  Nothing is released before phase 3.
 
 The phases are ordered parser first because the parser is the largest piece, has no dependency on Roslyn's pipeline, and can be tested completely by itself.  A thin end-to-end slice was considered and not chosen.
 
@@ -126,7 +126,7 @@ Every problem is an error, never a warning: an unknown directive, a duplicate or
 |----|----|
 | `SqlBlock.Name`, `NameSpan` | Phase 2: the member name, and the location for diagnostics about the block |
 | `SqlBlock.Summary` | Phase 2: the `<summary>`; null means generate one |
-| `SqlBlock.Segments` | Phase 2: one literal segment is a constant, and any token segment is the "tokens not supported" error.  Phase 3: the method body and its parameters. |
+| `SqlBlock.Segments` | Phase 2: one literal segment is a constant, and a block with any token segment is skipped.  Phase 3: the method body and its parameters. |
 | `SqlBlock.TokenValidation` | Phase 3: true or false when a directive applies, null when the project setting decides |
 | `SqlBlock.PreserveComments` | Nothing.  The parser has already applied it. |
 | `SqlParseError` kind, span and arguments | Phase 2: mapped to a Roslyn diagnostic located in the `.sql` file.  Each member of `SqlParseErrorKind` documents the one argument it carries, or that it carries none. |
@@ -150,7 +150,7 @@ The results are value-equal, so they can be cached in the incremental pipeline. 
 Everything under [Decisions for the whole epic](#decisions-for-the-whole-epic) that concerns the attribute, the modes, the supported types, the generated documentation and errors.  In addition:
 
 - The nested class is named `Sql`.
-- A block that contains tokens is an error until phase 3.  Phase 3 removes that diagnostic.
+- A block that contains tokens gets no member and no diagnostic until phase 3.  The package is not released before phase 3, so a diagnostic would only be written to be deleted.  The skip is marked with a `TODO` comment for phase 3 to replace.
 - Diagnostic ids and descriptors are created in this phase, one for each `SqlParseErrorKind` and one for each generator error.
 - A parser error is reported at its position in the `.sql` file, not at the attribute.
 - The dialect limits go into the README in this phase.  `docs/tech-debt/TD-0004-lexer-misreads-dialect-specific-sql.md` is the current list; the parser spec's list is incomplete.  `preserve-comments` is a workaround only where a limit strips SQL.  Where a limit reports an unterminated quote or comment, the SQL has to be rewritten.
@@ -247,7 +247,7 @@ The owner accepted the epic's recommendations as written, and settled the two it
 
 1. Emit a static method for each block that has tokens.
 2. Validate the method's parameters, under the control of the directives and a project setting.
-3. Remove phase 2's "tokens not supported" error.
+3. Replace phase 2's skip of a block that has tokens.
 
 ### Decided
 
@@ -291,13 +291,12 @@ The owner accepted the epic's recommendations as written, and settled the two it
 
 - **Generator driver tests:** one token, several tokens, a repeated token, both modes, validation on and off through each of the three switches and their precedence, and an invalid property value.
 - **End-to-end tests:** call the generated methods in `tests/SqlSource.Tests` and assert on the returned string and on the exceptions.
-- **Removal:** the "tokens not supported" diagnostic and its tests are deleted.
+- **Replacement:** phase 2's test that a query with tokens gets no member is replaced by the method tests.
 
 ### Documentation
 
 - `README.md`: the tokens section described above.
-- The analyzer release-tracking file records the removed diagnostic, `SQLSRC010`: its line is deleted from the unshipped file if no release has shipped it, and otherwise it is listed there under removed rules.
-- `docs/diagnostics.md` loses `SQLSRC010` and gains each diagnostic this phase adds.  New usage ids continue from `SQLSRC011`.
+- `docs/diagnostics.md` and the analyzer release-tracking file gain each diagnostic this phase adds.  New usage ids continue from `SQLSRC010`.
 
 ## Out of scope for the epic
 
