@@ -13,7 +13,7 @@ A file is read by the rules of its dialect: [`SqlDialectRules`](../../src/SqlSou
 | A bytes literal with a backslash escape, `b'\''` | CockroachDB, under `postgres` | PostgreSQL's reading: `b'\'` is complete |
 | A block comment that is still open at the end of the file | SQLite | `UnterminatedBlockComment` |
 
-The default dialect, `ansi`, is one set of rules for every database.  By design it also misreads what the table in `README.md` says it does not read: backslash escapes in plain strings, `[...]` identifiers, `q'...'` strings, `#` comments, `--` that needs whitespace, and comments that do not nest.  A project that sets a dialect is not affected.
+The default dialect, `ansi`, is one set of rules for every database.  By design it also misreads what the table in `README.md` says it does not read: backslash escapes in plain strings, `[...]` identifiers, `q'...'` strings, `#` comments, `--` that needs whitespace, and comments that do not nest.  Setting the dialect fixes those, and only those: each construct in the table above is still misread under its own dialect.
 
 A misread has one of two outcomes:
 
