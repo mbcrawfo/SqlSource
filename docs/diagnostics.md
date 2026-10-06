@@ -150,6 +150,8 @@ The MSBuild property `SqlSourceTokenValidation` decides whether the method of a 
 
 Set it to `false` to turn validation off for the project, or remove it to keep the default, which is to validate.  While the value is wrong the generated methods validate.
 
+The compiler hands a generator only the part of a value before the first `;` or `#`.  So `false;true` is read as `false` and is not reported, and `off;false` is reported as `off`.
+
 ## SQLSRC101
 
 **Quote is not closed**
