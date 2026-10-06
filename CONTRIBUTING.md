@@ -82,7 +82,7 @@ dotnet restore SqlSource.slnx
 
 | Script | Does |
 |----|----|
-| `format.sh` | Rewrites C# and project files: `dotnet format style`, `dotnet format analyzers`, then CSharpier |
+| `format.sh` | Builds the generator, which `dotnet format` needs in order to compile the test project, then rewrites C# and project files: `dotnet format style`, `dotnet format analyzers`, then CSharpier |
 | `format.sh --check` | Reports what `format.sh` would change, and rewrites nothing |
 | `pre-commit-validation.sh` | `format.sh --check`, the four linters below, the build, the tests and `tools/check-package.sh` |
 
