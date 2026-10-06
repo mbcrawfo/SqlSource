@@ -22,7 +22,7 @@ public partial class UserRepository
 }
 ```
 
-A query that contains a token is an error until phase 3.
+A query that contains a token gets no member until phase 3.  The package is not released before then.
 
 ## Decisions
 
@@ -36,7 +36,8 @@ The epic's decisions about the attribute, the modes, the supported types, the ge
 | `Path` | Always relative to the folder of the file that carries the attribute.  Null or empty means that folder. | One rule.  A rooted path would not be portable between machines. |
 | File-local types | Error | A generated partial declaration cannot join a `file` type.  Not in the epic. |
 | A `Mode` that is not a defined value | Error | Every problem is an error.  Not in the epic. |
-| Diagnostic ids | `SQLSRC001` to `SQLSRC010` for usage, `SQLSRC101` to `SQLSRC114` for the `.sql` file | Leaves room in each range |
+| Queries with tokens | Skipped without a diagnostic, at a `TODO` comment that names phase 3 | Nothing is released before phase 3, so a diagnostic would be written, documented and tested only to be deleted.  Throwing was rejected: the compiler discards all of a generator's output when it throws. |
+| Diagnostic ids | `SQLSRC001` to `SQLSRC009` for usage, `SQLSRC101` to `SQLSRC114` for the `.sql` file | Leaves room in each range |
 | Severity | Every descriptor is an error and is tagged `NotConfigurable` | A consumer could otherwise set a severity to `none`, which hides the message while the members are still missing |
 | Release tracking | `AnalyzerReleases.Shipped.md` and `AnalyzerReleases.Unshipped.md` | Rule RS2008 requires them, and they make the build fail when an id is added, removed or changed without a record |
 | User-facing diagnostic list | `docs/diagnostics.md`, linked from the README and from each descriptor's help link, and kept complete by a test | Ids are what a user sees in a build log and searches for |
@@ -202,10 +203,10 @@ Step 1 finds `SQLSRC001`, `SQLSRC002`, `SQLSRC006` and `SQLSRC007`, and step 4 t
 `SqlFileReader` calls `SqlFileParser.Parse` with the file's text and its file name, then builds a `ParsedSqlFile`:
 
 - Each `SqlParseError` becomes a `DiagnosticInfo` with the descriptor for its kind, its arguments, and its span converted to a line span through the file's `SourceText`.
-- If there are no parser errors, each block that has a token segment becomes a `SQLSRC010` diagnostic at the block's name, with the block's name and its first token's name.
-- If there are no errors of either kind, each block becomes a `SqlQuery`: its SQL is the text of its one literal segment, and its `NameLocation` is its `NameSpan` as a location.
+- If there are no errors, each block without a token segment becomes a `SqlQuery`: its SQL is the text of its one literal segment, and its `NameLocation` is its `NameSpan` as a location.
+- A block with a token segment is skipped.  The skip is one statement under a `TODO` comment that names phase 3, which replaces it with method emission.
 
-A file with errors has no queries.  The token check is here, not in the type's step, because it depends on the file alone: a file shared by two types is reported once.
+A file with errors has no queries.
 
 ## Checks across a type's files
 
@@ -216,7 +217,7 @@ A file with errors has no queries.  The token check is here, not in the type's s
 | `SQLSRC008` | A query's name was already taken by an earlier file of this type | The later query's name |
 | `SQLSRC009` | A query is named like the type its member goes in: `Sql` in `Nested` mode, the type's own name in `Direct` mode | The query's name |
 
-A file with either problem contributes no members to that type.  The type's other files still do, and the same file can still contribute to another type.  A file with parser or token errors contributes nothing to any type.
+A file with either problem contributes no members to that type.  The type's other files still do, and the same file can still contribute to another type.  A file with parser errors contributes nothing to any type.
 
 ## Generated code
 
@@ -297,9 +298,8 @@ Every descriptor has category `SqlSource`, severity error, is enabled by default
 | `SQLSRC007` | Type has a member named Sql | '{0}' already has a member named 'Sql'.  Rename it, or use SqlQueriesMode.Direct. |
 | `SQLSRC008` | Query name is used in two files | The query name '{0}' is already used in '{1}', which also belongs to '{2}' |
 | `SQLSRC009` | Query is named like its containing type | A query of '{0}' cannot be named '{1}', because its member would have the name of the type that contains it |
-| `SQLSRC010` | Tokens are not supported | The query '{0}' contains the token '{1}', and tokens are not supported yet |
 
-In `SQLSRC008`, `{1}` is the first file's name and `{2}` the type's name.  In `SQLSRC009`, `{0}` is the attributed type's name.  In `SQLSRC010`, `{1}` is the token with its braces.
+In `SQLSRC008`, `{1}` is the first file's name and `{2}` the type's name.  In `SQLSRC009`, `{0}` is the attributed type's name.
 
 ### SQL files
 
@@ -324,7 +324,7 @@ One for each `SqlParseErrorKind`, in the order of the enum.  The location is the
 
 ### Release tracking
 
-`AnalyzerReleases.Shipped.md` and `AnalyzerReleases.Unshipped.md` sit next to `SqlSource.csproj` and are `AdditionalFiles` of it.  The shipped file holds its header only.  The unshipped file lists all 24 ids as new rules.  Neither is packed.
+`AnalyzerReleases.Shipped.md` and `AnalyzerReleases.Unshipped.md` sit next to `SqlSource.csproj` and are `AdditionalFiles` of it.  The shipped file holds its header only.  The unshipped file lists all 23 ids as new rules.  Neither is packed.
 
 On each release the unshipped entries move to the shipped file under a `## Release` heading for that version, in the commit that is tagged.  `docs/publishing.md` gains that step.
 
@@ -359,7 +359,7 @@ A consumer who sets `EnableDefaultSqlSourceItems` to `false` lists the `.sql` fi
 Tests use xunit v3 and Shouldly.  Each behaviour is written as a failing test before its code.
 
 - **Unit tests** (`tests/SqlSource.Tests/Generation/`): `SqlPath` normalisation, including both separators, `.` and `..`, a `..` past the start, and case; `PathResolver` for the default folder, a folder path, a file path, a subfolder that is not searched, and each "matches nothing" case; `XmlDocWriter` for escaping, each line terminator and an empty line.
-- **Driver tests** (`tests/SqlSource.Tests/Generator/`): one helper builds a compilation from C# 12 source and in-memory `AdditionalText` values, runs the generator, and returns the generated sources and diagnostics.  A test compares a whole generated file with its expected text.  The helper also asserts that the compilation with the generated trees has no errors, except in tests of a diagnostic.  Covered: the attribute source; each mode; class, struct, record class and record struct; static, generic and nested types; the global namespace; a keyword as a type name; a generated summary and a written one; multi-line SQL; text that needs escaping in the literal and in the XML; member order across files; each of `SQLSRC001` to `SQLSRC010` with its location; a parser error with its line and column in the `.sql` file; one test that every `SqlParseErrorKind` has a descriptor; a file shared by two types reported once; a file listed twice; an unclaimed file with errors; an attribute on two partial declarations.
+- **Driver tests** (`tests/SqlSource.Tests/Generator/`): one helper builds a compilation from C# 12 source and in-memory `AdditionalText` values, runs the generator, and returns the generated sources and diagnostics.  A test compares a whole generated file with its expected text.  The helper also asserts that the compilation with the generated trees has no errors, except in tests of a diagnostic.  Covered: the attribute source; each mode; class, struct, record class and record struct; static, generic and nested types; the global namespace; a keyword as a type name; a generated summary and a written one; multi-line SQL; text that needs escaping in the literal and in the XML; member order across files; each of `SQLSRC001` to `SQLSRC009` with its location; a query with tokens, which gets no member and no diagnostic while the other queries of its file do; a parser error with its line and column in the `.sql` file; one test that every `SqlParseErrorKind` has a descriptor; a file shared by two types reported once; a file listed twice; an unclaimed file with errors; an attribute on two partial declarations.
 - **Caching** (in `Generator/`): with step tracking on, editing one `.sql` file leaves the other file's parse and the unrelated type's output cached; editing a method body leaves every step cached; adding a `.sql` file to another folder leaves every type's output cached.
 - **End-to-end** (`tests/SqlSource.Tests/EndToEnd/`): real `.sql` files and attributed types, compiled by the build with the generator loaded.  `SqlSource.Tests.csproj` imports the real `SqlSource.props`.  The tests assert the constants at run time, for: the default folder in `Nested` mode; `Direct` mode; `Path` to a file and to a folder; a generic type; a nested type; a record struct.
 - **Documentation:** the `docs/diagnostics.md` test above.
@@ -368,7 +368,7 @@ Tests use xunit v3 and Shouldly.  Each behaviour is written as a failing test be
 
 ## Documentation
 
-- `README.md`: the status; installation; the attribute, `Path` and both modes; the `.sql` file format and the directives that apply without tokens; the dialect limits from `docs/tech-debt/TD-0004-lexer-misreads-dialect-specific-sql.md`, with what `preserve-comments` can and cannot work around; opting out of the default `.sql` items; a link to `docs/diagnostics.md`.  Links stay absolute.
+- `README.md`: the status, which says that queries with tokens are not generated yet; installation; the attribute, `Path` and both modes; the `.sql` file format and the directives that apply without tokens; the dialect limits from `docs/tech-debt/TD-0004-lexer-misreads-dialect-specific-sql.md`, with what `preserve-comments` can and cannot work around; opting out of the default `.sql` items; a link to `docs/diagnostics.md`.  Links stay absolute.
 - `docs/diagnostics.md`: new, as described above.
 - `AGENTS.md`: `docs/diagnostics.md` joins the documents under "Keep the docs current".
 - `src/SqlSource/AGENTS.md`: the pipeline rules, the two new folders, where a new diagnostic is recorded, and the floor test project in place of the TD-0001 reference.
