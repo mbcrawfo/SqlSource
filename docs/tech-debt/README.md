@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0004`
+Next id: `TD-0006`
 
 ## Active items
 
@@ -11,6 +11,8 @@ Next id: `TD-0004`
 | [TD-0001](TD-0001-generator-not-run-on-roslyn-floor.md) | Open | 2026-10-05 | Medium | No test runs the generator on Roslyn 4.8.0, the oldest supported host |
 | [TD-0002](TD-0002-no-coverage-comment-on-fork-pull-requests.md) | Open | 2026-10-05 | Low | Fork and Dependabot pull requests get no coverage comment |
 | [TD-0003](TD-0003-run-number-limited-by-assembly-version.md) | Open | 2026-10-05 | Low | A run number above 65534 fails the build, because it is a part of the assembly version |
+| [TD-0004](TD-0004-lexer-misreads-dialect-specific-sql.md) | Open | 2026-10-05 | Medium | The SQL lexer misreads some MySQL, Oracle and SQL Server constructs, as an error or by stripping SQL |
+| [TD-0005](TD-0005-marker-above-name-applies-to-previous-block.md) | Open | 2026-10-05 | Medium | A summary or directive written above a `-- name:` marker silently applies to the previous block |
 
 ## Columns
 

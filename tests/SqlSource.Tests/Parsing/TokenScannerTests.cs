@@ -50,6 +50,8 @@ public class TokenScannerTests
     [InlineData("{ {name}}")]
     [InlineData("{{name}")]
     [InlineData("{{name} }")]
+    [InlineData("{{😀}}")]
+    [InlineData("{{a\u200B}}")]
     public void Scan_TextThatIsNotExactlyAToken_IsLiteral(string sql) => Scan(sql).ShouldBe(["L:" + sql]);
 
     [Fact]

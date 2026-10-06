@@ -11,7 +11,8 @@ namespace SqlSource.Parsing;
 internal sealed record SqlBlockText(string Text, ImmutableArray<int> Offsets)
 {
     /// <summary>
-    /// Converts a span of <see cref="Text" /> that lies on one line into the matching span of the file's text.
+    /// Converts a non-empty span of <see cref="Text" /> that lies on one line into the span of the file's text that it
+    /// came from.  The two can differ in length: a stripped block comment is one space here.
     /// </summary>
-    public TextSpan ToSourceSpan(TextSpan span) => new(Offsets[span.Start], span.Length);
+    public TextSpan ToSourceSpan(TextSpan span) => TextSpan.FromBounds(Offsets[span.Start], Offsets[span.End - 1] + 1);
 }
