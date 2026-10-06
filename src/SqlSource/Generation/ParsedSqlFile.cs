@@ -1,0 +1,17 @@
+using SqlSource.Diagnostics;
+
+namespace SqlSource.Generation;
+
+/// <summary>
+/// One <c>.sql</c> file that a type claims, parsed.
+/// </summary>
+/// <param name="NormalizedPath">The path in the form <see cref="SqlPath.Normalize" /> gives.</param>
+/// <param name="FileName">The file's name with its extension.</param>
+/// <param name="Queries">The file's queries, in file order.  Empty when <paramref name="Errors" /> is not.</param>
+/// <param name="Errors">The file's problems, located in the file.</param>
+internal sealed record ParsedSqlFile(
+    string NormalizedPath,
+    string FileName,
+    EquatableArray<SqlQuery> Queries,
+    EquatableArray<DiagnosticInfo> Errors
+);
