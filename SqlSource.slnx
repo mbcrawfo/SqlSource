@@ -3,6 +3,7 @@
     <Project Path="src/SqlSource/SqlSource.csproj" />
   </Folder>
   <Folder Name="/tests/">
+    <Project Path="tests/SqlSource.Tests.RoslynFloor/SqlSource.Tests.RoslynFloor.csproj" />
     <Project Path="tests/SqlSource.Tests/SqlSource.Tests.csproj" />
   </Folder>
 </Solution>

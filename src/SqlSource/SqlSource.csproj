@@ -20,6 +20,7 @@
     </PropertyGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="SqlSource.Tests" />
+        <InternalsVisibleTo Include="SqlSource.Tests.RoslynFloor" />
     </ItemGroup>
     <ItemGroup>
         <!-- Release tracking for the diagnostics in Diagnostics/SqlDiagnostics.cs (rules RS2000 to RS2008). -->
