@@ -244,7 +244,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor InvalidDirectiveValue = new(
         id: "SQLSRC111",
         title: "Directive value is not valid",
-        messageFormat: "The directive '{0}' lacks a value it needs, or has one it does not take",
+        messageFormat: "The directive '{0}' lacks a value it needs, has one it does not take, or has one that is not "
+            + "valid",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -255,7 +256,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor ConflictingDirectives = new(
         id: "SQLSRC112",
         title: "Directives conflict",
-        messageFormat: "'{0}' conflicts with the other token validation directive in the same scope",
+        messageFormat: "'{0}' conflicts with another directive in the same scope",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -282,6 +283,17 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc114",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor MisplacedDialect = new(
+        id: "SQLSRC115",
+        title: "Dialect directive is misplaced",
+        messageFormat: "The 'dialect' directive must come before the file's first query and before any SQL",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc115",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -313,7 +325,8 @@ internal static class SqlDiagnostics
             InvalidDirectiveValue,
             ConflictingDirectives,
             EmptyBlock,
-            ReservedTokenName
+            ReservedTokenName,
+            MisplacedDialect
         );
 
     /// <summary>
@@ -336,6 +349,7 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.ConflictingDirectives => ConflictingDirectives,
             SqlParseErrorKind.EmptyBlock => EmptyBlock,
             SqlParseErrorKind.ReservedTokenName => ReservedTokenName,
+            SqlParseErrorKind.MisplacedDialect => MisplacedDialect,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No descriptor is defined for this kind."),
         };
 }

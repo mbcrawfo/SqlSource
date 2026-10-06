@@ -12,10 +12,11 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void NewScope_HasNoDirectives()
     {
-        var scope = new SqlDirectiveScope();
+        var scope = new SqlDirectiveScope(headerEnd: 0);
 
         scope.KeepComments.ShouldBeFalse();
         scope.TokenValidation.ShouldBeNull();
+        scope.Dialect.ShouldBeNull();
         scope.IgnoredTokens.ShouldBeEmpty();
     }
 
@@ -183,18 +184,146 @@ public class SqlDirectiveScopeTests
         scope.KeepComments.ShouldBeTrue();
     }
 
-    private static (SqlDirectiveScope Scope, List<SqlParseError> Errors) Read(params string[] lines)
+    [Theory]
+    [InlineData("dialect=mysql", nameof(SqlDialect.MySql))]
+    [InlineData("DIALECT=Postgres", nameof(SqlDialect.PostgreSql))]
+    [InlineData("Dialect=TSQL", nameof(SqlDialect.SqlServer))]
+    [InlineData("dialect=ansi", nameof(SqlDialect.Ansi))]
+    public void Read_Dialect_KeepsTheDialectItNames(string directive, string expected)
     {
-        var scope = new SqlDirectiveScope();
+        var (scope, errors) = Read("-- SqlSource: " + directive);
+
+        errors.ShouldBeEmpty();
+        scope.Dialect.ToString().ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("dialect")]
+    [InlineData("dialect=")]
+    [InlineData("dialect=pgsql")]
+    [InlineData("dialect=mysql,postgres")]
+    [InlineData("dialect=mysql=x")]
+    public void Read_DialectWithoutAValueOrWithAnUnknownName_IsAnError(string directive)
+    {
+        var line = "-- SqlSource: " + directive;
+
+        var (scope, errors) = Read(line);
+
+        errors.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.InvalidDirectiveValue, SpanOf(line, directive), directive),
+        ]);
+        scope.Dialect.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Read_SameDialectTwice_IsAllowed()
+    {
+        var (scope, errors) = Read("-- SqlSource: dialect=mssql dialect=tsql", "-- SqlSource: dialect=SqlServer");
+
+        errors.ShouldBeEmpty();
+        scope.Dialect.ShouldBe(SqlDialect.SqlServer);
+    }
+
+    [Fact]
+    public void Read_TwoDialectsOnOneLine_ReportsTheSecondAndKeepsTheFirst()
+    {
+        const string Line = "-- SqlSource: dialect=mysql dialect=oracle";
+
+        var (scope, errors) = Read(Line);
+
+        errors.ShouldBe([
+            SqlParseError.Create(
+                SqlParseErrorKind.ConflictingDirectives,
+                SpanOf(Line, "dialect=oracle"),
+                "dialect=oracle"
+            ),
+        ]);
+        scope.Dialect.ShouldBe(SqlDialect.MySql);
+    }
+
+    [Fact]
+    public void Read_TwoDialectsOnSeparateLines_IsAnError()
+    {
+        var (scope, errors) = Read("-- SqlSource: dialect=mysql", "-- SqlSource: dialect=mariadb");
+
+        errors.ShouldHaveSingleItem().Kind.ShouldBe(SqlParseErrorKind.ConflictingDirectives);
+        scope.Dialect.ShouldBe(SqlDialect.MySql);
+    }
+
+    // The directive starts at offset 14 of the line.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(14)]
+    public void Read_DialectAtOrAfterTheHeaderEnd_IsMisplacedWhateverItNames(int headerEnd)
+    {
+        var (scope, errors) = Read(headerEnd, "-- SqlSource: dialect=mysql keep-comments", "-- SqlSource: dialect=x");
+
+        errors.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, new TextSpan(14, 13), "dialect=mysql"),
+            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, new TextSpan(14, 9), "dialect=x"),
+        ]);
+        scope.Dialect.ShouldBeNull();
+        scope.KeepComments.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Read_DialectJustBeforeTheHeaderEnd_IsAccepted()
+    {
+        var (scope, errors) = Read(15, "-- SqlSource: dialect=mysql");
+
+        errors.ShouldBeEmpty();
+        scope.Dialect.ShouldBe(SqlDialect.MySql);
+    }
+
+    [Theory]
+    [InlineData("-- SqlSource: dialect=mysql", nameof(SqlDialect.MySql))]
+    [InlineData("-- SqlSource: keep-comments DIALECT=Oracle token-ignore=a", nameof(SqlDialect.Oracle))]
+    [InlineData("-- SqlSource: dialect=nope dialect= dialect dialect=sqlite", nameof(SqlDialect.Sqlite))]
+    [InlineData("-- SqlSource: dialect=mysql dialect=oracle", nameof(SqlDialect.MySql))]
+    public void TryFindDialect_MarkerWithADialect_GivesTheFirstThatIsValid(string line, string expected)
+    {
+        SqlDirectiveScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeTrue();
+
+        dialect.ToString().ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("-- SqlSource: keep-comments")]
+    [InlineData("-- SqlSource:")]
+    [InlineData("-- SqlSource: dialect")]
+    [InlineData("-- SqlSource: dialect=")]
+    [InlineData("-- SqlSource: dialect=pgsql")]
+    [InlineData("-- SqlSource: xdialect=mysql")]
+    [InlineData("-- SqlSource: dialects=mysql")]
+    [InlineData("-- SqlSource: dialect:mysql")]
+    [InlineData("-- SqlSource: dialect = mysql")]
+    public void TryFindDialect_MarkerWithoutAValidDialect_FindsNone(string line)
+    {
+        SqlDirectiveScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeFalse();
+
+        dialect.ShouldBe(SqlDialect.Ansi);
+    }
+
+    private static (SqlDirectiveScope Scope, List<SqlParseError> Errors) Read(params string[] lines) =>
+        Read(int.MaxValue, lines);
+
+    // Each line is lexed alone, so every directive is at the offset it has in its own line.
+    private static (SqlDirectiveScope Scope, List<SqlParseError> Errors) Read(int headerEnd, params string[] lines)
+    {
+        var scope = new SqlDirectiveScope(headerEnd);
         var errors = new List<SqlParseError>();
         foreach (var line in lines)
         {
-            var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0]);
-            _ = marker.ShouldNotBeNull();
-            scope.Read(line, marker.Value, errors);
+            scope.Read(line, Marker(line), errors);
         }
 
         return (scope, errors);
+    }
+
+    private static SqlMarker Marker(string line)
+    {
+        var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0]);
+        return marker.ShouldNotBeNull();
     }
 
     private static TextSpan SpanOf(string text, string value) =>

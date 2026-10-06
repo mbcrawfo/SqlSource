@@ -29,3 +29,4 @@ SQLSRC111 | SqlSource | Error | Directive value is not valid
 SQLSRC112 | SqlSource | Error | Directives conflict
 SQLSRC113 | SqlSource | Error | Query has no SQL
 SQLSRC114 | SqlSource | Error | Token name is a keyword
+SQLSRC115 | SqlSource | Error | Dialect directive is misplaced

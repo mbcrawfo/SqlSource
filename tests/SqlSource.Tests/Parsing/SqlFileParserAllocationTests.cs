@@ -17,23 +17,29 @@ public class SqlFileParserAllocationTests
 
     private const int Queries = 50;
 
-    [Fact]
-    public void Parse_TypicalFile_AllocatesWithinItsBudget()
+    [Theory]
+    [InlineData(nameof(SqlDialect.Ansi), false)]
+    [InlineData(nameof(SqlDialect.MySql), false)]
+    [InlineData(nameof(SqlDialect.Oracle), false)]
+    // The file names its own dialect, so its header is read before the rest.
+    [InlineData(nameof(SqlDialect.Ansi), true)]
+    public void Parse_TypicalFile_AllocatesWithinItsBudget(string dialectName, bool hasDirective)
     {
         const int Iterations = 20;
-        var text = CreateFile();
-        SqlFileParser.Parse(text, "Queries.sql").Blocks.Count.ShouldBe(Queries);
+        var dialect = Enum.Parse<SqlDialect>(dialectName);
+        var text = CreateFile(hasDirective);
+        SqlFileParser.Parse(text, "Queries.sql", dialect).Blocks.Count.ShouldBe(Queries);
 
         // The first parses pay for one-off work: JIT compilation, static initialisers and the shared buffer pool.
         for (var iteration = 0; iteration < Iterations; iteration++)
         {
-            _ = SqlFileParser.Parse(text, "Queries.sql");
+            _ = SqlFileParser.Parse(text, "Queries.sql", dialect);
         }
 
         var before = GC.GetAllocatedBytesForCurrentThread();
         for (var iteration = 0; iteration < Iterations; iteration++)
         {
-            _ = SqlFileParser.Parse(text, "Queries.sql");
+            _ = SqlFileParser.Parse(text, "Queries.sql", dialect);
         }
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
@@ -43,9 +49,11 @@ public class SqlFileParserAllocationTests
 
     // A file like the ones the generator is written for: a preamble, and queries that mix line comments, block
     // comments, string literals, tokens and blank lines.
-    private static string CreateFile()
+    private static string CreateFile(bool hasDirective)
     {
-        var file = new StringBuilder("-- Copyright (c) Example\n-- SqlSource: token-ignore=raw\n\n");
+        var file = new StringBuilder("-- Copyright (c) Example\n-- SqlSource: token-ignore=raw")
+            .Append(hasDirective ? " dialect=postgres" : string.Empty)
+            .Append("\n\n");
         for (var query = 0; query < Queries; query++)
         {
             var number = query.ToString(CultureInfo.InvariantCulture);

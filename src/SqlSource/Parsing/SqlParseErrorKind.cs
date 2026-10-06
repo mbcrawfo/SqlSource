@@ -42,11 +42,15 @@ internal enum SqlParseErrorKind
     EmptyDirectiveLine,
 
     /// <summary>
-    /// A directive lacks a value it needs or has one it does not take.  Argument: the directive as written.
+    /// A directive lacks a value it needs, has one it does not take, or has one that is not valid.  Argument: the
+    /// directive as written.
     /// </summary>
     InvalidDirectiveValue,
 
-    /// <summary>Both validation directives appear in one scope.  Argument: the second directive as written.</summary>
+    /// <summary>
+    /// Two directives of one scope contradict each other: both validation directives, or two dialects.  Argument: the
+    /// second directive as written.
+    /// </summary>
     ConflictingDirectives,
 
     /// <summary>A block has no SQL.  No argument.</summary>
@@ -54,4 +58,9 @@ internal enum SqlParseErrorKind
 
     /// <summary>A token's name is a reserved C# keyword.  Argument: the name.</summary>
     ReservedTokenName,
+
+    /// <summary>
+    /// A <c>dialect=</c> directive is inside a named query or after SQL.  Argument: the directive as written.
+    /// </summary>
+    MisplacedDialect,
 }

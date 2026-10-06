@@ -465,9 +465,126 @@ public class SqlFileParserTests
     public void Parse_DifferentText_GivesUnequalResults() =>
         SqlFileParser.Parse("SELECT 1", "Query.sql").ShouldNotBe(SqlFileParser.Parse("SELECT 2", "Query.sql"));
 
-    private static SqlBlock[] Blocks(string text, string fileName = "Query.sql")
+    // ANSI ends the string at the second quote, takes the rest of the line for a comment, and would keep the #.
+    [Theory]
+    [InlineData(nameof(SqlDialect.Ansi), "SELECT 'a\\'b")]
+    [InlineData(nameof(SqlDialect.MySql), "SELECT 'a\\'b -- c', 2")]
+    public void Parse_Dialect_DecidesHowTheSqlIsRead(string dialect, string expected)
     {
-        var result = SqlFileParser.Parse(text, fileName);
+        const string Text = "-- name: A\nSELECT 'a\\'b -- c', 2 # d\n";
+
+        Sql(Blocks(Text, dialect: Enum.Parse<SqlDialect>(dialect)).ShouldHaveSingleItem()).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Parse_DialectDirectiveInThePreamble_AppliesToEveryBlockAndIsNotInTheSql()
+    {
+        const string Text =
+            "/* Copyright (c) Example */\n-- SqlSource: dialect=mysql\n\n"
+            + "-- name: A\nSELECT 'a\\'b' # c\n-- name: B\nSELECT 5--3 # d\n";
+
+        Blocks(Text).Select(Sql).ShouldBe(["SELECT 'a\\'b'", "SELECT 5--3"]);
+    }
+
+    [Fact]
+    public void Parse_DialectDirective_ReplacesTheDialectOfTheProject()
+    {
+        const string Text = "-- SqlSource: dialect=mssql\n-- name: A\nSELECT [a'b] -- c\n";
+
+        Sql(Blocks(Text, dialect: SqlDialect.MySql).ShouldHaveSingleItem()).ShouldBe("SELECT [a'b]");
+    }
+
+    [Fact]
+    public void Parse_DialectDirectiveInAFileWithoutANameMarker_GoesAboveItsSql()
+    {
+        const string Text = "-- summary: S\n-- SqlSource: dialect=oracle keep-comments\nSELECT q'[it's]' --+ h\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        Sql(block).ShouldBe("SELECT q'[it's]' --+ h");
+        block.Summary.ShouldBe("S");
+        block.KeepComments.ShouldBeTrue();
+    }
+
+    // The header is read under the dialect of the project, and the rest of the file under the directive's.
+    [Fact]
+    public void Parse_CommentAboveTheDialectDirective_IsReadUnderTheDialectOfTheProject()
+    {
+        const string Text = "# licence\n-- SqlSource: dialect=postgres\n-- name: A\nSELECT 1 # 2\n";
+
+        Sql(Blocks(Text, dialect: SqlDialect.MySql).ShouldHaveSingleItem()).ShouldBe("SELECT 1 # 2");
+    }
+
+    [Theory]
+    [InlineData("-- name: A\n-- SqlSource: dialect=mysql\nSELECT 1\n")]
+    [InlineData("-- SqlSource: dialect=mysql\n-- name: A\n-- SqlSource: dialect=mysql\nSELECT 1\n")]
+    [InlineData("SELECT 1\n-- SqlSource: dialect=mysql\nFROM t\n")]
+    [InlineData("-- name: A\nSELECT 1\n-- name: B\n-- SqlSource: dialect=nope\nSELECT 2\n")]
+    public void Parse_DialectDirectiveInsideAQueryOrAfterSql_IsMisplaced(string text)
+    {
+        var error = Errors(text).ShouldHaveSingleItem();
+
+        error.Kind.ShouldBe(SqlParseErrorKind.MisplacedDialect);
+        error.Span.Start.ShouldBe(text.LastIndexOf("dialect=", StringComparison.Ordinal));
+    }
+
+    // A misplaced directive does not change how the file is read: the # would be a comment under MySQL.
+    [Fact]
+    public void Parse_MisplacedDialectDirective_IsNotApplied() =>
+        Errors("-- name: A\n-- SqlSource: dialect=mysql\nSELECT 'it''s' # '\n")
+            .ShouldHaveSingleItem()
+            .Kind.ShouldBe(SqlParseErrorKind.UnterminatedQuote);
+
+    [Fact]
+    public void Parse_DialectDirectiveAfterSqlInThePreamble_IsReportedWithTheSql()
+    {
+        const string Text = "SELECT 0;\n-- SqlSource: dialect=mysql\n-- name: A\nSELECT 1\n";
+
+        Errors(Text)
+            .Select(static error => error.Kind)
+            .ShouldBe([SqlParseErrorKind.SqlBeforeFirstName, SqlParseErrorKind.MisplacedDialect]);
+    }
+
+    [Theory]
+    [InlineData("-- SqlSource: dialect=pgsql\n-- name: A\nSELECT 1\n", "dialect=pgsql")]
+    [InlineData("-- SqlSource: dialect\nSELECT 1\n", "dialect")]
+    public void Parse_DialectDirectiveWithoutAValidName_IsAnErrorAtTheDirective(string text, string directive) =>
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidDirectiveValue, SpanOf(text, directive), directive),
+            ]);
+
+    [Fact]
+    public void Parse_TwoDialectsInOneHeader_IsAnErrorAtTheSecondAndTheSameDialectTwiceIsNot()
+    {
+        const string Conflict = "-- SqlSource: dialect=mysql\n-- SqlSource: dialect=oracle\n-- name: A\nSELECT 1\n";
+        const string Repeat = "-- SqlSource: dialect=mysql\n-- SqlSource: dialect=MYSQL\n-- name: A\nSELECT 1 # c\n";
+
+        Errors(Conflict)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingDirectives,
+                    SpanOf(Conflict, "dialect=oracle"),
+                    "dialect=oracle"
+                ),
+            ]);
+        Sql(Blocks(Repeat).ShouldHaveSingleItem()).ShouldBe("SELECT 1");
+    }
+
+    [Fact]
+    public void Parse_SameTextUnderTwoDialects_GivesUnequalResultsOnlyWhereTheyReadItDifferently()
+    {
+        SqlFileParser
+            .Parse("SELECT 1 # c", "Query.sql", SqlDialect.MySql)
+            .ShouldNotBe(SqlFileParser.Parse("SELECT 1 # c", "Query.sql", SqlDialect.Ansi));
+        SqlFileParser
+            .Parse("SELECT 1 -- c", "Query.sql", SqlDialect.MySql)
+            .ShouldBe(SqlFileParser.Parse("SELECT 1 -- c", "Query.sql", SqlDialect.Ansi));
+    }
+
+    private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialect dialect = SqlDialect.Ansi)
+    {
+        var result = SqlFileParser.Parse(text, fileName, dialect);
         result.Errors.ShouldBeEmpty();
         return [.. result.Blocks];
     }

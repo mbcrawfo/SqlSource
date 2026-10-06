@@ -28,6 +28,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC112](#sqlsrc112) | Directives conflict |
 | [SQLSRC113](#sqlsrc113) | Query has no SQL |
 | [SQLSRC114](#sqlsrc114) | Token name is a keyword |
+| [SQLSRC115](#sqlsrc115) | Dialect directive is misplaced |
 
 Ids below 100 are about the type that carries `[SqlQueries]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
@@ -156,26 +157,28 @@ The compiler hands a generator only the part of a value before the first `;` or 
 
 **Quote is not closed**
 
-A string or a quoted identifier starts and never ends.  The error is at the opening quote.
+A string or a quoted identifier starts and never ends.  The error is at the opening quote or bracket.
 
 ```sql
 SELECT 'unfinished FROM users;
 ```
 
-Close the quote.  If the SQL is valid for your database, it uses a quoting form that SqlSource reads differently; see the dialect limits in the README.  Rewrite the construct in a form that SqlSource reads correctly.
+Close the quote.  If the SQL is valid for your database, SqlSource is reading it by the rules of another one: `'it\'s'` is one string in MySQL and an unclosed one elsewhere.  Set the dialect of the file; see [Dialects](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#dialects) in the README, which also lists the few constructs that no dialect setting reads correctly.
 
 ## SQLSRC102
 
 **Comment is not closed**
 
-A block comment or a hint starts with `/*` and never ends.  The error is at the `/*`.  SqlSource nests block comments, as PostgreSQL does: each `/*` inside a comment needs its own `*/`.
+A block comment or a hint starts with `/*` and never ends.  The error is at the `/*`.
 
 ```sql
 /* outer /* inner */
 SELECT 1;
 ```
 
-Close the comment.  In a dialect that does not nest comments, remove the inner `/*`.
+Close the comment.  Whether a `/*` inside a comment needs its own `*/` depends on the dialect: it does in the default dialect, in SQL Server and in PostgreSQL, and it does not in MySQL, MariaDB, SQLite and Oracle.  If the SQL is valid for your database, set the dialect of the file; see [Dialects](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#dialects) in the README.
+
+SQLite accepts a comment that is still open at the end of the file.  SqlSource does not, in any dialect, because the comment would take every later query of the file with it.
 
 ## SQLSRC103
 
@@ -280,22 +283,30 @@ Add a directive, or delete the line.
 
 **Directive value is not valid**
 
-`token-ignore` needs a value that is a C# identifier, as in `token-ignore=table`.  No other directive takes a value.
+A directive lacks a value it needs, has one it does not take, or has one that is not valid.
+
+- `token-ignore` needs a value that is a C# identifier, as in `token-ignore=table`.
+- `dialect` needs the name of a dialect, as in `dialect=postgres`.  The names are `ansi`, `mssql`, `postgres`, `mysql`, `mariadb`, `sqlite` and `oracle`, in any case; `sqlserver` and `tsql` also mean `mssql`, and `postgresql` also means `postgres`.
+- No other directive takes a value.
 
 ```sql
 -- SqlSource: token-ignore
+-- SqlSource: dialect=pgsql
 -- SqlSource: keep-comments=true
 ```
 
-Add the missing value, or remove the one that does not belong.
+Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
 ## SQLSRC112
 
 **Directives conflict**
 
-`token-validation` and `no-token-validation` both appear in one scope: both in the lines before the first `-- name:` marker, or both in one query.  The error is at the second.
+Two directives in one scope contradict each other.  A scope is the lines before the first `-- name:` marker, or one query.  The error is at the second directive.
 
-Remove one of the two.  A directive in a query overrides the same directive before the first `-- name:` marker, and that is not a conflict.
+- `token-validation` and `no-token-validation` both appear.
+- Two `dialect` directives name different dialects.  A file has one dialect.
+
+Remove one of the two.  A validation directive in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice is not a conflict either.
 
 ## SQLSRC113
 
@@ -321,3 +332,26 @@ SELECT * FROM {{class}};
 ```
 
 Rename the token.  If the braces are literal text and not a token, add `-- SqlSource: token-ignore=class` to the query.
+
+## SQLSRC115
+
+**Dialect directive is misplaced**
+
+A `dialect` directive sets the dialect of a whole file, and it changes how the text after it is read.  So it must come before the file's first `-- name:` marker and before the file's first SQL.  This one is inside a named query, or after SQL.
+
+```sql
+-- name: GetUser
+-- SqlSource: dialect=mysql
+SELECT 1;
+```
+
+Move the directive to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
+
+```sql
+-- SqlSource: dialect=mysql
+
+-- name: GetUser
+SELECT 1;
+```
+
+A file cannot mix dialects.  Put the queries for another database in a file of their own.
