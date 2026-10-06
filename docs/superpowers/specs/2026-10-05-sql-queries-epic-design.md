@@ -84,6 +84,7 @@ The [parser spec](2026-10-05-sql-parser-design.md) holds the full rules.  In out
 - Three markers are recognised, each a line comment that starts its line, matched case-insensitively and always removed from the SQL: `-- name:`, `-- summary:` and `-- SqlSource:`.
 - `-- name:` starts a named block that runs to the next name marker or the end of the file.  A file with no name marker is one block named after the file.
 - Before the first name marker, comments and `-- SqlSource:` directives are allowed and the directives apply to every block.  SQL there is an error.
+- A `-- summary:` or `-- SqlSource:` marker at the end of a block, with no SQL after it before the next name marker or the end of the file, is to be an error.  The parser does not report it yet: it accepts the marker and applies it to that block.  This is parser work, tracked in `docs/tech-debt/TD-0005-markers-at-the-end-of-a-block-are-accepted.md`, and is to be done before phase 2 documents the file format.
 - Directives:
 
 | Directive | Effect |
@@ -163,7 +164,6 @@ Everything under [Decisions for the whole epic](#decisions-for-the-whole-epic) t
 | Is `Path` a file or a folder? | A value ending in `.sql`, compared case-insensitively, is a file.  Anything else is a folder. | The generator may not touch the file system, so it cannot ask. |
 | Path comparison | Accept `/` and `\` in `Path`, and compare paths case-insensitively | A project then builds the same on every operating system |
 | The default folder holds no `.sql` file | Error | The attribute does nothing, which is never intended |
-| A `-- summary:` or `-- SqlSource:` marker written above the next `-- name:` marker | Make it an error in the parser before the format is documented.  Today it silently applies to the previous block; see `docs/tech-debt/TD-0005-marker-above-name-applies-to-previous-block.md`. | Annotations above a declaration are the C# habit, and the mistake is silent |
 | A `.sql` file no type points at | Ignored, including its parser errors | The package registers every `.sql` file in the project.  A migration script elsewhere must not break the build. |
 | A stray file in a type's folder whose name is not an identifier | Keep the parser's `InvalidFileName` error | It follows from the rules.  The developer adds a `-- name:` marker, moves the file or sets `Path`. |
 | A `.sql` file shared by two types | Parse it once and report its errors once | Avoids duplicate diagnostics |
