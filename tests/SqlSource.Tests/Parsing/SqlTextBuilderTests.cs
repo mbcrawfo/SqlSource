@@ -119,12 +119,40 @@ public class SqlTextBuilderTests
 
         var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, preserveComments);
 
-        built.Offsets.Length.ShouldBe(built.Text.Length);
         foreach (var token in new[] { "{{a}}", "{{b}}" })
         {
             var inBuilt = new TextSpan(built.Text.IndexOf(token, StringComparison.Ordinal), token.Length);
             var inFile = new TextSpan(Text.IndexOf(token, StringComparison.Ordinal), token.Length);
             built.ToSourceSpan(inBuilt).ShouldBe(inFile);
+        }
+    }
+
+    // Every character of the built text, other than a line break, must map to the place in the file it came from.  A
+    // stripped block comment is the one exception: its single space maps to the start of the comment.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void ToSourceSpan_EveryCharacterOfTheBuiltText_MapsToItsPlaceInTheFile(bool preserveComments)
+    {
+        const string Text =
+            "  -- lead\r\n\r\n-- summary: s\r\nSELECT 'a  \r\n\r\n b', /* c */ x   \r\n"
+            + "\t-- SqlSource: token-ignore=q\r\n"
+            + "\r\n  /*+ h\r\n  i */ FROM t -- d  \r\n   \r\nWHERE {{y}} = $$ z\n $$  \r\n";
+        var lexemes = SqlLexer.Lex(Text).Lexemes;
+
+        var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, preserveComments);
+
+        for (var index = 0; index < built.Text.Length; index++)
+        {
+            var character = built.Text[index];
+            if (character == '\n')
+            {
+                continue;
+            }
+
+            var source = Text[built.ToSourceSpan(new TextSpan(index, 1)).Start];
+            var isStrippedComment = !preserveComments && character == ' ' && source == '/';
+            (source == character || isStrippedComment).ShouldBeTrue($"offset {index} maps to '{source}'");
         }
     }
 

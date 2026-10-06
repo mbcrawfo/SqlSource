@@ -1,15 +1,19 @@
-using System;
+using System.Buffers;
 using System.Collections.Generic;
-using System.Collections.Immutable;
-using System.Text;
 
 namespace SqlSource.Parsing;
 
 /// <summary>
 /// Builds the SQL of one block from its lexemes.
 /// </summary>
+/// <remarks>
+/// This is where a parse does most of its work, so it is written to allocate little.  The output is written once into
+/// a pooled buffer, text is copied from the file in runs, and nothing is allocated for a line or for a character.
+/// </remarks>
 internal static class SqlTextBuilder
 {
+    private static readonly char[] LineTerminators = ['\r', '\n'];
+
     /// <summary>
     /// Builds the SQL of the lexemes from <paramref name="start" /> up to <paramref name="end" />.
     /// </summary>
@@ -21,46 +25,48 @@ internal static class SqlTextBuilder
         bool preserveComments
     )
     {
-        var writer = new Writer(text, preserveComments);
-        for (var index = start; index < end; index++)
+        if (start >= end)
         {
-            writer.Append(lexemes[index]);
+            return new SqlBlockText(string.Empty, []);
         }
 
-        return writer.Finish();
-    }
-
-    private sealed class Line
-    {
-        public StringBuilder Text { get; } = new();
-
-        public List<int> Offsets { get; } = [];
-
-        public bool IsMarker { get; set; }
-
-        public void Append(char value, int offset)
+        // The output is never longer than its source: each character written stands for a different character read.
+        var buffer = ArrayPool<char>.Shared.Rent(lexemes[end - 1].Span.End - lexemes[start].Span.Start);
+        try
         {
-            _ = Text.Append(value);
-            Offsets.Add(offset);
-        }
-
-        public void TrimEnd()
-        {
-            var length = Text.Length;
-            while (length > 0 && Text[length - 1] is ' ' or '\t')
+            var writer = new Writer(text, preserveComments, buffer);
+            for (var index = start; index < end; index++)
             {
-                length--;
+                writer.Append(lexemes[index]);
             }
 
-            Offsets.RemoveRange(length, Text.Length - length);
-            Text.Length = length;
+            return writer.Finish();
+        }
+        finally
+        {
+            ArrayPool<char>.Shared.Return(buffer);
         }
     }
 
-    private sealed class Writer(string source, bool preserveComments)
+    // The buffer holds the finished output, then the line breaks that would join the next line to it, then the line
+    // being written.  A line is judged when it ends: kept with its trailing blanks trimmed, or dropped by moving back
+    // to the end of the finished output.
+    private sealed class Writer(string source, bool preserveComments, char[] buffer)
     {
-        private readonly List<Line> _lines = [];
-        private Line _current = new();
+        private readonly List<(int Output, int Source)> _runs = [];
+
+        // The length of the finished output: whole lines, with no line break after the last one.
+        private int _finished;
+
+        // Where the line being written starts and where its content ends.  Blanks after the content are trimmed if the
+        // line ends there.  A line whose content is empty is blank.
+        private int _lineStart;
+        private int _contentEnd;
+        private int _position;
+
+        // Blank lines met since the last finished line.  They are written only if another line follows them.
+        private int _pendingBlankLines;
+        private bool _isMarkerLine;
 
         public void Append(SqlLexeme lexeme)
         {
@@ -70,7 +76,7 @@ internal static class SqlTextBuilder
             }
             else if (SqlMarkerReader.Read(source, lexeme) is not null)
             {
-                _current.IsMarker = true;
+                _isMarkerLine = true;
             }
             else if (preserveComments || lexeme.Kind == SqlLexemeKind.Text)
             {
@@ -80,56 +86,14 @@ internal static class SqlTextBuilder
             {
                 // A stripped block comment leaves one space, so that the text on either side of it stays apart.
                 // A stripped line comment leaves nothing.
-                _current.Append(' ', lexeme.Span.Start);
+                Write(' ', lexeme.Span.Start);
             }
         }
 
         public SqlBlockText Finish()
         {
             EndLine();
-            var kept = new List<Line>();
-            foreach (var line in _lines)
-            {
-                line.TrimEnd();
-                if (!line.IsMarker && (preserveComments || line.Text.Length > 0))
-                {
-                    kept.Add(line);
-                }
-            }
-
-            var first = 0;
-            var last = kept.Count - 1;
-            while (first <= last && kept[first].Text.Length == 0)
-            {
-                first++;
-            }
-
-            while (last >= first && kept[last].Text.Length == 0)
-            {
-                last--;
-            }
-
-            return Join(kept, first, last);
-        }
-
-        private static SqlBlockText Join(List<Line> lines, int first, int last)
-        {
-            var text = new StringBuilder();
-            var offsets = ImmutableArray.CreateBuilder<int>();
-            for (var index = first; index <= last; index++)
-            {
-                if (index > first)
-                {
-                    // The offset of a joining line break is never read: a token cannot span lines.
-                    _ = text.Append('\n');
-                    offsets.Add(-1);
-                }
-
-                _ = text.Append(lines[index].Text);
-                offsets.AddRange(lines[index].Offsets);
-            }
-
-            return new SqlBlockText(text.ToString(), offsets.ToImmutable());
+            return new SqlBlockText(new string(buffer, 0, _finished), [.. _runs]);
         }
 
         // Text and kept comments: a line terminator ends the output line.
@@ -139,47 +103,133 @@ internal static class SqlTextBuilder
             var end = lexeme.Span.End;
             while (index < end)
             {
-                var terminator = LineTerminatorLength(index, end);
-                if (terminator == 0)
-                {
-                    _current.Append(source[index], index);
-                    index++;
-                }
-                else
+                var lineEnd = FindLineEnd(index, end);
+                Copy(index, lineEnd);
+                ExtendContent(index, lineEnd);
+                if (lineEnd < end)
                 {
                     EndLine();
-                    index += terminator;
+                    BeginLine();
                 }
+
+                index = lineEnd + TerminatorLength(lineEnd, end);
             }
         }
 
-        // Quoted regions and hints: a line terminator becomes \n and stays inside the output line, so that the clean-up
-        // of trailing blanks and blank lines never reaches into a string literal.  A hint is protected because it can
-        // hold executable SQL, string literals included (MySQL's /*! ... */).
+        // Quoted regions and hints: a line terminator becomes \n and stays inside the output line, and every character
+        // counts as content, so that the clean-up of trailing blanks and blank lines never reaches into a string
+        // literal.  A hint is protected because it can hold executable SQL, string literals included (MySQL's
+        // /*! ... */).
         private void AppendProtected(SqlLexeme lexeme)
         {
             var index = lexeme.Span.Start;
             var end = lexeme.Span.End;
             while (index < end)
             {
-                var terminator = LineTerminatorLength(index, end);
-                _current.Append(terminator == 0 ? source[index] : '\n', index);
-                index += Math.Max(terminator, 1);
+                var lineEnd = FindLineEnd(index, end);
+                Copy(index, lineEnd);
+                if (lineEnd < end)
+                {
+                    Write('\n', lineEnd);
+                }
+
+                index = lineEnd + TerminatorLength(lineEnd, end);
+            }
+
+            _contentEnd = _position;
+        }
+
+        private int FindLineEnd(int start, int end)
+        {
+            var terminator = source.IndexOfAny(LineTerminators, start, end - start);
+            return terminator < 0 ? end : terminator;
+        }
+
+        private int TerminatorLength(int index, int end)
+        {
+            if (index == end)
+            {
+                return 0;
+            }
+
+            return source[index] == '\r' && index + 1 < end && source[index + 1] == '\n' ? 2 : 1;
+        }
+
+        private void Copy(int start, int end)
+        {
+            if (end > start)
+            {
+                _runs.Add((_position, start));
+                source.CopyTo(start, buffer, _position, end - start);
+                _position += end - start;
             }
         }
 
-        private int LineTerminatorLength(int index, int end) =>
-            source[index] switch
-            {
-                '\r' when index + 1 < end && source[index + 1] == '\n' => 2,
-                '\r' or '\n' => 1,
-                _ => 0,
-            };
+        private void Write(char value, int sourceOffset)
+        {
+            _runs.Add((_position, sourceOffset));
+            buffer[_position] = value;
+            _position++;
+        }
 
+        // Moves the end of the line's content to just after the last character of the copied text that is not a blank.
+        private void ExtendContent(int start, int end)
+        {
+            var last = end - 1;
+            while (last >= start && source[last] is ' ' or '\t')
+            {
+                last--;
+            }
+
+            if (last >= start)
+            {
+                _contentEnd = _position - (end - 1 - last);
+            }
+        }
+
+        // Keeps the line being written, without its trailing blanks, or drops it.
         private void EndLine()
         {
-            _lines.Add(_current);
-            _current = new Line();
+            if (!_isMarkerLine && _contentEnd > _lineStart)
+            {
+                RemoveRunsFrom(_contentEnd);
+                _finished = _contentEnd;
+                _pendingBlankLines = 0;
+                return;
+            }
+
+            RemoveRunsFrom(_lineStart);
+            if (!_isMarkerLine && preserveComments && _finished > 0)
+            {
+                _pendingBlankLines++;
+            }
+        }
+
+        // Starts a line after the finished output, joined to it by a line break and by one more for each pending blank
+        // line.  If the line is dropped, the next one starts from the same place.
+        private void BeginLine()
+        {
+            _position = _finished;
+            if (_finished > 0)
+            {
+                for (var count = 0; count <= _pendingBlankLines; count++)
+                {
+                    buffer[_position] = '\n';
+                    _position++;
+                }
+            }
+
+            _lineStart = _position;
+            _contentEnd = _position;
+            _isMarkerLine = false;
+        }
+
+        private void RemoveRunsFrom(int output)
+        {
+            while (_runs.Count > 0 && _runs[_runs.Count - 1].Output >= output)
+            {
+                _runs.RemoveAt(_runs.Count - 1);
+            }
         }
     }
 }
