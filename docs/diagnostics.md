@@ -34,6 +34,8 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 
 Ids below 100 are about the type that carries `[SqlQueries]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
+`SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the two types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
+
 ## SQLSRC001
 
 **Type must be partial**
