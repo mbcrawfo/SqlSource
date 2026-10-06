@@ -8,6 +8,11 @@
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
+        <!--
+            Off, so that EndToEnd/ shows the property reaching the generator through the MSBuild file above: a query
+            there without a directive does not check its arguments.
+        -->
+        <SqlSourceTokenValidation>false</SqlSourceTokenValidation>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="GitHubActionsTestLogger" />
@@ -19,6 +24,12 @@
     <ItemGroup>
         <!-- Diagnostics/DiagnosticsDocumentTests.cs reads the document from the output folder. -->
         <None Include="../../docs/diagnostics.md" Link="docs/diagnostics.md" CopyToOutputDirectory="PreserveNewest" />
+        <!-- Package/BuildFileTests.cs reads the MSBuild file from the output folder. -->
+        <None
+            Include="../../src/SqlSource/build/SqlSource.props"
+            Link="build/SqlSource.props"
+            CopyToOutputDirectory="PreserveNewest"
+        />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference

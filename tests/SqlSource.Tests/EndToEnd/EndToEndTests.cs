@@ -51,6 +51,57 @@ public class EndToEndTests
             );
 
     [Fact]
+    public void NestedMode_QueryWithSeveralTokens_ReplacesEachOccurrence() =>
+        TokenQueries
+            .Search("id, name", "users", "name LIKE @pattern")
+            .ShouldBe("SELECT id, name\nFROM users\nWHERE name LIKE @pattern\nORDER BY users.id;");
+
+    // SqlSource.Tests.csproj sets SqlSourceTokenValidation to false, and Search has no directive.  That its method
+    // checks nothing shows the property reaching the generator through the MSBuild file the package ships.
+    [Theory]
+    [InlineData("")]
+    [InlineData("  ")]
+    public void ProjectWithValidationOff_QueryWithoutADirective_AcceptsAnArgumentWithoutText(string filter) =>
+        TokenQueries
+            .Search("id", "users", filter)
+            .ShouldBe("SELECT id\nFROM users\nWHERE " + filter + "\nORDER BY users.id;");
+
+    [Fact]
+    public void ProjectWithValidationOff_QueryWithoutADirective_FailsOnANullArgumentWhereItIsRead() =>
+        Should.Throw<NullReferenceException>(() => TokenQueries.Search("id", null!, "1 = 1"));
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" \t")]
+    public void ProjectWithValidationOff_QueryWithTheDirective_RejectsAnArgumentWithoutText(string filter) =>
+        Should.Throw<ArgumentException>(() => TokenQueries.Checked("users", filter)).ParamName.ShouldBe("filter");
+
+    [Fact]
+    public void ProjectWithValidationOff_QueryWithTheDirective_RejectsANullArgument() =>
+        Should.Throw<ArgumentNullException>(() => TokenQueries.Checked(null!, "1 = 1")).ParamName.ShouldBe("table");
+
+    [Fact]
+    public void ProjectWithValidationOff_QueryWithTheDirective_ReturnsTheSqlForArgumentsWithText() =>
+        TokenQueries.Checked("users", "id = @id").ShouldBe("SELECT id FROM users WHERE id = @id;");
+
+    [Fact]
+    public void Method_Call_AllocatesTheStringItReturnsAndNothingElse()
+    {
+        // The first call creates the delegate that the method then keeps.
+        var expected = TokenQueries.Search("id, name", "users", "name LIKE @pattern");
+
+        var start = GC.GetAllocatedBytesForCurrentThread();
+        var sql = TokenQueries.Search("id, name", "users", "name LIKE @pattern");
+        var afterCall = GC.GetAllocatedBytesForCurrentThread();
+        var sameLength = new string('x', sql.Length);
+        var afterString = GC.GetAllocatedBytesForCurrentThread();
+
+        sql.ShouldBe(expected);
+        sameLength.Length.ShouldBe(sql.Length);
+        (afterCall - start).ShouldBe(afterString - afterCall);
+    }
+
+    [Fact]
     public void GenericType_PathToAFolder_SharesTheFileWithAnotherType() =>
         new Repository<int>(7).Describe().ShouldBe(OrderQueries.GetOrder + " -- 7");
 
@@ -63,6 +114,7 @@ public class EndToEndTests
     [InlineData(typeof(OrderQueries))]
     [InlineData(typeof(Repository<>))]
     [InlineData(typeof(Outer.Counts))]
+    [InlineData(typeof(TokenQueries))]
     public void Attribute_IsNotInTheMetadataOfTheTypesThatCarryIt(Type type) =>
         type.GetCustomAttributesData()
             .Select(attribute => attribute.AttributeType.FullName)
