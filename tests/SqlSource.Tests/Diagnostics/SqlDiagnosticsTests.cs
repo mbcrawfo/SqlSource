@@ -59,6 +59,12 @@ public class SqlDiagnosticsTests
     }
 
     [Fact]
+    public void InvalidDialect_Message_ListsTheNamesThatAreAccepted() =>
+        SqlDiagnostics
+            .InvalidDialect.MessageFormat.ToString(CultureInfo.InvariantCulture)
+            .ShouldEndWith("SqlSourceDialect accepts " + SqlDialectName.Accepted + ".");
+
+    [Fact]
     public void ForParseError_UndefinedKind_Throws() =>
         Should.Throw<ArgumentOutOfRangeException>(() => SqlDiagnostics.ForParseError((SqlParseErrorKind)(-1)));
 

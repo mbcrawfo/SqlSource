@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
@@ -65,12 +67,31 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (paths, _) => ToSortedSet(paths))
             .WithTrackingName(TrackingNames.ClaimedPaths);
 
+        // The project's dialect, which is the same value until the property itself changes.
+        var projectDialect = context
+            .AnalyzerConfigOptionsProvider.Select(
+                static (options, _) => DialectSetting.ReadProperty(options.GlobalOptions)
+            )
+            .WithTrackingName(TrackingNames.ProjectDialect);
+
+        // Each file with the dialect that MSBuild gives it.  The dialect is resolved here, before the parse, so that
+        // a change to the property parses only the files that fall back to it.
+        var fileDialects = sqlFiles
+            .Combine(context.AnalyzerConfigOptionsProvider)
+            .Select(
+                static (input, _) =>
+                    (File: input.Left, Metadata: DialectSetting.ReadMetadata(input.Right.GetOptions(input.Left)))
+            )
+            .Combine(projectDialect)
+            .Select(static (input, _) => FileDialect.Resolve(input.Left.File, input.Left.Metadata, input.Right))
+            .WithTrackingName(TrackingNames.FileDialect);
+
         // A file that no type claims is never read.
-        var parsedFiles = sqlFiles
+        var parsedFiles = fileDialects
             .Combine(claimedPaths)
             .Select(
                 static (input, cancellationToken) =>
-                    SqlPath.Normalize(input.Left.Path) is { } path && SqlPath.Contains(input.Right, path)
+                    SqlPath.Normalize(input.Left.File.Path) is { } path && SqlPath.Contains(input.Right, path)
                         ? SqlFileReader.Read(input.Left, path, cancellationToken)
                         : null
             )
@@ -81,14 +102,21 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (files, _) => ToSortedFiles(files))
             .WithTrackingName(TrackingNames.ParsedFiles);
 
-        // Reported from the collected files, so that a file the project lists twice is reported once.
+        // Reported from the collected files, so that a file the project lists twice is reported once.  A dialect that
+        // is not valid is reported here too, once for each value: the compiler does not say where an MSBuild
+        // property or the metadata of an item was set, so it has no position.
         context.RegisterSourceOutput(
-            parsedFiles,
-            static (output, files) =>
+            parsedFiles.Combine(projectDialect),
+            static (output, input) =>
             {
-                foreach (var error in files.SelectMany(static file => file.Errors))
+                foreach (var error in input.Left.SelectMany(static file => file.Errors))
                 {
                     output.ReportDiagnostic(error.ToDiagnostic());
+                }
+
+                foreach (var value in FindInvalidDialects(input.Left, input.Right))
+                {
+                    output.ReportDiagnostic(Diagnostic.Create(SqlDiagnostics.InvalidDialect, Location.None, value));
                 }
             }
         );
@@ -162,6 +190,26 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .OrderBy(static file => file.NormalizedPath, SqlPath.Comparer)
                 .ToImmutableArray()
         );
+
+    // Each value once, in ordinal order, so that the errors of a build do not depend on the order of its files.
+    private static SortedSet<string> FindInvalidDialects(EquatableArray<ParsedSqlFile> files, DialectSetting project)
+    {
+        var values = new SortedSet<string>(StringComparer.Ordinal);
+        if (project.InvalidValue is { } property)
+        {
+            _ = values.Add(property);
+        }
+
+        foreach (var file in files)
+        {
+            if (file.InvalidDialect is { } metadata)
+            {
+                _ = values.Add(metadata);
+            }
+        }
+
+        return values;
+    }
 
     private static TypeQueries SelectFiles(
         TypeFiles type,

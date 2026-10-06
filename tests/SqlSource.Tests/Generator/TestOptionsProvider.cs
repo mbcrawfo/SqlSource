@@ -1,27 +1,44 @@
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace SqlSource.Tests.Generator;
 
-// The project's MSBuild properties as the compiler hands them to a generator.  Only SqlSourceTokenValidation is
-// there, and a null value is a project that does not set it.
-internal sealed class TestOptionsProvider(string? tokenValidation) : AnalyzerConfigOptionsProvider
+// What MSBuild tells a generator, as the compiler hands it over: the project's SqlSourceTokenValidation and
+// SqlSourceDialect properties, and the SqlSourceDialect metadata of each .sql file, by the file's path.  A null value
+// is a project that does not set the property, and a path that is not listed is a file without the metadata.
+internal sealed class TestOptionsProvider(
+    string? tokenValidation,
+    string? dialect = null,
+    IReadOnlyDictionary<string, string>? fileDialects = null
+) : AnalyzerConfigOptionsProvider
 {
-    public override AnalyzerConfigOptions GlobalOptions { get; } = new Options(tokenValidation);
+    private static readonly Options None = new([]);
 
-    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => new Options(null);
+    // The keys are spelled out here, not taken from the generator, so that a change to the generator's spelling
+    // fails a test.
+    public override AnalyzerConfigOptions GlobalOptions { get; } =
+        new Options(
+            new Dictionary<string, string?>
+            {
+                ["build_property.SqlSourceTokenValidation"] = tokenValidation,
+                ["build_property.SqlSourceDialect"] = dialect,
+            }
+        );
 
-    public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => new Options(null);
+    public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => None;
 
-    private sealed class Options(string? tokenValidation) : AnalyzerConfigOptions
+    public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) =>
+        fileDialects is not null && fileDialects.TryGetValue(textFile.Path, out var value)
+            ? new Options(
+                new Dictionary<string, string?> { ["build_metadata.AdditionalFiles.SqlSourceDialect"] = value }
+            )
+            : None;
+
+    private sealed class Options(Dictionary<string, string?> values) : AnalyzerConfigOptions
     {
-        // The key is spelled out here, not taken from the generator, so that a change to the generator's spelling
-        // fails a test.
-        public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value)
-        {
-            value = key == "build_property.SqlSourceTokenValidation" ? tokenValidation : null;
-            return value is not null;
-        }
+        public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value) =>
+            values.TryGetValue(key, out value) && value is not null;
     }
 }
