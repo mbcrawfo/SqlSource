@@ -25,31 +25,42 @@ public partial class UserRepository
 }
 ```
 
+## How to read this document
+
+Phases 2 and 3 have not been through their own design.  This outline records what was settled while the epic was designed, so that whoever designs a later phase starts from it and does not reopen it.  Each statement about a later phase is one of three kinds:
+
+- **Decided.**  Agreed with the project owner.  A phase spec may add detail and must not contradict it.  Changing one means asking the owner and updating this outline.
+- **Recommended.**  The epic designer's proposal for a question that was raised and not settled.  It is a starting point for the phase's design, not an agreement.
+- **Technical notes.**  Facts about Roslyn, MSBuild and this repository that constrain the design.  Verify them against the code before relying on them.
+
+To pick up a phase: run the brainstorming workflow with this outline as the brief, settle the recommended items with the owner, write the phase spec in this folder, and update the phase table below in the same pull request.
+
 ## Phases
 
 | Phase | Status | Spec | Delivers |
 |----|----|----|----|
 | 1. SQL parser | Designed | [sql-parser-design](2026-10-05-sql-parser-design.md) | The text of one `.sql` file becomes named blocks with their directives, summary, cleaned SQL and token segments, or a list of errors.  Pure code with no generator pipeline. |
-| 2. Constants | Not designed | - | The `[SqlQueries]` attribute and `SqlQueriesMode` enum, `.sql` discovery and `Path` resolution, type-shape checks, constant emission with XML docs, diagnostics located in the `.sql` file, and `build/SqlSource.props` in the package. |
+| 2. Constants | Not designed | - | The `[SqlQueries]` attribute and `SqlQueriesMode` enum, `.sql` discovery and `Path` resolution, type-shape checks, constant emission with XML docs, diagnostics located in the `.sql` file, and the MSBuild file in the package. |
 | 3. Tokens | Not designed | - | Method emission with `string.Create`, parameter validation, and the `SqlSourceTokenValidation` MSBuild property. |
 
 Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 makes queries without tokens usable; until phase 3 lands, the generator reports a block that contains tokens as an error.
 
-## Decisions
+The phases are ordered parser first because the parser is the largest piece, has no dependency on Roslyn's pipeline, and can be tested completely by itself.  A thin end-to-end slice was considered and not chosen.
 
-These hold across phases.  A phase spec may add detail and must not contradict them.
+## Decisions for the whole epic
 
 ### Consumers
 
-- Generated code targets .NET 8 and later.  A project that targets an older framework gets a diagnostic, not output that fails to compile.
+- Generated code targets .NET 8 and later.  A project that targets an older framework gets a diagnostic, not output that fails to compile.  The floor comes from the generated code: `ArgumentException.ThrowIfNullOrWhiteSpace` needs .NET 8, and `string.Create` with a span callback needs .NET Core 2.1.
 - The host floor is unchanged: Roslyn 4.8.0, the .NET 8 SDK and Visual Studio 2022 17.8.
 
 ### The attribute
 
-- `SqlQueriesAttribute` and `SqlQueriesMode` are emitted by the generator as internal source and marked `[Conditional]`, so the package stays a development dependency with nothing in `lib/` and the attribute does not reach the consumer's metadata.
-- Two projects that both use SqlSource, where one has `InternalsVisibleTo` the other, get warning CS0436.  The clean fix, `AddEmbeddedAttributeDefinition`, needs Roslyn 4.14, above the floor.  Phase 2 records this in `docs/tech-debt`.
-- By default every `.sql` file in the folder of the `.cs` file that carries the attribute belongs to the type.  The `Path` property points at another folder or at one `.sql` file, relative to that `.cs` file.
-- `.sql` files reach the generator as `AdditionalFiles`.  The package registers them through `build/SqlSource.props`.
+- The trigger is `SqlQueriesAttribute`, with a `Path` property and a mode of type `SqlQueriesMode`.
+- Both types are emitted by the generator as internal source and marked `[Conditional]`.  The package stays a development dependency with nothing in `lib/`, and the attribute does not reach the consumer's metadata.  Shipping the types in a runtime assembly was rejected: it adds a second project and a runtime reference to manage.
+- Two projects that both use SqlSource, where one has `InternalsVisibleTo` the other, get warning CS0436, which is an error under `TreatWarningsAsErrors`.  The clean fix, `AddEmbeddedAttributeDefinition`, needs Roslyn 4.14, above the floor.  This is accepted, and phase 2 records it in `docs/tech-debt` with raising the floor to Roslyn 4.14 as its trigger.
+- By default every `.sql` file in the folder of the `.cs` file that carries the attribute belongs to the type.  `Path` points at another folder or at one `.sql` file, relative to that `.cs` file.  For a partial type declared in several files, the file that carries the attribute is the one that counts.
+- A `Path` that matches nothing is an error.
 
 ### Modes
 
@@ -58,13 +69,17 @@ These hold across phases.  A phase spec may add detail and must not contradict t
 | `Nested` (default) | `private static class Sql` nested in the type, with public members |
 | `Direct` | Public members on the type itself |
 
-There is no accessibility option.
+- The modes are named for where the members go, not for their accessibility.  The original names, private and public, were dropped because the modes change placement.
+- There is no accessibility option.  An `Accessibility` property and internal members in `Direct` mode were both considered and rejected for now.
+- A query without tokens is a `const string`.  A query with tokens is a static method that returns `string`.
 
 ### Supported types
 
-Partial classes, structs, record classes and record structs, including static, generic and nested ones.  The type and each containing type must be `partial`; otherwise the generator reports its own error.
+Partial classes, structs, record classes and record structs, including static, generic and nested ones.  The type and each containing type must be `partial`, because the generator can only add members through another partial declaration.  A type that is not gets the generator's own error, not the compiler's.
 
 ### SQL files
+
+The [parser spec](2026-10-05-sql-parser-design.md) holds the full rules.  In outline:
 
 - Three markers are recognised, each a line comment that starts its line, matched case-insensitively and always removed from the SQL: `-- name:`, `-- summary:` and `-- SqlSource:`.
 - `-- name:` starts a named block that runs to the next name marker or the end of the file.  A file with no name marker is one block named after the file.
@@ -79,14 +94,13 @@ Partial classes, structs, record classes and record structs, including static, g
 | `token-ignore=name` | `{{name}}` stays in the SQL as literal text |
 
 - Comments are stripped by one conservative lexer with no dialect setting.  Where dialects disagree it keeps the text, and where input is unbalanced it reports an error: a comment left in is harmless, SQL removed is a bug.  The dialect-sensitive choices sit in one place in the lexer so that a later dialect setting can become flags; no such setting is built now.
-- Line endings in generated SQL are always `\n`.
+- Line endings in generated SQL are always `\n`, so the constants do not differ between checkouts.
 
 ### Tokens
 
 - The form is `{{name}}`, where the name is a valid C# identifier; spaces inside the braces are ignored.
 - Each distinct name becomes one `string` parameter.  Parameters are ordered by first appearance.
-- Tokens are replaced anywhere in the SQL, including inside string literals.
-- Parameters are validated with `ArgumentException.ThrowIfNullOrWhiteSpace` unless validation is turned off for the query (`no-token-validation`) or for the project (`<SqlSourceTokenValidation>false</SqlSourceTokenValidation>`, exposed to the generator through `CompilerVisibleProperty`).
+- Tokens are replaced anywhere in the SQL, including inside string literals.  Where a token makes sense is left to the developer.
 - Token replacement is string concatenation into SQL.  It is an escape hatch for the places a query parameter cannot go, and it does not make a value safe.  The README says that tokens are for trusted fragments only.
 
 ### Generated documentation
@@ -94,19 +108,183 @@ Partial classes, structs, record classes and record structs, including static, g
 Every generated member has XML documentation, so a consumer that treats CS1591 as an error is not broken:
 
 - a `<summary>` taken from the block's `-- summary:` lines, or generated text that names the query and its file;
-- the SQL in `<remarks>`;
+- the SQL in `<remarks>`, inside `<code>`;
 - a `<param>` for each token parameter.
 
 ### Errors
 
 Every problem is an error, never a warning: an unknown directive, a duplicate or invalid name, an empty block, an unterminated string or comment, a `Path` that matches nothing.  A `.sql` file with any error produces no members.
 
-## Left to the phase specs
+## What phase 1 hands over
 
-| Phase | Open questions |
+`SqlFileParser.Parse(text, fileName)` returns a `SqlFileParseResult`.  The later phases consume it and do not parse SQL themselves.
+
+| Phase 1 output | Used by |
 |----|----|
-| 2 | Whether folder discovery is recursive.  Multiple attributes on one type.  Partial types spread across files.  Names that collide across files, with existing members or with the enclosing type.  Diagnostic ids and the analyzer release-tracking files.  Whether `docs/tech-debt/TD-0001` is resolved or kept, since its trigger fires in this phase. |
-| 3 | The shape of the emitted method.  Precedence between the MSBuild property and the two validation directives. |
+| `SqlBlock.Name`, `NameSpan` | Phase 2: the member name, and the location for diagnostics about the block |
+| `SqlBlock.Summary` | Phase 2: the `<summary>`; null means generate one |
+| `SqlBlock.Segments` | Phase 2: one literal segment is a constant, and any token segment is the "tokens not supported" error.  Phase 3: the method body and its parameters. |
+| `SqlBlock.TokenValidation` | Phase 3: true or false when a directive applies, null when the project setting decides |
+| `SqlBlock.PreserveComments` | Nothing.  The parser has already applied it. |
+| `SqlParseError` kind, span and arguments | Phase 2: mapped to a Roslyn diagnostic located in the `.sql` file |
+
+The results are value-equal, so they can be cached in the incremental pipeline.  Spans are offsets; phase 2 converts them to lines and columns.
+
+## Phase 2 - constants
+
+### Scope
+
+1. Emit `SqlQueriesAttribute` and `SqlQueriesMode`.
+2. Find the `.sql` files of each attributed type.
+3. Check the type's shape.
+4. Emit a constant for each block without tokens, with XML documentation.
+5. Report parser errors and generator errors as Roslyn diagnostics.
+6. Ship the MSBuild file that registers `.sql` files with the compiler.
+7. Make the feature usable: README, package contents, end-to-end tests.
+
+### Decided
+
+Everything under [Decisions for the whole epic](#decisions-for-the-whole-epic) that concerns the attribute, the modes, the supported types, the generated documentation and errors.  In addition:
+
+- The nested class is named `Sql`.
+- A block that contains tokens is an error until phase 3.  Phase 3 removes that diagnostic.
+- Diagnostic ids and descriptors are created in this phase, one for each `SqlParseErrorKind` and one for each generator error.
+- A parser error is reported at its position in the `.sql` file, not at the attribute.
+- The dialect limits listed in the parser spec go into the README in this phase, with `preserve-comments` as the workaround.
+
+### Recommended
+
+| Question | Recommendation | Reason |
+|----|----|----|
+| Shape of the attribute | `Path` and `Mode` are named properties with no constructor arguments.  `AttributeUsage` is `Class \| Struct`, not inherited.  Namespace `SqlSource`. | Records are covered by the class and struct targets.  The compiler then rejects interfaces and enums by itself. |
+| Several attributes on one type | Not allowed (`AllowMultiple = false`) | One attribute, one path is simple to explain.  Allowing more later breaks nobody. |
+| Is folder discovery recursive? | No | A subfolder usually belongs to another type.  A `Recursive` option can be added later without breaking anyone. |
+| Is `Path` a file or a folder? | A value ending in `.sql`, compared case-insensitively, is a file.  Anything else is a folder. | The generator may not touch the file system, so it cannot ask. |
+| Path comparison | Accept `/` and `\` in `Path`, and compare paths case-insensitively | A project then builds the same on every operating system |
+| The default folder holds no `.sql` file | Error | The attribute does nothing, which is never intended |
+| A `.sql` file no type points at | Ignored, including its parser errors | The package registers every `.sql` file in the project.  A migration script elsewhere must not break the build. |
+| A stray file in a type's folder whose name is not an identifier | Keep the parser's `InvalidFileName` error | It follows from the rules.  The developer adds a `-- name:` marker, moves the file or sets `Path`. |
+| A `.sql` file shared by two types | Parse it once and report its errors once | Avoids duplicate diagnostics |
+| A query name used in two files of one type | Generator error at the second block | The compiler's duplicate-member error would point at generated code |
+| A query named like its enclosing type (`Sql` in `Nested` mode, the type's own name in `Direct` mode) | Generator error | Otherwise the compiler reports CS0542 in generated code |
+| An existing member with a query's name, or an existing member named `Sql` in `Nested` mode | Generator error for the `Sql` case.  Leave other member collisions to the compiler. | The `Sql` case is common enough to explain.  Full collision checking is a lot of code for a rare mistake. |
+| Where the .NET 8 floor is checked | In this phase, for every attributed type | The supported set then does not depend on whether a query has tokens |
+| How the floor is detected | By looking for `ArgumentException.ThrowIfNullOrWhiteSpace` in the compilation | It tests the capability the generated code needs, and needs no MSBuild property |
+| Diagnostic id prefix | `SQLSRC` followed by three digits, category `SqlSource` | Short and unlikely to collide |
+| `docs/tech-debt/TD-0001` | Decide in the phase design.  Its trigger, "the generator gains its first real analysis logic", fires here. | The item must be resolved or consciously kept |
+| Output comparison in tests | Decide in the phase design between Shouldly assertions on the generated text and a snapshot library | No snapshot library is pinned in `Directory.Packages.props` today |
+
+### Technical notes
+
+**Finding files**
+
+- A generator sees only C# sources and `AdditionalFiles`.  The `.sql` files reach it through `context.AdditionalTextsProvider`, filtered by extension.
+- The package must add them: an `AdditionalFiles` item that includes `**/*.sql`, in an MSBuild file under `build/` named after the package id.  The epic so far calls it `build/SqlSource.props`.  A `.props` file is imported before the project body and a `.targets` file after it; verify that `bin/` and `obj/` are excluded and that a consumer can opt out.  If that needs a `.targets` file, use one and update this outline.
+- `SqlSource.csproj` packs only the README and the analyzer assembly today.  The `build/` file is a new pack item.
+- `tests/SqlSource.Tests` uses the generator through a `ProjectReference`, so it never sees the package's MSBuild file.  An end-to-end test there must import that file or declare the item itself.  Importing the real file exercises what ships.
+- The generator may not read the file system (analyzer rule RS1035).  Resolving `Path` is string work: take the directory of `AttributeData.ApplicationSyntaxReference.SyntaxTree.FilePath`, combine it with `Path`, normalise, and compare with each `AdditionalText.Path`.
+
+**The attribute**
+
+- Emit it with `RegisterPostInitializationOutput`, and find its uses with `SyntaxProvider.ForAttributeWithMetadataName`, which exists in Roslyn 4.8.
+- A `[Conditional]` attribute is still visible to the generator.  It is dropped only when the consumer's assembly is emitted.
+
+**Emission**
+
+- One generated file per attributed type.  The hint name must be unique and may not contain characters such as `<`, `>` or a path separator, so a generic or nested type needs a sanitised name.
+- The generated partial declaration repeats the namespace, each containing type and the type's own keyword (`class`, `struct`, `record`, `record struct`) and type parameters.  It does not need to repeat accessibility, `static` or other modifiers.
+- Write string values with `SymbolDisplay.FormatLiteral`.  The output is a regular escaped literal, which compiles under any `LangVersion` the consumer sets.  Raw string literals do not.
+- XML-escape the summary and the SQL in the documentation comment.
+- Start each file with `// <auto-generated/>` and `#nullable enable`.
+- Order members deterministically, for example by file path and then by position in the file.
+
+**The incremental pipeline**
+
+- Parse each `.sql` file in its own pipeline step, so that editing one file re-parses only that file.
+- Keep `ISymbol`, `SyntaxNode`, `Compilation`, `Location` and `Diagnostic` out of the values that flow between steps.  They defeat caching.  Carry value-equal data and build the `Location` and `Diagnostic` in the output step.
+- A location in a `.sql` file is `Location.Create(path, textSpan, lineSpan)`.  The line span comes from the file's `SourceText`.
+
+**Diagnostics**
+
+- `EnforceExtendedAnalyzerRules` is on, so creating a `DiagnosticDescriptor` requires the analyzer release-tracking files, `AnalyzerReleases.Shipped.md` and `AnalyzerReleases.Unshipped.md` (rule RS2008).
+- All descriptors are errors.
+
+**Repository rules that bite in this phase**
+
+- `src/SqlSource/AGENTS.md`: `netstandard2.0` only, no API newer than Roslyn 4.8.0, Roslyn references stay private.
+- The README is the package readme on nuget.org.  Its links must be absolute URLs, and its "Status" section becomes wrong in this phase.
+- `VersionPrefix` is checked against the release tags before the pull request is opened.
+
+### Testing
+
+- **Generator driver tests:** in-memory `AdditionalText` inputs and source text, asserting on generated trees and diagnostics, as `SqlSourceGeneratorTests` does today.  Cover each mode, each supported kind of type, generic and nested types, each generator error, and a parser error surfacing with its `.sql` location.
+- **End-to-end tests:** real `.sql` files and attributed types inside `tests/SqlSource.Tests`, with assertions on the constants at run time.
+- **Caching:** a driver test with step tracking turned on that edits one input and asserts that unrelated steps are reused.
+- **Package:** the packed `.nupkg` contains the `build/` file.
+
+### Documentation
+
+- `README.md`: status, installation, the attribute, both modes, the `.sql` file format, directives, the dialect limits.
+- `src/SqlSource/AGENTS.md`: the pipeline rules above.
+- `CONTRIBUTING.md`: only if building, testing or packing changes.
+- `docs/tech-debt`: the CS0436 item, and TD-0001 resolved or updated.
+
+## Phase 3 - tokens
+
+### Scope
+
+1. Emit a static method for each block that has tokens.
+2. Validate the method's parameters, under the control of the directives and a project setting.
+3. Remove phase 2's "tokens not supported" error.
+
+### Decided
+
+- **Signature.**  The method has the query's name and returns `string`.  It takes one `string` parameter for each distinct token name, named after the token and ordered by first appearance.  It sits where a constant would: in the `Sql` class in `Nested` mode, on the type in `Direct` mode.
+- **Building the string.**  The method uses `string.Create` to build the result efficiently.  The intent is one allocation of the final string, with no intermediate strings.
+- **Validation.**  Each parameter is checked with `ArgumentException.ThrowIfNullOrWhiteSpace` by default.
+- **Turning validation off for a project.**  `<SqlSourceTokenValidation>false</SqlSourceTokenValidation>` in the project file.
+- **Precedence**, highest first:
+  1. the block's own `token-validation` or `no-token-validation` directive;
+  2. the same directive in the file's preamble;
+  3. the `SqlSourceTokenValidation` property;
+  4. the default, which is to validate.
+
+  The parser resolves the first two into `SqlBlock.TokenValidation`.  Phase 3 applies the property only when that value is null.
+- **Why validation can be turned off.**  An empty fragment can be legitimate, for example an optional clause.
+- **Safety.**  Validation checks that a value is present, not that it is safe.  The README states that tokens are for trusted fragments only.
+- **Documentation.**  The method gets the same `<summary>` and `<remarks>` as a constant, plus a `<param>` for each parameter.
+- **Adding a token changes the member.**  A query that gains its first token changes from a constant to a method, which breaks its callers at compile time.  This is expected.
+
+### Recommended
+
+| Question | Recommendation | Reason |
+|----|----|----|
+| Which `string.Create` overload | `string.Create<TState>(int length, TState state, SpanAction<char, TState> action)`.  The length is the sum of the literal lengths plus the length of each parameter times its number of occurrences.  The state is a tuple of the parameters and the callback is a `static` lambda. | It allocates exactly the final string.  The interpolated-string overload builds in a pooled buffer first. |
+| Copying segments | Copy each literal and each parameter into the span in order, advancing a position | Direct, and no formatting is involved |
+| Names of generated locals and lambda parameters | Choose names that are not token names of that query, for example by adding a suffix until unique | Any identifier can be a token name, so no fixed name is safe |
+| A null argument when validation is off | Still throw, with `ArgumentNullException.ThrowIfNull` | The parameter type is non-nullable `string`.  Turning validation off is about empty and whitespace fragments. |
+| Value of `SqlSourceTokenValidation` | `true` and `false`, compared case-insensitively.  An empty or missing value means the default.  Any other value is an error. | A typo should not silently change behaviour |
+| Where the property is declared | A `CompilerVisibleProperty` item in the MSBuild file that phase 2 ships | The file already exists and is imported by every consumer |
+| README | A tokens section: the syntax, the generated method, validation and its three switches, `token-ignore`, and the trusted-fragments warning | The warning is a decided requirement |
+
+### Technical notes
+
+- An MSBuild property reaches a generator only when it is listed as a `CompilerVisibleProperty`.  It is then read from `AnalyzerConfigOptionsProvider.GlobalOptions` under the key `build_property.SqlSourceTokenValidation`.
+- A driver test supplies the property through a test implementation of `AnalyzerConfigOptionsProvider`.  The test project, which uses a `ProjectReference`, gets it only if it imports the package's MSBuild file.
+- For up to four parts `string.Concat` also makes a single allocation.  `string.Create` is the stated requirement and gives one code path for any number of parts.
+- A `static` lambda needs C# 9 and a tuple state needs `System.ValueTuple`.  Both are present for any .NET 8 consumer on its default language version.
+- Token names are case-sensitive, so `{{Table}}` and `{{table}}` are two parameters.  Reserved keywords never arrive as token names; the parser rejects them.
+
+### Testing
+
+- **Generator driver tests:** one token, several tokens, a repeated token, both modes, validation on and off through each of the three switches and their precedence, and an invalid property value.
+- **End-to-end tests:** call the generated methods in `tests/SqlSource.Tests` and assert on the returned string and on the exceptions.
+- **Removal:** the "tokens not supported" diagnostic and its tests are deleted.
+
+### Documentation
+
+- `README.md`: the tokens section described above.
+- The analyzer release-tracking file records the removed diagnostic.
 
 ## Out of scope for the epic
 
@@ -114,3 +292,4 @@ Every problem is an error, never a warning: an unknown directive, a duplicate or
 - An accessibility option on the attribute.
 - Parameter types other than `string`.
 - Consumers that target a framework older than .NET 8.
+- Recursive folder discovery and several attributes on one type, unless phase 2's design decides otherwise.
