@@ -166,8 +166,8 @@ internal static class SqlFileParser
                 return;
             }
 
-            var preserveComments = inherited.PreserveComments || scope.PreserveComments;
-            var sql = SqlTextBuilder.Build(text, lexemes, start, end, preserveComments);
+            var keepComments = inherited.KeepComments || scope.KeepComments;
+            var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments);
             HashSet<string> ignoredTokens = [.. inherited.IgnoredTokens, .. scope.IgnoredTokens];
             var scanned = TokenScanner.Scan(sql.Text, ignoredTokens);
             foreach (var error in scanned.Errors)
@@ -180,7 +180,7 @@ internal static class SqlFileParser
                     name,
                     nameSpan,
                     summary.Count == 0 ? null : string.Join(" ", summary),
-                    preserveComments,
+                    keepComments,
                     scope.TokenValidation ?? inherited.TokenValidation,
                     scanned.Segments
                 )

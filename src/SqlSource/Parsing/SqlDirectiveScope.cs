@@ -9,12 +9,12 @@ namespace SqlSource.Parsing;
 /// </summary>
 internal sealed class SqlDirectiveScope
 {
-    private const string PreserveCommentsName = "preserve-comments";
+    private const string KeepCommentsName = "keep-comments";
     private const string TokenValidationName = "token-validation";
     private const string NoTokenValidationName = "no-token-validation";
     private const string TokenIgnoreName = "token-ignore";
 
-    public bool PreserveComments { get; private set; }
+    public bool KeepComments { get; private set; }
 
     public bool? TokenValidation { get; private set; }
 
@@ -64,7 +64,7 @@ internal sealed class SqlDirectiveScope
         {
             problem = ApplyTokenIgnore(value);
         }
-        else if (Is(name, PreserveCommentsName) || Is(name, TokenValidationName) || Is(name, NoTokenValidationName))
+        else if (Is(name, KeepCommentsName) || Is(name, TokenValidationName) || Is(name, NoTokenValidationName))
         {
             problem = value is null ? ApplyFlag(name) : SqlParseErrorKind.InvalidDirectiveValue;
         }
@@ -92,9 +92,9 @@ internal sealed class SqlDirectiveScope
 
     private SqlParseErrorKind? ApplyFlag(string name)
     {
-        if (Is(name, PreserveCommentsName))
+        if (Is(name, KeepCommentsName))
         {
-            PreserveComments = true;
+            KeepComments = true;
             return null;
         }
 

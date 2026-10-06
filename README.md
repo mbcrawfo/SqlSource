@@ -100,13 +100,13 @@ A `-- SqlSource:` line holds one or more directives, separated by spaces.  Insid
 
 | Directive | Effect |
 |----|----|
-| `preserve-comments` | Comments and blank lines stay in the SQL |
+| `keep-comments` | Comments and blank lines stay in the SQL |
 | `token-ignore=name` | `{{name}}` is literal text, not a token |
 | `token-validation`, `no-token-validation` | The query's method checks its arguments, or does not, whatever the project says (see Tokens, below) |
 
 ```sql
 -- name: Report
--- SqlSource: preserve-comments
+-- SqlSource: keep-comments
 SELECT /* the database logs this comment */ id FROM users;
 ```
 
@@ -125,8 +125,8 @@ SqlSource finds comments and strings with one set of rules for every database: A
 
 A misread has one of two results:
 
-- **A build error** that reports an unclosed quote or comment ([SQLSRC101](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc101), [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc102)) in SQL that is valid for your database.  The construct has to be rewritten; `preserve-comments` does not help.
-- **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed: `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `preserve-comments` on the query prevents the removal.
+- **A build error** that reports an unclosed quote or comment ([SQLSRC101](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc101), [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc102)) in SQL that is valid for your database.  The construct has to be rewritten; `keep-comments` does not help.
+- **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed: `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `keep-comments` on the query prevents the removal.
 
 If your SQL uses one of these constructs, check the generated SQL: hover over the member, or read its documentation.
 

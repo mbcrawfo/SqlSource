@@ -38,7 +38,7 @@ public class FileDiagnosticsTests
             new SqlFile(
                 "/app/Repo/Users.sql",
                 """
-                -- SqlSource: preserve-comments shout
+                -- SqlSource: keep-comments shout
                 -- name: GetUser
                 SELECT 1;
 
@@ -51,7 +51,7 @@ public class FileDiagnosticsTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC109 /app/Repo/Users.sql(1,33)-(1,38): 'shout' is not a SqlSource directive",
+            "SQLSRC109 /app/Repo/Users.sql(1,29)-(1,34): 'shout' is not a SqlSource directive",
             "SQLSRC103 /app/Repo/Users.sql(5,10)-(5,18): 'get-user' is not a valid query name.  A name is a C# "
                 + "identifier that is not a reserved keyword.",
             "SQLSRC104 /app/Repo/Users.sql(7,10)-(7,17): The query name 'GetUser' is used more than once in this file",
@@ -221,7 +221,7 @@ public class FileDiagnosticsTests
             public partial class @class<T> { }
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: Sql\nSELECT 1;\n"),
-            new SqlFile("/app/Repo/Other.sql", "-- SqlSource: preserve-comments\n-- name: class\nSELECT 2;\n")
+            new SqlFile("/app/Repo/Other.sql", "-- SqlSource: keep-comments\n-- name: class\nSELECT 2;\n")
         );
 
         // "class" is a reserved keyword, so the parser has already refused it as a name.

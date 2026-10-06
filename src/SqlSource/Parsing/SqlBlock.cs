@@ -10,7 +10,7 @@ namespace SqlSource.Parsing;
 /// Where the name is in the file.  An empty span at the start of the file when the name comes from the file name.
 /// </param>
 /// <param name="Summary">The text of the block's <c>-- summary:</c> markers, or null when it has none.</param>
-/// <param name="PreserveComments">Whether comments were kept in the SQL.</param>
+/// <param name="KeepComments">Whether comments were kept in the SQL.</param>
 /// <param name="TokenValidation">
 /// True or false when a validation directive applies to the block, null when none does.
 /// </param>
@@ -19,7 +19,7 @@ internal sealed record SqlBlock(
     string Name,
     TextSpan NameSpan,
     string? Summary,
-    bool PreserveComments,
+    bool KeepComments,
     bool? TokenValidation,
     EquatableArray<SqlSegment> Segments
 );

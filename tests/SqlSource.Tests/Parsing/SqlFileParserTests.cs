@@ -17,7 +17,7 @@ public class SqlFileParserTests
         block.Name.ShouldBe("GetUser");
         block.NameSpan.ShouldBe(new TextSpan(0, 0));
         block.Summary.ShouldBeNull();
-        block.PreserveComments.ShouldBeFalse();
+        block.KeepComments.ShouldBeFalse();
         block.TokenValidation.ShouldBeNull();
         block.Segments.ShouldBe([new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")]);
     }
@@ -26,13 +26,13 @@ public class SqlFileParserTests
     public void Parse_FileWithoutNameMarker_ReadsSummaryAndDirectivesBeforeAndAmongItsSql()
     {
         const string Text =
-            "-- summary: First.\nSELECT 1 -- c\n-- SqlSource: preserve-comments no-token-validation\n"
+            "-- summary: First.\nSELECT 1 -- c\n-- SqlSource: keep-comments no-token-validation\n"
             + "-- summary: Second.\nFROM t\n";
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
         block.Summary.ShouldBe("First. Second.");
-        block.PreserveComments.ShouldBeTrue();
+        block.KeepComments.ShouldBeTrue();
         block.TokenValidation.ShouldBe(false);
         Sql(block).ShouldBe("SELECT 1 -- c\nFROM t");
     }
@@ -86,11 +86,11 @@ public class SqlFileParserTests
     public void Parse_Preamble_DiscardsItsCommentsEvenWhenPreserving()
     {
         const string Text =
-            "-- Copyright\n/* header */\n-- SqlSource: preserve-comments\n\n-- name: A\n-- kept\nSELECT 1\n";
+            "-- Copyright\n/* header */\n-- SqlSource: keep-comments\n\n-- name: A\n-- kept\nSELECT 1\n";
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
-        block.PreserveComments.ShouldBeTrue();
+        block.KeepComments.ShouldBeTrue();
         Sql(block).ShouldBe("-- kept\nSELECT 1");
     }
 
@@ -146,12 +146,12 @@ public class SqlFileParserTests
     public void Parse_BlockDirective_DoesNotLeakIntoTheNextBlock()
     {
         const string Text =
-            "-- name: A\n-- SqlSource: preserve-comments token-validation token-ignore=x\nSELECT 1 -- c\n"
+            "-- name: A\n-- SqlSource: keep-comments token-validation token-ignore=x\nSELECT 1 -- c\n"
             + "-- name: B\nSELECT {{x}} -- c\n";
 
         var blocks = Blocks(Text);
 
-        blocks[1].PreserveComments.ShouldBeFalse();
+        blocks[1].KeepComments.ShouldBeFalse();
         blocks[1].TokenValidation.ShouldBeNull();
         Sql(blocks[1]).ShouldBe("SELECT {{x}}");
         blocks[1].Segments[1].ShouldBe(new SqlSegment(SqlSegmentKind.Token, "x"));
@@ -214,7 +214,7 @@ public class SqlFileParserTests
     [Theory]
     [InlineData("-- name: A\n-- name: B\nSELECT 1")]
     [InlineData("-- name: A\n-- c\n/* d */\n\n-- name: B\nSELECT 1")]
-    [InlineData("-- name: A\n-- SqlSource: preserve-comments\n-- c\n-- name: B\nSELECT 1")]
+    [InlineData("-- name: A\n-- SqlSource: keep-comments\n-- c\n-- name: B\nSELECT 1")]
     [InlineData("-- name: B\nSELECT 1\n-- name: A")]
     [InlineData("-- name: B\nSELECT 1\n-- name: A\n-- summary: s\n")]
     public void Parse_BlockWithoutSql_IsAnErrorAtItsName(string text)
@@ -228,7 +228,7 @@ public class SqlFileParserTests
     [InlineData("")]
     [InlineData("  \r\n\t")]
     [InlineData("-- only a comment\n/* and another */")]
-    [InlineData("-- SqlSource: preserve-comments\n-- c")]
+    [InlineData("-- SqlSource: keep-comments\n-- c")]
     public void Parse_FileWithoutNameMarkerOrSql_IsAnErrorAtTheStart(string text) =>
         Errors(text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.EmptyBlock, new TextSpan(0, 0))]);
 
@@ -243,7 +243,7 @@ public class SqlFileParserTests
         "-- SqlSource: token-ignore=x"
     )]
     [InlineData("-- name: A\nSELECT 1\n-- summary: last", "-- summary: last")]
-    [InlineData("SELECT 1\n-- SqlSource: preserve-comments\n", "-- SqlSource: preserve-comments")]
+    [InlineData("SELECT 1\n-- SqlSource: keep-comments\n", "-- SqlSource: keep-comments")]
     [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- a comment\n/* another */\n", "-- summary: s")]
     [InlineData("-- name: A\nSELECT 1\n-- SqlSource: bogus", "-- SqlSource: bogus")]
     [InlineData("-- name: A\nSELECT 1\n-- summary:", "-- summary:")]
@@ -323,7 +323,7 @@ public class SqlFileParserTests
     [Fact]
     public void Parse_TokenInAStringLiteralOrAPreservedComment_IsAToken()
     {
-        const string Text = "-- name: A\n-- SqlSource: preserve-comments\nSELECT '{{a}}' -- {{b}}";
+        const string Text = "-- name: A\n-- SqlSource: keep-comments\nSELECT '{{a}}' -- {{b}}";
 
         Blocks(Text)
             .ShouldHaveSingleItem()
@@ -375,7 +375,7 @@ public class SqlFileParserTests
     }
 
     [Theory]
-    [InlineData("-- SqlSource: preserve-comment", nameof(SqlParseErrorKind.UnknownDirective), "preserve-comment")]
+    [InlineData("-- SqlSource: keep-comment", nameof(SqlParseErrorKind.UnknownDirective), "keep-comment")]
     [InlineData("-- SqlSource:", nameof(SqlParseErrorKind.EmptyDirectiveLine), "-- SqlSource:")]
     [InlineData("-- SqlSource: token-ignore=", nameof(SqlParseErrorKind.InvalidDirectiveValue), "token-ignore=")]
     [InlineData(

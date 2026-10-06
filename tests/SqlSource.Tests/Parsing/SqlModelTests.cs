@@ -36,7 +36,7 @@ public class SqlModelTests
                 "GetUser",
                 new TextSpan(9, 7),
                 "Loads a user.",
-                PreserveComments: false,
+                KeepComments: false,
                 TokenValidation: null,
                 new EquatableArray<SqlSegment>([
                     new SqlSegment(SqlSegmentKind.Literal, sql),

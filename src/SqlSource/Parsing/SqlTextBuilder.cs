@@ -22,7 +22,7 @@ internal static class SqlTextBuilder
         EquatableArray<SqlLexeme> lexemes,
         int start,
         int end,
-        bool preserveComments
+        bool keepComments
     )
     {
         if (start >= end)
@@ -34,7 +34,7 @@ internal static class SqlTextBuilder
         var buffer = ArrayPool<char>.Shared.Rent(lexemes[end - 1].Span.End - lexemes[start].Span.Start);
         try
         {
-            var writer = new Writer(text, preserveComments, buffer);
+            var writer = new Writer(text, keepComments, buffer);
             for (var index = start; index < end; index++)
             {
                 writer.Append(lexemes[index]);
@@ -51,7 +51,7 @@ internal static class SqlTextBuilder
     // The buffer holds the finished output, then the line breaks that would join the next line to it, then the line
     // being written.  A line is judged when it ends: kept with its trailing blanks trimmed, or dropped by moving back
     // to the end of the finished output.
-    private sealed class Writer(string source, bool preserveComments, char[] buffer)
+    private sealed class Writer(string source, bool keepComments, char[] buffer)
     {
         private readonly List<(int Output, int Source)> _runs = [];
 
@@ -78,7 +78,7 @@ internal static class SqlTextBuilder
             {
                 _isMarkerLine = true;
             }
-            else if (preserveComments || lexeme.Kind == SqlLexemeKind.Text)
+            else if (keepComments || lexeme.Kind == SqlLexemeKind.Text)
             {
                 AppendLines(lexeme);
             }
@@ -199,7 +199,7 @@ internal static class SqlTextBuilder
             }
 
             RemoveRunsFrom(_lineStart);
-            if (!_isMarkerLine && preserveComments && _finished > 0)
+            if (!_isMarkerLine && keepComments && _finished > 0)
             {
                 _pendingBlankLines++;
             }

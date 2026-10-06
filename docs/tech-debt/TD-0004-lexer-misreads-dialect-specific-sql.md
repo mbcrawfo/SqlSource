@@ -15,8 +15,8 @@
 
 A misread has one of two outcomes:
 
-- **An error.**  The quotes or comments no longer balance, and the file gets `UnterminatedQuote` or `UnterminatedBlockComment`.  The file produces nothing until the construct is rewritten.  The `preserve-comments` directive does not help, because a lexer error ends the pass.
-- **Silent removal.**  The misread quotes happen to balance, and SQL after them is read as a comment and stripped.  `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  The `preserve-comments` directive avoids the removal.
+- **An error.**  The quotes or comments no longer balance, and the file gets `UnterminatedQuote` or `UnterminatedBlockComment`.  The file produces nothing until the construct is rewritten.  The `keep-comments` directive does not help, because a lexer error ends the pass.
+- **Silent removal.**  The misread quotes happen to balance, and SQL after them is read as a comment and stripped.  `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  The `keep-comments` directive avoids the removal.
 
 The `Lex_KnownLimit_*` tests in [`SqlLexerTests`](../../tests/SqlSource.Tests/Parsing/SqlLexerTests.cs) pin each reading.
 
@@ -26,7 +26,7 @@ The epic decided on one conservative lexer with no dialect setting.  Each of the
 
 ## Impact
 
-A user of one of these constructs gets either an error that names an unterminated quote or comment in valid SQL (`SQLSRC101`, `SQLSRC102`), or a generated constant that is missing part of the query.  The second is silent at build time, though the truncated SQL will almost always fail when it runs.  `README.md` lists the constructs and says which outcome `preserve-comments` helps with.
+A user of one of these constructs gets either an error that names an unterminated quote or comment in valid SQL (`SQLSRC101`, `SQLSRC102`), or a generated constant that is missing part of the query.  The second is silent at build time, though the truncated SQL will almost always fail when it runs.  `README.md` lists the constructs and says which outcome `keep-comments` helps with.
 
 ## Proposed fix
 
