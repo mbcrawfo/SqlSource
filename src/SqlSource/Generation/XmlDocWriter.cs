@@ -52,6 +52,14 @@ internal static class XmlDocWriter
             .Append("}}</c>.</param>\n");
 
     /// <summary>
+    /// Appends the <c>returns</c> of the method of a query that has tokens.
+    /// </summary>
+    /// <param name="builder">The source being built.</param>
+    /// <param name="indent">The whitespace that starts the line.</param>
+    public static void AppendReturns(StringBuilder builder, string indent) =>
+        AppendLine(builder, indent, "<returns>The SQL with each token replaced by its argument.</returns>");
+
+    /// <summary>
     /// Escapes plain text for use as XML content.  A character that XML 1.0 does not allow, such as a form feed or
     /// the Ctrl-Z at the end of an old file, becomes U+FFFD: left as it is, it would make the comment malformed
     /// (CS1570) in code the consumer cannot change.

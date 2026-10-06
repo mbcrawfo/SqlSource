@@ -332,11 +332,12 @@ public class TypeEmitterTests
                         /// </code>
                         /// </remarks>
                         /// <param name="table">The text that replaces <c>{{table}}</c>.</param>
+                        /// <returns>The SQL with each token replaced by its argument.</returns>
                         public static string ListFrom(string table)
                         {
                             global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);
                             return string.Create(
-                                15 + table.Length,
+                                checked(15 + table.Length),
                                 table,
                                 static (span, state) =>
                                 {

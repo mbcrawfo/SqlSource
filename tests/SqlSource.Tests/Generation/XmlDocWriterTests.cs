@@ -100,6 +100,18 @@ public class XmlDocWriterTests
     }
 
     [Fact]
+    public void AppendReturns_Method_WritesOneLine()
+    {
+        var builder = new StringBuilder("before\n");
+
+        XmlDocWriter.AppendReturns(builder, "    ");
+
+        builder
+            .ToString()
+            .ShouldBe("before\n    /// <returns>The SQL with each token replaced by its argument.</returns>\n");
+    }
+
+    [Fact]
     public void AppendMember_EmptyLine_HasNoTrailingSpace()
     {
         var builder = new StringBuilder();

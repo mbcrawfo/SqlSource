@@ -54,6 +54,8 @@ internal static class MethodWriter
             XmlDocWriter.AppendParam(builder, indent, parameter);
         }
 
+        XmlDocWriter.AppendReturns(builder, indent);
+
         _ = builder.Append(indent).Append("public static string ").Append(name).Append('(');
         AppendList(builder, parameters, "string ");
         _ = builder.Append(")\n").Append(indent).Append("{\n");
@@ -152,7 +154,8 @@ internal static class MethodWriter
     }
 
     // The length of the result: the literal text as one number, then each parameter's length, times how often its
-    // token appears.
+    // token appears.  A sum or a product is checked: unchecked, a total above the largest int wraps around, and one
+    // that wraps to zero or a small number would give a short string and not an exception.
     private static void AppendLength(
         StringBuilder builder,
         EquatableArray<SqlSegment> segments,
@@ -173,6 +176,13 @@ internal static class MethodWriter
             }
         }
 
+        // One length by itself cannot overflow.
+        var isChecked = literalLength > 0 || parameters.Count > 1 || uses[0] > 1;
+        if (isChecked)
+        {
+            _ = builder.Append("checked(");
+        }
+
         if (literalLength > 0)
         {
             _ = builder.Append(literalLength.ToString(CultureInfo.InvariantCulture));
@@ -188,6 +198,11 @@ internal static class MethodWriter
             {
                 _ = builder.Append(" * ").Append(uses[index].ToString(CultureInfo.InvariantCulture));
             }
+        }
+
+        if (isChecked)
+        {
+            _ = builder.Append(')');
         }
     }
 

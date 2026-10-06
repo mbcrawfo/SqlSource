@@ -548,12 +548,13 @@ public class GeneratedSourceTests
                         /// </remarks>
                         /// <param name="table">The text that replaces <c>{{table}}</c>.</param>
                         /// <param name="filter">The text that replaces <c>{{filter}}</c>.</param>
+                        /// <returns>The SQL with each token replaced by its argument.</returns>
                         public static string ListFrom(string table, string filter)
                         {
                             global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);
                             global::System.ArgumentException.ThrowIfNullOrWhiteSpace(filter);
                             return string.Create(
-                                36 + table.Length * 2 + filter.Length,
+                                checked(36 + table.Length * 2 + filter.Length),
                                 (table, filter),
                                 static (span, state) =>
                                 {

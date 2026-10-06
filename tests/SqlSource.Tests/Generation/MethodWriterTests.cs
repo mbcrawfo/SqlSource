@@ -47,12 +47,13 @@ public class MethodWriterTests
                     /// </remarks>
                     /// <param name="table">The text that replaces <c>{{table}}</c>.</param>
                     /// <param name="filter">The text that replaces <c>{{filter}}</c>.</param>
+                    /// <returns>The SQL with each token replaced by its argument.</returns>
                     public static string ListFrom(string table, string filter)
                     {
                         global::System.ArgumentException.ThrowIfNullOrWhiteSpace(table);
                         global::System.ArgumentException.ThrowIfNullOrWhiteSpace(filter);
                         return string.Create(
-                            36 + table.Length * 2 + filter.Length,
+                            checked(36 + table.Length * 2 + filter.Length),
                             (table, filter),
                             static (span, state) =>
                             {
@@ -104,7 +105,7 @@ public class MethodWriterTests
                 public static string Q(string table)
                 {
                     return string.Create(
-                        15 + table.Length,
+                        checked(15 + table.Length),
                         table,
                         static (span, state) =>
                         {
@@ -148,7 +149,7 @@ public class MethodWriterTests
                 public static string Q(string a, string b)
                 {
                     return string.Create(
-                        3 + a.Length * 3 + b.Length,
+                        checked(3 + a.Length * 3 + b.Length),
                         (a, b),
                         static (span, state) =>
                         {
@@ -168,9 +169,15 @@ public class MethodWriterTests
                 """
             );
 
+    // A sum or a product is checked, so that a result too long for a string is an OverflowException and never a
+    // shorter string.  One length by itself cannot overflow.
+    [Fact]
+    public void Append_OneTokenUsedTwice_ChecksTheProduct() =>
+        Body(Token("a"), Token("a")).ShouldContain("        checked(a.Length * 2),\n");
+
     [Fact]
     public void Append_OnlyTokens_SumsTheirLengthsWithoutALeadingNumber() =>
-        Body(Token("a"), Token("b")).ShouldContain("        a.Length + b.Length,\n");
+        Body(Token("a"), Token("b")).ShouldContain("        checked(a.Length + b.Length),\n");
 
     [Fact]
     public void Append_EightTokens_ReadsTheEighthByPosition()
@@ -197,7 +204,7 @@ public class MethodWriterTests
                 public static string Q(string span, string state, string span1)
                 {
                     return string.Create(
-                        span.Length + state.Length + span1.Length,
+                        checked(span.Length + state.Length + span1.Length),
                         (span, state, span1),
                         static (span2, state1) =>
                         {
@@ -241,7 +248,7 @@ public class MethodWriterTests
         // 23 characters: the line feed, the tab, the backslash and each quote are one character each.
         var body = Body(Text("SELECT \"a\",\n'\t', '\\' < "), Token("max"));
 
-        body.ShouldContain("        23 + max.Length,\n");
+        body.ShouldContain("        checked(23 + max.Length),\n");
         body.ShouldContain("            \"SELECT \\\"a\\\",\\n'\\t', '\\\\' < \".CopyTo(span);\n");
         body.ShouldContain("            span = span.Slice(23);\n");
     }
@@ -254,6 +261,7 @@ public class MethodWriterTests
         text.ShouldContain(
             "/// <code>\n/// SELECT id\n/// FROM {{table}}\n/// WHERE id &lt; @max;\n/// </code>\n/// </remarks>\n"
                 + "/// <param name=\"table\">The text that replaces <c>{{table}}</c>.</param>\n"
+                + "/// <returns>The SQL with each token replaced by its argument.</returns>\n"
                 + "public static string Q(string table)\n"
         );
     }
