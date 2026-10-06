@@ -75,6 +75,7 @@ public class CachingTests
                 ignoreOrder: true
             );
         AllReasons(result, TrackingNames.TypeFiles).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.CaseCollisions).ShouldBe([IncrementalStepRunReason.Cached]);
         result
             .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
             .ToString()
@@ -121,6 +122,7 @@ public class CachingTests
         [
             TrackingNames.TargetTypes,
             TrackingNames.SqlPaths,
+            TrackingNames.CaseCollisions,
             TrackingNames.UnsupportedLanguageVersion,
             TrackingNames.TypeFiles,
             TrackingNames.ClaimedPaths,
@@ -158,6 +160,25 @@ public class CachingTests
         AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         result.Diagnostics.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_SqlFileAddedWhosePathDiffersOnlyByCase_ReportsItAndEmitsNothingAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRun(compilation);
+
+        var result = Run(
+            driver.AddAdditionalTexts([new InMemoryAdditionalText("/app/Users/users.sql", "SELECT 3;\n")]),
+            compilation
+        );
+
+        // The type keeps the file it had, so nothing about it is worked out again.
+        AllReasons(result, TrackingNames.CaseCollisions).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.SqlPaths).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.TypeFiles).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC013");
     }
 
     [Fact]

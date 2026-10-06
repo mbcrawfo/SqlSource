@@ -9,6 +9,8 @@ internal static class TrackingNames
 
     public const string SqlPaths = nameof(SqlPaths);
 
+    public const string CaseCollisions = nameof(CaseCollisions);
+
     public const string SupportedFramework = nameof(SupportedFramework);
 
     public const string UnsupportedLanguageVersion = nameof(UnsupportedLanguageVersion);

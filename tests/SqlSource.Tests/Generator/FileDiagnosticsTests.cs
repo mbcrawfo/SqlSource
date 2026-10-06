@@ -169,12 +169,62 @@ public class FileDiagnosticsTests
             Source,
             broken,
             users,
-            new SqlFile("/app/Repo/../Repo/broken.SQL", broken.Text),
+            new SqlFile("/app/Repo/../Repo/Broken.sql", broken.Text),
             new SqlFile("\\app\\Repo\\Users.sql", users.Text)
         );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC103 /app/Repo/Broken.sql(1,10)-(1,12)");
         run.Sources["App.Sample.g.cs"].Split("public const string GetUser").Length.ShouldBe(2);
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
+    // The generator compares paths ignoring case and may not ask the file system, so it cannot tell two files of a
+    // case-sensitive file system from one file that the project lists under two spellings.
+    [Theory]
+    [InlineData("/app/Repo/users.sql")]
+    [InlineData("/app/repo/Users.sql")]
+    [InlineData("\\app\\Repo\\Sub\\..\\USERS.SQL")]
+    public void Run_TwoFilesOfATypeWhosePathsDifferOnlyByCase_IsAnErrorAtTheSecond(string second)
+    {
+        var run = GeneratorHarness.Run(
+            Source,
+            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
+            new SqlFile(second, "-- name: GetOrder\nSELECT 2;\n")
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC013 {second}(1,1)-(1,1): This file's path differs only by case from '/app/Repo/Users.sql', and "
+                + "SqlSource compares paths ignoring case",
+        ]);
+    }
+
+    [Fact]
+    public void Run_FileListedTwiceAndAnotherThatDiffersByCase_IsOneErrorForEachSpelling()
+    {
+        var run = GeneratorHarness.Run(
+            Source,
+            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
+            new SqlFile("/app/Repo/users.sql", "-- name: GetOrder\nSELECT 2;\n"),
+            new SqlFile("/app/Repo/./users.sql", "-- name: GetOrder\nSELECT 2;\n"),
+            new SqlFile("/app/Repo/USERS.sql", "-- name: GetItem\nSELECT 3;\n")
+        );
+
+        run.Diagnostics.Count.ShouldBe(2);
+        run.Diagnostics[0].ShouldStartWith("SQLSRC013 /app/Repo/users.sql(1,1)-(1,1)");
+        run.Diagnostics[1].ShouldStartWith("SQLSRC013 /app/Repo/USERS.sql(1,1)-(1,1)");
+    }
+
+    [Fact]
+    public void Run_FilesThatNoTypeClaimsWhosePathsDifferOnlyByCase_AreIgnored()
+    {
+        var run = GeneratorHarness.Run(
+            Source,
+            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
+            new SqlFile("/app/Migrations/001_init.sql", "SELECT 1;\n"),
+            new SqlFile("/app/Migrations/001_INIT.sql", "SELECT 2;\n")
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
     }
 
