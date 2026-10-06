@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+        <RootNamespace>SqlSource.Tests</RootNamespace>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="GitHubActionsTestLogger" />
+        <!-- No VersionOverride: this project runs the generator on the pinned Roslyn, the oldest one supported. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="xunit.v3" />
+    </ItemGroup>
+    <ItemGroup>
+        <!-- The generator driver tests of SqlSource.Tests, compiled a second time against the older Roslyn. -->
+        <Compile Include="../SqlSource.Tests/Generator/**/*.cs" LinkBase="Generator" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+    </ItemGroup>
+</Project>

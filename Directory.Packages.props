@@ -15,7 +15,8 @@
         <!--
             4.8.0 is the compiler in the .NET 8 SDK and Visual Studio 2022 17.8, the oldest hosts SqlSource supports.
             Raising it drops those hosts: do not raise it without changing the support target in README.md.
-            tests/SqlSource.Tests overrides it to run on a current compiler; see docs/tech-debt/TD-0001.
+            tests/SqlSource.Tests overrides it to run on a current compiler.  tests/SqlSource.Tests.RoslynFloor does
+            not, and runs the generator tests on this version.
         -->
         <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
         <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
