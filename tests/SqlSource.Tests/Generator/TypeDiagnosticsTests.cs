@@ -240,6 +240,49 @@ public class TypeDiagnosticsTests
         run.CompilationErrors.ShouldBeEmpty();
     }
 
+    [Theory]
+    [InlineData("public static partial class Sql", "Sql")]
+    [InlineData("public partial class Sample<Sql>", "Sample")]
+    [InlineData("public partial struct Sample<T, Sql>", "Sample")]
+    public void Run_NestedModeAndATypeOrTypeParameterNamedSql_IsAnErrorAtTheAttribute(string declaration, string name)
+    {
+        // A nested class cannot have the name of the type that contains it, or of one of its type parameters.
+        var run = GeneratorHarness.Run(
+            $$"""
+            using SqlSource;
+            namespace App;
+            [SqlQueries]
+            {{declaration}} { }
+            """,
+            Users
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC007 /app/Repo/Sample.cs(3,2)-(3,12): '{name}' already has a member named 'Sql'.  Rename it, or "
+                + "use SqlQueriesMode.Direct.",
+        ]);
+        run.Sources.Keys.ShouldBe([AttributeOnly]);
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_DirectModeAndATypeNamedSql_IsAllowed()
+    {
+        var run = GeneratorHarness.Run(
+            """
+            using SqlSource;
+            namespace App;
+            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            public static partial class Sql { }
+            public static class Consumer { public const string Value = Sql.GetUser; }
+            """,
+            Users
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
     [Fact]
     public void Run_DirectModeAndAMemberNamedSql_IsAllowed()
     {

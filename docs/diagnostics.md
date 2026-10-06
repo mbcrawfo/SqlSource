@@ -75,7 +75,7 @@ Target `net8.0` or later.  For a project that targets several frameworks, put th
 public partial class UserRepository { }
 ```
 
-Check the spelling, and that the path starts from the folder of this source file and not from the project.  If the file exists, check that the build sees it: a project that sets `EnableDefaultSqlSourceItems` to `false` must list each `.sql` file as an `AdditionalFiles` item.
+Check the spelling, and that the path starts from the folder of this source file and not from the project.  If the file exists, check that the build sees it.  The package registers the `.sql` files under the project's own folder, so a file outside it, such as a linked file, must be listed as an `AdditionalFiles` item.  So must every `.sql` file of a project that sets `EnableDefaultSqlSourceItems` to `false`.
 
 ## SQLSRC005
 
@@ -102,7 +102,7 @@ Use `SqlQueriesMode.Nested` or `SqlQueriesMode.Direct`.
 
 **Type has a member named Sql**
 
-In `Nested` mode the queries go in a nested class named `Sql`, and the type already has a member with that name.
+In `Nested` mode the queries go in a nested class named `Sql`, and the type already has a member with that name.  The same error is reported when the type itself, or one of its type parameters, is named `Sql`: a nested class cannot share either name.
 
 ```csharp
 [SqlQueries]
@@ -112,7 +112,7 @@ public partial class UserRepository
 }
 ```
 
-Rename the member, or set `Mode = SqlQueriesMode.Direct` so that the queries become members of the type itself.
+Rename the member, the type or the type parameter, or set `Mode = SqlQueriesMode.Direct` so that the queries become members of the type itself.
 
 ## SQLSRC008
 
@@ -284,7 +284,7 @@ Remove one of the two.  A directive in a query overrides the same directive befo
 
 **Query has no SQL**
 
-A query, or a whole file without `-- name:` markers, holds nothing but whitespace, comments and markers.
+A query, or a whole file without `-- name:` markers, holds nothing but whitespace, comments and markers.  A file that cannot be read is reported the same way, at its first line.
 
 ```sql
 -- name: GetUser

@@ -45,7 +45,7 @@ internal static class TargetTypeReader
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         var types = ReadDeclarations(declaration, diagnostics);
         var placement = ReadPlacement(attribute, attributeLocation, diagnostics);
-        if (placement == MemberPlacement.Nested && !symbol.GetMembers(TypeEmitter.NestedClassName).IsEmpty)
+        if (placement == MemberPlacement.Nested && IsNestedClassNameTaken(symbol))
         {
             diagnostics.Add(DiagnosticInfo.Create(SqlDiagnostics.SqlMemberExists, attributeLocation, symbol.Name));
         }
@@ -62,6 +62,13 @@ internal static class TargetTypeReader
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
         );
     }
+
+    // A nested class cannot share its name with a member of the type, with the type itself or with one of the
+    // type's parameters.  Each is a compiler error in generated code unless it is reported here first.
+    private static bool IsNestedClassNameTaken(INamedTypeSymbol symbol) =>
+        symbol.Name == TypeEmitter.NestedClassName
+        || symbol.TypeParameters.Any(static parameter => parameter.Name == TypeEmitter.NestedClassName)
+        || !symbol.GetMembers(TypeEmitter.NestedClassName).IsEmpty;
 
     private static bool IsFirstAttributeOfType(INamedTypeSymbol symbol, AttributeData attribute)
     {
@@ -111,6 +118,7 @@ internal static class TargetTypeReader
                 new TypeDeclaration(
                     GetKeyword(type),
                     type.Identifier.Text,
+                    type.Identifier.ValueText,
                     GetTypeParameters(type.TypeParameterList),
                     type.TypeParameterList?.Parameters.Count ?? 0
                 )

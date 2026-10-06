@@ -2,7 +2,7 @@
 
 ## Problem
 
-The generator compares paths ignoring case, so that a project builds the same on every operating system; see [`SqlPath`](../../src/SqlSource/Generation/SqlPath.cs).  On a case-sensitive file system a folder can hold both `Users.sql` and `users.sql`.  [`SqlSourceGenerator`](../../src/SqlSource/SqlSourceGenerator.cs) removes duplicates from the list of paths with the same comparer, so it keeps the first of the two and never reads the second.  Nothing is reported.
+The generator compares paths ignoring case, so that a project builds the same on every operating system; see [`SqlPath`](../../src/SqlSource/Generation/SqlPath.cs).  On a case-sensitive file system a folder can hold both `Users.sql` and `users.sql`.  [`SqlSourceGenerator`](../../src/SqlSource/SqlSourceGenerator.cs) removes duplicates from the list of paths with the same comparer, so the two count as one file.  Both are read and parsed, and the result of the second is dropped.  Nothing is reported.
 
 ## Why it exists
 

@@ -19,6 +19,8 @@ internal static class TrackingNames
 
     public const string ParsedFiles = nameof(ParsedFiles);
 
+    public const string AmbiguousHintNames = nameof(AmbiguousHintNames);
+
     public const string TypeQueries = nameof(TypeQueries);
 
     public const string TypeOutput = nameof(TypeOutput);

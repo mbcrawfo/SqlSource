@@ -7,6 +7,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.Text;
+using Shouldly;
 using Xunit;
 
 namespace SqlSource.Tests.Generator;
@@ -35,10 +36,17 @@ internal static class GeneratorHarness
     public static GeneratorRun Run(string source, params SqlFile[] sqlFiles) =>
         Run([new SourceFile(SourcePath, source)], sqlFiles);
 
-    public static GeneratorRun Run(SourceFile[] sources, SqlFile[] sqlFiles, bool supportedFramework = true)
+    public static GeneratorRun Run(
+        SourceFile[] sources,
+        SqlFile[] sqlFiles,
+        bool supportedFramework = true,
+        LanguageVersion languageVersion = LanguageVersion.CSharp12,
+        MetadataReference[]? references = null
+    )
     {
-        var compilation = CreateCompilation(sources, supportedFramework);
-        var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()))
+        var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
+        var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
+        var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), parseOptions)
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,
@@ -47,6 +55,9 @@ internal static class GeneratorHarness
             );
 
         var result = driver.GetRunResult();
+
+        // An exception in the generator makes the compiler drop everything it generates, for every type.
+        result.Results.Single().Exception.ShouldBeNull();
         var diagnostics = updated.GetDiagnostics(TestContext.Current.CancellationToken);
         return new GeneratorRun(
             result
@@ -65,32 +76,59 @@ internal static class GeneratorHarness
         );
     }
 
-    // Without references the compilation has no System.ArgumentException, which is how the generator sees a project
-    // that targets a framework older than .NET 8.
-    public static CSharpCompilation CreateCompilation(SourceFile[] sources, bool supportedFramework = true) =>
+    // Without the runtime's references the compilation has no System.ArgumentException, which is how the generator
+    // sees a project that targets a framework older than .NET 8.
+    public static CSharpCompilation CreateCompilation(
+        SourceFile[] sources,
+        bool supportedFramework = true,
+        CSharpParseOptions? parseOptions = null,
+        IEnumerable<MetadataReference>? references = null,
+        string assemblyName = "TestAssembly"
+    ) =>
         CSharpCompilation.Create(
-            "TestAssembly",
+            assemblyName,
             sources.Select(source =>
                 CSharpSyntaxTree.ParseText(
                     source.Text,
-                    ParseOptions,
+                    parseOptions ?? ParseOptions,
                     source.Path,
                     cancellationToken: TestContext.Current.CancellationToken
                 )
             ),
-            supportedFramework ? RuntimeReferences : [],
+            (supportedFramework ? RuntimeReferences : []).Concat(references ?? []),
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
         );
 
     // Step tracking is on, so that a test can read why each step of the pipeline ran.
-    public static GeneratorDriver CreateDriver(IEnumerable<AdditionalText> sqlFiles) =>
+    public static GeneratorDriver CreateDriver(
+        IEnumerable<AdditionalText> sqlFiles,
+        CSharpParseOptions? parseOptions = null
+    ) =>
         CSharpGeneratorDriver.Create(
             [new SqlSourceGenerator().AsSourceGenerator()],
             sqlFiles,
-            ParseOptions,
+            parseOptions ?? ParseOptions,
             optionsProvider: null,
             new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true)
         );
+
+    // Another assembly that the generator ran on too, compiled and ready to reference.  With InternalsVisibleTo for
+    // "TestAssembly" in its source, it is what a test project sees of the project it tests.
+    public static MetadataReference CreateReference(string assemblyName, string source)
+    {
+        var compilation = CreateCompilation([new SourceFile("/other/Other.cs", source)], assemblyName: assemblyName);
+        _ = CreateDriver([])
+            .RunGeneratorsAndUpdateCompilation(
+                compilation,
+                out var updated,
+                out _,
+                TestContext.Current.CancellationToken
+            );
+
+        using var image = new MemoryStream();
+        updated.Emit(image, cancellationToken: TestContext.Current.CancellationToken).Success.ShouldBeTrue();
+        return MetadataReference.CreateFromImage(image.ToArray());
+    }
 
     // "SQLSRC001 /app/Repo/Sample.cs(3,14)-(3,20): message", with lines and columns counted from one as an IDE
     // shows them.
