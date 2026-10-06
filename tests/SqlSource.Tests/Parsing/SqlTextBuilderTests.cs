@@ -64,20 +64,17 @@ public class SqlTextBuilderTests
     public void Build_Hint_IsKeptAsWritten(string text)
     {
         Build(text).ShouldBe(text);
-        Build(text, preserveComments: true).ShouldBe(text);
+        Build(text, keepComments: true).ShouldBe(text);
     }
 
     [Theory]
-    [InlineData(
-        "-- summary: x\nSELECT 1\n  -- SqlSource: preserve-comments\nFROM t\n-- name: Next",
-        "SELECT 1\nFROM t"
-    )]
+    [InlineData("-- summary: x\nSELECT 1\n  -- SqlSource: keep-comments\nFROM t\n-- name: Next", "SELECT 1\nFROM t")]
     [InlineData("SELECT 1\n-- summary: x   ", "SELECT 1")]
     [InlineData("\t-- summary: x\nSELECT 1", "SELECT 1")]
     public void Build_MarkerLines_AreRemoved(string text, string expected)
     {
         Build(text).ShouldBe(expected);
-        Build(text, preserveComments: true).ShouldBe(expected);
+        Build(text, keepComments: true).ShouldBe(expected);
     }
 
     [Theory]
@@ -85,16 +82,16 @@ public class SqlTextBuilderTests
     [InlineData("-- c\nSELECT 1\n\nFROM t")]
     [InlineData("/* a\n\n b */ SELECT 1")]
     public void Build_Preserving_KeepsCommentsAndInnerBlankLines(string text) =>
-        Build(text, preserveComments: true).ShouldBe(text);
+        Build(text, keepComments: true).ShouldBe(text);
 
     [Theory]
     [InlineData("\n\nSELECT 1\n\nFROM t\n\n", "SELECT 1\n\nFROM t")]
     [InlineData("SELECT 1   \n-- c  ", "SELECT 1\n-- c")]
     [InlineData("/* a\r\n b */\r\nSELECT 1", "/* a\n b */\nSELECT 1")]
-    [InlineData("-- summary: x\n-- keep\nSELECT 1\n-- SqlSource: preserve-comments", "-- keep\nSELECT 1")]
+    [InlineData("-- summary: x\n-- keep\nSELECT 1\n-- SqlSource: keep-comments", "-- keep\nSELECT 1")]
     [InlineData("SELECT 1\n-- summary: x\nFROM t", "SELECT 1\nFROM t")]
     public void Build_Preserving_StillCleansLineEndsAndOuterBlankLines(string text, string expected) =>
-        Build(text, preserveComments: true).ShouldBe(expected);
+        Build(text, keepComments: true).ShouldBe(expected);
 
     [Fact]
     public void Build_NonAsciiText_IsKeptIntact() => Build("SELECT 'ñ😀' -- é").ShouldBe("SELECT 'ñ😀'");
@@ -105,19 +102,19 @@ public class SqlTextBuilderTests
         const string Text = "A\n-- name: X\nB\n";
         var lexemes = SqlLexer.Lex(Text).Lexemes;
 
-        SqlTextBuilder.Build(Text, lexemes, 0, 1, preserveComments: false).Text.ShouldBe("A");
-        SqlTextBuilder.Build(Text, lexemes, 2, 3, preserveComments: false).Text.ShouldBe("B");
+        SqlTextBuilder.Build(Text, lexemes, 0, 1, keepComments: false).Text.ShouldBe("A");
+        SqlTextBuilder.Build(Text, lexemes, 2, 3, keepComments: false).Text.ShouldBe("B");
     }
 
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ToSourceSpan_SpanInBuiltText_MapsToTheSameTextInTheFile(bool preserveComments)
+    public void ToSourceSpan_SpanInBuiltText_MapsToTheSameTextInTheFile(bool keepComments)
     {
         const string Text = "-- c\r\n/* x */ SELECT {{a}} -- d\r\n\r\n-- summary: s\r\n  FROM {{b}}";
         var lexemes = SqlLexer.Lex(Text).Lexemes;
 
-        var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, preserveComments);
+        var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, keepComments);
 
         foreach (var token in new[] { "{{a}}", "{{b}}" })
         {
@@ -132,7 +129,7 @@ public class SqlTextBuilderTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void ToSourceSpan_EveryCharacterOfTheBuiltText_MapsToItsPlaceInTheFile(bool preserveComments)
+    public void ToSourceSpan_EveryCharacterOfTheBuiltText_MapsToItsPlaceInTheFile(bool keepComments)
     {
         const string Text =
             "  -- lead\r\n\r\n-- summary: s\r\nSELECT 'a  \r\n\r\n b', /* c */ x   \r\n"
@@ -140,7 +137,7 @@ public class SqlTextBuilderTests
             + "\r\n  /*+ h\r\n  i */ FROM t -- d  \r\n   \r\nWHERE {{y}} = $$ z\n $$  \r\n";
         var lexemes = SqlLexer.Lex(Text).Lexemes;
 
-        var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, preserveComments);
+        var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, keepComments);
 
         for (var index = 0; index < built.Text.Length; index++)
         {
@@ -151,15 +148,15 @@ public class SqlTextBuilderTests
             }
 
             var source = Text[built.ToSourceSpan(new TextSpan(index, 1)).Start];
-            var isStrippedComment = !preserveComments && character == ' ' && source == '/';
+            var isStrippedComment = !keepComments && character == ' ' && source == '/';
             (source == character || isStrippedComment).ShouldBeTrue($"offset {index} maps to '{source}'");
         }
     }
 
-    private static string Build(string text, bool preserveComments = false)
+    private static string Build(string text, bool keepComments = false)
     {
         var lexed = SqlLexer.Lex(text);
         lexed.Error.ShouldBeNull();
-        return SqlTextBuilder.Build(text, lexed.Lexemes, 0, lexed.Lexemes.Count, preserveComments).Text;
+        return SqlTextBuilder.Build(text, lexed.Lexemes, 0, lexed.Lexemes.Count, keepComments).Text;
     }
 }

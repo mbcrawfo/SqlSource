@@ -14,18 +14,18 @@ public class SqlDirectiveScopeTests
     {
         var scope = new SqlDirectiveScope();
 
-        scope.PreserveComments.ShouldBeFalse();
+        scope.KeepComments.ShouldBeFalse();
         scope.TokenValidation.ShouldBeNull();
         scope.IgnoredTokens.ShouldBeEmpty();
     }
 
     [Fact]
-    public void Read_PreserveComments_SetsTheFlag()
+    public void Read_KeepComments_SetsTheFlag()
     {
-        var (scope, errors) = Read("-- SqlSource: preserve-comments");
+        var (scope, errors) = Read("-- SqlSource: keep-comments");
 
         errors.ShouldBeEmpty();
-        scope.PreserveComments.ShouldBeTrue();
+        scope.KeepComments.ShouldBeTrue();
         scope.TokenValidation.ShouldBeNull();
     }
 
@@ -43,10 +43,10 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_DirectiveNames_AreCaseInsensitive()
     {
-        var (scope, errors) = Read("-- SqlSource: PRESERVE-COMMENTS No-Token-Validation Token-Ignore=a");
+        var (scope, errors) = Read("-- SqlSource: KEEP-COMMENTS No-Token-Validation Token-Ignore=a");
 
         errors.ShouldBeEmpty();
-        scope.PreserveComments.ShouldBeTrue();
+        scope.KeepComments.ShouldBeTrue();
         scope.TokenValidation.ShouldBe(false);
         scope.IgnoredTokens.ShouldBe(["a"]);
     }
@@ -54,10 +54,10 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_SeveralDirectivesOnOneLine_AppliesEach()
     {
-        var (scope, errors) = Read("-- SqlSource: preserve-comments   token-ignore=a\ttoken-ignore=b");
+        var (scope, errors) = Read("-- SqlSource: keep-comments   token-ignore=a\ttoken-ignore=b");
 
         errors.ShouldBeEmpty();
-        scope.PreserveComments.ShouldBeTrue();
+        scope.KeepComments.ShouldBeTrue();
         scope.IgnoredTokens.ShouldBe(["a", "b"], ignoreOrder: true);
     }
 
@@ -65,13 +65,13 @@ public class SqlDirectiveScopeTests
     public void Read_SeveralMarkers_Accumulate()
     {
         var (scope, errors) = Read(
-            "-- SqlSource: preserve-comments",
+            "-- SqlSource: keep-comments",
             "-- SqlSource: token-validation",
             "-- SqlSource: token-ignore=a"
         );
 
         errors.ShouldBeEmpty();
-        scope.PreserveComments.ShouldBeTrue();
+        scope.KeepComments.ShouldBeTrue();
         scope.TokenValidation.ShouldBe(true);
         scope.IgnoredTokens.ShouldBe(["a"]);
     }
@@ -80,7 +80,7 @@ public class SqlDirectiveScopeTests
     public void Read_RepeatedDirective_IsAllowed()
     {
         var (scope, errors) = Read(
-            "-- SqlSource: preserve-comments preserve-comments token-validation token-ignore=a",
+            "-- SqlSource: keep-comments keep-comments token-validation token-ignore=a",
             "-- SqlSource: token-validation token-ignore=a"
         );
 
@@ -99,7 +99,8 @@ public class SqlDirectiveScopeTests
     }
 
     [Theory]
-    [InlineData("preserve-comment")]
+    [InlineData("keep-comment")]
+    [InlineData("preserve-comments")]
     [InlineData("strip-comments")]
     [InlineData("foo=bar")]
     [InlineData("=x")]
@@ -128,7 +129,7 @@ public class SqlDirectiveScopeTests
     [InlineData("token-ignore=1x")]
     [InlineData("token-ignore=a=b")]
     [InlineData("token-ignore=a,b")]
-    [InlineData("preserve-comments=x")]
+    [InlineData("keep-comments=x")]
     [InlineData("token-validation=true")]
     [InlineData("no-token-validation=")]
     public void Read_MissingOrUnexpectedValue_IsAnError(string directive)
@@ -140,7 +141,7 @@ public class SqlDirectiveScopeTests
         errors.ShouldBe([
             SqlParseError.Create(SqlParseErrorKind.InvalidDirectiveValue, SpanOf(line, directive), directive),
         ]);
-        scope.PreserveComments.ShouldBeFalse();
+        scope.KeepComments.ShouldBeFalse();
         scope.TokenValidation.ShouldBeNull();
         scope.IgnoredTokens.ShouldBeEmpty();
     }
@@ -176,10 +177,10 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_ErrorInOneDirective_StillAppliesTheOthers()
     {
-        var (scope, errors) = Read("-- SqlSource: bogus preserve-comments");
+        var (scope, errors) = Read("-- SqlSource: bogus keep-comments");
 
         errors.Count.ShouldBe(1);
-        scope.PreserveComments.ShouldBeTrue();
+        scope.KeepComments.ShouldBeTrue();
     }
 
     private static (SqlDirectiveScope Scope, List<SqlParseError> Errors) Read(params string[] lines)

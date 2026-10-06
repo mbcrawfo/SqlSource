@@ -16,7 +16,7 @@ public class SqlMarkerReaderTests
     [InlineData("--\t Name:\tGetUser  ", "Name:GetUser")]
     [InlineData("-- summary: Loads a user.", "Summary:Loads a user.")]
     [InlineData("-- Summary:Loads: a -- user", "Summary:Loads: a -- user")]
-    [InlineData("-- SqlSource: preserve-comments  token-ignore=a", "Directives:preserve-comments  token-ignore=a")]
+    [InlineData("-- SqlSource: keep-comments  token-ignore=a", "Directives:keep-comments  token-ignore=a")]
     [InlineData("-- SQLSOURCE: x", "Directives:x")]
     [InlineData("-- name:", "Name:")]
     [InlineData("-- name:   ", "Name:")]

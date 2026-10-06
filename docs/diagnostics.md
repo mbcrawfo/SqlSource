@@ -260,10 +260,10 @@ Move the marker below the `-- name:` marker of the query it describes, or delete
 
 **Directive is not known**
 
-A `-- SqlSource:` marker holds a word that is not a directive.  The directives are `preserve-comments`, `token-validation`, `no-token-validation` and `token-ignore=name`.
+A `-- SqlSource:` marker holds a word that is not a directive.  The directives are `keep-comments`, `token-validation`, `no-token-validation` and `token-ignore=name`.
 
 ```sql
--- SqlSource: keep-comments
+-- SqlSource: keep-comment
 ```
 
 Correct the directive.
@@ -284,7 +284,7 @@ Add a directive, or delete the line.
 
 ```sql
 -- SqlSource: token-ignore
--- SqlSource: preserve-comments=true
+-- SqlSource: keep-comments=true
 ```
 
 Add the missing value, or remove the one that does not belong.
