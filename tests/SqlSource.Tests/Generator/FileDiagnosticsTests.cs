@@ -228,6 +228,21 @@ public class FileDiagnosticsTests
         run.CompilationErrors.ShouldBeEmpty();
     }
 
+    // A ".." with no folder before it leaves a path that cannot be compared, so no type can claim the file.
+    [Fact]
+    public void Run_FileWhosePathLeavesItsRoot_IsIgnoredWithItsErrors()
+    {
+        var run = GeneratorHarness.Run(
+            Source,
+            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
+            new SqlFile("../Users.sql", "-- name: 1x\nSELECT 2;\n")
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.Sources["App.Sample.g.cs"].ShouldContain("public const string GetUser");
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
     [Fact]
     public void Run_FileThatNoTypeClaims_IsIgnoredWithItsErrors()
     {
