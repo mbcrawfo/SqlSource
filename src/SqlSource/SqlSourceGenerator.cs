@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using SqlSource.Diagnostics;
 using SqlSource.Generation;
 
 namespace SqlSource;
@@ -13,8 +14,8 @@ namespace SqlSource;
 [Generator(LanguageNames.CSharp)]
 public sealed class SqlSourceGenerator : IIncrementalGenerator
 {
-    // The generated code targets .NET 8 and later.  This method first appeared there, and phase 3 of the SQL queries
-    // epic calls it, so its presence is the test.
+    // The generated code targets .NET 8 and later.  This method first appeared there, and a generated method calls
+    // it to check an argument, so its presence is the test.
     private const string FloorType = "System.ArgumentException";
 
     private const string FloorMember = "ThrowIfNullOrWhiteSpace";
@@ -100,12 +101,35 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (names, _) => HintName.FindAmbiguous(names))
             .WithTrackingName(TrackingNames.AmbiguousHintNames);
 
+        // The project's setting, which is the same value until the property itself changes.
+        var tokenValidation = context
+            .AnalyzerConfigOptionsProvider.Select(
+                static (options, _) => TokenValidationSetting.Read(options.GlobalOptions)
+            )
+            .WithTrackingName(TrackingNames.TokenValidation);
+
+        // Not located: the compiler does not say where an MSBuild property was set.
+        context.RegisterSourceOutput(
+            tokenValidation,
+            static (output, setting) =>
+            {
+                if (setting.InvalidValue is { } value)
+                {
+                    output.ReportDiagnostic(
+                        Diagnostic.Create(SqlDiagnostics.InvalidTokenValidation, Location.None, value)
+                    );
+                }
+            }
+        );
+
+        // The setting joins after a type's queries are selected, so that it never reaches the parse of a file.
         var typeOutputs = typeFiles
             .Combine(parsedFiles)
             .Combine(ambiguousHintNames)
             .Select(static (input, _) => SelectFiles(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.TypeQueries)
-            .Select(static (queries, _) => TypeEmitter.Emit(queries, validateTokens: true))
+            .Combine(tokenValidation.Select(static (setting, _) => setting.Validate))
+            .Select(static (input, _) => TypeEmitter.Emit(input.Left, input.Right))
             .WithTrackingName(TrackingNames.TypeOutput);
 
         context.RegisterSourceOutput(

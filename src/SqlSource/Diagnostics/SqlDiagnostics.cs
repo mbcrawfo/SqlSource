@@ -118,6 +118,17 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor InvalidTokenValidation = new(
+        id: "SQLSRC010",
+        title: "SqlSourceTokenValidation is not valid",
+        messageFormat: "The MSBuild property SqlSourceTokenValidation is '{0}'.  It must be 'true' or 'false'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc010",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -288,6 +299,7 @@ internal static class SqlDiagnostics
             SqlMemberExists,
             DuplicateQueryName,
             QueryNamedLikeContainingType,
+            InvalidTokenValidation,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

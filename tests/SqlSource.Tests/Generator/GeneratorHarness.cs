@@ -41,12 +41,13 @@ internal static class GeneratorHarness
         SqlFile[] sqlFiles,
         bool supportedFramework = true,
         LanguageVersion languageVersion = LanguageVersion.CSharp12,
-        MetadataReference[]? references = null
+        MetadataReference[]? references = null,
+        string? tokenValidation = null
     )
     {
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
-        var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), parseOptions)
+        var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), parseOptions, tokenValidation)
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,
@@ -99,16 +100,18 @@ internal static class GeneratorHarness
             new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
         );
 
-    // Step tracking is on, so that a test can read why each step of the pipeline ran.
+    // Step tracking is on, so that a test can read why each step of the pipeline ran.  tokenValidation is the value
+    // of the project's SqlSourceTokenValidation property, and null is a project that does not set it.
     public static GeneratorDriver CreateDriver(
         IEnumerable<AdditionalText> sqlFiles,
-        CSharpParseOptions? parseOptions = null
+        CSharpParseOptions? parseOptions = null,
+        string? tokenValidation = null
     ) =>
         CSharpGeneratorDriver.Create(
             [new SqlSourceGenerator().AsSourceGenerator()],
             sqlFiles,
             parseOptions ?? ParseOptions,
-            optionsProvider: null,
+            new TestOptionsProvider(tokenValidation),
             new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true)
         );
 
