@@ -1,0 +1,122 @@
+# Posts the coverage report of a pull request's CI run as a comment on the pull request.
+#
+# A pull request from a fork or from Dependabot runs CI with a read-only token, so CI cannot comment.  This workflow
+# runs after CI, from main, with a token that can.  The price is that it handles data a fork controls: the branch name
+# and the coverage artifact.  It must never check out or run the pull request's code, and it reads one file of the
+# artifact as text and nothing else.
+name: Coverage comment
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+permissions: {}
+
+jobs:
+  comment:
+    name: Coverage comment
+    if: >-
+      ${{ github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      # Values from the event reach the script as environment variables, never as expressions inside it: a fork
+      # chooses its branch name, and an expression would paste it into the script as code.
+      - name: Create or update the comment
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          RUN_ID: ${{ github.event.workflow_run.id }}
+          RUN_URL: ${{ github.event.workflow_run.html_url }}
+          HEAD_OWNER: ${{ github.event.workflow_run.head_repository.owner.login }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+          MAX_ARTIFACT_BYTES: 10485760
+          # A comment holds 65536 characters.  The rest is for the marker and the link.
+          MAX_SUMMARY_BYTES: 60000
+        run: |
+          # The pull request comes from the event, not from the artifact, which could name any pull request.
+          # The run's event lists no pull requests when the head is a fork, so it is looked up by its head.
+          # CI runs only for pull requests to main.  One whose head has moved on gets its comment from a newer run.
+          pr_numbers="$(
+              gh api --method GET "repos/$REPO/pulls" --paginate \
+                  --raw-field state=open --raw-field "head=$HEAD_OWNER:$HEAD_BRANCH" --jq '
+                  .[]
+                  | select(.base.ref == "main")
+                  | select(.head.sha == env.HEAD_SHA)
+                  | .number'
+          )"
+          pr_number="${pr_numbers%%$'\n'*}"
+
+          if [[ -z "$pr_number" ]]; then
+              echo "No open pull request has $HEAD_SHA as its head.  Nothing to comment on."
+              exit 0
+          fi
+
+          artifact="$(
+              gh api --method GET "repos/$REPO/actions/runs/$RUN_ID/artifacts" --raw-field name=coverage \
+                  --jq '.artifacts[0] | select(. != null) | "\(.id) \(.size_in_bytes)"'
+          )"
+
+          if [[ -z "$artifact" ]]; then
+              echo "::error::Run $RUN_ID has no coverage artifact."
+              exit 1
+          fi
+
+          artifact_id="${artifact% *}"
+          artifact_bytes="${artifact#* }"
+
+          if ((artifact_bytes > MAX_ARTIFACT_BYTES)); then
+              echo "::error::The coverage artifact is $artifact_bytes bytes.  The limit is $MAX_ARTIFACT_BYTES."
+              exit 1
+          fi
+
+          gh api "repos/$REPO/actions/artifacts/$artifact_id/zip" > coverage.zip
+
+          # Only the summary is read, and it goes to a pipe: no path or link inside the archive is ever followed.
+          # head stops an entry that expands without end.
+          if ! unzip -p coverage.zip SummaryGithub.md | head -c "$((MAX_SUMMARY_BYTES + 1))" > summary.md; then
+              echo "::error::The coverage artifact has no SummaryGithub.md that can be read within the size limit."
+              exit 1
+          fi
+
+          if (($(wc -c < summary.md) > MAX_SUMMARY_BYTES)); then
+              echo "::error::SummaryGithub.md is larger than $MAX_SUMMARY_BYTES bytes."
+              exit 1
+          fi
+
+          if [[ "$(head -n 1 summary.md)" != '# Summary' ]]; then
+              echo "::error::SummaryGithub.md does not start with the heading of a coverage summary."
+              exit 1
+          fi
+
+          # The marker on the first line identifies the comment on later runs.
+          {
+              echo '<!-- sqlsource-coverage -->'
+              cat summary.md
+              printf '\nThe full report is the coverage artifact of [this run](%s).\n' "$RUN_URL"
+          } > comment.md
+
+          # Only a comment this workflow wrote is updated: anyone can post a comment that starts with the marker.
+          # The lookup is not piped, so that a failed request stops the step instead of creating a second comment.
+          comment_ids="$(
+              gh api "repos/$REPO/issues/$pr_number/comments" --paginate --jq '
+                  .[]
+                  | select(.user.login == "github-actions[bot]")
+                  | select(.body | startswith("<!-- sqlsource-coverage -->"))
+                  | .id'
+          )"
+          comment_id="${comment_ids%%$'\n'*}"
+
+          if [[ -n "$comment_id" ]]; then
+              gh api --method PATCH "repos/$REPO/issues/comments/$comment_id" --field body=@comment.md > /dev/null
+          else
+              gh api --method POST "repos/$REPO/issues/$pr_number/comments" --field body=@comment.md > /dev/null
+          fi

@@ -8,7 +8,6 @@ Next id: `TD-0013`
 
 | ID | Status | Added | Impact | Description |
 |----|----|----|----|----|
-| [TD-0002](TD-0002-no-coverage-comment-on-fork-pull-requests.md) | Open | 2026-10-05 | Low | Fork and Dependabot pull requests get no coverage comment |
 | [TD-0003](TD-0003-run-number-limited-by-assembly-version.md) | Open | 2026-10-05 | Low | A run number above 65534 fails the build, because it is a part of the assembly version |
 | [TD-0004](TD-0004-lexer-misreads-dialect-specific-sql.md) | Open | 2026-10-05 | Medium | The SQL lexer misreads some MySQL, Oracle and SQL Server constructs, as an error or by stripping SQL |
 | [TD-0006](TD-0006-attribute-conflicts-across-friend-assemblies.md) | Open | 2026-10-05 | Medium | Two projects that share internals and both use SqlSource get warning CS0436 for the generated attribute |
