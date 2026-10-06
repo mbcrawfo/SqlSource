@@ -27,7 +27,7 @@ public partial class UserRepository
 
 ## How to read this document
 
-Phases 2 and 3 have not been through their own design.  This outline records what was settled while the epic was designed, so that whoever designs a later phase starts from it and does not reopen it.  Each statement about a later phase is one of three kinds:
+Phase 3 has not been through its own design.  This outline records what was settled while the epic and the earlier phases were designed, so that whoever designs a later phase starts from it and does not reopen it.  Each statement about a later phase is one of three kinds:
 
 - **Decided.**  Agreed with the project owner.  A phase spec may add detail and must not contradict it.  Changing one means asking the owner and updating this outline.
 - **Recommended.**  The epic designer's proposal for a question that was raised and not settled.  It is a starting point for the phase's design, not an agreement.
@@ -40,7 +40,7 @@ To pick up a phase: run the brainstorming workflow with this outline as the brie
 | Phase | Status | Spec | Delivers |
 |----|----|----|----|
 | 1. SQL parser | Done | [sql-parser-design](2026-10-05-sql-parser-design.md) | The text of one `.sql` file becomes named blocks with their directives, summary, cleaned SQL and token segments, or a list of errors.  Pure code with no generator pipeline. |
-| 2. Constants | Not designed | - | The `[SqlQueries]` attribute and `SqlQueriesMode` enum, `.sql` discovery and `Path` resolution, type-shape checks, constant emission with XML docs, diagnostics located in the `.sql` file, and the MSBuild file in the package. |
+| 2. Constants | Designed | [sql-constants-design](2026-10-05-sql-constants-design.md) | The `[SqlQueries]` attribute and `SqlQueriesMode` enum, `.sql` discovery and `Path` resolution, type-shape checks, constant emission with XML docs, diagnostics located in the `.sql` file, and the MSBuild file in the package. |
 | 3. Tokens | Not designed | - | Method emission with `string.Create`, parameter validation, and the `SqlSourceTokenValidation` MSBuild property. |
 
 Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 makes queries without tokens usable; until phase 3 lands, the generator reports a block that contains tokens as an error.
@@ -57,7 +57,7 @@ The phases are ordered parser first because the parser is the largest piece, has
 ### The attribute
 
 - The trigger is `SqlQueriesAttribute`, with a `Path` property and a mode of type `SqlQueriesMode`.
-- Both types are emitted by the generator as internal source and marked `[Conditional]`.  The package stays a development dependency with nothing in `lib/`, and the attribute does not reach the consumer's metadata.  Shipping the types in a runtime assembly was rejected: it adds a second project and a runtime reference to manage.
+- Both types are emitted by the generator as internal source.  The attribute is marked `[Conditional]`, so it is not applied in the consumer's metadata.  The enum cannot be: C# allows `[Conditional]` on attribute classes only.  Both declarations stay in the consumer's assembly as internal types.  The package stays a development dependency with nothing in `lib/`.  Shipping the types in a runtime assembly was rejected: it adds a second project and a runtime reference to manage.
 - Two projects that both use SqlSource, where one has `InternalsVisibleTo` the other, get warning CS0436, which is an error under `TreatWarningsAsErrors`.  The clean fix, `AddEmbeddedAttributeDefinition`, needs Roslyn 4.14, above the floor.  This is accepted, and phase 2 records it in `docs/tech-debt` with raising the floor to Roslyn 4.14 as its trigger.
 - By default every `.sql` file in the folder of the `.cs` file that carries the attribute belongs to the type.  `Path` points at another folder or at one `.sql` file, relative to that `.cs` file.  For a partial type declared in several files, the file that carries the attribute is the one that counts.
 - A `Path` that matches nothing is an error.
@@ -155,9 +155,11 @@ Everything under [Decisions for the whole epic](#decisions-for-the-whole-epic) t
 - A parser error is reported at its position in the `.sql` file, not at the attribute.
 - The dialect limits go into the README in this phase.  `docs/tech-debt/TD-0004-lexer-misreads-dialect-specific-sql.md` is the current list; the parser spec's list is incomplete.  `preserve-comments` is a workaround only where a limit strips SQL.  Where a limit reports an unterminated quote or comment, the SQL has to be rewritten.
 
-### Recommended
+### Settled in the phase design
 
-| Question | Recommendation | Reason |
+The owner accepted the epic's recommendations as written, and settled the two it left open.  All of these are now decided.
+
+| Question | Decision | Reason |
 |----|----|----|
 | Shape of the attribute | `Path` and `Mode` are named properties with no constructor arguments.  `AttributeUsage` is `Class \| Struct`, not inherited.  Namespace `SqlSource`. | Records are covered by the class and struct targets.  The compiler then rejects interfaces and enums by itself. |
 | Several attributes on one type | Not allowed (`AllowMultiple = false`) | One attribute, one path is simple to explain.  Allowing more later breaks nobody. |
@@ -174,15 +176,22 @@ Everything under [Decisions for the whole epic](#decisions-for-the-whole-epic) t
 | Where the .NET 8 floor is checked | In this phase, for every attributed type | The supported set then does not depend on whether a query has tokens |
 | How the floor is detected | By looking for `ArgumentException.ThrowIfNullOrWhiteSpace` in the compilation | It tests the capability the generated code needs, and needs no MSBuild property |
 | Diagnostic id prefix | `SQLSRC` followed by three digits, category `SqlSource` | Short and unlikely to collide |
-| `docs/tech-debt/TD-0001` | Decide in the phase design.  Its trigger, "the generator gains its first real analysis logic", fires here. | The item must be resolved or consciously kept |
-| Output comparison in tests | Decide in the phase design between Shouldly assertions on the generated text and a snapshot library | No snapshot library is pinned in `Directory.Packages.props` today |
+| `docs/tech-debt/TD-0001` | Resolved in this phase: `tests/SqlSource.Tests.RoslynFloor` runs the generator driver tests on Roslyn 4.8.0 | Its trigger, "the generator gains its first real analysis logic", fires here |
+| Output comparison in tests | Shouldly against the whole expected file | `Verify.SourceGenerators` 2.4.3 and later need Roslyn 4.9, and Verify 33 fails the build until the project declares a sponsorship or an exemption |
+| `Path` rooted or relative | Always relative to the folder of the file that carries the attribute.  Null or empty means that folder. | One rule, and a rooted path is not portable |
+| A file-local type | Generator error | A generated partial declaration cannot join it |
+| A `Mode` that is not a defined value | Generator error | Every problem is an error |
+| Can a consumer change a diagnostic's severity? | No.  Every descriptor is tagged `NotConfigurable`. | Turning one off would hide the message while the members are still missing |
+| Diagnostic id ranges | `SQLSRC001` to `SQLSRC099` for usage, `SQLSRC101` and up for the `.sql` file | Each range has room to grow |
+| A list of diagnostics for users | `docs/diagnostics.md`, linked from the README and from each descriptor, and kept complete by a test | Ids are what a user sees in a build log |
+| The MSBuild file | `build/SqlSource.props`, with the opt-out property `EnableDefaultSqlSourceItems` | Verified: `bin/` and `obj/` are excluded, and a consumer can opt out by property or with `Remove` |
 
 ### Technical notes
 
 **Finding files**
 
 - A generator sees only C# sources and `AdditionalFiles`.  The `.sql` files reach it through `context.AdditionalTextsProvider`, filtered by extension.
-- The package must add them: an `AdditionalFiles` item that includes `**/*.sql`, in an MSBuild file under `build/` named after the package id.  The epic so far calls it `build/SqlSource.props`.  A `.props` file is imported before the project body and a `.targets` file after it; verify that `bin/` and `obj/` are excluded and that a consumer can opt out.  If that needs a `.targets` file, use one and update this outline.
+- The package must add them: an `AdditionalFiles` item that includes `**/*.sql`, in an MSBuild file under `build/` named after the package id.  It is `build/SqlSource.props`.  A `.props` file is imported before the project body, so a consumer can remove items in the project body; a `.targets` file would add them afterwards.  Its `Exclude` uses `$(DefaultItemExcludes)`, which keeps `bin/` and `obj/` out because items are evaluated after every property.
 - `SqlSource.csproj` packs only the README and the analyzer assembly today.  The `build/` file is a new pack item.
 - `tests/SqlSource.Tests` uses the generator through a `ProjectReference`, so it never sees the package's MSBuild file.  An end-to-end test there must import that file or declare the item itself.  Importing the real file exercises what ships.
 - The generator may not read the file system (analyzer rule RS1035).  Resolving `Path` is string work: take the directory of `AttributeData.ApplicationSyntaxReference.SyntaxTree.FilePath`, combine it with `Path`, normalise, and compare with each `AdditionalText.Path`.
@@ -287,7 +296,8 @@ Everything under [Decisions for the whole epic](#decisions-for-the-whole-epic) t
 ### Documentation
 
 - `README.md`: the tokens section described above.
-- The analyzer release-tracking file records the removed diagnostic.
+- The analyzer release-tracking file records the removed diagnostic, `SQLSRC010`: its line is deleted from the unshipped file if no release has shipped it, and otherwise it is listed there under removed rules.
+- `docs/diagnostics.md` loses `SQLSRC010` and gains each diagnostic this phase adds.  New usage ids continue from `SQLSRC011`.
 
 ## Out of scope for the epic
 
@@ -295,4 +305,4 @@ Everything under [Decisions for the whole epic](#decisions-for-the-whole-epic) t
 - An accessibility option on the attribute.
 - Parameter types other than `string`.
 - Consumers that target a framework older than .NET 8.
-- Recursive folder discovery and several attributes on one type, unless phase 2's design decides otherwise.
+- Recursive folder discovery and several attributes on one type.
