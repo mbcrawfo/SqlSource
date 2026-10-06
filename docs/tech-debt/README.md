@@ -12,7 +12,6 @@ Next id: `TD-0006`
 | [TD-0002](TD-0002-no-coverage-comment-on-fork-pull-requests.md) | Open | 2026-10-05 | Low | Fork and Dependabot pull requests get no coverage comment |
 | [TD-0003](TD-0003-run-number-limited-by-assembly-version.md) | Open | 2026-10-05 | Low | A run number above 65534 fails the build, because it is a part of the assembly version |
 | [TD-0004](TD-0004-lexer-misreads-dialect-specific-sql.md) | Open | 2026-10-05 | Medium | The SQL lexer misreads some MySQL, Oracle and SQL Server constructs, as an error or by stripping SQL |
-| [TD-0005](TD-0005-markers-at-the-end-of-a-block-are-accepted.md) | Open | 2026-10-05 | Medium | A summary or directive marker at the end of a block is accepted, and silently applies to that block, when it should be an error |
 
 ## Columns
 

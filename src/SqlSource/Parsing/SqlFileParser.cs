@@ -140,12 +140,17 @@ internal static class SqlFileParser
         {
             var scope = new SqlDirectiveScope();
             var summary = new List<string>();
-            var hasContent = false;
+            var lastContent = FindLastContent(start, end);
             for (var index = start; index < end; index++)
             {
-                var lexeme = lexemes[index];
-                var marker = SqlMarkerReader.Read(text, lexeme);
-                if (marker is { Kind: SqlMarkerKind.Directives })
+                var marker = SqlMarkerReader.Read(text, lexemes[index]);
+                if (marker is not null && lastContent >= 0 && index > lastContent)
+                {
+                    // A marker comes before the SQL it describes.  One after the block's last SQL would be taken by a
+                    // reader to belong to the next block, so it is rejected and not applied.
+                    AddError(SqlParseErrorKind.MarkerAtEndOfBlock, marker.Value.Span);
+                }
+                else if (marker is { Kind: SqlMarkerKind.Directives })
                 {
                     scope.Read(text, marker.Value, _errors);
                 }
@@ -153,13 +158,9 @@ internal static class SqlFileParser
                 {
                     summary.Add(text.Substring(marker.Value.ValueSpan.Start, marker.Value.ValueSpan.Length));
                 }
-                else
-                {
-                    hasContent |= lexeme.GetContentSpan(text) is not null;
-                }
             }
 
-            if (!hasContent)
+            if (lastContent < 0)
             {
                 AddError(SqlParseErrorKind.EmptyBlock, nameSpan);
                 return;
@@ -184,6 +185,20 @@ internal static class SqlFileParser
                     scanned.Segments
                 )
             );
+        }
+
+        // The index of the last lexeme from start up to end that holds SQL, or -1 when none does.
+        private int FindLastContent(int start, int end)
+        {
+            for (var index = end - 1; index >= start; index--)
+            {
+                if (lexemes[index].GetContentSpan(text) is not null)
+                {
+                    return index;
+                }
+            }
+
+            return -1;
         }
 
         private void AddError(SqlParseErrorKind kind, TextSpan span, params string[] arguments) =>
