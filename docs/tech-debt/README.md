@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0011`
+Next id: `TD-0012`
 
 ## Active items
 
@@ -16,6 +16,7 @@ Next id: `TD-0011`
 | [TD-0008](TD-0008-package-is-not-installed-in-a-test.md) | Open | 2026-10-05 | Medium | No test installs the packed package into a project and builds it |
 | [TD-0009](TD-0009-removed-sql-file-does-not-trigger-a-rebuild.md) | Open | 2026-10-06 | Medium | Deleting or renaming a `.sql` file does not trigger an incremental rebuild, so the old members stay until a full build |
 | [TD-0010](TD-0010-path-resolution-scales-with-types-times-files.md) | Open | 2026-10-06 | Low | Resolving paths costs time and memory in proportion to the number of types times the number of `.sql` files |
+| [TD-0011](TD-0011-language-version-is-not-checked.md) | Open | 2026-10-06 | Low | A project that sets `LangVersion` below 12 gets compiler errors in generated code, not a diagnostic |
 
 ## Columns
 
