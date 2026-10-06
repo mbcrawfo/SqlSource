@@ -4,8 +4,8 @@
 
 Two things check the package, and neither uses it the way a consumer does:
 
-- [`tools/check-package.sh`](../../tools/check-package.sh) lists the files in the `.nupkg` and checks that `build/SqlSource.props`, the analyzer assembly and the readme are there.
-- [`SqlSource.Tests.csproj`](../../tests/SqlSource.Tests/SqlSource.Tests.csproj) imports `src/SqlSource/build/SqlSource.props` by path and gets the generator through a project reference.
+- [`tools/check-package.sh`](../../tools/check-package.sh) lists the files in the `.nupkg` and checks that `build/SqlSource.props`, `build/SqlSource.targets`, the analyzer assembly and the readme are there.
+- [`SqlSource.Tests.csproj`](../../tests/SqlSource.Tests/SqlSource.Tests.csproj) imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets` by path and gets the generator through a project reference.
 
 Nothing restores the `.nupkg` into a project and builds it.
 
@@ -15,7 +15,7 @@ Such a test needs a local package feed, a scratch project and a second restore a
 
 ## Impact
 
-A mistake that only shows when NuGet consumes the package would reach a release: a file in the wrong package folder that the script does not look for, a `DevelopmentDependency` setting that stops `build/` assets from flowing, or a generator dependency missing from `analyzers/`.  The first sign would be a consumer whose attributed types report SQLSRC005 for a folder that has `.sql` files.
+A mistake that only shows when NuGet consumes the package would reach a release: a file in the wrong package folder that the script does not look for, a `DevelopmentDependency` setting that stops `build/` assets from flowing, a `build/` file that behaves differently where NuGet imports it than where the test project imports it by path, or a generator dependency missing from `analyzers/`.  The first sign would be a consumer whose attributed types report SQLSRC005 for a folder that has `.sql` files.
 
 ## Proposed fix
 

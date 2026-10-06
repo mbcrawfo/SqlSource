@@ -1,0 +1,12 @@
+<Project>
+    <!--
+        NuGet imports this file into each project that references the package, after the project's own content.
+
+        The compiler reads SqlSourceTokenValidation from a file that the build writes with one line for each property.
+        A value on a line of its own, as an element written over several lines has it, would arrive empty there and be
+        taken for the default.  Trimming it here makes that form mean what it says.
+    -->
+    <PropertyGroup Condition="'$(SqlSourceTokenValidation)' != ''">
+        <SqlSourceTokenValidation>$(SqlSourceTokenValidation.Trim())</SqlSourceTokenValidation>
+    </PropertyGroup>
+</Project>

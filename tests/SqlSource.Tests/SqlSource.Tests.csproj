@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
-        The generator comes from a project reference, which does not bring the package's MSBuild file.  Importing the
-        real one means the end-to-end tests exercise what ships.
+        The generator comes from a project reference, which does not bring the package's MSBuild files.  Importing the
+        real ones, here and at the end of this file, means the end-to-end tests exercise what ships.
     -->
     <Import Project="../../src/SqlSource/build/SqlSource.props" />
     <PropertyGroup>
@@ -9,10 +9,13 @@
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
         <!--
-            Off, so that EndToEnd/ shows the property reaching the generator through the MSBuild file above: a query
-            there without a directive does not check its arguments.
+            Off, so that EndToEnd/ shows the property reaching the generator through the MSBuild files: a query there
+            without a directive does not check its arguments.  The value is on a line of its own on purpose.  The
+            compiler would read that as empty, and SqlSource.targets is what trims it.
         -->
-        <SqlSourceTokenValidation>false</SqlSourceTokenValidation>
+        <SqlSourceTokenValidation>
+            false
+        </SqlSourceTokenValidation>
     </PropertyGroup>
     <ItemGroup>
         <PackageReference Include="GitHubActionsTestLogger" />
@@ -38,4 +41,5 @@
             ReferenceOutputAssembly="true"
         />
     </ItemGroup>
+    <Import Project="../../src/SqlSource/build/SqlSource.targets" />
 </Project>

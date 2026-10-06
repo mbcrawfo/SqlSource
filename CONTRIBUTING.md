@@ -36,7 +36,7 @@ The solution has two test projects:
 
 A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both, so it may use only Roslyn API that 4.8.0 has, and the C# it hands to the compiler is C# 12 at most.
 
-`tests/SqlSource.Tests` also uses the generator the way a consumer does: the types in `EndToEnd/` are compiled with the generator loaded, and the project imports `src/SqlSource/build/SqlSource.props`, the MSBuild file the package ships.
+`tests/SqlSource.Tests` also uses the generator the way a consumer does: the types in `EndToEnd/` are compiled with the generator loaded, and the project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.
 
 ### Coverage
 
@@ -62,7 +62,7 @@ This builds in `Release` and writes `artifacts/packages/SqlSource.<version>-dev.
 tools/check-package.sh artifacts/packages
 ```
 
-This checks what the package holds: the generator under `analyzers/`, `build/SqlSource.props`, the readme, and nothing under `lib/`.  Without an argument it packs into a temporary folder first.
+This checks what the package holds: the generator under `analyzers/`, `build/SqlSource.props` and `build/SqlSource.targets`, the readme, and nothing under `lib/`.  Without an argument it packs into a temporary folder first.
 
 ## Checks
 

@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Checks the contents of the SqlSource package: the generator, the MSBuild file that hands .sql files to the
-# compiler, the readme, and nothing under lib/.
+# Checks the contents of the SqlSource package: the generator, the two MSBuild files that hand .sql files and the
+# token validation setting to the compiler, the readme, and nothing under lib/.
 # Usage: check-package.sh [directory]   The directory holds one SqlSource.*.nupkg.  Without it, the package is packed
 # into a temporary directory first.
 set -euo pipefail
 
-REQUIRED=('build/SqlSource.props' 'analyzers/dotnet/cs/SqlSource.dll' 'README.md')
+REQUIRED=('build/SqlSource.props' 'build/SqlSource.targets' 'analyzers/dotnet/cs/SqlSource.dll' 'README.md')
 
 if [[ $# -gt 1 ]]; then
     echo 'Usage: check-package.sh [directory]' >&2
