@@ -1,5 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -35,19 +34,13 @@ internal static class SqlFileReader
         var queries = ImmutableArray.CreateBuilder<SqlQuery>(result.Blocks.Count);
         foreach (var block in result.Blocks)
         {
-            // TODO: Phase 3 of the SQL queries epic emits a method for a block that has tokens.  Until then it gets
-            // no member.
-            if (block.Segments.Any(static segment => segment.Kind == SqlSegmentKind.Token))
-            {
-                continue;
-            }
-
             queries.Add(
                 new SqlQuery(
                     block.Name,
                     LocationInfo.From(file.Path, text, block.NameSpan),
                     block.Summary,
-                    block.Segments[0].Text
+                    block.Segments,
+                    block.TokenValidation
                 )
             );
         }

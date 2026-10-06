@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Parsing;
 using SqlSource.Tests.Generator;
 using Xunit;
 
@@ -24,8 +25,20 @@ public class SqlFileReaderTests
         file.FileName.ShouldBe("Users.sql");
         file.Errors.ShouldBeEmpty();
         file.Queries.ShouldBe([
-            new SqlQuery("GetUser", Location(new TextSpan(9, 7), 0, 9, 0, 16), "Loads one user.", "SELECT 1;"),
-            new SqlQuery("ListUsers", Location(new TextSpan(70, 9), 4, 9, 4, 18), null, "SELECT 2\nFROM t;"),
+            new SqlQuery(
+                "GetUser",
+                Location(new TextSpan(9, 7), 0, 9, 0, 16),
+                "Loads one user.",
+                TestModels.Array(Literal("SELECT 1;")),
+                null
+            ),
+            new SqlQuery(
+                "ListUsers",
+                Location(new TextSpan(70, 9), 4, 9, 4, 18),
+                null,
+                TestModels.Array(Literal("SELECT 2\nFROM t;")),
+                null
+            ),
         ]);
     }
 
@@ -40,7 +53,8 @@ public class SqlFileReaderTests
                 "CountUsers",
                 new LocationInfo("C:\\app\\Repo\\CountUsers.sql", new TextSpan(0, 0), default),
                 null,
-                "SELECT 1;"
+                TestModels.Array(Literal("SELECT 1;")),
+                null
             ),
         ]);
     }
@@ -73,15 +87,38 @@ public class SqlFileReaderTests
     }
 
     [Fact]
-    public void Read_QueryWithTokens_IsSkippedAndTheOtherQueriesAreKept()
+    public void Read_QueryWithTokens_KeepsItsSegmentsBesideTheOtherQueries()
     {
         const string Text =
-            "-- name: GetUser\nSELECT 1;\n-- name: ListFrom\nSELECT * FROM {{table}};\n-- name: Count\nSELECT 3;\n";
+            "-- name: GetUser\nSELECT 1;\n-- name: ListFrom\nSELECT * FROM {{ table }} t WHERE {{filter}};\n"
+            + "-- name: Count\nSELECT 3;\n";
 
         var file = Read(Text);
 
         file.Errors.ShouldBeEmpty();
-        file.Queries.Select(query => query.Name).ShouldBe(["GetUser", "Count"]);
+        file.Queries.Select(query => query.Name).ShouldBe(["GetUser", "ListFrom", "Count"]);
+        file.Queries[1]
+            .Segments.ShouldBe([
+                Literal("SELECT * FROM "),
+                new SqlSegment(SqlSegmentKind.Token, "table"),
+                Literal(" t WHERE "),
+                new SqlSegment(SqlSegmentKind.Token, "filter"),
+                Literal(";"),
+            ]);
+    }
+
+    [Fact]
+    public void Read_ValidationDirectives_GiveEachQueryItsOwnOrTheFilesOrNone()
+    {
+        const string Text =
+            "-- SqlSource: no-token-validation\n-- name: FromFile\nSELECT {{a}};\n"
+            + "-- name: Own\n-- SqlSource: token-validation\nSELECT {{b}};\n";
+
+        var file = Read(Text);
+
+        file.Errors.ShouldBeEmpty();
+        file.Queries.Select(query => query.TokenValidation).ShouldBe([false, true]);
+        Read("SELECT {{a}};\n").Queries.ShouldHaveSingleItem().TokenValidation.ShouldBeNull();
     }
 
     [Fact]
@@ -89,7 +126,7 @@ public class SqlFileReaderTests
     {
         var file = Read("-- SqlSource: token-ignore=raw\nSELECT '{{raw}}';\n");
 
-        file.Queries.ShouldHaveSingleItem().Sql.ShouldBe("SELECT '{{raw}}';");
+        file.Queries.ShouldHaveSingleItem().Segments.ShouldBe([Literal("SELECT '{{raw}}';")]);
     }
 
     [Theory]
@@ -113,6 +150,8 @@ public class SqlFileReaderTests
 
         Read(Text).ShouldBe(Read(Text));
     }
+
+    private static SqlSegment Literal(string text) => new(SqlSegmentKind.Literal, text);
 
     private static ParsedSqlFile Read(string? text, string path = Path) =>
         SqlFileReader.Read(

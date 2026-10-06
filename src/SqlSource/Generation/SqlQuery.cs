@@ -1,14 +1,26 @@
 using SqlSource.Diagnostics;
+using SqlSource.Parsing;
 
 namespace SqlSource.Generation;
 
 /// <summary>
-/// One query of a <c>.sql</c> file that becomes a constant.
+/// One query of a <c>.sql</c> file.  It becomes a constant, or a method when its SQL has a token.
 /// </summary>
 /// <param name="Name">The query's name, a valid C# identifier.</param>
 /// <param name="NameLocation">
 /// Where the name is in the file.  The start of the file when the name comes from the file name.
 /// </param>
 /// <param name="Summary">The text of the query's <c>-- summary:</c> markers, or null when it has none.</param>
-/// <param name="Sql">The SQL.</param>
-internal sealed record SqlQuery(string Name, LocationInfo NameLocation, string? Summary, string Sql);
+/// <param name="Segments">
+/// The SQL, split into literal text and tokens.  Never empty.  Without a token it is one literal segment.
+/// </param>
+/// <param name="TokenValidation">
+/// True or false when a validation directive applies to the query, null when the project's setting decides.
+/// </param>
+internal sealed record SqlQuery(
+    string Name,
+    LocationInfo NameLocation,
+    string? Summary,
+    EquatableArray<SqlSegment> Segments,
+    bool? TokenValidation
+);
