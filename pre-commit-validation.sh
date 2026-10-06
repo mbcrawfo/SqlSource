@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Runs every validation on the whole repository: formatting, linting, build, tests and the package check.  Rewrites
-# nothing.  Every step runs even when an earlier one fails, except that the tests and the package check are skipped
-# when the build fails.
+# Runs every validation on the whole repository: formatting, linting, build, tests and the two package checks.
+# Rewrites nothing.  Every step runs even when an earlier one fails, except that the tests and the package checks are
+# skipped when the build fails.
 # Usage: pre-commit-validation.sh
 set -euo pipefail
 
@@ -43,8 +43,9 @@ run_step 'actionlint' tools/actionlint.sh || true
 if run_step 'build' dotnet build "$SOLUTION"; then
     run_step 'test' dotnet test --solution "$SOLUTION" --no-build || true
     run_step 'package' tools/check-package.sh || true
+    run_step 'package-install' tools/check-package-install.sh || true
 else
-    results+=('skipped  test' 'skipped  package')
+    results+=('skipped  test' 'skipped  package' 'skipped  package-install')
 fi
 
 printf '\nSummary:\n'
