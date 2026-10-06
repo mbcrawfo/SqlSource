@@ -64,7 +64,7 @@ internal static class SqlTextBuilder
 
         public void Append(SqlLexeme lexeme)
         {
-            if (lexeme.Kind == SqlLexemeKind.Quoted)
+            if (lexeme.Kind is SqlLexemeKind.Quoted or SqlLexemeKind.Hint)
             {
                 AppendProtected(lexeme);
             }
@@ -72,7 +72,7 @@ internal static class SqlTextBuilder
             {
                 _current.IsMarker = true;
             }
-            else if (preserveComments || lexeme.Kind is SqlLexemeKind.Text or SqlLexemeKind.Hint)
+            else if (preserveComments || lexeme.Kind == SqlLexemeKind.Text)
             {
                 AppendLines(lexeme);
             }
@@ -132,7 +132,7 @@ internal static class SqlTextBuilder
             return new SqlBlockText(text.ToString(), offsets.ToImmutable());
         }
 
-        // Text, hints and kept comments: a line terminator ends the output line.
+        // Text and kept comments: a line terminator ends the output line.
         private void AppendLines(SqlLexeme lexeme)
         {
             var index = lexeme.Span.Start;
@@ -153,8 +153,9 @@ internal static class SqlTextBuilder
             }
         }
 
-        // Quoted regions: a line terminator becomes \n and stays inside the output line, so that the clean-up of
-        // trailing blanks and blank lines never reaches into a string literal.
+        // Quoted regions and hints: a line terminator becomes \n and stays inside the output line, so that the clean-up
+        // of trailing blanks and blank lines never reaches into a string literal.  A hint is protected because it can
+        // hold executable SQL, string literals included (MySQL's /*! ... */).
         private void AppendProtected(SqlLexeme lexeme)
         {
             var index = lexeme.Span.Start;

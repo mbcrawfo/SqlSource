@@ -94,6 +94,7 @@ The [parser spec](2026-10-05-sql-parser-design.md) holds the full rules.  In out
 | `token-ignore=name` | `{{name}}` stays in the SQL as literal text |
 
 - Comments are stripped by one conservative lexer with no dialect setting.  Where dialects disagree it keeps the text, and where input is unbalanced it reports an error: a comment left in is harmless, SQL removed is a bug.  The dialect-sensitive choices sit in one place in the lexer so that a later dialect setting can become flags; no such setting is built now.
+- A hint (`/*+ ... */` or `/*! ... */`) is never stripped, and is copied exactly as written apart from line endings, like a quoted region.  It can hold executable SQL.  This was settled by the review of phase 1, and replaces the parser spec's treatment of a hint as plain text.
 - Line endings in generated SQL are always `\n`, so the constants do not differ between checkouts.
 
 ### Tokens
@@ -126,7 +127,7 @@ Every problem is an error, never a warning: an unknown directive, a duplicate or
 | `SqlBlock.Segments` | Phase 2: one literal segment is a constant, and any token segment is the "tokens not supported" error.  Phase 3: the method body and its parameters. |
 | `SqlBlock.TokenValidation` | Phase 3: true or false when a directive applies, null when the project setting decides |
 | `SqlBlock.PreserveComments` | Nothing.  The parser has already applied it. |
-| `SqlParseError` kind, span and arguments | Phase 2: mapped to a Roslyn diagnostic located in the `.sql` file |
+| `SqlParseError` kind, span and arguments | Phase 2: mapped to a Roslyn diagnostic located in the `.sql` file.  Each member of `SqlParseErrorKind` documents the one argument it carries, or that it carries none. |
 
 The results are value-equal, so they can be cached in the incremental pipeline.  Spans are offsets; phase 2 converts them to lines and columns.
 
@@ -150,7 +151,7 @@ Everything under [Decisions for the whole epic](#decisions-for-the-whole-epic) t
 - A block that contains tokens is an error until phase 3.  Phase 3 removes that diagnostic.
 - Diagnostic ids and descriptors are created in this phase, one for each `SqlParseErrorKind` and one for each generator error.
 - A parser error is reported at its position in the `.sql` file, not at the attribute.
-- The dialect limits listed in the parser spec go into the README in this phase, with `preserve-comments` as the workaround.
+- The dialect limits go into the README in this phase.  `docs/tech-debt/TD-0004-lexer-misreads-dialect-specific-sql.md` is the current list; the parser spec's list is incomplete.  `preserve-comments` is a workaround only where a limit strips SQL.  Where a limit reports an unterminated quote or comment, the SQL has to be rewritten.
 
 ### Recommended
 
@@ -162,6 +163,7 @@ Everything under [Decisions for the whole epic](#decisions-for-the-whole-epic) t
 | Is `Path` a file or a folder? | A value ending in `.sql`, compared case-insensitively, is a file.  Anything else is a folder. | The generator may not touch the file system, so it cannot ask. |
 | Path comparison | Accept `/` and `\` in `Path`, and compare paths case-insensitively | A project then builds the same on every operating system |
 | The default folder holds no `.sql` file | Error | The attribute does nothing, which is never intended |
+| A `-- summary:` or `-- SqlSource:` marker written above the next `-- name:` marker | Make it an error in the parser before the format is documented.  Today it silently applies to the previous block; see `docs/tech-debt/TD-0005-marker-above-name-applies-to-previous-block.md`. | Annotations above a declaration are the C# habit, and the mistake is silent |
 | A `.sql` file no type points at | Ignored, including its parser errors | The package registers every `.sql` file in the project.  A migration script elsewhere must not break the build. |
 | A stray file in a type's folder whose name is not an identifier | Keep the parser's `InvalidFileName` error | It follows from the rules.  The developer adds a `-- name:` marker, moves the file or sets `Path`. |
 | A `.sql` file shared by two types | Parse it once and report its errors once | Avoids duplicate diagnostics |

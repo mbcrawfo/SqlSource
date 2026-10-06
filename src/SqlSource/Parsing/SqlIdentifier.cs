@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
 
 namespace SqlSource.Parsing;
@@ -7,8 +9,14 @@ namespace SqlSource.Parsing;
 /// </summary>
 internal static class SqlIdentifier
 {
-    /// <summary>True when <paramref name="value" /> has the form of an identifier.  Keywords pass.</summary>
-    public static bool IsValid(string value) => SyntaxFacts.IsValidIdentifier(value);
+    /// <summary>
+    /// True when <paramref name="value" /> has the form of an identifier.  Keywords pass.  A Unicode formatting
+    /// character such as a zero-width space does not: C# allows one in an identifier and then ignores it, so two names
+    /// that differ only by one would collide in generated code.
+    /// </summary>
+    public static bool IsValid(string value) =>
+        SyntaxFacts.IsValidIdentifier(value)
+        && !value.Any(static c => char.GetUnicodeCategory(c) == UnicodeCategory.Format);
 
     /// <summary>
     /// True for a reserved keyword such as <c>class</c>.  A contextual keyword such as <c>where</c> is not one.

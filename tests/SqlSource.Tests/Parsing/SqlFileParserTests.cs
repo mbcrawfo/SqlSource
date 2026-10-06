@@ -182,6 +182,8 @@ public class SqlFileParserTests
     [InlineData("A B")]
     [InlineData("@class")]
     [InlineData("A -- note")]
+    [InlineData("😀")]
+    [InlineData("A\u200B")]
     public void Parse_UnusableName_IsAnErrorAtTheName(string name)
     {
         var text = $"-- name: {name}\nSELECT 1";
@@ -296,6 +298,16 @@ public class SqlFileParserTests
             .ShouldBe([
                 SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{ class }}"), "class"),
             ]);
+    }
+
+    [Fact]
+    public void Parse_ReservedKeywordTokenAroundAStrippedComment_IsReportedOverTheWholeToken()
+    {
+        const string Token = "{{ /* c */ class }}";
+        const string Text = "-- name: A\nSELECT " + Token;
+
+        Errors(Text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, Token), "class")]);
     }
 
     [Fact]

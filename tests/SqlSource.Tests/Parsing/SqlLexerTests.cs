@@ -120,6 +120,22 @@ public class SqlLexerTests
         result.Error.ShouldBe(SqlParseError.Create(SqlParseErrorKind.UnterminatedBlockComment, new TextSpan(0, 2)));
     }
 
+    [Fact]
+    public void Lex_KnownLimit_OracleQuoteLiteralIsNotRecognised()
+    {
+        var result = SqlLexer.Lex("q'[it's]'");
+
+        result.Error.ShouldBe(SqlParseError.Create(SqlParseErrorKind.UnterminatedQuote, new TextSpan(8, 1)));
+    }
+
+    // The silent form of the limits above: when the misread quotes happen to balance, SQL is read as a comment.
+    [Theory]
+    [InlineData("'a\\'b -- c', 2", "LineComment:-- c', 2")]
+    [InlineData("[a'b], 'x -- y'", "LineComment:-- y'")]
+    [InlineData("q'[it's -- x]', q'[y's]'", "LineComment:-- x]', q'[y's]'")]
+    public void Lex_KnownLimit_MisreadQuotesThatBalance_TurnSqlIntoAComment(string text, string comment) =>
+        Lex(text)[^1].ShouldBe(comment);
+
     [Theory]
     [InlineData("'abc", 0)]
     [InlineData("x \"abc", 2)]

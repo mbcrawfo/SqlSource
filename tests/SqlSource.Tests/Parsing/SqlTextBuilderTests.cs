@@ -48,14 +48,24 @@ public class SqlTextBuilderTests
     [InlineData("SELECT 1\rFROM t\r", "SELECT 1\nFROM t")]
     [InlineData("SELECT 'a\r\nb', 'c\rd'", "SELECT 'a\nb', 'c\nd'")]
     [InlineData("SELECT 1\r\n-- summary: x\r\nFROM t", "SELECT 1\nFROM t")]
+    [InlineData("/*+ a\r\n b */ 1", "/*+ a\n b */ 1")]
     public void Build_AnyLineTerminator_BecomesLineFeed(string text, string expected) => Build(text).ShouldBe(expected);
 
     [Theory]
     [InlineData("SELECT 1   \nFROM t\t", "SELECT 1\nFROM t")]
     [InlineData("SELECT 'a  \n\n  b'  \n", "SELECT 'a  \n\n  b'")]
-    [InlineData("/*+ a  \n b */", "/*+ a\n b */")]
     public void Build_TrailingBlanks_AreRemovedUnlessTheLineEndsInsideAQuotedRegion(string text, string expected) =>
         Build(text).ShouldBe(expected);
+
+    // A hint can hold executable SQL (MySQL's /*! ... */), string literals included, so nothing inside it is cleaned.
+    [Theory]
+    [InlineData("/*+ a  \n\n b */")]
+    [InlineData("SELECT /*! 'line1\n\nline2   \nx' */ 1")]
+    public void Build_Hint_IsKeptAsWritten(string text)
+    {
+        Build(text).ShouldBe(text);
+        Build(text, preserveComments: true).ShouldBe(text);
+    }
 
     [Theory]
     [InlineData(
