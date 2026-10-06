@@ -62,6 +62,35 @@ internal sealed class SqlDirectiveScope(int headerEnd)
     }
 
     /// <summary>
+    /// Reports every <c>dialect</c> directive of <paramref name="marker" /> as misplaced, whatever it names.  For a
+    /// marker that is not read into a scope because it comes after the last SQL of its block: such a directive is
+    /// past the header by definition, and would otherwise be reported only as a marker at the end of its block.
+    /// </summary>
+    public static void ReportMisplacedDialects(string text, SqlMarker marker, List<SqlParseError> errors)
+    {
+        var start = marker.ValueSpan.Start;
+        var end = marker.ValueSpan.End;
+        while (start < end)
+        {
+            var wordEnd = FindWordEnd(text, start, end);
+            var directive = text.Substring(start, wordEnd - start);
+            var separator = directive.IndexOf('=');
+            if (Is(separator < 0 ? directive : directive.Substring(0, separator), DialectName))
+            {
+                errors.Add(
+                    SqlParseError.Create(
+                        SqlParseErrorKind.MisplacedDialect,
+                        TextSpan.FromBounds(start, wordEnd),
+                        directive
+                    )
+                );
+            }
+
+            start = SkipWhiteSpace(text, wordEnd, end);
+        }
+    }
+
+    /// <summary>
     /// Applies the directives of one <c>-- SqlSource:</c> marker to this scope, adding any problems to
     /// <paramref name="errors" />.
     /// </summary>

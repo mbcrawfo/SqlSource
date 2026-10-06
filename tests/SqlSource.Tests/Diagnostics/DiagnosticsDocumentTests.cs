@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using Shouldly;
 using SqlSource.Diagnostics;
+using SqlSource.Parsing;
 using Xunit;
 
 namespace SqlSource.Tests.Diagnostics;
@@ -44,6 +45,35 @@ public class DiagnosticsDocumentTests
                 $"| [{descriptor.Id}](#sqlsrc{descriptor.Id[6..]}) | {descriptor.Title} |"
             )
         );
+    }
+
+    // The section of SQLSRC109 tells a user what the directives are.  A directive that is added is added to this
+    // list and to the section together, and nothing the section names may be unknown to the parser.
+    [Fact]
+    public void Document_UnknownDirectiveSection_ListsEveryDirective()
+    {
+        string[] directives =
+        [
+            "keep-comments",
+            "token-validation",
+            "no-token-validation",
+            "token-ignore=name",
+            "dialect=name",
+        ];
+        var section = string.Join('\n', Sections().Single(section => section.Id == "SQLSRC109").Body);
+
+        foreach (var directive in directives)
+        {
+            section.ShouldContain($"`{directive}`");
+
+            var line = "-- SqlSource: " + directive;
+            var marker = SqlMarkerReader
+                .Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0])
+                .ShouldNotBeNull();
+            var errors = new List<SqlParseError>();
+            new SqlDirectiveScope(int.MaxValue).Read(line, marker, errors);
+            errors.ShouldNotContain(error => error.Kind == SqlParseErrorKind.UnknownDirective, directive);
+        }
     }
 
     private static IEnumerable<(string Id, List<string> Body)> Sections()

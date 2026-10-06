@@ -151,8 +151,13 @@ internal static class SqlFileParser
                 if (marker is not null && lastContent >= 0 && index > lastContent)
                 {
                     // A marker comes before the SQL it describes.  One after the block's last SQL would be taken by a
-                    // reader to belong to the next block, so it is rejected and not applied.
+                    // reader to belong to the next block, so it is rejected and not applied.  A dialect directive in
+                    // it is reported as misplaced too: it belongs at the top of the file, not above the next SQL.
                     AddError(SqlParseErrorKind.MarkerAtEndOfBlock, marker.Value.Span);
+                    if (marker.Value.Kind == SqlMarkerKind.Directives)
+                    {
+                        SqlDirectiveScope.ReportMisplacedDialects(text, marker.Value, _errors);
+                    }
                 }
                 else if (marker is { Kind: SqlMarkerKind.Directives })
                 {
