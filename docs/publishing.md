@@ -21,8 +21,10 @@ Packages go to nuget.org through [trusted publishing](https://learn.microsoft.co
 
 ### Release
 
-1. Set `VersionPrefix` in `Directory.Build.props` to the version being released, and merge that to `main`.
-2. Tag the merged commit and push the tag:
+1. Set `VersionPrefix` in `Directory.Build.props` to the version being released.
+2. In the same pull request, record the diagnostics the release ships.  Move every entry of `src/SqlSource/AnalyzerReleases.Unshipped.md` to `src/SqlSource/AnalyzerReleases.Shipped.md`, under a new `## Release <version>` heading, keeping the `### New Rules`, `### Removed Rules` and `### Changed Rules` tables as they are.  Leave the unshipped file with its two header lines only.  Skip this when the unshipped file has no entries.  Nothing checks that it was done, and a release that skips it makes the next removal or change of a diagnostic impossible to record correctly.
+3. Merge that to `main`.
+4. Tag the merged commit and push the tag:
 
    ```bash
    git tag v0.2.0
@@ -32,8 +34,8 @@ Packages go to nuget.org through [trusted publishing](https://learn.microsoft.co
    git push origin v0.2.0
    ```
 
-3. `publish.yml` builds the tag, fails if the tag is not `v<VersionPrefix>`, pushes `SqlSource.0.2.0.nupkg` to nuget.org and creates the GitHub release.
-4. Raise `VersionPrefix` in the next pull request.  Until then, betas built from `main` sort below the release just published.
+5. `publish.yml` builds the tag, fails if the tag is not `v<VersionPrefix>`, pushes `SqlSource.0.2.0.nupkg` to nuget.org and creates the GitHub release.
+6. Raise `VersionPrefix` in the next pull request.  Until then, betas built from `main` sort below the release just published.
 
 ### Beta
 
