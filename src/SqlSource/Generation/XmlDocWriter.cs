@@ -36,6 +36,22 @@ internal static class XmlDocWriter
     }
 
     /// <summary>
+    /// Appends the <c>param</c> of a parameter that a token became.
+    /// </summary>
+    /// <param name="builder">The source being built.</param>
+    /// <param name="indent">The whitespace that starts the line.</param>
+    /// <param name="name">The token's name, which is the parameter's.  An identifier, so it needs no escaping.</param>
+    public static void AppendParam(StringBuilder builder, string indent, string name) =>
+        _ = builder
+            .Append(indent)
+            .Append(Prefix)
+            .Append(" <param name=\"")
+            .Append(name)
+            .Append("\">The text that replaces <c>{{")
+            .Append(name)
+            .Append("}}</c>.</param>\n");
+
+    /// <summary>
     /// Escapes plain text for use as XML content.  A character that XML 1.0 does not allow, such as a form feed or
     /// the Ctrl-Z at the end of an old file, becomes U+FFFD: left as it is, it would make the comment malformed
     /// (CS1570) in code the consumer cannot change.

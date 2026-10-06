@@ -88,6 +88,18 @@ public class XmlDocWriterTests
     }
 
     [Fact]
+    public void AppendParam_Name_WritesOneLineThatShowsTheToken()
+    {
+        var builder = new StringBuilder("before\n");
+
+        XmlDocWriter.AppendParam(builder, "    ", "table");
+
+        builder
+            .ToString()
+            .ShouldBe("before\n    /// <param name=\"table\">The text that replaces <c>{{table}}</c>.</param>\n");
+    }
+
+    [Fact]
     public void AppendMember_EmptyLine_HasNoTrailingSpace()
     {
         var builder = new StringBuilder();
