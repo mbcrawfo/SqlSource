@@ -72,6 +72,10 @@ public static partial class UserQueries;
 
 Each member is a `const string`, or a static method when the query has tokens (see Tokens, below).  Both are documented with the query's summary and its SQL.
 
+### Projects that share internals
+
+SqlSource adds the attribute and `SqlQueriesMode` to each project that uses it, as internal types.  A project that sees the internals of another one, as a test project does through `InternalsVisibleTo`, sees both types twice when both projects use SqlSource.  Each project uses its own copy.  The compiler warns about such a conflict (CS0436), and SqlSource turns that warning off for these two types only, as suppression `SQLSRC901`: nothing has to be added to `NoWarn`, and a conflict between two types of your own is still reported.
+
 ## SQL files
 
 ### Queries

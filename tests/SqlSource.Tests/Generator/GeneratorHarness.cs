@@ -4,8 +4,11 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Reflection;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using Xunit;
@@ -32,6 +35,13 @@ internal static class GeneratorHarness
             .Split(Path.PathSeparator)
             .Select(path => MetadataReference.CreateFromFile(path)),
     ];
+
+    // The analyzers that the compiler finds in the generator's assembly, looked up the way it looks them up in a
+    // package: by their attribute, not by name.
+    private static readonly ImmutableArray<DiagnosticAnalyzer> PackageAnalyzers = new AnalyzerFileReference(
+        typeof(SqlSourceGenerator).Assembly.Location,
+        new LoadedAssembly()
+    ).GetAnalyzers(LanguageNames.CSharp);
 
     public static GeneratorRun Run(string source, params SqlFile[] sqlFiles) =>
         Run([new SourceFile(SourcePath, source)], sqlFiles);
@@ -139,6 +149,42 @@ internal static class GeneratorHarness
         return MetadataReference.CreateFromImage(image.ToArray());
     }
 
+    // The compiler's warnings and errors for the source together with the generated code, as a build of the project
+    // reports them: after the analyzers that the package brings have run.  Without them it is what the compiler
+    // reports on its own.
+    public static async Task<IReadOnlyList<string>> BuildAsync(
+        string source,
+        SqlFile[] sqlFiles,
+        MetadataReference[] references,
+        bool warningsAsErrors = false,
+        bool packageAnalyzers = true
+    )
+    {
+        var compilation = CreateCompilation([new SourceFile(SourcePath, source)], references: references);
+        if (warningsAsErrors)
+        {
+            compilation = compilation.WithOptions(
+                compilation.Options.WithGeneralDiagnosticOption(ReportDiagnostic.Error)
+            );
+        }
+
+        _ = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()))
+            .RunGeneratorsAndUpdateCompilation(
+                compilation,
+                out var updated,
+                out _,
+                TestContext.Current.CancellationToken
+            );
+
+        var diagnostics = packageAnalyzers
+            ? await updated
+                .WithAnalyzers(PackageAnalyzers)
+                .GetAllDiagnosticsAsync(TestContext.Current.CancellationToken)
+            : updated.GetDiagnostics(TestContext.Current.CancellationToken);
+
+        return [.. diagnostics.Where(diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning).Select(Format)];
+    }
+
     // "SQLSRC001 /app/Repo/Sample.cs(3,14)-(3,20): message", with lines and columns counted from one as an IDE
     // shows them.
     private static string Format(Diagnostic diagnostic)
@@ -154,6 +200,14 @@ internal static class GeneratorHarness
 }
 
 internal sealed record SourceFile(string Path, string Text);
+
+// The generator's assembly is already loaded, by the reference to its project.
+internal sealed class LoadedAssembly : IAnalyzerAssemblyLoader
+{
+    public void AddDependencyLocation(string fullPath) { }
+
+    public Assembly LoadFromPath(string fullPath) => typeof(SqlSourceGenerator).Assembly;
+}
 
 // Dialect is the SqlSourceDialect metadata of the file's AdditionalFiles item, and null is a file without it.
 internal sealed record SqlFile(string Path, string? Text, string? Dialect = null)
