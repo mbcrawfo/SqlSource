@@ -6,5 +6,5 @@ FROM orders
 WHERE id = @id;
 
 -- name: OrdersOf
--- This query has a token, so it gets no constant.
-SELECT id FROM {{schema}}.orders WHERE user_id = @userId;
+-- The schema is a token, so this query is a method.
+SELECT o.id FROM {{schema}}.orders AS o INNER JOIN {{schema}}.users AS u ON u.id = o.user_id WHERE {{filter}};

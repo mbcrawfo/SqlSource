@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Diagnostics;
+using SqlSource.Parsing;
 
 namespace SqlSource.Generation;
 
@@ -29,7 +30,14 @@ internal static class TypeEmitter
         + "#pragma warning disable CS0108 // A query can have the name of an inherited member.\n"
         + "\n";
 
-    public static TypeOutput Emit(TypeQueries input)
+    /// <summary>
+    /// Writes the file of <paramref name="input" />.
+    /// </summary>
+    /// <param name="input">The type and its parsed files.</param>
+    /// <param name="validateTokens">
+    /// What the project asks for: whether a method checks its arguments.  A query's own directive comes first.
+    /// </param>
+    public static TypeOutput Emit(TypeQueries input, bool validateTokens)
     {
         var type = input.Type.Type;
         if (input.Type.Diagnostics.Count > 0)
@@ -41,7 +49,7 @@ internal static class TypeEmitter
         var members = SelectMembers(type, input.Files, diagnostics);
         return new TypeOutput(
             input.HintName,
-            Write(type, members),
+            Write(type, members, validateTokens),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
         );
     }
@@ -104,7 +112,7 @@ internal static class TypeEmitter
         return members;
     }
 
-    private static string Write(TargetType type, List<(SqlQuery Query, string FileName)> members)
+    private static string Write(TargetType type, List<(SqlQuery Query, string FileName)> members, bool validateTokens)
     {
         var builder = new StringBuilder(Header);
         var depth = 0;
@@ -136,13 +144,29 @@ internal static class TypeEmitter
             }
 
             var (query, fileName) = members[index];
-            XmlDocWriter.AppendMember(builder, indent, GetSummaryXml(query, fileName), query.Sql);
+            var summaryXml = GetSummaryXml(query, fileName);
+            if (HasToken(query))
+            {
+                MethodWriter.Append(
+                    builder,
+                    indent,
+                    summaryXml,
+                    query.Name,
+                    query.Segments,
+                    query.TokenValidation ?? validateTokens
+                );
+                continue;
+            }
+
+            // Without a token the SQL is one literal segment.
+            var sql = query.Segments[0].Text;
+            XmlDocWriter.AppendMember(builder, indent, summaryXml, sql);
             _ = builder
                 .Append(indent)
                 .Append("public const string ")
                 .Append(query.Name)
                 .Append(" = ")
-                .Append(SymbolDisplay.FormatLiteral(query.Sql, quote: true))
+                .Append(SymbolDisplay.FormatLiteral(sql, quote: true))
                 .Append(";\n");
         }
 
@@ -152,6 +176,19 @@ internal static class TypeEmitter
         }
 
         return builder.ToString();
+    }
+
+    private static bool HasToken(SqlQuery query)
+    {
+        foreach (var segment in query.Segments)
+        {
+            if (segment.Kind == SqlSegmentKind.Token)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static string GetSummaryXml(SqlQuery query, string fileName) =>

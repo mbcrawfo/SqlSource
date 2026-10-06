@@ -105,7 +105,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Combine(ambiguousHintNames)
             .Select(static (input, _) => SelectFiles(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.TypeQueries)
-            .Select(static (queries, _) => TypeEmitter.Emit(queries))
+            .Select(static (queries, _) => TypeEmitter.Emit(queries, validateTokens: true))
             .WithTrackingName(TrackingNames.TypeOutput);
 
         context.RegisterSourceOutput(

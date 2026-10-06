@@ -41,11 +41,14 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void QueryWithTokens_GetsNoMember() =>
-        typeof(OrderQueries)
-            .GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static)
-            .Select(field => field.Name)
-            .ShouldBe(["GetOrder"]);
+    public void DirectMode_QueryWithTokens_IsAMethodThatReplacesEachOccurrence() =>
+        OrderQueries
+            .OrdersOf("sales", "u.name = @name")
+            .ShouldBe(
+                "-- The schema is a token, so this query is a method.\n"
+                    + "SELECT o.id FROM sales.orders AS o INNER JOIN sales.users AS u ON u.id = o.user_id "
+                    + "WHERE u.name = @name;"
+            );
 
     [Fact]
     public void GenericType_PathToAFolder_SharesTheFileWithAnotherType() =>
