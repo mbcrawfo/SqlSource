@@ -13,12 +13,10 @@
         <Nullable>enable</Nullable>
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <!--
-            Each value is on a line of its own on purpose.  The compiler would read that as empty, and the package's
-            build/SqlSource.targets is what trims it.
+            The value is on a line of its own on purpose.  The compiler would read that as empty, and the package's
+            build/SqlSource.targets is what trims it.  Directory.Build.targets sets SqlSourceTokenValidation the same
+            way.
         -->
-        <SqlSourceTokenValidation>
-            false
-        </SqlSourceTokenValidation>
         <SqlSourceDialect>
             postgres
         </SqlSourceDialect>

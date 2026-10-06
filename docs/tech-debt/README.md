@@ -16,7 +16,6 @@ Next id: `TD-0016`
 | [TD-0012](TD-0012-token-method-shapes-are-compiled-but-not-run.md) | Open | 2026-10-06 | Low | A token-only query and one with more than seven tokens are compiled in tests and never run, and awkward token names are compiled as C# 12 only |
 | [TD-0013](TD-0013-sql-edit-reads-every-attributed-type-again.md) | Open | 2026-10-06 | Low | An edit to a `.sql` file makes the compiler read every attributed type again, because the attribute is added in a post-initialization step |
 | [TD-0014](TD-0014-every-sql-file-gets-a-section-in-the-compiler-configuration.md) | Open | 2026-10-06 | Low | Every `.sql` file of a project, used or not, adds a section to the configuration file the SDK writes for the compiler |
-| [TD-0015](TD-0015-values-set-after-the-package-targets-are-not-trimmed.md) | Open | 2026-10-06 | Low | A dialect or validation setting written over several lines in `Directory.Build.targets`, or on an item a target adds, reaches the compiler empty and is ignored |
 
 ## Columns
 
