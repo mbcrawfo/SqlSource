@@ -10,6 +10,11 @@
         GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the file.  The trims run before it and
         not where this file is imported: Directory.Build.targets is imported later, and a target can add an item while
         the build runs.  A build that writes the file runs them, so a design-time build does too.
+
+        One target is out of their reach: one that hooks GenerateMSBuildEditorConfigFileCore itself and is declared
+        after this file, as in Directory.Build.targets.  MSBuild runs it after the trims.  A target that adds a .sql
+        file hooks SqlSourceTrimDialectOfFiles instead, which runs it first wherever it is declared, or writes the
+        metadata on one line.
     -->
     <Target Name="SqlSourceTrimProperties" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
         <PropertyGroup>
