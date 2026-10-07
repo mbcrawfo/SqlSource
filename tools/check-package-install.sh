@@ -107,10 +107,10 @@ if ! diff "$EXPECTED" "$work/actual-output.txt"; then
     exit 1
 fi
 
-# A .sql file that is removed has no timestamp left to compare, so the build after it compiles again only if something
-# else changed.  That is the file that the target SqlSourceTrackAdditionalFiles of build/SqlSource.targets writes, with
-# a hash of the list of files, and names as an input of the compiler.  A build that succeeds here kept the members of
-# the removed file.
+# A .sql file that is removed has no timestamp left to compare, so the build after it compiles again only if an input
+# of the compiler changed.  The target SqlSourceTrackAdditionalFiles of build/SqlSource.targets writes a hash of the
+# list of AdditionalFiles to a file and names that file as an input: the hash, and so the file, changes when a .sql
+# file goes.  A build that succeeds here did not compile, and kept the members of the removed file.
 rm "$REMOVED"
 if dotnet build "$PROJECT" --nologo --verbosity quiet >"$work/rebuild.log" 2>&1; then
     cat "$work/rebuild.log" >&2
