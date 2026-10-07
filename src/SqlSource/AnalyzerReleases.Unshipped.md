@@ -17,6 +17,7 @@ SQLSRC009 | SqlSource | Error | Query is named like its containing type
 SQLSRC010 | SqlSource | Error | SqlSourceTokenValidation is not valid
 SQLSRC011 | SqlSource | Error | SqlSourceDialect is not valid
 SQLSRC012 | SqlSource | Error | Language version is not supported
+SQLSRC013 | SqlSource | Error | SQL file paths differ only by case
 SQLSRC101 | SqlSource | Error | Quote is not closed
 SQLSRC102 | SqlSource | Error | Comment is not closed
 SQLSRC103 | SqlSource | Error | Query name is not valid

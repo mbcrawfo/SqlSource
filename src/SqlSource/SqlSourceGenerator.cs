@@ -42,11 +42,21 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var sqlFiles = context.AdditionalTextsProvider.Where(static file => SqlPath.IsSqlFile(file.Path));
 
         // The paths alone, so that resolving a type's Path does not depend on the text of any file.
-        var sqlPaths = sqlFiles
-            .Select(static (file, _) => SqlPath.Normalize(file.Path))
-            .Collect()
-            .Select(static (paths, _) => ToSortedSet(paths.RemoveAll(static path => path is null)!))
+        var listedPaths = sqlFiles
+            .Select(static (file, _) => SqlFilePath.Create(file.Path))
+            .Where(static path => path is not null)
+            .Select(static (path, _) => path!)
+            .Collect();
+
+        var sqlPaths = listedPaths
+            .Select(static (paths, _) => ToSortedSet(paths.Select(static path => path.NormalizedPath)))
             .WithTrackingName(TrackingNames.SqlPaths);
+
+        // Two files whose paths differ only by case.  Almost always none, so this value almost never changes.
+        var caseCollisions = listedPaths
+            .Combine(sqlPaths)
+            .Select(static (input, _) => PathCollision.Find(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.CaseCollisions);
 
         var isSupportedFramework = context
             .CompilationProvider.Select(
@@ -74,6 +84,22 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Collect()
             .Select(static (paths, _) => ToSortedSet(paths))
             .WithTrackingName(TrackingNames.ClaimedPaths);
+
+        // Reported for a file that a type claims only, as every other problem of a file is.
+        context.RegisterSourceOutput(
+            caseCollisions.Combine(claimedPaths),
+            static (output, input) =>
+            {
+                foreach (
+                    var collision in input.Left.Where(collision =>
+                        SqlPath.Contains(input.Right, collision.NormalizedPath)
+                    )
+                )
+                {
+                    output.ReportDiagnostic(collision.ToDiagnostic());
+                }
+            }
+        );
 
         // The project's dialect, which is the same value until the property itself changes.
         var projectDialect = context
@@ -186,7 +212,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     }
 
     // Distinct ignoring case and in the order of SqlPath.Comparer, which is also the order of a type's members.
-    private static EquatableArray<string> ToSortedSet(ImmutableArray<string> paths) =>
+    private static EquatableArray<string> ToSortedSet(IEnumerable<string> paths) =>
         new(paths.Distinct(SqlPath.Comparer).OrderBy(static path => path, SqlPath.Comparer).ToImmutableArray());
 
     // One file for each path, the first the project lists, in the order of SqlPath.Comparer.

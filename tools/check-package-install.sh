@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Installs the SqlSource package into a project the way a consumer does, runs the project and checks what it prints.
+# Then removes a .sql file the project uses and checks that the next build, an incremental one, fails for it.
 # The project is tools/package-install.  It is copied out of the repository first, so that nothing of the repository's
 # own build applies to it, and it restores from the folder that holds the package and from nowhere else.
 # Usage: check-package-install.sh [directory]   The directory holds one SqlSource.*.nupkg.  Without it, the package is
@@ -10,6 +11,9 @@ PACKAGE_ID='SqlSource'
 FIXTURE='tools/package-install'
 PROJECT='Consumer.csproj'
 EXPECTED='expected-output.txt'
+# A .sql file of the project and the member that Program.cs uses from it.
+REMOVED='Queries/ByProperty.sql'
+REMOVED_MEMBER='ByProperty'
 
 if [[ $# -gt 1 ]]; then
     echo 'Usage: check-package-install.sh [directory]' >&2
@@ -103,4 +107,22 @@ if ! diff "$EXPECTED" "$work/actual-output.txt"; then
     exit 1
 fi
 
-echo "check-package-install: $package installs into a project, which builds and prints $FIXTURE/$EXPECTED"
+# A .sql file that is removed has no timestamp left to compare, so the build after it compiles again only if something
+# else changed.  That is the file the SDK writes for the compiler, which holds a section for each .sql file because
+# build/SqlSource.props declares metadata for them.  A build that succeeds here kept the members of the removed file.
+rm "$REMOVED"
+if dotnet build "$PROJECT" --nologo --verbosity quiet >"$work/rebuild.log" 2>&1; then
+    cat "$work/rebuild.log" >&2
+    echo "check-package-install: the build after $REMOVED was removed did not compile again" >&2
+    exit 1
+fi
+
+# No quotes around the member: the compiler writes them as its language does, "ByProperty" in German.
+if ! grep -q "error CS0117: .*$REMOVED_MEMBER" "$work/rebuild.log"; then
+    cat "$work/rebuild.log" >&2
+    echo "check-package-install: the build after $REMOVED was removed failed without reporting $REMOVED_MEMBER" >&2
+    exit 1
+fi
+
+echo "check-package-install: $package installs into a project, which builds and prints $FIXTURE/$EXPECTED,"
+echo "check-package-install: and whose next build compiles again after a .sql file is removed"

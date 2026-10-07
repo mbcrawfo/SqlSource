@@ -16,6 +16,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC010](#sqlsrc010) | SqlSourceTokenValidation is not valid |
 | [SQLSRC011](#sqlsrc011) | SqlSourceDialect is not valid |
 | [SQLSRC012](#sqlsrc012) | Language version is not supported |
+| [SQLSRC013](#sqlsrc013) | SQL file paths differ only by case |
 | [SQLSRC101](#sqlsrc101) | Quote is not closed |
 | [SQLSRC102](#sqlsrc102) | Comment is not closed |
 | [SQLSRC103](#sqlsrc103) | Query name is not valid |
@@ -196,6 +197,26 @@ The code SqlSource generates for a type is C# 12, the default language version o
 Remove `LangVersion` to get the default of the target framework, or set it to `12` or later.  It can be set in the project file, in `Directory.Build.props`, and by a `-p:` argument of the build command.
 
 The error is reported at each `[SqlQueries]` attribute, and no type gets members until it is fixed.  A project that targets a framework older than .NET 8 has an older language version by default; it gets [SQLSRC003](#sqlsrc003) and not this error, because targeting .NET 8 fixes both.
+
+## SQLSRC013
+
+**SQL file paths differ only by case**
+
+Two `.sql` files of the project have paths that differ only by upper and lower case: `Users.sql` and `users.sql` in one folder, or a file of the same name in `Queries` and in `queries`.  SqlSource compares paths ignoring case, so that a project builds the same on every operating system, and the two are one file to it.  It would use the one the project lists first and ignore the other.  The error is at the start of the file that would be ignored, and the message names the other one.
+
+Rename one of the files, or one of the folders.  Such a pair can exist only on a file system that tells upper case from lower, and already breaks a checkout of the repository on Windows and on macOS.
+
+A project that lists one file twice, with spellings that differ by case, gets the same error, because SqlSource may not ask the file system whether two paths are one file.  That takes an `AdditionalFiles` item written by hand for a file that the package already includes, here `Queries/Users.sql`:
+
+```xml
+<ItemGroup>
+    <AdditionalFiles Include="queries/users.sql" SqlSourceDialect="postgres" />
+</ItemGroup>
+```
+
+Write `Update` in place of `Include` to change the item the package adds, and spell the path as it is on disk.
+
+The error is reported only for a `.sql` file that a type uses.
 
 ## SQLSRC101
 

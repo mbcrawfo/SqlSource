@@ -1,0 +1,24 @@
+<Project>
+    <!--
+        The .NET SDK imports this file after the targets of every package, so nothing that the package does where it
+        is imported sees what is set here.  Each value is on a line of its own on purpose, as in Consumer.csproj.
+    -->
+    <PropertyGroup>
+        <SqlSourceTokenValidation>
+            false
+        </SqlSourceTokenValidation>
+    </PropertyGroup>
+    <ItemGroup>
+        <AdditionalFiles Remove="Queries/AddedByATarget.sql" />
+    </ItemGroup>
+    <!-- An item that exists only while the build runs, as a target that writes its .sql files would add one. -->
+    <Target Name="AddSqlFile" BeforeTargets="BeforeBuild">
+        <ItemGroup>
+            <AdditionalFiles Include="Queries/AddedByATarget.sql">
+                <SqlSourceDialect>
+                    mssql
+                </SqlSourceDialect>
+            </AdditionalFiles>
+        </ItemGroup>
+    </Target>
+</Project>
