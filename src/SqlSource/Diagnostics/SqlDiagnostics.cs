@@ -132,8 +132,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor InvalidDialect = new(
         id: "SQLSRC011",
         title: "SqlSourceDialect is not valid",
-        messageFormat: "'{0}' is not a SQL dialect.  SqlSourceDialect accepts ansi, mssql, postgres, mysql, mariadb, "
-            + "sqlite and oracle.",
+        messageFormat: "'{0}' is not a SQL dialect.  SqlSourceDialect accepts ansi, mssql, postgres, cockroachdb, "
+            + "mysql, mariadb, sqlite and oracle.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

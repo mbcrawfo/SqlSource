@@ -6,13 +6,16 @@ namespace SqlSource.Parsing;
 /// How one dialect reads comments and quoted regions.  The lexer reads by the rules it is given and names no dialect.
 /// </summary>
 /// <remarks>
-/// Every dialect-sensitive choice is here or in a <see cref="QuoteReader" />.  The static properties are the whole
-/// table: a value where dialects differ by a setting, a reader where they differ by how a quoted region ends.
-/// Changing a cell changes the SQL users get.
+/// Every dialect-sensitive choice is here or in a <see cref="QuoteReader" />.  The static properties, and the rules
+/// of MySQL and MariaDB under each set of options, are the whole table: a value where dialects differ by a setting, a
+/// reader where they differ by how a quoted region ends.  Changing a cell changes the SQL users get.
 /// </remarks>
 internal sealed class SqlDialectRules
 {
     private const int TableSize = 128;
+
+    // One for each combination of SqlDialectOptions.
+    private const int OptionSets = 4;
 
     // The first characters of --, # and /*.
     private const string CommentStarters = "-#/";
@@ -21,9 +24,10 @@ internal sealed class SqlDialectRules
 
     private static readonly QuoteReader Backslash = new BackslashQuoteReader();
 
-    private static readonly QuoteReader EscapeString = new EscapeStringReader(continues: false);
+    private static readonly QuoteReader EscapeString = new EscapeStringReader("Ee");
 
-    private static readonly QuoteReader ContinuedEscapeString = new EscapeStringReader(continues: true);
+    // CockroachDB's bytes literal, b'...', takes backslash escapes as an E string does.
+    private static readonly QuoteReader BytesEscapeString = new EscapeStringReader("Eeb");
 
     private static readonly QuoteReader QuoteOperator = new QuoteOperatorReader();
 
@@ -32,6 +36,11 @@ internal sealed class SqlDialectRules
     private static readonly QuoteReader EscapedBracket = new BracketReader(doubledCloserEscapes: true);
 
     private static readonly QuoteReader Dollar = new DollarQuoteReader();
+
+    // The rules of MySQL and of MariaDB under each set of options, at the index that the options have as a number.
+    private static readonly SqlDialectRules[] MySqlByOptions = CreateMySqlFamily(isMariaDb: false);
+
+    private static readonly SqlDialectRules[] MariaDbByOptions = CreateMySqlFamily(isMariaDb: true);
 
     private readonly QuoteReader?[] _readers = new QuoteReader?[TableSize];
 
@@ -59,22 +68,24 @@ internal sealed class SqlDialectRules
         new(('\'', Doubled), ('"', Doubled), ('[', EscapedBracket)) { NestedComments = true };
 
     public static SqlDialectRules PostgreSql { get; } =
-        new(('\'', ContinuedEscapeString), ('"', Doubled), ('$', Dollar)) { NestedComments = true };
-
-    public static SqlDialectRules MySql { get; } =
-        new(('\'', Backslash), ('"', Backslash), ('`', Doubled), ('$', Dollar))
+        new(('\'', EscapeString), ('"', Doubled), ('$', Dollar))
         {
-            DashNeedsWhitespace = true,
-            HashComments = true,
+            NestedComments = true,
+            StringContinuation = SqlStringContinuation.AcrossLineComments,
         };
 
-    public static SqlDialectRules MariaDb { get; } =
-        new(('\'', Backslash), ('"', Backslash), ('`', Doubled))
+    public static SqlDialectRules CockroachDb { get; } =
+        new(('\'', BytesEscapeString), ('"', Doubled), ('$', Dollar))
         {
-            DashNeedsWhitespace = true,
-            HashComments = true,
-            MariaDbHints = true,
+            NestedComments = true,
+            StringContinuation = SqlStringContinuation.AcrossWhitespace,
         };
+
+    /// <summary>MySQL with no options.  <see cref="For" /> gives the rules of a set of options.</summary>
+    public static SqlDialectRules MySql => MySqlByOptions[(int)SqlDialectOptions.None];
+
+    /// <summary>MariaDB with no options.  <see cref="For" /> gives the rules of a set of options.</summary>
+    public static SqlDialectRules MariaDb => MariaDbByOptions[(int)SqlDialectOptions.None];
 
     public static SqlDialectRules Sqlite { get; } =
         new(('\'', Doubled), ('"', Doubled), ('`', Doubled), ('[', Bracket));
@@ -99,19 +110,59 @@ internal sealed class SqlDialectRules
     /// <summary>Whether a block comment that starts <c>/*M!</c> is a hint, as in MariaDB.</summary>
     public bool MariaDbHints { get; private init; }
 
-    /// <summary>The rules of <paramref name="dialect" />.  One shared instance for each dialect.</summary>
-    public static SqlDialectRules For(SqlDialect dialect) =>
-        dialect switch
+    /// <summary>
+    /// Whether a string goes on after a gap with a line break, and what the gap may hold.  It matters after a
+    /// string whose reader names a continuation: the part after the gap is then read by that reader.
+    /// </summary>
+    public SqlStringContinuation StringContinuation { get; private init; }
+
+    /// <summary>
+    /// The rules of <paramref name="choice" />.  One shared instance for each choice.  Options that the dialect
+    /// does not have are ignored: a name never gives them.
+    /// </summary>
+    public static SqlDialectRules For(SqlDialectChoice choice) =>
+        choice.Dialect switch
         {
             SqlDialect.Ansi => Ansi,
             SqlDialect.SqlServer => SqlServer,
             SqlDialect.PostgreSql => PostgreSql,
-            SqlDialect.MySql => MySql,
-            SqlDialect.MariaDb => MariaDb,
+            SqlDialect.MySql => MySqlByOptions[(int)choice.Options & (OptionSets - 1)],
+            SqlDialect.MariaDb => MariaDbByOptions[(int)choice.Options & (OptionSets - 1)],
             SqlDialect.Sqlite => Sqlite,
             SqlDialect.Oracle => Oracle,
+            SqlDialect.CockroachDb => CockroachDb,
             _ => Ansi,
         };
+
+    // MySQL and MariaDB read "..." as a string and take backslash escapes in both kinds of quote.  ANSI_QUOTES makes
+    // "..." an identifier, which has none; NO_BACKSLASH_ESCAPES takes them from both.  MySQL reads dollar quotes,
+    // and MariaDB has its own hint.
+    private static SqlDialectRules[] CreateMySqlFamily(bool isMariaDb)
+    {
+        var family = new SqlDialectRules[OptionSets];
+        for (var index = 0; index < OptionSets; index++)
+        {
+            var options = (SqlDialectOptions)index;
+            var noBackslash = (options & SqlDialectOptions.NoBackslashEscapes) != 0;
+            var ansiQuotes = (options & SqlDialectOptions.AnsiQuotes) != 0;
+            var singleQuote = noBackslash ? Doubled : Backslash;
+            var doubleQuote = noBackslash || ansiQuotes ? Doubled : Backslash;
+            family[index] = isMariaDb
+                ? new SqlDialectRules(('\'', singleQuote), ('"', doubleQuote), ('`', Doubled))
+                {
+                    DashNeedsWhitespace = true,
+                    HashComments = true,
+                    MariaDbHints = true,
+                }
+                : new SqlDialectRules(('\'', singleQuote), ('"', doubleQuote), ('`', Doubled), ('$', Dollar))
+                {
+                    DashNeedsWhitespace = true,
+                    HashComments = true,
+                };
+        }
+
+        return family;
+    }
 
     /// <summary>
     /// The offset of the first character from <paramref name="start" /> on that can start a comment or a quoted

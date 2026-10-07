@@ -194,7 +194,7 @@ public class SqlDirectiveScopeTests
         var (scope, errors) = Read("-- SqlSource: " + directive);
 
         errors.ShouldBeEmpty();
-        scope.Dialect.ToString().ShouldBe(expected);
+        scope.Dialect.ShouldBe(Plain(Enum.Parse<SqlDialect>(expected)));
     }
 
     [Theory]
@@ -203,6 +203,9 @@ public class SqlDirectiveScopeTests
     [InlineData("dialect=pgsql")]
     [InlineData("dialect=mysql,postgres")]
     [InlineData("dialect=mysql=x")]
+    [InlineData("dialect=mysql,")]
+    [InlineData("dialect=mysql,nope")]
+    [InlineData("dialect=postgres,ansi-quotes")]
     public void Read_DialectWithoutAValueOrWithAnUnknownName_IsAnError(string directive)
     {
         var line = "-- SqlSource: " + directive;
@@ -221,7 +224,76 @@ public class SqlDirectiveScopeTests
         var (scope, errors) = Read("-- SqlSource: dialect=mssql dialect=tsql", "-- SqlSource: dialect=SqlServer");
 
         errors.ShouldBeEmpty();
-        scope.Dialect.ShouldBe(SqlDialect.SqlServer);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.SqlServer));
+    }
+
+    [Fact]
+    public void Read_DialectWithOptions_KeepsTheDialectAndItsOptions()
+    {
+        var (scope, errors) = Read("-- SqlSource: keep-comments DIALECT=MySql,ANSI_QUOTES");
+
+        errors.ShouldBeEmpty();
+        scope.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes));
+    }
+
+    [Fact]
+    public void Read_SameDialectAndOptionsTwice_IsAllowed()
+    {
+        var (scope, errors) = Read(
+            "-- SqlSource: dialect=mysql,ansi-quotes,no-backslash-escapes",
+            "-- SqlSource: dialect=MySQL,NO_BACKSLASH_ESCAPES,ANSI_QUOTES"
+        );
+
+        errors.ShouldBeEmpty();
+        scope.Dialect.ShouldBe(
+            new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes | SqlDialectOptions.NoBackslashEscapes)
+        );
+    }
+
+    [Fact]
+    public void Read_SameDialectWithOtherOptions_ReportsTheSecondAndKeepsTheFirst()
+    {
+        const string Line = "-- SqlSource: dialect=mysql dialect=mysql,ansi-quotes";
+
+        var (scope, errors) = Read(Line);
+
+        errors.ShouldBe([
+            SqlParseError.Create(
+                SqlParseErrorKind.ConflictingDirectives,
+                SpanOf(Line, "dialect=mysql,ansi-quotes"),
+                "dialect=mysql,ansi-quotes"
+            ),
+        ]);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
+    }
+
+    // A directive is one word.  A space after the comma ends it, and the option is read as a directive of its own.
+    [Fact]
+    public void Read_SpaceAfterTheCommaOfADialect_IsTwoErrors()
+    {
+        const string Line = "-- SqlSource: dialect=mysql, ansi-quotes";
+
+        var (scope, errors) = Read(Line);
+
+        errors.ShouldBe([
+            SqlParseError.Create(
+                SqlParseErrorKind.InvalidDirectiveValue,
+                SpanOf(Line, "dialect=mysql,"),
+                "dialect=mysql,"
+            ),
+            SqlParseError.Create(SqlParseErrorKind.UnknownDirective, SpanOf(Line, "ansi-quotes"), "ansi-quotes"),
+        ]);
+        scope.Dialect.ShouldBeNull();
+    }
+
+    [Fact]
+    public void TryFindDialect_MarkerWithOptions_GivesTheFirstValueThatIsValid()
+    {
+        const string Line = "-- SqlSource: dialect=mysql, dialect=mariadb,no-backslash-escapes dialect=mysql";
+
+        SqlDirectiveScope.TryFindDialect(Line, Marker(Line), out var dialect).ShouldBeTrue();
+
+        dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MariaDb, SqlDialectOptions.NoBackslashEscapes));
     }
 
     [Fact]
@@ -238,7 +310,7 @@ public class SqlDirectiveScopeTests
                 "dialect=oracle"
             ),
         ]);
-        scope.Dialect.ShouldBe(SqlDialect.MySql);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
     }
 
     [Fact]
@@ -247,7 +319,7 @@ public class SqlDirectiveScopeTests
         var (scope, errors) = Read("-- SqlSource: dialect=mysql", "-- SqlSource: dialect=mariadb");
 
         errors.ShouldHaveSingleItem().Kind.ShouldBe(SqlParseErrorKind.ConflictingDirectives);
-        scope.Dialect.ShouldBe(SqlDialect.MySql);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
     }
 
     // The directive starts at offset 14 of the line.
@@ -272,7 +344,7 @@ public class SqlDirectiveScopeTests
         var (scope, errors) = Read(15, "-- SqlSource: dialect=mysql");
 
         errors.ShouldBeEmpty();
-        scope.Dialect.ShouldBe(SqlDialect.MySql);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
     }
 
     [Theory]
@@ -284,7 +356,7 @@ public class SqlDirectiveScopeTests
     {
         SqlDirectiveScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeTrue();
 
-        dialect.ToString().ShouldBe(expected);
+        dialect.ShouldBe(Plain(Enum.Parse<SqlDialect>(expected)));
     }
 
     [Theory]
@@ -301,7 +373,7 @@ public class SqlDirectiveScopeTests
     {
         SqlDirectiveScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeFalse();
 
-        dialect.ShouldBe(SqlDialect.Ansi);
+        dialect.ShouldBe(default);
     }
 
     [Fact]
@@ -343,4 +415,6 @@ public class SqlDirectiveScopeTests
 
     private static TextSpan SpanOf(string text, string value) =>
         new(text.LastIndexOf(value, StringComparison.Ordinal), value.Length);
+
+    private static SqlDialectChoice Plain(SqlDialect dialect) => new(dialect, SqlDialectOptions.None);
 }

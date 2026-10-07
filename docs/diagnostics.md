@@ -164,7 +164,9 @@ The compiler hands a generator only the part of a value before the first `;` or 
 
 `SqlSourceDialect` says which database a project's SQL is written for, so that SqlSource finds its comments and strings by that database's rules.  It is set as an MSBuild property for the project, or as metadata on the `AdditionalFiles` item of a `.sql` file, and one of the two has a value that is not a dialect.  The message quotes the value.
 
-The names are `ansi`, `mssql`, `postgres`, `mysql`, `mariadb`, `sqlite` and `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, and `postgresql` also means `postgres`.
+The names are `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` and `oracle`, in any case.  `sqlserver` and `tsql` also mean `mssql`, `postgresql` also means `postgres`, and `cockroach` also means `cockroachdb`.
+
+After `mysql` or `mariadb` the value may name options, each after a comma, as in `mysql,ansi-quotes`.  The options are `ansi-quotes` and `no-backslash-escapes`, also written `ansi_quotes` and `no_backslash_escapes`.  An option that does not exist, an option after any other dialect, and a comma with nothing before it or after it each make the whole value wrong.
 
 ```xml
 <PropertyGroup>
@@ -351,7 +353,7 @@ Add a directive, or delete the line.
 A directive lacks a value it needs, has one it does not take, or has one that is not valid.
 
 - `token-ignore` needs a value that is a C# identifier, as in `token-ignore=table`.
-- `dialect` needs the name of a dialect, as in `dialect=postgres`.  The names are `ansi`, `mssql`, `postgres`, `mysql`, `mariadb`, `sqlite` and `oracle`, in any case; `sqlserver` and `tsql` also mean `mssql`, and `postgresql` also means `postgres`.
+- `dialect` needs the name of a dialect, as in `dialect=postgres`, with any options after it, as in `dialect=mysql,ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is one word: a space after a comma ends it.
 - No other directive takes a value.
 
 ```sql
@@ -369,9 +371,9 @@ Add the missing value, correct the one that is wrong, or remove the one that doe
 Two directives in one scope contradict each other.  A scope is the lines before the first `-- name:` marker, or one query.  The error is at the second directive.
 
 - `token-validation` and `no-token-validation` both appear.
-- Two `dialect` directives name different dialects.  A file has one dialect.
+- Two `dialect` directives name different dialects, or one dialect with different options.  A file has one dialect.
 
-Remove one of the two.  A validation directive in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice is not a conflict either.
+Remove one of the two.  A validation directive in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
 ## SQLSRC113
 

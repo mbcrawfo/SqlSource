@@ -123,7 +123,8 @@ Databases disagree about where a comment or a string ends.  `'it\'s'` is one str
 |----|----|----|
 | `ansi` | | The default.  Any database without a dialect of its own, such as Db2. |
 | `mssql` | `sqlserver`, `tsql` | SQL Server, Azure SQL |
-| `postgres` | `postgresql` | PostgreSQL, DuckDB, CockroachDB |
+| `postgres` | `postgresql` | PostgreSQL, DuckDB |
+| `cockroachdb` | `cockroach` | CockroachDB |
 | `mysql` | | MySQL |
 | `mariadb` | | MariaDB |
 | `sqlite` | | SQLite |
@@ -164,25 +165,57 @@ The directive wins over the metadata, and the metadata over the property.  A fil
 - It takes effect on the line after it.  Comments above it, such as a licence header, are read by the dialect that the metadata or the property gives.
 - A name that is not a dialect is an error: [SQLSRC011](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc011) in the property or the metadata, [SQLSRC111](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc111) in the directive.
 
+### Options of a dialect
+
+MySQL and MariaDB have SQL modes that change how a string is read.  If your server runs with one, name it after the dialect, with a comma:
+
+| Option | Also accepted | SQL mode | What it changes |
+|----|----|----|----|
+| `ansi-quotes` | `ansi_quotes` | `ANSI_QUOTES` | `"..."` is a quoted identifier, and a backslash does not escape in it |
+| `no-backslash-escapes` | `no_backslash_escapes` | `NO_BACKSLASH_ESCAPES` | A backslash does not escape in `'...'` or in `"..."` |
+
+```xml
+<PropertyGroup>
+    <SqlSourceDialect>mysql,ansi-quotes</SqlSourceDialect>
+</PropertyGroup>
+<ItemGroup>
+    <AdditionalFiles Update="Legacy/**/*.sql" SqlSourceDialect="mariadb,ansi-quotes,no-backslash-escapes" />
+</ItemGroup>
+```
+
+```sql
+-- SqlSource: dialect=mysql,no-backslash-escapes
+
+-- name: GetPath
+SELECT 'C:\temp\' AS path;
+```
+
+- Options are not case-sensitive and come in any order.
+- Only `mysql` and `mariadb` have options.  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect.
+- A value replaces the one it wins over whole.  A file with `dialect=mysql` in a project that sets `mysql,ansi-quotes` is read as plain `mysql`.
+- In the directive, write no space after the comma.
+
 ### What a dialect changes
 
-| | `ansi` | `mssql` | `postgres` | `mysql` | `mariadb` | `sqlite` | `oracle` |
-|----|----|----|----|----|----|----|----|
-| A backslash escapes in `'...'` and `"..."` | No | No | No | Yes | Yes | No | No |
-| A backslash escapes in `E'...'` | Yes | No | Yes | Yes | Yes | No | No |
-| `` `...` `` is a quoted identifier | Yes | No | No | Yes | Yes | Yes | No |
-| `[...]` is a quoted identifier | No | Yes | No | No | No | Yes | No |
-| `$tag$...$tag$` is a string | Yes | No | Yes | Yes | No | No | No |
-| `q'[...]'` is a string | No | No | No | No | No | No | Yes |
-| A `/*` inside a block comment needs its own `*/` | Yes | Yes | Yes | No | No | No | No |
-| `--` is a comment with no whitespace after it | Yes | Yes | Yes | No | No | Yes | Yes |
-| `#` starts a comment | No | No | No | Yes | Yes | No | No |
-| Kept as hints, besides `/*+ ... */` and `/*! ... */` | | | | | `/*M! ... */` | | `--+ ...` |
+| | `ansi` | `mssql` | `postgres` | `cockroachdb` | `mysql` | `mariadb` | `sqlite` | `oracle` |
+|----|----|----|----|----|----|----|----|----|
+| A backslash escapes in `'...'` and `"..."` | No | No | No | No | Yes | Yes | No | No |
+| A backslash escapes in `E'...'` | Yes | No | Yes | Yes | Yes | Yes | No | No |
+| `` `...` `` is a quoted identifier | Yes | No | No | No | Yes | Yes | Yes | No |
+| `[...]` is a quoted identifier | No | Yes | No | No | No | No | Yes | No |
+| `$tag$...$tag$` is a string | Yes | No | Yes | Yes | Yes | No | No | No |
+| `q'[...]'` is a string | No | No | No | No | No | No | No | Yes |
+| A `/*` inside a block comment needs its own `*/` | Yes | Yes | Yes | Yes | No | No | No | No |
+| `--` is a comment with no whitespace after it | Yes | Yes | Yes | Yes | No | No | Yes | Yes |
+| `#` starts a comment | No | No | No | No | Yes | Yes | No | No |
+| Kept as hints, besides `/*+ ... */` and `/*! ... */` | | | | | | `/*M! ... */` | | `--+ ...` |
 
-Two details:
+Four details:
 
 - In `mssql` a `]]` inside brackets stands for one `]`.  In `sqlite` the first `]` ends the identifier.
-- In `postgres` an `E'...'` string that is continued on the next line, as PostgreSQL allows, is one string, and its second part takes backslash escapes too.
+- In `mysql` and `mariadb` an option changes the first row (see Options of a dialect, above).
+- In `postgres` and `cockroachdb` an `E'...'` string that is continued on the next line is one string, and each later part takes backslash escapes too.  In `postgres`, `--` comments may stand between the parts, as PostgreSQL allows, and they are removed like any other comment.  In `cockroachdb` only whitespace may.
+- In `cockroachdb` a bytes literal, `b'...'`, takes backslash escapes as an `E'...'` string does.
 
 Under `mysql` and `mariadb` a marker needs the space that those databases need: `-- name: GetUser` is a marker, and `--name: GetUser` is not a comment at all.
 
@@ -192,11 +225,9 @@ SqlSource reads these differently from the database, whatever the dialect:
 
 | Construct | Database | How SqlSource reads it |
 |----|----|----|
-| SQL written for the SQL modes `ANSI_QUOTES` or `NO_BACKSLASH_ESCAPES` | MySQL, MariaDB | As in the default mode: a backslash escapes in `'...'` and `"..."` |
 | A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */` | MySQL, MariaDB | The comment ends at the first `*/`.  Where the server ends it depends on the server's version. |
-| A comment between the parts of a continued `E'...'` string | PostgreSQL | The string ends before the comment, and the part after it is a plain string |
-| A bytes literal with a backslash escape, `b'\''` | CockroachDB | PostgreSQL's reading: a string that ends at the second quote |
 | A block comment that is still open at the end of the file | SQLite | The error [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc102) |
+| A file whose lines end with a carriage return alone, with no line feed | MySQL, SQLite, CockroachDB | A line ends there, as in every dialect.  These databases end a `--` comment only at a line feed. |
 | A client command that is not SQL: `DELIMITER`, `GO`, SQL*Plus `PROMPT` and `REM`, a psql `\` command | All | As SQL, so a quote in it can open a string |
 
 And `ansi` reads the SQL of every database by one set of rules, so it misreads each construct in the table above that it says No to and your database says Yes to.  The fix for those is to set the dialect.

@@ -27,7 +27,7 @@ internal sealed class SqlDirectiveScope(int headerEnd)
     /// The dialect that a <c>dialect=</c> directive of this scope names, or null.  It is already in effect by the
     /// time the scope is read; it is kept here to find a second directive that names another.
     /// </summary>
-    public SqlDialect? Dialect { get; private set; }
+    public SqlDialectChoice? Dialect { get; private set; }
 
     public HashSet<string> IgnoredTokens { get; } = [];
 
@@ -35,7 +35,7 @@ internal sealed class SqlDirectiveScope(int headerEnd)
     /// Finds the first <c>dialect=</c> directive of <paramref name="marker" /> that names a dialect.  Nothing is
     /// allocated and nothing is reported.
     /// </summary>
-    public static bool TryFindDialect(string text, SqlMarker marker, out SqlDialect dialect)
+    public static bool TryFindDialect(string text, SqlMarker marker, out SqlDialectChoice dialect)
     {
         var start = marker.ValueSpan.Start;
         var end = marker.ValueSpan.End;
@@ -57,7 +57,7 @@ internal sealed class SqlDirectiveScope(int headerEnd)
             start = SkipWhiteSpace(text, wordEnd, end);
         }
 
-        dialect = SqlDialect.Ansi;
+        dialect = default;
         return false;
     }
 

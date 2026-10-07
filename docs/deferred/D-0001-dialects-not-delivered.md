@@ -1,4 +1,4 @@
-# D-0001 - Dialects beyond the first seven
+# D-0001 - Dialects beyond the first eight
 
 ## Planned
 
@@ -6,11 +6,11 @@ The [dialect design](../superpowers/specs/2026-10-06-sql-dialects-design.md) res
 
 ## Delivered instead
 
-Seven dialects: `ansi`, `mssql`, `postgres`, `mysql`, `mariadb`, `sqlite` and `oracle`, in [`SqlDialectRules`](../../src/SqlSource/Parsing/SqlDialectRules.cs).  `README.md` says which of them to use for DuckDB, CockroachDB, Firebird and Db2.
+Eight dialects: `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` and `oracle`, in [`SqlDialectRules`](../../src/SqlSource/Parsing/SqlDialectRules.cs).  `README.md` says which of them to use for DuckDB, Firebird and Db2.
 
 ## Why deferred
 
-The seven cover every engine whose ADO.NET providers have more than 100 million NuGet downloads.  The next engine has under 40 million.  BigQuery needs lexer machinery that nothing else does, and several rules of the rest could not be verified from a primary source.
+Seven of the eight cover every engine whose ADO.NET providers have more than 100 million NuGet downloads, and `cockroachdb` was added after them because it needed only a prefix for a reader that exists.  The next engine has under 40 million.  BigQuery needs lexer machinery that nothing else does, and several rules of the rest could not be verified from a primary source.
 
 ## Remaining work
 
@@ -19,7 +19,6 @@ A dialect is a value of `SqlDialect`, a name in `SqlDialectName`, a static prope
 | Engine | Read correctly today by | What it needs |
 |----|----|----|
 | DuckDB | `postgres` | A name of its own, if wanted.  No difference was found. |
-| CockroachDB | `postgres`, but for `b'\''` | A reader for `'` that takes backslash escapes after a `b` prefix |
 | Firebird | `oracle` | A name of its own, if wanted.  Its `q'...'` has no `n` prefix and the same pairing rule. |
 | Db2 | `ansi` | Confirm whether block comments nest on Linux, UNIX and Windows: the documentation is silent.  `$`, `#` and `@` are letters there, so `$$` is an identifier and dollar quotes should be off. |
 | Redshift | Neither | `postgres` with the Backslash reader for `'`.  Confirm whether block comments nest outside PL/pgSQL. |

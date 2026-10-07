@@ -16,10 +16,10 @@ internal static class SqlFileParser
     /// <summary>
     /// Parses <paramref name="text" />.  <paramref name="fileName" /> is the file's name with its extension and
     /// without a directory; it names the block of a file that has no <c>-- name:</c> marker.
-    /// <paramref name="dialect" /> is the dialect the project gives the file.  A <c>dialect=</c> directive in the
-    /// file's header replaces it for the text after the directive.
+    /// <paramref name="dialect" /> is the dialect, with its options, that the project gives the file.  A
+    /// <c>dialect=</c> directive in the file's header replaces it whole for the text after the directive.
     /// </summary>
-    public static SqlFileParseResult Parse(string text, string fileName, SqlDialect dialect = SqlDialect.Ansi)
+    public static SqlFileParseResult Parse(string text, string fileName, SqlDialectChoice dialect = default)
     {
         var lexer = new SqlLexer(text, SqlDialectRules.For(dialect));
         var headerEnd = SqlPreambleDialect.Apply(lexer, text);

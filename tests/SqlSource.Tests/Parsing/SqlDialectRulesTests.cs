@@ -15,10 +15,10 @@ public class SqlDialectRulesTests
     {
         var dialects = Enum.GetValues<SqlDialect>();
 
-        var rules = dialects.Select(SqlDialectRules.For).ToArray();
+        var rules = dialects.Select(dialect => SqlDialectRules.For(dialect)).ToArray();
 
         rules.Distinct().Count().ShouldBe(dialects.Length);
-        rules.ShouldBe(dialects.Select(SqlDialectRules.For));
+        rules.ShouldBe(dialects.Select(dialect => SqlDialectRules.For(dialect)));
         SqlDialectRules.For(SqlDialect.Ansi).ShouldBeSameAs(SqlDialectRules.Ansi);
         SqlDialectRules.For(SqlDialect.SqlServer).ShouldBeSameAs(SqlDialectRules.SqlServer);
         SqlDialectRules.For(SqlDialect.PostgreSql).ShouldBeSameAs(SqlDialectRules.PostgreSql);
@@ -26,12 +26,64 @@ public class SqlDialectRulesTests
         SqlDialectRules.For(SqlDialect.MariaDb).ShouldBeSameAs(SqlDialectRules.MariaDb);
         SqlDialectRules.For(SqlDialect.Sqlite).ShouldBeSameAs(SqlDialectRules.Sqlite);
         SqlDialectRules.For(SqlDialect.Oracle).ShouldBeSameAs(SqlDialectRules.Oracle);
+        SqlDialectRules.For(SqlDialect.CockroachDb).ShouldBeSameAs(SqlDialectRules.CockroachDb);
     }
 
     // A value that is not a dialect cannot come from a name, and must not throw inside the compiler if it ever does.
     [Fact]
     public void For_ValueThatIsNotADialect_GivesTheAnsiRules() =>
         SqlDialectRules.For((SqlDialect)99).ShouldBeSameAs(SqlDialectRules.Ansi);
+
+    [Fact]
+    public void For_EachSetOfOptions_GivesMySqlAndMariaDbTheirOwnSharedInstance()
+    {
+        var choices = MySqlFamilyChoices();
+
+        var rules = choices.Select(choice => SqlDialectRules.For(choice)).ToArray();
+
+        rules.Distinct().Count().ShouldBe(choices.Length);
+        rules.ShouldBe(choices.Select(choice => SqlDialectRules.For(choice)));
+        SqlDialectRules
+            .For(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.None))
+            .ShouldBeSameAs(SqlDialectRules.MySql);
+        SqlDialectRules
+            .For(new SqlDialectChoice(SqlDialect.MariaDb, SqlDialectOptions.None))
+            .ShouldBeSameAs(SqlDialectRules.MariaDb);
+    }
+
+    // An option changes how a quoted region ends, and nothing about comments, hints or what opens a region.
+    [Fact]
+    public void For_AnySetOfOptions_KeepsTheCommentRulesAndTheOpenersOfTheDialect()
+    {
+        foreach (var choice in MySqlFamilyChoices())
+        {
+            var rules = SqlDialectRules.For(choice);
+            var isMariaDb = choice.Dialect == SqlDialect.MariaDb;
+
+            rules.NestedComments.ShouldBeFalse(choice.ToString());
+            rules.DashNeedsWhitespace.ShouldBeTrue(choice.ToString());
+            rules.HashComments.ShouldBeTrue(choice.ToString());
+            rules.LineHints.ShouldBeFalse(choice.ToString());
+            rules.MariaDbHints.ShouldBe(isMariaDb, choice.ToString());
+            (rules.ReaderFor('$') is null).ShouldBe(isMariaDb, choice.ToString());
+            _ = rules.ReaderFor('\'').ShouldNotBeNull(choice.ToString());
+            _ = rules.ReaderFor('"').ShouldNotBeNull(choice.ToString());
+            _ = rules.ReaderFor('`').ShouldNotBeNull(choice.ToString());
+        }
+    }
+
+    [Fact]
+    public void For_OptionsOfADialectThatHasNone_AreIgnored() =>
+        SqlDialectRules
+            .For(new SqlDialectChoice(SqlDialect.PostgreSql, SqlDialectOptions.AnsiQuotes))
+            .ShouldBeSameAs(SqlDialectRules.PostgreSql);
+
+    // A value that no name gives must not throw inside the compiler if it ever arrives.
+    [Fact]
+    public void For_OptionsThatAreNotDefined_AreIgnored() =>
+        SqlDialectRules
+            .For(new SqlDialectChoice(SqlDialect.MySql, (SqlDialectOptions)4))
+            .ShouldBeSameAs(SqlDialectRules.MySql);
 
     [Theory]
     [InlineData("Ansi", "'\"`$")]
@@ -41,6 +93,7 @@ public class SqlDialectRulesTests
     [InlineData("MariaDb", "'\"`")]
     [InlineData("Sqlite", "'\"`[")]
     [InlineData("Oracle", "'\"")]
+    [InlineData("CockroachDb", "'\"$")]
     public void ReaderFor_Character_HasAReaderOnlyWhereTheDialectOpensAQuotedRegion(string dialect, string openers)
     {
         var rules = SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect));
@@ -61,6 +114,7 @@ public class SqlDialectRulesTests
     [InlineData("MariaDb", false, true, true, false, true)]
     [InlineData("Sqlite", false, false, false, false, false)]
     [InlineData("Oracle", false, false, false, true, false)]
+    [InlineData("CockroachDb", true, false, false, false, false)]
     public void CommentRules_OfEachDialect_AreTheRowOfTheTable(
         string dialect,
         bool nestedComments,
@@ -78,6 +132,18 @@ public class SqlDialectRulesTests
         rules.LineHints.ShouldBe(lineHints);
         rules.MariaDbHints.ShouldBe(mariaDbHints);
     }
+
+    [Theory]
+    [InlineData("Ansi", "None")]
+    [InlineData("SqlServer", "None")]
+    [InlineData("PostgreSql", "AcrossLineComments")]
+    [InlineData("MySql", "None")]
+    [InlineData("MariaDb", "None")]
+    [InlineData("Sqlite", "None")]
+    [InlineData("Oracle", "None")]
+    [InlineData("CockroachDb", "AcrossWhitespace")]
+    public void StringContinuation_OfEachDialect_IsTheRowOfTheTable(string dialect, string expected) =>
+        SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect)).StringContinuation.ToString().ShouldBe(expected);
 
     [Theory]
     [InlineData("SELECT a, b FROM t WHERE x = 1", 0, -1)]
@@ -103,5 +169,19 @@ public class SqlDialectRulesTests
         SqlDialectRules.SqlServer.FindStarter("a `b` $$ c", 0).ShouldBe(-1);
         SqlDialectRules.Oracle.FindStarter("a [b] `c` $$ d", 0).ShouldBe(-1);
         SqlDialectRules.Ansi.FindStarter("a [b] `c`", 0).ShouldBe(6);
+    }
+
+    private static SqlDialectChoice[] MySqlFamilyChoices()
+    {
+        SqlDialect[] dialects = [SqlDialect.MySql, SqlDialect.MariaDb];
+        SqlDialectOptions[] options =
+        [
+            SqlDialectOptions.None,
+            SqlDialectOptions.AnsiQuotes,
+            SqlDialectOptions.NoBackslashEscapes,
+            SqlDialectOptions.AnsiQuotes | SqlDialectOptions.NoBackslashEscapes,
+        ];
+
+        return [.. dialects.SelectMany(dialect => options.Select(option => new SqlDialectChoice(dialect, option)))];
     }
 }

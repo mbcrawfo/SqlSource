@@ -97,20 +97,31 @@ public class EndToEndTests
     public void ProjectWithADialect_FileWithMetadata_IsReadByTheDialectOfItsItem() =>
         DialectQueries.ByMetadata.ShouldBe("SELECT 'it\\'s' AS note, 5--3 AS eight;");
 
+    // The item of ByOption.sql names an option after the dialect, with a comma and a space, over several lines.
+    // Plain MySQL would not close the string, and this project would not build.
+    [Fact]
+    public void ProjectWithADialect_FileWithAnOptionInItsMetadata_IsReadByThatOption() =>
+        DialectQueries.ByOption.ShouldBe("SELECT 'C:\\temp\\' AS path;");
+
     // The build copies the file it wrote for the compiler of this project to the output folder.  It has a section for
     // each item whose metadata the package shows to the compiler.  A section for every .sql file would make the file,
-    // and the build, grow with files that set nothing.
+    // and the build, grow with files that set nothing.  A value with an option arrives whole, comma included.
     [Fact]
-    public void ProjectWithADialect_FileTheBuildWritesForTheCompiler_NamesOnlyTheFileWithMetadata()
+    public void ProjectWithADialect_FileTheBuildWritesForTheCompiler_NamesOnlyTheFilesWithMetadata()
     {
         var lines = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "build", "compiler.editorconfig"));
 
-        var sections = lines.Where(line => line.StartsWith('[') && line.EndsWith(".sql]", StringComparison.Ordinal));
+        var sections = lines
+            .Where(line => line.StartsWith('[') && line.EndsWith(".sql]", StringComparison.Ordinal))
+            .Select(section => section[section.LastIndexOf('/')..] + " " + lines[Array.IndexOf(lines, section) + 1]);
 
-        var section = sections.ShouldHaveSingleItem();
-        section.ShouldEndWith("/EndToEnd/Dialects/ByMetadata.sql]");
-        lines[Array.IndexOf(lines, section) + 1]
-            .ShouldBe("build_metadata.SqlSourceDialectFile.SqlSourceDialect = mysql");
+        sections.ShouldBe(
+            [
+                "/ByMetadata.sql] build_metadata.SqlSourceDialectFile.SqlSourceDialect = mysql",
+                "/ByOption.sql] build_metadata.SqlSourceDialectFile.SqlSourceDialect = mysql, no-backslash-escapes",
+            ],
+            ignoreOrder: true
+        );
     }
 
     [Fact]
