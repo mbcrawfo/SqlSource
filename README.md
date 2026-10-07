@@ -303,8 +303,6 @@ A project that lists its own files can give the metadata where it lists them:
 </ItemGroup>
 ```
 
-Write the value on one line.  In the project file and in `Directory.Build.props` a value on a line of its own, between its tags, works as well.  In `Directory.Build.targets`, and on an item that a target adds during the build, it does not: the value is read as not set, nothing is reported, and the file is read by the project's dialect or as `ansi`.  The same holds for `SqlSourceTokenValidation`.
-
 ## Supported environments
 
 A project that uses SqlSource must target .NET 8 or later; the generated code relies on it, and an older target is reported as [SQLSRC003](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc003).

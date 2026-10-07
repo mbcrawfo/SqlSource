@@ -6,7 +6,7 @@ using Consumer;
 // A constant: the generator was loaded, and the package handed the .sql files to the compiler.
 Console.WriteLine($"constant: {Queries.GetUser}");
 
-// The project turns token validation off.  With it on, the empty argument throws.
+// Directory.Build.targets turns token validation off for the project.  With it on, the empty argument throws.
 Console.WriteLine($"validation off: {Queries.ListUsers("users", "")}");
 
 // A directive turns it back on for this query.
@@ -23,3 +23,6 @@ catch (ArgumentException exception)
 // The project's dialect is postgres, and the item of ByMetadata.sql says mysql.
 Console.WriteLine($"dialect of the project: {Queries.ByProperty}");
 Console.WriteLine($"dialect of the item: {Queries.ByMetadata}");
+
+// A target of Directory.Build.targets adds the item of AddedByATarget.sql, and its metadata says mssql.
+Console.WriteLine($"dialect of an item that a target adds: {Queries.AddedByATarget}");
