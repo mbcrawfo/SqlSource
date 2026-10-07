@@ -152,6 +152,17 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor PathDiffersOnlyByCase = new(
+        id: "SQLSRC013",
+        title: "SQL file paths differ only by case",
+        messageFormat: "This file's path differs only by case from '{0}', and SqlSource compares paths ignoring case",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc013",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor UnterminatedQuote = new(
         id: "SQLSRC101",
         title: "Quote is not closed",
@@ -337,6 +348,7 @@ internal static class SqlDiagnostics
             InvalidTokenValidation,
             InvalidDialect,
             UnsupportedLanguageVersion,
+            PathDiffersOnlyByCase,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

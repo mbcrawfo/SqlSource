@@ -55,7 +55,7 @@ The package is a development dependency.  It adds nothing to your application's 
 - Without `Path`, the type gets every `.sql` file in the folder of the source file that carries the attribute.  Subfolders are not searched.
 - A `Path` that ends in `.sql` names one file: `[SqlQueries(Path = "Queries/Users.sql")]`.
 - Any other `Path` names a folder: `[SqlQueries(Path = "../Queries")]`.
-- `Path` is always relative to the folder of the source file, never to the project.  Both `/` and `\` separate folders, and paths are compared ignoring case, so a project builds the same on every operating system.
+- `Path` is always relative to the folder of the source file, never to the project.  Both `/` and `\` separate folders, and paths are compared ignoring case, so a project builds the same on every operating system.  Two `.sql` files of a type whose paths differ only by case are therefore an error, [SQLSRC013](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc013).
 - Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
 
 ### Modes
@@ -302,10 +302,6 @@ A project that lists its own files can give the metadata where it lists them:
     <AdditionalFiles Include="Queries/**/*.sql" SqlSourceDialect="postgres" />
 </ItemGroup>
 ```
-
-### Deleting or renaming a file
-
-Editing a `.sql` file is always picked up by the next build.  Deleting, renaming or moving one is not: an incremental `dotnet build` can succeed with the old members still in place, because MSBuild does not notice that the list of files changed.  Run `dotnet build --no-incremental` afterwards.  A clean build, such as a CI build, is not affected.
 
 ## Supported environments
 
