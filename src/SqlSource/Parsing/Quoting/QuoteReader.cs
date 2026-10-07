@@ -22,6 +22,13 @@ internal abstract class QuoteReader
     /// </summary>
     public abstract int FindEnd(string text, int start);
 
+    /// <summary>
+    /// The reader of a part that continues the region that opens at <paramref name="start" />, or null when a
+    /// later part would be read as the region itself.  A reader reads one part: whether another follows, and after
+    /// what, is for the lexer and the rules of the dialect.
+    /// </summary>
+    public virtual QuoteReader? FindContinuation(string text, int start) => null;
+
     /// <summary>True for a character that can be part of an unquoted identifier.</summary>
     protected static bool IsIdentifierCharacter(char value) => char.IsLetterOrDigit(value) || value is '_' or '$';
 

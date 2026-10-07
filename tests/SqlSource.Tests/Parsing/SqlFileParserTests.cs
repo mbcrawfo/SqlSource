@@ -539,6 +539,51 @@ public class SqlFileParserTests
             ]);
     }
 
+    // The comments between the parts are removed with the rest.  The line break stays, so PostgreSQL still reads
+    // one string.
+    [Fact]
+    public void Parse_ContinuedStringWithCommentsBetweenItsParts_StripsThemAndKeepsTheLineBreak()
+    {
+        const string Text =
+            "-- name: A\nSELECT E'it' -- first  \n\n    -- second\n    '\\'s -- not a comment' AS note; -- c\n";
+
+        Sql(Blocks(Text, dialect: SqlDialect.PostgreSql).ShouldHaveSingleItem())
+            .ShouldBe("SELECT E'it'\n    '\\'s -- not a comment' AS note;");
+    }
+
+    [Fact]
+    public void Parse_ContinuedStringUnderKeepComments_KeepsTheCommentsBetweenItsParts()
+    {
+        const string Text =
+            "-- SqlSource: keep-comments\n-- name: A\nSELECT E'it' -- first\n    '\\'s' AS note; -- c\n";
+
+        Sql(Blocks(Text, dialect: SqlDialect.PostgreSql).ShouldHaveSingleItem())
+            .ShouldBe("SELECT E'it' -- first\n    '\\'s' AS note; -- c");
+    }
+
+    // A marker is a marker wherever a comment can be.  Both halves are still read as PostgreSQL reads them.
+    [Fact]
+    public void Parse_NameMarkerBetweenThePartsOfAContinuedString_StartsABlockThere()
+    {
+        const string Text = "-- name: A\nSELECT E'a'\n-- name: B\n'b\\'c' AS x; -- d\n";
+
+        Blocks(Text, dialect: SqlDialect.PostgreSql).Select(Sql).ShouldBe(["SELECT E'a'", "'b\\'c' AS x;"]);
+    }
+
+    [Fact]
+    public void Parse_ContinuedStringWithAnUnclosedPart_IsAnErrorAtTheQuoteOfThatPart()
+    {
+        const string Text = "-- name: A\nSELECT E'a' -- c\n    'b\\' AS x;\n";
+
+        Errors(Text, dialect: SqlDialect.PostgreSql)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.UnterminatedQuote,
+                    new TextSpan(Text.IndexOf("'b", StringComparison.Ordinal), 1)
+                ),
+            ]);
+    }
+
     [Fact]
     public void Parse_DialectDirectiveInAFileWithoutANameMarker_GoesAboveItsSql()
     {

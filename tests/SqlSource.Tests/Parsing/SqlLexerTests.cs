@@ -215,7 +215,11 @@ public class SqlLexerTests
     )]
     [InlineData("SqlServer,Sqlite,Oracle", "E'a\\'b' -- c'", "Text:E | Quoted:'a\\' | Text:b | Quoted:' -- c'")]
     // An E string continued on the next line.
-    [InlineData("PostgreSql", "E'a'\n'b\\'c' -- d'", "Text:E | Quoted:'a'\n'b\\'c' | Text:  | LineComment:-- d'")]
+    [InlineData(
+        "PostgreSql",
+        "E'a'\n'b\\'c' -- d'",
+        "Text:E | Quoted:'a' | Text:\n | Quoted:'b\\'c' | Text:  | LineComment:-- d'"
+    )]
     [InlineData(
         "Ansi",
         "E'a'\n'b\\'c' -- d'",
@@ -303,6 +307,96 @@ public class SqlLexerTests
     public void Lex_HashInMySql_StartsACommentToTheEndOfItsLine(string text, string expected) =>
         string.Join(" | ", Lex(text, SqlDialectRules.MySql)).ShouldBe(expected);
 
+    // PostgreSQL reads a string that is followed by whitespace with a line break, and then a quote, as one string
+    // with the part after the quote.  A -- comment may stand in the gap.  After an E string the later parts take
+    // backslash escapes too.  Each part is a lexeme of its own, and the gap is ordinary text and comments.
+    [Theory]
+    [InlineData("E'a'\n'b\\'c' x", "Text:E | Quoted:'a' | Text:\n | Quoted:'b\\'c' | Text: x")]
+    [InlineData("e'a'\n'b\\'c' x", "Text:e | Quoted:'a' | Text:\n | Quoted:'b\\'c' | Text: x")]
+    // Each kind of line break, and blank lines.
+    [InlineData("E'a'\r\n    'b\\'c' x", "Text:E | Quoted:'a' | Text:\r\n     | Quoted:'b\\'c' | Text: x")]
+    [InlineData("E'a'\r'b\\'c' x", "Text:E | Quoted:'a' | Text:\r | Quoted:'b\\'c' | Text: x")]
+    [InlineData("E'a' \n\n\t'b\\'c' x", "Text:E | Quoted:'a' | Text: \n\n\t | Quoted:'b\\'c' | Text: x")]
+    // A comment before the line break, and comments on lines of their own.
+    [InlineData(
+        "E'a' -- c\n'b\\'d' x",
+        "Text:E | Quoted:'a' | Text:  | LineComment:-- c | Text:\n | Quoted:'b\\'d' | Text: x"
+    )]
+    [InlineData(
+        "E'a'\n-- c\n  -- d\r\n'b\\'e' x",
+        "Text:E | Quoted:'a' | Text:\n | LineComment:-- c | Text:\n   | LineComment:-- d | Text:\r\n | Quoted:'b\\'e'"
+            + " | Text: x"
+    )]
+    // A marker is a comment to the lexer.  The part after it is still read as PostgreSQL reads it.
+    [InlineData(
+        "E'a'\n-- name: B\n'b\\'c' x",
+        "Text:E | Quoted:'a' | Text:\n | LineComment:-- name: B | Text:\n | Quoted:'b\\'c' | Text: x"
+    )]
+    // A third part continues the second.
+    [InlineData(
+        "E'a'\n'b\\'c'\n -- d\n 'e\\'f' x",
+        "Text:E | Quoted:'a' | Text:\n | Quoted:'b\\'c' | Text:\n  | LineComment:-- d | Text:\n  | Quoted:'e\\'f'"
+            + " | Text: x"
+    )]
+    public void Lex_EscapeStringOfPostgreSqlThatGoesOnAfterAGap_ReadsEachPartWithBackslashEscapes(
+        string text,
+        string expected
+    ) => string.Join(" | ", Lex(text, SqlDialectRules.PostgreSql)).ShouldBe(expected);
+
+    // Each of these would fail with an unclosed quote if the second string took backslash escapes.
+    [Theory]
+    // No line break in the gap.
+    [InlineData("E'a' 'b\\' x", "Text:E | Quoted:'a' | Text:  | Quoted:'b\\' | Text: x")]
+    // Something other than whitespace and -- comments in the gap.
+    [InlineData("E'a',\n'b\\' x", "Text:E | Quoted:'a' | Text:,\n | Quoted:'b\\' | Text: x")]
+    [InlineData("E'a'\n- 'b\\' x", "Text:E | Quoted:'a' | Text:\n-  | Quoted:'b\\' | Text: x")]
+    [InlineData("E'a'\n|| 'b\\' x", "Text:E | Quoted:'a' | Text:\n||  | Quoted:'b\\' | Text: x")]
+    [InlineData(
+        "E'a' /* c */\n'b\\' x",
+        "Text:E | Quoted:'a' | Text:  | BlockComment:/* c */ | Text:\n | Quoted:'b\\' | Text: x"
+    )]
+    [InlineData(
+        "E'a' /*+ h */\n'b\\' x",
+        "Text:E | Quoted:'a' | Text:  | Hint:/*+ h */ | Text:\n | Quoted:'b\\' | Text: x"
+    )]
+    [InlineData(
+        "E'a'\n\"q\"\n'b\\' x",
+        "Text:E | Quoted:'a' | Text:\n | Quoted:\"q\" | Text:\n | Quoted:'b\\' | Text: x"
+    )]
+    [InlineData(
+        "E'a'\n$$q$$\n'b\\' x",
+        "Text:E | Quoted:'a' | Text:\n | Quoted:$$q$$ | Text:\n | Quoted:'b\\' | Text: x"
+    )]
+    // The first string has no prefix, so no part of it takes backslash escapes.
+    [InlineData("'a'\n'b\\' x", "Quoted:'a' | Text:\n | Quoted:'b\\' | Text: x")]
+    [InlineData("typeE'a'\n'b\\' x", "Text:typeE | Quoted:'a' | Text:\n | Quoted:'b\\' | Text: x")]
+    // A string on the same line as a continued part is not a part of it.
+    [InlineData(
+        "E'a'\n'b\\'c' 'd\\' x",
+        "Text:E | Quoted:'a' | Text:\n | Quoted:'b\\'c' | Text:  | Quoted:'d\\' | Text: x"
+    )]
+    // Nothing after the line break.
+    [InlineData("E'a'\n", "Text:E | Quoted:'a' | Text:\n")]
+    [InlineData("E'a'\n x", "Text:E | Quoted:'a' | Text:\n x")]
+    [InlineData("E'a' -- c", "Text:E | Quoted:'a' | Text:  | LineComment:-- c")]
+    public void Lex_StringOfPostgreSqlThatIsNotContinued_IsReadByItsOwnPrefix(string text, string expected) =>
+        string.Join(" | ", Lex(text, SqlDialectRules.PostgreSql)).ShouldBe(expected);
+
+    // The union of rules that is ANSI continues no string, and neither does a dialect that has no E strings.
+    [Theory]
+    [InlineData(nameof(SqlDialect.Ansi), "E'a'\n'b\\' x", "Text:E | Quoted:'a' | Text:\n | Quoted:'b\\' | Text: x")]
+    [InlineData(
+        nameof(SqlDialect.MySql),
+        "E'a'\n'b\\'c' x",
+        "Text:E | Quoted:'a' | Text:\n | Quoted:'b\\'c' | Text: x"
+    )]
+    [InlineData(nameof(SqlDialect.Sqlite), "E'a'\n'b\\' x", "Text:E | Quoted:'a' | Text:\n | Quoted:'b\\' | Text: x")]
+    public void Lex_StringOnTheLineAfterAnEscapeStringInAnotherDialect_IsAStringOfItsOwn(
+        string dialect,
+        string text,
+        string expected
+    ) => string.Join(" | ", Lex(text, Rules(dialect))).ShouldBe(expected);
+
     [Theory]
     [InlineData(nameof(SqlDialect.SqlServer), "x [abc", 2)]
     [InlineData(nameof(SqlDialect.SqlServer), "[abc]]", 0)]
@@ -311,8 +405,9 @@ public class SqlLexerTests
     [InlineData(nameof(SqlDialect.Oracle), "nq'[abc' x", 2)]
     [InlineData(nameof(SqlDialect.MySql), "'abc\\'", 0)]
     [InlineData(nameof(SqlDialect.MariaDb), "\"abc\\\"", 0)]
-    // The second part of a continued string is not closed.  The error is at the quote that opened the string.
-    [InlineData(nameof(SqlDialect.PostgreSql), "E'a'\n'b\\'", 1)]
+    // The second part of a continued string is not closed.  The error is at the quote of that part.
+    [InlineData(nameof(SqlDialect.PostgreSql), "E'a'\n'b\\'", 5)]
+    [InlineData(nameof(SqlDialect.PostgreSql), "E'a' -- c\n'b\\'c'\n  'd\\'", 19)]
     // Two readings that differ from the database, which docs/tech-debt/TD-0004 lists.  A MySQL comment for a version
     // ends at the first */, inside a string of its body too, so the quote after it opens a string.
     [InlineData(nameof(SqlDialect.MySql), "/*!50700 '*/' */", 12)]
@@ -494,6 +589,17 @@ public class SqlLexerTests
         _ = ReadLeadingComments(lexer, Text);
 
         lexer.ReadToEnd().ShouldBe(SqlLexer.Lex(Text, SqlDialectRules.Ansi));
+    }
+
+    [Fact]
+    public void TryReadLeadingComment_ThenReadToEnd_ReadsAContinuedStringAsLexingInOneCallDoes()
+    {
+        const string Text = "-- a\nSELECT E'b' -- c\n'd\\'e' -- f\n";
+        var lexer = new SqlLexer(Text, SqlDialectRules.PostgreSql);
+
+        _ = ReadLeadingComments(lexer, Text);
+
+        lexer.ReadToEnd().ShouldBe(SqlLexer.Lex(Text, SqlDialectRules.PostgreSql));
     }
 
     [Fact]

@@ -131,6 +131,17 @@ public class SqlDialectRulesTests
     }
 
     [Theory]
+    [InlineData("Ansi", "None")]
+    [InlineData("SqlServer", "None")]
+    [InlineData("PostgreSql", "AcrossLineComments")]
+    [InlineData("MySql", "None")]
+    [InlineData("MariaDb", "None")]
+    [InlineData("Sqlite", "None")]
+    [InlineData("Oracle", "None")]
+    public void StringContinuation_OfEachDialect_IsTheRowOfTheTable(string dialect, string expected) =>
+        SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect)).StringContinuation.ToString().ShouldBe(expected);
+
+    [Theory]
     [InlineData("SELECT a, b FROM t WHERE x = 1", 0, -1)]
     [InlineData("", 0, -1)]
     [InlineData("a - b", 0, 2)]

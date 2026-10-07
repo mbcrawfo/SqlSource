@@ -24,9 +24,7 @@ internal sealed class SqlDialectRules
 
     private static readonly QuoteReader Backslash = new BackslashQuoteReader();
 
-    private static readonly QuoteReader EscapeString = new EscapeStringReader(continues: false);
-
-    private static readonly QuoteReader ContinuedEscapeString = new EscapeStringReader(continues: true);
+    private static readonly QuoteReader EscapeString = new EscapeStringReader("Ee");
 
     private static readonly QuoteReader QuoteOperator = new QuoteOperatorReader();
 
@@ -67,7 +65,11 @@ internal sealed class SqlDialectRules
         new(('\'', Doubled), ('"', Doubled), ('[', EscapedBracket)) { NestedComments = true };
 
     public static SqlDialectRules PostgreSql { get; } =
-        new(('\'', ContinuedEscapeString), ('"', Doubled), ('$', Dollar)) { NestedComments = true };
+        new(('\'', EscapeString), ('"', Doubled), ('$', Dollar))
+        {
+            NestedComments = true,
+            StringContinuation = SqlStringContinuation.AcrossLineComments,
+        };
 
     /// <summary>MySQL with no options.  <see cref="For" /> gives the rules of a set of options.</summary>
     public static SqlDialectRules MySql => MySqlByOptions[(int)SqlDialectOptions.None];
@@ -97,6 +99,12 @@ internal sealed class SqlDialectRules
 
     /// <summary>Whether a block comment that starts <c>/*M!</c> is a hint, as in MariaDB.</summary>
     public bool MariaDbHints { get; private init; }
+
+    /// <summary>
+    /// Whether a string goes on after a gap with a line break, and what the gap may hold.  It matters after a
+    /// string whose reader names a continuation: the part after the gap is then read by that reader.
+    /// </summary>
+    public SqlStringContinuation StringContinuation { get; private init; }
 
     /// <summary>
     /// The rules of <paramref name="choice" />.  One shared instance for each choice.  Options that the dialect
