@@ -16,7 +16,7 @@ internal static class SqlDialectName
     /// <summary>
     /// The names as a message lists them.  The text of <c>SQLSRC011</c> repeats this list, and a test compares the two.
     /// </summary>
-    public const string Accepted = "ansi, mssql, postgres, mysql, mariadb, sqlite and oracle";
+    public const string Accepted = "ansi, mssql, postgres, cockroachdb, mysql, mariadb, sqlite and oracle";
 
     private static readonly (string Name, SqlDialect Dialect)[] Names =
     [
@@ -26,6 +26,8 @@ internal static class SqlDialectName
         ("tsql", SqlDialect.SqlServer),
         ("postgres", SqlDialect.PostgreSql),
         ("postgresql", SqlDialect.PostgreSql),
+        ("cockroachdb", SqlDialect.CockroachDb),
+        ("cockroach", SqlDialect.CockroachDb),
         ("mysql", SqlDialect.MySql),
         ("mariadb", SqlDialect.MariaDb),
         ("sqlite", SqlDialect.Sqlite),

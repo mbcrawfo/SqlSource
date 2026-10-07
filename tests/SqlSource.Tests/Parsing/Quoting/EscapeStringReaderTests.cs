@@ -68,4 +68,23 @@ public class EscapeStringReaderTests
     [Fact]
     public void FindContinuation_AnyReaderWithAPrefix_NamesTheOneSharedReader() =>
         Reader.FindContinuation("E'a'", 1).ShouldBeSameAs(new EscapeStringReader("Ee").FindContinuation("e'b'", 1));
+
+    // CockroachDB's bytes literal.  The prefix is the lower-case letter only: B'...' is a bit string.
+    [Theory]
+    [InlineData("b'a\\'b' x", "'a\\'b'")]
+    [InlineData("E'a\\'b' x", "'a\\'b'")]
+    [InlineData("B'a\\' x", "'a\\'")]
+    [InlineData("ab'a\\' x", "'a\\'")]
+    [InlineData("x'a\\' x", "'a\\'")]
+    public void FindEnd_ReaderWithTheBytesPrefix_TakesBackslashEscapesAfterItToo(string text, string expected) =>
+        Region.Read(new EscapeStringReader("Eeb"), text, '\'').ShouldBe(expected);
+
+    [Fact]
+    public void FindContinuation_ReaderWithTheBytesPrefix_NamesAReaderAfterABytesLiteral()
+    {
+        var reader = new EscapeStringReader("Eeb");
+
+        _ = reader.FindContinuation("b'a'", 1).ShouldBeOfType<BackslashQuoteReader>();
+        reader.FindContinuation("B'a'", 1).ShouldBeNull();
+    }
 }

@@ -26,6 +26,9 @@ internal sealed class SqlDialectRules
 
     private static readonly QuoteReader EscapeString = new EscapeStringReader("Ee");
 
+    // CockroachDB's bytes literal, b'...', takes backslash escapes as an E string does.
+    private static readonly QuoteReader BytesEscapeString = new EscapeStringReader("Eeb");
+
     private static readonly QuoteReader QuoteOperator = new QuoteOperatorReader();
 
     private static readonly QuoteReader Bracket = new BracketReader(doubledCloserEscapes: false);
@@ -69,6 +72,13 @@ internal sealed class SqlDialectRules
         {
             NestedComments = true,
             StringContinuation = SqlStringContinuation.AcrossLineComments,
+        };
+
+    public static SqlDialectRules CockroachDb { get; } =
+        new(('\'', BytesEscapeString), ('"', Doubled), ('$', Dollar))
+        {
+            NestedComments = true,
+            StringContinuation = SqlStringContinuation.AcrossWhitespace,
         };
 
     /// <summary>MySQL with no options.  <see cref="For" /> gives the rules of a set of options.</summary>
@@ -120,6 +130,7 @@ internal sealed class SqlDialectRules
             SqlDialect.MariaDb => MariaDbByOptions[(int)choice.Options & (OptionSets - 1)],
             SqlDialect.Sqlite => Sqlite,
             SqlDialect.Oracle => Oracle,
+            SqlDialect.CockroachDb => CockroachDb,
             _ => Ansi,
         };
 

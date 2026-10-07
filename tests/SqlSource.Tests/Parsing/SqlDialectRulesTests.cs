@@ -26,6 +26,7 @@ public class SqlDialectRulesTests
         SqlDialectRules.For(SqlDialect.MariaDb).ShouldBeSameAs(SqlDialectRules.MariaDb);
         SqlDialectRules.For(SqlDialect.Sqlite).ShouldBeSameAs(SqlDialectRules.Sqlite);
         SqlDialectRules.For(SqlDialect.Oracle).ShouldBeSameAs(SqlDialectRules.Oracle);
+        SqlDialectRules.For(SqlDialect.CockroachDb).ShouldBeSameAs(SqlDialectRules.CockroachDb);
     }
 
     // A value that is not a dialect cannot come from a name, and must not throw inside the compiler if it ever does.
@@ -92,6 +93,7 @@ public class SqlDialectRulesTests
     [InlineData("MariaDb", "'\"`")]
     [InlineData("Sqlite", "'\"`[")]
     [InlineData("Oracle", "'\"")]
+    [InlineData("CockroachDb", "'\"$")]
     public void ReaderFor_Character_HasAReaderOnlyWhereTheDialectOpensAQuotedRegion(string dialect, string openers)
     {
         var rules = SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect));
@@ -112,6 +114,7 @@ public class SqlDialectRulesTests
     [InlineData("MariaDb", false, true, true, false, true)]
     [InlineData("Sqlite", false, false, false, false, false)]
     [InlineData("Oracle", false, false, false, true, false)]
+    [InlineData("CockroachDb", true, false, false, false, false)]
     public void CommentRules_OfEachDialect_AreTheRowOfTheTable(
         string dialect,
         bool nestedComments,
@@ -138,6 +141,7 @@ public class SqlDialectRulesTests
     [InlineData("MariaDb", "None")]
     [InlineData("Sqlite", "None")]
     [InlineData("Oracle", "None")]
+    [InlineData("CockroachDb", "AcrossWhitespace")]
     public void StringContinuation_OfEachDialect_IsTheRowOfTheTable(string dialect, string expected) =>
         SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect)).StringContinuation.ToString().ShouldBe(expected);
 

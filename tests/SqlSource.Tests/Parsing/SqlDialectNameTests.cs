@@ -20,6 +20,9 @@ public class SqlDialectNameTests
     [InlineData("mariadb", nameof(SqlDialect.MariaDb))]
     [InlineData("sqlite", nameof(SqlDialect.Sqlite))]
     [InlineData("oracle", nameof(SqlDialect.Oracle))]
+    [InlineData("cockroachdb", nameof(SqlDialect.CockroachDb))]
+    [InlineData("cockroach", nameof(SqlDialect.CockroachDb))]
+    [InlineData("CockroachDB", nameof(SqlDialect.CockroachDb))]
     // Any case, and surrounding whitespace as a value written on a line of its own has it.
     [InlineData("MSSQL", nameof(SqlDialect.SqlServer))]
     [InlineData("Postgres", nameof(SqlDialect.PostgreSql))]
@@ -83,6 +86,8 @@ public class SqlDialectNameTests
     [InlineData("postgres,ansi-quotes")]
     [InlineData("ansi,no-backslash-escapes")]
     [InlineData("oracle,ansi_quotes")]
+    [InlineData("cockroachdb,ansi-quotes")]
+    [InlineData("crdb")]
     [InlineData("ansi-quotes")]
     [InlineData("ansi-quotes,mysql")]
     // Another separator.
@@ -113,7 +118,7 @@ public class SqlDialectNameTests
     [Fact]
     public void TryParse_EveryDialect_HasAName()
     {
-        string[] names = ["ansi", "mssql", "postgres", "mysql", "mariadb", "sqlite", "oracle"];
+        string[] names = ["ansi", "mssql", "postgres", "mysql", "mariadb", "sqlite", "oracle", "cockroachdb"];
 
         var parsed = names.Select(name =>
         {
@@ -126,7 +131,7 @@ public class SqlDialectNameTests
 
     [Fact]
     public void Accepted_ListsTheNameOfEveryDialect() =>
-        SqlDialectName.Accepted.ShouldBe("ansi, mssql, postgres, mysql, mariadb, sqlite and oracle");
+        SqlDialectName.Accepted.ShouldBe("ansi, mssql, postgres, cockroachdb, mysql, mariadb, sqlite and oracle");
 
     [Fact]
     public void Ansi_IsTheDefaultValue() => default(SqlDialect).ShouldBe(SqlDialect.Ansi);

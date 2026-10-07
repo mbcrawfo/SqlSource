@@ -27,7 +27,8 @@ public class DialectTests
     private const string SqlServer = "SELECT 1 # x [y--z]";
 
     private const string Invalid =
-        "' is not a SQL dialect.  SqlSourceDialect accepts ansi, mssql, postgres, mysql, mariadb, sqlite and oracle.";
+        "' is not a SQL dialect.  SqlSourceDialect accepts ansi, mssql, postgres, cockroachdb, mysql, mariadb, "
+        + "sqlite and oracle.";
 
     // Valid only where a backslash does not escape.  Under plain MySQL the string is never closed.
     private const string PathQuery = "SELECT 'C:\\temp\\' AS p;\n";
@@ -147,6 +148,26 @@ public class DialectTests
         var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- SqlSource: dialect=postgres,ansi-quotes\n" + Query));
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC111 /app/Repo/Q.sql(1,15)-(1,43): ");
+    }
+
+    // A bytes literal that ends with an escaped quote.  PostgreSQL has no escape there, and does not close it.
+    [Theory]
+    [InlineData("cockroachdb", null)]
+    [InlineData("Cockroach", null)]
+    [InlineData("postgres", "SQLSRC101 ")]
+    public void Run_BytesLiteralWithAnEscapedQuote_IsReadOnlyByCockroachDb(string property, string? error)
+    {
+        var run = Run(property, new SqlFile("/app/Repo/Q.sql", "SELECT b'\\'' AS x; -- c\n"));
+
+        if (error is null)
+        {
+            run.Diagnostics.ShouldBeEmpty();
+            run.CompilationErrors.ShouldBeEmpty();
+        }
+        else
+        {
+            run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith(error);
+        }
     }
 
     [Theory]

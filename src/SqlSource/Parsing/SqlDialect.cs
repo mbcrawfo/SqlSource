@@ -28,4 +28,9 @@ internal enum SqlDialect
 
     /// <summary>Oracle.</summary>
     Oracle,
+
+    /// <summary>
+    /// CockroachDB: PostgreSQL's rules, with its own bytes literal and its own gap in a continued string.
+    /// </summary>
+    CockroachDb,
 }
