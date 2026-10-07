@@ -26,6 +26,11 @@
                 mysql
             </SqlSourceDialect>
         </AdditionalFiles>
+        <AdditionalFiles Update="EndToEnd/Dialects/ByOption.sql">
+            <SqlSourceDialect>
+                mysql, no-backslash-escapes
+            </SqlSourceDialect>
+        </AdditionalFiles>
     </ItemGroup>
     <ItemGroup>
         <PackageReference Include="GitHubActionsTestLogger" />

@@ -96,6 +96,12 @@ public class EndToEndTests
     public void ProjectWithADialect_FileWithMetadata_IsReadByTheDialectOfItsItem() =>
         DialectQueries.ByMetadata.ShouldBe("SELECT 'it\\'s' AS note, 5--3 AS eight;");
 
+    // The item of ByOption.sql names an option after the dialect, with a comma and a space, over several lines.
+    // Plain MySQL would not close the string, and this project would not build.
+    [Fact]
+    public void ProjectWithADialect_FileWithAnOptionInItsMetadata_IsReadByThatOption() =>
+        DialectQueries.ByOption.ShouldBe("SELECT 'C:\\temp\\' AS path;");
+
     [Fact]
     public void ProjectWithADialect_FileWithADirective_IsReadByTheDialectItNames() =>
         DialectQueries.ByDirective.ShouldBe("SELECT [it's] FROM #orders;");

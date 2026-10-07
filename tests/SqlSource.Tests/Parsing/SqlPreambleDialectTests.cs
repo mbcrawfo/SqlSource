@@ -24,6 +24,20 @@ public class SqlPreambleDialectTests
         lexer.Rules.ShouldBeSameAs(SqlDialectRules.MySql);
     }
 
+    [Fact]
+    public void Apply_DirectiveWithAnOption_SwitchesTheLexerToTheRulesOfThatOption()
+    {
+        const string Text = "-- SqlSource: dialect=mysql,no-backslash-escapes\nSELECT 'C:\\temp\\'";
+        var lexer = new SqlLexer(Text, SqlDialectRules.Ansi);
+
+        _ = SqlPreambleDialect.Apply(lexer, Text);
+
+        lexer.Rules.ShouldBeSameAs(
+            SqlDialectRules.For(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.NoBackslashEscapes))
+        );
+        lexer.Rules.ShouldNotBeSameAs(SqlDialectRules.MySql);
+    }
+
     [Theory]
     // No directive.
     [InlineData("SELECT 1")]

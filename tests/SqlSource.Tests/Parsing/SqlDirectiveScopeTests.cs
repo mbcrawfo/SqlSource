@@ -203,6 +203,9 @@ public class SqlDirectiveScopeTests
     [InlineData("dialect=pgsql")]
     [InlineData("dialect=mysql,postgres")]
     [InlineData("dialect=mysql=x")]
+    [InlineData("dialect=mysql,")]
+    [InlineData("dialect=mysql,nope")]
+    [InlineData("dialect=postgres,ansi-quotes")]
     public void Read_DialectWithoutAValueOrWithAnUnknownName_IsAnError(string directive)
     {
         var line = "-- SqlSource: " + directive;
@@ -222,6 +225,75 @@ public class SqlDirectiveScopeTests
 
         errors.ShouldBeEmpty();
         scope.Dialect.ShouldBe(Plain(SqlDialect.SqlServer));
+    }
+
+    [Fact]
+    public void Read_DialectWithOptions_KeepsTheDialectAndItsOptions()
+    {
+        var (scope, errors) = Read("-- SqlSource: keep-comments DIALECT=MySql,ANSI_QUOTES");
+
+        errors.ShouldBeEmpty();
+        scope.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes));
+    }
+
+    [Fact]
+    public void Read_SameDialectAndOptionsTwice_IsAllowed()
+    {
+        var (scope, errors) = Read(
+            "-- SqlSource: dialect=mysql,ansi-quotes,no-backslash-escapes",
+            "-- SqlSource: dialect=MySQL,NO_BACKSLASH_ESCAPES,ANSI_QUOTES"
+        );
+
+        errors.ShouldBeEmpty();
+        scope.Dialect.ShouldBe(
+            new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes | SqlDialectOptions.NoBackslashEscapes)
+        );
+    }
+
+    [Fact]
+    public void Read_SameDialectWithOtherOptions_ReportsTheSecondAndKeepsTheFirst()
+    {
+        const string Line = "-- SqlSource: dialect=mysql dialect=mysql,ansi-quotes";
+
+        var (scope, errors) = Read(Line);
+
+        errors.ShouldBe([
+            SqlParseError.Create(
+                SqlParseErrorKind.ConflictingDirectives,
+                SpanOf(Line, "dialect=mysql,ansi-quotes"),
+                "dialect=mysql,ansi-quotes"
+            ),
+        ]);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
+    }
+
+    // A directive is one word.  A space after the comma ends it, and the option is read as a directive of its own.
+    [Fact]
+    public void Read_SpaceAfterTheCommaOfADialect_IsTwoErrors()
+    {
+        const string Line = "-- SqlSource: dialect=mysql, ansi-quotes";
+
+        var (scope, errors) = Read(Line);
+
+        errors.ShouldBe([
+            SqlParseError.Create(
+                SqlParseErrorKind.InvalidDirectiveValue,
+                SpanOf(Line, "dialect=mysql,"),
+                "dialect=mysql,"
+            ),
+            SqlParseError.Create(SqlParseErrorKind.UnknownDirective, SpanOf(Line, "ansi-quotes"), "ansi-quotes"),
+        ]);
+        scope.Dialect.ShouldBeNull();
+    }
+
+    [Fact]
+    public void TryFindDialect_MarkerWithOptions_GivesTheFirstValueThatIsValid()
+    {
+        const string Line = "-- SqlSource: dialect=mysql, dialect=mariadb,no-backslash-escapes dialect=mysql";
+
+        SqlDirectiveScope.TryFindDialect(Line, Marker(Line), out var dialect).ShouldBeTrue();
+
+        dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MariaDb, SqlDialectOptions.NoBackslashEscapes));
     }
 
     [Fact]

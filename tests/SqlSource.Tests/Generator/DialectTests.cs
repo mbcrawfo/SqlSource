@@ -29,6 +29,9 @@ public class DialectTests
     private const string Invalid =
         "' is not a SQL dialect.  SqlSourceDialect accepts ansi, mssql, postgres, mysql, mariadb, sqlite and oracle.";
 
+    // Valid only where a backslash does not escape.  Under plain MySQL the string is never closed.
+    private const string PathQuery = "SELECT 'C:\\temp\\' AS p;\n";
+
     [Theory]
     // Nothing set.
     [InlineData(null, null, null, Ansi)]
@@ -80,6 +83,70 @@ public class DialectTests
         source.ShouldContain("public const string A = \"" + MySql + "\";");
         source.ShouldContain("public const string B = \"" + SqlServer + "\";");
         source.ShouldContain("public const string C = \"" + Ansi + "\";");
+    }
+
+    [Theory]
+    // In the directive, in the metadata and in the property.
+    [InlineData("mysql,no-backslash-escapes", null, null)]
+    [InlineData(null, "mysql,no-backslash-escapes", null)]
+    [InlineData(null, null, "mysql,no-backslash-escapes")]
+    // As the server spells it, with the whitespace of a value written over several lines.
+    [InlineData(null, null, "\n    MySQL,\n    NO_BACKSLASH_ESCAPES\n  ")]
+    [InlineData(null, "mariadb , ansi_quotes , no_backslash_escapes", null)]
+    // A value with the option wins over one without it.
+    [InlineData("mariadb,no-backslash-escapes", "mysql", "postgres")]
+    [InlineData(null, "mysql,no-backslash-escapes", "mysql")]
+    public void Run_OptionOfADialect_IsReadFromTheDirectiveTheMetadataAndTheProperty(
+        string? directive,
+        string? metadata,
+        string? property
+    )
+    {
+        var sql = (directive is null ? string.Empty : "-- SqlSource: dialect=" + directive + "\n") + PathQuery;
+
+        var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
+
+        run.Diagnostics.ShouldBeEmpty();
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+    }
+
+    // The value that wins names no option, so the file is read without one: options are not merged.
+    [Theory]
+    [InlineData("mysql", null, "mysql,no-backslash-escapes")]
+    [InlineData("mysql", "mysql,no-backslash-escapes", null)]
+    [InlineData(null, "mysql", "mysql,no-backslash-escapes")]
+    public void Run_ValueWithoutTheOption_ReplacesAValueWithItWhole(
+        string? directive,
+        string? metadata,
+        string? property
+    )
+    {
+        var sql = (directive is null ? string.Empty : "-- SqlSource: dialect=" + directive + "\n") + PathQuery;
+
+        var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC101 ");
+    }
+
+    [Theory]
+    [InlineData("postgres,ansi-quotes")]
+    [InlineData("mysql,")]
+    [InlineData("mysql,ansi")]
+    public void Run_PropertyWithAnOptionThatIsNotValid_IsAnErrorThatQuotesTheWholeValue(string property)
+    {
+        var run = Run(property, new SqlFile("/app/Repo/Q.sql", Query));
+
+        run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): '" + property + Invalid]);
+        run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Ansi + "\";");
+    }
+
+    [Fact]
+    public void Run_DirectiveWithAnOptionThatIsNotValid_IsAnErrorAtTheDirective()
+    {
+        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- SqlSource: dialect=postgres,ansi-quotes\n" + Query));
+
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC111 /app/Repo/Q.sql(1,15)-(1,43): ");
     }
 
     [Theory]

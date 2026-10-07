@@ -494,6 +494,51 @@ public class SqlFileParserTests
         Sql(Blocks(Text, dialect: SqlDialect.MySql).ShouldHaveSingleItem()).ShouldBe("SELECT [a'b]");
     }
 
+    // Under plain MySQL the backslash takes the closing quote with it, and the string is not closed.
+    [Fact]
+    public void Parse_DialectDirectiveWithAnOption_ReadsTheFileByThatOption()
+    {
+        const string Text =
+            "-- SqlSource: dialect=mysql,no-backslash-escapes\n-- name: A\nSELECT 'C:\\temp\\' AS path -- c\n";
+
+        Sql(Blocks(Text).ShouldHaveSingleItem()).ShouldBe("SELECT 'C:\\temp\\' AS path");
+    }
+
+    [Fact]
+    public void Parse_OptionOfTheProject_IsUsedByAFileWithoutADirective()
+    {
+        const string Text = "-- name: A\nSELECT \"a\\\" AS b -- c\n";
+        var project = new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes);
+
+        Sql(Blocks(Text, dialect: project).ShouldHaveSingleItem()).ShouldBe("SELECT \"a\\\" AS b");
+    }
+
+    // The directive names no option, so the file has none: the option of the project is not kept.
+    [Fact]
+    public void Parse_DialectDirectiveWithoutOptions_ReplacesTheOptionsOfTheProjectToo()
+    {
+        const string Text = "-- SqlSource: dialect=mysql\n-- name: A\nSELECT 'it\\'s' -- c\n";
+        var project = new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.NoBackslashEscapes);
+
+        Sql(Blocks(Text, dialect: project).ShouldHaveSingleItem()).ShouldBe("SELECT 'it\\'s'");
+    }
+
+    [Fact]
+    public void Parse_TwoDialectDirectivesThatDifferOnlyInOptions_IsAnError()
+    {
+        const string Text =
+            "-- SqlSource: dialect=mysql\n-- SqlSource: dialect=mysql,ansi-quotes\n-- name: A\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingDirectives,
+                    SpanOf(Text, "dialect=mysql,ansi-quotes"),
+                    "dialect=mysql,ansi-quotes"
+                ),
+            ]);
+    }
+
     [Fact]
     public void Parse_DialectDirectiveInAFileWithoutANameMarker_GoesAboveItsSql()
     {

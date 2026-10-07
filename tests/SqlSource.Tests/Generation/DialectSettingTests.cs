@@ -34,10 +34,21 @@ public class DialectSettingTests
     }
 
     [Theory]
+    [InlineData("mysql,ansi-quotes")]
+    [InlineData("\n    MySQL ,\n    ANSI_QUOTES\n  ")]
+    public void Parse_NameWithAnOption_IsThatDialectWithTheOption(string value) =>
+        DialectSetting
+            .Parse(value)
+            .ShouldBe(new DialectSetting(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes), null));
+
+    [Theory]
     [InlineData("pgsql")]
     [InlineData("sql server")]
     [InlineData(" Postgres 16 ")]
     [InlineData("true")]
+    [InlineData("postgres,ansi-quotes")]
+    [InlineData("mysql,")]
+    [InlineData("mysql,ansi")]
     public void Parse_AnythingElse_IsAnsiAndKeepsTheValueAsWritten(string value) =>
         DialectSetting.Parse(value).ShouldBe(new DialectSetting(SqlDialect.Ansi, value));
 
@@ -105,6 +116,31 @@ public class DialectSettingTests
         resolved.File.ShouldBeSameAs(file);
         resolved.Dialect.ShouldBe(new SqlDialectChoice(Enum.Parse<SqlDialect>(dialect), SqlDialectOptions.None));
         resolved.InvalidValue.ShouldBe(invalid);
+    }
+
+    // A value replaces the one it wins over whole: the option of the property is not added to the metadata.
+    [Fact]
+    public void Resolve_MetadataWithoutAnOption_DoesNotTakeTheOptionOfTheProperty()
+    {
+        var file = new InMemoryAdditionalText(Path, "SELECT 1;");
+
+        var resolved = FileDialect.Resolve(
+            file,
+            DialectSetting.Parse("mysql"),
+            DialectSetting.Parse("mysql,ansi-quotes")
+        );
+
+        resolved.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.None));
+    }
+
+    [Fact]
+    public void Resolve_NoMetadata_TakesTheOptionOfTheProperty()
+    {
+        var file = new InMemoryAdditionalText(Path, "SELECT 1;");
+
+        var resolved = FileDialect.Resolve(file, DialectSetting.Parse(null), DialectSetting.Parse("mysql,ansi-quotes"));
+
+        resolved.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes));
     }
 
     [Fact]
