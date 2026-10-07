@@ -48,6 +48,15 @@
             Link="build/SqlSource.targets"
             CopyToOutputDirectory="PreserveNewest"
         />
+        <!--
+            EndToEnd/EndToEndTests.cs reads the file that the build writes for the compiler of this project.  The SDK
+            writes it before it compiles, and the copy to the output folder comes after.
+        -->
+        <None
+            Include="$(IntermediateOutputPath)$(MSBuildProjectName).GeneratedMSBuildEditorConfig.editorconfig"
+            Link="build/compiler.editorconfig"
+            CopyToOutputDirectory="PreserveNewest"
+        />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference

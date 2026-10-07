@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using Shouldly;
@@ -95,6 +96,22 @@ public class EndToEndTests
     [Fact]
     public void ProjectWithADialect_FileWithMetadata_IsReadByTheDialectOfItsItem() =>
         DialectQueries.ByMetadata.ShouldBe("SELECT 'it\\'s' AS note, 5--3 AS eight;");
+
+    // The build copies the file it wrote for the compiler of this project to the output folder.  It has a section for
+    // each item whose metadata the package shows to the compiler.  A section for every .sql file would make the file,
+    // and the build, grow with files that set nothing.
+    [Fact]
+    public void ProjectWithADialect_FileTheBuildWritesForTheCompiler_NamesOnlyTheFileWithMetadata()
+    {
+        var lines = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "build", "compiler.editorconfig"));
+
+        var sections = lines.Where(line => line.StartsWith('[') && line.EndsWith(".sql]", StringComparison.Ordinal));
+
+        var section = sections.ShouldHaveSingleItem();
+        section.ShouldEndWith("/EndToEnd/Dialects/ByMetadata.sql]");
+        lines[Array.IndexOf(lines, section) + 1]
+            .ShouldBe("build_metadata.SqlSourceDialectFile.SqlSourceDialect = mysql");
+    }
 
     [Fact]
     public void ProjectWithADialect_FileWithADirective_IsReadByTheDialectItNames() =>

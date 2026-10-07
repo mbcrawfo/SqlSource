@@ -12,9 +12,9 @@
         the build runs.  A build that writes the file runs them, so a design-time build does too.
 
         One target is out of their reach: one that hooks GenerateMSBuildEditorConfigFileCore itself and is declared
-        after this file, as in Directory.Build.targets.  MSBuild runs it after the trims.  A target that adds a .sql
-        file hooks SqlSourceTrimDialectOfFiles instead, which runs it first wherever it is declared, or writes the
-        metadata on one line.
+        after this file, as in Directory.Build.targets.  MSBuild runs it after the targets here, so the dialect of a
+        .sql file that it adds is not trimmed and not collected, and does not reach the compiler.  A target that adds a
+        .sql file hooks SqlSourceTrimDialectOfFiles instead, which runs it first wherever it is declared.  TD-0016.
     -->
     <Target Name="SqlSourceTrimProperties" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
         <PropertyGroup>
@@ -43,6 +43,48 @@
             <AdditionalFiles>
                 <SqlSourceDialect>$(SqlSourceDialectAsWritten.Trim())</SqlSourceDialect>
             </AdditionalFiles>
+        </ItemGroup>
+    </Target>
+    <!--
+        The compiler reads the metadata from the items of SqlSourceDialectFile: see SqlSource.props.  These are the
+        files that have a dialect, and a project has few of them.  This depends on the trim, so that it copies trimmed
+        values and leaves out a file whose value was only white space.  MSBuild does not promise an order for two
+        targets that hook the same one.
+    -->
+    <Target
+        Name="SqlSourceCollectDialectFiles"
+        BeforeTargets="GenerateMSBuildEditorConfigFileCore"
+        DependsOnTargets="SqlSourceTrimDialectOfFiles"
+    >
+        <ItemGroup>
+            <SqlSourceDialectFile
+                Include="@(AdditionalFiles)"
+                Condition="'%(AdditionalFiles.SqlSourceDialect)' != ''"
+            />
+        </ItemGroup>
+    </Target>
+    <!--
+        Makes the build after a .sql file is deleted, renamed or moved compile again.  A file that is gone has no
+        timestamp to compare, and the SDK's own record of what the compiler was given does not hold AdditionalFiles.
+        CustomAdditionalCompileInputs is the item the SDK reads for more inputs of the compiler.  The file holds a hash
+        of the list and is written only when the hash changes, so a build with the same files does not compile for it.
+    -->
+    <Target Name="SqlSourceTrackAdditionalFiles" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
+        <PropertyGroup>
+            <SqlSourceFilesCache>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.cache</SqlSourceFilesCache>
+        </PropertyGroup>
+        <Hash ItemsToHash="@(AdditionalFiles)">
+            <Output TaskParameter="HashResult" PropertyName="SqlSourceFilesHash" />
+        </Hash>
+        <WriteLinesToFile
+            File="$(SqlSourceFilesCache)"
+            Lines="$(SqlSourceFilesHash)"
+            Overwrite="true"
+            WriteOnlyWhenDifferent="true"
+        />
+        <ItemGroup>
+            <CustomAdditionalCompileInputs Include="$(SqlSourceFilesCache)" />
+            <FileWrites Include="$(SqlSourceFilesCache)" />
         </ItemGroup>
     </Target>
 </Project>
