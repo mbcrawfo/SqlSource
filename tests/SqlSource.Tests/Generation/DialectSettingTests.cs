@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation;
@@ -28,7 +29,7 @@ public class DialectSettingTests
     {
         var setting = DialectSetting.Parse(value);
 
-        setting.Dialect.ToString().ShouldBe(expected);
+        setting.Dialect.ShouldBe(new SqlDialectChoice(Enum.Parse<SqlDialect>(expected), SqlDialectOptions.None));
         setting.InvalidValue.ShouldBeNull();
     }
 
@@ -102,7 +103,7 @@ public class DialectSettingTests
         var resolved = FileDialect.Resolve(file, DialectSetting.Parse(metadata), DialectSetting.Parse(property));
 
         resolved.File.ShouldBeSameAs(file);
-        resolved.Dialect.ToString().ShouldBe(dialect);
+        resolved.Dialect.ShouldBe(new SqlDialectChoice(Enum.Parse<SqlDialect>(dialect), SqlDialectOptions.None));
         resolved.InvalidValue.ShouldBe(invalid);
     }
 

@@ -22,7 +22,7 @@ internal static class SqlFileReader
     public static ParsedSqlFile Read(
         AdditionalText file,
         string normalizedPath,
-        SqlDialect dialect,
+        SqlDialectChoice dialect,
         string? invalidDialect,
         CancellationToken cancellationToken
     )

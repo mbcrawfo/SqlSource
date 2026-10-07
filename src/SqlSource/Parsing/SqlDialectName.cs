@@ -30,22 +30,22 @@ internal static class SqlDialectName
     /// <summary>
     /// Reads a name or an alias, ignoring case and surrounding whitespace.  False for anything else, and for null.
     /// </summary>
-    public static bool TryParse(string? value, out SqlDialect dialect) => TryParse(value.AsSpan(), out dialect);
+    public static bool TryParse(string? value, out SqlDialectChoice choice) => TryParse(value.AsSpan(), out choice);
 
-    /// <inheritdoc cref="TryParse(string?, out SqlDialect)" />
-    public static bool TryParse(ReadOnlySpan<char> value, out SqlDialect dialect)
+    /// <inheritdoc cref="TryParse(string?, out SqlDialectChoice)" />
+    public static bool TryParse(ReadOnlySpan<char> value, out SqlDialectChoice choice)
     {
         var name = value.Trim();
         foreach (var (candidate, candidateDialect) in Names)
         {
             if (name.Equals(candidate.AsSpan(), StringComparison.OrdinalIgnoreCase))
             {
-                dialect = candidateDialect;
+                choice = candidateDialect;
                 return true;
             }
         }
 
-        dialect = SqlDialect.Ansi;
+        choice = default;
         return false;
     }
 }

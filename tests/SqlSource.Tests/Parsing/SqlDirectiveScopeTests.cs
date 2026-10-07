@@ -194,7 +194,7 @@ public class SqlDirectiveScopeTests
         var (scope, errors) = Read("-- SqlSource: " + directive);
 
         errors.ShouldBeEmpty();
-        scope.Dialect.ToString().ShouldBe(expected);
+        scope.Dialect.ShouldBe(Plain(Enum.Parse<SqlDialect>(expected)));
     }
 
     [Theory]
@@ -221,7 +221,7 @@ public class SqlDirectiveScopeTests
         var (scope, errors) = Read("-- SqlSource: dialect=mssql dialect=tsql", "-- SqlSource: dialect=SqlServer");
 
         errors.ShouldBeEmpty();
-        scope.Dialect.ShouldBe(SqlDialect.SqlServer);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.SqlServer));
     }
 
     [Fact]
@@ -238,7 +238,7 @@ public class SqlDirectiveScopeTests
                 "dialect=oracle"
             ),
         ]);
-        scope.Dialect.ShouldBe(SqlDialect.MySql);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
     }
 
     [Fact]
@@ -247,7 +247,7 @@ public class SqlDirectiveScopeTests
         var (scope, errors) = Read("-- SqlSource: dialect=mysql", "-- SqlSource: dialect=mariadb");
 
         errors.ShouldHaveSingleItem().Kind.ShouldBe(SqlParseErrorKind.ConflictingDirectives);
-        scope.Dialect.ShouldBe(SqlDialect.MySql);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
     }
 
     // The directive starts at offset 14 of the line.
@@ -272,7 +272,7 @@ public class SqlDirectiveScopeTests
         var (scope, errors) = Read(15, "-- SqlSource: dialect=mysql");
 
         errors.ShouldBeEmpty();
-        scope.Dialect.ShouldBe(SqlDialect.MySql);
+        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
     }
 
     [Theory]
@@ -284,7 +284,7 @@ public class SqlDirectiveScopeTests
     {
         SqlDirectiveScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeTrue();
 
-        dialect.ToString().ShouldBe(expected);
+        dialect.ShouldBe(Plain(Enum.Parse<SqlDialect>(expected)));
     }
 
     [Theory]
@@ -301,7 +301,7 @@ public class SqlDirectiveScopeTests
     {
         SqlDirectiveScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeFalse();
 
-        dialect.ShouldBe(SqlDialect.Ansi);
+        dialect.ShouldBe(default);
     }
 
     [Fact]
@@ -343,4 +343,6 @@ public class SqlDirectiveScopeTests
 
     private static TextSpan SpanOf(string text, string value) =>
         new(text.LastIndexOf(value, StringComparison.Ordinal), value.Length);
+
+    private static SqlDialectChoice Plain(SqlDialect dialect) => new(dialect, SqlDialectOptions.None);
 }

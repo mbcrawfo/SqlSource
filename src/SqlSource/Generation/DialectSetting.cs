@@ -8,10 +8,11 @@ namespace SqlSource.Generation;
 /// comes before both.
 /// </summary>
 /// <param name="Dialect">
-/// The dialect that is set, or null when none is.  <see cref="SqlDialect.Ansi" /> when the value is not valid.
+/// The dialect that is set, with its options, or null when none is.  <see cref="SqlDialect.Ansi" /> with no
+/// options when the value is not valid.
 /// </param>
 /// <param name="InvalidValue">The value as written when it is not valid, and null otherwise.</param>
-internal sealed record DialectSetting(SqlDialect? Dialect, string? InvalidValue)
+internal sealed record DialectSetting(SqlDialectChoice? Dialect, string? InvalidValue)
 {
     /// <summary>
     /// Where the compiler puts the <c>SqlSourceDialect</c> property of the project.  It is there only because
@@ -44,6 +45,6 @@ internal sealed record DialectSetting(SqlDialect? Dialect, string? InvalidValue)
 
         return SqlDialectName.TryParse(value, out var dialect)
             ? new DialectSetting(dialect, null)
-            : new DialectSetting(SqlDialect.Ansi, value);
+            : new DialectSetting(default(SqlDialectChoice), value);
     }
 }

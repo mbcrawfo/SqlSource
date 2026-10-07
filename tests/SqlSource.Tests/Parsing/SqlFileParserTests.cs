@@ -599,16 +599,20 @@ public class SqlFileParserTests
             .ShouldBe(SqlFileParser.Parse("SELECT 1 -- c", "Query.sql", SqlDialect.Ansi));
     }
 
-    private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialect dialect = SqlDialect.Ansi)
+    private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialectChoice dialect = default)
     {
         var result = SqlFileParser.Parse(text, fileName, dialect);
         result.Errors.ShouldBeEmpty();
         return [.. result.Blocks];
     }
 
-    private static SqlParseError[] Errors(string text, string fileName = "Query.sql")
+    private static SqlParseError[] Errors(
+        string text,
+        string fileName = "Query.sql",
+        SqlDialectChoice dialect = default
+    )
     {
-        var result = SqlFileParser.Parse(text, fileName);
+        var result = SqlFileParser.Parse(text, fileName, dialect);
         result.Blocks.ShouldBeEmpty();
         return [.. result.Errors];
     }

@@ -28,9 +28,10 @@ public class SqlDialectNameTests
     [InlineData("\n    sqlite\n", nameof(SqlDialect.Sqlite))]
     public void TryParse_NameOrAlias_GivesItsDialect(string name, string expected)
     {
-        SqlDialectName.TryParse(name, out var dialect).ShouldBeTrue();
+        SqlDialectName.TryParse(name, out var choice).ShouldBeTrue();
 
-        dialect.ToString().ShouldBe(expected);
+        choice.Dialect.ToString().ShouldBe(expected);
+        choice.Options.ShouldBe(SqlDialectOptions.None);
     }
 
     [Theory]
@@ -48,17 +49,17 @@ public class SqlDialectNameTests
     [InlineData("sqlıte")]
     public void TryParse_AnythingElse_IsRejected(string? name)
     {
-        SqlDialectName.TryParse(name, out var dialect).ShouldBeFalse();
+        SqlDialectName.TryParse(name, out var choice).ShouldBeFalse();
 
-        dialect.ShouldBe(SqlDialect.Ansi);
+        choice.ShouldBe(default);
     }
 
     [Fact]
     public void TryParse_Span_ReadsTheSameNames()
     {
-        SqlDialectName.TryParse("dialect=MariaDB".AsSpan(8), out var dialect).ShouldBeTrue();
+        SqlDialectName.TryParse("dialect=MariaDB".AsSpan(8), out var choice).ShouldBeTrue();
 
-        dialect.ShouldBe(SqlDialect.MariaDb);
+        choice.ShouldBe(new SqlDialectChoice(SqlDialect.MariaDb, SqlDialectOptions.None));
     }
 
     [Fact]
@@ -68,8 +69,8 @@ public class SqlDialectNameTests
 
         var parsed = names.Select(name =>
         {
-            SqlDialectName.TryParse(name, out var dialect).ShouldBeTrue();
-            return dialect;
+            SqlDialectName.TryParse(name, out var choice).ShouldBeTrue();
+            return choice.Dialect;
         });
 
         parsed.ShouldBe(Enum.GetValues<SqlDialect>());
