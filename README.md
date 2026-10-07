@@ -303,10 +303,6 @@ A project that lists its own files can give the metadata where it lists them:
 </ItemGroup>
 ```
 
-### Deleting or renaming a file
-
-Editing a `.sql` file is always picked up by the next build.  Deleting, renaming or moving one is not: an incremental `dotnet build` can succeed with the old members still in place, because MSBuild does not notice that the list of files changed.  Run `dotnet build --no-incremental` afterwards.  A clean build, such as a CI build, is not affected.
-
 ## Supported environments
 
 A project that uses SqlSource must target .NET 8 or later; the generated code relies on it, and an older target is reported as [SQLSRC003](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc003).

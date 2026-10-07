@@ -17,6 +17,10 @@
         false.  SqlSourceDialect names the database whose rules the .sql files are read by: as a property for the
         project, and as metadata of an AdditionalFiles item for one file or for the files of a glob.  None of this is
         under the condition above: a project that lists its own .sql files still needs it.
+
+        The metadata does a second job.  Because of it the SDK writes a section for each .sql file into the file it
+        generates for the compiler, so that file changes when a .sql file is deleted, renamed or moved, and the next
+        build compiles again.  Nothing else tells an incremental build that the list of files changed.
     -->
     <ItemGroup>
         <CompilerVisibleProperty Include="SqlSourceTokenValidation" />
