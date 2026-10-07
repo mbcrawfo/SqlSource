@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using Shouldly;
@@ -101,6 +102,27 @@ public class EndToEndTests
     [Fact]
     public void ProjectWithADialect_FileWithAnOptionInItsMetadata_IsReadByThatOption() =>
         DialectQueries.ByOption.ShouldBe("SELECT 'C:\\temp\\' AS path;");
+
+    // The build copies the file it wrote for the compiler of this project to the output folder.  It has a section for
+    // each item whose metadata the package shows to the compiler.  A section for every .sql file would make the file,
+    // and the build, grow with files that set nothing.  A value with an option arrives whole, comma included.
+    [Fact]
+    public void ProjectWithADialect_FileTheBuildWritesForTheCompiler_NamesOnlyTheFilesWithMetadata()
+    {
+        var lines = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "build", "compiler.editorconfig"));
+
+        var sections = lines
+            .Where(line => line.StartsWith('[') && line.EndsWith(".sql]", StringComparison.Ordinal))
+            .Select(section => section[section.LastIndexOf('/')..] + " " + lines[Array.IndexOf(lines, section) + 1]);
+
+        sections.ShouldBe(
+            [
+                "/ByMetadata.sql] build_metadata.SqlSourceDialectFile.SqlSourceDialect = mysql",
+                "/ByOption.sql] build_metadata.SqlSourceDialectFile.SqlSourceDialect = mysql, no-backslash-escapes",
+            ],
+            ignoreOrder: true
+        );
+    }
 
     [Fact]
     public void ProjectWithADialect_FileWithADirective_IsReadByTheDialectItNames() =>

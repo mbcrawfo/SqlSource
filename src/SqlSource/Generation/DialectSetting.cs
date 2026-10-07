@@ -22,9 +22,10 @@ internal sealed record DialectSetting(SqlDialectChoice? Dialect, string? Invalid
 
     /// <summary>
     /// Where the compiler puts the <c>SqlSourceDialect</c> metadata of one <c>AdditionalFiles</c> item.  It is there
-    /// only because <c>build/SqlSource.props</c> lists it as a <c>CompilerVisibleItemMetadata</c>.
+    /// only because <c>build/SqlSource.props</c> lists it as a <c>CompilerVisibleItemMetadata</c> of
+    /// <c>SqlSourceDialectFile</c>, and <c>build/SqlSource.targets</c> puts the items that have a dialect there.
     /// </summary>
-    public const string MetadataName = "build_metadata.AdditionalFiles.SqlSourceDialect";
+    public const string MetadataName = "build_metadata.SqlSourceDialectFile.SqlSourceDialect";
 
     private static readonly DialectSetting NotSet = new(null, null);
 
