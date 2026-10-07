@@ -2,20 +2,47 @@
     <!--
         NuGet imports this file into each project that references the package, after the project's own content.
 
-        The compiler reads SqlSourceTokenValidation and SqlSourceDialect from a file that the build writes with one
-        line for each property.  A value on a line of its own, as an element written over several lines has it, would
-        arrive empty there and be taken for the default.  Trimming it here makes that form mean what it says.
+        The compiler reads SqlSourceTokenValidation and SqlSourceDialect, and the SqlSourceDialect metadata of an
+        AdditionalFiles item, from a file that the build writes with one line for each value.  A value on a line of
+        its own, as an element written over several lines has it, would arrive empty there and be taken for the
+        default.  Trimming it makes that form mean what it says.
+
+        GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the file.  The trims run before it and
+        not where this file is imported: Directory.Build.targets is imported later, and a target can add an item while
+        the build runs.  A build that writes the file runs them, so a design-time build does too.
+
+        One target is out of their reach: one that hooks GenerateMSBuildEditorConfigFileCore itself and is declared
+        after this file, as in Directory.Build.targets.  MSBuild runs it after the trims.  A target that adds a .sql
+        file hooks SqlSourceTrimDialectOfFiles instead, which runs it first wherever it is declared, or writes the
+        metadata on one line.
     -->
-    <PropertyGroup Condition="'$(SqlSourceTokenValidation)' != ''">
-        <SqlSourceTokenValidation>$(SqlSourceTokenValidation.Trim())</SqlSourceTokenValidation>
-    </PropertyGroup>
-    <PropertyGroup Condition="'$(SqlSourceDialect)' != ''">
-        <SqlSourceDialect>$(SqlSourceDialect.Trim())</SqlSourceDialect>
-    </PropertyGroup>
-    <ItemGroup>
-        <AdditionalFiles
-            Update="@(AdditionalFiles)"
-            SqlSourceDialect="$([System.String]::Copy('%(SqlSourceDialect)').Trim())"
-        />
-    </ItemGroup>
+    <Target Name="SqlSourceTrimProperties" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
+        <PropertyGroup>
+            <SqlSourceTokenValidation>$(SqlSourceTokenValidation.Trim())</SqlSourceTokenValidation>
+            <SqlSourceDialect>$(SqlSourceDialect.Trim())</SqlSourceDialect>
+        </PropertyGroup>
+    </Target>
+    <!--
+        Outputs makes this run once for each value that the metadata has, with only the items of that value in reach.
+        The value goes through a property because MSBuild puts metadata into an expression as text: inside the quotes
+        of a property function, a value that holds a quote would end the argument early.
+
+        The files without the metadata are one batch, and in most projects it holds every file.  It has nothing to
+        trim, so nothing is written back to it.  The condition is on the item group because the condition of a target
+        cannot read metadata.
+    -->
+    <Target
+        Name="SqlSourceTrimDialectOfFiles"
+        BeforeTargets="GenerateMSBuildEditorConfigFileCore"
+        Outputs="%(AdditionalFiles.SqlSourceDialect)"
+    >
+        <PropertyGroup>
+            <SqlSourceDialectAsWritten>%(AdditionalFiles.SqlSourceDialect)</SqlSourceDialectAsWritten>
+        </PropertyGroup>
+        <ItemGroup Condition="'$(SqlSourceDialectAsWritten)' != ''">
+            <AdditionalFiles>
+                <SqlSourceDialect>$(SqlSourceDialectAsWritten.Trim())</SqlSourceDialect>
+            </AdditionalFiles>
+        </ItemGroup>
+    </Target>
 </Project>
