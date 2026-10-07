@@ -8,7 +8,8 @@ using Xunit;
 namespace SqlSource.Tests.Parsing;
 
 // A test without a dialect in its name reads by the ANSI rules, which are the default.  An internal type cannot be
-// the parameter of a public test method, so a row names its dialects, separated by commas.
+// the parameter of a public test method, so a row names its dialects, separated by commas.  An option of a dialect
+// follows it after a plus sign, as in "MySql+AnsiQuotes".
 public class SqlLexerTests
 {
     private const string AllDialects = "Ansi,SqlServer,PostgreSql,MySql,MariaDb,Sqlite,Oracle";
@@ -184,6 +185,28 @@ public class SqlLexerTests
         "\"a\\\"b\" -- c\"",
         "Quoted:\"a\\\" | Text:b | Quoted:\" -- c\""
     )]
+    // The options of MySQL and MariaDB.  ANSI_QUOTES takes the backslash escape from "...", and
+    // NO_BACKSLASH_ESCAPES takes it from both.
+    [InlineData("MySql+AnsiQuotes,MariaDb+AnsiQuotes", "'a\\'b' -- c'", "Quoted:'a\\'b' | Text:  | LineComment:-- c'")]
+    [InlineData(
+        "MySql+NoBackslashEscapes,MariaDb+NoBackslashEscapes,"
+            + "MySql+AnsiQuotes+NoBackslashEscapes,MariaDb+AnsiQuotes+NoBackslashEscapes",
+        "'a\\'b' -- c'",
+        "Quoted:'a\\' | Text:b | Quoted:' -- c'"
+    )]
+    [InlineData(
+        "MySql+AnsiQuotes,MariaDb+AnsiQuotes,MySql+NoBackslashEscapes,MariaDb+NoBackslashEscapes,"
+            + "MySql+AnsiQuotes+NoBackslashEscapes,MariaDb+AnsiQuotes+NoBackslashEscapes",
+        "\"a\\\"b\" -- c\"",
+        "Quoted:\"a\\\" | Text:b | Quoted:\" -- c\""
+    )]
+    // An option leaves the rest of the dialect alone.
+    [InlineData(
+        "MySql+AnsiQuotes+NoBackslashEscapes,MariaDb+AnsiQuotes+NoBackslashEscapes",
+        "1 # c -- d\n2",
+        "Text:1  | LineComment:# c -- d | Text:\n2"
+    )]
+    [InlineData("MySql+AnsiQuotes+NoBackslashEscapes,MariaDb+AnsiQuotes+NoBackslashEscapes", "5--3", "Text:5--3")]
     // PostgreSQL's E prefix.  MySQL and MariaDB take the backslash with or without it.
     [InlineData(
         "Ansi,PostgreSql,MySql,MariaDb",
@@ -511,7 +534,15 @@ public class SqlLexerTests
         SqlLexer.Lex("--+ h", SqlDialectRules.Oracle).Lexemes[0].GetContentSpan("--+ h").ShouldBe(new TextSpan(0, 5));
     }
 
-    private static SqlDialectRules Rules(string dialect) => SqlDialectRules.For(Enum.Parse<SqlDialect>(dialect));
+    private static SqlDialectRules Rules(string choice)
+    {
+        var parts = choice.Split('+');
+        var options = parts
+            .Skip(1)
+            .Aggregate(SqlDialectOptions.None, (all, option) => all | Enum.Parse<SqlDialectOptions>(option));
+
+        return SqlDialectRules.For(new SqlDialectChoice(Enum.Parse<SqlDialect>(parts[0]), options));
+    }
 
     private static string[] Lex(string text) => Lex(text, SqlDialectRules.Ansi);
 
