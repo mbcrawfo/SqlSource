@@ -8,7 +8,7 @@ Next id: `D-0002`
 
 | ID | Status | Added | Planned in | Description |
 |----|----|----|----|----|
-| [D-0001](D-0001-dialects-not-delivered.md) | Open | 2026-10-06 | [SQL dialects design](../superpowers/specs/2026-10-06-sql-dialects-design.md) | Dialects for Redshift, Snowflake, BigQuery, ClickHouse, Spark and Trino, and names of their own for DuckDB, CockroachDB, Firebird and Db2 |
+| [D-0001](D-0001-dialects-not-delivered.md) | Open | 2026-10-06 | [SQL dialects design](../superpowers/specs/2026-10-06-sql-dialects-design.md) | Dialects for Redshift, Snowflake, BigQuery, ClickHouse, Spark and Trino, and names of their own for DuckDB, Firebird and Db2 |
 
 ## Columns
 
