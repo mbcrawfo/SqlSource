@@ -17,7 +17,13 @@ public partial class BuildFileTests
     private const string Prefix = "SqlSource";
 
     // The properties of the SDK that the files read.  Every other property in them belongs to the package.
-    private static readonly string[] SdkProperties = ["DefaultItemExcludes", "DefaultExcludesInProjectFolder"];
+    private static readonly string[] SdkProperties =
+    [
+        "DefaultItemExcludes",
+        "DefaultExcludesInProjectFolder",
+        "IntermediateOutputPath",
+        "MSBuildProjectFile",
+    ];
 
     private static readonly XDocument Props = Load("SqlSource.props");
 
@@ -121,6 +127,26 @@ public partial class BuildFileTests
         item.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("@(AdditionalFiles)");
         item.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe("'%(AdditionalFiles.SqlSourceDialect)' != ''");
         target.Attribute("DependsOnTargets").ShouldNotBeNull().Value.ShouldBe("SqlSourceTrimDialectOfFiles");
+    }
+
+    // A file that is removed has no timestamp left to compare, so the build after it compiles again only when an
+    // input of the compiler changed.  The list of AdditionalFiles is not among the inputs the SDK keeps.  The package
+    // writes a hash of the list to a file and names the file as an input, and it writes the file only when the hash
+    // changed, or every build would compile.  tools/check-package-install.sh removes a file and shows this at work.
+    [Fact]
+    public void Targets_ListOfAdditionalFiles_IsAnInputOfTheCompiler()
+    {
+        var hash = Targets.Descendants("Hash").ShouldHaveSingleItem();
+        var target = hash.Parent.ShouldNotBeNull();
+        var write = target.Elements("WriteLinesToFile").ShouldHaveSingleItem();
+        var input = target.Descendants("CustomAdditionalCompileInputs").ShouldHaveSingleItem();
+
+        hash.Attribute("ItemsToHash").ShouldNotBeNull().Value.ShouldBe("@(AdditionalFiles)");
+        var property = hash.Elements("Output").ShouldHaveSingleItem().Attribute("PropertyName").ShouldNotBeNull().Value;
+        write.Attribute("Lines").ShouldNotBeNull().Value.ShouldBe($"$({property})");
+        write.Attribute("WriteOnlyWhenDifferent").ShouldNotBeNull().Value.ShouldBe("true");
+        write.Attribute("Overwrite").ShouldNotBeNull().Value.ShouldBe("true");
+        input.Attribute("Include").ShouldNotBeNull().Value.ShouldBe(write.Attribute("File").ShouldNotBeNull().Value);
     }
 
     // MSBuild puts metadata into an expression as text, before it reads the expression.  A value with a quote in it

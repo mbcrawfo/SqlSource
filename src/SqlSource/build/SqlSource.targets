@@ -63,4 +63,28 @@
             />
         </ItemGroup>
     </Target>
+    <!--
+        Makes the build after a .sql file is deleted, renamed or moved compile again.  A file that is gone has no
+        timestamp to compare, and the SDK's own record of what the compiler was given does not hold AdditionalFiles.
+        CustomAdditionalCompileInputs is the item the SDK reads for more inputs of the compiler.  The file holds a hash
+        of the list and is written only when the hash changes, so a build with the same files does not compile for it.
+    -->
+    <Target Name="SqlSourceTrackAdditionalFiles" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
+        <PropertyGroup>
+            <SqlSourceFilesCache>$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.cache</SqlSourceFilesCache>
+        </PropertyGroup>
+        <Hash ItemsToHash="@(AdditionalFiles)">
+            <Output TaskParameter="HashResult" PropertyName="SqlSourceFilesHash" />
+        </Hash>
+        <WriteLinesToFile
+            File="$(SqlSourceFilesCache)"
+            Lines="$(SqlSourceFilesHash)"
+            Overwrite="true"
+            WriteOnlyWhenDifferent="true"
+        />
+        <ItemGroup>
+            <CustomAdditionalCompileInputs Include="$(SqlSourceFilesCache)" />
+            <FileWrites Include="$(SqlSourceFilesCache)" />
+        </ItemGroup>
+    </Target>
 </Project>
