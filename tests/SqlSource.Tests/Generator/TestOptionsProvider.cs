@@ -32,7 +32,7 @@ internal sealed class TestOptionsProvider(
     public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) =>
         fileDialects is not null && fileDialects.TryGetValue(textFile.Path, out var value)
             ? new Options(
-                new Dictionary<string, string?> { ["build_metadata.AdditionalFiles.SqlSourceDialect"] = value }
+                new Dictionary<string, string?> { ["build_metadata.SqlSourceDialectFile.SqlSourceDialect"] = value }
             )
             : None;
 

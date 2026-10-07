@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0016`
+Next id: `TD-0017`
 
 ## Active items
 
@@ -15,7 +15,7 @@ Next id: `TD-0016`
 | [TD-0009](TD-0009-removed-sql-file-does-not-trigger-a-rebuild.md) | Open | 2026-10-06 | Medium | Deleting or renaming a `.sql` file does not trigger an incremental rebuild, so the old members stay until a full build |
 | [TD-0012](TD-0012-token-method-shapes-are-compiled-but-not-run.md) | Open | 2026-10-06 | Low | A token-only query and one with more than seven tokens are compiled in tests and never run, and awkward token names are compiled as C# 12 only |
 | [TD-0013](TD-0013-sql-edit-reads-every-attributed-type-again.md) | Open | 2026-10-06 | Low | An edit to a `.sql` file makes the compiler read every attributed type again, because the attribute is added in a post-initialization step |
-| [TD-0014](TD-0014-every-sql-file-gets-a-section-in-the-compiler-configuration.md) | Open | 2026-10-06 | Low | Every `.sql` file of a project, used or not, adds a section to the configuration file the SDK writes for the compiler |
+| [TD-0016](TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) | Open | 2026-10-06 | Low | A `.sql` file that a target adds loses its dialect metadata when the target hooks `GenerateMSBuildEditorConfigFileCore` and is declared after the package's targets |
 
 ## Columns
 

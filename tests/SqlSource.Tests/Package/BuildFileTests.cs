@@ -37,12 +37,16 @@ public partial class BuildFileTests
         items.SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
+    // The SDK writes a section into the file the compiler reads for every item of the type that is named here,
+    // whether the item has the metadata or not.  AdditionalFiles would be every .sql file of the project.
+    // SqlSourceDialectFile holds only the files that have a dialect: see
+    // Targets_FilesWithADialect_AreTheItemsWhoseMetadataTheCompilerReads.
     [Fact]
     public void Props_DialectMetadataOfASqlFile_ReachesTheCompilerInEveryProject()
     {
         var item = Props.Descendants("CompilerVisibleItemMetadata").ShouldHaveSingleItem();
 
-        item.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("AdditionalFiles");
+        item.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("SqlSourceDialectFile");
         item.Attribute("MetadataName").ShouldNotBeNull().Value.ShouldBe("SqlSourceDialect");
         ConditionsAround(item).ShouldBeEmpty();
     }
@@ -51,9 +55,10 @@ public partial class BuildFileTests
     // line of its own would arrive empty, so the package trims each one.  GenerateMSBuildEditorConfigFileCore is the
     // target of the SDK that writes the file.  A trim that runs before it sees a value wherever it was set, in
     // Directory.Build.targets or by another target, and runs in every build that writes the file, a design-time
-    // build too.  A trim outside a target would see only what is set before NuGet imports the file.
+    // build too.  A trim outside a target would see only what is set before NuGet imports the file.  The target that
+    // collects the files with a dialect runs there for the same reasons.
     [Fact]
-    public void Targets_EveryTrim_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
+    public void Targets_EveryTarget_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
     {
         var root = Targets.Root.ShouldNotBeNull();
 
@@ -101,6 +106,21 @@ public partial class BuildFileTests
             .Value.ShouldBe("'$(SqlSourceDialectAsWritten)' != ''");
         item.Elements().ShouldHaveSingleItem().Name.LocalName.ShouldBe("SqlSourceDialect");
         item.Elements().ShouldHaveSingleItem().Value.ShouldBe("$(SqlSourceDialectAsWritten.Trim())");
+    }
+
+    // The compiler reads the metadata from the items of SqlSourceDialectFile, and the files without a dialect are
+    // not among them.  The collecting has to come after the trim: the values it copies are trimmed by then, and a
+    // file whose value was only white space is left out.  MSBuild does not promise an order for two targets that hook
+    // the same one, so the target says what it depends on.
+    [Fact]
+    public void Targets_FilesWithADialect_AreTheItemsWhoseMetadataTheCompilerReads()
+    {
+        var item = Targets.Descendants("SqlSourceDialectFile").ShouldHaveSingleItem();
+        var target = item.Ancestors("Target").ShouldHaveSingleItem();
+
+        item.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("@(AdditionalFiles)");
+        item.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe("'%(AdditionalFiles.SqlSourceDialect)' != ''");
+        target.Attribute("DependsOnTargets").ShouldNotBeNull().Value.ShouldBe("SqlSourceTrimDialectOfFiles");
     }
 
     // MSBuild puts metadata into an expression as text, before it reads the expression.  A value with a quote in it

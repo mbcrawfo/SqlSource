@@ -17,10 +17,16 @@
         false.  SqlSourceDialect names the database whose rules the .sql files are read by: as a property for the
         project, and as metadata of an AdditionalFiles item for one file or for the files of a glob.  None of this is
         under the condition above: a project that lists its own .sql files still needs it.
+
+        The metadata is listed for SqlSourceDialectFile and not for AdditionalFiles.  The SDK writes a section for
+        every item of the type that is listed, into the file the compiler reads, whether the item has the metadata or
+        not: for AdditionalFiles that is every .sql file of the project.  A target in SqlSource.targets puts the
+        AdditionalFiles items that have a dialect into SqlSourceDialectFile.  The compiler finds the metadata of a file
+        by its path, so the generator still reads it for the file.
     -->
     <ItemGroup>
         <CompilerVisibleProperty Include="SqlSourceTokenValidation" />
         <CompilerVisibleProperty Include="SqlSourceDialect" />
-        <CompilerVisibleItemMetadata Include="AdditionalFiles" MetadataName="SqlSourceDialect" />
+        <CompilerVisibleItemMetadata Include="SqlSourceDialectFile" MetadataName="SqlSourceDialect" />
     </ItemGroup>
 </Project>
