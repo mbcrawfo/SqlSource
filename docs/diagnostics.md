@@ -263,6 +263,8 @@ SELECT 1;
 
 Rename the query, for example to `GetUser`.
 
+The name ends at `->`, when the marker has one.
+
 ## SQLSRC104
 
 **Query name is used twice**
@@ -356,6 +358,7 @@ Add a generator parameter, or delete the line.
 A generator parameter has a value it does not take; a `-- dialect:` marker does not name a dialect; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
 
 - No generator parameter takes a value.
+- What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
 - `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
 
 ```sql

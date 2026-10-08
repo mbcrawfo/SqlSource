@@ -3,6 +3,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.Parsing;
@@ -1159,6 +1160,52 @@ public class SqlFileParserTests
                 ),
             ]);
     }
+
+    [Theory]
+    [InlineData("-- name: A", "A", null)]
+    [InlineData("-- name: A -> many", "A", "Many")]
+    [InlineData("-- name: A->one", "A", "One")]
+    [InlineData("-- name: A  ->  One-Optional  ", "A", "OneOptional")]
+    [InlineData("-- name: A -> rowcount", "A", "RowCount")]
+    [InlineData("-- name: A -> none", "A", "None")]
+    public void Parse_NameMarker_ReadsTheNameAndTheShape(string marker, string name, string? shape)
+    {
+        var text = marker + "\nSELECT 1\n";
+
+        var block = Blocks(text).ShouldHaveSingleItem();
+
+        block.Name.ShouldBe(name);
+        block.NameSpan.ShouldBe(SpanOf(text, name));
+        block.Shape.ShouldBe(shape is null ? null : Enum.Parse<ResultShape>(shape));
+    }
+
+    [Theory]
+    [InlineData("A ->", "->")]
+    [InlineData("A -> several", "-> several")]
+    [InlineData("A -> one -> many", "-> one -> many")]
+    [InlineData("A -> one, many", "-> one, many")]
+    public void Parse_NameMarkerWithAShapeThatIsNotOne_IsInvalidAtWhatFollowsTheName(string value, string at)
+    {
+        var text = "-- name: " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, at), "name: " + value)]);
+    }
+
+    [Fact]
+    public void Parse_NameMarkerWithAShapeAndNoName_IsAnInvalidName()
+    {
+        const string Text = "-- name: -> one\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidName, SpanOf(Text, "-- name: -> one"), string.Empty),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_FileWithoutNameMarker_HasNoShape() =>
+        Blocks("SELECT 1\n").ShouldHaveSingleItem().Shape.ShouldBeNull();
 
     private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialectChoice dialect = default)
     {

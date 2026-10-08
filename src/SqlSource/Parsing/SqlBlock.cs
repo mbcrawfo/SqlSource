@@ -1,4 +1,5 @@
 using Microsoft.CodeAnalysis.Text;
+using SqlSource.Settings;
 
 namespace SqlSource.Parsing;
 
@@ -10,6 +11,9 @@ namespace SqlSource.Parsing;
 /// Where the name is in the file.  An empty span at the start of the file when the name comes from the file name.
 /// </param>
 /// <param name="Summary">The text of the block's <c>-- summary:</c> markers, or null when it has none.</param>
+/// <param name="Shape">
+/// The shape the name marker gives, or null when it gives none.  It has no effect yet.
+/// </param>
 /// <param name="KeepComments">Whether comments were kept in the SQL.</param>
 /// <param name="TokenValidation">
 /// True or false when a validation generator parameter applies to the block, null when none does.
@@ -23,6 +27,7 @@ internal sealed record SqlBlock(
     string Name,
     TextSpan NameSpan,
     string? Summary,
+    ResultShape? Shape,
     bool KeepComments,
     bool? TokenValidation,
     EquatableArray<SqlSegment> Segments,

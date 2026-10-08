@@ -503,6 +503,7 @@ public class TypeEmitterTests
             name,
             NameLocation(file),
             summary,
+            null,
             TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, sql)),
             EquatableArray<SqlToken>.Empty,
             null,
@@ -514,6 +515,7 @@ public class TypeEmitterTests
         new(
             name,
             NameLocation(file),
+            null,
             null,
             TestModels.Array(
                 new SqlSegment(SqlSegmentKind.Literal, "SELECT * FROM "),

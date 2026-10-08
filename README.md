@@ -84,6 +84,8 @@ A line comment that starts its line and has the form `-- word: rest`, where the 
 
 A line comment that starts its line and has the form `-- name: GetUser` begins a query.  The query runs to the next `-- name:` line or to the end of the file, and its name becomes the member's name, so it must be a C# identifier.
 
+A name can be followed by `->` and a shape: `-- name: GetUser -> one-optional`.  The shapes are `many`, `one`, `one-optional`, `none` and `rowcount`.  A shape says what the method that a later release generates for the query returns; it is checked now and has no effect yet.
+
 A file with no `-- name:` line is one query, named after the file: `CountUsers.sql` becomes `CountUsers`.
 
 Before the first `-- name:` line a file may hold comments, such as a licence header, `-- generator:` lines that apply to every query in the file, and a `-- dialect:` marker (see Dialects, below).

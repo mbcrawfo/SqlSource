@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.Parsing;
@@ -31,11 +32,17 @@ public class SqlModelTests
     [Fact]
     public void SqlBlock_SameValuesInSeparateInstances_AreEqual()
     {
-        static SqlBlock Create(string sql, string parameter = "id", string? tokenDefault = null) =>
+        static SqlBlock Create(
+            string sql,
+            string parameter = "id",
+            string? tokenDefault = null,
+            ResultShape? shape = null
+        ) =>
             new(
                 "GetUser",
                 new TextSpan(9, 7),
                 "Loads a user.",
+                shape,
                 KeepComments: false,
                 TokenValidation: null,
                 new EquatableArray<SqlSegment>([
@@ -50,5 +57,6 @@ public class SqlModelTests
         Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 2 FROM "));
         Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", parameter: "other"));
         Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", tokenDefault: "users"));
+        Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", shape: ResultShape.One));
     }
 }

@@ -52,6 +52,7 @@ internal static class SqlFileReader
                     block.Name,
                     LocationInfo.From(file.Path, text, block.NameSpan),
                     block.Summary,
+                    block.Shape,
                     block.Segments,
                     block.Tokens,
                     block.TokenValidation,

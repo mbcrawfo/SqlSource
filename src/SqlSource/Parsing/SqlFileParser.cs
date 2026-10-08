@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis.Text;
+using SqlSource.Settings;
 
 namespace SqlSource.Parsing;
 
@@ -101,7 +103,7 @@ internal static class SqlFileParser
                 AddError(SqlParseErrorKind.InvalidFileName, FileStart, fileName);
             }
 
-            ReadBlock(name, FileStart, null, 0, lexemes.Count);
+            ReadBlock(name, FileStart, null, null, 0, lexemes.Count);
         }
 
         private void ReadNamedBlocks(List<(int Index, SqlMarker Marker)> nameMarkers)
@@ -111,8 +113,9 @@ internal static class SqlFileParser
             {
                 var (index, marker) = nameMarkers[position];
                 var end = position + 1 < nameMarkers.Count ? nameMarkers[position + 1].Index : lexemes.Count;
-                var name = text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length);
-                var nameSpan = name.Length == 0 ? marker.Span : marker.ValueSpan;
+                var (written, shape) = ReadName(marker);
+                var name = text.Substring(written.Start, written.Length);
+                var nameSpan = name.Length == 0 ? marker.Span : written;
                 if (!SqlIdentifier.IsUsableName(name))
                 {
                     AddError(SqlParseErrorKind.InvalidName, nameSpan, name);
@@ -123,8 +126,41 @@ internal static class SqlFileParser
                 }
 
                 // A marker with an unusable name still starts a block, so that what follows is checked as a block.
-                ReadBlock(name, nameSpan, preamble, index + 1, end);
+                ReadBlock(name, nameSpan, shape, preamble, index + 1, end);
             }
+        }
+
+        // "Name", or "Name -> shape".  What follows the name is reported whole when it is not an arrow and a shape.
+        private (TextSpan Name, ResultShape? Shape) ReadName(SqlMarker marker)
+        {
+            var value = marker.ValueSpan;
+            var arrow = text.IndexOf("->", value.Start, value.Length, StringComparison.Ordinal);
+            if (arrow < 0)
+            {
+                return (value, null);
+            }
+
+            var nameEnd = arrow;
+            while (nameEnd > value.Start && char.IsWhiteSpace(text[nameEnd - 1]))
+            {
+                nameEnd--;
+            }
+
+            ResultShape? shape = null;
+            if (SettingValue.TryReadChoice<ResultShape>(text.AsSpan(arrow + 2, value.End - arrow - 2), out var read))
+            {
+                shape = read;
+            }
+            else
+            {
+                AddError(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    TextSpan.FromBounds(arrow, value.End),
+                    SqlMarkerReader.Describe(text, marker)
+                );
+            }
+
+            return (TextSpan.FromBounds(value.Start, nameEnd), shape);
         }
 
         private SqlMarkerScope ReadPreamble(int end)
@@ -160,7 +196,14 @@ internal static class SqlFileParser
         }
 
         // preamble is null for a file with no name marker: the file is one query and its own preamble.
-        private void ReadBlock(string name, TextSpan nameSpan, SqlMarkerScope? preamble, int start, int end)
+        private void ReadBlock(
+            string name,
+            TextSpan nameSpan,
+            ResultShape? shape,
+            SqlMarkerScope? preamble,
+            int start,
+            int end
+        )
         {
             // Created at the first marker the scope takes: most queries have none.
             SqlMarkerScope? scope = null;
@@ -239,6 +282,7 @@ internal static class SqlFileParser
                     name,
                     nameSpan,
                     summary.Count == 0 ? null : string.Join(" ", summary),
+                    shape,
                     keepComments,
                     own?.TokenValidation ?? inherited?.TokenValidation,
                     scanned.Segments,
