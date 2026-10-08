@@ -331,7 +331,7 @@ Move the marker below the `-- name:` marker of the query it describes, or delete
 
 **Generator parameter is not known**
 
-A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation`, `no-token-validation` and `token-ignore=name`.
+A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation` and `no-token-validation`.  `token-ignore` was a generator parameter and is a marker now: `-- token-ignore: name`, inside the query.
 
 ```sql
 -- generator: keep-comment
@@ -351,18 +351,18 @@ Add a generator parameter, or delete the line.
 
 **Marker value is not valid**
 
-A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid; or a `-- dialect:` marker does not name a dialect.
+A generator parameter has a value it does not take; a `-- dialect:` marker does not name a dialect; or a `-- token:` or `-- token-ignore:` marker does not hold what it needs.
 
-- `token-ignore` needs a value that is a C# identifier, as in `token-ignore=table`.
-- No other generator parameter takes a value.
+- No generator parameter takes a value.
 - `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
 
 ```sql
--- generator: token-ignore
 -- generator: keep-comments=true
 -- dialect: pgsql
 -- dialect: mysql keep-comments
 ```
+
+A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
 A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else; and a quote or a block comment inside the default must close there.
 
@@ -405,7 +405,7 @@ SELECT * FROM {{class}};
 
 The same holds for the name in a `-- token:` marker.
 
-Rename the token.  If the braces are literal text and not a token, add `-- generator: token-ignore=class` to the query.
+Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
 
 ## SQLSRC115
 

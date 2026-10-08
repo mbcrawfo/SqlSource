@@ -53,7 +53,7 @@ public class SqlFileParserAllocationTests
     {
         var file = new StringBuilder("-- Copyright (c) Example\n")
             .Append(hasDialect ? "-- dialect: postgres\n" : string.Empty)
-            .Append("-- generator: token-ignore=raw\n\n");
+            .Append('\n');
         for (var query = 0; query < Queries; query++)
         {
             var number = query.ToString(CultureInfo.InvariantCulture);

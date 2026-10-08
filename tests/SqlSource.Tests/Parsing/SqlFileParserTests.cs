@@ -97,21 +97,12 @@ public class SqlFileParserTests
     [Fact]
     public void Parse_PreambleGeneratorParameters_ApplyToEveryBlock()
     {
-        const string Text =
-            "-- generator: no-token-validation token-ignore=x\n"
-            + "-- name: A\nSELECT {{x}}\n"
-            + "-- name: B\nSELECT {{x}} {{y}}\n";
+        const string Text = "-- generator: no-token-validation\n" + "-- name: A\nSELECT 1\n" + "-- name: B\nSELECT 2\n";
 
         var blocks = Blocks(Text);
 
         blocks[0].TokenValidation.ShouldBe(false);
         blocks[1].TokenValidation.ShouldBe(false);
-        blocks[0].Segments.ShouldBe([new SqlSegment(SqlSegmentKind.Literal, "SELECT {{x}}")]);
-        blocks[1]
-            .Segments.ShouldBe([
-                new SqlSegment(SqlSegmentKind.Literal, "SELECT {{x}} "),
-                new SqlSegment(SqlSegmentKind.Token, "y"),
-            ]);
     }
 
     [Fact]
@@ -129,24 +120,10 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_BlockTokenIgnore_AddsToThePreamble()
-    {
-        const string Text =
-            "-- generator: token-ignore=x\n-- name: A\n-- generator: token-ignore=y\nSELECT {{x}} {{y}} {{z}}\n";
-
-        Blocks(Text)
-            .ShouldHaveSingleItem()
-            .Segments.ShouldBe([
-                new SqlSegment(SqlSegmentKind.Literal, "SELECT {{x}} {{y}} "),
-                new SqlSegment(SqlSegmentKind.Token, "z"),
-            ]);
-    }
-
-    [Fact]
     public void Parse_BlockGeneratorParameter_DoesNotLeakIntoTheNextBlock()
     {
         const string Text =
-            "-- name: A\n-- generator: keep-comments token-validation token-ignore=x\nSELECT 1 -- c\n"
+            "-- name: A\n-- generator: keep-comments token-validation\n-- token-ignore: x\nSELECT {{x}} -- c\n"
             + "-- name: B\nSELECT {{x}} -- c\n";
 
         var blocks = Blocks(Text);
@@ -238,10 +215,7 @@ public class SqlFileParserTests
 
     [Theory]
     [InlineData("-- name: A\nSELECT 1\n\n-- summary: Loads B.\n-- name: B\nSELECT 2", "-- summary: Loads B.")]
-    [InlineData(
-        "-- name: A\nSELECT 1\n  -- generator: token-ignore=x\n-- name: B\nSELECT 2",
-        "-- generator: token-ignore=x"
-    )]
+    [InlineData("-- name: A\nSELECT 1\n  -- token-ignore: x\n-- name: B\nSELECT 2", "-- token-ignore: x")]
     [InlineData("-- name: A\nSELECT 1\n-- summary: last", "-- summary: last")]
     [InlineData("SELECT 1\n-- generator: keep-comments\n", "-- generator: keep-comments")]
     [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- a comment\n/* another */\n", "-- summary: s")]
@@ -356,7 +330,7 @@ public class SqlFileParserTests
     [Fact]
     public void Parse_ReservedKeywordTokenThatIsIgnored_IsLiteral()
     {
-        const string Text = "-- name: A\n-- generator: token-ignore=class\nSELECT {{class}}";
+        const string Text = "-- name: A\n-- token-ignore: class\nSELECT {{class}}";
 
         Sql(Blocks(Text).ShouldHaveSingleItem()).ShouldBe("SELECT {{class}}");
     }
@@ -377,7 +351,7 @@ public class SqlFileParserTests
     [Theory]
     [InlineData("-- generator: keep-comment", nameof(SqlParseErrorKind.UnknownGeneratorParameter), "keep-comment")]
     [InlineData("-- generator:", nameof(SqlParseErrorKind.EmptyGeneratorLine), "-- generator:")]
-    [InlineData("-- generator: token-ignore=", nameof(SqlParseErrorKind.InvalidMarkerValue), "token-ignore=")]
+    [InlineData("-- generator: keep-comments=", nameof(SqlParseErrorKind.InvalidMarkerValue), "keep-comments=")]
     [InlineData(
         "-- generator: token-validation no-token-validation",
         nameof(SqlParseErrorKind.ConflictingSettings),
@@ -900,10 +874,90 @@ public class SqlFileParserTests
 
     [Fact]
     public void Parse_ParameterInsideAnIgnoredToken_IsAParameterOfTheSql() =>
-        Blocks("-- name: Q\n-- generator: token-ignore=f\nSELECT {{f:@b}}\n")
+        Blocks("-- name: Q\n-- token-ignore: f\nSELECT {{f:@b}}\n")
             .ShouldHaveSingleItem()
             .Parameters.Select(static parameter => parameter.Name)
             .ShouldBe(["b"]);
+
+    [Fact]
+    public void Parse_TokenIgnoreMarkers_KeepEachNamedTokenAsText()
+    {
+        const string Text =
+            "-- name: Q\n-- token-ignore: a\n-- TOKEN-IGNORE: b\nSELECT '{{a}}', '{{b:x}}', {{c}}\n"
+            + "-- name: R\nSELECT {{a}}\n";
+
+        var blocks = Blocks(Text);
+
+        Sql(blocks[0]).ShouldBe("SELECT '{{a}}', '{{b:x}}', {{c}}");
+        Tokens(blocks[0]).ShouldBe(["c=<none>"]);
+        // One query's marker does not reach the next.
+        Tokens(blocks[1]).ShouldBe(["a=<none>"]);
+    }
+
+    [Theory]
+    [InlineData("a b")]
+    [InlineData("a-b")]
+    [InlineData("{{a}}")]
+    [InlineData("1a")]
+    public void Parse_TokenIgnoreMarkerThatIsNotOneName_IsInvalid(string value)
+    {
+        var text = "-- name: Q\n-- token-ignore: " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(text, value),
+                    "token-ignore: " + value
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenIgnoreMarkerWithoutAName_IsInvalidAtTheMarker()
+    {
+        const string Text = "-- name: Q\n-- token-ignore:\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(Text, "-- token-ignore:"),
+                    "token-ignore:"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenIgnoreMarkerInThePreamble_IsNotAllowedThere()
+    {
+        const string Text = "-- token-ignore: a\n-- name: Q\nSELECT {{a}}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.MarkerNotAllowedHere,
+                    SpanOf(Text, "-- token-ignore: a"),
+                    "token-ignore",
+                    "inside a query"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenIgnoreAsAGeneratorParameter_IsNotKnown()
+    {
+        const string Text = "-- name: Q\n-- generator: token-ignore=a\nSELECT {{a}}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.UnknownGeneratorParameter,
+                    SpanOf(Text, "token-ignore=a"),
+                    "token-ignore=a"
+                ),
+            ]);
+    }
 
     private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialectChoice dialect = default)
     {

@@ -145,7 +145,7 @@ public class SqlTextBuilderTests
     {
         const string Text =
             "  -- lead\r\n\r\n-- summary: s\r\nSELECT 'a  \r\n\r\n b', /* c */ x   \r\n"
-            + "\t-- generator: token-ignore=q\r\n"
+            + "\t-- token-ignore: q\r\n"
             + "\r\n  /*+ h\r\n  i */ FROM t -- d  \r\n   \r\nWHERE {{y}} = $$ z\n $$  \r\n";
         var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
 

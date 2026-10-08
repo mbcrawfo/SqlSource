@@ -17,13 +17,21 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
 
     private const string BeforeTheFirstQuery = "before the file's first query";
 
+    /// <summary>The names of a scope that has none.  Shared, and never changed.</summary>
+    public static readonly ISet<string> NoNames = new HashSet<string>();
+
     private List<SqlTokenDefault>? _tokenDefaults;
+
+    private HashSet<string>? _ignoredTokens;
 
     /// <summary>The scope's generator parameters.</summary>
     public SqlGeneratorParameterScope Generator { get; } = new();
 
     /// <summary>The defaults the scope's <c>-- token:</c> markers give, in marker order, each name once.</summary>
     public IReadOnlyList<SqlTokenDefault> TokenDefaults => _tokenDefaults ?? (IReadOnlyList<SqlTokenDefault>)[];
+
+    /// <summary>The names the scope's <c>-- token-ignore:</c> markers give, as written.</summary>
+    public ISet<string> IgnoredTokens => _ignoredTokens ?? NoNames;
 
     /// <summary>
     /// Reads one marker.  <paramref name="inQuery" /> and <paramref name="inPreamble" /> say what the scope is; both
@@ -53,10 +61,14 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
         {
             ReadToken(marker);
         }
+        else if (marker.Kind == SqlMarkerKind.TokenIgnore)
+        {
+            ReadTokenIgnore(marker);
+        }
     }
 
     private static bool IsAllowedInQuery(SqlMarkerKind kind) =>
-        kind is SqlMarkerKind.GeneratorParameters or SqlMarkerKind.Token;
+        kind is SqlMarkerKind.GeneratorParameters or SqlMarkerKind.Token or SqlMarkerKind.TokenIgnore;
 
     private static bool IsAllowedInPreamble(SqlMarkerKind kind) => kind is SqlMarkerKind.GeneratorParameters;
 
@@ -105,6 +117,20 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
         }
 
         _tokenDefaults.Add(new SqlTokenDefault(name, defaultText, marker.ValueSpan.Start + place.Start, marker));
+    }
+
+    // The value is one name, as a C# identifier is written.  A keyword is allowed: it is a token that is not one.
+    private void ReadTokenIgnore(SqlMarker marker)
+    {
+        var name = text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length);
+        if (!SqlIdentifier.IsValid(name))
+        {
+            AddInvalid(marker);
+            return;
+        }
+
+        _ignoredTokens ??= [];
+        _ = _ignoredTokens.Add(name);
     }
 
     // At the value, or at the whole marker when it has none.

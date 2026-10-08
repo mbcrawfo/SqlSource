@@ -143,7 +143,7 @@ public class SqlFileReaderTests
     [Fact]
     public void Read_IgnoredToken_IsLiteralTextOfAConstant()
     {
-        var file = Read("-- generator: token-ignore=raw\nSELECT '{{raw}}';\n");
+        var file = Read("-- token-ignore: raw\nSELECT '{{raw}}';\n");
 
         file.Queries.ShouldHaveSingleItem().Segments.ShouldBe([Literal("SELECT '{{raw}}';")]);
     }

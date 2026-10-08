@@ -19,4 +19,7 @@ internal enum SqlMarkerKind
 
     /// <summary><c>-- token:</c> gives a token of its query a default.</summary>
     Token,
+
+    /// <summary><c>-- token-ignore:</c> names a token of its query that stays literal text.</summary>
+    TokenIgnore,
 }

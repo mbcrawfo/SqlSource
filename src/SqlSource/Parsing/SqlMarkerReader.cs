@@ -15,6 +15,7 @@ internal static class SqlMarkerReader
         ("generator:", SqlMarkerKind.GeneratorParameters),
         ("dialect:", SqlMarkerKind.Dialect),
         ("token:", SqlMarkerKind.Token),
+        ("token-ignore:", SqlMarkerKind.TokenIgnore),
     ];
 
     /// <summary>

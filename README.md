@@ -94,7 +94,7 @@ A `-- summary:` line inside a query becomes the documentation of its member.  Se
 
 ### What reaches the generated SQL
 
-- Every marker line is removed: `-- name:`, `-- summary:`, `-- generator:`, `-- dialect:` and `-- token:`.
+- Every marker line is removed: `-- name:`, `-- summary:`, `-- generator:`, `-- dialect:`, `-- token:` and `-- token-ignore:`.
 - Comments are removed: a line comment is deleted and a block comment becomes one space.  Lines left blank are removed.
 - Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.  So are MariaDB's `/*M! ... */` and Oracle's `--+ ...` when the dialect is theirs.
 - Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect (see Dialects, below).
@@ -107,7 +107,6 @@ A `-- generator:` line holds one or more generator parameters, separated by spac
 | Parameter | Effect |
 |----|----|
 | `keep-comments` | Comments and blank lines stay in the SQL |
-| `token-ignore=name` | `{{name}}` is literal text, not a token |
 | `token-validation`, `no-token-validation` | The query's method checks its arguments, or does not, whatever the project says (see Tokens, below) |
 
 ```sql
@@ -262,7 +261,7 @@ var sql = Sql.ListFrom("users", "name DESC");
 - A name that is used more than once is one parameter, and every occurrence is replaced.
 - A token is replaced wherever it is written, including inside a string or a quoted identifier.
 - Braces around anything that is not a name, or a name and a default, such as `{{table-name}}`, `{{1st}}` or `{{order by}}`, are not a token.  The text stays in the SQL as written, and nothing is reported.
-- Text that has the form of a token and is not meant as one stays in the SQL when a `token-ignore=name` generator parameter lists its name.
+- Text that has the form of a token and is not meant as one stays in the SQL when a `-- token-ignore: name` marker inside the query lists its name.  One name for each marker; a query can have several.
 - After its first call, the method allocates the string it returns and nothing else.
 - A query that gains its first token changes from a constant to a method, so the code that uses it stops compiling until it passes the argument.
 
@@ -282,7 +281,7 @@ A default is a sample of what the caller will pass.  It changes nothing that is 
 
 - A `-- token:` marker inside a query gives the default for a token that the query writes several times, or whose sample is long.  Its value is exactly what the SQL would hold: one token with its default.
 - Two defaults for one token of a query must be the same.  Two that differ are the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112).
-- `{{a:b}}` in SQL that does not mean a token, the text of a template for example, is kept as written by a `token-ignore=a` generator parameter.
+- `{{a:b}}` in SQL that does not mean a token, the text of a template for example, is kept as written by a `-- token-ignore: a` marker.
 
 **Tokens are for trusted text only.**  A token is replaced by string concatenation.  Nothing is escaped, quoted or checked for safety, so a value that a user can influence is a SQL injection.  Use a token for a fragment that your own code chooses, such as a table name from a fixed list, and a query parameter for every value.
 

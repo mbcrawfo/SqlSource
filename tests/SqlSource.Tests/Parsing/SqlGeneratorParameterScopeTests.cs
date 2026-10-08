@@ -16,7 +16,6 @@ public class SqlGeneratorParameterScopeTests
 
         scope.KeepComments.ShouldBeFalse();
         scope.TokenValidation.ShouldBeNull();
-        scope.IgnoredTokens.ShouldBeEmpty();
     }
 
     [Fact]
@@ -43,59 +42,43 @@ public class SqlGeneratorParameterScopeTests
     [Fact]
     public void Read_GeneratorParameterNames_AreCaseInsensitive()
     {
-        var (scope, errors) = Read("-- generator: KEEP-COMMENTS No-Token-Validation Token-Ignore=a");
+        var (scope, errors) = Read("-- generator: KEEP-COMMENTS No-Token-Validation");
 
         errors.ShouldBeEmpty();
         scope.KeepComments.ShouldBeTrue();
         scope.TokenValidation.ShouldBe(false);
-        scope.IgnoredTokens.ShouldBe(["a"]);
     }
 
     [Fact]
     public void Read_SeveralGeneratorParametersOnOneLine_AppliesEach()
     {
-        var (scope, errors) = Read("-- generator: keep-comments   token-ignore=a\ttoken-ignore=b");
+        var (scope, errors) = Read("-- generator: keep-comments\ttoken-validation");
 
         errors.ShouldBeEmpty();
         scope.KeepComments.ShouldBeTrue();
-        scope.IgnoredTokens.ShouldBe(["a", "b"], ignoreOrder: true);
+        scope.TokenValidation.ShouldBe(true);
     }
 
     [Fact]
     public void Read_SeveralMarkers_Accumulate()
     {
-        var (scope, errors) = Read(
-            "-- generator: keep-comments",
-            "-- generator: token-validation",
-            "-- generator: token-ignore=a"
-        );
+        var (scope, errors) = Read("-- generator: keep-comments", "-- generator: token-validation");
 
         errors.ShouldBeEmpty();
         scope.KeepComments.ShouldBeTrue();
         scope.TokenValidation.ShouldBe(true);
-        scope.IgnoredTokens.ShouldBe(["a"]);
     }
 
     [Fact]
     public void Read_RepeatedGeneratorParameter_IsAllowed()
     {
         var (scope, errors) = Read(
-            "-- generator: keep-comments keep-comments token-validation token-ignore=a",
-            "-- generator: token-validation token-ignore=a"
+            "-- generator: keep-comments keep-comments token-validation",
+            "-- generator: token-validation"
         );
 
         errors.ShouldBeEmpty();
         scope.TokenValidation.ShouldBe(true);
-        scope.IgnoredTokens.ShouldBe(["a"]);
-    }
-
-    [Fact]
-    public void Read_TokenIgnore_KeepsTheNameAsWrittenAndAcceptsAKeyword()
-    {
-        var (scope, errors) = Read("-- generator: token-ignore=Table token-ignore=class");
-
-        errors.ShouldBeEmpty();
-        scope.IgnoredTokens.ShouldBe(["Table", "class"], ignoreOrder: true);
     }
 
     [Theory]
@@ -103,6 +86,8 @@ public class SqlGeneratorParameterScopeTests
     [InlineData("preserve-comments")]
     [InlineData("strip-comments")]
     [InlineData("foo=bar")]
+    // The token-ignore marker was a generator parameter once.
+    [InlineData("token-ignore=a")]
     [InlineData("=x")]
     // The dialect is a marker of its own.  As a generator parameter the word means nothing.
     [InlineData("dialect=mysql")]
@@ -130,11 +115,6 @@ public class SqlGeneratorParameterScopeTests
     }
 
     [Theory]
-    [InlineData("token-ignore")]
-    [InlineData("token-ignore=")]
-    [InlineData("token-ignore=1x")]
-    [InlineData("token-ignore=a=b")]
-    [InlineData("token-ignore=a,b")]
     [InlineData("keep-comments=x")]
     [InlineData("token-validation=true")]
     [InlineData("no-token-validation=")]
@@ -149,7 +129,6 @@ public class SqlGeneratorParameterScopeTests
         ]);
         scope.KeepComments.ShouldBeFalse();
         scope.TokenValidation.ShouldBeNull();
-        scope.IgnoredTokens.ShouldBeEmpty();
     }
 
     [Theory]

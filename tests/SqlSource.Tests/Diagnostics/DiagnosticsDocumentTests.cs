@@ -52,7 +52,7 @@ public class DiagnosticsDocumentTests
     [Fact]
     public void Document_UnknownGeneratorParameterSection_ListsEveryGeneratorParameter()
     {
-        string[] parameters = ["keep-comments", "token-validation", "no-token-validation", "token-ignore=name"];
+        string[] parameters = ["keep-comments", "token-validation", "no-token-validation"];
         var section = string.Join('\n', Sections().Single(section => section.Id == "SQLSRC109").Body);
 
         foreach (var parameter in parameters)

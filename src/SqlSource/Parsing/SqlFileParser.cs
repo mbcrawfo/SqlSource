@@ -42,9 +42,6 @@ internal static class SqlFileParser
     {
         private static readonly TextSpan FileStart = new(0, 0);
 
-        // Shared and never changed.
-        private static readonly HashSet<string> NoNames = [];
-
         private readonly List<SqlBlock> _blocks = [];
         private readonly List<SqlParseError> _errors = [];
         private readonly HashSet<string> _names = [];
@@ -216,7 +213,7 @@ internal static class SqlFileParser
             var inherited = preamble?.Generator;
             var keepComments = (inherited?.KeepComments ?? false) || (own?.KeepComments ?? false);
             var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments);
-            var scanned = TokenScanner.Scan(sql.Text, IgnoredTokens(own, inherited));
+            var scanned = TokenScanner.Scan(sql.Text, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
             foreach (var error in scanned.Errors)
             {
                 _errors.Add(error with { Span = sql.ToSourceSpan(error.Span) });
@@ -234,30 +231,6 @@ internal static class SqlFileParser
                     SqlParameterList.Create(sql, scanned.Occurrences)
                 )
             );
-        }
-
-        // The names of the two scopes together.  Nothing is allocated unless both have some: the scanner only reads the
-        // set it gets.
-        private static HashSet<string> IgnoredTokens(
-            SqlGeneratorParameterScope? own,
-            SqlGeneratorParameterScope? inherited
-        )
-        {
-            var ownNames = own is { IgnoredTokens.Count: > 0 } ? own.IgnoredTokens : null;
-            var inheritedNames = inherited is { IgnoredTokens.Count: > 0 } ? inherited.IgnoredTokens : null;
-            if (ownNames is null)
-            {
-                return inheritedNames ?? NoNames;
-            }
-
-            if (inheritedNames is null)
-            {
-                return ownNames;
-            }
-
-            var names = new HashSet<string>(ownNames);
-            names.UnionWith(inheritedNames);
-            return names;
         }
 
         // The place is checked first: a marker in the wrong place is reported as that, whatever it names.
