@@ -23,7 +23,7 @@ WHERE id = @id;
 ```
 
 ```csharp
-[SqlQueries]
+[SqlSourceGenerate]
 public partial class UserRepository(IDbConnection connection)
 {
     // Generated beside Sql.GetUser:
@@ -58,6 +58,7 @@ Decided:
 
 | Phase | Status | Spec | Delivers |
 |----|----|----|----|
+| 0. Names | Not started | | `[SqlQueries]` becomes `[SqlSourceGenerate]`, `SqlQueriesMode` becomes `GeneratorTarget` and the `Mode` property becomes `Target`, through the generator, the README, the diagnostics, the tests and the package-install project.  Nothing else changes. |
 | 1. Parameters | Not started | | The lexer finds `@name` parameters by the file's dialect; each query carries its ordered parameter list and the hash of its SQL.  Nothing a user sees changes. |
 | 2. The tool and the snapshot | Not started | | The `SqlSource.Tool` package: the `sqlsource describe` command with `--check` and `--force`, project evaluation through MSBuild, the snapshot format with its shared reader and writer, and the PostgreSQL describer with nullability inference.  Publishing covers the second package. |
 | 3. Models | Not started | | The generator reads snapshots, maps PostgreSQL types to C#, emits the input and output types with documentation, and reports stale, missing and mismatched snapshots.  The PostgreSQL end-to-end project.  The first usable release. |
@@ -65,7 +66,7 @@ Decided:
 | 5. Execution methods | Not started | | A generated method per query that opens a command, binds the parameters, runs it and reads the rows into the output type by ordinal with typed getters, for both engines.  The end-to-end projects execute through them. |
 | 6. Build integration | Not started | | The online mode: an MSBuild target runs the tool before compile when a connection string is in the environment.  A watch mode.  The package-install check runs the tool. |
 
-Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 ships a tool whose output nothing reads yet; its package is published so that phase 3 can be tried against it.  Phase 3 is the first release a user can use, for PostgreSQL with Dapper or their own ADO.NET code.  Phase 4 adds SQL Server.  Phase 5 delivers the third goal.  Phase 6 removes the need to run the tool by hand.
+Each phase has its own spec, plan and pull request.  Phase 0 is a rename and nothing else, kept apart because it touches every file that names the attribute.  Phase 1 changes nothing a user can see.  Phase 2 ships a tool whose output nothing reads yet; its package is published so that phase 3 can be tried against it.  Phase 3 is the first release a user can use, for PostgreSQL with Dapper or their own ADO.NET code.  Phase 4 adds SQL Server.  Phase 5 delivers the third goal.  Phase 6 removes the need to run the tool by hand.
 
 The order puts the parameter lexeme first because every later phase depends on it and it is small; the tool before the generator because the generator's models cannot be tested without a snapshot to read; PostgreSQL before SQL Server because its nullability inference is the hardest single piece and should be proven early; the execution methods after both describers so that their abstraction over the two providers is designed with both in hand; and the build integration last because it is convenience over a working whole.
 
@@ -145,8 +146,8 @@ Recommended: exit code zero on success, one when a query could not be described,
 
 Decided:
 
-- The attribute's `Mode` property is renamed `Target`, and the `SqlQueriesMode` enum with it.  Its values, `Nested` and `Direct`, say where the members go, which is what a target is.  Nothing has been published, so the rename breaks nobody.
-- A new setting, `SqlSourceOutput`, says what SqlSource generates for a query:
+- The attribute is renamed `SqlSourceGenerate`, `[SqlSourceGenerate]` on the type, since it now drives three kinds of generation and not only queries.  Its `Mode` property is renamed `Target` and the `SqlQueriesMode` enum `GeneratorTarget`; its values, `Nested` and `Direct`, say where the members go, which is what a target is.  Nothing has been published, so the rename breaks nobody.  It is phase 0.
+- A new setting, `SqlSourceOutput`, says what SqlSource generates for a query.  Its values are the members of a new enum, `GeneratorOutput`, emitted beside `GeneratorTarget`:
 
 | Value | Generates |
 |----|----|
@@ -155,14 +156,15 @@ Decided:
 | `CodeGen` | `Models`, plus the execution methods |
 
 - The default is `CodeGen`.
-- It is set the way the dialect and the database are: the property `SqlSourceOutput` for the project, metadata `SqlSourceOutput` on a file's `AdditionalFiles` item, and an `output=models` directive in a file's preamble or inside a query.  The query's directive wins over the file's, the file's over the metadata, the metadata over the property.
+- It is set the way the dialect and the database are, plus one place of its own: the property `SqlSourceOutput` for the project, metadata `SqlSourceOutput` on a file's `AdditionalFiles` item, an optional `Output` property on the attribute, `[SqlSourceGenerate(Output = GeneratorOutput.Models)]`, for the files a type claims, and an `output=models` directive in a file's preamble or inside a query.
 - The tool reads the setting too, to leave out what needs no types: a project whose queries all resolve to `Sql` is skipped in solution mode, and so is a file or a query that resolves to `Sql`.  A sidecar holds entries only for the queries that need them, and the tool deletes a sidecar that would be empty.
 - `Models` and `CodeGen` need a dialect that has a describer: `postgres` or `mssql` in this epic.  A query that resolves to either output under any other dialect is an error, in the generator and in the tool, that says to set the dialect or to set the output to `Sql`.  Whether `cockroachdb` joins the two, through the PostgreSQL describer, is for phase 2 to settle.
 - The default dialect stays `ansi`.  Only a project that generates `Sql` alone can use it, and that is who it is for.  A project that uses nothing but the defaults therefore gets the error above on every file, and its message is the instruction: set `SqlSourceDialect`.  The README's installation section says so before anything else.
 
 Recommended:
 
-- The enum is `SqlQueriesTarget`, keeping the attribute's name as its prefix; a bare `Target` in the consumer's `SqlSource` namespace would be too easy to collide with.
+- Precedence, most specific first: the query's directive, the file's directive, the attribute's `Output`, the file's metadata, the project's property, then the default.  The attribute sits above the metadata because it is set on one type on purpose, while metadata is usually a glob; and below the directives because what a file says about itself wins everywhere else in SqlSource.  Since two types may claim one file, the output is resolved per type and query, not per file.
+- The tool therefore has to know which types claim which files with which `Output`, which it needs anyway: a `.sql` file no type claims is ignored by the generator today and gets no sidecar.  The manifest carries the project's `Compile` items, and the tool reads the attributes from them with the generator's own reader over syntax trees, matching the attribute by name.  A semantic match, which the generator has, needs a compilation with references the tool does not want; the syntax match is an approximation only for a project that aliases or shadows the attribute's name, which the phase 2 spec records.
 - Until phase 5 ships, `CodeGen` behaves as `Models`.
 - A value that is not one of the three is an error with no position, once per distinct value, as an invalid dialect is; the files it covers are generated as `CodeGen`.
 - The output-needs-a-dialect error is reported once per file, at the directive that set the output when there is one and at the start of the file otherwise, rather than at every query, since the fix is one setting.  The file still gets its constants and methods for the `Sql` part of its output.
@@ -328,6 +330,21 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 - `docs/publishing.md` covers the second package from phase 2.
 - `docs/diagnostics.md` gains each diagnostic in the phase that adds it.
 
+## Phase 0 - names
+
+### Scope
+
+1. `SqlQueriesAttribute` becomes `SqlSourceGenerateAttribute`, used as `[SqlSourceGenerate]`; `SqlQueriesMode` becomes `GeneratorTarget`; the attribute's `Mode` property becomes `Target`.  The values `Nested` and `Direct` and the `Path` property are unchanged.
+2. Every place that names them: the generator's emitted source, the suppressor, the README, `docs/diagnostics.md`, the tests, and `tools/package-install`.
+
+### Decided
+
+- A rename and nothing else, in its own pull request, so that the diff is mechanical and the later phases start from the new names.
+
+### Testing
+
+The existing tests, under the new names.  The package-install check proves the attribute reaches a consumer under its new name.
+
 ## Phase 1 - parameters and settings
 
 ### Scope
@@ -337,14 +354,13 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 3. The hash of a query's SQL, computed where the generator builds the emitted text, so that the tool and the generator cannot disagree.
 4. The `-- param:` marker: parsed, validated and carried on the block, with no effect yet, and the parameter list rule under Parameters.
 5. Token defaults: the inline `{{name:default}}` form in the token scanner, the once-only marker, the conflict errors, and each token's resolved default carried on the block.  The hash and the parameter list are computed over the sample SQL.
-6. The `database=` and `output=` directives, in the preamble and inside a query, carried on the block; the `SqlSourceDatabase` and `SqlSourceOutput` property and metadata in the props and targets; the per-file settings record that resolves all three settings by one rule.  `output` is validated and has no effect yet; `database` is never read by the generator.
-7. The rename of `Mode` to `Target` and `SqlQueriesMode` to `SqlQueriesTarget`, through the README, the diagnostics, the tests and the package-install project.
-8. `InternalsVisibleTo` for `SqlSource.Tool`.
+6. The `database=` and `output=` directives, in the preamble and inside a query, carried on the block; the `SqlSourceDatabase` and `SqlSourceOutput` property and metadata in the props and targets; the `GeneratorOutput` enum and the attribute's `Output` property; the settings record that resolves all three settings by one rule, per type and query for the output.  `output` is validated and has no effect yet; `database` is never read by the generator.
+7. `InternalsVisibleTo` for `SqlSource.Tool`.
 
 ### Decided
 
 - Parameters are found by the lexer, under the file's dialect.
-- Apart from the rename, nothing a user sees changes.  No member is generated from the parameter list yet, and the only diagnostics added are an invalid `SqlSourceOutput` value and whatever the new marker and directives need.
+- Nothing a user sees changes beyond the attribute's new `Output` property, which is accepted and has no effect yet.  No member is generated from the parameter list, and the only diagnostics added are an invalid `SqlSourceOutput` value and whatever the new marker and directives need.
 
 ### Recommended
 
@@ -364,7 +380,7 @@ Theory tests over the rule under each dialect, including `@` inside strings, com
 ### Scope
 
 1. `src/SqlSource.Tool`: the console application, its package, its command line, its exit codes and its error output format.
-2. Finding the unit of a run, listing a solution's projects, the `SqlSourceImported` marker, the manifest target in `SqlSource.targets` and its format, and running it to get the compiler's view of the `.sql` files with their dialects, databases and outputs.  Resolving the three settings per query with the shared code, and leaving out every project, file and query whose output is `Sql`.
+2. Finding the unit of a run, listing a solution's projects, the `SqlSourceImported` marker, the manifest target in `SqlSource.targets` and its format, and running it to get the compiler's view of the `.sql` files with their dialects, databases and outputs, and of the `Compile` items.  Reading the `[SqlSourceGenerate]` attributes from the C# files with the generator's reader over syntax trees, resolving each type's files with the generator's path resolver, resolving the three settings per type and query with the shared code, and leaving out every unclaimed file and every project, type, file and query whose output is `Sql`.
 3. The snapshot model, the shared reader and writer, and the format version, as the [sidecar format design](2026-10-07-sidecar-format-design.md) specifies; the JSON Schema under `schemas/`.
 4. `IQueryDescriber`, the engine-neutral `QueryDescription`, and the PostgreSQL describer over Npgsql, with nullability inference.
 5. `sqlsource describe`, `--check`, `--force`, `--database`, the connection options and the environment variables.  Token defaults substituted before describing; a token without one is an error.
