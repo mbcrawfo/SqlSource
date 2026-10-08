@@ -22,4 +22,9 @@ internal enum SqlMarkerKind
 
     /// <summary><c>-- token-ignore:</c> names a token of its query that stays literal text.</summary>
     TokenIgnore,
+
+    /// <summary>
+    /// <c>-- param:</c> declares a parameter of its query: its type, whether it is nullable, or both.
+    /// </summary>
+    Param,
 }

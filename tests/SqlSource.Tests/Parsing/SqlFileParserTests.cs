@@ -864,12 +864,198 @@ public class SqlFileParserTests
     public void Parse_TokenMarkerInAFileWithoutNameMarker_IsAllowed() =>
         Tokens(Blocks("-- token: {{a:x}}\nSELECT {{a}}\n").ShouldHaveSingleItem()).ShouldBe(["a=x"]);
 
+    private static string[] Parameters(SqlBlock block) =>
+        [
+            .. block.Parameters.Select(static parameter =>
+                parameter.Name
+                + ":"
+                + (parameter.Type ?? "<none>")
+                + ":"
+                + Nullability(parameter.Nullable)
+                + (parameter.IsDeclared ? ":declared" : string.Empty)
+            ),
+        ];
+
+    private static string Nullability(bool? nullable)
+    {
+        if (nullable is not { } value)
+        {
+            return "<unsaid>";
+        }
+
+        return value ? "null" : "not null";
+    }
+
+    [Theory]
+    [InlineData("@a", "a:<none>:<unsaid>:declared")]
+    [InlineData("@a int", "a:int:<unsaid>:declared")]
+    [InlineData("@a null", "a:<none>:null:declared")]
+    [InlineData("@a not null", "a:<none>:not null:declared")]
+    [InlineData("@a timestamptz null", "a:timestamptz:null:declared")]
+    [InlineData("@a decimal(18, 2) not null", "a:decimal(18, 2):not null:declared")]
+    [InlineData("@a double precision", "a:double precision:<unsaid>:declared")]
+    // As people type it.
+    [InlineData("@a\tint\tNULL", "a:int:null:declared")]
+    [InlineData("@a int NOT  NULL", "a:int:not null:declared")]
+    [InlineData("@A int", "a:int:<unsaid>:declared")]
+    // A type that only ends in the letters of the word.
+    [InlineData("@a mynull", "a:mynull:<unsaid>:declared")]
+    [InlineData("@a knot null", "a:knot:null:declared")]
+    public void Parse_ParamMarker_GivesItsParameterATypeAndNullability(string value, string expected) =>
+        Parameters(Blocks("-- name: Q\n-- param: " + value + "\nSELECT @a\n").ShouldHaveSingleItem())
+            .ShouldBe([expected]);
+
+    [Fact]
+    public void Parse_ParamMarkerWithWindowsLineEndings_IsRead() =>
+        Parameters(Blocks("-- name: Q\r\n-- param: @a int null  \r\nSELECT @a\r\n").ShouldHaveSingleItem())
+            .ShouldBe(["a:int:null:declared"]);
+
+    [Fact]
+    public void Parse_ParameterList_IsTheSqlsParametersThenTheDeclaredOnesInMarkerOrder()
+    {
+        const string Text =
+            "-- name: Q\n-- param: @z int\n-- param: @b text null\n-- param: @y int\nSELECT @a, @b {{f}}\n";
+
+        Parameters(Blocks(Text).ShouldHaveSingleItem())
+            .ShouldBe([
+                "a:<none>:<unsaid>",
+                "b:text:null:declared",
+                "z:int:<unsaid>:declared",
+                "y:int:<unsaid>:declared",
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TheSameDeclarationTwice_IsNotAConflict() =>
+        Parameters(
+                Blocks("-- name: Q\n-- param: @a int null\n-- param: @A int null\nSELECT @a\n").ShouldHaveSingleItem()
+            )
+            .ShouldBe(["a:int:null:declared"]);
+
+    [Theory]
+    [InlineData("@a text")]
+    [InlineData("@a int null")]
+    [InlineData("@a INT")]
+    [InlineData("@a")]
+    public void Parse_TwoDeclarationsOfOneParameterThatDiffer_Conflict(string second)
+    {
+        var text = "-- name: Q\n-- param: @a int\n-- param: " + second + "\nSELECT @a\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    new TextSpan(
+                        text.IndexOf("-- param: " + second + "\n", StringComparison.Ordinal) + 10,
+                        second.Length
+                    ),
+                    "param: " + second
+                ),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("a int")]
+    [InlineData("@")]
+    [InlineData("@ a")]
+    [InlineData("@a-b int")]
+    [InlineData("@a,@b")]
+    [InlineData(":a int")]
+    public void Parse_ParamMarkerWithoutAPrefixedNameOnItsOwn_IsInvalid(string value)
+    {
+        var text = "-- name: Q\n-- param: " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "param: " + value),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_ParamMarkerWithoutAValue_IsInvalid()
+    {
+        const string Text = "-- name: Q\n-- param:\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(Text, "-- param:"), "param:"),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_ParamMarkerInThePreamble_IsNotAllowedThere()
+    {
+        const string Text = "-- param: @a int\n-- name: Q\nSELECT @a\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.MarkerNotAllowedHere,
+                    SpanOf(Text, "-- param: @a int"),
+                    "param",
+                    "inside a query"
+                ),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("@page")]
+    [InlineData("@page null")]
+    [InlineData("@page not null")]
+    public void Parse_DeclaredOnlyParameterWithoutAType_IsAnError(string value)
+    {
+        var text = "-- name: Q\n-- param: " + value + "\nSELECT 1 {{tail:LIMIT @page}}\n";
+
+        Errors(text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.MissingParameterType, SpanOf(text, value), "@page")]);
+    }
+
+    [Fact]
+    public void Parse_ParameterOnlyInAnInlineDefault_MustBeDeclared()
+    {
+        const string Text = "-- name: Q\nSELECT @a {{f:AND x = @b AND y = @a}}\n";
+
+        Errors(Text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, SpanOf(Text, "@b"), "@b")]);
+    }
+
+    [Fact]
+    public void Parse_ParameterOnlyInAMarkersDefault_MustBeDeclared()
+    {
+        const string Text = "-- name: Q\n-- token: {{f:AND x = @b AND y = '@c'}}\nSELECT 1 {{f}}\n";
+
+        Errors(Text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, SpanOf(Text, "@b"), "@b")]);
+    }
+
+    [Fact]
+    public void Parse_ParameterInADefaultThatIsDeclaredWithAType_IsADeclaredOnlyParameter() =>
+        Parameters(
+                Blocks("-- name: Q\n-- param: @b int\n-- token: {{g:OFFSET @b}}\nSELECT @a {{f:LIMIT @b}} {{g}}\n")
+                    .ShouldHaveSingleItem()
+            )
+            .ShouldBe(["a:<none>:<unsaid>", "b:int:<unsaid>:declared"]);
+
+    // The query does not hold the token, so its marker's default is not the query's.
+    [Fact]
+    public void Parse_ParameterInTheDefaultOfATokenTheQueryLacks_IsNotChecked() =>
+        Blocks("-- name: Q\n-- token: {{other:@x}}\nSELECT 1\n").ShouldHaveSingleItem().Parameters.ShouldBeEmpty();
+
+    // A fragment passed at run time may use it.
+    [Fact]
+    public void Parse_DeclaredParameterThatNothingHolds_IsKept() =>
+        Parameters(Blocks("-- name: Q\n-- param: @later int\nSELECT 1 {{f}}\n").ShouldHaveSingleItem())
+            .ShouldBe(["later:int:<unsaid>:declared"]);
+
+    [Fact]
+    public void Parse_ParamMarkerInAFileWithoutNameMarker_IsAllowed() =>
+        Parameters(Blocks("-- param: @a int\nSELECT @a\n").ShouldHaveSingleItem())
+            .ShouldBe(["a:int:<unsaid>:declared"]);
+
     [Fact]
     public void Parse_ParameterInsideAToken_IsNotAParameterOfTheSql()
     {
-        var block = Blocks("-- name: Q\nSELECT @a {{f:AND x = @b}} {{t}}@c\n").ShouldHaveSingleItem();
+        var block = Blocks("-- name: Q\n-- param: @b int\nSELECT @a {{f:AND x = @b}} {{t}}@c\n").ShouldHaveSingleItem();
 
-        block.Parameters.Select(static parameter => parameter.Name).ShouldBe(["a", "c"]);
+        block.Parameters.Select(static parameter => parameter.Name).ShouldBe(["a", "c", "b"]);
     }
 
     [Fact]

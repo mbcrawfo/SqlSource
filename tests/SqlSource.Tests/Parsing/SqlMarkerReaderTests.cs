@@ -24,6 +24,9 @@ public class SqlMarkerReaderTests
     [InlineData("-- dialect:", "Dialect:")]
     [InlineData("-- token-ignore: a", "TokenIgnore:a")]
     [InlineData("-- TOKEN-IGNORE:a", "TokenIgnore:a")]
+    [InlineData("-- param: @a int", "Param:@a int")]
+    [InlineData("--PARAM:@a", "Param:@a")]
+    [InlineData("-- param:", "Param:")]
     [InlineData("-- token: {{a:b}}", "Token:{{a:b}}")]
     [InlineData("-- TOKEN: x", "Token:x")]
     [InlineData("--token:", "Token:")]
@@ -63,6 +66,9 @@ public class SqlMarkerReaderTests
     [InlineData("-- generators: keep-comments")]
     [InlineData("-- dialect=mysql")]
     [InlineData("-- dialects: mysql")]
+    [InlineData("-- params: @a")]
+    [InlineData("-- param @a")]
+    [InlineData("SELECT 1 -- param: @a")]
     [InlineData("-- tokens: x")]
     [InlineData("-- token x")]
     [InlineData("SELECT 1 -- dialect: mysql")]
@@ -120,6 +126,7 @@ public class SqlMarkerReaderTests
     {
         SqlMarkerReader.WordOf(SqlMarkerKind.Token).ShouldBe("token");
         SqlMarkerReader.WordOf(SqlMarkerKind.GeneratorParameters).ShouldBe("generator");
+        SqlMarkerReader.WordOf(SqlMarkerKind.Param).ShouldBe("param");
     }
 
     [Theory]

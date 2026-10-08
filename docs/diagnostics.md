@@ -33,6 +33,8 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC114](#sqlsrc114) | Token name is a keyword |
 | [SQLSRC115](#sqlsrc115) | Dialect marker is misplaced |
 | [SQLSRC116](#sqlsrc116) | Marker is not allowed here |
+| [SQLSRC117](#sqlsrc117) | Parameter has no type |
+| [SQLSRC118](#sqlsrc118) | Parameter is not declared |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
@@ -351,7 +353,7 @@ Add a generator parameter, or delete the line.
 
 **Marker value is not valid**
 
-A generator parameter has a value it does not take; a `-- dialect:` marker does not name a dialect; or a `-- token:` or `-- token-ignore:` marker does not hold what it needs.
+A generator parameter has a value it does not take; a `-- dialect:` marker does not name a dialect; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
 
 - No generator parameter takes a value.
 - `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
@@ -366,6 +368,8 @@ A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
 A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else; and a quote or a block comment inside the default must close there.
 
+A `-- param:` marker starts with the parameter as the SQL writes it, `@name`, alone or followed by a space.
+
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
 ## SQLSRC112
@@ -377,6 +381,7 @@ Two settings contradict each other.  The error is at the second.
 - `token-validation` and `no-token-validation` both appear in one scope.  A scope is the lines before the first `-- name:` marker, or one query.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 - Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
+- Two `-- param:` markers for one parameter that give different types or different nullability.
 
 Remove one of the two.  A validation parameter in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
@@ -446,3 +451,30 @@ SELECT id FROM users WHERE 1 = 1 {{filter}};
 ```
 
 Move the marker to where the message says.  A file with no `-- name:` line is one query, and takes every marker.
+
+## SQLSRC117
+
+**Parameter has no type**
+
+A `-- param:` marker names a parameter that is not in the SQL of its query.  Such a parameter reaches the query only inside the text of a token, so nothing but the marker can say what type it has.
+
+```sql
+-- name: ListUsers
+-- param: @page
+SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
+```
+
+Give the type, in the database's own words: `-- param: @page int`.
+
+## SQLSRC118
+
+**Parameter is not declared**
+
+A parameter appears in the default of a token, in the SQL or in a `-- token:` marker, and nowhere else in the query.  A default is a sample, and a type taken from a sample alone would be a guess.
+
+```sql
+-- name: ListUsers
+SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
+```
+
+Declare the parameter with its type: `-- param: @page int`.

@@ -34,3 +34,5 @@ SQLSRC113 | SqlSource | Error | Query has no SQL
 SQLSRC114 | SqlSource | Error | Token name is a keyword
 SQLSRC115 | SqlSource | Error | Dialect marker is misplaced
 SQLSRC116 | SqlSource | Error | Marker is not allowed here
+SQLSRC117 | SqlSource | Error | Parameter has no type
+SQLSRC118 | SqlSource | Error | Parameter is not declared

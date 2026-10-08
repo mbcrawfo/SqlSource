@@ -219,6 +219,18 @@ internal static class SqlFileParser
                 _errors.Add(error with { Span = sql.ToSourceSpan(error.Span) });
             }
 
+            // A query without markers has no scope, and so no defaults and no declarations.
+            var tokenDefaults = scope?.TokenDefaults ?? [];
+            var tokens = SqlTokenList.Create(text, sql, scanned.Occurrences, tokenDefaults, _errors);
+            var parameters = SqlParameterList.Create(
+                rules,
+                sql,
+                scanned.Occurrences,
+                tokens,
+                tokenDefaults,
+                scope?.Declarations ?? [],
+                _errors
+            );
             _blocks.Add(
                 new SqlBlock(
                     name,
@@ -227,8 +239,8 @@ internal static class SqlFileParser
                     keepComments,
                     own?.TokenValidation ?? inherited?.TokenValidation,
                     scanned.Segments,
-                    SqlTokenList.Create(text, sql, scanned.Occurrences, scope?.TokenDefaults ?? [], _errors),
-                    SqlParameterList.Create(sql, scanned.Occurrences)
+                    tokens,
+                    parameters
                 )
             );
         }

@@ -24,6 +24,8 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
 
     private HashSet<string>? _ignoredTokens;
 
+    private List<SqlParameterDeclaration>? _declarations;
+
     /// <summary>The scope's generator parameters.</summary>
     public SqlGeneratorParameterScope Generator { get; } = new();
 
@@ -32,6 +34,10 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
 
     /// <summary>The names the scope's <c>-- token-ignore:</c> markers give, as written.</summary>
     public ISet<string> IgnoredTokens => _ignoredTokens ?? NoNames;
+
+    /// <summary>What the scope's <c>-- param:</c> markers declare, in marker order, each parameter once.</summary>
+    public IReadOnlyList<SqlParameterDeclaration> Declarations =>
+        _declarations ?? (IReadOnlyList<SqlParameterDeclaration>)[];
 
     /// <summary>
     /// Reads one marker.  <paramref name="inQuery" /> and <paramref name="inPreamble" /> say what the scope is; both
@@ -65,10 +71,18 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
         {
             ReadTokenIgnore(marker);
         }
+        else if (marker.Kind == SqlMarkerKind.Param)
+        {
+            ReadParam(marker);
+        }
     }
 
     private static bool IsAllowedInQuery(SqlMarkerKind kind) =>
-        kind is SqlMarkerKind.GeneratorParameters or SqlMarkerKind.Token or SqlMarkerKind.TokenIgnore;
+        kind
+            is SqlMarkerKind.GeneratorParameters
+                or SqlMarkerKind.Token
+                or SqlMarkerKind.TokenIgnore
+                or SqlMarkerKind.Param;
 
     private static bool IsAllowedInPreamble(SqlMarkerKind kind) => kind is SqlMarkerKind.GeneratorParameters;
 
@@ -131,6 +145,77 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
 
         _ignoredTokens ??= [];
         _ = _ignoredTokens.Add(name);
+    }
+
+    // "@name [type] [null | not null]".  The type is what stands between the name and those words, as written.
+    private void ReadParam(SqlMarker marker)
+    {
+        var start = marker.ValueSpan.Start;
+        var end = marker.ValueSpan.End;
+        var nameEnd = start + 1;
+        while (nameEnd < end && SqlLexer.IsParameterNameCharacter(text[nameEnd]))
+        {
+            nameEnd++;
+        }
+
+        if (
+            start == end
+            || text[start] != rules.ParameterPrefix
+            || nameEnd == start + 1
+            || (nameEnd < end && !char.IsWhiteSpace(text[nameEnd]))
+        )
+        {
+            AddInvalid(marker);
+            return;
+        }
+
+        var name = text.Substring(start + 1, nameEnd - start - 1);
+        var rest = text.AsSpan(nameEnd, end - nameEnd).Trim();
+        bool? nullable = null;
+        if (TryTakeLastWord(ref rest, "null"))
+        {
+            nullable = !TryTakeLastWord(ref rest, "not");
+        }
+
+        var declaration = new SqlParameterDeclaration(name, rest.IsEmpty ? null : rest.ToString(), nullable, marker);
+        _declarations ??= [];
+        foreach (var existing in _declarations)
+        {
+            if (!string.Equals(existing.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (
+                !string.Equals(existing.Type, declaration.Type, StringComparison.Ordinal)
+                || existing.Nullable != nullable
+            )
+            {
+                AddConflict(marker);
+            }
+
+            return;
+        }
+
+        _declarations.Add(declaration);
+    }
+
+    // Takes word off the end of rest when it stands there as a word: alone, or after white space.
+    private static bool TryTakeLastWord(ref ReadOnlySpan<char> rest, string word)
+    {
+        if (!rest.EndsWith(word.AsSpan(), StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        var before = rest.Length - word.Length;
+        if (before > 0 && !char.IsWhiteSpace(rest[before - 1]))
+        {
+            return false;
+        }
+
+        rest = rest.Slice(0, before).TrimEnd();
+        return true;
     }
 
     // At the value, or at the whole marker when it has none.

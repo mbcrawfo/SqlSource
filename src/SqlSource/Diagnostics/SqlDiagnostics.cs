@@ -340,6 +340,29 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor MissingParameterType = new(
+        id: "SQLSRC117",
+        title: "Parameter has no type",
+        messageFormat: "'{0}' is not in the SQL of its query, so its '-- param:' marker must give its type",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc117",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor UndeclaredParameter = new(
+        id: "SQLSRC118",
+        title: "Parameter is not declared",
+        messageFormat: "'{0}' appears only in the default of a token.  Declare it with a '-- param:' marker that "
+            + "gives its type.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc118",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -373,7 +396,9 @@ internal static class SqlDiagnostics
             EmptyBlock,
             ReservedTokenName,
             MisplacedDialect,
-            MarkerNotAllowedHere
+            MarkerNotAllowedHere,
+            MissingParameterType,
+            UndeclaredParameter
         );
 
     /// <summary>
@@ -398,6 +423,8 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.ReservedTokenName => ReservedTokenName,
             SqlParseErrorKind.MisplacedDialect => MisplacedDialect,
             SqlParseErrorKind.MarkerNotAllowedHere => MarkerNotAllowedHere,
+            SqlParseErrorKind.MissingParameterType => MissingParameterType,
+            SqlParseErrorKind.UndeclaredParameter => UndeclaredParameter,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No descriptor is defined for this kind."),
         };
 }

@@ -94,7 +94,7 @@ A `-- summary:` line inside a query becomes the documentation of its member.  Se
 
 ### What reaches the generated SQL
 
-- Every marker line is removed: `-- name:`, `-- summary:`, `-- generator:`, `-- dialect:`, `-- token:` and `-- token-ignore:`.
+- Every marker line is removed: `-- name:`, `-- summary:`, `-- generator:`, `-- dialect:`, `-- token:`, `-- token-ignore:` and `-- param:`.
 - Comments are removed: a line comment is deleted and a block comment becomes one space.  Lines left blank are removed.
 - Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.  So are MariaDB's `/*M! ... */` and Oracle's `--+ ...` when the dialect is theirs.
 - Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect (see Dialects, below).
@@ -238,6 +238,28 @@ A misread has one of two results:
 - **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed: under `ansi`, `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `keep-comments` on the query prevents the removal.
 
 If your SQL uses one of these constructs, check the generated SQL: hover over the member, or read its documentation.
+
+## Parameters
+
+SqlSource finds the parameters of a query: `@` and a name of letters, digits and `_`, outside strings, quoted identifiers, comments and hints.  Names are compared ignoring case.  `@>`, `<@`, `@@`, `@?` and `@@ROWCOUNT` are not parameters, and neither is the `@` inside a word such as `user@host`.
+
+Nothing is generated from a query's parameters yet, and a parameter stays in the SQL exactly as written.  The list is what a later release types.
+
+A `-- param:` marker inside a query declares one parameter:
+
+```sql
+-- name: FindUsers
+-- param: @since timestamptz not null
+-- param: @name text null
+-- param: @page int
+SELECT id, name FROM users
+WHERE created_at >= @since AND (@name IS NULL OR name = @name) {{paging:LIMIT 20 OFFSET @page}};
+```
+
+- The form is `@name`, then a type, then `null` or `not null`; the type and the last part are each optional.  The type is in the database's own words and is not checked here: `decimal(18,2)`, `double precision`.
+- `not null` says what saying nothing says.  It is accepted because it is what a column definition says.
+- A parameter that the query's SQL does not hold, because it comes only with a token, must be declared with its type: without one it is the error [SQLSRC117](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc117).  A parameter that appears only in a token's default and is not declared is [SQLSRC118](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc118).
+- A T-SQL local variable or a MySQL user variable is read as a parameter, and so is `@x` written for PostgreSQL's absolute value of `x`: write `abs(x)`.
 
 ## Tokens
 

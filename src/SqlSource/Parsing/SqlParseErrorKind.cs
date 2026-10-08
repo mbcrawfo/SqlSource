@@ -68,4 +68,15 @@ internal enum SqlParseErrorKind
     /// Arguments: the marker's word, and where it is allowed.
     /// </summary>
     MarkerNotAllowedHere,
+
+    /// <summary>
+    /// A <c>-- param:</c> marker gives no type for a parameter that the query's SQL does not hold.  Argument: the
+    /// parameter, with its prefix.
+    /// </summary>
+    MissingParameterType,
+
+    /// <summary>
+    /// A parameter stands only in the default of a token.  Argument: the parameter, with its prefix.
+    /// </summary>
+    UndeclaredParameter,
 }
