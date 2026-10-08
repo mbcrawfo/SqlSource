@@ -19,6 +19,7 @@ Settled with the owner after the format was proposed.  The open questions in sec
 | Range and multirange | Both carry `subtype`. |
 | `source_database` on SQL Server | Not stored; adding `database` to `origin` is additive. |
 | The JSON Schema | Shipped in the repository under `schemas/`, one file per format version, by phase 2. |
+| `matchesTable` | Added after the proposal, for table models.  An object with the shape of `origin` without `column`, or `null`, on entries with rows. |
 
 ## 0. Prior art
 
@@ -54,6 +55,7 @@ A file whose `queries` would be empty is deleted by the tool, never written empt
 | `resultKind` | `"rows"` or `"none"` | always | Whether the statement produces a result set. |
 | `parameters` | array | always | In parameter order; empty when the query has none. |
 | `columns` | array | iff `resultKind` is `"rows"` | In result order.  Absent, not empty, when there is no result set. |
+| `matchesTable` | object or `null` | iff `resultKind` is `"rows"` | `{ "schema", "table" }` of the table whose column list the result is exactly, by the epic's rule under Models: every column originates in that table, the names are the table's unchanged, the columns are the table's full list in the table's order, and each column's nullability is the table column's.  `null` when no table matches.  The generator names the model after the table. |
 
 Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar and the hash proves equality; SQLx's copy doubles every diff), a timestamp (it changes on every run), the C# types (the generator's map evolves without a database), and anything about tokens beyond what the hash covers.  Names and defaults are in the SQL, the sample is reconstructible from it, and the method's `string` parameters come from the lexer.  An entry for a token query is indistinguishable from one for a plain query, which is the point: the describer saw a plain query.
 
@@ -221,6 +223,7 @@ LIMIT @limit;
       "database": "app",
       "serverVersion": "16.4",
       "resultKind": "rows",
+      "matchesTable": null,
       "parameters": [
         {
           "name": "id",
@@ -342,6 +345,7 @@ LIMIT @limit;
       "database": "app",
       "serverVersion": "16.4",
       "resultKind": "rows",
+      "matchesTable": null,
       "parameters": [
         {
           "name": "name",
@@ -459,6 +463,7 @@ LIMIT @limit;
       "database": "app",
       "serverVersion": "16.4",
       "resultKind": "rows",
+      "matchesTable": null,
       "parameters": [
         {
           "name": "statuses",
@@ -656,6 +661,7 @@ ORDER BY {{orderBy:Id DESC}};
       "database": "sales",
       "serverVersion": "16.0.4135.4",
       "resultKind": "rows",
+      "matchesTable": null,
       "parameters": [
         {
           "name": "id",
@@ -773,6 +779,7 @@ ORDER BY {{orderBy:Id DESC}};
       "database": "sales",
       "serverVersion": "16.0.4135.4",
       "resultKind": "rows",
+      "matchesTable": null,
       "parameters": [
         {
           "name": "customerId",
@@ -881,6 +888,7 @@ ORDER BY {{orderBy:Id DESC}};
       "database": "sales",
       "serverVersion": "16.0.4135.4",
       "resultKind": "rows",
+      "matchesTable": null,
       "parameters": [
         {
           "name": "top",
@@ -1023,13 +1031,14 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
         "serverVersion": { "type": "string" },
         "resultKind": { "type": "string", "enum": ["rows", "none"] },
         "parameters": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
-        "columns": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/column" } }
+        "columns": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/column" } },
+        "matchesTable": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/tableRef" }] }
       },
       "allOf": [
         {
           "if": { "properties": { "resultKind": { "const": "rows" } } },
-          "then": { "required": ["columns"] },
-          "else": { "not": { "required": ["columns"] } }
+          "then": { "required": ["columns", "matchesTable"] },
+          "else": { "allOf": [{ "not": { "required": ["columns"] } }, { "not": { "required": ["matchesTable"] } }] }
         },
         {
           "if": { "properties": { "engine": { "enum": ["postgres", "cockroachdb"] } } },
@@ -1077,6 +1086,15 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
         "origin": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/origin" }] },
         "identity": { "$ref": "#/$defs/triState" },
         "computed": { "$ref": "#/$defs/triState" }
+      }
+    },
+    "tableRef": {
+      "type": "object",
+      "required": ["schema", "table"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "type": ["string", "null"] },
+        "table": { "type": "string", "minLength": 1 }
       }
     },
     "origin": {
