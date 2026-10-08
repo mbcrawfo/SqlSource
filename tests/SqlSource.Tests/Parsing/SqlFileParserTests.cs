@@ -489,35 +489,34 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_DialectGeneratorParameterInThePreamble_AppliesToEveryBlockAndIsNotInTheSql()
+    public void Parse_DialectMarkerInThePreamble_AppliesToEveryBlockAndIsNotInTheSql()
     {
         const string Text =
-            "/* Copyright (c) Example */\n-- generator: dialect=mysql\n\n"
+            "/* Copyright (c) Example */\n-- dialect: mysql\n\n"
             + "-- name: A\nSELECT 'a\\'b' # c\n-- name: B\nSELECT 5--3 # d\n";
 
         Blocks(Text).Select(Sql).ShouldBe(["SELECT 'a\\'b'", "SELECT 5--3"]);
     }
 
     [Fact]
-    public void Parse_DialectGeneratorParameter_ReplacesTheDialectOfTheProject()
+    public void Parse_DialectMarker_ReplacesTheDialectOfTheProject()
     {
-        const string Text = "-- generator: dialect=mssql\n-- name: A\nSELECT [a'b] -- c\n";
+        const string Text = "-- dialect: mssql\n-- name: A\nSELECT [a'b] -- c\n";
 
         Sql(Blocks(Text, dialect: SqlDialect.MySql).ShouldHaveSingleItem()).ShouldBe("SELECT [a'b]");
     }
 
     // Under plain MySQL the backslash takes the closing quote with it, and the string is not closed.
     [Fact]
-    public void Parse_DialectGeneratorParameterWithAnOption_ReadsTheFileByThatOption()
+    public void Parse_DialectMarkerWithAnOption_ReadsTheFileByThatOption()
     {
-        const string Text =
-            "-- generator: dialect=mysql,no-backslash-escapes\n-- name: A\nSELECT 'C:\\temp\\' AS path -- c\n";
+        const string Text = "-- dialect: mysql,no-backslash-escapes\n-- name: A\nSELECT 'C:\\temp\\' AS path -- c\n";
 
         Sql(Blocks(Text).ShouldHaveSingleItem()).ShouldBe("SELECT 'C:\\temp\\' AS path");
     }
 
     [Fact]
-    public void Parse_OptionOfTheProject_IsUsedByAFileWithoutAGeneratorParameter()
+    public void Parse_OptionOfTheProject_IsUsedByAFileWithoutAMarker()
     {
         const string Text = "-- name: A\nSELECT \"a\\\" AS b -- c\n";
         var project = new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes);
@@ -525,28 +524,27 @@ public class SqlFileParserTests
         Sql(Blocks(Text, dialect: project).ShouldHaveSingleItem()).ShouldBe("SELECT \"a\\\" AS b");
     }
 
-    // The generator parameter names no option, so the file has none: the option of the project is not kept.
+    // The marker names no option, so the file has none: the option of the project is not kept.
     [Fact]
-    public void Parse_DialectGeneratorParameterWithoutOptions_ReplacesTheOptionsOfTheProjectToo()
+    public void Parse_DialectMarkerWithoutOptions_ReplacesTheOptionsOfTheProjectToo()
     {
-        const string Text = "-- generator: dialect=mysql\n-- name: A\nSELECT 'it\\'s' -- c\n";
+        const string Text = "-- dialect: mysql\n-- name: A\nSELECT 'it\\'s' -- c\n";
         var project = new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.NoBackslashEscapes);
 
         Sql(Blocks(Text, dialect: project).ShouldHaveSingleItem()).ShouldBe("SELECT 'it\\'s'");
     }
 
     [Fact]
-    public void Parse_TwoDialectGeneratorParametersThatDifferOnlyInOptions_IsAnError()
+    public void Parse_TwoDialectMarkersThatDifferOnlyInOptions_IsAnError()
     {
-        const string Text =
-            "-- generator: dialect=mysql\n-- generator: dialect=mysql,ansi-quotes\n-- name: A\nSELECT 1\n";
+        const string Text = "-- dialect: mysql\n-- dialect: mysql, ansi-quotes\n-- name: A\nSELECT 1\n";
 
         Errors(Text)
             .ShouldBe([
                 SqlParseError.Create(
                     SqlParseErrorKind.ConflictingSettings,
-                    SpanOf(Text, "dialect=mysql,ansi-quotes"),
-                    "dialect=mysql,ansi-quotes"
+                    SpanOf(Text, "mysql, ansi-quotes"),
+                    "dialect: mysql, ansi-quotes"
                 ),
             ]);
     }
@@ -597,9 +595,9 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_DialectGeneratorParameterInAFileWithoutANameMarker_GoesAboveItsSql()
+    public void Parse_DialectMarkerInAFileWithoutANameMarker_GoesAboveItsSql()
     {
-        const string Text = "-- summary: S\n-- generator: dialect=oracle keep-comments\nSELECT q'[it's]' --+ h\n";
+        const string Text = "-- summary: S\n-- dialect: oracle\n-- generator: keep-comments\nSELECT q'[it's]' --+ h\n";
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
@@ -608,58 +606,62 @@ public class SqlFileParserTests
         block.KeepComments.ShouldBeTrue();
     }
 
-    // The header is read under the dialect of the project, and the rest of the file under the generator parameter's.
+    // The header is read under the dialect of the project, and the rest of the file under the marker's.
     [Fact]
-    public void Parse_CommentAboveTheDialectGeneratorParameter_IsReadUnderTheDialectOfTheProject()
+    public void Parse_CommentAboveTheDialectMarker_IsReadUnderTheDialectOfTheProject()
     {
-        const string Text = "# licence\n-- generator: dialect=postgres\n-- name: A\nSELECT 1 # 2\n";
+        const string Text = "# licence\n-- dialect: postgres\n-- name: A\nSELECT 1 # 2\n";
 
         Sql(Blocks(Text, dialect: SqlDialect.MySql).ShouldHaveSingleItem()).ShouldBe("SELECT 1 # 2");
     }
 
+    // The place is checked before the value, so text that was never meant as a dialect is reported the same way.
     [Theory]
-    [InlineData("-- name: A\n-- generator: dialect=mysql\nSELECT 1\n")]
-    [InlineData("-- generator: dialect=mysql\n-- name: A\n-- generator: dialect=mysql\nSELECT 1\n")]
-    [InlineData("SELECT 1\n-- generator: dialect=mysql\nFROM t\n")]
-    [InlineData("-- name: A\nSELECT 1\n-- name: B\n-- generator: dialect=nope\nSELECT 2\n")]
-    public void Parse_DialectGeneratorParameterInsideAQueryOrAfterSql_IsMisplaced(string text)
+    [InlineData("-- name: A\n-- dialect: mysql\nSELECT 1\n")]
+    [InlineData("-- dialect: mysql\n-- name: A\n-- dialect: mysql\nSELECT 1\n")]
+    [InlineData("SELECT 1\n-- dialect: mysql\nFROM t\n")]
+    [InlineData("-- name: A\nSELECT 1\n-- name: B\n-- dialect: nope\nSELECT 2\n")]
+    [InlineData("-- name: A\n-- dialect: see the wiki\nSELECT 1\n")]
+    [InlineData("-- name: A\n-- dialect:\nSELECT 1\n")]
+    public void Parse_DialectMarkerInsideAQueryOrAfterSql_IsMisplaced(string text)
     {
         var error = Errors(text).ShouldHaveSingleItem();
 
         error.Kind.ShouldBe(SqlParseErrorKind.MisplacedDialect);
-        error.Span.Start.ShouldBe(text.LastIndexOf("dialect=", StringComparison.Ordinal));
+        error.Span.Start.ShouldBe(text.LastIndexOf("-- dialect:", StringComparison.Ordinal));
+        error.Span.End.ShouldBe(text.IndexOf('\n', error.Span.Start));
+        error.Arguments.Count.ShouldBe(0);
     }
 
-    // A marker after the last SQL of its block is reported as that.  A dialect generator parameter in it is reported as
-    // misplaced too, so that the user learns at once that it belongs at the top of the file.
+    // A marker after the last SQL of its block is reported as that.  A dialect marker is reported as misplaced too,
+    // so that the user learns at once that it belongs at the top of the file.
     [Theory]
-    [InlineData("SELECT 1;\n-- generator: dialect=mysql\n")]
-    [InlineData("-- name: A\nSELECT 1;\n-- generator: keep-comments dialect=nope\n")]
-    [InlineData("-- name: A\nSELECT 1;\n-- generator: DIALECT\n-- name: B\nSELECT 2;\n")]
-    public void Parse_DialectGeneratorParameterAfterTheLastSqlOfItsBlock_IsMisplacedAsWellAsAtTheEndOfItsBlock(
-        string text
-    )
+    [InlineData("SELECT 1;\n-- dialect: mysql\n")]
+    [InlineData("-- name: A\nSELECT 1;\n-- dialect: nope\n")]
+    [InlineData("-- name: A\nSELECT 1;\n-- DIALECT:\n-- name: B\nSELECT 2;\n")]
+    public void Parse_DialectMarkerAfterTheLastSqlOfItsBlock_IsMisplacedAsWellAsAtTheEndOfItsBlock(string text)
     {
         var errors = Errors(text);
+        var marker = text.IndexOf("-- dialect:", StringComparison.OrdinalIgnoreCase);
 
         errors
             .Select(static error => error.Kind)
             .ShouldBe([SqlParseErrorKind.MarkerAtEndOfBlock, SqlParseErrorKind.MisplacedDialect]);
-        errors[0].Span.Start.ShouldBe(text.IndexOf("-- generator:", StringComparison.Ordinal));
-        errors[1].Span.Start.ShouldBe(text.IndexOf("dialect", StringComparison.OrdinalIgnoreCase));
+        errors[0].Span.Start.ShouldBe(marker);
+        errors[1].Span.ShouldBe(errors[0].Span);
     }
 
-    // A misplaced generator parameter does not change how the file is read: the # would be a comment under MySQL.
+    // A misplaced marker does not change how the file is read: the # would be a comment under MySQL.
     [Fact]
-    public void Parse_MisplacedDialectGeneratorParameter_IsNotApplied() =>
-        Errors("-- name: A\n-- generator: dialect=mysql\nSELECT 'it''s' # '\n")
+    public void Parse_MisplacedDialectMarker_IsNotApplied() =>
+        Errors("-- name: A\n-- dialect: mysql\nSELECT 'it''s' # '\n")
             .ShouldHaveSingleItem()
             .Kind.ShouldBe(SqlParseErrorKind.UnterminatedQuote);
 
     [Fact]
-    public void Parse_DialectGeneratorParameterAfterSqlInThePreamble_IsReportedWithTheSql()
+    public void Parse_DialectMarkerAfterSqlInThePreamble_IsReportedWithTheSql()
     {
-        const string Text = "SELECT 0;\n-- generator: dialect=mysql\n-- name: A\nSELECT 1\n";
+        const string Text = "SELECT 0;\n-- dialect: mysql\n-- name: A\nSELECT 1\n";
 
         Errors(Text)
             .Select(static error => error.Kind)
@@ -667,30 +669,79 @@ public class SqlFileParserTests
     }
 
     [Theory]
-    [InlineData("-- generator: dialect=pgsql\n-- name: A\nSELECT 1\n", "dialect=pgsql")]
-    [InlineData("-- generator: dialect\nSELECT 1\n", "dialect")]
-    public void Parse_DialectGeneratorParameterWithoutAValidName_IsAnErrorAtTheGeneratorParameter(
-        string text,
-        string parameter
-    ) =>
+    [InlineData("-- dialect: pgsql\n-- name: A\nSELECT 1\n", "pgsql")]
+    [InlineData("-- dialect: postgres,ansi-quotes\nSELECT 1\n", "postgres,ansi-quotes")]
+    [InlineData("-- dialect: mysql,\nSELECT 1\n", "mysql,")]
+    // Several words on one line were the old form.  The line is one value, and it is not a dialect.
+    [InlineData("-- dialect: mysql keep-comments\nSELECT 1\n", "mysql keep-comments")]
+    [InlineData("-- dialect: mysql -- legacy\nSELECT 1\n", "mysql -- legacy")]
+    public void Parse_DialectMarkerWithoutAValidValue_IsAnErrorAtTheValue(string text, string value) =>
         Errors(text)
-            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, parameter), parameter)]);
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "dialect: " + value),
+            ]);
+
+    [Fact]
+    public void Parse_DialectMarkerWithoutAValue_IsAnErrorAtTheMarker()
+    {
+        const string Text = "-- dialect:\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(Text, "-- dialect:"), "dialect:"),
+            ]);
+    }
 
     [Fact]
     public void Parse_TwoDialectsInOneHeader_IsAnErrorAtTheSecondAndTheSameDialectTwiceIsNot()
     {
-        const string Conflict = "-- generator: dialect=mysql\n-- generator: dialect=oracle\n-- name: A\nSELECT 1\n";
-        const string Repeat = "-- generator: dialect=mysql\n-- generator: dialect=MYSQL\n-- name: A\nSELECT 1 # c\n";
+        const string Conflict = "-- dialect: mysql\n-- dialect: oracle\n-- name: A\nSELECT 1\n";
+        const string Repeat = "-- dialect: mysql\n-- dialect: MYSQL\n-- name: A\nSELECT 1 # c\n";
 
         Errors(Conflict)
             .ShouldBe([
                 SqlParseError.Create(
                     SqlParseErrorKind.ConflictingSettings,
-                    SpanOf(Conflict, "dialect=oracle"),
-                    "dialect=oracle"
+                    SpanOf(Conflict, "oracle"),
+                    "dialect: oracle"
                 ),
             ]);
         Sql(Blocks(Repeat).ShouldHaveSingleItem()).ShouldBe("SELECT 1");
+    }
+
+    // An invalid marker does not hide a conflict between the two valid ones around it.
+    [Fact]
+    public void Parse_InvalidDialectMarkerBetweenTwoThatDiffer_ReportsBoth()
+    {
+        const string Text = "-- dialect: mysql\n-- dialect: nope\n-- dialect: oracle\nSELECT 1\n";
+
+        Errors(Text)
+            .Select(static error => error.Kind)
+            .ShouldBe([SqlParseErrorKind.InvalidMarkerValue, SqlParseErrorKind.ConflictingSettings]);
+    }
+
+    [Fact]
+    public void Parse_DialectMarkerInAFileWithWindowsLineEndings_IsRead()
+    {
+        const string Text =
+            "-- dialect: mysql, no-backslash-escapes  \r\n-- name: A\r\nSELECT 'C:\\temp\\' AS p # c\r\n";
+
+        Sql(Blocks(Text).ShouldHaveSingleItem()).ShouldBe("SELECT 'C:\\temp\\' AS p");
+    }
+
+    [Fact]
+    public void Parse_DialectAsAGeneratorParameter_IsNotKnownAndIsNotApplied()
+    {
+        const string Text = "-- generator: dialect=mysql\n-- name: A\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.UnknownGeneratorParameter,
+                    SpanOf(Text, "dialect=mysql"),
+                    "dialect=mysql"
+                ),
+            ]);
     }
 
     [Fact]

@@ -26,3 +26,6 @@ Console.WriteLine($"dialect of the item: {Queries.ByMetadata}");
 
 // A target of Directory.Build.targets adds the item of AddedByATarget.sql, and its metadata says mssql.
 Console.WriteLine($"dialect of an item that a target adds: {Queries.AddedByATarget}");
+
+// ByMarker.sql names its own dialect, mssql, with a marker.
+Console.WriteLine($"dialect of the file's marker: {Queries.ByMarker}");

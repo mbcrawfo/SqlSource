@@ -31,7 +31,8 @@ internal enum SqlParseErrorKind
     SummaryBeforeFirstName,
 
     /// <summary>
-    /// A <c>-- summary:</c> or <c>-- generator:</c> marker has no SQL after it in its block.  No argument.
+    /// A <c>-- summary:</c>, <c>-- generator:</c> or <c>-- dialect:</c> marker has no SQL after it in its block.  No
+    /// argument.
     /// </summary>
     MarkerAtEndOfBlock,
 
@@ -42,14 +43,15 @@ internal enum SqlParseErrorKind
     EmptyGeneratorLine,
 
     /// <summary>
-    /// A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid.  Argument:
-    /// the generator parameter as written.
+    /// A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid; or a
+    /// <c>-- dialect:</c> marker does not name a dialect.  Argument: the parameter as written, or the marker as
+    /// <see cref="SqlDialectMarker.Describe" /> gives it.
     /// </summary>
     InvalidMarkerValue,
 
     /// <summary>
-    /// Two generator parameters of one scope contradict each other: both validation generator parameters, or two
-    /// dialects.  Argument: the second generator parameter as written.
+    /// Two settings contradict each other: both validation parameters in one scope, or two dialects in one file.
+    /// Argument: the second one, as for <see cref="InvalidMarkerValue" />.
     /// </summary>
     ConflictingSettings,
 
@@ -59,9 +61,6 @@ internal enum SqlParseErrorKind
     /// <summary>A token's name is a reserved C# keyword.  Argument: the name.</summary>
     ReservedTokenName,
 
-    /// <summary>
-    /// A <c>dialect=</c> generator parameter is inside a named query or after SQL.  Argument: the generator parameter
-    /// as written.
-    /// </summary>
+    /// <summary>A <c>-- dialect:</c> marker is inside a named query or after SQL.  No argument.</summary>
     MisplacedDialect,
 }

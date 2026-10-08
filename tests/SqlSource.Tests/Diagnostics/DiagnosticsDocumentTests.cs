@@ -52,14 +52,7 @@ public class DiagnosticsDocumentTests
     [Fact]
     public void Document_UnknownGeneratorParameterSection_ListsEveryGeneratorParameter()
     {
-        string[] parameters =
-        [
-            "keep-comments",
-            "token-validation",
-            "no-token-validation",
-            "token-ignore=name",
-            "dialect=name",
-        ];
+        string[] parameters = ["keep-comments", "token-validation", "no-token-validation", "token-ignore=name"];
         var section = string.Join('\n', Sections().Single(section => section.Id == "SQLSRC109").Body);
 
         foreach (var parameter in parameters)
@@ -71,7 +64,7 @@ public class DiagnosticsDocumentTests
                 .Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0])
                 .ShouldNotBeNull();
             var errors = new List<SqlParseError>();
-            new SqlGeneratorParameterScope(int.MaxValue).Read(line, marker, errors);
+            new SqlGeneratorParameterScope().Read(line, marker, errors);
             errors.ShouldNotContain(error => error.Kind == SqlParseErrorKind.UnknownGeneratorParameter, parameter);
         }
     }

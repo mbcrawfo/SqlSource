@@ -30,7 +30,7 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
 
     /// <summary>
     /// The rules for the text that has not been read yet.  They may be changed between two lexemes, which is how a
-    /// file's <c>dialect=</c> generator parameter takes effect from the line after it.
+    /// file's <c>-- dialect:</c> marker takes effect from the line after it.
     /// </summary>
     public SqlDialectRules Rules { get; set; } = rules;
 

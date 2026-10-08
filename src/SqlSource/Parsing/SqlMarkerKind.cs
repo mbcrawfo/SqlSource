@@ -13,4 +13,7 @@ internal enum SqlMarkerKind
 
     /// <summary><c>-- generator:</c> carries generator parameters.</summary>
     GeneratorParameters,
+
+    /// <summary><c>-- dialect:</c> names the dialect of the file.</summary>
+    Dialect,
 }

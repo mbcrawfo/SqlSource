@@ -60,35 +60,35 @@ public class FileDiagnosticsTests
     }
 
     [Fact]
-    public void Run_DialectGeneratorParameterInsideAQuery_IsAnErrorAtTheGeneratorParameter()
+    public void Run_DialectMarkerInsideAQuery_IsAnErrorAtTheMarker()
     {
         var run = GeneratorHarness.Run(
             Source,
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n-- generator: dialect=mysql\nSELECT 1;\n")
+            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n-- dialect: mysql\nSELECT 1;\n")
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC115 /app/Repo/Users.sql(2,15)-(2,28): The 'dialect' generator parameter must come before the "
-                + "file's first query and before any SQL",
+            "SQLSRC115 /app/Repo/Users.sql(2,1)-(2,18): The '-- dialect:' marker must come before the file's first "
+                + "query and before any SQL",
         ]);
         run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
     }
 
     [Fact]
-    public void Run_DialectGeneratorParameterThatIsNotValidOrConflicts_IsAnErrorAtTheGeneratorParameter()
+    public void Run_DialectMarkerThatIsNotValidOrConflicts_IsAnErrorAtItsValue()
     {
         var run = GeneratorHarness.Run(
             Source,
             new SqlFile(
                 "/app/Repo/Users.sql",
-                "-- generator: dialect=pgsql\n-- generator: dialect=mysql dialect=oracle\n-- name: GetUser\nSELECT 1;\n"
+                "-- dialect: pgsql\n-- dialect: mysql\n-- dialect: oracle\n-- name: GetUser\nSELECT 1;\n"
             )
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC111 /app/Repo/Users.sql(1,15)-(1,28): 'dialect=pgsql' lacks a value it needs, has one it does "
+            "SQLSRC111 /app/Repo/Users.sql(1,13)-(1,18): 'dialect: pgsql' lacks a value it needs, has one it does "
                 + "not take, or has one that is not valid",
-            "SQLSRC112 /app/Repo/Users.sql(2,29)-(2,43): 'dialect=oracle' conflicts with a setting given earlier in "
+            "SQLSRC112 /app/Repo/Users.sql(3,13)-(3,19): 'dialect: oracle' conflicts with a setting given earlier in "
                 + "the same scope",
         ]);
     }

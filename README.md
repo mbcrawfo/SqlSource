@@ -78,7 +78,7 @@ SqlSource adds the attribute and `SqlLocation` to each project that uses it, as 
 
 ## SQL files
 
-A line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows, is a marker.  Nothing else in a comment is read.  The markers are `-- name:`, `-- summary:` and `-- generator:`, written in any case, and each has its own form for the rest of the line.
+A line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows, is a marker.  Nothing else in a comment is read.  The markers are `-- name:`, `-- summary:`, `-- generator:` and `-- dialect:`, written in any case, and each has its own form for the rest of the line.
 
 ### Queries
 
@@ -94,7 +94,7 @@ A `-- summary:` line inside a query becomes the documentation of its member.  Se
 
 ### What reaches the generated SQL
 
-- The `-- name:`, `-- summary:` and `-- generator:` lines are removed.
+- The `-- name:`, `-- summary:`, `-- generator:` and `-- dialect:` lines are removed.
 - Comments are removed: a line comment is deleted and a block comment becomes one space.  Lines left blank are removed.
 - Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.  So are MariaDB's `/*M! ... */` and Oracle's `--+ ...` when the dialect is theirs.
 - Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect (see Dialects, below).
@@ -109,7 +109,6 @@ A `-- generator:` line holds one or more generator parameters, separated by spac
 | `keep-comments` | Comments and blank lines stay in the SQL |
 | `token-ignore=name` | `{{name}}` is literal text, not a token |
 | `token-validation`, `no-token-validation` | The query's method checks its arguments, or does not, whatever the project says (see Tokens, below) |
-| `dialect=name` | The file is read by the rules of that database (see Dialects, below).  Allowed only before the first `-- name:` line and before any SQL. |
 
 ```sql
 -- name: Report
@@ -152,20 +151,20 @@ For some of its files, with metadata on their items.  Where two lines match a fi
 </ItemGroup>
 ```
 
-For one file, with the `dialect` generator parameter in the file:
+For one file, with a marker in the file:
 
 ```sql
--- generator: dialect=mysql
+-- dialect: mysql
 
 -- name: FindByNote
 SELECT id FROM notes WHERE body = 'it\'s here'; # MySQL reads this as a comment
 ```
 
-The generator parameter wins over the metadata, and the metadata over the property.  A file has one dialect:
+The marker wins over the metadata, and the metadata over the property.  A file has one dialect:
 
-- The generator parameter goes before the file's first `-- name:` line and before its first SQL.  Anywhere else it is the error [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc115).
+- The marker goes before the file's first `-- name:` line and before its first SQL.  Anywhere else it is the error [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc115).
 - It takes effect on the line after it.  Comments above it, such as a licence header, are read by the dialect that the metadata or the property gives.
-- A name that is not a dialect is an error: [SQLSRC011](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc011) in the property or the metadata, [SQLSRC111](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc111) in the generator parameter.
+- A name that is not a dialect is an error: [SQLSRC011](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc011) in the property or the metadata, [SQLSRC111](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc111) in the marker.
 
 ### Options of a dialect
 
@@ -186,7 +185,7 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 ```
 
 ```sql
--- generator: dialect=mysql,no-backslash-escapes
+-- dialect: mysql, no-backslash-escapes
 
 -- name: GetPath
 SELECT 'C:\temp\' AS path;
@@ -194,8 +193,7 @@ SELECT 'C:\temp\' AS path;
 
 - Options are not case-sensitive and come in any order.
 - Only `mysql` and `mariadb` have options.  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect.
-- A value replaces the one it wins over whole.  A file with `dialect=mysql` in a project that sets `mysql,ansi-quotes` is read as plain `mysql`.
-- In the generator parameter, write no space after the comma.
+- A value replaces the one it wins over whole.  A file with `-- dialect: mysql` in a project that sets `mysql,ansi-quotes` is read as plain `mysql`.
 
 ### What a dialect changes
 

@@ -10,7 +10,7 @@ namespace SqlSource.Generation;
 /// <param name="File">
 /// The file.  Compared by reference: the compiler hands out the same object until the file changes.
 /// </param>
-/// <param name="Dialect">The dialect the file is parsed with, unless a generator parameter in it names another.</param>
+/// <param name="Dialect">The dialect the file is parsed with, unless a marker in it names another.</param>
 /// <param name="InvalidValue">The file's metadata as written when it is not a dialect, and null otherwise.</param>
 internal sealed record FileDialect(AdditionalText File, SqlDialectChoice Dialect, string? InvalidValue)
 {

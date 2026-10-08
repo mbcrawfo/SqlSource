@@ -3,7 +3,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// Which dialect a file is read by: the dialect= generator parameter at the top of the file decides, then the
+// Which dialect a file is read by: the -- dialect: marker at the top of the file decides, then the
 // SqlSourceDialect metadata of the file's item, then the project's SqlSourceDialect property, and without any of them
 // it is ANSI.
 public class DialectTests
@@ -48,19 +48,19 @@ public class DialectTests
     [InlineData(null, "mssql", "mysql", SqlServer)]
     [InlineData(null, "ansi", "mysql", Ansi)]
     [InlineData(null, "", "mysql", MySql)]
-    // The file's generator parameter beats both.
+    // The file's marker beats both.
     [InlineData("mysql", null, null, MySql)]
     [InlineData("mysql", "mssql", null, MySql)]
     [InlineData("mssql", "mysql", "mysql", SqlServer)]
     [InlineData("ansi", "mssql", "mysql", Ansi)]
-    public void Run_File_IsReadByItsGeneratorParameterThenItsMetadataThenTheProperty(
-        string? parameter,
+    public void Run_File_IsReadByItsMarkerThenItsMetadataThenTheProperty(
+        string? marker,
         string? metadata,
         string? property,
         string expected
     )
     {
-        var sql = (parameter is null ? string.Empty : "-- generator: dialect=" + parameter + "\n") + Query;
+        var sql = (marker is null ? string.Empty : "-- dialect: " + marker + "\n") + Query;
 
         var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
@@ -77,7 +77,7 @@ public class DialectTests
             "mysql",
             new SqlFile("/app/Repo/A.sql", Query),
             new SqlFile("/app/Repo/B.sql", Query, "mssql"),
-            new SqlFile("/app/Repo/C.sql", "-- generator: dialect=ansi\n" + Query, "mssql")
+            new SqlFile("/app/Repo/C.sql", "-- dialect: ansi\n" + Query, "mssql")
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -88,23 +88,26 @@ public class DialectTests
     }
 
     [Theory]
-    // In the generator parameter, in the metadata and in the property.
+    // In the marker, in the metadata and in the property.
     [InlineData("mysql,no-backslash-escapes", null, null)]
     [InlineData(null, "mysql,no-backslash-escapes", null)]
     [InlineData(null, null, "mysql,no-backslash-escapes")]
     // As the server spells it, with the whitespace of a value written over several lines.
     [InlineData(null, null, "\n    MySQL,\n    NO_BACKSLASH_ESCAPES\n  ")]
     [InlineData(null, "mariadb , ansi_quotes , no_backslash_escapes", null)]
+    // In the marker the value is the rest of the line, read as the property is.
+    [InlineData("mysql, no-backslash-escapes", null, null)]
+    [InlineData("MySQL ,  NO_BACKSLASH_ESCAPES", null, null)]
     // A value with the option wins over one without it.
     [InlineData("mariadb,no-backslash-escapes", "mysql", "postgres")]
     [InlineData(null, "mysql,no-backslash-escapes", "mysql")]
-    public void Run_OptionOfADialect_IsReadFromTheGeneratorParameterTheMetadataAndTheProperty(
-        string? parameter,
+    public void Run_OptionOfADialect_IsReadFromTheMarkerTheMetadataAndTheProperty(
+        string? marker,
         string? metadata,
         string? property
     )
     {
-        var sql = (parameter is null ? string.Empty : "-- generator: dialect=" + parameter + "\n") + PathQuery;
+        var sql = (marker is null ? string.Empty : "-- dialect: " + marker + "\n") + PathQuery;
 
         var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
@@ -118,13 +121,9 @@ public class DialectTests
     [InlineData("mysql", null, "mysql,no-backslash-escapes")]
     [InlineData("mysql", "mysql,no-backslash-escapes", null)]
     [InlineData(null, "mysql", "mysql,no-backslash-escapes")]
-    public void Run_ValueWithoutTheOption_ReplacesAValueWithItWhole(
-        string? parameter,
-        string? metadata,
-        string? property
-    )
+    public void Run_ValueWithoutTheOption_ReplacesAValueWithItWhole(string? marker, string? metadata, string? property)
     {
-        var sql = (parameter is null ? string.Empty : "-- generator: dialect=" + parameter + "\n") + PathQuery;
+        var sql = (marker is null ? string.Empty : "-- dialect: " + marker + "\n") + PathQuery;
 
         var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
@@ -144,11 +143,11 @@ public class DialectTests
     }
 
     [Fact]
-    public void Run_GeneratorParameterWithAnOptionThatIsNotValid_IsAnErrorAtTheGeneratorParameter()
+    public void Run_MarkerWithAnOptionThatIsNotValid_IsAnErrorAtItsValue()
     {
-        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- generator: dialect=postgres,ansi-quotes\n" + Query));
+        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- dialect: postgres,ansi-quotes\n" + Query));
 
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC111 /app/Repo/Q.sql(1,15)-(1,43): ");
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC111 /app/Repo/Q.sql(1,13)-(1,33): ");
     }
 
     // A bytes literal that ends with an escaped quote.  PostgreSQL has no escape there, and does not close it.
@@ -228,9 +227,9 @@ public class DialectTests
     }
 
     [Fact]
-    public void Run_InvalidMetadataOfAFileWithAGeneratorParameter_IsStillReportedAndTheGeneratorParameterIsUsed()
+    public void Run_InvalidMetadataOfAFileWithAMarker_IsStillReportedAndTheMarkerIsUsed()
     {
-        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- generator: dialect=mysql\n" + Query, "nope"));
+        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- dialect: mysql\n" + Query, "nope"));
 
         run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): 'nope" + Invalid]);
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + MySql + "\";");

@@ -108,8 +108,8 @@ public class SqlDialectNameTests
     [Fact]
     public void TryParse_Span_ReadsTheSameNamesAndOptions()
     {
-        SqlDialectName.TryParse("dialect=MariaDB".AsSpan(8), out var plain).ShouldBeTrue();
-        SqlDialectName.TryParse("dialect=MariaDB,ansi-quotes".AsSpan(8), out var withOption).ShouldBeTrue();
+        SqlDialectName.TryParse("dialect: MariaDB".AsSpan(9), out var plain).ShouldBeTrue();
+        SqlDialectName.TryParse("dialect: MariaDB,ansi-quotes".AsSpan(9), out var withOption).ShouldBeTrue();
 
         plain.ShouldBe(new SqlDialectChoice(SqlDialect.MariaDb, SqlDialectOptions.None));
         withOption.ShouldBe(new SqlDialectChoice(SqlDialect.MariaDb, SqlDialectOptions.AnsiQuotes));

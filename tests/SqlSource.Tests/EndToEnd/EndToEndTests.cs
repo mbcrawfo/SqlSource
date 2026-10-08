@@ -125,8 +125,8 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void ProjectWithADialect_FileWithAGeneratorParameter_IsReadByTheDialectItNames() =>
-        DialectQueries.ByParameter.ShouldBe("SELECT [it's] FROM #orders;");
+    public void ProjectWithADialect_FileWithAMarker_IsReadByTheDialectItNames() =>
+        DialectQueries.ByMarker.ShouldBe("SELECT [it's] FROM #orders;");
 
     [Fact]
     public void Method_Call_AllocatesTheStringItReturnsAndNothingElse()

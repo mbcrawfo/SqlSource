@@ -71,6 +71,7 @@ public class SqlTextBuilderTests
     [InlineData("-- summary: x\nSELECT 1\n  -- generator: keep-comments\nFROM t\n-- name: Next", "SELECT 1\nFROM t")]
     [InlineData("SELECT 1\n-- summary: x   ", "SELECT 1")]
     [InlineData("\t-- summary: x\nSELECT 1", "SELECT 1")]
+    [InlineData("-- dialect: mysql\nSELECT 1", "SELECT 1")]
     public void Build_MarkerLines_AreRemoved(string text, string expected)
     {
         Build(text).ShouldBe(expected);

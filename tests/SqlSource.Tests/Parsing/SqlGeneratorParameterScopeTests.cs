@@ -12,11 +12,10 @@ public class SqlGeneratorParameterScopeTests
     [Fact]
     public void NewScope_HasNoGeneratorParameters()
     {
-        var scope = new SqlGeneratorParameterScope(headerEnd: 0);
+        var scope = new SqlGeneratorParameterScope();
 
         scope.KeepComments.ShouldBeFalse();
         scope.TokenValidation.ShouldBeNull();
-        scope.Dialect.ShouldBeNull();
         scope.IgnoredTokens.ShouldBeEmpty();
     }
 
@@ -105,6 +104,10 @@ public class SqlGeneratorParameterScopeTests
     [InlineData("strip-comments")]
     [InlineData("foo=bar")]
     [InlineData("=x")]
+    // The dialect is a marker of its own.  As a generator parameter the word means nothing.
+    [InlineData("dialect=mysql")]
+    [InlineData("dialect")]
+    [InlineData("DIALECT=postgres")]
     public void Read_UnknownGeneratorParameter_IsAnError(string parameter)
     {
         var line = "-- generator: " + parameter;
@@ -186,228 +189,10 @@ public class SqlGeneratorParameterScopeTests
         scope.KeepComments.ShouldBeTrue();
     }
 
-    [Theory]
-    [InlineData("dialect=mysql", nameof(SqlDialect.MySql))]
-    [InlineData("DIALECT=Postgres", nameof(SqlDialect.PostgreSql))]
-    [InlineData("Dialect=TSQL", nameof(SqlDialect.SqlServer))]
-    [InlineData("dialect=ansi", nameof(SqlDialect.Ansi))]
-    public void Read_Dialect_KeepsTheDialectItNames(string parameter, string expected)
-    {
-        var (scope, errors) = Read("-- generator: " + parameter);
-
-        errors.ShouldBeEmpty();
-        scope.Dialect.ShouldBe(Plain(Enum.Parse<SqlDialect>(expected)));
-    }
-
-    [Theory]
-    [InlineData("dialect")]
-    [InlineData("dialect=")]
-    [InlineData("dialect=pgsql")]
-    [InlineData("dialect=mysql,postgres")]
-    [InlineData("dialect=mysql=x")]
-    [InlineData("dialect=mysql,")]
-    [InlineData("dialect=mysql,nope")]
-    [InlineData("dialect=postgres,ansi-quotes")]
-    public void Read_DialectWithoutAValueOrWithAnUnknownName_IsAnError(string parameter)
-    {
-        var line = "-- generator: " + parameter;
-
-        var (scope, errors) = Read(line);
-
-        errors.ShouldBe([
-            SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(line, parameter), parameter),
-        ]);
-        scope.Dialect.ShouldBeNull();
-    }
-
-    [Fact]
-    public void Read_SameDialectTwice_IsAllowed()
-    {
-        var (scope, errors) = Read("-- generator: dialect=mssql dialect=tsql", "-- generator: dialect=SqlServer");
-
-        errors.ShouldBeEmpty();
-        scope.Dialect.ShouldBe(Plain(SqlDialect.SqlServer));
-    }
-
-    [Fact]
-    public void Read_DialectWithOptions_KeepsTheDialectAndItsOptions()
-    {
-        var (scope, errors) = Read("-- generator: keep-comments DIALECT=MySql,ANSI_QUOTES");
-
-        errors.ShouldBeEmpty();
-        scope.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes));
-    }
-
-    [Fact]
-    public void Read_SameDialectAndOptionsTwice_IsAllowed()
-    {
-        var (scope, errors) = Read(
-            "-- generator: dialect=mysql,ansi-quotes,no-backslash-escapes",
-            "-- generator: dialect=MySQL,NO_BACKSLASH_ESCAPES,ANSI_QUOTES"
-        );
-
-        errors.ShouldBeEmpty();
-        scope.Dialect.ShouldBe(
-            new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes | SqlDialectOptions.NoBackslashEscapes)
-        );
-    }
-
-    [Fact]
-    public void Read_SameDialectWithOtherOptions_ReportsTheSecondAndKeepsTheFirst()
-    {
-        const string Line = "-- generator: dialect=mysql dialect=mysql,ansi-quotes";
-
-        var (scope, errors) = Read(Line);
-
-        errors.ShouldBe([
-            SqlParseError.Create(
-                SqlParseErrorKind.ConflictingSettings,
-                SpanOf(Line, "dialect=mysql,ansi-quotes"),
-                "dialect=mysql,ansi-quotes"
-            ),
-        ]);
-        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
-    }
-
-    // A generator parameter is one word.  A space after the comma ends it, and the option is read as a generator
-    // parameter of its own.
-    [Fact]
-    public void Read_SpaceAfterTheCommaOfADialect_IsTwoErrors()
-    {
-        const string Line = "-- generator: dialect=mysql, ansi-quotes";
-
-        var (scope, errors) = Read(Line);
-
-        errors.ShouldBe([
-            SqlParseError.Create(
-                SqlParseErrorKind.InvalidMarkerValue,
-                SpanOf(Line, "dialect=mysql,"),
-                "dialect=mysql,"
-            ),
-            SqlParseError.Create(
-                SqlParseErrorKind.UnknownGeneratorParameter,
-                SpanOf(Line, "ansi-quotes"),
-                "ansi-quotes"
-            ),
-        ]);
-        scope.Dialect.ShouldBeNull();
-    }
-
-    [Fact]
-    public void TryFindDialect_MarkerWithOptions_GivesTheFirstValueThatIsValid()
-    {
-        const string Line = "-- generator: dialect=mysql, dialect=mariadb,no-backslash-escapes dialect=mysql";
-
-        SqlGeneratorParameterScope.TryFindDialect(Line, Marker(Line), out var dialect).ShouldBeTrue();
-
-        dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MariaDb, SqlDialectOptions.NoBackslashEscapes));
-    }
-
-    [Fact]
-    public void Read_TwoDialectsOnOneLine_ReportsTheSecondAndKeepsTheFirst()
-    {
-        const string Line = "-- generator: dialect=mysql dialect=oracle";
-
-        var (scope, errors) = Read(Line);
-
-        errors.ShouldBe([
-            SqlParseError.Create(
-                SqlParseErrorKind.ConflictingSettings,
-                SpanOf(Line, "dialect=oracle"),
-                "dialect=oracle"
-            ),
-        ]);
-        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
-    }
-
-    [Fact]
-    public void Read_TwoDialectsOnSeparateLines_IsAnError()
-    {
-        var (scope, errors) = Read("-- generator: dialect=mysql", "-- generator: dialect=mariadb");
-
-        errors.ShouldHaveSingleItem().Kind.ShouldBe(SqlParseErrorKind.ConflictingSettings);
-        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
-    }
-
-    // The generator parameter starts at offset 14 of the line.
-    [Theory]
-    [InlineData(0)]
-    [InlineData(14)]
-    public void Read_DialectAtOrAfterTheHeaderEnd_IsMisplacedWhateverItNames(int headerEnd)
-    {
-        var (scope, errors) = Read(headerEnd, "-- generator: dialect=mysql keep-comments", "-- generator: dialect=x");
-
-        errors.ShouldBe([
-            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, new TextSpan(14, 13), "dialect=mysql"),
-            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, new TextSpan(14, 9), "dialect=x"),
-        ]);
-        scope.Dialect.ShouldBeNull();
-        scope.KeepComments.ShouldBeTrue();
-    }
-
-    [Fact]
-    public void Read_DialectJustBeforeTheHeaderEnd_IsAccepted()
-    {
-        var (scope, errors) = Read(15, "-- generator: dialect=mysql");
-
-        errors.ShouldBeEmpty();
-        scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
-    }
-
-    [Theory]
-    [InlineData("-- generator: dialect=mysql", nameof(SqlDialect.MySql))]
-    [InlineData("-- generator: keep-comments DIALECT=Oracle token-ignore=a", nameof(SqlDialect.Oracle))]
-    [InlineData("-- generator: dialect=nope dialect= dialect dialect=sqlite", nameof(SqlDialect.Sqlite))]
-    [InlineData("-- generator: dialect=mysql dialect=oracle", nameof(SqlDialect.MySql))]
-    public void TryFindDialect_MarkerWithADialect_GivesTheFirstThatIsValid(string line, string expected)
-    {
-        SqlGeneratorParameterScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeTrue();
-
-        dialect.ShouldBe(Plain(Enum.Parse<SqlDialect>(expected)));
-    }
-
-    [Theory]
-    [InlineData("-- generator: keep-comments")]
-    [InlineData("-- generator:")]
-    [InlineData("-- generator: dialect")]
-    [InlineData("-- generator: dialect=")]
-    [InlineData("-- generator: dialect=pgsql")]
-    [InlineData("-- generator: xdialect=mysql")]
-    [InlineData("-- generator: dialects=mysql")]
-    [InlineData("-- generator: dialect:mysql")]
-    [InlineData("-- generator: dialect = mysql")]
-    public void TryFindDialect_MarkerWithoutAValidDialect_FindsNone(string line)
-    {
-        SqlGeneratorParameterScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeFalse();
-
-        dialect.ShouldBe(default);
-    }
-
-    [Fact]
-    public void ReportMisplacedDialects_Marker_ReportsEachDialectGeneratorParameterWhateverItNamesAndNothingElse()
-    {
-        const string Line = "-- generator: keep-comments dialect=mysql bogus DIALECT dialect=nope dialects=x";
-        var errors = new List<SqlParseError>();
-
-        SqlGeneratorParameterScope.ReportMisplacedDialects(Line, Marker(Line), errors);
-
-        errors.ShouldBe([
-            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, SpanOf(Line, "dialect=mysql"), "dialect=mysql"),
-            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, SpanOf(Line, "DIALECT"), "DIALECT"),
-            SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, SpanOf(Line, "dialect=nope"), "dialect=nope"),
-        ]);
-    }
-
-    private static (SqlGeneratorParameterScope Scope, List<SqlParseError> Errors) Read(params string[] lines) =>
-        Read(int.MaxValue, lines);
-
     // Each line is lexed alone, so every generator parameter is at the offset it has in its own line.
-    private static (SqlGeneratorParameterScope Scope, List<SqlParseError> Errors) Read(
-        int headerEnd,
-        params string[] lines
-    )
+    private static (SqlGeneratorParameterScope Scope, List<SqlParseError> Errors) Read(params string[] lines)
     {
-        var scope = new SqlGeneratorParameterScope(headerEnd);
+        var scope = new SqlGeneratorParameterScope();
         var errors = new List<SqlParseError>();
         foreach (var line in lines)
         {
@@ -425,6 +210,4 @@ public class SqlGeneratorParameterScopeTests
 
     private static TextSpan SpanOf(string text, string value) =>
         new(text.LastIndexOf(value, StringComparison.Ordinal), value.Length);
-
-    private static SqlDialectChoice Plain(SqlDialect dialect) => new(dialect, SqlDialectOptions.None);
 }

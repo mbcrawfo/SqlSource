@@ -32,4 +32,4 @@ SQLSRC111 | SqlSource | Error | Marker value is not valid
 SQLSRC112 | SqlSource | Error | Settings conflict
 SQLSRC113 | SqlSource | Error | Query has no SQL
 SQLSRC114 | SqlSource | Error | Token name is a keyword
-SQLSRC115 | SqlSource | Error | Dialect parameter is misplaced
+SQLSRC115 | SqlSource | Error | Dialect marker is misplaced

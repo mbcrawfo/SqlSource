@@ -3,9 +3,8 @@ using System;
 namespace SqlSource.Parsing;
 
 /// <summary>
-/// The names a dialect and its options are set by: in the <c>dialect=</c> generator parameter, in the
-/// <c>SqlSourceDialect</c> MSBuild property and in the metadata of the same name.  This is the only place the names
-/// are known.
+/// The names a dialect and its options are set by: in the <c>-- dialect:</c> marker, in the <c>SqlSourceDialect</c>
+/// MSBuild property and in the metadata of the same name.  This is the only place the names are known.
 /// </summary>
 /// <remarks>
 /// A value is the name of a dialect, then any options of that dialect, separated by commas:

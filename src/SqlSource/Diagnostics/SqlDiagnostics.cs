@@ -244,8 +244,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor MarkerAtEndOfBlock = new(
         id: "SQLSRC108",
         title: "Marker has no SQL after it",
-        messageFormat: "A '-- summary:' or '-- generator:' marker comes before the SQL it describes, and no SQL "
-            + "follows this one in its query",
+        messageFormat: "A '-- summary:', '-- generator:' or '-- dialect:' marker comes before the SQL it describes, "
+            + "and no SQL follows this one in its query",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -321,8 +321,8 @@ internal static class SqlDiagnostics
 
     public static readonly DiagnosticDescriptor MisplacedDialect = new(
         id: "SQLSRC115",
-        title: "Dialect parameter is misplaced",
-        messageFormat: "The 'dialect' generator parameter must come before the file's first query and before any SQL",
+        title: "Dialect marker is misplaced",
+        messageFormat: "The '-- dialect:' marker must come before the file's first query and before any SQL",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

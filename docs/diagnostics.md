@@ -31,7 +31,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC112](#sqlsrc112) | Settings conflict |
 | [SQLSRC113](#sqlsrc113) | Query has no SQL |
 | [SQLSRC114](#sqlsrc114) | Token name is a keyword |
-| [SQLSRC115](#sqlsrc115) | Dialect parameter is misplaced |
+| [SQLSRC115](#sqlsrc115) | Dialect marker is misplaced |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
@@ -285,7 +285,7 @@ Add a `-- name:` marker at the top of the file, or rename the file.  If the file
 
 **SQL before the first name**
 
-In a file that has `-- name:` markers, only comments and `-- generator:` lines may come before the first one.  SQL there would belong to no query.
+In a file that has `-- name:` markers, only comments, `-- generator:` lines and a `-- dialect:` marker may come before the first one.  SQL there would belong to no query.
 
 ```sql
 SET search_path TO app;
@@ -314,7 +314,7 @@ Move the summary below the `-- name:` marker.
 
 **Marker has no SQL after it**
 
-A `-- summary:` or `-- generator:` marker comes before the SQL it describes.  This one is the last thing in its query, which usually means it was written above the next `-- name:` marker and was meant for that query.
+A `-- summary:`, `-- generator:` or `-- dialect:` marker comes before the SQL it describes.  This one is the last thing in its query, which usually means it was written above the next `-- name:` marker and was meant for that query.
 
 ```sql
 -- name: GetUser
@@ -330,13 +330,13 @@ Move the marker below the `-- name:` marker of the query it describes, or delete
 
 **Generator parameter is not known**
 
-A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation`, `no-token-validation`, `token-ignore=name` and `dialect=name`.
+A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation`, `no-token-validation` and `token-ignore=name`.
 
 ```sql
 -- generator: keep-comment
 ```
 
-Correct the generator parameter.
+Correct the parameter.  A dialect is not a generator parameter: it has a marker of its own, `-- dialect: name`.
 
 ## SQLSRC110
 
@@ -350,16 +350,17 @@ Add a generator parameter, or delete the line.
 
 **Marker value is not valid**
 
-A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid.
+A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid; or a `-- dialect:` marker does not name a dialect.
 
 - `token-ignore` needs a value that is a C# identifier, as in `token-ignore=table`.
-- `dialect` needs the name of a dialect, as in `dialect=postgres`, with any options after it, as in `dialect=mysql,ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is one word: a space after a comma ends it.
 - No other generator parameter takes a value.
+- `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
 
 ```sql
 -- generator: token-ignore
--- generator: dialect=pgsql
 -- generator: keep-comments=true
+-- dialect: pgsql
+-- dialect: mysql keep-comments
 ```
 
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
@@ -368,12 +369,12 @@ Add the missing value, correct the one that is wrong, or remove the one that doe
 
 **Settings conflict**
 
-Two generator parameters in one scope contradict each other.  A scope is the lines before the first `-- name:` marker, or one query.  The error is at the second generator parameter.
+Two settings contradict each other.  The error is at the second.
 
-- `token-validation` and `no-token-validation` both appear.
-- Two `dialect` generator parameters name different dialects, or one dialect with different options.  A file has one dialect.
+- `token-validation` and `no-token-validation` both appear in one scope.  A scope is the lines before the first `-- name:` marker, or one query.
+- Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 
-Remove one of the two.  A validation generator parameter in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
+Remove one of the two.  A validation parameter in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
 ## SQLSRC113
 
@@ -402,25 +403,23 @@ Rename the token.  If the braces are literal text and not a token, add `-- gener
 
 ## SQLSRC115
 
-**Dialect parameter is misplaced**
+**Dialect marker is misplaced**
 
-The `dialect` generator parameter sets the dialect of a whole file, and it changes how the text after it is read.  So it must come before the file's first `-- name:` marker and before the file's first SQL.  This one is inside a named query, or after SQL.
+A `-- dialect:` marker sets the dialect of a whole file, and it changes how the text after it is read.  So it must come before the file's first `-- name:` marker and before the file's first SQL.  This one is inside a named query, or after SQL.
 
 ```sql
 -- name: GetUser
--- generator: dialect=mysql
+-- dialect: mysql
 SELECT 1;
 ```
 
-A generator parameter after the last SQL of its query is reported twice: as this error, and as [SQLSRC108](#sqlsrc108).
+A marker after the last SQL of its query is reported twice: as this error, and as [SQLSRC108](#sqlsrc108).
 
-Move the generator parameter to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
+Move the marker to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
 
 ```sql
--- generator: dialect=mysql
+-- dialect: mysql
 
 -- name: GetUser
 SELECT 1;
 ```
-
-A file cannot mix dialects.  Put the queries for another database in a file of their own.

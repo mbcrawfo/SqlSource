@@ -16,13 +16,13 @@ internal static class SqlFileParser
     /// <summary>
     /// Parses <paramref name="text" />.  <paramref name="fileName" /> is the file's name with its extension and without
     /// a directory; it names the block of a file that has no <c>-- name:</c> marker.  <paramref name="dialect" /> is
-    /// the dialect, with its options, that the project gives the file.  A <c>dialect=</c> generator parameter in the
-    /// file's header replaces it whole for the text after the generator parameter.
+    /// the dialect, with its options, that the project gives the file.  A <c>-- dialect:</c> marker in the file's
+    /// header replaces it whole for the text after the marker.
     /// </summary>
     public static SqlFileParseResult Parse(string text, string fileName, SqlDialectChoice dialect = default)
     {
         var lexer = new SqlLexer(text, SqlDialectRules.For(dialect));
-        var headerEnd = SqlPreambleDialect.Apply(lexer, text);
+        var headerEnd = SqlDialectMarker.Apply(lexer, text);
         var lexed = lexer.ReadToEnd();
         return lexed.Error is null
             ? new Parser(text, fileName, lexed.Lexemes, headerEnd).Run()
@@ -39,6 +39,10 @@ internal static class SqlFileParser
         private readonly List<SqlBlock> _blocks = [];
         private readonly List<SqlParseError> _errors = [];
         private readonly HashSet<string> _names = [];
+
+        // The dialect that a marker of the file has named so far.  It is already in effect by the time the markers
+        // are read here; it is kept to find a second marker that names another.
+        private SqlDialectChoice? _dialect;
 
         public SqlFileParseResult Run()
         {
@@ -88,7 +92,7 @@ internal static class SqlFileParser
                 AddError(SqlParseErrorKind.InvalidFileName, FileStart, fileName);
             }
 
-            ReadBlock(name, FileStart, new SqlGeneratorParameterScope(headerEnd), 0, lexemes.Count);
+            ReadBlock(name, FileStart, new SqlGeneratorParameterScope(), 0, lexemes.Count);
         }
 
         private void ReadNamedBlocks(List<(int Index, SqlMarker Marker)> nameMarkers)
@@ -116,7 +120,7 @@ internal static class SqlFileParser
 
         private SqlGeneratorParameterScope ReadPreamble(int end)
         {
-            var scope = new SqlGeneratorParameterScope(headerEnd);
+            var scope = new SqlGeneratorParameterScope();
             var sqlReported = false;
             for (var index = 0; index < end; index++)
             {
@@ -125,6 +129,10 @@ internal static class SqlFileParser
                 if (marker is { Kind: SqlMarkerKind.GeneratorParameters })
                 {
                     scope.Read(text, marker.Value, _errors);
+                }
+                else if (marker is { Kind: SqlMarkerKind.Dialect })
+                {
+                    ReadDialect(marker.Value);
                 }
                 else if (marker is { Kind: SqlMarkerKind.Summary })
                 {
@@ -142,7 +150,7 @@ internal static class SqlFileParser
 
         private void ReadBlock(string name, TextSpan nameSpan, SqlGeneratorParameterScope inherited, int start, int end)
         {
-            var scope = new SqlGeneratorParameterScope(headerEnd);
+            var scope = new SqlGeneratorParameterScope();
             var summary = new List<string>();
             var lastContent = FindLastContent(start, end);
             for (var index = start; index < end; index++)
@@ -151,18 +159,22 @@ internal static class SqlFileParser
                 if (marker is not null && lastContent >= 0 && index > lastContent)
                 {
                     // A marker comes before the SQL it describes.  One after the block's last SQL would be taken by a
-                    // reader to belong to the next block, so it is rejected and not applied.  A dialect generator
-                    // parameter in it is reported as misplaced too: it belongs at the top of the file, not above the
-                    // next SQL.
+                    // reader to belong to the next block, so it is rejected and not applied.  A dialect marker there
+                    // is past the header by definition, and is reported as misplaced too: it belongs at the top of
+                    // the file, not above the next SQL.
                     AddError(SqlParseErrorKind.MarkerAtEndOfBlock, marker.Value.Span);
-                    if (marker.Value.Kind == SqlMarkerKind.GeneratorParameters)
+                    if (marker.Value.Kind == SqlMarkerKind.Dialect)
                     {
-                        SqlGeneratorParameterScope.ReportMisplacedDialects(text, marker.Value, _errors);
+                        ReadDialect(marker.Value);
                     }
                 }
                 else if (marker is { Kind: SqlMarkerKind.GeneratorParameters })
                 {
                     scope.Read(text, marker.Value, _errors);
+                }
+                else if (marker is { Kind: SqlMarkerKind.Dialect })
+                {
+                    ReadDialect(marker.Value);
                 }
                 else if (marker is { Kind: SqlMarkerKind.Summary, ValueSpan.IsEmpty: false })
                 {
@@ -195,6 +207,30 @@ internal static class SqlFileParser
                     scanned.Segments
                 )
             );
+        }
+
+        // The place is checked first: a marker in the wrong place is reported as that, whatever it names.
+        private void ReadDialect(SqlMarker marker)
+        {
+            if (marker.Span.Start >= headerEnd)
+            {
+                AddError(SqlParseErrorKind.MisplacedDialect, marker.Span);
+                return;
+            }
+
+            var place = marker.ValueSpan.IsEmpty ? marker.Span : marker.ValueSpan;
+            if (!SqlDialectMarker.TryRead(text, marker, out var dialect))
+            {
+                AddError(SqlParseErrorKind.InvalidMarkerValue, place, SqlDialectMarker.Describe(text, marker));
+            }
+            else if (_dialect is { } existing && existing != dialect)
+            {
+                AddError(SqlParseErrorKind.ConflictingSettings, place, SqlDialectMarker.Describe(text, marker));
+            }
+            else
+            {
+                _dialect = dialect;
+            }
         }
 
         // The index of the last lexeme from start up to end that holds SQL, or -1 when none does.
