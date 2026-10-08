@@ -56,7 +56,8 @@ internal static class SqlTextBuilder
     {
         private readonly List<(int Output, int Source)> _runs = [];
 
-        private readonly List<TextSpan> _parameters = [];
+        // Created at the first parameter: most blocks have none.
+        private List<TextSpan>? _parameters;
 
         // The length of the finished output: whole lines, with no line break after the last one.
         private int _finished;
@@ -85,7 +86,7 @@ internal static class SqlTextBuilder
             {
                 // A parameter is on a line with content and never on a marker's line, so the line is kept and the
                 // offset stands.
-                _parameters.Add(new TextSpan(_position, lexeme.Span.Length));
+                (_parameters ??= []).Add(new TextSpan(_position, lexeme.Span.Length));
                 AppendLines(lexeme);
             }
             else if (keepComments || lexeme.Kind == SqlLexemeKind.Text)
@@ -103,7 +104,11 @@ internal static class SqlTextBuilder
         public SqlBlockText Finish()
         {
             EndLine();
-            return new SqlBlockText(new string(buffer, 0, _finished), [.. _runs], [.. _parameters]);
+            return new SqlBlockText(
+                new string(buffer, 0, _finished),
+                [.. _runs],
+                _parameters is null ? [] : [.. _parameters]
+            );
         }
 
         // Text and kept comments: a line terminator ends the output line.

@@ -10,7 +10,13 @@ namespace SqlSource.Parsing;
 /// </summary>
 internal static class SqlParameterList
 {
-    public static EquatableArray<SqlQueryParameter> Create(SqlBlockText sql)
+    /// <summary>
+    /// A parameter inside a token is part of a sample, not of the SQL, and is left out.
+    /// </summary>
+    public static EquatableArray<SqlQueryParameter> Create(
+        SqlBlockText sql,
+        EquatableArray<SqlTokenOccurrence> occurrences
+    )
     {
         if (sql.Parameters.Length == 0)
         {
@@ -18,17 +24,29 @@ internal static class SqlParameterList
         }
 
         var parameters = ImmutableArray.CreateBuilder<SqlQueryParameter>();
+        var token = 0;
         foreach (var span in sql.Parameters)
         {
-            if (IndexOf(parameters, sql.Text, span) >= 0)
+            // Both lists are in the order of the SQL.
+            while (token < occurrences.Count && occurrences[token].Span.End <= span.Start)
+            {
+                token++;
+            }
+
+            if (token < occurrences.Count && occurrences[token].Span.Start <= span.Start)
             {
                 continue;
             }
 
-            parameters.Add(new SqlQueryParameter(NameOf(sql.Text, span), null, null, false));
+            if (IndexOf(parameters, sql.Text, span) < 0)
+            {
+                parameters.Add(new SqlQueryParameter(NameOf(sql.Text, span), null, null, false));
+            }
         }
 
-        return new EquatableArray<SqlQueryParameter>(parameters.ToImmutable());
+        return parameters.Count == 0
+            ? EquatableArray<SqlQueryParameter>.Empty
+            : new EquatableArray<SqlQueryParameter>(parameters.ToImmutable());
     }
 
     // The span holds the prefix, which is one character.

@@ -25,16 +25,25 @@ internal static class SqlFileParser
         var headerEnd = SqlDialectMarker.Apply(lexer, text);
         var lexed = lexer.ReadToEnd();
         return lexed.Error is null
-            ? new Parser(text, fileName, lexed.Lexemes, headerEnd).Run()
+            ? new Parser(text, fileName, lexed.Lexemes, headerEnd, lexer.Rules).Run()
             : new SqlFileParseResult(
                 EquatableArray<SqlBlock>.Empty,
                 new EquatableArray<SqlParseError>(ImmutableArray.Create(lexed.Error))
             );
     }
 
-    private sealed class Parser(string text, string fileName, EquatableArray<SqlLexeme> lexemes, int headerEnd)
+    private sealed class Parser(
+        string text,
+        string fileName,
+        EquatableArray<SqlLexeme> lexemes,
+        int headerEnd,
+        SqlDialectRules rules
+    )
     {
         private static readonly TextSpan FileStart = new(0, 0);
+
+        // Shared and never changed.
+        private static readonly HashSet<string> NoNames = [];
 
         private readonly List<SqlBlock> _blocks = [];
         private readonly List<SqlParseError> _errors = [];
@@ -92,7 +101,7 @@ internal static class SqlFileParser
                 AddError(SqlParseErrorKind.InvalidFileName, FileStart, fileName);
             }
 
-            ReadBlock(name, FileStart, new SqlGeneratorParameterScope(), 0, lexemes.Count);
+            ReadBlock(name, FileStart, null, 0, lexemes.Count);
         }
 
         private void ReadNamedBlocks(List<(int Index, SqlMarker Marker)> nameMarkers)
@@ -118,25 +127,27 @@ internal static class SqlFileParser
             }
         }
 
-        private SqlGeneratorParameterScope ReadPreamble(int end)
+        private SqlMarkerScope ReadPreamble(int end)
         {
-            var scope = new SqlGeneratorParameterScope();
+            var scope = new SqlMarkerScope(text, rules, _errors);
             var sqlReported = false;
             for (var index = 0; index < end; index++)
             {
                 var lexeme = lexemes[index];
-                var marker = SqlMarkerReader.Read(text, lexeme);
-                if (marker is { Kind: SqlMarkerKind.GeneratorParameters })
+                if (SqlMarkerReader.Read(text, lexeme) is { } marker)
                 {
-                    scope.Read(text, marker.Value, _errors);
-                }
-                else if (marker is { Kind: SqlMarkerKind.Dialect })
-                {
-                    ReadDialect(marker.Value);
-                }
-                else if (marker is { Kind: SqlMarkerKind.Summary })
-                {
-                    AddError(SqlParseErrorKind.SummaryBeforeFirstName, marker.Value.Span);
+                    if (marker.Kind == SqlMarkerKind.Dialect)
+                    {
+                        ReadDialect(marker);
+                    }
+                    else if (marker.Kind == SqlMarkerKind.Summary)
+                    {
+                        AddError(SqlParseErrorKind.SummaryBeforeFirstName, marker.Span);
+                    }
+                    else
+                    {
+                        scope.Read(marker, inQuery: false, inPreamble: true);
+                    }
                 }
                 else if (!sqlReported && lexeme.GetContentSpan(text) is { } content)
                 {
@@ -148,37 +159,50 @@ internal static class SqlFileParser
             return scope;
         }
 
-        private void ReadBlock(string name, TextSpan nameSpan, SqlGeneratorParameterScope inherited, int start, int end)
+        // preamble is null for a file with no name marker: the file is one query and its own preamble.
+        private void ReadBlock(string name, TextSpan nameSpan, SqlMarkerScope? preamble, int start, int end)
         {
-            var scope = new SqlGeneratorParameterScope();
+            // Created at the first marker the scope takes: most queries have none.
+            SqlMarkerScope? scope = null;
             var summary = new List<string>();
             var lastContent = FindLastContent(start, end);
             for (var index = start; index < end; index++)
             {
-                var marker = SqlMarkerReader.Read(text, lexemes[index]);
-                if (marker is not null && lastContent >= 0 && index > lastContent)
+                if (SqlMarkerReader.Read(text, lexemes[index]) is not { } marker)
+                {
+                    continue;
+                }
+
+                if (lastContent >= 0 && index > lastContent)
                 {
                     // A marker comes before the SQL it describes.  One after the block's last SQL would be taken by a
                     // reader to belong to the next block, so it is rejected and not applied.  A dialect marker there
                     // is past the header by definition, and is reported as misplaced too: it belongs at the top of
                     // the file, not above the next SQL.
-                    AddError(SqlParseErrorKind.MarkerAtEndOfBlock, marker.Value.Span);
-                    if (marker.Value.Kind == SqlMarkerKind.Dialect)
+                    AddError(SqlParseErrorKind.MarkerAtEndOfBlock, marker.Span);
+                    if (marker.Kind == SqlMarkerKind.Dialect)
                     {
-                        ReadDialect(marker.Value);
+                        ReadDialect(marker);
                     }
                 }
-                else if (marker is { Kind: SqlMarkerKind.GeneratorParameters })
+                else if (marker.Kind == SqlMarkerKind.Dialect)
                 {
-                    scope.Read(text, marker.Value, _errors);
+                    ReadDialect(marker);
                 }
-                else if (marker is { Kind: SqlMarkerKind.Dialect })
+                else if (marker.Kind == SqlMarkerKind.Summary)
                 {
-                    ReadDialect(marker.Value);
+                    if (!marker.ValueSpan.IsEmpty)
+                    {
+                        summary.Add(text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length));
+                    }
                 }
-                else if (marker is { Kind: SqlMarkerKind.Summary, ValueSpan.IsEmpty: false })
+                else if (marker.Kind != SqlMarkerKind.Name)
                 {
-                    summary.Add(text.Substring(marker.Value.ValueSpan.Start, marker.Value.ValueSpan.Length));
+                    (scope ??= new SqlMarkerScope(text, rules, _errors)).Read(
+                        marker,
+                        inQuery: true,
+                        inPreamble: preamble is null
+                    );
                 }
             }
 
@@ -188,10 +212,11 @@ internal static class SqlFileParser
                 return;
             }
 
-            var keepComments = inherited.KeepComments || scope.KeepComments;
+            var own = scope?.Generator;
+            var inherited = preamble?.Generator;
+            var keepComments = (inherited?.KeepComments ?? false) || (own?.KeepComments ?? false);
             var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments);
-            HashSet<string> ignoredTokens = [.. inherited.IgnoredTokens, .. scope.IgnoredTokens];
-            var scanned = TokenScanner.Scan(sql.Text, ignoredTokens);
+            var scanned = TokenScanner.Scan(sql.Text, IgnoredTokens(own, inherited));
             foreach (var error in scanned.Errors)
             {
                 _errors.Add(error with { Span = sql.ToSourceSpan(error.Span) });
@@ -203,11 +228,36 @@ internal static class SqlFileParser
                     nameSpan,
                     summary.Count == 0 ? null : string.Join(" ", summary),
                     keepComments,
-                    scope.TokenValidation ?? inherited.TokenValidation,
+                    own?.TokenValidation ?? inherited?.TokenValidation,
                     scanned.Segments,
-                    SqlParameterList.Create(sql)
+                    SqlTokenList.Create(text, sql, scanned.Occurrences, scope?.TokenDefaults ?? [], _errors),
+                    SqlParameterList.Create(sql, scanned.Occurrences)
                 )
             );
+        }
+
+        // The names of the two scopes together.  Nothing is allocated unless both have some: the scanner only reads the
+        // set it gets.
+        private static HashSet<string> IgnoredTokens(
+            SqlGeneratorParameterScope? own,
+            SqlGeneratorParameterScope? inherited
+        )
+        {
+            var ownNames = own is { IgnoredTokens.Count: > 0 } ? own.IgnoredTokens : null;
+            var inheritedNames = inherited is { IgnoredTokens.Count: > 0 } ? inherited.IgnoredTokens : null;
+            if (ownNames is null)
+            {
+                return inheritedNames ?? NoNames;
+            }
+
+            if (inheritedNames is null)
+            {
+                return ownNames;
+            }
+
+            var names = new HashSet<string>(ownNames);
+            names.UnionWith(inheritedNames);
+            return names;
         }
 
         // The place is checked first: a marker in the wrong place is reported as that, whatever it names.

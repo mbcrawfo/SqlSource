@@ -16,4 +16,7 @@ internal enum SqlMarkerKind
 
     /// <summary><c>-- dialect:</c> names the dialect of the file.</summary>
     Dialect,
+
+    /// <summary><c>-- token:</c> gives a token of its query a default.</summary>
+    Token,
 }

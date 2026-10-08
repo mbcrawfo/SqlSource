@@ -9,7 +9,8 @@ namespace SqlSource.Parsing;
 /// <param name="Kind">What is wrong.</param>
 /// <param name="Span">Where it is, as offsets into the file's text.</param>
 /// <param name="Arguments">
-/// The text a message quotes.  <see cref="SqlParseErrorKind" /> says what each kind carries: one argument or none.
+/// The text a message quotes.  <see cref="SqlParseErrorKind" /> says what each kind carries: one argument, two, or
+/// none.
 /// </param>
 internal sealed record SqlParseError(SqlParseErrorKind Kind, TextSpan Span, EquatableArray<string> Arguments)
 {

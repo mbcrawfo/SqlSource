@@ -14,6 +14,9 @@ namespace SqlSource.Generation;
 /// <param name="Segments">
 /// The SQL, split into literal text and tokens.  Never empty.  Without a token it is one literal segment.
 /// </param>
+/// <param name="Tokens">
+/// The query's tokens, each once, in order of first appearance, with its default.  Empty when the SQL has none.
+/// </param>
 /// <param name="TokenValidation">
 /// True or false when a validation generator parameter applies to the query, null when the project's setting decides.
 /// </param>
@@ -23,6 +26,7 @@ internal sealed record SqlQuery(
     LocationInfo NameLocation,
     string? Summary,
     EquatableArray<SqlSegment> Segments,
+    EquatableArray<SqlToken> Tokens,
     bool? TokenValidation,
     EquatableArray<SqlQueryParameter> Parameters
 );

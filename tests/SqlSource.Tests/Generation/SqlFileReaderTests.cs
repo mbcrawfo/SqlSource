@@ -30,6 +30,7 @@ public class SqlFileReaderTests
                 Location(new TextSpan(9, 7), 0, 9, 0, 16),
                 "Loads one user.",
                 TestModels.Array(Literal("SELECT 1;")),
+                EquatableArray<SqlToken>.Empty,
                 null,
                 EquatableArray<SqlQueryParameter>.Empty
             ),
@@ -38,6 +39,7 @@ public class SqlFileReaderTests
                 Location(new TextSpan(70, 9), 4, 9, 4, 18),
                 null,
                 TestModels.Array(Literal("SELECT 2\nFROM t;")),
+                EquatableArray<SqlToken>.Empty,
                 null,
                 EquatableArray<SqlQueryParameter>.Empty
             ),
@@ -56,11 +58,18 @@ public class SqlFileReaderTests
                 new LocationInfo("C:\\app\\Repo\\CountUsers.sql", new TextSpan(0, 0), default),
                 null,
                 TestModels.Array(Literal("SELECT 1;")),
+                EquatableArray<SqlToken>.Empty,
                 null,
                 EquatableArray<SqlQueryParameter>.Empty
             ),
         ]);
     }
+
+    [Fact]
+    public void Read_QueryWithTokens_CopiesThem() =>
+        Read("-- name: Q\n-- token: {{b:y}}\nSELECT {{a:x}}, {{b}};\n")
+            .Queries.ShouldHaveSingleItem()
+            .Tokens.ShouldBe([new SqlToken("a", "x"), new SqlToken("b", "y")]);
 
     [Fact]
     public void Read_QueryWithParameters_CopiesThem() =>

@@ -244,8 +244,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor MarkerAtEndOfBlock = new(
         id: "SQLSRC108",
         title: "Marker has no SQL after it",
-        messageFormat: "A '-- summary:', '-- generator:' or '-- dialect:' marker comes before the SQL it describes, "
-            + "and no SQL follows this one in its query",
+        messageFormat: "A marker comes before the SQL it describes, and no SQL follows this one in its query",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -330,6 +329,17 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor MarkerNotAllowedHere = new(
+        id: "SQLSRC116",
+        title: "Marker is not allowed here",
+        messageFormat: "The '-- {0}:' marker is allowed only {1}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc116",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -362,7 +372,8 @@ internal static class SqlDiagnostics
             ConflictingSettings,
             EmptyBlock,
             ReservedTokenName,
-            MisplacedDialect
+            MisplacedDialect,
+            MarkerNotAllowedHere
         );
 
     /// <summary>
@@ -386,6 +397,7 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.EmptyBlock => EmptyBlock,
             SqlParseErrorKind.ReservedTokenName => ReservedTokenName,
             SqlParseErrorKind.MisplacedDialect => MisplacedDialect,
+            SqlParseErrorKind.MarkerNotAllowedHere => MarkerNotAllowedHere,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No descriptor is defined for this kind."),
         };
 }

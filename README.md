@@ -78,7 +78,7 @@ SqlSource adds the attribute and `SqlLocation` to each project that uses it, as 
 
 ## SQL files
 
-A line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows, is a marker.  Nothing else in a comment is read.  The markers are `-- name:`, `-- summary:`, `-- generator:` and `-- dialect:`, written in any case, and each has its own form for the rest of the line.
+A line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows, is a marker.  Nothing else in a comment is read.  The markers are `-- name:`, `-- summary:`, `-- generator:`, `-- dialect:` and `-- token:`, written in any case, and each has its own form for the rest of the line.
 
 ### Queries
 
@@ -94,7 +94,7 @@ A `-- summary:` line inside a query becomes the documentation of its member.  Se
 
 ### What reaches the generated SQL
 
-- The `-- name:`, `-- summary:`, `-- generator:` and `-- dialect:` lines are removed.
+- Every marker line is removed: `-- name:`, `-- summary:`, `-- generator:`, `-- dialect:` and `-- token:`.
 - Comments are removed: a line comment is deleted and a block comment becomes one space.  Lines left blank are removed.
 - Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.  So are MariaDB's `/*M! ... */` and Oracle's `--+ ...` when the dialect is theirs.
 - Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect (see Dialects, below).
@@ -261,10 +261,28 @@ var sql = Sql.ListFrom("users", "name DESC");
 - Names are case-sensitive: `{{Table}}` and `{{table}}` are two parameters.
 - A name that is used more than once is one parameter, and every occurrence is replaced.
 - A token is replaced wherever it is written, including inside a string or a quoted identifier.
-- Braces around anything that is not a name, such as `{{table-name}}`, `{{1st}}` or `{{order by}}`, are not a token.  The text stays in the SQL as written, and nothing is reported.
+- Braces around anything that is not a name, or a name and a default, such as `{{table-name}}`, `{{1st}}` or `{{order by}}`, are not a token.  The text stays in the SQL as written, and nothing is reported.
 - Text that has the form of a token and is not meant as one stays in the SQL when a `token-ignore=name` generator parameter lists its name.
 - After its first call, the method allocates the string it returns and nothing else.
 - A query that gains its first token changes from a constant to a method, so the code that uses it stops compiling until it passes the argument.
+
+### Defaults
+
+A token can carry a default: `{{name:default}}`.  The default is everything after the first `:` up to the closing `}}`, without the white space around it, so `{{cast:x::int}}` is the token `cast` with the default `x::int`.  It may be empty, `{{extraWhere:}}`, and may run over several lines.
+
+```sql
+-- name: ListUsers
+-- token: {{filter:AND deleted_at IS NULL}}
+SELECT id, name FROM {{table:users}}
+WHERE 1 = 1 {{filter}}
+ORDER BY {{orderBy:name}};
+```
+
+A default is a sample of what the caller will pass.  It changes nothing that is generated today: the method still takes each token as a `string`, and nothing uses the default at run time.  It is there for the tool that will describe a query to its database, which needs SQL it can send.
+
+- A `-- token:` marker inside a query gives the default for a token that the query writes several times, or whose sample is long.  Its value is exactly what the SQL would hold: one token with its default.
+- Two defaults for one token of a query must be the same.  Two that differ are the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112).
+- `{{a:b}}` in SQL that does not mean a token, the text of a template for example, is kept as written by a `token-ignore=a` generator parameter.
 
 **Tokens are for trusted text only.**  A token is replaced by string concatenation.  Nothing is escaped, quoted or checked for safety, so a value that a user can influence is a SQL injection.  Use a token for a fragment that your own code chooses, such as a table name from a fixed list, and a query parameter for every value.
 

@@ -31,7 +31,7 @@ public class SqlModelTests
     [Fact]
     public void SqlBlock_SameValuesInSeparateInstances_AreEqual()
     {
-        static SqlBlock Create(string sql, string parameter = "id") =>
+        static SqlBlock Create(string sql, string parameter = "id", string? tokenDefault = null) =>
             new(
                 "GetUser",
                 new TextSpan(9, 7),
@@ -42,11 +42,13 @@ public class SqlModelTests
                     new SqlSegment(SqlSegmentKind.Literal, sql),
                     new SqlSegment(SqlSegmentKind.Token, "table"),
                 ]),
+                new EquatableArray<SqlToken>([new SqlToken("table", tokenDefault)]),
                 new EquatableArray<SqlQueryParameter>([new SqlQueryParameter(parameter, null, null, false)])
             );
 
         Create("SELECT 1 FROM ").ShouldBe(Create("SELECT 1 FROM "));
         Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 2 FROM "));
         Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", parameter: "other"));
+        Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", tokenDefault: "users"));
     }
 }

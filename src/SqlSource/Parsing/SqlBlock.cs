@@ -15,6 +15,9 @@ namespace SqlSource.Parsing;
 /// True or false when a validation generator parameter applies to the block, null when none does.
 /// </param>
 /// <param name="Segments">The SQL, split into literal text and tokens.  Never empty.</param>
+/// <param name="Tokens">
+/// The query's tokens, each once, in order of first appearance, with its default.  Empty when the SQL has none.
+/// </param>
 /// <param name="Parameters">The query's parameters, in order of first appearance.  Empty when it has none.</param>
 internal sealed record SqlBlock(
     string Name,
@@ -23,5 +26,6 @@ internal sealed record SqlBlock(
     bool KeepComments,
     bool? TokenValidation,
     EquatableArray<SqlSegment> Segments,
+    EquatableArray<SqlToken> Tokens,
     EquatableArray<SqlQueryParameter> Parameters
 );

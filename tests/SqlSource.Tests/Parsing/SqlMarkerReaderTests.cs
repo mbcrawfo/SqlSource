@@ -22,6 +22,9 @@ public class SqlMarkerReaderTests
     [InlineData("-- DIALECT: MySql", "Dialect:MySql")]
     [InlineData("--dialect:mysql, ansi-quotes  ", "Dialect:mysql, ansi-quotes")]
     [InlineData("-- dialect:", "Dialect:")]
+    [InlineData("-- token: {{a:b}}", "Token:{{a:b}}")]
+    [InlineData("-- TOKEN: x", "Token:x")]
+    [InlineData("--token:", "Token:")]
     [InlineData("-- name:", "Name:")]
     [InlineData("-- name:   ", "Name:")]
     public void Read_MarkerComment_ReturnsItsKindAndValue(string text, string expected) =>
@@ -58,6 +61,8 @@ public class SqlMarkerReaderTests
     [InlineData("-- generators: keep-comments")]
     [InlineData("-- dialect=mysql")]
     [InlineData("-- dialects: mysql")]
+    [InlineData("-- tokens: x")]
+    [InlineData("-- token x")]
     [InlineData("SELECT 1 -- dialect: mysql")]
     public void Read_AnythingElse_IsNotAMarker(string text) => Markers(text).ShouldBeEmpty();
 
@@ -106,6 +111,25 @@ public class SqlMarkerReaderTests
 
         _ = marker.ShouldNotBeNull();
         marker.Value.ValueSpan.IsEmpty.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void WordOf_EveryKind_IsTheKeywordWithoutItsColon()
+    {
+        SqlMarkerReader.WordOf(SqlMarkerKind.Token).ShouldBe("token");
+        SqlMarkerReader.WordOf(SqlMarkerKind.GeneratorParameters).ShouldBe("generator");
+    }
+
+    [Theory]
+    [InlineData("-- token: {{a:b}}", "token: {{a:b}}")]
+    [InlineData("--  token:  x  ", "token: x")]
+    [InlineData("-- token:", "token:")]
+    public void Describe_Marker_IsItsWordAndItsValue(string text, string expected)
+    {
+        var marker = SqlMarkerReader.Read(text, SqlLexer.Lex(text, SqlDialectRules.Ansi).Lexemes[0]);
+
+        _ = marker.ShouldNotBeNull();
+        SqlMarkerReader.Describe(text, marker.Value).ShouldBe(expected);
     }
 
     private static string[] Markers(string text) => Markers(text, SqlDialectRules.Ansi);

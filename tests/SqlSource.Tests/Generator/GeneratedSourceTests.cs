@@ -703,6 +703,35 @@ public class GeneratedSourceTests
     }
 
     [Fact]
+    public void Run_TokenWithADefault_GeneratesTheMethodItGeneratesWithout()
+    {
+        const string Source = """
+            using SqlSource;
+
+            namespace App;
+
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
+            public partial class Sample;
+            """;
+
+        var plain = GeneratorHarness.Run(
+            Source,
+            new SqlFile("/app/Repo/Q.sql", "SELECT * FROM {{table}} {{filter}};\n")
+        );
+        var withDefaults = GeneratorHarness.Run(
+            Source,
+            new SqlFile(
+                "/app/Repo/Q.sql",
+                "-- token: {{filter:WHERE x = 1}}\nSELECT * FROM {{table:users}} {{filter}};\n"
+            )
+        );
+
+        withDefaults.Diagnostics.ShouldBeEmpty();
+        withDefaults.GeneratedCodeWarnings.ShouldBeEmpty();
+        withDefaults.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
+    }
+
+    [Fact]
     public void Run_SqlWithATokenThatNeedsEscaping_CompilesAndDocumentsIt()
     {
         // The literal text around a token is escaped like a constant's, in the string and in the comment.

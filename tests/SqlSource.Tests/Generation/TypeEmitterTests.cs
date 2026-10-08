@@ -504,6 +504,7 @@ public class TypeEmitterTests
             NameLocation(file),
             summary,
             TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, sql)),
+            EquatableArray<SqlToken>.Empty,
             null,
             EquatableArray<SqlQueryParameter>.Empty
         );
@@ -519,6 +520,7 @@ public class TypeEmitterTests
                 new SqlSegment(SqlSegmentKind.Token, "table"),
                 new SqlSegment(SqlSegmentKind.Literal, ";")
             ),
+            TestModels.Array(new SqlToken("table", null)),
             tokenValidation,
             EquatableArray<SqlQueryParameter>.Empty
         );

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis.Text;
@@ -97,6 +98,64 @@ public class TokenScannerTests
     [InlineData("x {{ ")]
     [InlineData("{")]
     public void Scan_SqlEndingInsideAToken_IsLiteral(string sql) => Scan(sql).ShouldBe(["L:" + sql]);
+
+    [Theory]
+    [InlineData("{{a:b}}", "a=b")]
+    [InlineData("{{ a : b c }}", "a=b c")]
+    [InlineData("{{a:}}", "a=")]
+    [InlineData("{{a:  }}", "a=")]
+    [InlineData("{{cast:x::int}}", "cast=x::int")]
+    [InlineData("{{a:x\n  AND y}}", "a=x\n  AND y")]
+    [InlineData("{{a:{b} }}", "a={b}")]
+    [InlineData("{{a}}", "a=<none>")]
+    public void Scan_TokenWithADefault_ReadsTheNameAndTheTrimmedDefault(string sql, string expected)
+    {
+        Defaults(sql).ShouldBe([expected]);
+        Scan(sql).ShouldBe(["T:" + expected[..expected.IndexOf('=', StringComparison.Ordinal)]]);
+    }
+
+    [Theory]
+    [InlineData("{{a:b}")]
+    [InlineData("{{a:b")]
+    [InlineData("{{a b:c}}")]
+    [InlineData("{{1a:c}}")]
+    [InlineData("{{:c}}")]
+    public void Scan_TextThatOnlyLooksLikeATokenWithADefault_IsLiteral(string sql) => Scan(sql).ShouldBe(["L:" + sql]);
+
+    [Fact]
+    public void Scan_Occurrences_HaveTheirPlaceInTheSql()
+    {
+        const string Sql = "a {{x}} b {{y:1}} c";
+
+        var occurrences = TokenScanner.Scan(Sql, new HashSet<string>()).Occurrences;
+
+        occurrences.Select(token => Sql.Substring(token.Span.Start, token.Span.Length)).ShouldBe(["{{x}}", "{{y:1}}"]);
+    }
+
+    [Fact]
+    public void Scan_IgnoredTokenWithADefault_StaysLiteralWithItsDefault()
+    {
+        Scan("x {{raw:@a}} y", "raw").ShouldBe(["L:x {{raw:@a}} y"]);
+        Defaults("x {{raw:@a}} y", "raw").ShouldBeEmpty();
+    }
+
+    // A keyword is a keyword with a default too.
+    [Fact]
+    public void Scan_ReservedNameWithADefault_IsAnError()
+    {
+        var error = TokenScanner.Scan("{{default:x}}", new HashSet<string>()).Errors.ShouldHaveSingleItem();
+
+        error.Kind.ShouldBe(SqlParseErrorKind.ReservedTokenName);
+        error.Span.ShouldBe(new TextSpan(0, 13));
+        error.Arguments.ShouldBe(["default"]);
+    }
+
+    private static string[] Defaults(string sql, params string[] ignoredNames) =>
+        [
+            .. TokenScanner
+                .Scan(sql, new HashSet<string>(ignoredNames))
+                .Occurrences.Select(token => token.Name + "=" + (token.Default ?? "<none>")),
+        ];
 
     private static string[] Scan(string sql, params string[] ignoredNames)
     {

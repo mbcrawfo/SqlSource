@@ -14,8 +14,6 @@ namespace SqlSource.Parsing;
 /// </remarks>
 internal static class SqlDialectMarker
 {
-    private const string Word = "dialect:";
-
     /// <summary>
     /// Reads the comments at the start of <paramref name="text" /> from <paramref name="lexer" /> and switches the
     /// lexer to the dialect that the first valid <c>-- dialect:</c> marker among them names.  Returns the offset
@@ -57,6 +55,5 @@ internal static class SqlDialectMarker
     /// <summary>
     /// The marker as a message names it: <c>dialect: mysql</c>, or <c>dialect:</c> for one without a value.
     /// </summary>
-    public static string Describe(string text, SqlMarker marker) =>
-        marker.ValueSpan.IsEmpty ? Word : Word + " " + text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length);
+    public static string Describe(string text, SqlMarker marker) => SqlMarkerReader.Describe(text, marker);
 }

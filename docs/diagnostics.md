@@ -32,6 +32,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC113](#sqlsrc113) | Query has no SQL |
 | [SQLSRC114](#sqlsrc114) | Token name is a keyword |
 | [SQLSRC115](#sqlsrc115) | Dialect marker is misplaced |
+| [SQLSRC116](#sqlsrc116) | Marker is not allowed here |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
@@ -314,7 +315,7 @@ Move the summary below the `-- name:` marker.
 
 **Marker has no SQL after it**
 
-A `-- summary:`, `-- generator:` or `-- dialect:` marker comes before the SQL it describes.  This one is the last thing in its query, which usually means it was written above the next `-- name:` marker and was meant for that query.
+A marker comes before the SQL it describes.  This one stands after the last SQL of its query, where a reader would take it to belong to the next one.  That usually means it was written above the next `-- name:` marker and was meant for that query.
 
 ```sql
 -- name: GetUser
@@ -363,6 +364,8 @@ A generator parameter lacks a value it needs, has one it does not take, or has o
 -- dialect: mysql keep-comments
 ```
 
+A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else; and a quote or a block comment inside the default must close there.
+
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
 ## SQLSRC112
@@ -373,6 +376,7 @@ Two settings contradict each other.  The error is at the second.
 
 - `token-validation` and `no-token-validation` both appear in one scope.  A scope is the lines before the first `-- name:` marker, or one query.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
+- Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
 
 Remove one of the two.  A validation parameter in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
@@ -398,6 +402,8 @@ A token `{{name}}` becomes a parameter of a generated method, so its name must n
 ```sql
 SELECT * FROM {{class}};
 ```
+
+The same holds for the name in a `-- token:` marker.
 
 Rename the token.  If the braces are literal text and not a token, add `-- generator: token-ignore=class` to the query.
 
@@ -425,3 +431,18 @@ SELECT 1;
 ```
 
 A file cannot mix dialects.  Put the queries for another database in a file of their own.
+
+## SQLSRC116
+
+**Marker is not allowed here**
+
+A marker stands in the wrong part of its file.  Some markers describe one query and go inside it, after its `-- name:` line; some describe the whole file and go before the first `-- name:` line.  The message says which this one is.
+
+```sql
+-- token: {{filter:AND deleted_at IS NULL}}
+
+-- name: ListUsers
+SELECT id FROM users WHERE 1 = 1 {{filter}};
+```
+
+Move the marker to where the message says.  A file with no `-- name:` line is one query, and takes every marker.
