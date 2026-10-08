@@ -309,7 +309,7 @@ The emitter takes `KeptSegments` when the resolved list has `keep-comments`, and
 
 - `engine` is `SqlDialectName.Canonical(dialect)`, the first name the dialect has in `SqlDialectName`: `postgres`, `mssql`.
 - `sql` is `segments` in order: a literal as it is, and a token as `{{name:default}}` with its resolved default, `{{name:}}` for an empty one, and `{{name}}` when it has none.  `segments` is the stripped form, so `keep-comments` changes nothing, and its line endings are `\n` already.
-- A declaration is one parameter that a `-- param:` marker declares, in marker order: the name without its prefix as the marker writes it, then a space and the type when there is one, then ` null` or ` not null` when the marker says so.  A query with no declarations ends after the line feed that follows the SQL.
+- A declaration is one parameter of the query's list that a `-- param:` marker declares, in the list's order: its name as the list has it, without the prefix, then a space and the type when there is one, then ` null` or ` not null` when the marker says so.  The list's order is the rule's, so a declared-only parameter stands in marker order and moving a marker that types a parameter of the SQL changes nothing.  A query with no declarations ends after the line feed that follows the SQL.
 
 It is a pure function, and nothing in the pipeline calls it in this phase, so a parse pays nothing for it.  Phase 2 and phase 5 call it, and decide where its result is kept.  `SHA256` is used through `System.Security.Cryptography`, which `netstandard2.0` has; the plan confirms first that the analyzer rules allow it.
 
