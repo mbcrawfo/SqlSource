@@ -12,7 +12,7 @@ namespace SqlSource.Parsing;
 /// <param name="Summary">The text of the block's <c>-- summary:</c> markers, or null when it has none.</param>
 /// <param name="KeepComments">Whether comments were kept in the SQL.</param>
 /// <param name="TokenValidation">
-/// True or false when a validation directive applies to the block, null when none does.
+/// True or false when a validation generator parameter applies to the block, null when none does.
 /// </param>
 /// <param name="Segments">The SQL, split into literal text and tokens.  Never empty.</param>
 internal sealed record SqlBlock(

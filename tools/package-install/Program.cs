@@ -9,7 +9,7 @@ Console.WriteLine($"constant: {Queries.GetUser}");
 // Directory.Build.targets turns token validation off for the project.  With it on, the empty argument throws.
 Console.WriteLine($"validation off: {Queries.ListUsers("users", "")}");
 
-// A directive turns it back on for this query.
+// A generator parameter turns it back on for this query.
 try
 {
     _ = Queries.ListChecked("users", "");

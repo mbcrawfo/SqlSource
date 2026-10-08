@@ -4,8 +4,8 @@ using SqlSource.Parsing;
 namespace SqlSource.Generation;
 
 /// <summary>
-/// What MSBuild says about the dialect, for the project or for one file.  A <c>dialect=</c> directive in a file
-/// comes before both.
+/// What MSBuild says about the dialect, for the project or for one file.  A <c>dialect=</c> generator parameter in a
+/// file comes before both.
 /// </summary>
 /// <param name="Dialect">
 /// The dialect that is set, with its options, or null when none is.  <see cref="SqlDialect.Ansi" /> with no

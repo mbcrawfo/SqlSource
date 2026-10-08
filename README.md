@@ -78,13 +78,15 @@ SqlSource adds the attribute and `SqlLocation` to each project that uses it, as 
 
 ## SQL files
 
+A line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows, is a marker.  Nothing else in a comment is read.  The markers are `-- name:`, `-- summary:` and `-- generator:`, written in any case, and each has its own form for the rest of the line.
+
 ### Queries
 
 A line comment that starts its line and has the form `-- name: GetUser` begins a query.  The query runs to the next `-- name:` line or to the end of the file, and its name becomes the member's name, so it must be a C# identifier.
 
 A file with no `-- name:` line is one query, named after the file: `CountUsers.sql` becomes `CountUsers`.
 
-Before the first `-- name:` line a file may hold comments, such as a licence header, and `-- SqlSource:` directives that apply to every query in the file.
+Before the first `-- name:` line a file may hold comments, such as a licence header, and `-- generator:` lines that apply to every query in the file.
 
 ### Summaries
 
@@ -92,17 +94,17 @@ A `-- summary:` line inside a query becomes the documentation of its member.  Se
 
 ### What reaches the generated SQL
 
-- The `-- name:`, `-- summary:` and `-- SqlSource:` lines are removed.
+- The `-- name:`, `-- summary:` and `-- generator:` lines are removed.
 - Comments are removed: a line comment is deleted and a block comment becomes one space.  Lines left blank are removed.
 - Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.  So are MariaDB's `/*M! ... */` and Oracle's `--+ ...` when the dialect is theirs.
 - Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect (see Dialects, below).
 - Line endings are always `\n`, so the SQL does not depend on how the file was checked out.
 
-### Directives
+### Generator parameters
 
-A `-- SqlSource:` line holds one or more directives, separated by spaces.  Inside a query it applies to that query.  Before the first `-- name:` line it applies to every query in the file.
+A `-- generator:` line holds one or more generator parameters, separated by spaces.  Inside a query it applies to that query.  Before the first `-- name:` line it applies to every query in the file.
 
-| Directive | Effect |
+| Parameter | Effect |
 |----|----|
 | `keep-comments` | Comments and blank lines stay in the SQL |
 | `token-ignore=name` | `{{name}}` is literal text, not a token |
@@ -111,7 +113,7 @@ A `-- SqlSource:` line holds one or more directives, separated by spaces.  Insid
 
 ```sql
 -- name: Report
--- SqlSource: keep-comments
+-- generator: keep-comments
 SELECT /* the database logs this comment */ id FROM users;
 ```
 
@@ -150,20 +152,20 @@ For some of its files, with metadata on their items.  Where two lines match a fi
 </ItemGroup>
 ```
 
-For one file, with a directive in the file:
+For one file, with the `dialect` generator parameter in the file:
 
 ```sql
--- SqlSource: dialect=mysql
+-- generator: dialect=mysql
 
 -- name: FindByNote
 SELECT id FROM notes WHERE body = 'it\'s here'; # MySQL reads this as a comment
 ```
 
-The directive wins over the metadata, and the metadata over the property.  A file has one dialect:
+The generator parameter wins over the metadata, and the metadata over the property.  A file has one dialect:
 
-- The directive goes before the file's first `-- name:` line and before its first SQL.  Anywhere else it is the error [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc115).
+- The generator parameter goes before the file's first `-- name:` line and before its first SQL.  Anywhere else it is the error [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc115).
 - It takes effect on the line after it.  Comments above it, such as a licence header, are read by the dialect that the metadata or the property gives.
-- A name that is not a dialect is an error: [SQLSRC011](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc011) in the property or the metadata, [SQLSRC111](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc111) in the directive.
+- A name that is not a dialect is an error: [SQLSRC011](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc011) in the property or the metadata, [SQLSRC111](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc111) in the generator parameter.
 
 ### Options of a dialect
 
@@ -184,7 +186,7 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 ```
 
 ```sql
--- SqlSource: dialect=mysql,no-backslash-escapes
+-- generator: dialect=mysql,no-backslash-escapes
 
 -- name: GetPath
 SELECT 'C:\temp\' AS path;
@@ -193,7 +195,7 @@ SELECT 'C:\temp\' AS path;
 - Options are not case-sensitive and come in any order.
 - Only `mysql` and `mariadb` have options.  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect.
 - A value replaces the one it wins over whole.  A file with `dialect=mysql` in a project that sets `mysql,ansi-quotes` is read as plain `mysql`.
-- In the directive, write no space after the comma.
+- In the generator parameter, write no space after the comma.
 
 ### What a dialect changes
 
@@ -261,7 +263,7 @@ var sql = Sql.ListFrom("users", "name DESC");
 - A name that is used more than once is one parameter, and every occurrence is replaced.
 - A token is replaced wherever it is written, including inside a string or a quoted identifier.
 - Braces around anything that is not a name, such as `{{table-name}}`, `{{1st}}` or `{{order by}}`, are not a token.  The text stays in the SQL as written, and nothing is reported.
-- Text that has the form of a token and is not meant as one stays in the SQL when a `token-ignore=name` directive lists its name.
+- Text that has the form of a token and is not meant as one stays in the SQL when a `token-ignore=name` generator parameter lists its name.
 - After its first call, the method allocates the string it returns and nothing else.
 - A query that gains its first token changes from a constant to a method, so the code that uses it stops compiling until it passes the argument.
 
@@ -273,8 +275,8 @@ By default the method checks each argument with `ArgumentException.ThrowIfNullOr
 
 An empty fragment can be what you want, for an optional clause for example, so the check can be turned off.  Three switches decide, and the first one that applies wins:
 
-1. A `-- SqlSource: token-validation` or `-- SqlSource: no-token-validation` directive inside the query.
-2. The same directive before the first `-- name:` line, which covers every query in the file.
+1. A `-- generator: token-validation` or `-- generator: no-token-validation` line inside the query.
+2. The same line before the first `-- name:` line, which covers every query in the file.
 3. The MSBuild property `SqlSourceTokenValidation`, which covers the project.  It accepts `true` and `false`; any other value is the error [SQLSRC010](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc010).
 
 ```xml
@@ -285,7 +287,7 @@ An empty fragment can be what you want, for an optional clause for example, so t
 
 ```sql
 -- name: ListFiltered
--- SqlSource: no-token-validation
+-- generator: no-token-validation
 SELECT id, name FROM users {{whereClause}};
 ```
 

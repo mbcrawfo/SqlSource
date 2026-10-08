@@ -1,4 +1,4 @@
--- SqlSource: keep-comments
+-- generator: keep-comments
 
 -- name: GetOrder
 SELECT id, total /* in cents */

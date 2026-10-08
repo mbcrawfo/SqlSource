@@ -23,11 +23,11 @@ public class SqlFileParserAllocationTests
     [InlineData(nameof(SqlDialect.Oracle), false)]
     // The file names its own dialect, so its header is read before the rest.
     [InlineData(nameof(SqlDialect.Ansi), true)]
-    public void Parse_TypicalFile_AllocatesWithinItsBudget(string dialectName, bool hasDirective)
+    public void Parse_TypicalFile_AllocatesWithinItsBudget(string dialectName, bool hasGeneratorParameter)
     {
         const int Iterations = 20;
         var dialect = Enum.Parse<SqlDialect>(dialectName);
-        var text = CreateFile(hasDirective);
+        var text = CreateFile(hasGeneratorParameter);
         SqlFileParser.Parse(text, "Queries.sql", dialect).Blocks.Count.ShouldBe(Queries);
 
         // The first parses pay for one-off work: JIT compilation, static initialisers and the shared buffer pool.
@@ -49,10 +49,10 @@ public class SqlFileParserAllocationTests
 
     // A file like the ones the generator is written for: a preamble, and queries that mix line comments, block
     // comments, string literals, tokens and blank lines.
-    private static string CreateFile(bool hasDirective)
+    private static string CreateFile(bool hasGeneratorParameter)
     {
-        var file = new StringBuilder("-- Copyright (c) Example\n-- SqlSource: token-ignore=raw")
-            .Append(hasDirective ? " dialect=postgres" : string.Empty)
+        var file = new StringBuilder("-- Copyright (c) Example\n-- generator: token-ignore=raw")
+            .Append(hasGeneratorParameter ? " dialect=postgres" : string.Empty)
             .Append("\n\n");
         for (var query = 0; query < Queries; query++)
         {

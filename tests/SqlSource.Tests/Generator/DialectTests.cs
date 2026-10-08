@@ -3,8 +3,9 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// Which dialect a file is read by: the dialect= directive at the top of the file decides, then the SqlSourceDialect
-// metadata of the file's item, then the project's SqlSourceDialect property, and without any of them it is ANSI.
+// Which dialect a file is read by: the dialect= generator parameter at the top of the file decides, then the
+// SqlSourceDialect metadata of the file's item, then the project's SqlSourceDialect property, and without any of them
+// it is ANSI.
 public class DialectTests
 {
     private const string Source = """
@@ -47,19 +48,19 @@ public class DialectTests
     [InlineData(null, "mssql", "mysql", SqlServer)]
     [InlineData(null, "ansi", "mysql", Ansi)]
     [InlineData(null, "", "mysql", MySql)]
-    // The file's directive beats both.
+    // The file's generator parameter beats both.
     [InlineData("mysql", null, null, MySql)]
     [InlineData("mysql", "mssql", null, MySql)]
     [InlineData("mssql", "mysql", "mysql", SqlServer)]
     [InlineData("ansi", "mssql", "mysql", Ansi)]
-    public void Run_File_IsReadByItsDirectiveThenItsMetadataThenTheProperty(
-        string? directive,
+    public void Run_File_IsReadByItsGeneratorParameterThenItsMetadataThenTheProperty(
+        string? parameter,
         string? metadata,
         string? property,
         string expected
     )
     {
-        var sql = (directive is null ? string.Empty : "-- SqlSource: dialect=" + directive + "\n") + Query;
+        var sql = (parameter is null ? string.Empty : "-- generator: dialect=" + parameter + "\n") + Query;
 
         var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
@@ -76,7 +77,7 @@ public class DialectTests
             "mysql",
             new SqlFile("/app/Repo/A.sql", Query),
             new SqlFile("/app/Repo/B.sql", Query, "mssql"),
-            new SqlFile("/app/Repo/C.sql", "-- SqlSource: dialect=ansi\n" + Query, "mssql")
+            new SqlFile("/app/Repo/C.sql", "-- generator: dialect=ansi\n" + Query, "mssql")
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -87,7 +88,7 @@ public class DialectTests
     }
 
     [Theory]
-    // In the directive, in the metadata and in the property.
+    // In the generator parameter, in the metadata and in the property.
     [InlineData("mysql,no-backslash-escapes", null, null)]
     [InlineData(null, "mysql,no-backslash-escapes", null)]
     [InlineData(null, null, "mysql,no-backslash-escapes")]
@@ -97,13 +98,13 @@ public class DialectTests
     // A value with the option wins over one without it.
     [InlineData("mariadb,no-backslash-escapes", "mysql", "postgres")]
     [InlineData(null, "mysql,no-backslash-escapes", "mysql")]
-    public void Run_OptionOfADialect_IsReadFromTheDirectiveTheMetadataAndTheProperty(
-        string? directive,
+    public void Run_OptionOfADialect_IsReadFromTheGeneratorParameterTheMetadataAndTheProperty(
+        string? parameter,
         string? metadata,
         string? property
     )
     {
-        var sql = (directive is null ? string.Empty : "-- SqlSource: dialect=" + directive + "\n") + PathQuery;
+        var sql = (parameter is null ? string.Empty : "-- generator: dialect=" + parameter + "\n") + PathQuery;
 
         var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
@@ -118,12 +119,12 @@ public class DialectTests
     [InlineData("mysql", "mysql,no-backslash-escapes", null)]
     [InlineData(null, "mysql", "mysql,no-backslash-escapes")]
     public void Run_ValueWithoutTheOption_ReplacesAValueWithItWhole(
-        string? directive,
+        string? parameter,
         string? metadata,
         string? property
     )
     {
-        var sql = (directive is null ? string.Empty : "-- SqlSource: dialect=" + directive + "\n") + PathQuery;
+        var sql = (parameter is null ? string.Empty : "-- generator: dialect=" + parameter + "\n") + PathQuery;
 
         var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
@@ -143,9 +144,9 @@ public class DialectTests
     }
 
     [Fact]
-    public void Run_DirectiveWithAnOptionThatIsNotValid_IsAnErrorAtTheDirective()
+    public void Run_GeneratorParameterWithAnOptionThatIsNotValid_IsAnErrorAtTheGeneratorParameter()
     {
-        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- SqlSource: dialect=postgres,ansi-quotes\n" + Query));
+        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- generator: dialect=postgres,ansi-quotes\n" + Query));
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC111 /app/Repo/Q.sql(1,15)-(1,43): ");
     }
@@ -227,9 +228,9 @@ public class DialectTests
     }
 
     [Fact]
-    public void Run_InvalidMetadataOfAFileWithADirective_IsStillReportedAndTheDirectiveIsUsed()
+    public void Run_InvalidMetadataOfAFileWithAGeneratorParameter_IsStillReportedAndTheGeneratorParameterIsUsed()
     {
-        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- SqlSource: dialect=mysql\n" + Query, "nope"));
+        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- generator: dialect=mysql\n" + Query, "nope"));
 
         run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): 'nope" + Invalid]);
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + MySql + "\";");

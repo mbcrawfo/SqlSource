@@ -37,7 +37,8 @@ internal static class TypeEmitter
     /// </summary>
     /// <param name="input">The type and its parsed files.</param>
     /// <param name="validateTokens">
-    /// What the project asks for: whether a method checks its arguments.  A query's own directive comes first.
+    /// What the project asks for: whether a method checks its arguments.  A query's own generator parameter comes
+    /// first.
     /// </param>
     public static TypeOutput Emit(TypeQueries input, bool validateTokens)
     {

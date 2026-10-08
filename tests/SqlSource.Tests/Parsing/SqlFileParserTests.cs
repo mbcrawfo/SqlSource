@@ -23,10 +23,10 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_FileWithoutNameMarker_ReadsSummaryAndDirectivesBeforeAndAmongItsSql()
+    public void Parse_FileWithoutNameMarker_ReadsSummaryAndGeneratorParametersBeforeAndAmongItsSql()
     {
         const string Text =
-            "-- summary: First.\nSELECT 1 -- c\n-- SqlSource: keep-comments no-token-validation\n"
+            "-- summary: First.\nSELECT 1 -- c\n-- generator: keep-comments no-token-validation\n"
             + "-- summary: Second.\nFROM t\n";
 
         var block = Blocks(Text).ShouldHaveSingleItem();
@@ -86,7 +86,7 @@ public class SqlFileParserTests
     public void Parse_Preamble_DiscardsItsCommentsEvenWhenPreserving()
     {
         const string Text =
-            "-- Copyright\n/* header */\n-- SqlSource: keep-comments\n\n-- name: A\n-- kept\nSELECT 1\n";
+            "-- Copyright\n/* header */\n-- generator: keep-comments\n\n-- name: A\n-- kept\nSELECT 1\n";
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
@@ -95,10 +95,10 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_PreambleDirectives_ApplyToEveryBlock()
+    public void Parse_PreambleGeneratorParameters_ApplyToEveryBlock()
     {
         const string Text =
-            "-- SqlSource: no-token-validation token-ignore=x\n"
+            "-- generator: no-token-validation token-ignore=x\n"
             + "-- name: A\nSELECT {{x}}\n"
             + "-- name: B\nSELECT {{x}} {{y}}\n";
 
@@ -115,11 +115,11 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_BlockValidationDirective_OverridesThePreamble()
+    public void Parse_BlockValidationGeneratorParameter_OverridesThePreamble()
     {
         const string Text =
-            "-- SqlSource: no-token-validation\n"
-            + "-- name: A\n-- SqlSource: token-validation\nSELECT 1\n"
+            "-- generator: no-token-validation\n"
+            + "-- name: A\n-- generator: token-validation\nSELECT 1\n"
             + "-- name: B\nSELECT 2\n";
 
         var blocks = Blocks(Text);
@@ -132,7 +132,7 @@ public class SqlFileParserTests
     public void Parse_BlockTokenIgnore_AddsToThePreamble()
     {
         const string Text =
-            "-- SqlSource: token-ignore=x\n-- name: A\n-- SqlSource: token-ignore=y\nSELECT {{x}} {{y}} {{z}}\n";
+            "-- generator: token-ignore=x\n-- name: A\n-- generator: token-ignore=y\nSELECT {{x}} {{y}} {{z}}\n";
 
         Blocks(Text)
             .ShouldHaveSingleItem()
@@ -143,10 +143,10 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_BlockDirective_DoesNotLeakIntoTheNextBlock()
+    public void Parse_BlockGeneratorParameter_DoesNotLeakIntoTheNextBlock()
     {
         const string Text =
-            "-- name: A\n-- SqlSource: keep-comments token-validation token-ignore=x\nSELECT 1 -- c\n"
+            "-- name: A\n-- generator: keep-comments token-validation token-ignore=x\nSELECT 1 -- c\n"
             + "-- name: B\nSELECT {{x}} -- c\n";
 
         var blocks = Blocks(Text);
@@ -214,7 +214,7 @@ public class SqlFileParserTests
     [Theory]
     [InlineData("-- name: A\n-- name: B\nSELECT 1")]
     [InlineData("-- name: A\n-- c\n/* d */\n\n-- name: B\nSELECT 1")]
-    [InlineData("-- name: A\n-- SqlSource: keep-comments\n-- c\n-- name: B\nSELECT 1")]
+    [InlineData("-- name: A\n-- generator: keep-comments\n-- c\n-- name: B\nSELECT 1")]
     [InlineData("-- name: B\nSELECT 1\n-- name: A")]
     [InlineData("-- name: B\nSELECT 1\n-- name: A\n-- summary: s\n")]
     public void Parse_BlockWithoutSql_IsAnErrorAtItsName(string text)
@@ -228,7 +228,7 @@ public class SqlFileParserTests
     [InlineData("")]
     [InlineData("  \r\n\t")]
     [InlineData("-- only a comment\n/* and another */")]
-    [InlineData("-- SqlSource: keep-comments\n-- c")]
+    [InlineData("-- generator: keep-comments\n-- c")]
     public void Parse_FileWithoutNameMarkerOrSql_IsAnErrorAtTheStart(string text) =>
         Errors(text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.EmptyBlock, new TextSpan(0, 0))]);
 
@@ -239,13 +239,13 @@ public class SqlFileParserTests
     [Theory]
     [InlineData("-- name: A\nSELECT 1\n\n-- summary: Loads B.\n-- name: B\nSELECT 2", "-- summary: Loads B.")]
     [InlineData(
-        "-- name: A\nSELECT 1\n  -- SqlSource: token-ignore=x\n-- name: B\nSELECT 2",
-        "-- SqlSource: token-ignore=x"
+        "-- name: A\nSELECT 1\n  -- generator: token-ignore=x\n-- name: B\nSELECT 2",
+        "-- generator: token-ignore=x"
     )]
     [InlineData("-- name: A\nSELECT 1\n-- summary: last", "-- summary: last")]
-    [InlineData("SELECT 1\n-- SqlSource: keep-comments\n", "-- SqlSource: keep-comments")]
+    [InlineData("SELECT 1\n-- generator: keep-comments\n", "-- generator: keep-comments")]
     [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- a comment\n/* another */\n", "-- summary: s")]
-    [InlineData("-- name: A\nSELECT 1\n-- SqlSource: bogus", "-- SqlSource: bogus")]
+    [InlineData("-- name: A\nSELECT 1\n-- generator: bogus", "-- generator: bogus")]
     [InlineData("-- name: A\nSELECT 1\n-- summary:", "-- summary:")]
     public void Parse_MarkerAfterTheLastSqlOfItsBlock_IsAnErrorAtTheMarker(string text, string marker) =>
         Errors(text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.MarkerAtEndOfBlock, SpanOf(text, marker))]);
@@ -254,22 +254,22 @@ public class SqlFileParserTests
     public void Parse_SeveralMarkersAfterTheLastSqlOfABlock_AreEachAnError()
     {
         const string Text =
-            "-- name: A\nSELECT 1\n-- SqlSource: no-token-validation\n-- summary: s\n-- name: B\nSELECT 2";
+            "-- name: A\nSELECT 1\n-- generator: no-token-validation\n-- summary: s\n-- name: B\nSELECT 2";
 
         Errors(Text)
             .ShouldBe([
                 SqlParseError.Create(
                     SqlParseErrorKind.MarkerAtEndOfBlock,
-                    SpanOf(Text, "-- SqlSource: no-token-validation")
+                    SpanOf(Text, "-- generator: no-token-validation")
                 ),
                 SqlParseError.Create(SqlParseErrorKind.MarkerAtEndOfBlock, SpanOf(Text, "-- summary: s")),
             ]);
     }
 
     [Theory]
-    [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- SqlSource: no-token-validation\nFROM t", "SELECT 1\nFROM t")]
-    [InlineData("-- name: A\n-- summary: s\n-- SqlSource: no-token-validation\n/*+ H */", "/*+ H */")]
-    [InlineData("-- name: A\n-- summary: s\n-- SqlSource: no-token-validation\n'x'\n-- c", "'x'")]
+    [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- generator: no-token-validation\nFROM t", "SELECT 1\nFROM t")]
+    [InlineData("-- name: A\n-- summary: s\n-- generator: no-token-validation\n/*+ H */", "/*+ H */")]
+    [InlineData("-- name: A\n-- summary: s\n-- generator: no-token-validation\n'x'\n-- c", "'x'")]
     public void Parse_MarkerWithSqlAfterItInItsBlock_IsAccepted(string text, string expectedSql)
     {
         var block = Blocks(text).ShouldHaveSingleItem();
@@ -323,7 +323,7 @@ public class SqlFileParserTests
     [Fact]
     public void Parse_TokenInAStringLiteralOrAPreservedComment_IsAToken()
     {
-        const string Text = "-- name: A\n-- SqlSource: keep-comments\nSELECT '{{a}}' -- {{b}}";
+        const string Text = "-- name: A\n-- generator: keep-comments\nSELECT '{{a}}' -- {{b}}";
 
         Blocks(Text)
             .ShouldHaveSingleItem()
@@ -356,7 +356,7 @@ public class SqlFileParserTests
     [Fact]
     public void Parse_ReservedKeywordTokenThatIsIgnored_IsLiteral()
     {
-        const string Text = "-- name: A\n-- SqlSource: token-ignore=class\nSELECT {{class}}";
+        const string Text = "-- name: A\n-- generator: token-ignore=class\nSELECT {{class}}";
 
         Sql(Blocks(Text).ShouldHaveSingleItem()).ShouldBe("SELECT {{class}}");
     }
@@ -375,15 +375,15 @@ public class SqlFileParserTests
     }
 
     [Theory]
-    [InlineData("-- SqlSource: keep-comment", nameof(SqlParseErrorKind.UnknownDirective), "keep-comment")]
-    [InlineData("-- SqlSource:", nameof(SqlParseErrorKind.EmptyDirectiveLine), "-- SqlSource:")]
-    [InlineData("-- SqlSource: token-ignore=", nameof(SqlParseErrorKind.InvalidDirectiveValue), "token-ignore=")]
+    [InlineData("-- generator: keep-comment", nameof(SqlParseErrorKind.UnknownGeneratorParameter), "keep-comment")]
+    [InlineData("-- generator:", nameof(SqlParseErrorKind.EmptyGeneratorLine), "-- generator:")]
+    [InlineData("-- generator: token-ignore=", nameof(SqlParseErrorKind.InvalidMarkerValue), "token-ignore=")]
     [InlineData(
-        "-- SqlSource: token-validation no-token-validation",
-        nameof(SqlParseErrorKind.ConflictingDirectives),
+        "-- generator: token-validation no-token-validation",
+        nameof(SqlParseErrorKind.ConflictingSettings),
         "no-token-validation"
     )]
-    public void Parse_DirectiveProblem_IsReportedAtItsPlaceInTheFile(string line, string kind, string place)
+    public void Parse_GeneratorParameterProblem_IsReportedAtItsPlaceInTheFile(string line, string kind, string place)
     {
         var text = "-- name: A\n" + line + "\nSELECT 1";
 
@@ -391,6 +391,18 @@ public class SqlFileParserTests
 
         error.Kind.ToString().ShouldBe(kind);
         error.Span.ShouldBe(SpanOf(text, place));
+    }
+
+    // A comment that has the form of a marker is one, whatever its author meant by it.
+    [Fact]
+    public void Parse_OrdinaryCommentThatStartsWithGenerator_IsReadAsGeneratorParameters()
+    {
+        const string Text = "-- generator: pgloader\n-- name: A\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.UnknownGeneratorParameter, SpanOf(Text, "pgloader"), "pgloader"),
+            ]);
     }
 
     [Theory]
@@ -404,7 +416,7 @@ public class SqlFileParserTests
     {
         const string Text =
             "-- name: 1x\nSELECT 1\n"
-            + "-- name: B\n-- SqlSource: bogus\n"
+            + "-- name: B\n-- generator: bogus\n"
             + "-- name: C\nSELECT {{class}}\n"
             + "-- name: C\nSELECT 3\n";
 
@@ -415,7 +427,7 @@ public class SqlFileParserTests
             .ShouldBe([
                 SqlParseErrorKind.InvalidName,
                 SqlParseErrorKind.EmptyBlock,
-                SqlParseErrorKind.UnknownDirective,
+                SqlParseErrorKind.UnknownGeneratorParameter,
                 SqlParseErrorKind.ReservedTokenName,
                 SqlParseErrorKind.DuplicateName,
             ]);
@@ -434,7 +446,7 @@ public class SqlFileParserTests
     public void Parse_WindowsLineEndings_GiveTheSameBlocksAsUnixLineEndings()
     {
         const string Unix =
-            "-- SqlSource: no-token-validation\n\n-- name: A\n-- summary: S\nSELECT 1 -- c\nFROM {{t}}\n\n"
+            "-- generator: no-token-validation\n\n-- name: A\n-- summary: S\nSELECT 1 -- c\nFROM {{t}}\n\n"
             + "-- name: B\nSELECT 'x\ny'\n";
         var windows = Unix.Replace("\n", "\r\n", StringComparison.Ordinal);
 
@@ -449,7 +461,7 @@ public class SqlFileParserTests
 
     [Theory]
     [InlineData("-- name: A\n-- summary: s\nSELECT {{a}} -- c\n-- name: B\nSELECT 2\n")]
-    [InlineData("-- name: 1x\n-- SqlSource: bogus\nSELECT {{class}}\n")]
+    [InlineData("-- name: 1x\n-- generator: bogus\nSELECT {{class}}\n")]
     [InlineData("SELECT 'abc")]
     public void Parse_SameTextTwice_GivesEqualResults(string text)
     {
@@ -477,35 +489,35 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_DialectDirectiveInThePreamble_AppliesToEveryBlockAndIsNotInTheSql()
+    public void Parse_DialectGeneratorParameterInThePreamble_AppliesToEveryBlockAndIsNotInTheSql()
     {
         const string Text =
-            "/* Copyright (c) Example */\n-- SqlSource: dialect=mysql\n\n"
+            "/* Copyright (c) Example */\n-- generator: dialect=mysql\n\n"
             + "-- name: A\nSELECT 'a\\'b' # c\n-- name: B\nSELECT 5--3 # d\n";
 
         Blocks(Text).Select(Sql).ShouldBe(["SELECT 'a\\'b'", "SELECT 5--3"]);
     }
 
     [Fact]
-    public void Parse_DialectDirective_ReplacesTheDialectOfTheProject()
+    public void Parse_DialectGeneratorParameter_ReplacesTheDialectOfTheProject()
     {
-        const string Text = "-- SqlSource: dialect=mssql\n-- name: A\nSELECT [a'b] -- c\n";
+        const string Text = "-- generator: dialect=mssql\n-- name: A\nSELECT [a'b] -- c\n";
 
         Sql(Blocks(Text, dialect: SqlDialect.MySql).ShouldHaveSingleItem()).ShouldBe("SELECT [a'b]");
     }
 
     // Under plain MySQL the backslash takes the closing quote with it, and the string is not closed.
     [Fact]
-    public void Parse_DialectDirectiveWithAnOption_ReadsTheFileByThatOption()
+    public void Parse_DialectGeneratorParameterWithAnOption_ReadsTheFileByThatOption()
     {
         const string Text =
-            "-- SqlSource: dialect=mysql,no-backslash-escapes\n-- name: A\nSELECT 'C:\\temp\\' AS path -- c\n";
+            "-- generator: dialect=mysql,no-backslash-escapes\n-- name: A\nSELECT 'C:\\temp\\' AS path -- c\n";
 
         Sql(Blocks(Text).ShouldHaveSingleItem()).ShouldBe("SELECT 'C:\\temp\\' AS path");
     }
 
     [Fact]
-    public void Parse_OptionOfTheProject_IsUsedByAFileWithoutADirective()
+    public void Parse_OptionOfTheProject_IsUsedByAFileWithoutAGeneratorParameter()
     {
         const string Text = "-- name: A\nSELECT \"a\\\" AS b -- c\n";
         var project = new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes);
@@ -513,26 +525,26 @@ public class SqlFileParserTests
         Sql(Blocks(Text, dialect: project).ShouldHaveSingleItem()).ShouldBe("SELECT \"a\\\" AS b");
     }
 
-    // The directive names no option, so the file has none: the option of the project is not kept.
+    // The generator parameter names no option, so the file has none: the option of the project is not kept.
     [Fact]
-    public void Parse_DialectDirectiveWithoutOptions_ReplacesTheOptionsOfTheProjectToo()
+    public void Parse_DialectGeneratorParameterWithoutOptions_ReplacesTheOptionsOfTheProjectToo()
     {
-        const string Text = "-- SqlSource: dialect=mysql\n-- name: A\nSELECT 'it\\'s' -- c\n";
+        const string Text = "-- generator: dialect=mysql\n-- name: A\nSELECT 'it\\'s' -- c\n";
         var project = new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.NoBackslashEscapes);
 
         Sql(Blocks(Text, dialect: project).ShouldHaveSingleItem()).ShouldBe("SELECT 'it\\'s'");
     }
 
     [Fact]
-    public void Parse_TwoDialectDirectivesThatDifferOnlyInOptions_IsAnError()
+    public void Parse_TwoDialectGeneratorParametersThatDifferOnlyInOptions_IsAnError()
     {
         const string Text =
-            "-- SqlSource: dialect=mysql\n-- SqlSource: dialect=mysql,ansi-quotes\n-- name: A\nSELECT 1\n";
+            "-- generator: dialect=mysql\n-- generator: dialect=mysql,ansi-quotes\n-- name: A\nSELECT 1\n";
 
         Errors(Text)
             .ShouldBe([
                 SqlParseError.Create(
-                    SqlParseErrorKind.ConflictingDirectives,
+                    SqlParseErrorKind.ConflictingSettings,
                     SpanOf(Text, "dialect=mysql,ansi-quotes"),
                     "dialect=mysql,ansi-quotes"
                 ),
@@ -555,7 +567,7 @@ public class SqlFileParserTests
     public void Parse_ContinuedStringUnderKeepComments_KeepsTheCommentsBetweenItsParts()
     {
         const string Text =
-            "-- SqlSource: keep-comments\n-- name: A\nSELECT E'it' -- first\n    '\\'s' AS note; -- c\n";
+            "-- generator: keep-comments\n-- name: A\nSELECT E'it' -- first\n    '\\'s' AS note; -- c\n";
 
         Sql(Blocks(Text, dialect: SqlDialect.PostgreSql).ShouldHaveSingleItem())
             .ShouldBe("SELECT E'it' -- first\n    '\\'s' AS note; -- c");
@@ -585,9 +597,9 @@ public class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_DialectDirectiveInAFileWithoutANameMarker_GoesAboveItsSql()
+    public void Parse_DialectGeneratorParameterInAFileWithoutANameMarker_GoesAboveItsSql()
     {
-        const string Text = "-- summary: S\n-- SqlSource: dialect=oracle keep-comments\nSELECT q'[it's]' --+ h\n";
+        const string Text = "-- summary: S\n-- generator: dialect=oracle keep-comments\nSELECT q'[it's]' --+ h\n";
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
@@ -596,21 +608,21 @@ public class SqlFileParserTests
         block.KeepComments.ShouldBeTrue();
     }
 
-    // The header is read under the dialect of the project, and the rest of the file under the directive's.
+    // The header is read under the dialect of the project, and the rest of the file under the generator parameter's.
     [Fact]
-    public void Parse_CommentAboveTheDialectDirective_IsReadUnderTheDialectOfTheProject()
+    public void Parse_CommentAboveTheDialectGeneratorParameter_IsReadUnderTheDialectOfTheProject()
     {
-        const string Text = "# licence\n-- SqlSource: dialect=postgres\n-- name: A\nSELECT 1 # 2\n";
+        const string Text = "# licence\n-- generator: dialect=postgres\n-- name: A\nSELECT 1 # 2\n";
 
         Sql(Blocks(Text, dialect: SqlDialect.MySql).ShouldHaveSingleItem()).ShouldBe("SELECT 1 # 2");
     }
 
     [Theory]
-    [InlineData("-- name: A\n-- SqlSource: dialect=mysql\nSELECT 1\n")]
-    [InlineData("-- SqlSource: dialect=mysql\n-- name: A\n-- SqlSource: dialect=mysql\nSELECT 1\n")]
-    [InlineData("SELECT 1\n-- SqlSource: dialect=mysql\nFROM t\n")]
-    [InlineData("-- name: A\nSELECT 1\n-- name: B\n-- SqlSource: dialect=nope\nSELECT 2\n")]
-    public void Parse_DialectDirectiveInsideAQueryOrAfterSql_IsMisplaced(string text)
+    [InlineData("-- name: A\n-- generator: dialect=mysql\nSELECT 1\n")]
+    [InlineData("-- generator: dialect=mysql\n-- name: A\n-- generator: dialect=mysql\nSELECT 1\n")]
+    [InlineData("SELECT 1\n-- generator: dialect=mysql\nFROM t\n")]
+    [InlineData("-- name: A\nSELECT 1\n-- name: B\n-- generator: dialect=nope\nSELECT 2\n")]
+    public void Parse_DialectGeneratorParameterInsideAQueryOrAfterSql_IsMisplaced(string text)
     {
         var error = Errors(text).ShouldHaveSingleItem();
 
@@ -618,34 +630,36 @@ public class SqlFileParserTests
         error.Span.Start.ShouldBe(text.LastIndexOf("dialect=", StringComparison.Ordinal));
     }
 
-    // A marker after the last SQL of its block is reported as that.  A dialect directive in it is reported as
+    // A marker after the last SQL of its block is reported as that.  A dialect generator parameter in it is reported as
     // misplaced too, so that the user learns at once that it belongs at the top of the file.
     [Theory]
-    [InlineData("SELECT 1;\n-- SqlSource: dialect=mysql\n")]
-    [InlineData("-- name: A\nSELECT 1;\n-- SqlSource: keep-comments dialect=nope\n")]
-    [InlineData("-- name: A\nSELECT 1;\n-- SqlSource: DIALECT\n-- name: B\nSELECT 2;\n")]
-    public void Parse_DialectDirectiveAfterTheLastSqlOfItsBlock_IsMisplacedAsWellAsAtTheEndOfItsBlock(string text)
+    [InlineData("SELECT 1;\n-- generator: dialect=mysql\n")]
+    [InlineData("-- name: A\nSELECT 1;\n-- generator: keep-comments dialect=nope\n")]
+    [InlineData("-- name: A\nSELECT 1;\n-- generator: DIALECT\n-- name: B\nSELECT 2;\n")]
+    public void Parse_DialectGeneratorParameterAfterTheLastSqlOfItsBlock_IsMisplacedAsWellAsAtTheEndOfItsBlock(
+        string text
+    )
     {
         var errors = Errors(text);
 
         errors
             .Select(static error => error.Kind)
             .ShouldBe([SqlParseErrorKind.MarkerAtEndOfBlock, SqlParseErrorKind.MisplacedDialect]);
-        errors[0].Span.Start.ShouldBe(text.IndexOf("-- SqlSource:", StringComparison.Ordinal));
+        errors[0].Span.Start.ShouldBe(text.IndexOf("-- generator:", StringComparison.Ordinal));
         errors[1].Span.Start.ShouldBe(text.IndexOf("dialect", StringComparison.OrdinalIgnoreCase));
     }
 
-    // A misplaced directive does not change how the file is read: the # would be a comment under MySQL.
+    // A misplaced generator parameter does not change how the file is read: the # would be a comment under MySQL.
     [Fact]
-    public void Parse_MisplacedDialectDirective_IsNotApplied() =>
-        Errors("-- name: A\n-- SqlSource: dialect=mysql\nSELECT 'it''s' # '\n")
+    public void Parse_MisplacedDialectGeneratorParameter_IsNotApplied() =>
+        Errors("-- name: A\n-- generator: dialect=mysql\nSELECT 'it''s' # '\n")
             .ShouldHaveSingleItem()
             .Kind.ShouldBe(SqlParseErrorKind.UnterminatedQuote);
 
     [Fact]
-    public void Parse_DialectDirectiveAfterSqlInThePreamble_IsReportedWithTheSql()
+    public void Parse_DialectGeneratorParameterAfterSqlInThePreamble_IsReportedWithTheSql()
     {
-        const string Text = "SELECT 0;\n-- SqlSource: dialect=mysql\n-- name: A\nSELECT 1\n";
+        const string Text = "SELECT 0;\n-- generator: dialect=mysql\n-- name: A\nSELECT 1\n";
 
         Errors(Text)
             .Select(static error => error.Kind)
@@ -653,24 +667,25 @@ public class SqlFileParserTests
     }
 
     [Theory]
-    [InlineData("-- SqlSource: dialect=pgsql\n-- name: A\nSELECT 1\n", "dialect=pgsql")]
-    [InlineData("-- SqlSource: dialect\nSELECT 1\n", "dialect")]
-    public void Parse_DialectDirectiveWithoutAValidName_IsAnErrorAtTheDirective(string text, string directive) =>
+    [InlineData("-- generator: dialect=pgsql\n-- name: A\nSELECT 1\n", "dialect=pgsql")]
+    [InlineData("-- generator: dialect\nSELECT 1\n", "dialect")]
+    public void Parse_DialectGeneratorParameterWithoutAValidName_IsAnErrorAtTheGeneratorParameter(
+        string text,
+        string parameter
+    ) =>
         Errors(text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidDirectiveValue, SpanOf(text, directive), directive),
-            ]);
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, parameter), parameter)]);
 
     [Fact]
     public void Parse_TwoDialectsInOneHeader_IsAnErrorAtTheSecondAndTheSameDialectTwiceIsNot()
     {
-        const string Conflict = "-- SqlSource: dialect=mysql\n-- SqlSource: dialect=oracle\n-- name: A\nSELECT 1\n";
-        const string Repeat = "-- SqlSource: dialect=mysql\n-- SqlSource: dialect=MYSQL\n-- name: A\nSELECT 1 # c\n";
+        const string Conflict = "-- generator: dialect=mysql\n-- generator: dialect=oracle\n-- name: A\nSELECT 1\n";
+        const string Repeat = "-- generator: dialect=mysql\n-- generator: dialect=MYSQL\n-- name: A\nSELECT 1 # c\n";
 
         Errors(Conflict)
             .ShouldBe([
                 SqlParseError.Create(
-                    SqlParseErrorKind.ConflictingDirectives,
+                    SqlParseErrorKind.ConflictingSettings,
                     SpanOf(Conflict, "dialect=oracle"),
                     "dialect=oracle"
                 ),

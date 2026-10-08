@@ -5,13 +5,13 @@ using Microsoft.CodeAnalysis.Text;
 namespace SqlSource.Parsing;
 
 /// <summary>
-/// The directives given by the <c>-- SqlSource:</c> markers of one scope: a block, or a file's preamble.
+/// The generator parameters given by the <c>-- generator:</c> markers of one scope: a block, or a file's preamble.
 /// </summary>
 /// <param name="headerEnd">
-/// Where the file's header ends, as <see cref="SqlPreambleDialect.Apply" /> gives it.  A <c>dialect=</c> directive
-/// is accepted only before it.
+/// Where the file's header ends, as <see cref="SqlPreambleDialect.Apply" /> gives it.  A <c>dialect=</c> generator
+/// parameter is accepted only before it.
 /// </param>
-internal sealed class SqlDirectiveScope(int headerEnd)
+internal sealed class SqlGeneratorParameterScope(int headerEnd)
 {
     private const string KeepCommentsName = "keep-comments";
     private const string TokenValidationName = "token-validation";
@@ -24,16 +24,16 @@ internal sealed class SqlDirectiveScope(int headerEnd)
     public bool? TokenValidation { get; private set; }
 
     /// <summary>
-    /// The dialect that a <c>dialect=</c> directive of this scope names, or null.  It is already in effect by the
-    /// time the scope is read; it is kept here to find a second directive that names another.
+    /// The dialect that a <c>dialect=</c> generator parameter of this scope names, or null.  It is already in effect by
+    /// the time the scope is read; it is kept here to find a second generator parameter that names another.
     /// </summary>
     public SqlDialectChoice? Dialect { get; private set; }
 
     public HashSet<string> IgnoredTokens { get; } = [];
 
     /// <summary>
-    /// Finds the first <c>dialect=</c> directive of <paramref name="marker" /> that names a dialect.  Nothing is
-    /// allocated and nothing is reported.
+    /// Finds the first <c>dialect=</c> generator parameter of <paramref name="marker" /> that names a dialect.  Nothing
+    /// is allocated and nothing is reported.
     /// </summary>
     public static bool TryFindDialect(string text, SqlMarker marker, out SqlDialectChoice dialect)
     {
@@ -62,9 +62,10 @@ internal sealed class SqlDirectiveScope(int headerEnd)
     }
 
     /// <summary>
-    /// Reports every <c>dialect</c> directive of <paramref name="marker" /> as misplaced, whatever it names.  For a
-    /// marker that is not read into a scope because it comes after the last SQL of its block: such a directive is
-    /// past the header by definition, and would otherwise be reported only as a marker at the end of its block.
+    /// Reports every <c>dialect</c> generator parameter of <paramref name="marker" /> as misplaced, whatever it names.
+    /// For a marker that is not read into a scope because it comes after the last SQL of its block: such a generator
+    /// parameter is past the header by definition, and would otherwise be reported only as a marker at the end of its
+    /// block.
     /// </summary>
     public static void ReportMisplacedDialects(string text, SqlMarker marker, List<SqlParseError> errors)
     {
@@ -73,15 +74,15 @@ internal sealed class SqlDirectiveScope(int headerEnd)
         while (start < end)
         {
             var wordEnd = FindWordEnd(text, start, end);
-            var directive = text.Substring(start, wordEnd - start);
-            var separator = directive.IndexOf('=');
-            if (Is(separator < 0 ? directive : directive.Substring(0, separator), DialectName))
+            var parameter = text.Substring(start, wordEnd - start);
+            var separator = parameter.IndexOf('=');
+            if (Is(separator < 0 ? parameter : parameter.Substring(0, separator), DialectName))
             {
                 errors.Add(
                     SqlParseError.Create(
                         SqlParseErrorKind.MisplacedDialect,
                         TextSpan.FromBounds(start, wordEnd),
-                        directive
+                        parameter
                     )
                 );
             }
@@ -91,14 +92,14 @@ internal sealed class SqlDirectiveScope(int headerEnd)
     }
 
     /// <summary>
-    /// Applies the directives of one <c>-- SqlSource:</c> marker to this scope, adding any problems to
+    /// Applies the generator parameters of one <c>-- generator:</c> marker to this scope, adding any problems to
     /// <paramref name="errors" />.
     /// </summary>
     public void Read(string text, SqlMarker marker, List<SqlParseError> errors)
     {
         if (marker.ValueSpan.IsEmpty)
         {
-            errors.Add(SqlParseError.Create(SqlParseErrorKind.EmptyDirectiveLine, marker.Span));
+            errors.Add(SqlParseError.Create(SqlParseErrorKind.EmptyGeneratorLine, marker.Span));
             return;
         }
 
@@ -132,14 +133,14 @@ internal sealed class SqlDirectiveScope(int headerEnd)
         return start;
     }
 
-    private static bool Is(string name, string directive) =>
-        string.Equals(name, directive, StringComparison.OrdinalIgnoreCase);
+    private static bool Is(string name, string parameter) =>
+        string.Equals(name, parameter, StringComparison.OrdinalIgnoreCase);
 
-    private void Apply(string directive, TextSpan span, List<SqlParseError> errors)
+    private void Apply(string parameter, TextSpan span, List<SqlParseError> errors)
     {
-        var separator = directive.IndexOf('=');
-        var name = separator < 0 ? directive : directive.Substring(0, separator);
-        var value = separator < 0 ? null : directive.Substring(separator + 1);
+        var separator = parameter.IndexOf('=');
+        var name = separator < 0 ? parameter : parameter.Substring(0, separator);
+        var value = separator < 0 ? null : parameter.Substring(separator + 1);
         SqlParseErrorKind? problem;
         if (Is(name, TokenIgnoreName))
         {
@@ -151,16 +152,16 @@ internal sealed class SqlDirectiveScope(int headerEnd)
         }
         else if (Is(name, KeepCommentsName) || Is(name, TokenValidationName) || Is(name, NoTokenValidationName))
         {
-            problem = value is null ? ApplyFlag(name) : SqlParseErrorKind.InvalidDirectiveValue;
+            problem = value is null ? ApplyFlag(name) : SqlParseErrorKind.InvalidMarkerValue;
         }
         else
         {
-            problem = SqlParseErrorKind.UnknownDirective;
+            problem = SqlParseErrorKind.UnknownGeneratorParameter;
         }
 
         if (problem is { } kind)
         {
-            errors.Add(SqlParseError.Create(kind, span, directive));
+            errors.Add(SqlParseError.Create(kind, span, parameter));
         }
     }
 
@@ -168,14 +169,14 @@ internal sealed class SqlDirectiveScope(int headerEnd)
     {
         if (value is null || !SqlIdentifier.IsValid(value))
         {
-            return SqlParseErrorKind.InvalidDirectiveValue;
+            return SqlParseErrorKind.InvalidMarkerValue;
         }
 
         _ = IgnoredTokens.Add(value);
         return null;
     }
 
-    // The place is checked first: a directive in the wrong place is reported as that, whatever it names.
+    // The place is checked first: a generator parameter in the wrong place is reported as that, whatever it names.
     private SqlParseErrorKind? ApplyDialect(string? value, TextSpan span)
     {
         if (span.Start >= headerEnd)
@@ -185,12 +186,12 @@ internal sealed class SqlDirectiveScope(int headerEnd)
 
         if (!SqlDialectName.TryParse(value, out var dialect))
         {
-            return SqlParseErrorKind.InvalidDirectiveValue;
+            return SqlParseErrorKind.InvalidMarkerValue;
         }
 
         if (Dialect is { } existing && existing != dialect)
         {
-            return SqlParseErrorKind.ConflictingDirectives;
+            return SqlParseErrorKind.ConflictingSettings;
         }
 
         Dialect = dialect;
@@ -208,7 +209,7 @@ internal sealed class SqlDirectiveScope(int headerEnd)
         var validate = Is(name, TokenValidationName);
         if (TokenValidation is { } existing && existing != validate)
         {
-            return SqlParseErrorKind.ConflictingDirectives;
+            return SqlParseErrorKind.ConflictingSettings;
         }
 
         TokenValidation = validate;

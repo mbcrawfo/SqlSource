@@ -25,13 +25,13 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC106](#sqlsrc106) | SQL before the first name |
 | [SQLSRC107](#sqlsrc107) | Summary before the first name |
 | [SQLSRC108](#sqlsrc108) | Marker has no SQL after it |
-| [SQLSRC109](#sqlsrc109) | Directive is not known |
-| [SQLSRC110](#sqlsrc110) | Directive is missing |
-| [SQLSRC111](#sqlsrc111) | Directive value is not valid |
-| [SQLSRC112](#sqlsrc112) | Directives conflict |
+| [SQLSRC109](#sqlsrc109) | Generator parameter is not known |
+| [SQLSRC110](#sqlsrc110) | Generator parameter is missing |
+| [SQLSRC111](#sqlsrc111) | Marker value is not valid |
+| [SQLSRC112](#sqlsrc112) | Settings conflict |
 | [SQLSRC113](#sqlsrc113) | Query has no SQL |
 | [SQLSRC114](#sqlsrc114) | Token name is a keyword |
-| [SQLSRC115](#sqlsrc115) | Dialect directive is misplaced |
+| [SQLSRC115](#sqlsrc115) | Dialect parameter is misplaced |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
@@ -285,7 +285,7 @@ Add a `-- name:` marker at the top of the file, or rename the file.  If the file
 
 **SQL before the first name**
 
-In a file that has `-- name:` markers, only comments and `-- SqlSource:` directives may come before the first one.  SQL there would belong to no query.
+In a file that has `-- name:` markers, only comments and `-- generator:` lines may come before the first one.  SQL there would belong to no query.
 
 ```sql
 SET search_path TO app;
@@ -314,7 +314,7 @@ Move the summary below the `-- name:` marker.
 
 **Marker has no SQL after it**
 
-A `-- summary:` or `-- SqlSource:` marker comes before the SQL it describes.  This one is the last thing in its query, which usually means it was written above the next `-- name:` marker and was meant for that query.
+A `-- summary:` or `-- generator:` marker comes before the SQL it describes.  This one is the last thing in its query, which usually means it was written above the next `-- name:` marker and was meant for that query.
 
 ```sql
 -- name: GetUser
@@ -328,52 +328,52 @@ Move the marker below the `-- name:` marker of the query it describes, or delete
 
 ## SQLSRC109
 
-**Directive is not known**
+**Generator parameter is not known**
 
-A `-- SqlSource:` marker holds a word that is not a directive.  The directives are `keep-comments`, `token-validation`, `no-token-validation`, `token-ignore=name` and `dialect=name`.
+A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation`, `no-token-validation`, `token-ignore=name` and `dialect=name`.
 
 ```sql
--- SqlSource: keep-comment
+-- generator: keep-comment
 ```
 
-Correct the directive.
+Correct the generator parameter.
 
 ## SQLSRC110
 
-**Directive is missing**
+**Generator parameter is missing**
 
-A `-- SqlSource:` marker has nothing after the colon.
+A `-- generator:` marker has nothing after the colon.
 
-Add a directive, or delete the line.
+Add a generator parameter, or delete the line.
 
 ## SQLSRC111
 
-**Directive value is not valid**
+**Marker value is not valid**
 
-A directive lacks a value it needs, has one it does not take, or has one that is not valid.
+A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid.
 
 - `token-ignore` needs a value that is a C# identifier, as in `token-ignore=table`.
 - `dialect` needs the name of a dialect, as in `dialect=postgres`, with any options after it, as in `dialect=mysql,ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is one word: a space after a comma ends it.
-- No other directive takes a value.
+- No other generator parameter takes a value.
 
 ```sql
--- SqlSource: token-ignore
--- SqlSource: dialect=pgsql
--- SqlSource: keep-comments=true
+-- generator: token-ignore
+-- generator: dialect=pgsql
+-- generator: keep-comments=true
 ```
 
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
 ## SQLSRC112
 
-**Directives conflict**
+**Settings conflict**
 
-Two directives in one scope contradict each other.  A scope is the lines before the first `-- name:` marker, or one query.  The error is at the second directive.
+Two generator parameters in one scope contradict each other.  A scope is the lines before the first `-- name:` marker, or one query.  The error is at the second generator parameter.
 
 - `token-validation` and `no-token-validation` both appear.
-- Two `dialect` directives name different dialects, or one dialect with different options.  A file has one dialect.
+- Two `dialect` generator parameters name different dialects, or one dialect with different options.  A file has one dialect.
 
-Remove one of the two.  A validation directive in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
+Remove one of the two.  A validation generator parameter in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
 ## SQLSRC113
 
@@ -398,26 +398,26 @@ A token `{{name}}` becomes a parameter of a generated method, so its name must n
 SELECT * FROM {{class}};
 ```
 
-Rename the token.  If the braces are literal text and not a token, add `-- SqlSource: token-ignore=class` to the query.
+Rename the token.  If the braces are literal text and not a token, add `-- generator: token-ignore=class` to the query.
 
 ## SQLSRC115
 
-**Dialect directive is misplaced**
+**Dialect parameter is misplaced**
 
-A `dialect` directive sets the dialect of a whole file, and it changes how the text after it is read.  So it must come before the file's first `-- name:` marker and before the file's first SQL.  This one is inside a named query, or after SQL.
+The `dialect` generator parameter sets the dialect of a whole file, and it changes how the text after it is read.  So it must come before the file's first `-- name:` marker and before the file's first SQL.  This one is inside a named query, or after SQL.
 
 ```sql
 -- name: GetUser
--- SqlSource: dialect=mysql
+-- generator: dialect=mysql
 SELECT 1;
 ```
 
-A directive after the last SQL of its query is reported twice: as this error, and as [SQLSRC108](#sqlsrc108).
+A generator parameter after the last SQL of its query is reported twice: as this error, and as [SQLSRC108](#sqlsrc108).
 
-Move the directive to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
+Move the generator parameter to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
 
 ```sql
--- SqlSource: dialect=mysql
+-- generator: dialect=mysql
 
 -- name: GetUser
 SELECT 1;

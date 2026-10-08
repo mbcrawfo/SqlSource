@@ -12,7 +12,7 @@ internal static class SqlMarkerReader
     [
         ("name:", SqlMarkerKind.Name),
         ("summary:", SqlMarkerKind.Summary),
-        ("sqlsource:", SqlMarkerKind.Directives),
+        ("generator:", SqlMarkerKind.GeneratorParameters),
     ];
 
     /// <summary>

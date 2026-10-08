@@ -68,13 +68,23 @@ public class SqlTextBuilderTests
     }
 
     [Theory]
-    [InlineData("-- summary: x\nSELECT 1\n  -- SqlSource: keep-comments\nFROM t\n-- name: Next", "SELECT 1\nFROM t")]
+    [InlineData("-- summary: x\nSELECT 1\n  -- generator: keep-comments\nFROM t\n-- name: Next", "SELECT 1\nFROM t")]
     [InlineData("SELECT 1\n-- summary: x   ", "SELECT 1")]
     [InlineData("\t-- summary: x\nSELECT 1", "SELECT 1")]
     public void Build_MarkerLines_AreRemoved(string text, string expected)
     {
         Build(text).ShouldBe(expected);
         Build(text, keepComments: true).ShouldBe(expected);
+    }
+
+    // The old marker is an ordinary comment: removed by default, kept when comments are.
+    [Fact]
+    public void Build_LineOfTheOldMarker_IsAComment()
+    {
+        const string Text = "-- SqlSource: keep-comments\nSELECT 1";
+
+        Build(Text).ShouldBe("SELECT 1");
+        Build(Text, keepComments: true).ShouldBe(Text);
     }
 
     [Theory]
@@ -88,7 +98,7 @@ public class SqlTextBuilderTests
     [InlineData("\n\nSELECT 1\n\nFROM t\n\n", "SELECT 1\n\nFROM t")]
     [InlineData("SELECT 1   \n-- c  ", "SELECT 1\n-- c")]
     [InlineData("/* a\r\n b */\r\nSELECT 1", "/* a\n b */\nSELECT 1")]
-    [InlineData("-- summary: x\n-- keep\nSELECT 1\n-- SqlSource: keep-comments", "-- keep\nSELECT 1")]
+    [InlineData("-- summary: x\n-- keep\nSELECT 1\n-- generator: keep-comments", "-- keep\nSELECT 1")]
     [InlineData("SELECT 1\n-- summary: x\nFROM t", "SELECT 1\nFROM t")]
     public void Build_Preserving_StillCleansLineEndsAndOuterBlankLines(string text, string expected) =>
         Build(text, keepComments: true).ShouldBe(expected);
@@ -133,7 +143,7 @@ public class SqlTextBuilderTests
     {
         const string Text =
             "  -- lead\r\n\r\n-- summary: s\r\nSELECT 'a  \r\n\r\n b', /* c */ x   \r\n"
-            + "\t-- SqlSource: token-ignore=q\r\n"
+            + "\t-- generator: token-ignore=q\r\n"
             + "\r\n  /*+ h\r\n  i */ FROM t -- d  \r\n   \r\nWHERE {{y}} = $$ z\n $$  \r\n";
         var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
 

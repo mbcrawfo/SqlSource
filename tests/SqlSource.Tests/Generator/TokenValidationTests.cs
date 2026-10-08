@@ -3,8 +3,9 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// Whether a generated method checks its arguments: the query's own directive decides, then the directive at the top
-// of its file, then the project's SqlSourceTokenValidation property, and without any of them it does.
+// Whether a generated method checks its arguments: the query's own generator parameter decides, then the generator
+// parameter at the top of its file, then the project's SqlSourceTokenValidation property, and without any of them it
+// does.
 public class TokenValidationTests
 {
     private const string Source = """
@@ -29,26 +30,26 @@ public class TokenValidationTests
     [InlineData(null, null, " False ", false)]
     [InlineData(null, null, "true", true)]
     [InlineData(null, null, "", true)]
-    // The file's directive beats the property.
+    // The file's generator parameter beats the property.
     [InlineData(null, "no-token-validation", null, false)]
     [InlineData(null, "no-token-validation", "true", false)]
     [InlineData(null, "token-validation", "false", true)]
-    // The query's directive beats both.
+    // The query's generator parameter beats both.
     [InlineData("no-token-validation", null, "true", false)]
     [InlineData("token-validation", null, "false", true)]
     [InlineData("no-token-validation", "token-validation", "true", false)]
     [InlineData("token-validation", "no-token-validation", "false", true)]
     public void Run_Method_ValidatesByQueryThenFileThenProject(
-        string? queryDirective,
-        string? fileDirective,
+        string? queryGeneratorParameter,
+        string? fileGeneratorParameter,
         string? property,
         bool expected
     )
     {
         var sql =
-            (fileDirective is null ? string.Empty : "-- SqlSource: " + fileDirective + "\n")
+            (fileGeneratorParameter is null ? string.Empty : "-- generator: " + fileGeneratorParameter + "\n")
             + "-- name: ListFrom\n"
-            + (queryDirective is null ? string.Empty : "-- SqlSource: " + queryDirective + "\n")
+            + (queryGeneratorParameter is null ? string.Empty : "-- generator: " + queryGeneratorParameter + "\n")
             + "SELECT * FROM {{table}};\n";
 
         var run = Run(property, new SqlFile("/app/Repo/Users.sql", sql));
@@ -68,7 +69,7 @@ public class TokenValidationTests
     }
 
     [Fact]
-    public void Run_PropertyOff_ChangesOnlyTheQueriesWithoutADirective()
+    public void Run_PropertyOff_ChangesOnlyTheQueriesWithoutAGeneratorParameter()
     {
         var run = GeneratorHarness.Run(
             [
@@ -87,7 +88,7 @@ public class TokenValidationTests
             [
                 new SqlFile(
                     "/app/Repo/Users.sql",
-                    "-- name: Plain\nSELECT {{a}};\n-- name: Checked\n-- SqlSource: token-validation\nSELECT {{b}};\n"
+                    "-- name: Plain\nSELECT {{a}};\n-- name: Checked\n-- generator: token-validation\nSELECT {{b}};\n"
                 ),
             ],
             tokenValidation: "false"

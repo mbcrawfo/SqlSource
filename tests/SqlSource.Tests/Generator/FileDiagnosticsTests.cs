@@ -38,7 +38,7 @@ public class FileDiagnosticsTests
             new SqlFile(
                 "/app/Repo/Users.sql",
                 """
-                -- SqlSource: keep-comments shout
+                -- generator: keep-comments shout
                 -- name: GetUser
                 SELECT 1;
 
@@ -51,7 +51,7 @@ public class FileDiagnosticsTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC109 /app/Repo/Users.sql(1,29)-(1,34): 'shout' is not a SqlSource directive",
+            "SQLSRC109 /app/Repo/Users.sql(1,29)-(1,34): 'shout' is not a generator parameter",
             "SQLSRC103 /app/Repo/Users.sql(5,10)-(5,18): 'get-user' is not a valid query name.  A name is a C# "
                 + "identifier that is not a reserved keyword.",
             "SQLSRC104 /app/Repo/Users.sql(7,10)-(7,17): The query name 'GetUser' is used more than once in this file",
@@ -60,36 +60,36 @@ public class FileDiagnosticsTests
     }
 
     [Fact]
-    public void Run_DialectDirectiveInsideAQuery_IsAnErrorAtTheDirective()
+    public void Run_DialectGeneratorParameterInsideAQuery_IsAnErrorAtTheGeneratorParameter()
     {
         var run = GeneratorHarness.Run(
             Source,
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n-- SqlSource: dialect=mysql\nSELECT 1;\n")
+            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n-- generator: dialect=mysql\nSELECT 1;\n")
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC115 /app/Repo/Users.sql(2,15)-(2,28): The 'dialect' directive must come before the file's first "
-                + "query and before any SQL",
+            "SQLSRC115 /app/Repo/Users.sql(2,15)-(2,28): The 'dialect' generator parameter must come before the "
+                + "file's first query and before any SQL",
         ]);
         run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
     }
 
     [Fact]
-    public void Run_DialectDirectiveThatIsNotValidOrConflicts_IsAnErrorAtTheDirective()
+    public void Run_DialectGeneratorParameterThatIsNotValidOrConflicts_IsAnErrorAtTheGeneratorParameter()
     {
         var run = GeneratorHarness.Run(
             Source,
             new SqlFile(
                 "/app/Repo/Users.sql",
-                "-- SqlSource: dialect=pgsql\n-- SqlSource: dialect=mysql dialect=oracle\n-- name: GetUser\nSELECT 1;\n"
+                "-- generator: dialect=pgsql\n-- generator: dialect=mysql dialect=oracle\n-- name: GetUser\nSELECT 1;\n"
             )
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC111 /app/Repo/Users.sql(1,15)-(1,28): The directive 'dialect=pgsql' lacks a value it needs, has "
-                + "one it does not take, or has one that is not valid",
-            "SQLSRC112 /app/Repo/Users.sql(2,29)-(2,43): 'dialect=oracle' conflicts with another directive in the "
-                + "same scope",
+            "SQLSRC111 /app/Repo/Users.sql(1,15)-(1,28): 'dialect=pgsql' lacks a value it needs, has one it does "
+                + "not take, or has one that is not valid",
+            "SQLSRC112 /app/Repo/Users.sql(2,29)-(2,43): 'dialect=oracle' conflicts with a setting given earlier in "
+                + "the same scope",
         ]);
     }
 
@@ -320,7 +320,7 @@ public class FileDiagnosticsTests
             public partial class @class<T> { }
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: Sql\nSELECT 1;\n"),
-            new SqlFile("/app/Repo/Other.sql", "-- SqlSource: keep-comments\n-- name: class\nSELECT 2;\n")
+            new SqlFile("/app/Repo/Other.sql", "-- generator: keep-comments\n-- name: class\nSELECT 2;\n")
         );
 
         // "class" is a reserved keyword, so the parser has already refused it as a name.

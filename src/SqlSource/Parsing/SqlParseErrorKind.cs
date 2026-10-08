@@ -31,27 +31,27 @@ internal enum SqlParseErrorKind
     SummaryBeforeFirstName,
 
     /// <summary>
-    /// A <c>-- summary:</c> or <c>-- SqlSource:</c> marker has no SQL after it in its block.  No argument.
+    /// A <c>-- summary:</c> or <c>-- generator:</c> marker has no SQL after it in its block.  No argument.
     /// </summary>
     MarkerAtEndOfBlock,
 
-    /// <summary>A directive is not recognised.  Argument: the directive as written.</summary>
-    UnknownDirective,
+    /// <summary>A generator parameter is not recognised.  Argument: the generator parameter as written.</summary>
+    UnknownGeneratorParameter,
 
-    /// <summary>A <c>-- SqlSource:</c> marker has no directives.  No argument.</summary>
-    EmptyDirectiveLine,
-
-    /// <summary>
-    /// A directive lacks a value it needs, has one it does not take, or has one that is not valid.  Argument: the
-    /// directive as written.
-    /// </summary>
-    InvalidDirectiveValue,
+    /// <summary>A <c>-- generator:</c> marker has no generator parameters.  No argument.</summary>
+    EmptyGeneratorLine,
 
     /// <summary>
-    /// Two directives of one scope contradict each other: both validation directives, or two dialects.  Argument: the
-    /// second directive as written.
+    /// A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid.  Argument:
+    /// the generator parameter as written.
     /// </summary>
-    ConflictingDirectives,
+    InvalidMarkerValue,
+
+    /// <summary>
+    /// Two generator parameters of one scope contradict each other: both validation generator parameters, or two
+    /// dialects.  Argument: the second generator parameter as written.
+    /// </summary>
+    ConflictingSettings,
 
     /// <summary>A block has no SQL.  No argument.</summary>
     EmptyBlock,
@@ -60,7 +60,8 @@ internal enum SqlParseErrorKind
     ReservedTokenName,
 
     /// <summary>
-    /// A <c>dialect=</c> directive is inside a named query or after SQL.  Argument: the directive as written.
+    /// A <c>dialect=</c> generator parameter is inside a named query or after SQL.  Argument: the generator parameter
+    /// as written.
     /// </summary>
     MisplacedDialect,
 }

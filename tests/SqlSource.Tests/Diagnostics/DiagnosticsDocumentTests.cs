@@ -47,12 +47,12 @@ public class DiagnosticsDocumentTests
         );
     }
 
-    // The section of SQLSRC109 tells a user what the directives are.  A directive that is added is added to this
-    // list and to the section together, and nothing the section names may be unknown to the parser.
+    // The section of SQLSRC109 tells a user what the generator parameters are.  A generator parameter that is added is
+    // added to this list and to the section together, and nothing the section names may be unknown to the parser.
     [Fact]
-    public void Document_UnknownDirectiveSection_ListsEveryDirective()
+    public void Document_UnknownGeneratorParameterSection_ListsEveryGeneratorParameter()
     {
-        string[] directives =
+        string[] parameters =
         [
             "keep-comments",
             "token-validation",
@@ -62,17 +62,17 @@ public class DiagnosticsDocumentTests
         ];
         var section = string.Join('\n', Sections().Single(section => section.Id == "SQLSRC109").Body);
 
-        foreach (var directive in directives)
+        foreach (var parameter in parameters)
         {
-            section.ShouldContain($"`{directive}`");
+            section.ShouldContain($"`{parameter}`");
 
-            var line = "-- SqlSource: " + directive;
+            var line = "-- generator: " + parameter;
             var marker = SqlMarkerReader
                 .Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0])
                 .ShouldNotBeNull();
             var errors = new List<SqlParseError>();
-            new SqlDirectiveScope(int.MaxValue).Read(line, marker, errors);
-            errors.ShouldNotContain(error => error.Kind == SqlParseErrorKind.UnknownDirective, directive);
+            new SqlGeneratorParameterScope(int.MaxValue).Read(line, marker, errors);
+            errors.ShouldNotContain(error => error.Kind == SqlParseErrorKind.UnknownGeneratorParameter, parameter);
         }
     }
 

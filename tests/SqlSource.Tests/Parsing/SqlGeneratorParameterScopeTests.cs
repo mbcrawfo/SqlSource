@@ -7,12 +7,12 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlDirectiveScopeTests
+public class SqlGeneratorParameterScopeTests
 {
     [Fact]
-    public void NewScope_HasNoDirectives()
+    public void NewScope_HasNoGeneratorParameters()
     {
-        var scope = new SqlDirectiveScope(headerEnd: 0);
+        var scope = new SqlGeneratorParameterScope(headerEnd: 0);
 
         scope.KeepComments.ShouldBeFalse();
         scope.TokenValidation.ShouldBeNull();
@@ -23,7 +23,7 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_KeepComments_SetsTheFlag()
     {
-        var (scope, errors) = Read("-- SqlSource: keep-comments");
+        var (scope, errors) = Read("-- generator: keep-comments");
 
         errors.ShouldBeEmpty();
         scope.KeepComments.ShouldBeTrue();
@@ -31,9 +31,9 @@ public class SqlDirectiveScopeTests
     }
 
     [Theory]
-    [InlineData("-- SqlSource: token-validation", true)]
-    [InlineData("-- SqlSource: no-token-validation", false)]
-    public void Read_ValidationDirective_SetsTokenValidation(string line, bool expected)
+    [InlineData("-- generator: token-validation", true)]
+    [InlineData("-- generator: no-token-validation", false)]
+    public void Read_ValidationGeneratorParameter_SetsTokenValidation(string line, bool expected)
     {
         var (scope, errors) = Read(line);
 
@@ -42,9 +42,9 @@ public class SqlDirectiveScopeTests
     }
 
     [Fact]
-    public void Read_DirectiveNames_AreCaseInsensitive()
+    public void Read_GeneratorParameterNames_AreCaseInsensitive()
     {
-        var (scope, errors) = Read("-- SqlSource: KEEP-COMMENTS No-Token-Validation Token-Ignore=a");
+        var (scope, errors) = Read("-- generator: KEEP-COMMENTS No-Token-Validation Token-Ignore=a");
 
         errors.ShouldBeEmpty();
         scope.KeepComments.ShouldBeTrue();
@@ -53,9 +53,9 @@ public class SqlDirectiveScopeTests
     }
 
     [Fact]
-    public void Read_SeveralDirectivesOnOneLine_AppliesEach()
+    public void Read_SeveralGeneratorParametersOnOneLine_AppliesEach()
     {
-        var (scope, errors) = Read("-- SqlSource: keep-comments   token-ignore=a\ttoken-ignore=b");
+        var (scope, errors) = Read("-- generator: keep-comments   token-ignore=a\ttoken-ignore=b");
 
         errors.ShouldBeEmpty();
         scope.KeepComments.ShouldBeTrue();
@@ -66,9 +66,9 @@ public class SqlDirectiveScopeTests
     public void Read_SeveralMarkers_Accumulate()
     {
         var (scope, errors) = Read(
-            "-- SqlSource: keep-comments",
-            "-- SqlSource: token-validation",
-            "-- SqlSource: token-ignore=a"
+            "-- generator: keep-comments",
+            "-- generator: token-validation",
+            "-- generator: token-ignore=a"
         );
 
         errors.ShouldBeEmpty();
@@ -78,11 +78,11 @@ public class SqlDirectiveScopeTests
     }
 
     [Fact]
-    public void Read_RepeatedDirective_IsAllowed()
+    public void Read_RepeatedGeneratorParameter_IsAllowed()
     {
         var (scope, errors) = Read(
-            "-- SqlSource: keep-comments keep-comments token-validation token-ignore=a",
-            "-- SqlSource: token-validation token-ignore=a"
+            "-- generator: keep-comments keep-comments token-validation token-ignore=a",
+            "-- generator: token-validation token-ignore=a"
         );
 
         errors.ShouldBeEmpty();
@@ -93,7 +93,7 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_TokenIgnore_KeepsTheNameAsWrittenAndAcceptsAKeyword()
     {
-        var (scope, errors) = Read("-- SqlSource: token-ignore=Table token-ignore=class");
+        var (scope, errors) = Read("-- generator: token-ignore=Table token-ignore=class");
 
         errors.ShouldBeEmpty();
         scope.IgnoredTokens.ShouldBe(["Table", "class"], ignoreOrder: true);
@@ -105,23 +105,25 @@ public class SqlDirectiveScopeTests
     [InlineData("strip-comments")]
     [InlineData("foo=bar")]
     [InlineData("=x")]
-    public void Read_UnknownDirective_IsAnError(string directive)
+    public void Read_UnknownGeneratorParameter_IsAnError(string parameter)
     {
-        var line = "-- SqlSource: " + directive;
+        var line = "-- generator: " + parameter;
 
         var (_, errors) = Read(line);
 
-        errors.ShouldBe([SqlParseError.Create(SqlParseErrorKind.UnknownDirective, SpanOf(line, directive), directive)]);
+        errors.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.UnknownGeneratorParameter, SpanOf(line, parameter), parameter),
+        ]);
     }
 
     [Theory]
-    [InlineData("-- SqlSource:")]
-    [InlineData("-- SqlSource:   ")]
-    public void Read_MarkerWithoutDirectives_IsAnError(string line)
+    [InlineData("-- generator:")]
+    [InlineData("-- generator:   ")]
+    public void Read_MarkerWithoutGeneratorParameters_IsAnError(string line)
     {
         var (_, errors) = Read(line);
 
-        errors.ShouldBe([SqlParseError.Create(SqlParseErrorKind.EmptyDirectiveLine, new TextSpan(0, line.Length))]);
+        errors.ShouldBe([SqlParseError.Create(SqlParseErrorKind.EmptyGeneratorLine, new TextSpan(0, line.Length))]);
     }
 
     [Theory]
@@ -133,14 +135,14 @@ public class SqlDirectiveScopeTests
     [InlineData("keep-comments=x")]
     [InlineData("token-validation=true")]
     [InlineData("no-token-validation=")]
-    public void Read_MissingOrUnexpectedValue_IsAnError(string directive)
+    public void Read_MissingOrUnexpectedValue_IsAnError(string parameter)
     {
-        var line = "-- SqlSource: " + directive;
+        var line = "-- generator: " + parameter;
 
         var (scope, errors) = Read(line);
 
         errors.ShouldBe([
-            SqlParseError.Create(SqlParseErrorKind.InvalidDirectiveValue, SpanOf(line, directive), directive),
+            SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(line, parameter), parameter),
         ]);
         scope.KeepComments.ShouldBeFalse();
         scope.TokenValidation.ShouldBeNull();
@@ -150,15 +152,15 @@ public class SqlDirectiveScopeTests
     [Theory]
     [InlineData("token-validation", "no-token-validation", true)]
     [InlineData("no-token-validation", "token-validation", false)]
-    public void Read_BothValidationDirectivesOnOneLine_ReportsTheSecond(string first, string second, bool kept)
+    public void Read_BothValidationGeneratorParametersOnOneLine_ReportsTheSecond(string first, string second, bool kept)
     {
-        var line = $"-- SqlSource: {first} {second}";
+        var line = $"-- generator: {first} {second}";
 
         var (scope, errors) = Read(line);
 
         errors.ShouldBe([
             SqlParseError.Create(
-                SqlParseErrorKind.ConflictingDirectives,
+                SqlParseErrorKind.ConflictingSettings,
                 new TextSpan(line.Length - second.Length, second.Length),
                 second
             ),
@@ -167,18 +169,18 @@ public class SqlDirectiveScopeTests
     }
 
     [Fact]
-    public void Read_BothValidationDirectivesOnSeparateLines_IsAnError()
+    public void Read_BothValidationGeneratorParametersOnSeparateLines_IsAnError()
     {
-        var (_, errors) = Read("-- SqlSource: token-validation", "-- SqlSource: no-token-validation");
+        var (_, errors) = Read("-- generator: token-validation", "-- generator: no-token-validation");
 
         errors.Count.ShouldBe(1);
-        errors[0].Kind.ShouldBe(SqlParseErrorKind.ConflictingDirectives);
+        errors[0].Kind.ShouldBe(SqlParseErrorKind.ConflictingSettings);
     }
 
     [Fact]
-    public void Read_ErrorInOneDirective_StillAppliesTheOthers()
+    public void Read_ErrorInOneGeneratorParameter_StillAppliesTheOthers()
     {
-        var (scope, errors) = Read("-- SqlSource: bogus keep-comments");
+        var (scope, errors) = Read("-- generator: bogus keep-comments");
 
         errors.Count.ShouldBe(1);
         scope.KeepComments.ShouldBeTrue();
@@ -189,9 +191,9 @@ public class SqlDirectiveScopeTests
     [InlineData("DIALECT=Postgres", nameof(SqlDialect.PostgreSql))]
     [InlineData("Dialect=TSQL", nameof(SqlDialect.SqlServer))]
     [InlineData("dialect=ansi", nameof(SqlDialect.Ansi))]
-    public void Read_Dialect_KeepsTheDialectItNames(string directive, string expected)
+    public void Read_Dialect_KeepsTheDialectItNames(string parameter, string expected)
     {
-        var (scope, errors) = Read("-- SqlSource: " + directive);
+        var (scope, errors) = Read("-- generator: " + parameter);
 
         errors.ShouldBeEmpty();
         scope.Dialect.ShouldBe(Plain(Enum.Parse<SqlDialect>(expected)));
@@ -206,14 +208,14 @@ public class SqlDirectiveScopeTests
     [InlineData("dialect=mysql,")]
     [InlineData("dialect=mysql,nope")]
     [InlineData("dialect=postgres,ansi-quotes")]
-    public void Read_DialectWithoutAValueOrWithAnUnknownName_IsAnError(string directive)
+    public void Read_DialectWithoutAValueOrWithAnUnknownName_IsAnError(string parameter)
     {
-        var line = "-- SqlSource: " + directive;
+        var line = "-- generator: " + parameter;
 
         var (scope, errors) = Read(line);
 
         errors.ShouldBe([
-            SqlParseError.Create(SqlParseErrorKind.InvalidDirectiveValue, SpanOf(line, directive), directive),
+            SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(line, parameter), parameter),
         ]);
         scope.Dialect.ShouldBeNull();
     }
@@ -221,7 +223,7 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_SameDialectTwice_IsAllowed()
     {
-        var (scope, errors) = Read("-- SqlSource: dialect=mssql dialect=tsql", "-- SqlSource: dialect=SqlServer");
+        var (scope, errors) = Read("-- generator: dialect=mssql dialect=tsql", "-- generator: dialect=SqlServer");
 
         errors.ShouldBeEmpty();
         scope.Dialect.ShouldBe(Plain(SqlDialect.SqlServer));
@@ -230,7 +232,7 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_DialectWithOptions_KeepsTheDialectAndItsOptions()
     {
-        var (scope, errors) = Read("-- SqlSource: keep-comments DIALECT=MySql,ANSI_QUOTES");
+        var (scope, errors) = Read("-- generator: keep-comments DIALECT=MySql,ANSI_QUOTES");
 
         errors.ShouldBeEmpty();
         scope.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes));
@@ -240,8 +242,8 @@ public class SqlDirectiveScopeTests
     public void Read_SameDialectAndOptionsTwice_IsAllowed()
     {
         var (scope, errors) = Read(
-            "-- SqlSource: dialect=mysql,ansi-quotes,no-backslash-escapes",
-            "-- SqlSource: dialect=MySQL,NO_BACKSLASH_ESCAPES,ANSI_QUOTES"
+            "-- generator: dialect=mysql,ansi-quotes,no-backslash-escapes",
+            "-- generator: dialect=MySQL,NO_BACKSLASH_ESCAPES,ANSI_QUOTES"
         );
 
         errors.ShouldBeEmpty();
@@ -253,13 +255,13 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_SameDialectWithOtherOptions_ReportsTheSecondAndKeepsTheFirst()
     {
-        const string Line = "-- SqlSource: dialect=mysql dialect=mysql,ansi-quotes";
+        const string Line = "-- generator: dialect=mysql dialect=mysql,ansi-quotes";
 
         var (scope, errors) = Read(Line);
 
         errors.ShouldBe([
             SqlParseError.Create(
-                SqlParseErrorKind.ConflictingDirectives,
+                SqlParseErrorKind.ConflictingSettings,
                 SpanOf(Line, "dialect=mysql,ansi-quotes"),
                 "dialect=mysql,ansi-quotes"
             ),
@@ -267,21 +269,26 @@ public class SqlDirectiveScopeTests
         scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
     }
 
-    // A directive is one word.  A space after the comma ends it, and the option is read as a directive of its own.
+    // A generator parameter is one word.  A space after the comma ends it, and the option is read as a generator
+    // parameter of its own.
     [Fact]
     public void Read_SpaceAfterTheCommaOfADialect_IsTwoErrors()
     {
-        const string Line = "-- SqlSource: dialect=mysql, ansi-quotes";
+        const string Line = "-- generator: dialect=mysql, ansi-quotes";
 
         var (scope, errors) = Read(Line);
 
         errors.ShouldBe([
             SqlParseError.Create(
-                SqlParseErrorKind.InvalidDirectiveValue,
+                SqlParseErrorKind.InvalidMarkerValue,
                 SpanOf(Line, "dialect=mysql,"),
                 "dialect=mysql,"
             ),
-            SqlParseError.Create(SqlParseErrorKind.UnknownDirective, SpanOf(Line, "ansi-quotes"), "ansi-quotes"),
+            SqlParseError.Create(
+                SqlParseErrorKind.UnknownGeneratorParameter,
+                SpanOf(Line, "ansi-quotes"),
+                "ansi-quotes"
+            ),
         ]);
         scope.Dialect.ShouldBeNull();
     }
@@ -289,9 +296,9 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void TryFindDialect_MarkerWithOptions_GivesTheFirstValueThatIsValid()
     {
-        const string Line = "-- SqlSource: dialect=mysql, dialect=mariadb,no-backslash-escapes dialect=mysql";
+        const string Line = "-- generator: dialect=mysql, dialect=mariadb,no-backslash-escapes dialect=mysql";
 
-        SqlDirectiveScope.TryFindDialect(Line, Marker(Line), out var dialect).ShouldBeTrue();
+        SqlGeneratorParameterScope.TryFindDialect(Line, Marker(Line), out var dialect).ShouldBeTrue();
 
         dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MariaDb, SqlDialectOptions.NoBackslashEscapes));
     }
@@ -299,13 +306,13 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_TwoDialectsOnOneLine_ReportsTheSecondAndKeepsTheFirst()
     {
-        const string Line = "-- SqlSource: dialect=mysql dialect=oracle";
+        const string Line = "-- generator: dialect=mysql dialect=oracle";
 
         var (scope, errors) = Read(Line);
 
         errors.ShouldBe([
             SqlParseError.Create(
-                SqlParseErrorKind.ConflictingDirectives,
+                SqlParseErrorKind.ConflictingSettings,
                 SpanOf(Line, "dialect=oracle"),
                 "dialect=oracle"
             ),
@@ -316,19 +323,19 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_TwoDialectsOnSeparateLines_IsAnError()
     {
-        var (scope, errors) = Read("-- SqlSource: dialect=mysql", "-- SqlSource: dialect=mariadb");
+        var (scope, errors) = Read("-- generator: dialect=mysql", "-- generator: dialect=mariadb");
 
-        errors.ShouldHaveSingleItem().Kind.ShouldBe(SqlParseErrorKind.ConflictingDirectives);
+        errors.ShouldHaveSingleItem().Kind.ShouldBe(SqlParseErrorKind.ConflictingSettings);
         scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
     }
 
-    // The directive starts at offset 14 of the line.
+    // The generator parameter starts at offset 14 of the line.
     [Theory]
     [InlineData(0)]
     [InlineData(14)]
     public void Read_DialectAtOrAfterTheHeaderEnd_IsMisplacedWhateverItNames(int headerEnd)
     {
-        var (scope, errors) = Read(headerEnd, "-- SqlSource: dialect=mysql keep-comments", "-- SqlSource: dialect=x");
+        var (scope, errors) = Read(headerEnd, "-- generator: dialect=mysql keep-comments", "-- generator: dialect=x");
 
         errors.ShouldBe([
             SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, new TextSpan(14, 13), "dialect=mysql"),
@@ -341,48 +348,48 @@ public class SqlDirectiveScopeTests
     [Fact]
     public void Read_DialectJustBeforeTheHeaderEnd_IsAccepted()
     {
-        var (scope, errors) = Read(15, "-- SqlSource: dialect=mysql");
+        var (scope, errors) = Read(15, "-- generator: dialect=mysql");
 
         errors.ShouldBeEmpty();
         scope.Dialect.ShouldBe(Plain(SqlDialect.MySql));
     }
 
     [Theory]
-    [InlineData("-- SqlSource: dialect=mysql", nameof(SqlDialect.MySql))]
-    [InlineData("-- SqlSource: keep-comments DIALECT=Oracle token-ignore=a", nameof(SqlDialect.Oracle))]
-    [InlineData("-- SqlSource: dialect=nope dialect= dialect dialect=sqlite", nameof(SqlDialect.Sqlite))]
-    [InlineData("-- SqlSource: dialect=mysql dialect=oracle", nameof(SqlDialect.MySql))]
+    [InlineData("-- generator: dialect=mysql", nameof(SqlDialect.MySql))]
+    [InlineData("-- generator: keep-comments DIALECT=Oracle token-ignore=a", nameof(SqlDialect.Oracle))]
+    [InlineData("-- generator: dialect=nope dialect= dialect dialect=sqlite", nameof(SqlDialect.Sqlite))]
+    [InlineData("-- generator: dialect=mysql dialect=oracle", nameof(SqlDialect.MySql))]
     public void TryFindDialect_MarkerWithADialect_GivesTheFirstThatIsValid(string line, string expected)
     {
-        SqlDirectiveScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeTrue();
+        SqlGeneratorParameterScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeTrue();
 
         dialect.ShouldBe(Plain(Enum.Parse<SqlDialect>(expected)));
     }
 
     [Theory]
-    [InlineData("-- SqlSource: keep-comments")]
-    [InlineData("-- SqlSource:")]
-    [InlineData("-- SqlSource: dialect")]
-    [InlineData("-- SqlSource: dialect=")]
-    [InlineData("-- SqlSource: dialect=pgsql")]
-    [InlineData("-- SqlSource: xdialect=mysql")]
-    [InlineData("-- SqlSource: dialects=mysql")]
-    [InlineData("-- SqlSource: dialect:mysql")]
-    [InlineData("-- SqlSource: dialect = mysql")]
+    [InlineData("-- generator: keep-comments")]
+    [InlineData("-- generator:")]
+    [InlineData("-- generator: dialect")]
+    [InlineData("-- generator: dialect=")]
+    [InlineData("-- generator: dialect=pgsql")]
+    [InlineData("-- generator: xdialect=mysql")]
+    [InlineData("-- generator: dialects=mysql")]
+    [InlineData("-- generator: dialect:mysql")]
+    [InlineData("-- generator: dialect = mysql")]
     public void TryFindDialect_MarkerWithoutAValidDialect_FindsNone(string line)
     {
-        SqlDirectiveScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeFalse();
+        SqlGeneratorParameterScope.TryFindDialect(line, Marker(line), out var dialect).ShouldBeFalse();
 
         dialect.ShouldBe(default);
     }
 
     [Fact]
-    public void ReportMisplacedDialects_Marker_ReportsEachDialectDirectiveWhateverItNamesAndNothingElse()
+    public void ReportMisplacedDialects_Marker_ReportsEachDialectGeneratorParameterWhateverItNamesAndNothingElse()
     {
-        const string Line = "-- SqlSource: keep-comments dialect=mysql bogus DIALECT dialect=nope dialects=x";
+        const string Line = "-- generator: keep-comments dialect=mysql bogus DIALECT dialect=nope dialects=x";
         var errors = new List<SqlParseError>();
 
-        SqlDirectiveScope.ReportMisplacedDialects(Line, Marker(Line), errors);
+        SqlGeneratorParameterScope.ReportMisplacedDialects(Line, Marker(Line), errors);
 
         errors.ShouldBe([
             SqlParseError.Create(SqlParseErrorKind.MisplacedDialect, SpanOf(Line, "dialect=mysql"), "dialect=mysql"),
@@ -391,13 +398,16 @@ public class SqlDirectiveScopeTests
         ]);
     }
 
-    private static (SqlDirectiveScope Scope, List<SqlParseError> Errors) Read(params string[] lines) =>
+    private static (SqlGeneratorParameterScope Scope, List<SqlParseError> Errors) Read(params string[] lines) =>
         Read(int.MaxValue, lines);
 
-    // Each line is lexed alone, so every directive is at the offset it has in its own line.
-    private static (SqlDirectiveScope Scope, List<SqlParseError> Errors) Read(int headerEnd, params string[] lines)
+    // Each line is lexed alone, so every generator parameter is at the offset it has in its own line.
+    private static (SqlGeneratorParameterScope Scope, List<SqlParseError> Errors) Read(
+        int headerEnd,
+        params string[] lines
+    )
     {
-        var scope = new SqlDirectiveScope(headerEnd);
+        var scope = new SqlGeneratorParameterScope(headerEnd);
         var errors = new List<SqlParseError>();
         foreach (var line in lines)
         {
