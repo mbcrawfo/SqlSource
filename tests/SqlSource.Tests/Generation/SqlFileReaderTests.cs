@@ -30,14 +30,16 @@ public class SqlFileReaderTests
                 Location(new TextSpan(9, 7), 0, 9, 0, 16),
                 "Loads one user.",
                 TestModels.Array(Literal("SELECT 1;")),
-                null
+                null,
+                EquatableArray<SqlQueryParameter>.Empty
             ),
             new SqlQuery(
                 "ListUsers",
                 Location(new TextSpan(70, 9), 4, 9, 4, 18),
                 null,
                 TestModels.Array(Literal("SELECT 2\nFROM t;")),
-                null
+                null,
+                EquatableArray<SqlQueryParameter>.Empty
             ),
         ]);
     }
@@ -54,10 +56,18 @@ public class SqlFileReaderTests
                 new LocationInfo("C:\\app\\Repo\\CountUsers.sql", new TextSpan(0, 0), default),
                 null,
                 TestModels.Array(Literal("SELECT 1;")),
-                null
+                null,
+                EquatableArray<SqlQueryParameter>.Empty
             ),
         ]);
     }
+
+    [Fact]
+    public void Read_QueryWithParameters_CopiesThem() =>
+        Read("-- name: Q\nSELECT @a, @b;\n")
+            .Queries.ShouldHaveSingleItem()
+            .Parameters.Select(static parameter => parameter.Name)
+            .ShouldBe(["a", "b"]);
 
     [Fact]
     public void Read_FileWithErrors_GivesEachErrorWithItsLineAndColumnAndNoQueries()

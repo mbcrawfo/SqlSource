@@ -765,6 +765,29 @@ public class SqlFileParserTests
             .ShouldBe(SqlFileParser.Parse("SELECT 1 -- c", "Query.sql", SqlDialect.Ansi));
     }
 
+    [Theory]
+    [InlineData("SELECT @a, @b, @a", new[] { "a", "b" })]
+    [InlineData("SELECT @Id, @ID, @id", new[] { "Id" })]
+    [InlineData("SELECT '@x', @y -- @z", new[] { "y" })]
+    [InlineData("SELECT @@ROWCOUNT, a @> b", new string[0])]
+    public void Parse_Parameters_AreThoseOfTheSqlInOrderOfFirstAppearance(string sql, string[] expected)
+    {
+        var block = Blocks("-- name: Q\n" + sql + "\n").ShouldHaveSingleItem();
+
+        block.Parameters.Select(static parameter => parameter.Name).ShouldBe(expected);
+        block.Parameters.ShouldAllBe(static parameter =>
+            parameter.Type == null && parameter.Nullable == null && !parameter.IsDeclared
+        );
+        Sql(block).ShouldBe(sql.Replace(" -- @z", string.Empty, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Parse_KeptComment_HoldsNoParameter() =>
+        Blocks("-- name: Q\n-- generator: keep-comments\nSELECT @a -- @b\n")
+            .ShouldHaveSingleItem()
+            .Parameters.Select(static parameter => parameter.Name)
+            .ShouldBe(["a"]);
+
     private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialectChoice dialect = default)
     {
         var result = SqlFileParser.Parse(text, fileName, dialect);

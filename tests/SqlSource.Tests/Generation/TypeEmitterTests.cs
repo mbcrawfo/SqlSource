@@ -499,7 +499,14 @@ public class TypeEmitterTests
         new("app/Repo/" + fileName, fileName, TestModels.Array(queries), TestModels.Array<DiagnosticInfo>());
 
     private static SqlQuery Query(string name, string sql, string? summary = null, string file = "Users.sql") =>
-        new(name, NameLocation(file), summary, TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, sql)), null);
+        new(
+            name,
+            NameLocation(file),
+            summary,
+            TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, sql)),
+            null,
+            EquatableArray<SqlQueryParameter>.Empty
+        );
 
     // "SELECT * FROM {{table}};", which is a method with one parameter.
     private static SqlQuery TokenQuery(string name, bool? tokenValidation = null, string file = "Users.sql") =>
@@ -512,7 +519,8 @@ public class TypeEmitterTests
                 new SqlSegment(SqlSegmentKind.Token, "table"),
                 new SqlSegment(SqlSegmentKind.Literal, ";")
             ),
-            tokenValidation
+            tokenValidation,
+            EquatableArray<SqlQueryParameter>.Empty
         );
 
     private static LocationInfo NameLocation(string file) =>

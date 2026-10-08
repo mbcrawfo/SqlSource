@@ -683,6 +683,66 @@ public class SqlLexerTests
         SqlLexer.Lex("--+ h", SqlDialectRules.Oracle).Lexemes[0].GetContentSpan("--+ h").ShouldBe(new TextSpan(0, 5));
     }
 
+    [Theory]
+    [InlineData("WHERE id = @id", new[] { "Text:WHERE id = ", "Parameter:@id" })]
+    [InlineData("@a + @b", new[] { "Parameter:@a", "Text: + ", "Parameter:@b" })]
+    [InlineData("(@1)", new[] { "Text:(", "Parameter:@1", "Text:)" })]
+    [InlineData("@_a;", new[] { "Parameter:@_a", "Text:;" })]
+    [InlineData("@größe;", new[] { "Parameter:@größe", "Text:;" })]
+    [InlineData("'x'@p", new[] { "Quoted:'x'", "Parameter:@p" })]
+    public void Lex_Parameter_IsThePrefixAndAName(string text, string[] expected) => Lex(text).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("a @> b")]
+    [InlineData("a <@ b")]
+    [InlineData("a @@ b")]
+    [InlineData("a @? b")]
+    [InlineData("SELECT @@ROWCOUNT")]
+    [InlineData("user@host")]
+    [InlineData("x_@y")]
+    [InlineData("1@y")]
+    [InlineData("@ x")]
+    [InlineData("@")]
+    public void Lex_AtSignThatStartsNoParameter_IsText(string text) => Lex(text).ShouldBe(["Text:" + text]);
+
+    [Theory]
+    [InlineData("'@a'", "Quoted:'@a'")]
+    [InlineData("\"@a\"", "Quoted:\"@a\"")]
+    [InlineData("-- @a", "LineComment:-- @a")]
+    [InlineData("/* @a */", "BlockComment:/* @a */")]
+    [InlineData("/*+ @a */", "Hint:/*+ @a */")]
+    public void Lex_AtSignInsideAQuoteACommentOrAHint_IsNotAParameter(string text, string expected) =>
+        Lex(text).ShouldBe([expected]);
+
+    [Theory]
+    [InlineData("Ansi")]
+    [InlineData("SqlServer")]
+    [InlineData("PostgreSql")]
+    [InlineData("CockroachDb")]
+    [InlineData("MySql")]
+    [InlineData("MySql+AnsiQuotes+NoBackslashEscapes")]
+    [InlineData("MariaDb")]
+    [InlineData("Sqlite")]
+    [InlineData("Oracle")]
+    public void Lex_Parameter_IsFoundUnderEveryDialect(string dialect) =>
+        Lex("x = @p", Rules(dialect)).ShouldBe(["Text:x = ", "Parameter:@p"]);
+
+    // Without the parameter the second part would continue the E string, and its backslash would escape the quote.
+    [Fact]
+    public void Lex_ParameterBetweenTwoStrings_EndsTheContinuation() =>
+        Lex("E'a'\n@p\n'b\\' x", SqlDialectRules.PostgreSql)
+            .ShouldBe(["Text:E", "Quoted:'a'", "Text:\n", "Parameter:@p", "Text:\n", "Quoted:'b\\'", "Text: x"]);
+
+    [Fact]
+    public void Lex_TextWithParameters_IsCoveredWithoutGaps()
+    {
+        const string Text = "SELECT @a,@b FROM t WHERE x@y = '@z' -- @c\n";
+
+        var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
+
+        string.Concat(lexemes.Select(lexeme => Text.Substring(lexeme.Span.Start, lexeme.Span.Length))).ShouldBe(Text);
+    }
+
     private static SqlDialectRules Rules(string choice)
     {
         var parts = choice.Split('+');

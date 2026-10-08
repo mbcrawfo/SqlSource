@@ -20,6 +20,10 @@ internal sealed class SqlDialectRules
     // The first characters of --, # and /*.
     private const string CommentStarters = "-#/";
 
+    // The prefix of a parameter in every dialect SqlSource reads today.  It is a value of the rules so that an engine
+    // with another prefix, Oracle's ":name", is a rule and not a rewrite.
+    private const char AtSign = '@';
+
     private static readonly QuoteReader Doubled = new DoubledQuoteReader();
 
     private static readonly QuoteReader Backslash = new BackslashQuoteReader();
@@ -44,19 +48,24 @@ internal sealed class SqlDialectRules
 
     private readonly QuoteReader?[] _readers = new QuoteReader?[TableSize];
 
-    // Every character that can start something other than plain text: a comment in any dialect, or a quoted region
-    // in this one.
+    // Every character that can start something other than plain text: a comment in any dialect, a parameter, or a
+    // quoted region in this one.
     private readonly char[] _starters;
 
     private SqlDialectRules(params (char Opener, QuoteReader Reader)[] readers)
+        : this(AtSign, readers) { }
+
+    private SqlDialectRules(char parameterPrefix, (char Opener, QuoteReader Reader)[] readers)
     {
-        _starters = new char[CommentStarters.Length + readers.Length];
+        ParameterPrefix = parameterPrefix;
+        _starters = new char[CommentStarters.Length + 1 + readers.Length];
         CommentStarters.CopyTo(0, _starters, 0, CommentStarters.Length);
+        _starters[CommentStarters.Length] = parameterPrefix;
         for (var index = 0; index < readers.Length; index++)
         {
             var (opener, reader) = readers[index];
             _readers[opener] = reader;
-            _starters[CommentStarters.Length + index] = opener;
+            _starters[CommentStarters.Length + 1 + index] = opener;
         }
     }
 
@@ -91,6 +100,9 @@ internal sealed class SqlDialectRules
         new(('\'', Doubled), ('"', Doubled), ('`', Doubled), ('[', Bracket));
 
     public static SqlDialectRules Oracle { get; } = new(('\'', QuoteOperator), ('"', Doubled)) { LineHints = true };
+
+    /// <summary>The character that starts a parameter, as in <c>@id</c>.</summary>
+    public char ParameterPrefix { get; }
 
     /// <summary>Whether a <c>/*</c> inside a block comment opens a comment that needs its own <c>*/</c>.</summary>
     public bool NestedComments { get; private init; }
@@ -165,9 +177,9 @@ internal sealed class SqlDialectRules
     }
 
     /// <summary>
-    /// The offset of the first character from <paramref name="start" /> on that can start a comment or a quoted
-    /// region, or -1 when the rest of the text is plain.  Most of a SQL file is plain text, and this skips it in one
-    /// search.
+    /// The offset of the first character from <paramref name="start" /> on that can start a comment, a parameter or a
+    /// quoted region, or -1 when the rest of the text is plain.  Most of a SQL file is plain text, and this skips it in
+    /// one search.
     /// </summary>
     public int FindStarter(string text, int start) => text.IndexOfAny(_starters, start);
 

@@ -204,7 +204,8 @@ internal static class SqlFileParser
                     summary.Count == 0 ? null : string.Join(" ", summary),
                     keepComments,
                     scope.TokenValidation ?? inherited.TokenValidation,
-                    scanned.Segments
+                    scanned.Segments,
+                    SqlParameterList.Create(sql)
                 )
             );
         }

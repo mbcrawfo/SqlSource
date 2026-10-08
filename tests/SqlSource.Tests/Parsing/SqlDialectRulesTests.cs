@@ -171,6 +171,28 @@ public class SqlDialectRulesTests
         SqlDialectRules.Ansi.FindStarter("a [b] `c`", 0).ShouldBe(6);
     }
 
+    [Fact]
+    public void ParameterPrefix_IsTheAtSignInEveryDialectAndOptionSet()
+    {
+        foreach (var dialect in Enum.GetValues<SqlDialect>())
+        {
+            foreach (
+                var options in new[]
+                {
+                    SqlDialectOptions.None,
+                    SqlDialectOptions.AnsiQuotes,
+                    SqlDialectOptions.NoBackslashEscapes,
+                }
+            )
+            {
+                var rules = SqlDialectRules.For(new SqlDialectChoice(dialect, options));
+
+                rules.ParameterPrefix.ShouldBe('@');
+                rules.FindStarter("abc @p", 0).ShouldBe(4);
+            }
+        }
+    }
+
     private static SqlDialectChoice[] MySqlFamilyChoices()
     {
         SqlDialect[] dialects = [SqlDialect.MySql, SqlDialect.MariaDb];

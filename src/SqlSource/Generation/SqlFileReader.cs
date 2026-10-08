@@ -53,7 +53,8 @@ internal static class SqlFileReader
                     LocationInfo.From(file.Path, text, block.NameSpan),
                     block.Summary,
                     block.Segments,
-                    block.TokenValidation
+                    block.TokenValidation,
+                    block.Parameters
                 )
             );
         }

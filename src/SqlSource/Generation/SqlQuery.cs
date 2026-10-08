@@ -17,10 +17,12 @@ namespace SqlSource.Generation;
 /// <param name="TokenValidation">
 /// True or false when a validation generator parameter applies to the query, null when the project's setting decides.
 /// </param>
+/// <param name="Parameters">The query's parameters, in order of first appearance.  Empty when it has none.</param>
 internal sealed record SqlQuery(
     string Name,
     LocationInfo NameLocation,
     string? Summary,
     EquatableArray<SqlSegment> Segments,
-    bool? TokenValidation
+    bool? TokenValidation,
+    EquatableArray<SqlQueryParameter> Parameters
 );

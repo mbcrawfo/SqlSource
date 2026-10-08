@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Parsing;
@@ -179,6 +180,18 @@ public class SqlTextBuilderTests
     public void Build_HintOfMariaDb_IsCopiedAsWritten() =>
         Build("SELECT /*M! SQL_NO_CACHE */ 1 /* c */", rules: SqlDialectRules.MariaDb)
             .ShouldBe("SELECT /*M! SQL_NO_CACHE */ 1");
+
+    [Fact]
+    public void Build_Parameters_AreCopiedAndTheirPlacesInTheSqlAreKept()
+    {
+        const string Text = "SELECT @a, -- note @x\n    @b /* c */ FROM t\n\nWHERE x = @a;\n";
+        var lexemes = SqlLexer.Lex(Text, SqlDialectRules.Ansi).Lexemes;
+
+        var built = SqlTextBuilder.Build(Text, lexemes, 0, lexemes.Count, keepComments: false);
+
+        built.Text.ShouldBe("SELECT @a,\n    @b   FROM t\nWHERE x = @a;");
+        built.Parameters.Select(span => built.Text.Substring(span.Start, span.Length)).ShouldBe(["@a", "@b", "@a"]);
+    }
 
     private static string Build(string text, bool keepComments = false, SqlDialectRules? rules = null)
     {
