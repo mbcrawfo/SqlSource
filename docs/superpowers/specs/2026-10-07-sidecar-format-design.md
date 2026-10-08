@@ -180,7 +180,8 @@ A bump is a whole-file matter: a file is one `formatVersion`, never mixed entrie
 ### 4.1 `Users.sql` (PostgreSQL)
 
 ```sql
--- SqlSource: dialect=postgres database=app
+-- dialect: postgres
+-- database: app
 
 -- name: GetUser
 -- summary: Loads one user by id.
@@ -617,7 +618,8 @@ LIMIT @limit;
 ### 4.2 `Orders.sql` (SQL Server)
 
 ```sql
--- SqlSource: dialect=mssql database=sales
+-- dialect: mssql
+-- database: sales
 
 -- name: GetOrder
 SELECT Id, CustomerId, Total, Notes, RowVersion

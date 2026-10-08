@@ -58,7 +58,7 @@ Decided:
 
 | Phase | Status | Spec | Delivers |
 |----|----|----|----|
-| 0. Names | Not started | | `[SqlQueries]` becomes `[SqlSourceGenerate]`, `SqlQueriesMode` becomes `GeneratorTarget` and the `Mode` property becomes `Target`, through the generator, the README, the diagnostics, the tests and the package-install project.  Nothing else changes. |
+| 0. Names | Not started | | `[SqlQueries]` becomes `[SqlSourceGenerate]`, `SqlQueriesMode` becomes `GeneratorTarget` and `Mode` becomes `Target`; `-- SqlSource:` becomes `-- generator:` and `dialect=` becomes the marker `-- dialect:`.  Through the generator, the parser, the README, the diagnostics, the tests and the package-install project.  Nothing else changes. |
 | 1. Parameters | Not started | | The lexer finds `@name` parameters by the file's dialect; each query carries its ordered parameter list and the hash of its SQL.  Nothing a user sees changes. |
 | 2. The tool and the snapshot | Not started | | The `SqlSource.Tool` package: the `sqlsource describe` command with `--check` and `--force`, project evaluation through MSBuild, the snapshot format with its shared reader and writer, and the PostgreSQL describer with nullability inference.  Publishing covers the second package. |
 | 3. Models | Not started | | The generator reads snapshots, maps PostgreSQL types to C#, emits the input and output types with documentation, and reports stale, missing and mismatched snapshots.  The PostgreSQL end-to-end project.  The first usable release. |
@@ -88,7 +88,7 @@ Decided: the generator keeps the emission, of the models and of the execution me
 Decided:
 
 - The tool is a normal .NET console application in `src/SqlSource.Tool`, packed as a .NET tool with `PackAsTool` and the command name `sqlsource`, published as the package `SqlSource.Tool`.  It targets `net8.0` with `RollForward` set to `Major`.
-- `SqlSourceDatabase` is the first MSBuild value that the tool reads and the generator does not.  It still goes through the package's props and targets, so its metadata is trimmed and collected the way `SqlSourceDialect`'s is, and it obeys the prefix rule.  The `database=` directive is parsed by the shared parser, so the generator accepts it and ignores it.
+- `SqlSourceDatabase` is the first MSBuild value that the tool reads and the generator does not.  It still goes through the package's props and targets, so its metadata is trimmed and collected the way `SqlSourceDialect`'s is, and it obeys the prefix rule.  The `-- database:` marker is parsed by the shared parser, so the generator accepts it and ignores it.
 - The tool references the generator project directly, and the generator adds `InternalsVisibleTo` for it, as it has for the test projects.  The lexer, the file parser, the dialect rules, the snapshot reader and writer, the hashing and the diagnostic descriptors are shared this way.  No library package is split out; the generator's package is unchanged.  A `SqlSource.Core` library is the refactor to make if a third consumer appears.
 - Both packages carry the same `VersionPrefix` and are published together by the same workflow.
 - The generator package stays a development dependency with one DLL under `analyzers/dotnet/cs` and nothing under `lib/`.
@@ -113,7 +113,7 @@ Decided, the unit of a run:
 Decided, databases:
 
 - A project can use several databases, of one engine or of several, and one run refreshes every file the run has a connection for.
-- Each `.sql` file belongs to one logical database, named the way its dialect is: a `-- SqlSource: database=billing` directive in the file, as metadata `SqlSourceDatabase` on the file's `AdditionalFiles` item, or as the property `SqlSourceDatabase` for the project.  The directive is allowed in the preamble, for every query of the file, and inside a query, for that query alone; the query's directive wins over the file's, the file's over the metadata, the metadata over the property.  When nothing is set, the name is the dialect's name.
+- Each `.sql` file belongs to one logical database, named the way its dialect is: a `-- database: billing` marker in the file, as metadata `SqlSourceDatabase` on the file's `AdditionalFiles` item, or as the property `SqlSourceDatabase` for the project.  The marker is allowed in the preamble, for every query of the file, and inside a query, for that query alone; the query's marker wins over the file's, the file's over the metadata, the metadata over the property.  When nothing is set, the name is the dialect's name.
 - A name is one database across the whole run: a `billing` database used by three projects is one connection.  Every query that names a database has the dialect of its file, and the tool errors when two queries of one name have two dialects, since the dialect picks the driver for that connection.
 - Connections are supplied per name, on the command line or in the environment, never in the project file, since they hold credentials.  A name with no connection is an error for its queries; the rest of the run continues.
 
@@ -156,19 +156,19 @@ Decided:
 | `CodeGen` | `Models`, plus the execution methods |
 
 - The default is `CodeGen`.
-- It is set the way the dialect and the database are, plus one place of its own: the property `SqlSourceOutput` for the project, metadata `SqlSourceOutput` on a file's `AdditionalFiles` item, an optional `Output` property on the attribute, `[SqlSourceGenerate(Output = GeneratorOutput.Models)]`, for the files a type claims, and an `output=models` directive in a file's preamble or inside a query.
+- It is set the way the dialect and the database are, plus one place of its own: the property `SqlSourceOutput` for the project, metadata `SqlSourceOutput` on a file's `AdditionalFiles` item, an optional `Output` property on the attribute, `[SqlSourceGenerate(Output = GeneratorOutput.Models)]`, for the files a type claims, and an `-- output: models` marker in a file's preamble or inside a query.
 - The tool reads the setting too, to leave out what needs no types: a project whose queries all resolve to `Sql` is skipped in solution mode, and so is a file or a query that resolves to `Sql`.  A sidecar holds entries only for the queries that need them, and the tool deletes a sidecar that would be empty.
 - `Models` and `CodeGen` need a dialect that has a describer: `postgres` or `mssql` in this epic.  A query that resolves to either output under any other dialect is an error, in the generator and in the tool, that says to set the dialect or to set the output to `Sql`.  Whether `cockroachdb` joins the two, through the PostgreSQL describer, is for phase 2 to settle.
 - The default dialect stays `ansi`.  Only a project that generates `Sql` alone can use it, and that is who it is for.  A project that uses nothing but the defaults therefore gets the error above on every file, and its message is the instruction: set `SqlSourceDialect`.  The README's installation section says so before anything else.
 
 Recommended:
 
-- Precedence, most specific first: the query's directive, the file's directive, the attribute's `Output`, the file's metadata, the project's property, then the default.  The attribute sits above the metadata because it is set on one type on purpose, while metadata is usually a glob; and below the directives because what a file says about itself wins everywhere else in SqlSource.  Since two types may claim one file, the output is resolved per type and query, not per file.
+- Precedence, most specific first: the query's marker, the file's marker, the attribute's `Output`, the file's metadata, the project's property, then the default.  The attribute sits above the metadata because it is set on one type on purpose, while metadata is usually a glob; and below the markers because what a file says about itself wins everywhere else in SqlSource.  Since two types may claim one file, the output is resolved per type and query, not per file.
 - The tool therefore has to know which types claim which files with which `Output`, which it needs anyway: a `.sql` file no type claims is ignored by the generator today and gets no sidecar.  The manifest carries the project's `Compile` items, and the tool reads the attributes from them with the generator's own reader over syntax trees, matching the attribute by name.  A semantic match, which the generator has, needs a compilation with references the tool does not want; the syntax match is an approximation only for a project that aliases or shadows the attribute's name, which the phase 2 spec records.
 - Until phase 5 ships, `CodeGen` behaves as `Models`.
 - A value that is not one of the three is an error with no position, once per distinct value, as an invalid dialect is; the files it covers are generated as `CodeGen`.
-- The output-needs-a-dialect error is reported once per file, at the directive that set the output when there is one and at the start of the file otherwise, rather than at every query, since the fix is one setting.  The file still gets its constants and methods for the `Sql` part of its output.
-- The three per-file settings, dialect, database and output, resolve by the same rule from the same four sources, so the generator's dialect resolution generalises to a per-file settings record rather than growing two siblings.  The dialect alone keeps its preamble-only restriction, since it changes how the lines after it are lexed.
+- The output-needs-a-dialect error is reported once per file, at the marker that set the output when there is one and at the start of the file otherwise, rather than at every query, since the fix is one setting.  The file still gets its constants and methods for the `Sql` part of its output.
+- The three per-file settings, dialect, database and output, resolve by the same rule from the same four sources, so the generator's dialect resolution generalises to a per-file settings record rather than growing two siblings.  The dialect marker alone keeps its preamble-only restriction, since it changes how the lines after it are lexed.
 
 Technical notes:
 
@@ -243,7 +243,7 @@ Decided:
 
 Recommended:
 
-- The marker form was chosen over a `-- SqlSource: token-default=` directive because directives are a space-separated list and most defaults are SQL fragments with spaces, which would need a quoting rule; and over `-- token: where AND ...`, a bare name and a space, because that reads as SQL to anyone who does not know the rule.
+- The marker form was chosen over a `-- generator: token-default=` parameter because generator parameters are a space-separated list and most defaults are SQL fragments with spaces, which would need a quoting rule; and over `-- token: where AND ...`, a bare name and a space, because that reads as SQL to anyone who does not know the rule.
 - An inline default and a marker default for one token in one query, or two inline occurrences with different defaults, is an error, not a precedence.  One occurrence with a default and others without is fine.
 - The hash covers the sample and the declarations: the SQL with each token rendered as `{{name:default}}` using the resolved default, followed by the `-- param:` declarations in effect, so a changed default, a renamed token or a changed declaration re-describes.
 - A parameter that appears only inside a token's default, or only in the fragment a caller will pass at run time, is not in the static SQL, so the lexer cannot find it; it must be declared with a `-- param:` marker that gives its type.  See Parameters.
@@ -335,15 +335,24 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 ### Scope
 
 1. `SqlQueriesAttribute` becomes `SqlSourceGenerateAttribute`, used as `[SqlSourceGenerate]`; `SqlQueriesMode` becomes `GeneratorTarget`; the attribute's `Mode` property becomes `Target`.  The values `Nested` and `Direct` and the `Path` property are unchanged.
-2. Every place that names them: the generator's emitted source, the suppressor, the README, `docs/diagnostics.md`, the tests, and `tools/package-install`.
+2. `-- SqlSource:` becomes `-- generator:`, and its `dialect=` directive becomes the marker `-- dialect: postgres`.  What a `-- generator:` line holds is called a generator parameter, not a directive, in the code and the documents.
+3. Every place that names them: the generator's emitted source, the suppressor, the parser, the README, `docs/diagnostics.md`, the tests, and `tools/package-install`.
 
 ### Decided
 
-- A rename and nothing else, in its own pull request, so that the diff is mechanical and the later phases start from the new names.
+- Renames and nothing else, in one pull request with one commit per rename, so that each diff is mechanical and the later phases start from the new names.
+- The rule the README states for `.sql` files: a line comment of the form `-- word: rest` whose word SqlSource knows is a marker; nothing else in a comment is read.  Each marker has its own grammar for the rest.  `-- generator:` is the marker whose rest is a list of generator parameters: `keep-comments`, `token-validation`, `no-token-validation` and `token-ignore=name`, the switches that have no value of their own.
+- A setting with one value, and an MSBuild property and metadata beside it, is a marker: `-- dialect:` now, `-- database:` and `-- output:` in phase 1.  The dialect marker keeps the placement rule the directive had, before the first `-- name:` line and before any SQL, since it changes how the lines after it are lexed.
+- This is the last phase that can rename what a user writes at no cost, so it ships before anything else does.
+
+### Technical notes
+
+- The diagnostics that mention the directive form, the invalid dialect in a file and the misplaced dialect, are reworded, keep their ids, and their sections in `docs/diagnostics.md` follow.
+- The parser's names for the directive scope and the preamble dialect follow the rename, so that later phases do not read "directive" in code and "marker" in the documents.
 
 ### Testing
 
-The existing tests, under the new names.  The package-install check proves the attribute reaches a consumer under its new name.
+The existing tests, under the new names and markers.  The package-install check proves the attribute reaches a consumer under its new name and that a `.sql` file with the new markers builds.
 
 ## Phase 1 - parameters and settings
 
@@ -354,13 +363,13 @@ The existing tests, under the new names.  The package-install check proves the a
 3. The hash of a query's SQL, computed where the generator builds the emitted text, so that the tool and the generator cannot disagree.
 4. The `-- param:` marker: parsed, validated and carried on the block, with no effect yet, and the parameter list rule under Parameters.
 5. Token defaults: the inline `{{name:default}}` form in the token scanner, the once-only marker, the conflict errors, and each token's resolved default carried on the block.  The hash and the parameter list are computed over the sample SQL.
-6. The `database=` and `output=` directives, in the preamble and inside a query, carried on the block; the `SqlSourceDatabase` and `SqlSourceOutput` property and metadata in the props and targets; the `GeneratorOutput` enum and the attribute's `Output` property; the settings record that resolves all three settings by one rule, per type and query for the output.  `output` is validated and has no effect yet; `database` is never read by the generator.
+6. The `-- database:` and `-- output:` markers, in the preamble and inside a query, carried on the block; the `SqlSourceDatabase` and `SqlSourceOutput` property and metadata in the props and targets; the `GeneratorOutput` enum and the attribute's `Output` property; the settings record that resolves all three settings by one rule, per type and query for the output.  `output` is validated and has no effect yet; `database` is never read by the generator.
 7. `InternalsVisibleTo` for `SqlSource.Tool`.
 
 ### Decided
 
 - Parameters are found by the lexer, under the file's dialect.
-- Nothing a user sees changes beyond the attribute's new `Output` property, which is accepted and has no effect yet.  No member is generated from the parameter list, and the only diagnostics added are an invalid `SqlSourceOutput` value and whatever the new marker and directives need.
+- Nothing a user sees changes beyond the attribute's new `Output` property, which is accepted and has no effect yet.  No member is generated from the parameter list, and the only diagnostics added are an invalid `SqlSourceOutput` value and whatever the new markers need.
 
 ### Recommended
 
@@ -528,7 +537,7 @@ The describer against a SQL Server container.  The SQL Server end-to-end project
 ### Recommended
 
 - Asynchronous methods only, named after the query with an `Async` suffix, static, placed where the query's constant is.
-- The result shape is the user's to say, since the description cannot: sqlc uses `:one`, `:many`, `:exec` and `:execrows` on its name marker.  A marker or directive, settled in this phase's spec with its grammar added to the lexer, chooses between one row or null, a list of rows, and the affected-row count for a query with no result set.  The default when nothing is said: a list for a query with rows, the count for one without.
+- The result shape is the user's to say, since the description cannot: sqlc uses `:one`, `:many`, `:exec` and `:execrows` on its name marker.  A marker or generator parameter, settled in this phase's spec with its grammar added to the lexer, chooses between one row or null, a list of rows, and the affected-row count for a query with no result set.  The default when nothing is said: a list for a query with rows, the count for one without.
 - An open transaction is passed as an optional `DbTransaction`.  Opening the connection is the caller's business.
 - Reading by ordinal, not by name: the snapshot fixes the ordinal of every column, and the hash guarantees the SQL is the one described.  A type the provider cannot convert to the mapped C# type is a bug in the type map, caught by the end-to-end tests.
 
