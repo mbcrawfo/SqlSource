@@ -15,7 +15,7 @@ At the end of this epic a project can do three things with SqlSource, together o
 A project that only wants the constants is unchanged.  A project that wants the models and runs them through Dapper or its own ADO.NET code can.  A project that wants the generated methods gets them from the same sidecar.
 
 ```sql
--- name: GetUser
+-- name: GetUser -> one-optional
 -- summary: Loads one user by id.
 SELECT id, name, created_at, deleted_at
 FROM users
@@ -24,13 +24,15 @@ WHERE id = @id;
 
 ```csharp
 [SqlSourceGenerate]
-public partial class UserRepository(IDbConnection connection)
+public partial class UserRepository(DbConnection connection)
 {
-    // Generated beside Sql.GetUser:
-    //   public sealed record GetUserParameters(int Id);
-    //   public sealed record GetUserRow(int Id, string Name, DateTime CreatedAt, DateTime? DeletedAt);
-    //   public static Task<GetUserRow?> GetUserAsync(DbConnection connection, GetUserParameters parameters, CancellationToken ct);
-    public Task<GetUserRow?> Get(int id, CancellationToken ct) => Sql.GetUserAsync(connection, new GetUserParameters(id), ct);
+    // Generated beside Sql.GetUser, in the namespace of this type:
+    //   public sealed record GetUserParams(int Id);
+    //   public sealed record GetUserDto(int Id, string Name, DateTime CreatedAt, DateTime? DeletedAt);
+    // and on DbConnection, in a generated UserRepositoryExtensions class:
+    //   public static Task<GetUserDto?> GetUser(this DbConnection connection, GetUserParams parameters,
+    //       DbTransaction? transaction = null, int? commandTimeout = null, CancellationToken cancellationToken = default);
+    public Task<GetUserDto?> Get(int id, CancellationToken ct) => connection.GetUser(new GetUserParams(id), cancellationToken: ct);
 }
 ```
 
