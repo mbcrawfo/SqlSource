@@ -136,7 +136,6 @@ Recommended:
 - The tool is installed through a local tool manifest, so its version is pinned per repository and `dotnet tool restore` gets it, the way this repository pins CSharpier.
 - Phase 6's online mode, decided: a target in `SqlSource.targets` runs `dotnet sqlsource describe` on the project before `CoreCompile`.  `SqlSourceOnline` is `auto`, `true` or `false`: `auto`, the default, runs the tool when a connection variable is in the environment or a `.env` exists in the project or solution directory, which MSBuild tests with `Exists`; `true` always runs it and the tool reports a missing connection; `false` never runs it, for CI or a machine that has the variable for other reasons.  Without a connection the build is offline and the committed snapshot is used.  This is SQLx's online and offline split.
 - Phase 6's `--watch`, decided: `sqlsource describe --watch` on a unit watches its `.sql` files and project files, debounces saves, re-describes the changed file, and re-runs the manifest target when a project file changes.  The IDE's generator run picks up the written sidecar.
-- Starting a throwaway database with Testcontainers and running the project's migration command, then describing against it, is a later addition to the tool and not in this epic.  DbUp, FluentMigrator and EF Core migrations all have a command-line form, so "run this command against this connection string" would cover them.
 
 ### Output of the tool
 
@@ -348,9 +347,18 @@ Decided: one end-to-end test project per supported database, each with its own `
 2. Every query executed through its generated method, asserting the typed results, nullability included.  This proves the type map and the generated ADO.NET code at run time.  Until phase 5, the projects execute through Dapper, and a Dapper test stays afterwards for the subset of users who run the models that way.
 3. The error paths, a stale sidecar and an undescribable query, by running the tool against a scratch copy.
 
+Decided, the projects:
+
+- `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.SqlServer`, following the `SqlSource.Tests.<Variant>` naming.  Each references the generator the way `tests/SqlSource.Tests` does, a project reference as an analyzer with the props and targets imported by path, and the tool as a project.  Docker is already a required tool, so Testcontainers adds nothing to the setup; `CONTRIBUTING.md` says which images the tests pull.
+- One project per database, not per output mode.  A project holds files with `output` set to each of `Sql`, `Models` and `CodeGen`, classes with each `SqlLocation` and `MethodLocation`, each collection type and each shape, so one project covers the combinations and proves the tool's filtering.  Each project uses two logical databases on one container, `app` and `billing`, so the database names and the per-name connections are exercised.
+- A `schema.sql` per logical database in the project, applied by the test fixture after the container starts with plain ADO.NET, split on `GO` for SQL Server.  No migration library: it would add a dependency to test a feature that does not depend on one.
+- The sidecars are committed, produced by `tools/describe-end-to-end.sh`, which starts the containers, applies the schemas and runs the tool.  The `--check` test asserts they match what the tool produces today, so a schema or query change that forgets the script fails CI with a diff, the same discipline the epic asks of users.
+- Images are pinned by tag in one place per project, with an environment variable to override, defaulting to the newest release: PostgreSQL 18 and SQL Server 2025.  CI runs each project twice, newest and oldest supported: PostgreSQL 13 and SQL Server 2017, the oldest image Microsoft publishes.  For PostgreSQL that covers both sides of the `EXPLAIN (GENERIC_PLAN)` boundary at 16, so the `PREPARE` path runs on 13 and the direct path on 18.  SQL Server's image is x64 only; on Apple silicon it runs under Docker's emulation, slowly, which `CONTRIBUTING.md` says rather than the tests skipping themselves.
+- The tool runs in process through a public `Cli.Run(args)` entry, for speed and debuggability, with one test per project that runs the packed command as a subprocess to prove the command line.  The container is a collection fixture shared by the project's tests and cleaned up by Testcontainers' reaper.
+- No Roslyn-floor variant: the existing floor project recompiles the generator tests, which is where model and method emission are unit-tested.
+
 Recommended:
 
-- The projects live under `tests/`, one per database, named for it.  They reference the generator the way `tests/SqlSource.Tests` does and the tool as a project.  Docker is already a required tool, so Testcontainers adds nothing to the setup; `CONTRIBUTING.md` says which images the tests pull.
 - The tool's own unit tests, the snapshot round trip, the hash, the parameter lexeme and the type map need no database and live with the existing tests.  The describer pipelines are tested from recorded fixtures through the replay seam, without a database; the container tests prove the live implementations and record the fixtures.
 - The nullability inference for PostgreSQL gets a test matrix of its own: left, right and full joins; nested joins; a self-join on both sides; a `LEFT JOIN` reduced to inner by a `WHERE` and by a later inner join; an outer join inside a subquery and inside a CTE; `LEFT JOIN LATERAL`; a view over an outer join; `USING` and `NATURAL`; aggregates over an outer join with a plain group key; `UNION` of two outer-join queries; and each plan shape, hash, merge and nested loop, by toggling `enable_hashjoin`, `enable_mergejoin` and `enable_nestloop`.
 - `tools/check-package-install.sh` gains a run of the packed tool, so the packed tool and the packed generator are proven together once per build.  It proves packaging, not behaviour: the packed tool's `--help`, and a `describe` with no connection asserting the expected error, with no database.  Behaviour is the end-to-end projects' job, and this keeps Docker out of that script.
@@ -648,7 +656,8 @@ Obfuscate the fixtures and assert that replay gives the same provenance on the o
 - Using a token's default as the C# default value of the generated method's parameter.  A default is a sample for describing; whether it should also be a run-time default is a separate question.
 - Synchronous execution methods, streaming results as `IAsyncEnumerable<T>`, and bulk operations.  The method shapes in this epic are one row, a list and a count.
 - Per-column C# type overrides.  Table-valued parameters.
-- A schema fingerprint in the snapshot.  Starting a database from the tool.
+- A schema fingerprint in the snapshot.
+- Running migrations or starting a database from the tool.  The tool describes against a database the user has; how the schema got there is not its business.
 
 ## Research
 
