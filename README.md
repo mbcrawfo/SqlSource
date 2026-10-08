@@ -104,18 +104,22 @@ A `-- summary:` line inside a query becomes the documentation of its member.  Se
 
 ### Generator parameters
 
-A `-- generator:` line holds one or more generator parameters, separated by spaces.  Inside a query it applies to that query.  Before the first `-- name:` line it applies to every query in the file.
+A `-- generator:` line holds one or more generator parameters, separated by spaces.  Each one is a departure from a default, so a query with no list gets every default.
 
 | Parameter | Effect |
 |----|----|
 | `keep-comments` | Comments and blank lines stay in the SQL |
-| `token-validation`, `no-token-validation` | The query's method checks its arguments, or does not, whatever the project says (see Tokens, below) |
+| `no-token-validation` | The query's method does not check its arguments (see Tokens, below) |
+| `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` | None yet: they shape what a later release generates |
+| `default` | The empty list: every default.  It stands alone |
 
 ```sql
 -- name: Report
 -- generator: keep-comments
 SELECT /* the database logs this comment */ id FROM users;
 ```
+
+**A list replaces; it never adds.**  The `-- generator:` lines inside a query are that query's list.  The lines before the first `-- name:` line are the list of every query in the file that has none of its own.  A query whose file says `keep-comments` and which itself says `no-token-validation` does not keep its comments: it restates `keep-comments` if it wants it.  `-- generator: default` gives a query every default, whatever its file says.
 
 ## Dialects
 
@@ -315,9 +319,9 @@ By default the method checks each argument with `ArgumentException.ThrowIfNullOr
 
 An empty fragment can be what you want, for an optional clause for example, so the check can be turned off.  Three switches decide, and the first one that applies wins:
 
-1. A `-- generator: token-validation` or `-- generator: no-token-validation` line inside the query.
-2. The same line before the first `-- name:` line, which covers every query in the file.
-3. The MSBuild property `SqlSourceTokenValidation`, which covers the project.  It accepts `true` and `false`; any other value is the error [SQLSRC010](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc010).
+1. The generator parameters inside the query, when it has any: with `no-token-validation` the method checks nothing, and without it the method checks.
+2. Otherwise the generator parameters before the first `-- name:` line, the same way.
+3. Otherwise the MSBuild property `SqlSourceTokenValidation`, which covers the project.  It accepts `true` and `false`; any other value is the error [SQLSRC010](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc010).
 
 ```xml
 <PropertyGroup>

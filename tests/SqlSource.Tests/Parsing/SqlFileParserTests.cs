@@ -115,25 +115,42 @@ public class SqlFileParserTests
         blocks[1].TokenValidation.ShouldBe(false);
     }
 
-    [Fact]
-    public void Parse_BlockValidationGeneratorParameter_OverridesThePreamble()
+    [Theory]
+    // The query has a list: it is the list, whole.
+    [InlineData("keep-comments", "no-token-validation", false, false)]
+    [InlineData("keep-comments no-token-validation", "default", false, true)]
+    [InlineData("no-token-validation", "keep-comments", true, true)]
+    // The query has none: the preamble's.
+    [InlineData("keep-comments no-token-validation", null, true, false)]
+    public void Parse_QueryWithItsOwnGeneratorParameters_ReplacesThePreambles(
+        string preamble,
+        string? query,
+        bool keepComments,
+        bool? tokenValidation
+    )
     {
-        const string Text =
-            "-- generator: no-token-validation\n"
-            + "-- name: A\n-- generator: token-validation\nSELECT 1\n"
-            + "-- name: B\nSELECT 2\n";
+        var text =
+            "-- generator: "
+            + preamble
+            + "\n-- name: Q\n"
+            + (query is null ? string.Empty : "-- generator: " + query + "\n")
+            + "SELECT 1 -- c\n";
 
-        var blocks = Blocks(Text);
+        var block = Blocks(text).ShouldHaveSingleItem();
 
-        blocks[0].TokenValidation.ShouldBe(true);
-        blocks[1].TokenValidation.ShouldBe(false);
+        block.KeepComments.ShouldBe(keepComments);
+        block.TokenValidation.ShouldBe(tokenValidation);
     }
+
+    [Fact]
+    public void Parse_QueryWithoutAnyGeneratorParameters_LeavesValidationToTheProject() =>
+        Blocks("-- name: Q\nSELECT 1\n").ShouldHaveSingleItem().TokenValidation.ShouldBeNull();
 
     [Fact]
     public void Parse_BlockGeneratorParameter_DoesNotLeakIntoTheNextBlock()
     {
         const string Text =
-            "-- name: A\n-- generator: keep-comments token-validation\n-- token-ignore: x\nSELECT {{x}} -- c\n"
+            "-- name: A\n-- generator: keep-comments no-token-validation\n-- token-ignore: x\nSELECT {{x}} -- c\n"
             + "-- name: B\nSELECT {{x}} -- c\n";
 
         var blocks = Blocks(Text);
@@ -363,7 +380,7 @@ public class SqlFileParserTests
     [InlineData("-- generator:", nameof(SqlParseErrorKind.EmptyGeneratorLine), "-- generator:")]
     [InlineData("-- generator: keep-comments=", nameof(SqlParseErrorKind.InvalidMarkerValue), "keep-comments=")]
     [InlineData(
-        "-- generator: token-validation no-token-validation",
+        "-- generator: default no-token-validation",
         nameof(SqlParseErrorKind.ConflictingSettings),
         "no-token-validation"
     )]

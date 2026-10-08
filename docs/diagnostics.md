@@ -335,7 +335,7 @@ Move the marker below the `-- name:` marker of the query it describes, or delete
 
 **Generator parameter is not known**
 
-A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation` and `no-token-validation`.  `token-ignore` was a generator parameter and is a marker now: `-- token-ignore: name`, inside the query.
+A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` and `default`.  `token-validation` is gone because omitting `no-token-validation` says it.  `token-ignore` was a generator parameter and is a marker now: `-- token-ignore: name`, inside the query.
 
 ```sql
 -- generator: keep-comment
@@ -357,7 +357,7 @@ Add a generator parameter, or delete the line.
 
 A generator parameter has a value it does not take; a `-- dialect:` marker does not name a dialect; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
 
-- No generator parameter takes a value.
+- No generator parameter takes a value: `keep-comments=1` is this error.
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
 - `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
 
@@ -381,12 +381,12 @@ Add the missing value, correct the one that is wrong, or remove the one that doe
 
 Two settings contradict each other.  The error is at the second.
 
-- `token-validation` and `no-token-validation` both appear in one scope.  A scope is the lines before the first `-- name:` marker, or one query.
+- `default` beside another generator parameter in one scope: `default` is the empty list, and a list that holds something is not empty.  A scope is the lines before the first `-- name:` marker, or one query.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 - Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
 - Two `-- param:` markers for one parameter that give different types or different nullability.
 
-Remove one of the two.  A validation parameter in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
+Remove one of the two.  A query's list replaces the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
 ## SQLSRC113
 

@@ -16,7 +16,7 @@ public class SqlMarkerReaderTests
     [InlineData("--\t Name:\tGetUser  ", "Name:GetUser")]
     [InlineData("-- summary: Loads a user.", "Summary:Loads a user.")]
     [InlineData("-- Summary:Loads: a -- user", "Summary:Loads: a -- user")]
-    [InlineData("-- generator: keep-comments  token-validation", "GeneratorParameters:keep-comments  token-validation")]
+    [InlineData("-- generator: keep-comments  sort-input", "GeneratorParameters:keep-comments  sort-input")]
     [InlineData("-- GENERATOR: x", "GeneratorParameters:x")]
     [InlineData("-- dialect: postgres", "Dialect:postgres")]
     [InlineData("-- DIALECT: MySql", "Dialect:MySql")]

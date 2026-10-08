@@ -5,5 +5,5 @@ SELECT id, name FROM users WHERE id = @id;
 SELECT id, name FROM {{table}} {{whereClause}};
 
 -- name: ListChecked
--- generator: token-validation
+-- generator: default
 SELECT id, name FROM {{table}} {{whereClause}};

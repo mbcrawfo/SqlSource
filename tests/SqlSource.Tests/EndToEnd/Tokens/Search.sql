@@ -1,4 +1,5 @@
--- Queries with tokens.  The test project turns token validation off, so only Checked checks its arguments.
+-- Queries with tokens.  The test project turns token validation off, so only Checked, whose own list is the default,
+-- checks its arguments.
 
 -- name: Search
 -- summary: Finds rows of a table.
@@ -8,5 +9,5 @@ WHERE {{filter}}
 ORDER BY {{table}}.id;
 
 -- name: Checked
--- generator: token-validation
+-- generator: default
 SELECT id FROM {{table}} WHERE {{filter}};

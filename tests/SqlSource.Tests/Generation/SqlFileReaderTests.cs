@@ -141,7 +141,7 @@ public class SqlFileReaderTests
     {
         const string Text =
             "-- generator: no-token-validation\n-- name: FromFile\nSELECT {{a}};\n"
-            + "-- name: Own\n-- generator: token-validation\nSELECT {{b}};\n";
+            + "-- name: Own\n-- generator: default\nSELECT {{b}};\n";
 
         var file = Read(Text);
 

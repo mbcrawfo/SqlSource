@@ -255,9 +255,9 @@ internal static class SqlFileParser
                 return;
             }
 
-            var own = scope?.Generator;
-            var inherited = preamble?.Generator;
-            var keepComments = (inherited?.KeepComments ?? false) || (own?.KeepComments ?? false);
+            // A query that has a list uses it whole.  One that has none uses the preamble's.
+            var list = scope?.Generator.Parameters ?? preamble?.Generator.Parameters;
+            var keepComments = list is { } given && (given & GeneratorParameters.KeepComments) != 0;
             var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments);
             var scanned = TokenScanner.Scan(sql.Text, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
             foreach (var error in scanned.Errors)
@@ -284,7 +284,7 @@ internal static class SqlFileParser
                     summary.Count == 0 ? null : string.Join(" ", summary),
                     shape,
                     keepComments,
-                    own?.TokenValidation ?? inherited?.TokenValidation,
+                    list is { } decided ? (decided & GeneratorParameters.NoTokenValidation) == 0 : null,
                     scanned.Segments,
                     tokens,
                     parameters

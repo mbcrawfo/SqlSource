@@ -3,9 +3,9 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// Whether a generated method checks its arguments: the query's own generator parameter decides, then the generator
-// parameter at the top of its file, then the project's SqlSourceTokenValidation property, and without any of them it
-// does.
+// Whether a generated method checks its arguments: a list of generator parameters decides whole, the query's before
+// the file's, and the project's SqlSourceTokenValidation property decides for a query that has neither.  Without any
+// of them it checks.
 public class TokenValidationTests
 {
     private const string Source = """
@@ -30,15 +30,17 @@ public class TokenValidationTests
     [InlineData(null, null, " False ", false)]
     [InlineData(null, null, "true", true)]
     [InlineData(null, null, "", true)]
-    // The file's generator parameter beats the property.
+    // The file's list beats the property, with or without the switch.
     [InlineData(null, "no-token-validation", null, false)]
     [InlineData(null, "no-token-validation", "true", false)]
-    [InlineData(null, "token-validation", "false", true)]
-    // The query's generator parameter beats both.
+    [InlineData(null, "default", "false", true)]
+    [InlineData(null, "keep-comments", "false", true)]
+    // The query's list replaces the file's.
     [InlineData("no-token-validation", null, "true", false)]
-    [InlineData("token-validation", null, "false", true)]
-    [InlineData("no-token-validation", "token-validation", "true", false)]
-    [InlineData("token-validation", "no-token-validation", "false", true)]
+    [InlineData("default", null, "false", true)]
+    [InlineData("no-token-validation", "default", "true", false)]
+    [InlineData("default", "no-token-validation", "false", true)]
+    [InlineData("keep-comments", "no-token-validation", "false", true)]
     public void Run_Method_ValidatesByQueryThenFileThenProject(
         string? queryGeneratorParameter,
         string? fileGeneratorParameter,
@@ -88,7 +90,7 @@ public class TokenValidationTests
             [
                 new SqlFile(
                     "/app/Repo/Users.sql",
-                    "-- name: Plain\nSELECT {{a}};\n-- name: Checked\n-- generator: token-validation\nSELECT {{b}};\n"
+                    "-- name: Plain\nSELECT {{a}};\n-- name: Checked\n-- generator: default\nSELECT {{b}};\n"
                 ),
             ],
             tokenValidation: "false"
