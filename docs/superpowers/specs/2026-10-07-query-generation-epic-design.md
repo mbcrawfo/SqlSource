@@ -126,15 +126,16 @@ Decided, commands:
 
 Recommended:
 
-- `--connection billing=Host=...` names a connection; `SQLSOURCE_CONNECTION_BILLING` is the same in the environment, with the name upper-cased.  A bare `--connection ...` or `SQLSOURCE_CONNECTION` is accepted when exactly one database is in the run, which is most projects.  Environment variables are not MSBuild properties and need not carry the `SqlSource` prefix, but the name should still make the owner obvious.
+- `--connection billing=Host=...` names a connection; `SQLSOURCE_CONNECTION_BILLING` is the same in the environment, with the name upper-cased, and the same line in a `.env` file.  A bare `--connection ...` or `SQLSOURCE_CONNECTION` is accepted when exactly one database is in the run, which is most projects.  Environment variables are not MSBuild properties and need not carry the `SqlSource` prefix, but the name should still make the owner obvious.
+- The `.env` file is the primary source, decided: standard dotenv syntax, found by walking up from the project directory to the repository root, git-ignored by convention with a committed `.env.example` if a team wants to document the names.  Precedence: the command line, then the process environment, then the file.  A file is what works in every IDE, since Visual Studio, Rider and VS Code inherit their process environment and set variables per run configuration, not per build, and an OS-wide variable is wrong for anyone who works on several projects.  It is what SQLx does with `DATABASE_URL`.  `dotnet user-secrets` was considered and not taken: it is keyed per project, connections are per logical database across a solution, and two mechanisms is two pages of README.
 - `--database billing` restricts a run, including `--check`, to the named databases, so refreshing one after a migration neither needs nor complains about the others' connections.  `--project` and a file path restrict a run the same way.
 - A project uses SqlSource when the package's props set a marker property, `SqlSourceImported`, which evaluation returns whether SqlSource came as a package or, as in this repository's tests, as a project reference with the props imported by path.  Looking for a `PackageReference` would miss the second.
 - A `.sql` file with lexer errors is skipped and its errors reported, since the generator rejects it anyway.
 - Every run ends with one summary line per database, with the counts of queries described, skipped and failed, so a filter that matched nothing is visible.
 - The sidecar records each query's database name, so a reader knows where its types came from.  The generator does not read it.
 - The tool is installed through a local tool manifest, so its version is pinned per repository and `dotnet tool restore` gets it, the way this repository pins CSharpier.
-- Phase 6's online mode: a target in `SqlSource.targets` runs `dotnet sqlsource describe` before `CoreCompile` when the variable is set and the build is not a design-time build.  The tool hashes before it connects, so a build with nothing changed costs nothing.  Without the variable the build is offline and the committed snapshot is used, which is what CI and a machine without a database get.  This is SQLx's online and offline split.
-- Phase 6's `--watch` describes a file as it is saved, for people who want the IDE to update without a build, as pgtyped's watch mode does.
+- Phase 6's online mode, decided: a target in `SqlSource.targets` runs `dotnet sqlsource describe` on the project before `CoreCompile`.  `SqlSourceOnline` is `auto`, `true` or `false`: `auto`, the default, runs the tool when a connection variable is in the environment or a `.env` exists in the project or solution directory, which MSBuild tests with `Exists`; `true` always runs it and the tool reports a missing connection; `false` never runs it, for CI or a machine that has the variable for other reasons.  Without a connection the build is offline and the committed snapshot is used.  This is SQLx's online and offline split.
+- Phase 6's `--watch`, decided: `sqlsource describe --watch` on a unit watches its `.sql` files and project files, debounces saves, re-describes the changed file, and re-runs the manifest target when a project file changes.  The IDE's generator run picks up the written sidecar.
 - Starting a throwaway database with Testcontainers and running the project's migration command, then describing against it, is a later addition to the tool and not in this epic.  DbUp, FluentMigrator and EF Core migrations all have a command-line form, so "run this command against this connection string" would cover them.
 
 ### Output of the tool
@@ -352,7 +353,7 @@ Recommended:
 - The projects live under `tests/`, one per database, named for it.  They reference the generator the way `tests/SqlSource.Tests` does and the tool as a project.  Docker is already a required tool, so Testcontainers adds nothing to the setup; `CONTRIBUTING.md` says which images the tests pull.
 - The tool's own unit tests, the snapshot round trip, the hash, the parameter lexeme and the type map need no database and live with the existing tests.  The describer pipelines are tested from recorded fixtures through the replay seam, without a database; the container tests prove the live implementations and record the fixtures.
 - The nullability inference for PostgreSQL gets a test matrix of its own: left, right and full joins; nested joins; a self-join on both sides; a `LEFT JOIN` reduced to inner by a `WHERE` and by a later inner join; an outer join inside a subquery and inside a CTE; `LEFT JOIN LATERAL`; a view over an outer join; `USING` and `NATURAL`; aggregates over an outer join with a plain group key; `UNION` of two outer-join queries; and each plan shape, hash, merge and nested loop, by toggling `enable_hashjoin`, `enable_mergejoin` and `enable_nestloop`.
-- `tools/check-package-install.sh` gains a run of the packed tool, so the packed tool and the packed generator are proven together once per build.  Whether that run needs a database, and so Docker in that script, is phase 6's to settle; a `--check` against a committed sidecar with no changes may be enough to prove the packaging.
+- `tools/check-package-install.sh` gains a run of the packed tool, so the packed tool and the packed generator are proven together once per build.  It proves packaging, not behaviour: the packed tool's `--help`, and a `describe` with no connection asserting the expected error, with no database.  Behaviour is the end-to-end projects' job, and this keeps Docker out of that script.
 
 ### Documentation
 
@@ -601,18 +602,27 @@ The end-to-end projects run every query through its generated method and assert 
 
 ### Scope
 
-1. The online-mode target in `SqlSource.targets`.
-2. `sqlsource describe --watch`.
-3. The packed tool in `tools/check-package-install.sh`.
-4. The README's online-mode section and `CONTRIBUTING.md`.
+1. The online-mode target in `SqlSource.targets` and the `SqlSourceOnline` property.
+2. The `.env` file as a connection source in the tool.
+3. `sqlsource describe --watch`.
+4. The packed tool in `tools/check-package-install.sh`.
+5. The README's online-mode section, `.env` and `.gitignore` guidance, and `CONTRIBUTING.md`.
 
-### Recommended
+### Decided
 
-The items under Workflow.  The target runs the tool through `dotnet sqlsource`, so a project without the tool manifest gets a clear error.  It must not run in a design-time build, and it must not run when the variable is unset.
+- The items under Workflow: `.env`, `SqlSourceOnline` with `auto`, `true` and `false`, and `--watch`.
+- The target runs before `CoreCompile` and after the manifest target, is skipped in a design-time build, and has MSBuild `Inputs` of the project's `.sql` files and the manifest and `Outputs` of the sidecars, so that a build where nothing changed skips it without launching the tool, in any IDE.  A schema change does not touch the inputs; that is the known gap `--force` and `--check` cover.
+- An unreachable database is a build error, not a silent fall back to offline, since a passing build would hide a stale sidecar.  The message says to start the database, remove the connection or set `SqlSourceOnline=false`.
+- A failed description is a build error in the compiler's format, which the tool already produces.  The generator then also reports the missing entry: two errors for one cause, accepted, since the tool's names the server's reason and the generator's the consequence, and suppressing the second would need the generator to know the tool ran.
+- The unit is the project being built, through its own manifest, never the solution.  Connections come from the three sources as in a manual run.
+- The tool is found through the local tool manifest, `dotnet sqlsource`; no manifest is an error that says to install it.  Bundling the tool in the generator package stays rejected: the package is a development dependency with one DLL.
+- `--check` stays a CI step outside the build.  A build mode that fails on drift would duplicate it and slow every build.
+- `SqlSourceLog` is the property the target passes through as `--log`.
 
 ### Technical notes
 
-- The target runs before `CoreCompile`, after the package's own targets that collect `AdditionalFiles`, so the tool and the compiler see the same files.  A sidecar the tool writes during the build is read by `CoreCompile` in the same build; the IDE's generator run sees it afterwards.
+- A sidecar the tool writes before `CoreCompile` is read by the compiler in the same build; the phase verifies this against the package's own file-tracking target, `SqlSourceTrackAdditionalFiles`, which hashes the file list and not the contents.  The IDE's generator run sees the file afterwards.
+- `Exists` in the target's condition can test the project directory and `$(SolutionDir)`; the tool's own search walks further, to the repository root, so the two can disagree for a `.env` placed between the two.  The README says where to put the file: the solution directory.
 
 ## Phase 7 - bug reports
 
