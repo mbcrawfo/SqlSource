@@ -1,4 +1,4 @@
-# Query models - epic outline
+# Query generation - epic outline
 
 Date: 2026-10-07
 
@@ -6,7 +6,13 @@ This outline coordinates the phases of the epic.  It is kept current until the e
 
 ## Goal
 
-Give each query a typed input and a typed output, found from the database itself, in the manner of sqlc.
+At the end of this epic a project can do three things with SqlSource, together or any subset of them:
+
+1. **Use queries written in `.sql` files**, as it can today: a constant, or a method where the query has tokens.
+2. **Get strongly typed input and output models for its queries**, found from the database itself, in the manner of sqlc.
+3. **Execute its queries through generated methods**: ADO.NET code that SqlSource writes, as a replacement for Dapper, not a wrapper around it.
+
+A project that only wants the constants is unchanged.  A project that wants the models and runs them through Dapper or its own ADO.NET code can.  A project that wants the generated methods gets them from the same sidecar.
 
 ```sql
 -- name: GetUser
@@ -23,12 +29,12 @@ public partial class UserRepository(IDbConnection connection)
     // Generated beside Sql.GetUser:
     //   public sealed record GetUserParameters(int Id);
     //   public sealed record GetUserRow(int Id, string Name, DateTime CreatedAt, DateTime? DeletedAt);
-    public Task<GetUserRow?> Get(int id) =>
-        connection.QuerySingleOrDefaultAsync<GetUserRow>(Sql.GetUser, new GetUserParameters(id));
+    //   public static Task<GetUserRow?> GetUserAsync(DbConnection connection, GetUserParameters parameters, CancellationToken ct);
+    public Task<GetUserRow?> Get(int id, CancellationToken ct) => Sql.GetUserAsync(connection, new GetUserParameters(id), ct);
 }
 ```
 
-The types come from a new command-line tool, `sqlsource`, which asks a running database to describe each query and writes the answer into a file beside the `.sql` file.  The generator reads that file and never touches a database.  A build reports a file that is out of date with its SQL, so a wrong type never compiles silently.
+The types, and everything the methods need to run the query, come from a new command-line tool, `sqlsource`, which asks a running database to describe each query and writes the answer into a file beside the `.sql` file.  The generator reads that file and never touches a database.  A build reports a file that is out of date with its SQL, so a wrong type never compiles silently.
 
 ## How to read this document
 
@@ -45,6 +51,7 @@ Decided:
 - One result set per query: a `SELECT`, or an `INSERT`, `UPDATE`, `DELETE` or `MERGE` with `RETURNING` or `OUTPUT`.  A statement without a result set gets an input type only.
 - A select list that is visible in the query.  Stored procedures and table-valued functions are not called to find their shape.
 - PostgreSQL and SQL Server.  The design leaves room for every dialect SqlSource lexes, and the parts that would differ for them are named.
+- Generated execution methods are plain ADO.NET over `DbConnection`, with the provider's own types only where ADO.NET's abstractions do not reach.  Dapper is not a dependency of anything generated.
 - Extensive end-to-end tests, one project per supported database, that run the tool, build with the generator and execute the generated code against a real database in a container.
 
 ## Phases
@@ -55,11 +62,12 @@ Decided:
 | 2. The tool and the snapshot | Not started | | The `SqlSource.Tool` package: the `sqlsource describe` command with `--check` and `--force`, project evaluation through MSBuild, the snapshot format with its shared reader and writer, and the PostgreSQL describer with nullability inference.  Publishing covers the second package. |
 | 3. Models | Not started | | The generator reads snapshots, maps PostgreSQL types to C#, emits the input and output types with documentation, and reports stale, missing and mismatched snapshots.  The PostgreSQL end-to-end project.  The first usable release. |
 | 4. SQL Server | Not started | | The SQL Server describer, its type map, and its end-to-end project. |
-| 5. Build integration | Not started | | The online mode: an MSBuild target runs the tool before compile when a connection string is in the environment.  A watch mode.  The package-install check runs the tool. |
+| 5. Execution methods | Not started | | A generated method per query that opens a command, binds the parameters, runs it and reads the rows into the output type by ordinal with typed getters, for both engines.  The end-to-end projects execute through them. |
+| 6. Build integration | Not started | | The online mode: an MSBuild target runs the tool before compile when a connection string is in the environment.  A watch mode.  The package-install check runs the tool. |
 
-Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 ships a tool whose output nothing reads yet; its package is published so that phase 3 can be tried against it.  Phase 3 is the first release a user can use, for PostgreSQL.  Phase 4 adds SQL Server.  Phase 5 removes the need to run the tool by hand.
+Each phase has its own spec, plan and pull request.  Phase 1 changes nothing a user can see.  Phase 2 ships a tool whose output nothing reads yet; its package is published so that phase 3 can be tried against it.  Phase 3 is the first release a user can use, for PostgreSQL with Dapper or their own ADO.NET code.  Phase 4 adds SQL Server.  Phase 5 delivers the third goal.  Phase 6 removes the need to run the tool by hand.
 
-The order puts the parameter lexeme first because every later phase depends on it and it is small; the tool before the generator because the generator's models cannot be tested without a snapshot to read; PostgreSQL before SQL Server because its nullability inference is the hardest single piece and should be proven early; and the build integration last because it is convenience over a working whole.
+The order puts the parameter lexeme first because every later phase depends on it and it is small; the tool before the generator because the generator's models cannot be tested without a snapshot to read; PostgreSQL before SQL Server because its nullability inference is the hardest single piece and should be proven early; the execution methods after both describers so that their abstraction over the two providers is designed with both in hand; and the build integration last because it is convenience over a working whole.
 
 ## Decisions for the whole epic
 
@@ -72,13 +80,14 @@ Decided: the types are found by asking the database, from a tool that runs outsi
 3. Every tool of this kind built in the last five years asks the database: SQLx, pgtyped, Prisma TypedSQL, SqlBound, and sqlc's analyser.
 4. The static approach stays open.  Describing sits behind one interface and the snapshot is engine-neutral; a static describer for an engine that cannot answer, SQLite is the plausible one, is a later implementation of that interface.
 
-Decided: the generator keeps the emission.  A tool that emitted C# itself was weighed and rejected: generated code would land in the repository and go stale silently, every change to naming, nullability policy or the type map would need a database run to apply, and the constants, token methods and diagnostics the generator already produces would be duplicated or moved.  With the split, stale types are a build error, the snapshot is a small diffable file, and the mapping evolves with the package.
+Decided: the generator keeps the emission, of the models and of the execution methods.  A tool that emitted C# itself was weighed and rejected: generated code would land in the repository and go stale silently, every change to naming, nullability policy, the type map or the generated methods would need a database run to apply, and the constants, token methods and diagnostics the generator already produces would be duplicated or moved.  With the split, stale types are a build error, the snapshot is a small diffable file, and the mapping evolves with the package.
 
 ### Packages and repository
 
 Decided:
 
 - The tool is a normal .NET console application in `src/SqlSource.Tool`, packed as a .NET tool with `PackAsTool` and the command name `sqlsource`, published as the package `SqlSource.Tool`.  It targets `net8.0` with `RollForward` set to `Major`.
+- `SqlSourceDatabase` is the first MSBuild value that the tool reads and the generator does not.  It still goes through the package's props and targets, so its metadata is trimmed and collected the way `SqlSourceDialect`'s is, and it obeys the prefix rule.  The `database=` directive is parsed by the shared parser, so the generator accepts it and ignores it.
 - The tool references the generator project directly, and the generator adds `InternalsVisibleTo` for it, as it has for the test projects.  The lexer, the file parser, the dialect rules, the snapshot reader and writer, the hashing and the diagnostic descriptors are shared this way.  No library package is split out; the generator's package is unchanged.  A `SqlSource.Core` library is the refactor to make if a third consumer appears.
 - Both packages carry the same `VersionPrefix` and are published together by the same workflow.
 - The generator package stays a development dependency with one DLL under `analyzers/dotnet/cs` and nothing under `lib/`.
@@ -87,24 +96,43 @@ Technical notes:
 
 - A tool package carries its whole dependency closure in its own folder, so the generator DLL and Roslyn travel with it without packaging work.  The tool gets `Microsoft.CodeAnalysis` transitively; the parser uses `TextSpan` from it.
 - The generator cannot take a JSON library.  `System.Text.Json` in a `netstandard2.0` analyzer collides with the compiler's own copy, and Newtonsoft is a dependency the package cannot ship cleanly.  The snapshot reader is a small hand-written JSON parser, and the writer is hand-written too so that the two are tested together.  The format stays within what such a parser handles comfortably: objects, arrays, strings, integers, booleans and null.
-- The tool evaluates the project by running `dotnet msbuild <project> -getItem:AdditionalFiles -getProperty:SqlSourceDialect` as a subprocess, which returns the compiler's view of the files with their metadata as JSON, after the package's own props and targets have run.  The switches exist from the .NET 8 SDK.  Hosting MSBuild in-process was rejected: it needs `MSBuildLocator` and matches SDK versions by hand.  Whether evaluation alone sees a file that a target adds, `TD-0016`, is for phase 2 to verify; a target in `SqlSource.targets` that writes a response file for the tool is the fallback.
+- The tool learns what the compiler sees from a **manifest** that a target in `SqlSource.targets` writes: the project's `.sql` files with their metadata and the project's `SqlSource` properties, to a file under `obj`, at the point where the compiler's own config file is written and after the package's trim and collect targets.  From the command line the tool runs `dotnet msbuild -t:SqlSourceWriteManifest` on each project in the run and reads the files; in phase 6's online mode the target has already run as part of the build, so no second MSBuild process is spawned.  The manifest is a contract between package and tool, as the sidecar is between tool and generator, and carries a format version.
+- The alternatives and why not: `dotnet msbuild -getItem:AdditionalFiles` evaluates without running targets, so it misses a file a target adds and the package's own trimming, and inside a build it would mean a second evaluation of the project being built; hosting MSBuild in-process needs `MSBuildLocator` and matches SDK versions by hand; reading `obj/*.GeneratedMSBuildEditorConfig.editorconfig` needs a prior build and holds no file list.  Globbing `**/*.sql` in the tool was never an option, since `Remove`, `Update`, `DefaultItemExcludes`, `SqlSourceIncludeFiles=false` and `Directory.Build.props` all change what the compiler sees.
+- For a solution, phase 2 chooses between one process per project and a generated traversal project that runs the target over every project in parallel with `SkipNonexistentTargets`, which also skips projects without SqlSource; `-getProperty:SqlSourceImported` is the cheap evaluation-only check if the first route is taken.  A multi-targeting project writes one manifest per target framework and the tool reads the first, since `AdditionalFiles` almost never depend on the framework.
 - MSBuild in Visual Studio runs on .NET Framework; shipping the describe step as an MSBuild task instead of a tool would mean building it twice and loading Npgsql inside MSBuild.  A tool invoked by a target is the lower-risk shape.
 
 ### Workflow
 
-Decided:
+Decided, the unit of a run:
 
-- `sqlsource describe <project>` describes every query of every `.sql` file the project claims and writes or updates the sidecars.  A query whose hash and versions match its entry is skipped.
+- The tool mirrors the SDK's commands.  With no argument it looks in the current directory for exactly one `.sln`, `.slnx` or `.csproj` and errors otherwise; an explicit path to either is an argument.
+- In solution mode the tool lists the solution's projects and keeps the ones that use SqlSource.  In project mode a project that does not use SqlSource is an error.
+- The tool's configuration is the project file: which `.sql` files the project claims, their dialects, and their databases.  There is no configuration file of the tool's own.
+
+Decided, databases:
+
+- A project can use several databases, of one engine or of several, and one run refreshes every file the run has a connection for.
+- Each `.sql` file belongs to one logical database, named the way its dialect is: a `-- SqlSource: database=billing` directive in the file, as metadata `SqlSourceDatabase` on the file's `AdditionalFiles` item, or as the property `SqlSourceDatabase` for the project.  The directive is allowed in the preamble, for every query of the file, and inside a query, for that query alone; the query's directive wins over the file's, the file's over the metadata, the metadata over the property.  When nothing is set, the name is the dialect's name.
+- A name is one database across the whole run: a `billing` database used by three projects is one connection.  Every query that names a database has the dialect of its file, and the tool errors when two queries of one name have two dialects, since the dialect picks the driver for that connection.
+- Connections are supplied per name, on the command line or in the environment, never in the project file, since they hold credentials.  A name with no connection is an error for its queries; the rest of the run continues.
+
+Decided, commands:
+
+- `sqlsource describe` describes every query of every `.sql` file in the run and writes or updates the sidecars.  A query whose hash and versions match its entry is skipped.
 - `sqlsource describe --force` describes every query again whether or not its entry is up to date.  It is also the command to run after a schema change, since the hash cannot see one.
 - `sqlsource describe --check` describes into a temporary location and compares with the committed sidecars, and exits non-zero when they differ.  It is the CI step, as `cargo sqlx prepare --check` and `sqlc diff` are.
-- The connection string comes from a command-line option or an environment variable, never from the project file, since it holds credentials.
 
 Recommended:
 
-- The environment variable is `SQLSOURCE_CONNECTION`.  Environment variables are not MSBuild properties and need not carry the `SqlSource` prefix, but the name should still make the owner obvious.
+- `--connection billing=Host=...` names a connection; `SQLSOURCE_CONNECTION_BILLING` is the same in the environment, with the name upper-cased.  A bare `--connection ...` or `SQLSOURCE_CONNECTION` is accepted when exactly one database is in the run, which is most projects.  Environment variables are not MSBuild properties and need not carry the `SqlSource` prefix, but the name should still make the owner obvious.
+- `--database billing` restricts a run, including `--check`, to the named databases, so refreshing one after a migration neither needs nor complains about the others' connections.  `--project` and a file path restrict a run the same way.
+- A project uses SqlSource when the package's props set a marker property, `SqlSourceImported`, which evaluation returns whether SqlSource came as a package or, as in this repository's tests, as a project reference with the props imported by path.  Looking for a `PackageReference` would miss the second.
+- A `.sql` file with lexer errors is skipped and its errors reported, since the generator rejects it anyway.
+- Every run ends with one summary line per database, with the counts of queries described, skipped and failed, so a filter that matched nothing is visible.
+- The sidecar records each query's database name, so a reader knows where its types came from.  The generator does not read it.
 - The tool is installed through a local tool manifest, so its version is pinned per repository and `dotnet tool restore` gets it, the way this repository pins CSharpier.
-- Phase 5's online mode: a target in `SqlSource.targets` runs `dotnet sqlsource describe` before `CoreCompile` when the variable is set and the build is not a design-time build.  The tool hashes before it connects, so a build with nothing changed costs nothing.  Without the variable the build is offline and the committed snapshot is used, which is what CI and a machine without a database get.  This is SQLx's online and offline split.
-- Phase 5's `--watch` describes a file as it is saved, for people who want the IDE to update without a build, as pgtyped's watch mode does.
+- Phase 6's online mode: a target in `SqlSource.targets` runs `dotnet sqlsource describe` before `CoreCompile` when the variable is set and the build is not a design-time build.  The tool hashes before it connects, so a build with nothing changed costs nothing.  Without the variable the build is offline and the committed snapshot is used, which is what CI and a machine without a database get.  This is SQLx's online and offline split.
+- Phase 6's `--watch` describes a file as it is saved, for people who want the IDE to update without a build, as pgtyped's watch mode does.
 - Starting a throwaway database with Testcontainers and running the project's migration command, then describing against it, is a later addition to the tool and not in this epic.  DbUp, FluentMigrator and EF Core migrations all have a command-line form, so "run this command against this connection string" would cover them.
 
 ### Output of the tool
@@ -112,6 +140,37 @@ Recommended:
 Decided: the tool reports errors in the compiler's format, `path(line,col): error SQLSRCnnn: message`, with the same ids as the generator where the condition is the same, so that the online mode's errors reach the IDE's error list and a terminal shows what the build would.
 
 Recommended: exit code zero on success, one when a query could not be described, two when `--check` found a difference.  Command-line parsing with System.CommandLine, which gives help and exit codes for free; the commands are few enough that a hand-written parser would also do.
+
+### What is generated
+
+Decided:
+
+- The attribute's `Mode` property is renamed `Target`, and the `SqlQueriesMode` enum with it.  Its values, `Nested` and `Direct`, say where the members go, which is what a target is.  Nothing has been published, so the rename breaks nobody.
+- A new setting, `SqlSourceOutput`, says what SqlSource generates for a query:
+
+| Value | Generates |
+|----|----|
+| `Sql` | The constant or token method, as today |
+| `Models` | `Sql`, plus the input and output types |
+| `CodeGen` | `Models`, plus the execution methods |
+
+- The default is `CodeGen`.
+- It is set the way the dialect and the database are: the property `SqlSourceOutput` for the project, metadata `SqlSourceOutput` on a file's `AdditionalFiles` item, and an `output=models` directive in a file's preamble or inside a query.  The query's directive wins over the file's, the file's over the metadata, the metadata over the property.
+- The tool reads the setting too, to leave out what needs no types: a project whose queries all resolve to `Sql` is skipped in solution mode, and so is a file or a query that resolves to `Sql`.  A sidecar holds entries only for the queries that need them, and the tool deletes a sidecar that would be empty.
+- `Models` and `CodeGen` need a dialect that has a describer: `postgres` or `mssql` in this epic.  A query that resolves to either output under any other dialect is an error, in the generator and in the tool, that says to set the dialect or to set the output to `Sql`.  Whether `cockroachdb` joins the two, through the PostgreSQL describer, is for phase 2 to settle.
+- The default dialect stays `ansi`.  Only a project that generates `Sql` alone can use it, and that is who it is for.  A project that uses nothing but the defaults therefore gets the error above on every file, and its message is the instruction: set `SqlSourceDialect`.  The README's installation section says so before anything else.
+
+Recommended:
+
+- The enum is `SqlQueriesTarget`, keeping the attribute's name as its prefix; a bare `Target` in the consumer's `SqlSource` namespace would be too easy to collide with.
+- Until phase 5 ships, `CodeGen` behaves as `Models`.
+- A value that is not one of the three is an error with no position, once per distinct value, as an invalid dialect is; the files it covers are generated as `CodeGen`.
+- The output-needs-a-dialect error is reported once per file, at the directive that set the output when there is one and at the start of the file otherwise, rather than at every query, since the fix is one setting.  The file still gets its constants and methods for the `Sql` part of its output.
+- The three per-file settings, dialect, database and output, resolve by the same rule from the same four sources, so the generator's dialect resolution generalises to a per-file settings record rather than growing two siblings.  The dialect alone keeps its preamble-only restriction, since it changes how the lines after it are lexed.
+
+Technical notes:
+
+- Each setting the generator reads needs a `CompilerVisibleProperty` and a `CompilerVisibleItemMetadata` in the props, and the trim and collect targets in `SqlSource.targets` that the dialect has.  `SqlSourceDatabase` needs the trim and collect so that the tool sees a clean value, even though the generator never reads it.
 
 ### The sidecar
 
@@ -133,14 +192,14 @@ What the generator does with a sidecar:
 
 | State | Effect |
 |----|----|
-| No sidecar for a `.sql` file | No models for its queries, no diagnostic.  The feature is unused for that file. |
-| Sidecar present, query missing from it | An error at the query: run the tool. |
+| A query whose output is `Sql` | Its sidecar entry, if any, is ignored for generation; an entry that exists is an orphan, below. |
+| A query whose output needs types and has no sidecar or no entry | An error at the query: run the tool. |
 | Entry present, hash differs | An error at the query: the snapshot is stale.  No model is emitted, so stale types never compile. |
 | Entry present for a query that no longer exists | A warning at the sidecar: an orphan entry. |
 | Sidecar's engine differs from the file's dialect | An error at the sidecar. |
 | Format version unknown, or tool version differs | As above under Recommended. |
 
-Recommended: a file opts in by having a sidecar.  No property or attribute setting is needed, and a project that never runs the tool builds exactly as today.  Whether a missing entry should be a warning instead of an error, so that a new query compiles as a constant until the tool runs, is for phase 3 to settle; the error is the safer default.
+Recommended: a missing entry is an error, not a warning, so that a new query never silently compiles as a constant alone.  A project that wants only the constants says `SqlSourceOutput=Sql` and never runs the tool.
 
 ### Parameters
 
@@ -151,7 +210,38 @@ Recommended, the rule for both dialects in scope: `@` followed by a letter, a di
 Technical notes:
 
 - At run time the SQL still holds `@name`.  On SQL Server that is native.  On PostgreSQL, Npgsql rewrites `@name` to `$n` when the command's parameters are named, which is what Dapper produces.  SqlSource's rule must therefore agree with Npgsql's for every query, and the tool checks it: for PostgreSQL it lets Npgsql derive the parameters of the original SQL and compares names and count with the lexer's, and reports a disagreement as an error on the query.
-- A query with `{{tokens}}` cannot be described as written.  Recommended: such queries get no models in this epic and no diagnostic for it.  A marker that gives a sample value for each token, with the snapshot hashed over the sampled SQL, is the later path and is recorded under Out of scope.
+
+Decided, the parameter list of a query:
+
+- It is the parameters the lexer finds in the static SQL, in order of first appearance, followed by the parameters that `-- param:` markers declare and the static SQL does not hold, in marker order.
+- A `-- param:` marker for a parameter that is not in the static SQL must give a type.  Such a parameter reaches the query only through a token's fragment at run time, so nothing else can type it.  A marker without a type for such a parameter is an error.
+- A parameter that appears in a token's default and in neither the static SQL nor a marker is an error that says to declare it.  A default is a sample, and a type taken from a sample alone would be a guess.
+- The marker writes the parameter with the dialect's prefix, as the SQL does: `@name` under `postgres` and `mssql`, and `:name` under `oracle` if that dialect ever describes.  One parameter per marker, allowed inside a query and in the preamble for a name every query of the file shares, the query's winning.  A marker in a query that names a parameter the query neither holds nor could receive is not an error, since the receiving case cannot be told apart.
+
+Technical notes:
+
+- The tool asks the server to resolve a declared type name, so that every parameter in the sidecar carries a resolved type and the generator never parses a type name.  On PostgreSQL that is a `pg_type` lookup through Npgsql's type catalog; on SQL Server the type goes into `@params` where the procedure resolves it, or through `sys.types` for a parameter the sample does not use.
+- A declared parameter that a run-time fragment does not use is bound anyway by the generated method.  SQL Server accepts a parameter the batch does not reference; Npgsql in named mode sends only the parameters whose placeholders appear in the text.  Phase 5 verifies both.
+
+### Tokens
+
+A query with `{{tokens}}` cannot be described as written, so each token gets a default: a sample fragment that the tool substitutes before describing.
+
+Decided:
+
+- A token may carry its default inline: `{{name:default}}`.  The name is as today; the default is everything after the first `:` up to the closing `}}`, trimmed, so `{{cast:x::int}}` is the token `cast` with the default `x::int`.  A default cannot contain `}}`.  An empty default, `{{extraWhere:}}`, is allowed and means the query is described with nothing there.
+- A default is a sample for describing and nothing else.  The generated method still takes the token as a `string`, the emitted SQL still holds the placeholder, and token validation applies to the run-time argument as today.
+- Under `Sql` output a default is allowed and ignored.  Under `Models` and `CodeGen` a token without a default is an error at the query, in the generator and in the tool.
+- A default can also be given once for a token that appears several times, with a marker that holds the inline form: `-- token: {{where:AND deleted_at IS NULL}}`.  The marker's body is exactly what would be written in the SQL, parsed by the same scanner, so there is no second grammar to learn; one token per marker, and anything outside the braces is an error.  It is allowed inside a query and in the preamble, where it covers every query of the file; the query's wins.
+- The README states the contract: a fragment passed at run time must keep the sample's shape, the same result columns and the same parameters, because nothing can check it.  An `ORDER BY` fragment or a table name keeps it; a column list does not.
+
+Recommended:
+
+- The marker form was chosen over a `-- SqlSource: token-default=` directive because directives are a space-separated list and most defaults are SQL fragments with spaces, which would need a quoting rule; and over `-- token: where AND ...`, a bare name and a space, because that reads as SQL to anyone who does not know the rule.
+- An inline default and a marker default for one token in one query, or two inline occurrences with different defaults, is an error, not a precedence.  One occurrence with a default and others without is fine.
+- The hash covers the sample and the declarations: the SQL with each token rendered as `{{name:default}}` using the resolved default, followed by the `-- param:` declarations in effect, so a changed default, a renamed token or a changed declaration re-describes.
+- A parameter that appears only inside a token's default, or only in the fragment a caller will pass at run time, is not in the static SQL, so the lexer cannot find it; it must be declared with a `-- param:` marker that gives its type.  See Parameters.
+- `{{a:b}}` was literal text under the rule that braces around anything but a name are not a token; it is now a token.  Nothing is published, so the change costs nothing, and the README's rule is updated.
 
 ### Nullability
 
@@ -164,14 +254,14 @@ Recommended, the overrides, each written so that the `.sql` file stays runnable 
 | What | How | Precedent |
 |----|----|----|
 | A column's nullability | An alias with a suffix: `AS "name!"` is not null, `AS "name?"` is nullable.  Legal quoted identifiers on both engines; `[name!]` also on SQL Server.  The database returns the name with the suffix and the generator strips it. | SQLx, pgtyped |
-| A parameter's nullability | A marker in the query: `-- param: id nullable`. | sqlc's `narg`, pgtyped's `!` in the other direction |
-| A parameter's type | The same marker: `-- param: id type=int`.  The tool declares it instead of asking, so `SELECT @p` can be described.  Every engine outside the two in scope except DuckDB needs this for every parameter. | Prisma's `-- @param {Int} $1:name`, sqlc's `sqlc.arg` |
+| A parameter's nullability | A marker in the query: `-- param: @deletedBefore null`.  The parameter as it is written in the SQL, with the dialect's prefix, then `null`, the word a column definition uses. | sqlc's `narg`, pgtyped's `!` in the other direction |
+| A parameter's type | The same marker with a type in the database's own vocabulary: `-- param: @page int`, `-- param: @since timestamptz null`.  The tool hands the type to the server as the parameter's type, so the server still checks it against every use.  It fixes a type the server cannot infer, `SELECT @p`, or infers too wide, `varchar(8000)` in `TOP (@n)`; and it is how a parameter that is not in the static SQL gets a type at all.  Every engine outside the two in scope except DuckDB needs it for every parameter. | Prisma's `-- @param {Int} $1:name`, sqlc's `sqlc.arg`, T-SQL's own `@name type` declarations |
 
 A suffix on the parameter in the SQL, `@id?`, was rejected: it is valid on neither server, so the file could no longer be run by the user's tools or by the describer without rewriting.  The marker's exact grammar is phase 1's to settle, since the lexer reads markers.
 
 ### Types in C#
 
-Recommended: the default C# type for a database type is **the type the driver boxes**, so that Dapper assigns the value without conversion.  The rows that need a decision:
+Recommended: the default C# type for a database type is **the type the driver boxes**.  A generated method reads with `GetFieldValue<T>` and could ask for any type the driver converts to, but the models also serve a project that runs them through Dapper or its own code, where the boxed type is the one that arrives without conversion.  One default serves both.  The rows that need a decision:
 
 | Database type | Default | Why, and the alternative |
 |----|----|----|
@@ -197,6 +287,7 @@ Recommended: the default C# type for a database type is **the type the driver bo
 - Facets, `varchar(50)` and `decimal(18,2)`, are dropped from the type, as every surveyed tool drops them, and kept in the description; the generator puts them in the member's documentation.
 - The override is a project-level mapping from a database type name to a C# type, `timestamptz` to `DateTimeOffset`, `public.status` to `MyApp.Status`.  Its MSBuild form is phase 3's; its property starts with `SqlSource`, as every property of the package does.  A per-column C# type override, SQLx's `AS "created: DateTimeOffset"`, is not in this epic.
 - The type map lives in the generator and never in the snapshot, so a better mapping needs no database, and one snapshot serves two projects that map differently.
+- The map yields two things for a parameter: the C# type, and what the generated method sets on the `DbParameter`: `DbType` where it is enough, or the provider's own type, `NpgsqlDbType` or `SqlDbType`, where it is not, such as `jsonb`, an array or an enum on PostgreSQL, and the facets for `SqlParameter`'s size, precision and scale.  The description already carries the facets.
 
 ### Generated types
 
@@ -205,7 +296,7 @@ Recommended, for phase 3 to settle:
 - For a query `GetUser`: `GetUserParameters` when it has parameters, and `GetUserRow` when it has a result set.  Both `sealed record` types with positional parameters in the query's order, which gives value equality, `with`, and deconstruction, and which Dapper constructs when the constructor's parameters match the columns in order by name and type.
 - They are nested in the attributed type in both modes, since in `Nested` mode the `Sql` class is private and a private nested type cannot appear in the signature of a method of the containing type.  Their accessibility is the type's own, which the phase spec confirms against how `Direct` mode exposes members.
 - Column and parameter names become property names by PascalCasing: `created_at` to `CreatedAt`.  A name that is not an identifier after that, or two columns with one name, which `SELECT a.id, b.id` produces, is an error that asks for an alias.
-- Dapper matches `created_at` to `CreatedAt` only when `DefaultTypeMap.MatchNamesWithUnderscores` is true.  The README says so.  A generated reader that maps by ordinal with the typed getters, which would make Dapper's conventions and version irrelevant, is recorded under Out of scope as the candidate for a later epic.
+- A generated method reads by ordinal with the typed getters, so naming never affects it.  A project that runs the models through Dapper instead needs `DefaultTypeMap.MatchNamesWithUnderscores` for snake_case columns, which the README says.
 - Each generated type and member has XML documentation: the query's summary, the database type and facets of each member, and the origin table and column when there is one.
 
 ### Diagnostics
@@ -217,7 +308,7 @@ Recommended: a new range, `SQLSRC2xx`, for the epic: a stale, missing or orphane
 Decided: one end-to-end test project per supported database, each with its own `.sql` files, a schema script, and **committed sidecars** so that the project compiles with the generator like any consumer.  Each runs against a Testcontainers instance with the schema applied and has three kinds of test:
 
 1. The tool in `--check` mode against the container, asserting that the committed sidecars are what the tool produces today.  This proves the describer.
-2. Every generated query executed through Dapper, asserting the typed results, nullability included.  This proves the type map at run time.
+2. Every query executed through its generated method, asserting the typed results, nullability included.  This proves the type map and the generated ADO.NET code at run time.  Until phase 5, the projects execute through Dapper, and a Dapper test stays afterwards for the subset of users who run the models that way.
 3. The error paths, a stale sidecar and an undescribable query, by running the tool against a scratch copy.
 
 Recommended:
@@ -225,35 +316,38 @@ Recommended:
 - The projects live under `tests/`, one per database, named for it.  They reference the generator the way `tests/SqlSource.Tests` does and the tool as a project.  Docker is already a required tool, so Testcontainers adds nothing to the setup; `CONTRIBUTING.md` says which images the tests pull.
 - The tool's own unit tests, the snapshot round trip, the hash, the parameter lexeme and the type map need no database and live with the existing tests.
 - The nullability inference for PostgreSQL gets a test matrix of its own: left, right and full joins, nested joins, joins inside subqueries and CTEs, lateral joins, a view over an outer join, aggregates, set operations and the planner's join reordering.
-- `tools/check-package-install.sh` gains a run of the packed tool, so the packed tool and the packed generator are proven together once per build.  Whether that run needs a database, and so Docker in that script, is phase 5's to settle; a `--check` against a committed sidecar with no changes may be enough to prove the packaging.
+- `tools/check-package-install.sh` gains a run of the packed tool, so the packed tool and the packed generator are proven together once per build.  Whether that run needs a database, and so Docker in that script, is phase 6's to settle; a `--check` against a committed sidecar with no changes may be enough to prove the packaging.
 
 ### Documentation
 
 Each phase keeps the documents current, by the rules in `AGENTS.md`:
 
-- `README.md` gains a section on models: installing the tool, running `describe`, committing the sidecar, the overrides, the type map and its option, the Dapper settings a user needs, and what is unsupported.  Phase 3 writes it for PostgreSQL; phase 4 adds SQL Server; phase 5 adds the online mode.
+- `README.md`'s installation section changes with phase 3: add the package and the tool, set the dialect, run `describe`, commit the sidecar; and a one-line note that a project wanting only the constants sets `SqlSourceOutput=Sql` and can keep the default dialect.  It gains a section on models: running `describe`, committing the sidecar, the overrides, the type map and its option, the Dapper settings a user who stays with Dapper needs, and what is unsupported.  Phase 3 writes it for PostgreSQL; phase 4 adds SQL Server; phase 5 adds the generated methods; phase 6 adds the online mode.
 - `CONTRIBUTING.md` gains the tool project, the end-to-end projects and their images, and the new package check.
 - `docs/publishing.md` covers the second package from phase 2.
 - `docs/diagnostics.md` gains each diagnostic in the phase that adds it.
 
-## Phase 1 - parameters
+## Phase 1 - parameters and settings
 
 ### Scope
 
 1. A `Parameter` lexeme kind in `SqlLexer`, found by the rule under Parameters, under every dialect.
 2. `SqlBlock` and `SqlQuery` carry the ordered list of parameter names.  The segments are unchanged: a parameter stays in the SQL as written.
 3. The hash of a query's SQL, computed where the generator builds the emitted text, so that the tool and the generator cannot disagree.
-4. The `-- param:` marker: parsed, validated and carried on the block, with no effect yet.  Its grammar is settled here.
-5. `InternalsVisibleTo` for `SqlSource.Tool`.
+4. The `-- param:` marker: parsed, validated and carried on the block, with no effect yet, and the parameter list rule under Parameters.
+5. Token defaults: the inline `{{name:default}}` form in the token scanner, the once-only marker, the conflict errors, and each token's resolved default carried on the block.  The hash and the parameter list are computed over the sample SQL.
+6. The `database=` and `output=` directives, in the preamble and inside a query, carried on the block; the `SqlSourceDatabase` and `SqlSourceOutput` property and metadata in the props and targets; the per-file settings record that resolves all three settings by one rule.  `output` is validated and has no effect yet; `database` is never read by the generator.
+7. The rename of `Mode` to `Target` and `SqlQueriesMode` to `SqlQueriesTarget`, through the README, the diagnostics, the tests and the package-install project.
+8. `InternalsVisibleTo` for `SqlSource.Tool`.
 
 ### Decided
 
 - Parameters are found by the lexer, under the file's dialect.
-- Nothing a user sees changes.  No member is generated from the parameter list yet, and no diagnostic is added unless the marker needs one.
+- Apart from the rename, nothing a user sees changes.  No member is generated from the parameter list yet, and the only diagnostics added are an invalid `SqlSourceOutput` value and whatever the new marker and directives need.
 
 ### Recommended
 
-- The marker is `-- param: <name> [nullable] [type=<database type>]`, one parameter per marker, inside a query, matched like the other markers.  A marker that names a parameter the query does not have is an error.
+- The marker is `-- param: <prefix><name> [<database type>] [null]`, as under Overrides, matched like the other markers.  The type is the rest of the line before an optional trailing `null`, so a type with facets, `decimal(18,2)`, or with spaces, `double precision`, needs no quoting.
 - The hash is SHA-256 of `engine + "\n" + SQL`, hex-encoded, where the SQL is the comment-stripped emitted text with `\n` line endings.  `System.Security.Cryptography.SHA256` is available to a `netstandard2.0` analyzer.
 
 ### Technical notes
@@ -269,10 +363,10 @@ Theory tests over the rule under each dialect, including `@` inside strings, com
 ### Scope
 
 1. `src/SqlSource.Tool`: the console application, its package, its command line, its exit codes and its error output format.
-2. Project evaluation through `dotnet msbuild -getItem`, giving the tool the compiler's view of the `.sql` files and their dialects.
+2. Finding the unit of a run, listing a solution's projects, the `SqlSourceImported` marker, the manifest target in `SqlSource.targets` and its format, and running it to get the compiler's view of the `.sql` files with their dialects, databases and outputs.  Resolving the three settings per query with the shared code, and leaving out every project, file and query whose output is `Sql`.
 3. The snapshot model, the shared reader and writer, and the format version.
 4. `IQueryDescriber`, the engine-neutral `QueryDescription`, and the PostgreSQL describer over Npgsql, with nullability inference.
-5. `sqlsource describe`, `--check`, `--force`, the connection option and the environment variable.
+5. `sqlsource describe`, `--check`, `--force`, `--database`, the connection options and the environment variables.  Token defaults substituted before describing; a token without one is an error.
 6. Publishing for the second package.
 
 ### Decided
@@ -318,7 +412,7 @@ The server's errors and what the tool says:
 
 - `Parse` and `Describe` plan and execute nothing; `Describe` of a statement that returns no rows answers `NoData`, and `RETURNING` lists are treated as select lists.  Table origins survive subqueries in `FROM`, CTEs and joins; they are zero for expressions, function results, casts, aggregates, the merged column of a `USING` join, and the whole output of a `UNION`, `INTERSECT` or `EXCEPT`.  A view reports the view's OID and column, and a view's columns are never `NOT NULL` in `pg_attribute`, so they are nullable unless overridden.
 - Versions: `Parse` and `Describe` are protocol 3.0; `EXPLAIN (FORMAT JSON)` is 9.0; `plan_cache_mode` is 12; `EXPLAIN (GENERIC_PLAN)` is 16.  The supported floor is for this phase to set; PostgreSQL 13 is the oldest version in support.
-- Unverified, and the first thing this phase's spike settles: that `SchemaOnly | KeyInfo` together behave as described in Npgsql; that `EXPLAIN (GENERIC_PLAN)` accepts `$n` through the extended protocol, or whether the `PREPARE` form is needed on 16 too; what `Describe` reports for a domain-typed expression and for a `USING` column of a `FULL JOIN`; and whether `-getItem` evaluation sees a file that a target adds.
+- Unverified, and the first thing this phase's spike settles: that `SchemaOnly | KeyInfo` together behave as described in Npgsql; that `EXPLAIN (GENERIC_PLAN)` accepts `$n` through the extended protocol, or whether the `PREPARE` form is needed on 16 too; and what `Describe` reports for a domain-typed expression and for a `USING` column of a `FULL JOIN`.
 - The tool must leave the database as it found it: a `PREPARE` is deallocated, a `SET` is session-local, nothing is executed.
 
 ### Testing
@@ -333,7 +427,7 @@ The snapshot round trip and the command line without a database.  The describer 
 
 ### Scope
 
-1. The generator's pipeline reads `.sql.json` sidecars as a second file kind, paired by path, parsed with the shared reader into a value-equal record, cached like a parsed `.sql` file.
+1. The generator's pipeline reads `.sql.json` sidecars as a second file kind, paired by path, parsed with the shared reader into a value-equal record, cached like a parsed `.sql` file.  `SqlSourceOutput` takes effect: `Models` and `CodeGen` queries need an entry, `Sql` queries do not, and a `Models` or `CodeGen` query with a token that has no default is an error.
 2. Hash and version comparison per query, and the diagnostics under The sidecar.
 3. The PostgreSQL type map and the project-level mapping override.
 4. Emission of the input and output types with documentation, and the override suffix stripped from names.
@@ -400,7 +494,38 @@ The errors to expect:
 
 The describer against a SQL Server container.  The SQL Server end-to-end project.
 
-## Phase 5 - build integration
+## Phase 5 - execution methods
+
+### Scope
+
+1. For each query whose output is `CodeGen`, a generated method that takes a `DbConnection`, the parameters type when there is one, and a `CancellationToken`; creates the command; binds each parameter with its mapped `DbType` or provider type and facets; and executes it.
+2. For a query with a result set, reading each row into the output type by ordinal with `GetFieldValue<T>`, with `IsDBNull` for nullable members.
+3. The method's shape per query: how many rows it returns.
+4. Both engines, in the end-to-end projects, executing through the generated methods.
+
+### Decided
+
+- Plain ADO.NET over `DbConnection`, `DbCommand`, `DbParameter` and `DbDataReader`.  The provider's own types only where ADO.NET's abstractions do not reach.  Nothing generated depends on Dapper.
+- A project that does not want the methods still gets the models.
+
+### Recommended
+
+- Asynchronous methods only, named after the query with an `Async` suffix, static, placed where the query's constant is.
+- The result shape is the user's to say, since the description cannot: sqlc uses `:one`, `:many`, `:exec` and `:execrows` on its name marker.  A marker or directive, settled in this phase's spec with its grammar added to the lexer, chooses between one row or null, a list of rows, and the affected-row count for a query with no result set.  The default when nothing is said: a list for a query with rows, the count for one without.
+- An open transaction is passed as an optional `DbTransaction`.  Opening the connection is the caller's business.
+- Reading by ordinal, not by name: the snapshot fixes the ordinal of every column, and the hash guarantees the SQL is the one described.  A type the provider cannot convert to the mapped C# type is a bug in the type map, caught by the end-to-end tests.
+
+### Technical notes
+
+- `GetFieldValue<DateOnly>` and `GetFieldValue<TimeOnly>` work on Microsoft.Data.SqlClient 5.1 and later and on Npgsql 6 and later; the type map's options for those types are honoured by asking for the chosen type.
+- `NpgsqlDbType` is needed for a parameter whose PostgreSQL type `DbType` cannot name: arrays, `jsonb`, enums, ranges.  Generated code that sets it references Npgsql, which a project that uses PostgreSQL has; the generator finds the provider by the file's dialect.
+- A `SqlParameter` for `decimal` needs precision and scale set, or the server rounds; for `nvarchar(n)` a size, or the plan cache fragments.  The description's facets give both.
+
+### Testing
+
+The end-to-end projects run every query through its generated method and assert rows, counts, nulls and cancellation.  Generator tests cover the method shapes and the parameter binding code for every row of the type map.
+
+## Phase 6 - build integration
 
 ### Scope
 
@@ -421,8 +546,8 @@ The items under Workflow.  The target runs the tool through `dotnet sqlsource`, 
 
 - Multiple result sets, stored procedures and table-valued functions.
 - Databases other than PostgreSQL and SQL Server.  The description's optional fields and the `-- param:` type marker are the room left for them.  SQLite would need a static describer; MySQL, MariaDB and Oracle need declared parameter types.
-- Queries with `{{tokens}}`.  A `-- sample:` marker giving a value per token, with the snapshot hashed over the sampled SQL, is the later path.
-- Executing queries.  The generated code is types and SQL; Dapper or ADO.NET runs them.  A generated reader that maps by ordinal with the typed getters is the candidate for a later epic, and would remove the dependence on Dapper's conventions and versions.
+- Using a token's default as the C# default value of the generated method's parameter.  A default is a sample for describing; whether it should also be a run-time default is a separate question.
+- Synchronous execution methods, streaming results as `IAsyncEnumerable<T>`, and bulk operations.  The method shapes in this epic are one row, a list and a count.
 - Sharing a type between queries that read the same columns, as sqlc does with table structs.  The origin fields are kept so that it can be added.
 - Per-column C# type overrides.  Composite, `record`, CLR and `vector` types.  Table-valued parameters.
 - A schema fingerprint in the snapshot.  Starting a database from the tool.
