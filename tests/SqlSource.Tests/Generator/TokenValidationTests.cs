@@ -12,7 +12,7 @@ public class TokenValidationTests
 
         namespace App;
 
-        [SqlQueries(Mode = SqlQueriesMode.Direct)]
+        [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
         public partial class Sample
         {
             public static string List() => ListFrom("users");
@@ -79,7 +79,7 @@ public class TokenValidationTests
 
                     namespace App;
 
-                    [SqlQueries(Mode = SqlQueriesMode.Direct)]
+                    [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
                     public partial class Sample;
                     """
                 ),
@@ -129,7 +129,7 @@ public class TokenValidationTests
         );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC010 ");
-        run.Sources.Keys.ShouldBe(["SqlQueriesAttribute.g.cs"]);
+        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
     }
 
     private static GeneratorRun Run(string? property, SqlFile file) =>

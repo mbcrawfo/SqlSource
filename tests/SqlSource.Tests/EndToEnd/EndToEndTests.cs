@@ -163,14 +163,14 @@ public class EndToEndTests
     public void Attribute_IsNotInTheMetadataOfTheTypesThatCarryIt(Type type) =>
         type.GetCustomAttributesData()
             .Select(attribute => attribute.AttributeType.FullName)
-            .ShouldNotContain("SqlSource.SqlQueriesAttribute");
+            .ShouldNotContain("SqlSource.SqlSourceGenerateAttribute");
 
     [Fact]
     public void AttributeAndEnum_AreInternalTypesOfTheConsumingAssembly()
     {
         var assembly = typeof(EndToEndTests).Assembly;
 
-        assembly.GetType("SqlSource.SqlQueriesAttribute").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
+        assembly.GetType("SqlSource.SqlSourceGenerateAttribute").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
         assembly.GetType("SqlSource.SqlQueriesMode").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
     }
 }

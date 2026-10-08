@@ -9,7 +9,7 @@ public class FileDiagnosticsTests
     private const string Source = """
         using SqlSource;
         namespace App;
-        [SqlQueries]
+        [SqlSourceGenerate]
         public partial class Sample { }
         """;
 
@@ -148,9 +148,9 @@ public class FileDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlQueries]
+            [SqlSourceGenerate]
             public partial class First { }
-            [SqlQueries(Path = "Users.sql")]
+            [SqlSourceGenerate(Path = "Users.sql")]
             public partial class Second { }
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: 1x\nSELECT 1;\n")
@@ -283,9 +283,9 @@ public class FileDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlQueries(Path = "A.sql")]
+            [SqlSourceGenerate(Path = "A.sql")]
             public partial class First { }
-            [SqlQueries(Path = "B.sql")]
+            [SqlSourceGenerate(Path = "B.sql")]
             public partial class Second { }
             """,
             new SqlFile("/app/Repo/A.sql", "-- name: GetUser\nSELECT 1;\n"),
@@ -316,7 +316,7 @@ public class FileDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public partial class @class<T> { }
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: Sql\nSELECT 1;\n"),
@@ -335,7 +335,7 @@ public class FileDiagnosticsTests
             """
             using SqlSource;
             namespace App;
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public partial class Sample { }
             """,
             new SqlFile("/app/Repo/A.sql", "-- name: Kept\nSELECT 1;\n"),

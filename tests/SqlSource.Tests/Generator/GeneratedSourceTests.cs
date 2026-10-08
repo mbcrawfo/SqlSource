@@ -16,8 +16,8 @@ public class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run("public class Sample;", Users);
 
-        run.Sources.Keys.ShouldBe(["SqlQueriesAttribute.g.cs"]);
-        run.Sources["SqlQueriesAttribute.g.cs"].ShouldBe(AttributeSource.Text);
+        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
+        run.Sources["SqlSourceGenerateAttribute.g.cs"].ShouldBe(AttributeSource.Text);
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
@@ -32,7 +32,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries]
+            [SqlSourceGenerate]
             public partial class Sample
             {
                 public static string First => Sql.GetUser;
@@ -59,7 +59,7 @@ public class GeneratedSourceTests
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
-        run.Sources.Keys.ShouldBe(["SqlQueriesAttribute.g.cs", "App.Sample.g.cs"], ignoreOrder: true);
+        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", "App.Sample.g.cs"], ignoreOrder: true);
         run.Sources["App.Sample.g.cs"]
             .ShouldBe(
                 """
@@ -111,7 +111,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public static partial class Sample;
 
             public static class Consumer
@@ -181,7 +181,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries]
+            [SqlSourceGenerate]
             {{declaration}}
             {
                 public static string Value => Sql.GetUser;
@@ -210,7 +210,7 @@ public class GeneratedSourceTests
                 {
                     public partial interface IMiddle<TKey, TValue>
                     {
-                        [SqlQueries]
+                        [SqlSourceGenerate]
                         private partial record Inner
                         {
                             public static string Value => Sql.GetUser;
@@ -266,7 +266,7 @@ public class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run(
             """
-            [SqlSource.SqlQueries(Mode = SqlSource.SqlQueriesMode.Direct)]
+            [SqlSource.SqlSourceGenerate(Mode = SqlSource.SqlQueriesMode.Direct)]
             public partial struct @class
             {
                 public static string Value => GetUser;
@@ -313,7 +313,7 @@ public class GeneratedSourceTests
             {
                 namespace Data
                 {
-                    [SqlQueries]
+                    [SqlSourceGenerate]
                     public partial class Sample
                     {
                         public static string Value => Sql.GetUser;
@@ -339,16 +339,16 @@ public class GeneratedSourceTests
 
             namespace App
             {
-                [SqlQueries]
+                [SqlSourceGenerate]
                 public partial class Sample;
 
-                [SqlQueries]
+                [SqlSourceGenerate]
                 public partial class Sample<T>;
             }
 
             namespace Other
             {
-                [SqlQueries]
+                [SqlSourceGenerate]
                 public partial class Sample;
             }
             """,
@@ -359,7 +359,7 @@ public class GeneratedSourceTests
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         run.Sources.Keys.ShouldBe(
-            ["SqlQueriesAttribute.g.cs", "App.Sample.g.cs", "App.Sample-1.g.cs", "Other.Sample.g.cs"],
+            ["SqlSourceGenerateAttribute.g.cs", "App.Sample.g.cs", "App.Sample-1.g.cs", "Other.Sample.g.cs"],
             ignoreOrder: true
         );
     }
@@ -373,7 +373,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/c.sql", "-- name: Fifth\nSELECT 5;\n"),
@@ -415,7 +415,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries(Path = @"{{path}}", Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Path = @"{{path}}", Mode = SqlQueriesMode.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: FromRepo\nSELECT 1;\n"),
@@ -441,7 +441,8 @@ public class GeneratedSourceTests
             [
                 new SourceFile(
                     @"C:\app\Repo\Sample.cs",
-                    "[SqlSource.SqlQueries]\npublic partial class Sample { public string Value => Sql.GetUser; }\n"
+                    "[SqlSource.SqlSourceGenerate]\n"
+                        + "public partial class Sample { public string Value => Sql.GetUser; }\n"
                 ),
             ],
             [new SqlFile(@"c:\App\repo\Users.sql", "-- name: GetUser\nSELECT 1;\n")]
@@ -462,13 +463,13 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries]
+            [SqlSourceGenerate]
             public partial class First
             {
                 public static string Value => Sql.GetUser;
             }
 
-            [SqlQueries(Path = "Users.sql", Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Path = "Users.sql", Mode = SqlQueriesMode.Direct)]
             public partial class Second
             {
                 public static string Value => GetUser;
@@ -493,7 +494,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public partial class Sample
             {
                 public static string List() => ListFrom("users", "1 = 1") + GetUser;
@@ -591,7 +592,7 @@ public class GeneratedSourceTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlQueries]
+            [SqlSourceGenerate]
             public partial struct Sample<T>
             {
                 /// <summary>Uses the query.</summary>
@@ -621,7 +622,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries]
+            [SqlSourceGenerate]
             public partial class Sample
             {
                 public static string Whole() => Sql.Whole("SELECT 1;");
@@ -675,7 +676,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries]
+            [SqlSourceGenerate]
             public partial class Sample<T>
             {
                 public static string One() => Sql.Probe("a");
@@ -714,7 +715,7 @@ public class GeneratedSourceTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", Sql + "\n")
@@ -741,7 +742,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- summary: a < b & c\n" + Sql + "\n")
@@ -769,11 +770,11 @@ public class GeneratedSourceTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public partial class Sample;
 
             /// <summary>More queries.</summary>
-            [SqlQueries]
+            [SqlSourceGenerate]
             public partial struct Other;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n-- summary: x < y & z\nSELECT 1 WHERE a < b;\n")
@@ -796,7 +797,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- summary: a\fb\nSELECT '\f\u001A';\n")
@@ -823,7 +824,7 @@ public class GeneratedSourceTests
             languageVersion: languageVersion
         );
 
-        run.Sources.Keys.ShouldBe(["SqlQueriesAttribute.g.cs"]);
+        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
     }
@@ -869,7 +870,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlQueries(Mode = SqlQueriesMode.{{mode}})]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.{{mode}})]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: " + name + "\nSELECT 1;\n")
@@ -898,7 +899,7 @@ public class GeneratedSourceTests
                 public virtual string ListFrom(string table) => table;
             }
 
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
             public partial class Sample : Base;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: ListFrom\nSELECT * FROM {{table}};\n")
@@ -923,7 +924,7 @@ public class GeneratedSourceTests
                 protected static int Sql => 1;
             }
 
-            [SqlQueries]
+            [SqlSourceGenerate]
             public partial class Sample : Base
             {
                 public static string Value => Sql.GetUser;
@@ -948,19 +949,19 @@ public class GeneratedSourceTests
 
             namespace App
             {
-                [SqlQueries]
+                [SqlSourceGenerate]
                 public partial class Sample { public static string Value => Sql.GetUser; }
 
-                [SqlQueries]
+                [SqlSourceGenerate]
                 public partial class sample { public static string Value => Sql.GetUser; }
 
-                [SqlQueries]
+                [SqlSourceGenerate]
                 public partial class Other { public static string Value => Sql.GetUser; }
             }
 
             namespace APP
             {
-                [SqlQueries]
+                [SqlSourceGenerate]
                 public partial class Sample { public static string Value => Sql.GetUser; }
             }
             """,
@@ -982,8 +983,8 @@ public class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run(
             """
-            [SqlSource.SqlQueries]
-            public partial class SqlQueriesAttribute
+            [SqlSource.SqlSourceGenerate]
+            public partial class SqlSourceGenerateAttribute
             {
                 public static string Value => Sql.GetUser;
             }
@@ -994,7 +995,7 @@ public class GeneratedSourceTests
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources.Count.ShouldBe(2);
-        run.Sources["SqlQueriesAttribute.g.cs"].ShouldBe(AttributeSource.Text);
+        run.Sources["SqlSourceGenerateAttribute.g.cs"].ShouldBe(AttributeSource.Text);
     }
 
     [Fact]
@@ -1005,7 +1006,7 @@ public class GeneratedSourceTests
             """
             namespace App;
 
-            [SqlSource.SqlQueries]
+            [SqlSource.SqlSourceGenerate]
             public partial class \u0053ample
             {
                 public static string Value => Sql.GetUser;
@@ -1026,7 +1027,7 @@ public class GeneratedSourceTests
             [
                 new SourceFile(
                     "/app/Dépôt/Sample.cs",
-                    "namespace Données;\n[SqlSource.SqlQueries]\n"
+                    "namespace Données;\n[SqlSource.SqlSourceGenerate]\n"
                         + "public partial class Requêtes { public string V => Sql.Größe; }\n"
                 ),
             ],
@@ -1044,14 +1045,14 @@ public class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run(
             [
-                new SourceFile("/app/Repo/Sample.cs", "[SqlSource.SqlQueries]\npublic partial class Sample;\n"),
-                new SourceFile("/app/Other/Sample.cs", "[SqlSource.SqlQueries]\npublic partial class Sample;\n"),
+                new SourceFile("/app/Repo/Sample.cs", "[SqlSource.SqlSourceGenerate]\npublic partial class Sample;\n"),
+                new SourceFile("/app/Other/Sample.cs", "[SqlSource.SqlSourceGenerate]\npublic partial class Sample;\n"),
             ],
             [Users, new SqlFile("/app/Other/Orders.sql", "SELECT 2;\n")]
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        run.Sources.Keys.ShouldBe(["SqlQueriesAttribute.g.cs", "Sample.g.cs"], ignoreOrder: true);
+        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs", "Sample.g.cs"], ignoreOrder: true);
         run.Sources["Sample.g.cs"].ShouldContain("public const string GetUser");
         run.CompilationErrors.ShouldHaveSingleItem().ShouldStartWith("CS0579 /app/Other/Sample.cs(1,2)");
     }

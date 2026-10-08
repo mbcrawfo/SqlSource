@@ -20,7 +20,7 @@ Mark a partial type in the same folder, and use the queries by name:
 ```csharp
 using SqlSource;
 
-[SqlQueries]
+[SqlSourceGenerate]
 public partial class UserRepository(IDbConnection connection)
 {
     public Task<User> Get(int id) => connection.QuerySingleAsync<User>(Sql.GetUser, new { id });
@@ -43,7 +43,7 @@ The package is a development dependency.  It adds nothing to your application's 
 
 ## The attribute
 
-`[SqlQueries]` goes on a partial class, struct, record or record struct.  The type may be static, generic, or nested in other types, as long as it and every type that contains it is `partial`.
+`[SqlSourceGenerate]` goes on a partial class, struct, record or record struct.  The type may be static, generic, or nested in other types, as long as it and every type that contains it is `partial`.
 
 | Property | Default | Meaning |
 |----|----|----|
@@ -53,8 +53,8 @@ The package is a development dependency.  It adds nothing to your application's 
 ### Which files belong to a type
 
 - Without `Path`, the type gets every `.sql` file in the folder of the source file that carries the attribute.  Subfolders are not searched.
-- A `Path` that ends in `.sql` names one file: `[SqlQueries(Path = "Queries/Users.sql")]`.
-- Any other `Path` names a folder: `[SqlQueries(Path = "../Queries")]`.
+- A `Path` that ends in `.sql` names one file: `[SqlSourceGenerate(Path = "Queries/Users.sql")]`.
+- Any other `Path` names a folder: `[SqlSourceGenerate(Path = "../Queries")]`.
 - `Path` is always relative to the folder of the source file, never to the project.  Both `/` and `\` separate folders, and paths are compared ignoring case, so a project builds the same on every operating system.  Two `.sql` files of a type whose paths differ only by case are therefore an error, [SQLSRC013](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc013).
 - Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
 
@@ -66,7 +66,7 @@ The package is a development dependency.  It adds nothing to your application's 
 | `SqlQueriesMode.Direct` | Public members on the type itself | `UserQueries.GetUser`, wherever the type is visible |
 
 ```csharp
-[SqlQueries(Mode = SqlQueriesMode.Direct)]
+[SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
 public static partial class UserQueries;
 ```
 

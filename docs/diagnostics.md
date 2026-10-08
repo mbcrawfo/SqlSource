@@ -33,7 +33,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC114](#sqlsrc114) | Token name is a keyword |
 | [SQLSRC115](#sqlsrc115) | Dialect directive is misplaced |
 
-Ids below 100 are about the type that carries `[SqlQueries]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the two types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
@@ -44,7 +44,7 @@ Ids below 100 are about the type that carries `[SqlQueries]`, or about the proje
 SqlSource adds members through a second declaration of the type, which C# allows only when every declaration is `partial`.  The same holds for each type the type is nested in.
 
 ```csharp
-[SqlQueries]
+[SqlSourceGenerate]
 public class UserRepository { }
 ```
 
@@ -57,7 +57,7 @@ Add `partial` to the type named in the message.
 A type declared with the `file` modifier exists only in its own source file, so generated code cannot add to it.  The same holds for a type nested in a file-local type.
 
 ```csharp
-[SqlQueries]
+[SqlSourceGenerate]
 file partial class UserRepository { }
 ```
 
@@ -78,7 +78,7 @@ Target `net8.0` or later.  For a project that targets several frameworks, put th
 `Path` is relative to the folder of the source file that carries the attribute.  A value that ends in `.sql` names one file.  Any other value names a folder, and the type gets the `.sql` files directly in it; subfolders are not searched.
 
 ```csharp
-[SqlQueries(Path = "Queries/User.sql")] // The file is Queries/Users.sql.
+[SqlSourceGenerate(Path = "Queries/User.sql")] // The file is Queries/Users.sql.
 public partial class UserRepository { }
 ```
 
@@ -99,7 +99,7 @@ Add a `.sql` file next to the source file, or set `Path` to the folder or file t
 `Mode` was given a value that `SqlQueriesMode` does not define.
 
 ```csharp
-[SqlQueries(Mode = (SqlQueriesMode)5)]
+[SqlSourceGenerate(Mode = (SqlQueriesMode)5)]
 public partial class UserRepository { }
 ```
 
@@ -112,7 +112,7 @@ Use `SqlQueriesMode.Nested` or `SqlQueriesMode.Direct`.
 In `Nested` mode the queries go in a nested class named `Sql`, and the type already has a member with that name.  The same error is reported when the type itself, or one of its type parameters, is named `Sql`: a nested class cannot share either name.
 
 ```csharp
-[SqlQueries]
+[SqlSourceGenerate]
 public partial class UserRepository
 {
     private string Sql { get; }
@@ -198,7 +198,7 @@ The code SqlSource generates for a type is C# 12, the default language version o
 
 Remove `LangVersion` to get the default of the target framework, or set it to `12` or later.  It can be set in the project file, in `Directory.Build.props`, and by a `-p:` argument of the build command.
 
-The error is reported at each `[SqlQueries]` attribute, and no type gets members until it is fixed.  A project that targets a framework older than .NET 8 has an older language version by default; it gets [SQLSRC003](#sqlsrc003) and not this error, because targeting .NET 8 fixes both.
+The error is reported at each `[SqlSourceGenerate]` attribute, and no type gets members until it is fixed.  A project that targets a framework older than .NET 8 has an older language version by default; it gets [SQLSRC003](#sqlsrc003) and not this error, because targeting .NET 8 fixes both.
 
 ## SQLSRC013
 

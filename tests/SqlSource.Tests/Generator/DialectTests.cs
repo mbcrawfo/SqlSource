@@ -12,7 +12,7 @@ public class DialectTests
 
         namespace App;
 
-        [SqlQueries(Mode = SqlQueriesMode.Direct)]
+        [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
         public partial class Sample;
         """;
 
@@ -245,7 +245,7 @@ public class DialectTests
         );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC011 ");
-        run.Sources.Keys.ShouldBe(["SqlQueriesAttribute.g.cs"]);
+        run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
     }
 
     // The two settings of the project are read apart: a value of one is never taken for the other.

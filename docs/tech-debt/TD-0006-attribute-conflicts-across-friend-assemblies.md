@@ -2,7 +2,7 @@
 
 ## Problem
 
-The generator adds `SqlQueriesAttribute` and `SqlQueriesMode` to every project that references it, as internal types in the namespace `SqlSource`; see [`AttributeSource`](../../src/SqlSource/Generation/AttributeSource.cs).  When project A uses SqlSource and declares `InternalsVisibleTo` for project B, and B uses SqlSource too, B sees two copies of each type: its own and A's.  The compiler picks B's own and reports warning CS0436 at every use of `SqlQueries` and `SqlQueriesMode` in B's code.
+The generator adds `SqlSourceGenerateAttribute` and `SqlQueriesMode` to every project that references it, as internal types in the namespace `SqlSource`; see [`AttributeSource`](../../src/SqlSource/Generation/AttributeSource.cs).  When project A uses SqlSource and declares `InternalsVisibleTo` for project B, and B uses SqlSource too, B sees two copies of each type: its own and A's.  The compiler picks B's own and reports warning CS0436 at every use of `SqlSourceGenerate` and `SqlQueriesMode` in B's code.
 
 The package hides that warning and leaves its cause in place.  [`AttributeConflictSuppressor`](../../src/SqlSource/Diagnostics/AttributeConflictSuppressor.cs) is a `DiagnosticSuppressor` that turns CS0436 off where it names one of the two types, and a `#pragma` in the generated file covers that file.  A compiler or an IDE that does not run suppressors still shows the warning, and a project that sets `TreatWarningsAsErrors` then fails to build.
 
@@ -28,4 +28,4 @@ When the floor reaches Roslyn 4.14, call `AddEmbeddedAttributeDefinition` in the
 
 ## Trigger
 
-The Roslyn pin in `Directory.Packages.props` is raised to 4.14 or later.  A user reports CS0436 for `SqlQueries` or `SqlQueriesMode`.
+The Roslyn pin in `Directory.Packages.props` is raised to 4.14 or later.  A user reports CS0436 for `SqlSourceGenerate` or `SqlQueriesMode`.

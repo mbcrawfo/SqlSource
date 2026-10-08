@@ -5,9 +5,9 @@ namespace SqlSource.Generation;
 /// </summary>
 internal static class AttributeSource
 {
-    public const string HintName = "SqlQueriesAttribute.g.cs";
+    public const string HintName = "SqlSourceGenerateAttribute.g.cs";
 
-    public const string AttributeMetadataName = "SqlSource.SqlQueriesAttribute";
+    public const string AttributeMetadataName = "SqlSource.SqlSourceGenerateAttribute";
 
     public const string ModeMetadataName = "SqlSource.SqlQueriesMode";
 
@@ -33,7 +33,7 @@ internal static class AttributeSource
         namespace SqlSource
         {
             /// <summary>
-            /// Where the members generated for a type marked with <see cref="SqlQueriesAttribute" /> go.
+            /// Where the members generated for a type marked with <see cref="SqlSourceGenerateAttribute" /> go.
             /// </summary>
             internal enum SqlQueriesMode
             {
@@ -57,7 +57,7 @@ internal static class AttributeSource
                 Inherited = false
             )]
             [global::System.Diagnostics.Conditional("SQLSOURCE_ATTRIBUTES")]
-            internal sealed class SqlQueriesAttribute : global::System.Attribute
+            internal sealed class SqlSourceGenerateAttribute : global::System.Attribute
             {
                 /// <summary>
                 /// A folder or one <c>.sql</c> file, relative to the folder of the file that carries the attribute.
