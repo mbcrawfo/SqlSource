@@ -58,12 +58,12 @@ Decided:
 
 | Phase | Status | Spec | Delivers |
 |----|----|----|----|
-| 0. Names | Not started | | `[SqlQueries]` becomes `[SqlSourceGenerate]`, `SqlQueriesMode` becomes `GeneratorTarget` and `Mode` becomes `Target`; `-- SqlSource:` becomes `-- generator:` and `dialect=` becomes the marker `-- dialect:`.  Through the generator, the parser, the README, the diagnostics, the tests and the package-install project.  Nothing else changes. |
+| 0. Names | Not started | | `[SqlQueries]` becomes `[SqlSourceGenerate]`, `SqlQueriesMode` becomes `SqlLocation` and `Mode` becomes `SqlLocation`; `-- SqlSource:` becomes `-- generator:` and `dialect=` becomes the marker `-- dialect:`.  Through the generator, the parser, the README, the diagnostics, the tests and the package-install project.  Nothing else changes. |
 | 1. Parameters | Not started | | The lexer finds `@name` parameters by the file's dialect; each query carries its ordered parameter list and the hash of its SQL.  Nothing a user sees changes. |
 | 2. The tool and the snapshot | Not started | | The `SqlSource.Tool` package: the `sqlsource describe` command with `--check` and `--force`, project evaluation through MSBuild, the snapshot format with its shared reader and writer, and the PostgreSQL describer with nullability inference.  Publishing covers the second package. |
 | 3. Models | Not started | | The generator reads snapshots, maps PostgreSQL types to C#, emits the input and output types with documentation, and reports stale, missing and mismatched snapshots.  The PostgreSQL end-to-end project.  The first usable release. |
 | 4. SQL Server | Not started | | The SQL Server describer, its type map, and its end-to-end project. |
-| 5. Execution methods | Not started | | A generated method per query that opens a command, binds the parameters, runs it and reads the rows into the output type by ordinal with typed getters, for both engines.  The end-to-end projects execute through them. |
+| 5. Execution methods | Not started | | A generated asynchronous method per query, an extension method on `DbConnection` by default, that binds the parameters, runs the command and reads the rows into the output type by ordinal with typed getters, in the shape and collection type the query asks for, for both engines.  The end-to-end projects execute through them. |
 | 6. Build integration | Not started | | The online mode: an MSBuild target runs the tool before compile when a connection string is in the environment.  A watch mode.  The package-install check runs the tool. |
 | 7. Bug reports | Not started | | `sqlsource diagnose`, the obfuscated bundle, and `sqlsource replay`, which runs the pipeline from a bundle's capture without a database. |
 
@@ -147,7 +147,7 @@ Recommended: exit code zero on success, one when a query could not be described,
 
 Decided:
 
-- The attribute is renamed `SqlSourceGenerate`, `[SqlSourceGenerate]` on the type, since it now drives three kinds of generation and not only queries.  Its `Mode` property is renamed `Target` and the `SqlQueriesMode` enum `GeneratorTarget`; its values, `Nested` and `Direct`, say where the members go, which is what a target is.  Nothing has been published, so the rename breaks nobody.  It is phase 0.
+- The attribute is renamed `SqlSourceGenerate`, `[SqlSourceGenerate]` on the type, since it now drives three kinds of generation and not only queries.  Its `Mode` property and the `SqlQueriesMode` enum are both renamed `SqlLocation`; its values, `Nested` and `Direct`, say where the SQL constants and token methods go, and nothing else, which the name now says.  Nothing has been published, so the rename breaks nobody.  It is phase 0.
 - A new setting, `SqlSourceOutput`, says what SqlSource generates for a query.  Its values are the members of a new enum, `GeneratorOutput`, emitted beside `GeneratorTarget`:
 
 | Value | Generates |
@@ -318,7 +318,7 @@ Recommended:
 - **No deduplication by shape.**  Two queries with identical shapes have two names, and a model shared by inference has to take one of them, which is arbitrary, and unstable: a query added earlier in the file, or a column added to one of the two, renames or splits the shared model and breaks code far from the edit.  Table models share under a name that comes from the schema and cannot drift; the shared-name rule shares under a name of the user's choosing.  Between them, shape-matching heuristics have no place.
 - **Table model names and default.**  PascalCase of the table name plus the output suffix: `users` gives `UsersDto`.  No singularising, since inflection is wrong often enough in English and always elsewhere.  The schema is dropped when it is the engine's default, `public` or `dbo`, and prefixed otherwise, so `billing.invoices` gives `BillingInvoicesDto` and cannot collide with `public.invoices`.  Table models are on by default and `no-table-models` turns them off.  The README states the one consequence worth knowing: a query that stops matching, because the table gained a column and the query lists its columns, gets a model of its own name again, which is a compile error wherever the table model was used; `SELECT *` queries never pay it.
 - **Dapper and sorting.**  Dapper matches a constructor's parameters to the columns in order, so a sorted positional record no longer maps through Dapper; the generated methods call the constructor themselves and are unaffected.  The README says that a project that runs sorted models through Dapper uses `class` models, and that snake_case columns need `DefaultTypeMap.MatchNamesWithUnderscores` there.
-- The attribute ends with `Path`, `Target`, `Output`, `InputModelSuffix`, `OutputModelSuffix`, `ModelNamespace`, `InputModelType`, `OutputModelType` and `Parameters`.  Every one is optional and follows one rule.  The expected use is project-level defaults for most projects, `AdditionalFiles` metadata or file and query markers for the rest, and the attribute rarely; it is there so that the chain has no gap.
+- The attribute ends with `Path`, `SqlLocation`, `Output`, `InputModelSuffix`, `OutputModelSuffix`, `ModelNamespace`, `InputModelType`, `OutputModelType`, `MethodLocation`, `CollectionType` and `Parameters`.  Every one is optional and follows one rule.  The expected use is project-level defaults for most projects, `AdditionalFiles` metadata or file and query markers for the rest, and the attribute rarely; it is there so that the chain has no gap.
 
 ### Diagnostics
 
@@ -367,7 +367,7 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 
 ### Scope
 
-1. `SqlQueriesAttribute` becomes `SqlSourceGenerateAttribute`, used as `[SqlSourceGenerate]`; `SqlQueriesMode` becomes `GeneratorTarget`; the attribute's `Mode` property becomes `Target`.  The values `Nested` and `Direct` and the `Path` property are unchanged.
+1. `SqlQueriesAttribute` becomes `SqlSourceGenerateAttribute`, used as `[SqlSourceGenerate]`; `SqlQueriesMode` becomes `SqlLocation`, and so does the attribute's `Mode` property.  The values `Nested` and `Direct` and the `Path` property are unchanged.
 2. `-- SqlSource:` becomes `-- generator:`, and its `dialect=` directive becomes the marker `-- dialect: postgres`.  What a `-- generator:` line holds is called a generator parameter, not a directive, in the code and the documents.
 3. Every place that names them: the generator's emitted source, the suppressor, the parser, the README, `docs/diagnostics.md`, the tests, and `tools/package-install`.
 
@@ -397,8 +397,9 @@ The existing tests, under the new names and markers.  The package-install check 
 4. The `-- param:` marker: parsed, validated and carried on the block, with no effect yet, and the parameter list rule under Parameters.
 5. Token defaults: the inline `{{name:default}}` form in the token scanner, the once-only marker, the conflict errors, and each token's resolved default carried on the block.  The hash and the parameter list are computed over the sample SQL.
 6. The `-- database:` and `-- output:` markers, in the preamble and inside a query, carried on the block; the `SqlSourceDatabase` and `SqlSourceOutput` property and metadata in the props and targets; the `GeneratorOutput` enum and the attribute's `Output` property; the settings record that resolves all three settings by one rule, per type and query for the output.  `output` is validated and has no effect yet; `database` is never read by the generator.
-7. The model settings under Models, each at every level: the suffixes, the namespace, the model types with the `GeneratorModelType` enum, the per-query names, and `SqlSourceGeneratorParameters` with its metadata and attribute property, into which `SqlSourceTokenValidation` is folded.  The `sort-input`, `sort-output` and `no-table-models` parameters are accepted and `token-validation` is dropped; each level sets the list whole.  All validated, none with an effect before phase 3.
-8. `InternalsVisibleTo` for `SqlSource.Tool`.
+7. The `-> shape` suffix on the name marker, parsed and validated, with no effect yet.
+8. The model settings under Models, each at every level: the suffixes, the namespace, the model types with the `GeneratorModelType` enum, the per-query names, and `SqlSourceGeneratorParameters` with its metadata and attribute property, into which `SqlSourceTokenValidation` is folded.  The collection type and method location settings under Phase 5, each at every level.  The `sort-input`, `sort-output`, `no-table-models` and `async-method-suffix` parameters are accepted and `token-validation` is dropped; each level sets the list whole.  All validated, none with an effect before phase 3.
+9. `InternalsVisibleTo` for `SqlSource.Tool`.
 
 ### Decided
 
@@ -565,32 +566,36 @@ The describer against a SQL Server container.  The SQL Server end-to-end project
 
 ### Scope
 
-1. For each query whose output is `CodeGen`, a generated method that takes a `DbConnection`, the parameters type when there is one, and a `CancellationToken`; creates the command; binds each parameter with its mapped `DbType` or provider type and facets; and executes it.
-2. For a query with a result set, reading each row into the output type by ordinal with `GetFieldValue<T>`, with `IsDBNull` for nullable members.
-3. The method's shape per query: how many rows it returns.
-4. Both engines, in the end-to-end projects, executing through the generated methods.
+1. For each query whose output is `CodeGen`, a generated method that binds the parameters, runs the command and, for a query with rows, reads them into the output type by ordinal with `GetFieldValue<T>` and `IsDBNull`.
+2. The result shape on the name marker, the collection type setting, the method location setting, the `async-method-suffix` generator parameter, and the exception type.
+3. Both engines, in the end-to-end projects, executing through the generated methods.
 
 ### Decided
 
-- Plain ADO.NET over `DbConnection`, `DbCommand`, `DbParameter` and `DbDataReader`.  The provider's own types only where ADO.NET's abstractions do not reach.  Nothing generated depends on Dapper.
-- A project that does not want the methods still gets the models.
-
-### Recommended
-
-- Asynchronous methods only, named after the query with an `Async` suffix, static, placed where the query's constant is.
-- The result shape is the user's to say, since the description cannot: sqlc uses `:one`, `:many`, `:exec` and `:execrows` on its name marker.  A marker or generator parameter, settled in this phase's spec with its grammar added to the lexer, chooses between one row or null, a list of rows, and the affected-row count for a query with no result set.  The default when nothing is said: a list for a query with rows, the count for one without.
-- An open transaction is passed as an optional `DbTransaction`.  Opening the connection is the caller's business.
-- Reading by ordinal, not by name: the snapshot fixes the ordinal of every column, and the hash guarantees the SQL is the one described.  A type the provider cannot convert to the mapped C# type is a bug in the type map, caught by the end-to-end tests.
+- **Plain ADO.NET** over `DbConnection`, `DbCommand`, `DbParameter` and `DbDataReader`.  The provider's own types only where ADO.NET's abstractions do not reach.  Nothing generated depends on Dapper.  A project that does not want the methods still gets the models.
+- **Asynchronous only.**  The method is named after the query; the generator parameter `async-method-suffix` appends `Async`.
+- **Signature**: the parameters type when the query has parameters, then the query's tokens as `string` arguments in order of first appearance, then `DbTransaction? transaction = null`, `int? commandTimeout = null` and `CancellationToken cancellationToken = default`.  The parameters object comes first because it is the what and a token is the how, and a query without parameters has only tokens either way.  `DbTransaction` and `DbConnection`, not the interfaces: the interfaces have no asynchronous surface, and `DbCommand.Transaction` is a `DbTransaction`.  The README's example injects a `DbConnection`.
+- **The connection** is opened if it is closed and closed again on the way out, and left alone if it was open, which is Dapper's rule: a transaction needs an open connection before it begins, so a method called inside one finds it open and never touches it.
+- **No `CommandType` or `CommandFlags`.**  `CommandType` exists for stored procedures and `TableDirect`, both out of scope; the text is always `Text`.  Dapper's flags are `Buffered`, which is the collection type here, `Pipelined`, a Dapper internal, and `NoCache`, meaningless for generated code.  `commandTimeout` is the one knob people reach for.
+- **Shapes** are written on the name marker: `-- name: GetUsers -> many`.  `many` returns the collection type; `one` returns one row and throws when there are none or more than one; `one-optional` returns one row or null and throws on more than one; `none` returns nothing; `rowcount` returns `ExecuteNonQuery`'s count.  Defaults: `many` for a query with rows, `rowcount` for one without, which matches `ExecuteNonQuery` and Dapper's `Execute` at no cost.  `one`, `one-optional` and `many` are errors on a query with no result set; `none` and `rowcount` are allowed on any, since an `INSERT ... RETURNING` whose rows nobody wants is a real case.  `one` and `one-optional` read one row past the expected to detect the second.
+- **The exception** is `UnexpectedRowCountException`, deriving from `InvalidOperationException` so that code written for LINQ's `Single` still catches it, emitted into the consumer's project as internal source like the attribute, since the package has no runtime assembly.
+- **Collection types**: `SqlSourceCollectionType` as a property, as metadata, as `CollectionType` on the attribute with a `GeneratorCollectionType` enum, and as the marker `-- collection-type:` in the preamble or a query.  Values `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` and `IImmutableList`; default `Array`, giving `Task<GetUserDto[]>`.  The read-only interfaces are backed by the array; `IList`, `ICollection` and `IImmutableList` by a `List<T>` or an `ImmutableList<T>`.
+- **Every collection is materialised before the method returns**, `IEnumerable` included, which is the array under that interface.  A lazy `IEnumerable<T>` from an asynchronous method is Dapper's unbuffered mode and a known trap: the task completes when the reader opens, the rows are then read synchronously in `MoveNext`, the command, reader and connection must outlive the call, an error surfaces in a `foreach` far from it, and a second enumeration cannot re-read a reader.  Streaming is what `IAsyncEnumerable<T>` is for, and it is the later feature with a shape of its own.  Structurally, one reading loop feeds every materialiser.
+- **Method location**: `SqlSourceMethodLocation` as a property, as metadata, as `MethodLocation` on the attribute with a `MethodLocation` enum, and as the marker `-- method-location:` in the preamble or a query.  `ExtensionClass`, the default, puts the methods as extension methods on `DbConnection` in a generated top-level `static partial class <Type>Extensions` in the attributed type's namespace with the type's accessibility; extension methods can live only in a top-level non-generic static class, so neither the nested `Sql` class nor a non-static attributed type can hold them.  `Public`, `Internal` and `Private` put them in the attributed type as static methods of that accessibility, taking the `DbConnection` as their first argument.  `SqlLocation` does not affect methods.
+- A method in the attributed type with `SqlLocation` `Direct` and no `async-method-suffix` has the same name as the query's constant, which C# does not allow in one type; that is an error that names the three settings, not a silent rename.
+- **Reading by ordinal**, not by name: the sidecar fixes the ordinal of every column, and the hash guarantees the SQL is the one described.  A type the provider cannot convert to the mapped C# type is a bug in the type map, caught by the end-to-end tests.
+- `IAsyncEnumerable<T>`, synchronous methods and bulk operations are out of scope.
 
 ### Technical notes
 
 - `GetFieldValue<DateOnly>` and `GetFieldValue<TimeOnly>` work on Microsoft.Data.SqlClient 5.1 and later and on Npgsql 6 and later; the type map's options for those types are honoured by asking for the chosen type.
 - A parameter whose PostgreSQL type `DbType` cannot name, an array, `jsonb`, an enum, a range, is bound by setting `NpgsqlParameter.DataTypeName` to the type's name from the sidecar.  Generated code therefore casts to or constructs an `NpgsqlParameter`, which it does for the `postgres` dialect anyway, and never names an `NpgsqlDbType` member.  SQL Server's `json` binds as `nvarchar` on every version; `SqlDbTypeExtensions.Json`, in the `Microsoft.Data` namespace, waits for a phase that maps `SqlJson` and is gated on its flag.
 - A `SqlParameter` for `decimal` needs precision and scale set, or the server rounds; for `nvarchar(n)` a size, or the plan cache fragments.  The description's facets give both.
+- The `-> shape` suffix changes the name marker's grammar, which phase 1 owns; phase 1 parses and validates it and phase 5 gives it effect.
 
 ### Testing
 
-The end-to-end projects run every query through its generated method and assert rows, counts, nulls and cancellation.  Generator tests cover the method shapes and the parameter binding code for every row of the type map.
+The end-to-end projects run every query through its generated method and assert rows, counts, nulls, each shape's success and failure, each collection type, the transaction and timeout arguments, cancellation, and that a closed connection is closed again and an open one left open.  Generator tests cover the method shapes, the locations and the parameter binding code for every row of the type map.
 
 ## Phase 6 - build integration
 
