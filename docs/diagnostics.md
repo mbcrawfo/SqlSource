@@ -423,3 +423,5 @@ Move the marker to the top of the file.  Comments may come before it, such as a 
 -- name: GetUser
 SELECT 1;
 ```
+
+A file cannot mix dialects.  Put the queries for another database in a file of their own.

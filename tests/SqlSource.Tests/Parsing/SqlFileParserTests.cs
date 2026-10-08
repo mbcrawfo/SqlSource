@@ -709,6 +709,16 @@ public class SqlFileParserTests
         Sql(Blocks(Repeat).ShouldHaveSingleItem()).ShouldBe("SELECT 1");
     }
 
+    // Two markers conflict when they name different dialects or options, not when they are written differently.
+    [Theory]
+    [InlineData("-- dialect: mssql\n-- dialect: tsql\n-- dialect: SqlServer\n-- name: A\nSELECT [a'b] -- c\n")]
+    [InlineData(
+        "-- dialect: mysql,ansi-quotes,no-backslash-escapes\n-- dialect: MySQL, NO_BACKSLASH_ESCAPES, ANSI_QUOTES\n"
+            + "-- name: A\nSELECT 1 # c\n"
+    )]
+    public void Parse_SameDialectWrittenAnotherWay_IsNotAConflict(string text) =>
+        Blocks(text).ShouldHaveSingleItem().Name.ShouldBe("A");
+
     // An invalid marker does not hide a conflict between the two valid ones around it.
     [Fact]
     public void Parse_InvalidDialectMarkerBetweenTwoThatDiffer_ReportsBoth()

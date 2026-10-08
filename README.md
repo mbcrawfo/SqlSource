@@ -86,7 +86,7 @@ A line comment that starts its line and has the form `-- name: GetUser` begins a
 
 A file with no `-- name:` line is one query, named after the file: `CountUsers.sql` becomes `CountUsers`.
 
-Before the first `-- name:` line a file may hold comments, such as a licence header, and `-- generator:` lines that apply to every query in the file.
+Before the first `-- name:` line a file may hold comments, such as a licence header, `-- generator:` lines that apply to every query in the file, and a `-- dialect:` marker (see Dialects, below).
 
 ### Summaries
 
@@ -163,6 +163,7 @@ SELECT id FROM notes WHERE body = 'it\'s here'; # MySQL reads this as a comment
 The marker wins over the metadata, and the metadata over the property.  A file has one dialect:
 
 - The marker goes before the file's first `-- name:` line and before its first SQL.  Anywhere else it is the error [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc115).
+- Its value is the rest of the line: a dialect name, then any options, separated by commas, with any spaces around them.  Nothing else may follow it on the line.
 - It takes effect on the line after it.  Comments above it, such as a licence header, are read by the dialect that the metadata or the property gives.
 - A name that is not a dialect is an error: [SQLSRC011](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc011) in the property or the metadata, [SQLSRC111](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc111) in the marker.
 

@@ -860,7 +860,7 @@ public class GeneratedSourceTests
     [InlineData("Direct", "GetType")]
     [InlineData("Direct", "ToString")]
     [InlineData("Direct", "Equals")]
-    public void Run_QueryNamedLikeAMemberOfObject_GetsNoWarningInGeneratedCode(string mode, string name)
+    public void Run_QueryNamedLikeAMemberOfObject_GetsNoWarningInGeneratedCode(string location, string name)
     {
         // "GetType" is a likely name for a query on a table of types.  The constant hides the inherited method, which
         // is what was asked for, and the compiler's request to add "new" is one nobody can act on.
@@ -870,7 +870,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(SqlLocation = SqlLocation.{{mode}})]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.{{location}})]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: " + name + "\nSELECT 1;\n")
