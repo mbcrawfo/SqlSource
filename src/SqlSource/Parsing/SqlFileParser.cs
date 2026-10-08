@@ -28,7 +28,8 @@ internal static class SqlFileParser
             ? new Parser(text, fileName, lexed.Lexemes, headerEnd, lexer.Rules).Run()
             : new SqlFileParseResult(
                 EquatableArray<SqlBlock>.Empty,
-                new EquatableArray<SqlParseError>(ImmutableArray.Create(lexed.Error))
+                new EquatableArray<SqlParseError>(ImmutableArray.Create(lexed.Error)),
+                lexer.Rules.Dialect
             );
     }
 
@@ -67,11 +68,13 @@ internal static class SqlFileParser
                     EquatableArray<SqlBlock>.Empty,
                     new EquatableArray<SqlParseError>(
                         _errors.OrderBy(static error => error.Span.Start).ToImmutableArray()
-                    )
+                    ),
+                    rules.Dialect
                 )
                 : new SqlFileParseResult(
                     new EquatableArray<SqlBlock>(_blocks.ToImmutableArray()),
-                    EquatableArray<SqlParseError>.Empty
+                    EquatableArray<SqlParseError>.Empty,
+                    rules.Dialect
                 );
         }
 

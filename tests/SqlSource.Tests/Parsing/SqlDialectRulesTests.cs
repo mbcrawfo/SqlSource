@@ -193,6 +193,15 @@ public class SqlDialectRulesTests
         }
     }
 
+    [Fact]
+    public void Dialect_OfTheRulesOfAChoice_IsThatChoicesDialect()
+    {
+        foreach (var dialect in Enum.GetValues<SqlDialect>())
+        {
+            SqlDialectRules.For(new SqlDialectChoice(dialect, SqlDialectOptions.None)).Dialect.ShouldBe(dialect);
+        }
+    }
+
     private static SqlDialectChoice[] MySqlFamilyChoices()
     {
         SqlDialect[] dialects = [SqlDialect.MySql, SqlDialect.MariaDb];

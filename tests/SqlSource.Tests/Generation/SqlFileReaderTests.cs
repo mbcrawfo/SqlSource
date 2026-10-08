@@ -184,6 +184,13 @@ public class SqlFileReaderTests
     }
 
     [Fact]
+    public void Read_Dialect_IsNamedOnTheFileByTheOneItWasReadBy()
+    {
+        Read("SELECT 1;\n", dialect: SqlDialect.MySql).Dialect.ShouldBe(SqlDialect.MySql);
+        Read("-- dialect: postgres\nSELECT 1;\n", dialect: SqlDialect.MySql).Dialect.ShouldBe(SqlDialect.PostgreSql);
+    }
+
+    [Fact]
     public void Read_InvalidDialectOfTheFile_IsCarriedAndTheFileIsStillParsed()
     {
         var file = Read("SELECT 1;\n", invalidDialect: "pgsql");

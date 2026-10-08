@@ -65,6 +65,7 @@ internal static class SqlFileReader
             fileName,
             new EquatableArray<SqlQuery>(queries.ToImmutable()),
             new EquatableArray<DiagnosticInfo>(errors.ToImmutable()),
+            result.Dialect,
             invalidDialect
         );
     }

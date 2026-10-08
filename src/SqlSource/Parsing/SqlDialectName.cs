@@ -43,6 +43,22 @@ internal static class SqlDialectName
     ];
 
     /// <summary>
+    /// The name that stands for <paramref name="dialect" /> wherever one name is needed: its first in the list.
+    /// </summary>
+    public static string Canonical(SqlDialect dialect)
+    {
+        foreach (var (name, candidate) in Names)
+        {
+            if (candidate == dialect)
+            {
+                return name;
+            }
+        }
+
+        return Names[0].Name;
+    }
+
+    /// <summary>
     /// Reads a name or an alias and the options after it, ignoring case and the whitespace around each part.  False
     /// for anything else, and for null: a name that is not a dialect, an option that does not exist or that the
     /// dialect does not have, and an empty part.

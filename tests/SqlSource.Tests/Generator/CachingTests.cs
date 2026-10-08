@@ -362,12 +362,13 @@ public class CachingTests
             compilation
         );
 
-        // Every file was parsed again, under the new dialect, and gave an equal value.  So nothing after the parse
-        // ran.
+        // Every file was parsed again, under the new dialect.  The file's value names the dialect it was read by, so
+        // it is not equal, and each type's output was worked out again; it came out equal, so nothing was emitted.
         AllReasons(result, TrackingNames.FileDialect)
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
-        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
-        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.TypeOutput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
         result.Diagnostics.ShouldBeEmpty();
     }
 

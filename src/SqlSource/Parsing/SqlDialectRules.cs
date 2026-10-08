@@ -74,11 +74,16 @@ internal sealed class SqlDialectRules
         new(('\'', EscapeString), ('"', Doubled), ('`', Doubled), ('$', Dollar)) { NestedComments = true };
 
     public static SqlDialectRules SqlServer { get; } =
-        new(('\'', Doubled), ('"', Doubled), ('[', EscapedBracket)) { NestedComments = true };
+        new(('\'', Doubled), ('"', Doubled), ('[', EscapedBracket))
+        {
+            Dialect = SqlDialect.SqlServer,
+            NestedComments = true,
+        };
 
     public static SqlDialectRules PostgreSql { get; } =
         new(('\'', EscapeString), ('"', Doubled), ('$', Dollar))
         {
+            Dialect = SqlDialect.PostgreSql,
             NestedComments = true,
             StringContinuation = SqlStringContinuation.AcrossLineComments,
         };
@@ -86,6 +91,7 @@ internal sealed class SqlDialectRules
     public static SqlDialectRules CockroachDb { get; } =
         new(('\'', BytesEscapeString), ('"', Doubled), ('$', Dollar))
         {
+            Dialect = SqlDialect.CockroachDb,
             NestedComments = true,
             StringContinuation = SqlStringContinuation.AcrossWhitespace,
         };
@@ -97,9 +103,13 @@ internal sealed class SqlDialectRules
     public static SqlDialectRules MariaDb => MariaDbByOptions[(int)SqlDialectOptions.None];
 
     public static SqlDialectRules Sqlite { get; } =
-        new(('\'', Doubled), ('"', Doubled), ('`', Doubled), ('[', Bracket));
+        new(('\'', Doubled), ('"', Doubled), ('`', Doubled), ('[', Bracket)) { Dialect = SqlDialect.Sqlite };
 
-    public static SqlDialectRules Oracle { get; } = new(('\'', QuoteOperator), ('"', Doubled)) { LineHints = true };
+    public static SqlDialectRules Oracle { get; } =
+        new(('\'', QuoteOperator), ('"', Doubled)) { Dialect = SqlDialect.Oracle, LineHints = true };
+
+    /// <summary>The dialect these rules are for.</summary>
+    public SqlDialect Dialect { get; private init; }
 
     /// <summary>The character that starts a parameter, as in <c>@id</c>.</summary>
     public char ParameterPrefix { get; }
@@ -162,12 +172,14 @@ internal sealed class SqlDialectRules
             family[index] = isMariaDb
                 ? new SqlDialectRules(('\'', singleQuote), ('"', doubleQuote), ('`', Doubled))
                 {
+                    Dialect = SqlDialect.MariaDb,
                     DashNeedsWhitespace = true,
                     HashComments = true,
                     MariaDbHints = true,
                 }
                 : new SqlDialectRules(('\'', singleQuote), ('"', doubleQuote), ('`', Doubled), ('$', Dollar))
                 {
+                    Dialect = SqlDialect.MySql,
                     DashNeedsWhitespace = true,
                     HashComments = true,
                 };

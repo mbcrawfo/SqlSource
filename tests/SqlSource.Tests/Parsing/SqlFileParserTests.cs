@@ -9,6 +9,15 @@ namespace SqlSource.Tests.Parsing;
 
 public class SqlFileParserTests
 {
+    [Theory]
+    [InlineData("SELECT 1;\n", "MySql", "MySql")]
+    [InlineData("-- dialect: mssql\nSELECT 1;\n", "MySql", "SqlServer")]
+    [InlineData("-- dialect: nope\nSELECT 'open\n", "Oracle", "Oracle")]
+    public void Parse_Result_NamesTheDialectTheFileWasReadBy(string text, string given, string expected) =>
+        SqlFileParser
+            .Parse(text, "Query.sql", new SqlDialectChoice(Enum.Parse<SqlDialect>(given), SqlDialectOptions.None))
+            .Dialect.ShouldBe(Enum.Parse<SqlDialect>(expected));
+
     [Fact]
     public void Parse_FileWithoutNameMarker_IsOneBlockNamedAfterTheFile()
     {
@@ -731,12 +740,18 @@ public class SqlFileParserTests
     [Fact]
     public void Parse_SameTextUnderTwoDialects_GivesUnequalResultsOnlyWhereTheyReadItDifferently()
     {
-        SqlFileParser
-            .Parse("SELECT 1 # c", "Query.sql", SqlDialect.MySql)
-            .ShouldNotBe(SqlFileParser.Parse("SELECT 1 # c", "Query.sql", SqlDialect.Ansi));
-        SqlFileParser
-            .Parse("SELECT 1 -- c", "Query.sql", SqlDialect.MySql)
-            .ShouldBe(SqlFileParser.Parse("SELECT 1 -- c", "Query.sql", SqlDialect.Ansi));
+        // The result names the dialect it was read by, so only what was read is compared.
+        ReadOf("SELECT 1 # c", SqlDialect.MySql).ShouldNotBe(ReadOf("SELECT 1 # c", SqlDialect.Ansi));
+        ReadOf("SELECT 1 -- c", SqlDialect.MySql).ShouldBe(ReadOf("SELECT 1 -- c", SqlDialect.Ansi));
+    }
+
+    private static (EquatableArray<SqlBlock> Blocks, EquatableArray<SqlParseError> Errors) ReadOf(
+        string text,
+        SqlDialect dialect
+    )
+    {
+        var result = SqlFileParser.Parse(text, "Query.sql", dialect);
+        return (result.Blocks, result.Errors);
     }
 
     [Theory]
