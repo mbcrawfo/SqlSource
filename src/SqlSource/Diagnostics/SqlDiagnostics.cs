@@ -73,10 +73,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidMode = new(
+    public static readonly DiagnosticDescriptor InvalidSqlLocation = new(
         id: "SQLSRC006",
-        title: "Mode is not valid",
-        messageFormat: "'{0}' is not a value of SqlQueriesMode",
+        title: "SqlLocation is not valid",
+        messageFormat: "'{0}' is not a value of SqlLocation",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -87,7 +87,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor SqlMemberExists = new(
         id: "SQLSRC007",
         title: "Type has a member named Sql",
-        messageFormat: "'{0}' already has a member named 'Sql'.  Rename it, or use SqlQueriesMode.Direct.",
+        messageFormat: "'{0}' already has a member named 'Sql'.  Rename it, or use SqlLocation.Direct.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -244,8 +244,8 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor MarkerAtEndOfBlock = new(
         id: "SQLSRC108",
         title: "Marker has no SQL after it",
-        messageFormat: "A '-- summary:' or '-- SqlSource:' marker comes before the SQL it describes, and no SQL "
-            + "follows this one in its query",
+        messageFormat: "A '-- summary:', '-- generator:' or '-- dialect:' marker comes before the SQL it describes, "
+            + "and no SQL follows this one in its query",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -253,10 +253,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor UnknownDirective = new(
+    public static readonly DiagnosticDescriptor UnknownGeneratorParameter = new(
         id: "SQLSRC109",
-        title: "Directive is not known",
-        messageFormat: "'{0}' is not a SqlSource directive",
+        title: "Generator parameter is not known",
+        messageFormat: "'{0}' is not a generator parameter",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -264,10 +264,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor EmptyDirectiveLine = new(
+    public static readonly DiagnosticDescriptor EmptyGeneratorLine = new(
         id: "SQLSRC110",
-        title: "Directive is missing",
-        messageFormat: "The '-- SqlSource:' marker has no directive",
+        title: "Generator parameter is missing",
+        messageFormat: "The '-- generator:' marker has no parameter",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -275,11 +275,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidDirectiveValue = new(
+    public static readonly DiagnosticDescriptor InvalidMarkerValue = new(
         id: "SQLSRC111",
-        title: "Directive value is not valid",
-        messageFormat: "The directive '{0}' lacks a value it needs, has one it does not take, or has one that is not "
-            + "valid",
+        title: "Marker value is not valid",
+        messageFormat: "'{0}' lacks a value it needs, has one it does not take, or has one that is not valid",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -287,10 +286,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor ConflictingDirectives = new(
+    public static readonly DiagnosticDescriptor ConflictingSettings = new(
         id: "SQLSRC112",
-        title: "Directives conflict",
-        messageFormat: "'{0}' conflicts with another directive in the same scope",
+        title: "Settings conflict",
+        messageFormat: "'{0}' conflicts with a setting given earlier in the same scope",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -322,8 +321,8 @@ internal static class SqlDiagnostics
 
     public static readonly DiagnosticDescriptor MisplacedDialect = new(
         id: "SQLSRC115",
-        title: "Dialect directive is misplaced",
-        messageFormat: "The 'dialect' directive must come before the file's first query and before any SQL",
+        title: "Dialect marker is misplaced",
+        messageFormat: "The '-- dialect:' marker must come before the file's first query and before any SQL",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -341,7 +340,7 @@ internal static class SqlDiagnostics
             UnsupportedTargetFramework,
             PathMatchesNothing,
             FolderHasNoSqlFile,
-            InvalidMode,
+            InvalidSqlLocation,
             SqlMemberExists,
             DuplicateQueryName,
             QueryNamedLikeContainingType,
@@ -357,10 +356,10 @@ internal static class SqlDiagnostics
             SqlBeforeFirstName,
             SummaryBeforeFirstName,
             MarkerAtEndOfBlock,
-            UnknownDirective,
-            EmptyDirectiveLine,
-            InvalidDirectiveValue,
-            ConflictingDirectives,
+            UnknownGeneratorParameter,
+            EmptyGeneratorLine,
+            InvalidMarkerValue,
+            ConflictingSettings,
             EmptyBlock,
             ReservedTokenName,
             MisplacedDialect
@@ -380,10 +379,10 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.SqlBeforeFirstName => SqlBeforeFirstName,
             SqlParseErrorKind.SummaryBeforeFirstName => SummaryBeforeFirstName,
             SqlParseErrorKind.MarkerAtEndOfBlock => MarkerAtEndOfBlock,
-            SqlParseErrorKind.UnknownDirective => UnknownDirective,
-            SqlParseErrorKind.EmptyDirectiveLine => EmptyDirectiveLine,
-            SqlParseErrorKind.InvalidDirectiveValue => InvalidDirectiveValue,
-            SqlParseErrorKind.ConflictingDirectives => ConflictingDirectives,
+            SqlParseErrorKind.UnknownGeneratorParameter => UnknownGeneratorParameter,
+            SqlParseErrorKind.EmptyGeneratorLine => EmptyGeneratorLine,
+            SqlParseErrorKind.InvalidMarkerValue => InvalidMarkerValue,
+            SqlParseErrorKind.ConflictingSettings => ConflictingSettings,
             SqlParseErrorKind.EmptyBlock => EmptyBlock,
             SqlParseErrorKind.ReservedTokenName => ReservedTokenName,
             SqlParseErrorKind.MisplacedDialect => MisplacedDialect,

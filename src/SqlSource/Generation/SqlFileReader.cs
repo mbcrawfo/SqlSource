@@ -13,7 +13,7 @@ namespace SqlSource.Generation;
 internal static class SqlFileReader
 {
     /// <summary>
-    /// Parses <paramref name="file" /> with the dialect that MSBuild gives it.  A <c>dialect=</c> directive in the
+    /// Parses <paramref name="file" /> with the dialect that MSBuild gives it.  A <c>-- dialect:</c> marker in the
     /// file replaces that dialect.
     /// </summary>
     public static ParsedSqlFile Read(FileDialect file, string normalizedPath, CancellationToken cancellationToken) =>

@@ -9,7 +9,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC003](#sqlsrc003) | Target framework is not supported |
 | [SQLSRC004](#sqlsrc004) | Path matches no SQL file |
 | [SQLSRC005](#sqlsrc005) | Folder has no SQL file |
-| [SQLSRC006](#sqlsrc006) | Mode is not valid |
+| [SQLSRC006](#sqlsrc006) | SqlLocation is not valid |
 | [SQLSRC007](#sqlsrc007) | Type has a member named Sql |
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
@@ -25,15 +25,15 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC106](#sqlsrc106) | SQL before the first name |
 | [SQLSRC107](#sqlsrc107) | Summary before the first name |
 | [SQLSRC108](#sqlsrc108) | Marker has no SQL after it |
-| [SQLSRC109](#sqlsrc109) | Directive is not known |
-| [SQLSRC110](#sqlsrc110) | Directive is missing |
-| [SQLSRC111](#sqlsrc111) | Directive value is not valid |
-| [SQLSRC112](#sqlsrc112) | Directives conflict |
+| [SQLSRC109](#sqlsrc109) | Generator parameter is not known |
+| [SQLSRC110](#sqlsrc110) | Generator parameter is missing |
+| [SQLSRC111](#sqlsrc111) | Marker value is not valid |
+| [SQLSRC112](#sqlsrc112) | Settings conflict |
 | [SQLSRC113](#sqlsrc113) | Query has no SQL |
 | [SQLSRC114](#sqlsrc114) | Token name is a keyword |
-| [SQLSRC115](#sqlsrc115) | Dialect directive is misplaced |
+| [SQLSRC115](#sqlsrc115) | Dialect marker is misplaced |
 
-Ids below 100 are about the type that carries `[SqlQueries]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the two types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
@@ -44,7 +44,7 @@ Ids below 100 are about the type that carries `[SqlQueries]`, or about the proje
 SqlSource adds members through a second declaration of the type, which C# allows only when every declaration is `partial`.  The same holds for each type the type is nested in.
 
 ```csharp
-[SqlQueries]
+[SqlSourceGenerate]
 public class UserRepository { }
 ```
 
@@ -57,7 +57,7 @@ Add `partial` to the type named in the message.
 A type declared with the `file` modifier exists only in its own source file, so generated code cannot add to it.  The same holds for a type nested in a file-local type.
 
 ```csharp
-[SqlQueries]
+[SqlSourceGenerate]
 file partial class UserRepository { }
 ```
 
@@ -78,7 +78,7 @@ Target `net8.0` or later.  For a project that targets several frameworks, put th
 `Path` is relative to the folder of the source file that carries the attribute.  A value that ends in `.sql` names one file.  Any other value names a folder, and the type gets the `.sql` files directly in it; subfolders are not searched.
 
 ```csharp
-[SqlQueries(Path = "Queries/User.sql")] // The file is Queries/Users.sql.
+[SqlSourceGenerate(Path = "Queries/User.sql")] // The file is Queries/Users.sql.
 public partial class UserRepository { }
 ```
 
@@ -94,32 +94,32 @@ Add a `.sql` file next to the source file, or set `Path` to the folder or file t
 
 ## SQLSRC006
 
-**Mode is not valid**
+**SqlLocation is not valid**
 
-`Mode` was given a value that `SqlQueriesMode` does not define.
+`SqlLocation` was given a value that the `SqlLocation` enum does not define.
 
 ```csharp
-[SqlQueries(Mode = (SqlQueriesMode)5)]
+[SqlSourceGenerate(SqlLocation = (SqlLocation)5)]
 public partial class UserRepository { }
 ```
 
-Use `SqlQueriesMode.Nested` or `SqlQueriesMode.Direct`.
+Use `SqlLocation.Nested` or `SqlLocation.Direct`.
 
 ## SQLSRC007
 
 **Type has a member named Sql**
 
-In `Nested` mode the queries go in a nested class named `Sql`, and the type already has a member with that name.  The same error is reported when the type itself, or one of its type parameters, is named `Sql`: a nested class cannot share either name.
+With `SqlLocation.Nested` the queries go in a nested class named `Sql`, and the type already has a member with that name.  The same error is reported when the type itself, or one of its type parameters, is named `Sql`: a nested class cannot share either name.
 
 ```csharp
-[SqlQueries]
+[SqlSourceGenerate]
 public partial class UserRepository
 {
     private string Sql { get; }
 }
 ```
 
-Rename the member, the type or the type parameter, or set `Mode = SqlQueriesMode.Direct` so that the queries become members of the type itself.
+Rename the member, the type or the type parameter, or set `SqlLocation = SqlLocation.Direct` so that the queries become members of the type itself.
 
 ## SQLSRC008
 
@@ -133,7 +133,7 @@ Rename one of the queries.
 
 **Query is named like its containing type**
 
-A member cannot have the name of the type that contains it.  In `Nested` mode that type is the generated class, so no query can be named `Sql`.  In `Direct` mode it is the attributed type, so no query can have that type's name.
+A member cannot have the name of the type that contains it.  With `SqlLocation.Nested` that type is the generated class, so no query can be named `Sql`.  With `SqlLocation.Direct` it is the attributed type, so no query can have that type's name.
 
 ```sql
 -- name: Sql
@@ -198,7 +198,7 @@ The code SqlSource generates for a type is C# 12, the default language version o
 
 Remove `LangVersion` to get the default of the target framework, or set it to `12` or later.  It can be set in the project file, in `Directory.Build.props`, and by a `-p:` argument of the build command.
 
-The error is reported at each `[SqlQueries]` attribute, and no type gets members until it is fixed.  A project that targets a framework older than .NET 8 has an older language version by default; it gets [SQLSRC003](#sqlsrc003) and not this error, because targeting .NET 8 fixes both.
+The error is reported at each `[SqlSourceGenerate]` attribute, and no type gets members until it is fixed.  A project that targets a framework older than .NET 8 has an older language version by default; it gets [SQLSRC003](#sqlsrc003) and not this error, because targeting .NET 8 fixes both.
 
 ## SQLSRC013
 
@@ -285,7 +285,7 @@ Add a `-- name:` marker at the top of the file, or rename the file.  If the file
 
 **SQL before the first name**
 
-In a file that has `-- name:` markers, only comments and `-- SqlSource:` directives may come before the first one.  SQL there would belong to no query.
+In a file that has `-- name:` markers, only comments, `-- generator:` lines and a `-- dialect:` marker may come before the first one.  SQL there would belong to no query.
 
 ```sql
 SET search_path TO app;
@@ -314,7 +314,7 @@ Move the summary below the `-- name:` marker.
 
 **Marker has no SQL after it**
 
-A `-- summary:` or `-- SqlSource:` marker comes before the SQL it describes.  This one is the last thing in its query, which usually means it was written above the next `-- name:` marker and was meant for that query.
+A `-- summary:`, `-- generator:` or `-- dialect:` marker comes before the SQL it describes.  This one is the last thing in its query, which usually means it was written above the next `-- name:` marker and was meant for that query.
 
 ```sql
 -- name: GetUser
@@ -328,52 +328,53 @@ Move the marker below the `-- name:` marker of the query it describes, or delete
 
 ## SQLSRC109
 
-**Directive is not known**
+**Generator parameter is not known**
 
-A `-- SqlSource:` marker holds a word that is not a directive.  The directives are `keep-comments`, `token-validation`, `no-token-validation`, `token-ignore=name` and `dialect=name`.
+A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation`, `no-token-validation` and `token-ignore=name`.
 
 ```sql
--- SqlSource: keep-comment
+-- generator: keep-comment
 ```
 
-Correct the directive.
+Correct the parameter.  A dialect is not a generator parameter: it has a marker of its own, `-- dialect: name`.
 
 ## SQLSRC110
 
-**Directive is missing**
+**Generator parameter is missing**
 
-A `-- SqlSource:` marker has nothing after the colon.
+A `-- generator:` marker has nothing after the colon.
 
-Add a directive, or delete the line.
+Add a generator parameter, or delete the line.
 
 ## SQLSRC111
 
-**Directive value is not valid**
+**Marker value is not valid**
 
-A directive lacks a value it needs, has one it does not take, or has one that is not valid.
+A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid; or a `-- dialect:` marker does not name a dialect.
 
 - `token-ignore` needs a value that is a C# identifier, as in `token-ignore=table`.
-- `dialect` needs the name of a dialect, as in `dialect=postgres`, with any options after it, as in `dialect=mysql,ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is one word: a space after a comma ends it.
-- No other directive takes a value.
+- No other generator parameter takes a value.
+- `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
 
 ```sql
--- SqlSource: token-ignore
--- SqlSource: dialect=pgsql
--- SqlSource: keep-comments=true
+-- generator: token-ignore
+-- generator: keep-comments=true
+-- dialect: pgsql
+-- dialect: mysql keep-comments
 ```
 
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
 ## SQLSRC112
 
-**Directives conflict**
+**Settings conflict**
 
-Two directives in one scope contradict each other.  A scope is the lines before the first `-- name:` marker, or one query.  The error is at the second directive.
+Two settings contradict each other.  The error is at the second.
 
-- `token-validation` and `no-token-validation` both appear.
-- Two `dialect` directives name different dialects, or one dialect with different options.  A file has one dialect.
+- `token-validation` and `no-token-validation` both appear in one scope.  A scope is the lines before the first `-- name:` marker, or one query.
+- Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 
-Remove one of the two.  A validation directive in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
+Remove one of the two.  A validation parameter in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
 ## SQLSRC113
 
@@ -398,26 +399,26 @@ A token `{{name}}` becomes a parameter of a generated method, so its name must n
 SELECT * FROM {{class}};
 ```
 
-Rename the token.  If the braces are literal text and not a token, add `-- SqlSource: token-ignore=class` to the query.
+Rename the token.  If the braces are literal text and not a token, add `-- generator: token-ignore=class` to the query.
 
 ## SQLSRC115
 
-**Dialect directive is misplaced**
+**Dialect marker is misplaced**
 
-A `dialect` directive sets the dialect of a whole file, and it changes how the text after it is read.  So it must come before the file's first `-- name:` marker and before the file's first SQL.  This one is inside a named query, or after SQL.
+A `-- dialect:` marker sets the dialect of a whole file, and it changes how the text after it is read.  So it must come before the file's first `-- name:` marker and before the file's first SQL.  This one is inside a named query, or after SQL.
 
 ```sql
 -- name: GetUser
--- SqlSource: dialect=mysql
+-- dialect: mysql
 SELECT 1;
 ```
 
-A directive after the last SQL of its query is reported twice: as this error, and as [SQLSRC108](#sqlsrc108).
+A marker after the last SQL of its query is reported twice: as this error, and as [SQLSRC108](#sqlsrc108).
 
-Move the directive to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
+Move the marker to the top of the file.  Comments may come before it, such as a licence header.  In a file with no `-- name:` marker, which is one query, put it above the query's SQL.
 
 ```sql
--- SqlSource: dialect=mysql
+-- dialect: mysql
 
 -- name: GetUser
 SELECT 1;

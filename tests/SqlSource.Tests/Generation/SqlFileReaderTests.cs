@@ -63,7 +63,7 @@ public class SqlFileReaderTests
     public void Read_FileWithErrors_GivesEachErrorWithItsLineAndColumnAndNoQueries()
     {
         const string Text =
-            "-- name: GetUser\nSELECT 1;\n-- name: get-user\nSELECT 2;\n-- SqlSource: nonsense\nSELECT 3;";
+            "-- name: GetUser\nSELECT 1;\n-- name: get-user\nSELECT 2;\n-- generator: nonsense\nSELECT 3;";
 
         var file = Read(Text);
 
@@ -71,7 +71,7 @@ public class SqlFileReaderTests
         file.Errors.ShouldBe([
             DiagnosticInfo.Create(SqlDiagnostics.InvalidName, Location(new TextSpan(36, 8), 2, 9, 2, 17), "get-user"),
             DiagnosticInfo.Create(
-                SqlDiagnostics.UnknownDirective,
+                SqlDiagnostics.UnknownGeneratorParameter,
                 Location(new TextSpan(69, 8), 4, 14, 4, 22),
                 "nonsense"
             ),
@@ -108,11 +108,11 @@ public class SqlFileReaderTests
     }
 
     [Fact]
-    public void Read_ValidationDirectives_GiveEachQueryItsOwnOrTheFilesOrNone()
+    public void Read_ValidationGeneratorParameters_GiveEachQueryItsOwnOrTheFilesOrNone()
     {
         const string Text =
-            "-- SqlSource: no-token-validation\n-- name: FromFile\nSELECT {{a}};\n"
-            + "-- name: Own\n-- SqlSource: token-validation\nSELECT {{b}};\n";
+            "-- generator: no-token-validation\n-- name: FromFile\nSELECT {{a}};\n"
+            + "-- name: Own\n-- generator: token-validation\nSELECT {{b}};\n";
 
         var file = Read(Text);
 
@@ -124,7 +124,7 @@ public class SqlFileReaderTests
     [Fact]
     public void Read_IgnoredToken_IsLiteralTextOfAConstant()
     {
-        var file = Read("-- SqlSource: token-ignore=raw\nSELECT '{{raw}}';\n");
+        var file = Read("-- generator: token-ignore=raw\nSELECT '{{raw}}';\n");
 
         file.Queries.ShouldHaveSingleItem().Segments.ShouldBe([Literal("SELECT '{{raw}}';")]);
     }

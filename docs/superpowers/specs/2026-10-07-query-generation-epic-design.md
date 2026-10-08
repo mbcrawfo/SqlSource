@@ -60,7 +60,7 @@ Decided:
 
 | Phase | Status | Spec | Delivers |
 |----|----|----|----|
-| 0. Names | Not started | | `[SqlQueries]` becomes `[SqlSourceGenerate]`, `SqlQueriesMode` becomes `SqlLocation` and `Mode` becomes `SqlLocation`; `-- SqlSource:` becomes `-- generator:` and `dialect=` becomes the marker `-- dialect:`.  Through the generator, the parser, the README, the diagnostics, the tests and the package-install project.  Nothing else changes. |
+| 0. Names | Done | [query-generation-phase-0-names-design](2026-10-08-query-generation-phase-0-names-design.md) | `[SqlQueries]` becomes `[SqlSourceGenerate]`, `SqlQueriesMode` becomes `SqlLocation` and `Mode` becomes `SqlLocation`; `-- SqlSource:` becomes `-- generator:` and `dialect=` becomes the marker `-- dialect:`.  Through the generator, the parser, the README, the diagnostics, the tests and the package-install project.  Nothing else changes. |
 | 1. Parameters and settings | Not started | | The lexer finds `@name` parameters by the file's dialect; each query carries its ordered parameter list and the hash of its SQL; every new marker, setting, enum and generator parameter of the epic is parsed and validated with no effect yet.  Nothing a user sees changes beyond accepted settings. |
 | 2. The tool and the snapshot | Not started | | The `SqlSource.Tool` package: the command line, the project manifest, discovery, the attribute reader, settings resolution, the snapshot format with its shared reader, writer and schema, `describe` with `--check`, `--force` and `--database`, logging, the error format, and a describer interface with no engine behind it yet.  Publishing covers the second package. |
 | 3. The PostgreSQL describer | Not started | | The describer over Npgsql behind the replay seam: parameters, columns, the nullability walk, the table match, provenance, the describer's log events, driver logging, and the recorded fixtures with the nullability matrix. |
@@ -412,6 +412,7 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 - The rule the README states for `.sql` files: a line comment of the form `-- word: rest` whose word SqlSource knows is a marker; nothing else in a comment is read.  Each marker has its own grammar for the rest.  `-- generator:` is the marker whose rest is a list of generator parameters: `keep-comments`, `token-validation`, `no-token-validation` and `token-ignore=name`, the switches that have no value of their own.
 - A setting with one value, and an MSBuild property and metadata beside it, is a marker: `-- dialect:` now, `-- database:` and `-- output:` in phase 1.  The dialect marker keeps the placement rule the directive had, before the first `-- name:` line and before any SQL, since it changes how the lines after it are lexed.
 - This is the last phase that can rename what a user writes at no cost, so it ships before anything else does.
+- The dialect marker's value is the rest of its line, read as the `SqlSourceDialect` property is: `-- dialect: mysql, ansi-quotes` is accepted, where the directive's value was one word.  The old spellings are not kept: `-- SqlSource:` is an ordinary comment, and `dialect=` in a `-- generator:` line is an unknown generator parameter.
 
 ### Technical notes
 

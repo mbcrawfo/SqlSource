@@ -8,5 +8,5 @@ WHERE {{filter}}
 ORDER BY {{table}}.id;
 
 -- name: Checked
--- SqlSource: token-validation
+-- generator: token-validation
 SELECT id FROM {{table}} WHERE {{filter}};

@@ -18,12 +18,12 @@ public class AttributeConflictTests
     private static readonly SqlFile Users = new("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
 
     [Theory]
-    [InlineData("using SqlSource;\n[SqlQueries]\ninternal partial class Sample { }", "(2,2)-(2,12)")]
-    [InlineData("using SqlSource;\n[SqlQueriesAttribute]\ninternal partial class Sample { }", "(2,2)-(2,21)")]
-    [InlineData("[SqlSource.SqlQueries]\ninternal partial class Sample { }", "(1,12)-(1,22)")]
-    [InlineData("[global::SqlSource.SqlQueries()]\ninternal partial class Sample { }", "(1,20)-(1,30)")]
-    [InlineData("internal class Sample { object o = typeof(SqlSource.SqlQueriesMode); }", "(1,53)-(1,67)")]
-    [InlineData("internal class Sample { object o = SqlSource.SqlQueriesMode.Direct; }", "(1,36)-(1,60)")]
+    [InlineData("using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }", "(2,2)-(2,19)")]
+    [InlineData("using SqlSource;\n[SqlSourceGenerateAttribute]\ninternal partial class Sample { }", "(2,2)-(2,28)")]
+    [InlineData("[SqlSource.SqlSourceGenerate]\ninternal partial class Sample { }", "(1,12)-(1,29)")]
+    [InlineData("[global::SqlSource.SqlSourceGenerate()]\ninternal partial class Sample { }", "(1,20)-(1,37)")]
+    [InlineData("internal class Sample { object o = typeof(SqlSource.SqlLocation); }", "(1,53)-(1,64)")]
+    [InlineData("internal class Sample { object o = SqlSource.SqlLocation.Direct; }", "(1,36)-(1,57)")]
     public async Task Build_UseOfAGeneratedType_IsAConflictOnlyWithoutThePackageAnalyzers(string source, string span)
     {
         var compilerAlone = await GeneratorHarness.BuildAsync(source, [Users], [Other()], packageAnalyzers: false);
@@ -34,11 +34,11 @@ public class AttributeConflictTests
     }
 
     [Fact]
-    public async Task Build_AttributeThatSetsTheMode_HasNoConflictForEitherType()
+    public async Task Build_AttributeThatSetsTheLocation_HasNoConflictForEitherType()
     {
         const string Source = """
             using SqlSource;
-            [SqlQueries(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             internal partial class Sample { }
             """;
 
@@ -47,8 +47,8 @@ public class AttributeConflictTests
 
         Places(compilerAlone)
             .ShouldBe([
-                $"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,12)",
-                $"CS0436 {GeneratorHarness.SourcePath}(2,20)-(2,34)",
+                $"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)",
+                $"CS0436 {GeneratorHarness.SourcePath}(2,34)-(2,45)",
             ]);
         build.ShouldBeEmpty();
     }
@@ -57,7 +57,7 @@ public class AttributeConflictTests
     [Fact]
     public async Task Build_WarningsAsErrors_HasNoConflictForAGeneratedType()
     {
-        const string Source = "using SqlSource;\n[SqlQueries]\ninternal partial class Sample { }";
+        const string Source = "using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }";
 
         var compilerAlone = await GeneratorHarness.BuildAsync(
             Source,
@@ -68,14 +68,14 @@ public class AttributeConflictTests
         );
         var build = await GeneratorHarness.BuildAsync(Source, [Users], [Other()], warningsAsErrors: true);
 
-        Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,12)"]);
+        Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)"]);
         build.ShouldBeEmpty();
     }
 
     // The compiler's error is the whole story: the conflict is not reported next to it.
     [Theory]
-    [InlineData("[SqlQueries(1)]", "CS1729 /app/Repo/Sample.cs(2,2)-(2,15)")]
-    [InlineData("[SqlQueries(Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,13)-(2,20)")]
+    [InlineData("[SqlSourceGenerate(1)]", "CS1729 /app/Repo/Sample.cs(2,2)-(2,22)")]
+    [InlineData("[SqlSourceGenerate(Missing = 1)]", "CS0246 /app/Repo/Sample.cs(2,20)-(2,27)")]
     public async Task Build_AttributeThatDoesNotCompile_HasItsErrorAndNoConflict(string attribute, string error)
     {
         var source = $"using SqlSource;\n{attribute}\ninternal partial class Sample {{ }}";
@@ -83,17 +83,17 @@ public class AttributeConflictTests
         var compilerAlone = await GeneratorHarness.BuildAsync(source, [Users], [Other()], packageAnalyzers: false);
         var build = await GeneratorHarness.BuildAsync(source, [Users], [Other()]);
 
-        Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,12)", error], true);
+        Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)", error], true);
         Places(build).ShouldBe([error]);
     }
 
     // A type that the project and the other one both declare by hand is a conflict that the user has to know about,
     // whatever its name.
     [Theory]
-    [InlineData("Mine", "SqlQueriesMode")]
-    [InlineData("Mine", "SqlQueriesAttribute")]
+    [InlineData("Mine", "SqlLocation")]
+    [InlineData("Mine", "SqlSourceGenerateAttribute")]
     [InlineData("SqlSource", "Shared")]
-    [InlineData("SqlSource.Inner", "SqlQueriesMode")]
+    [InlineData("SqlSource.Inner", "SqlLocation")]
     public async Task Build_UseOfATypeThatBothProjectsDeclare_IsStillAConflict(string @namespace, string name)
     {
         var declaration = $"namespace {@namespace} {{ internal class {name} {{ }} }}\n";

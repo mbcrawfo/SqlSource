@@ -381,7 +381,7 @@ public class TypeEmitterTests
         source.ShouldNotContain("class Sql");
     }
 
-    // The query's own directive, then what the project asks for.
+    // The query's own generator parameter, then what the project asks for.
     [Theory]
     [InlineData(null, true, true)]
     [InlineData(null, false, false)]
@@ -389,13 +389,13 @@ public class TypeEmitterTests
     [InlineData(true, true, true)]
     [InlineData(false, true, false)]
     [InlineData(false, false, false)]
-    public void Emit_QueryWithAToken_ValidatesByItsDirectiveAndThenByTheProject(
-        bool? directive,
+    public void Emit_QueryWithAToken_ValidatesByItsGeneratorParameterAndThenByTheProject(
+        bool? parameter,
         bool project,
         bool expected
     )
     {
-        var output = Emit(TestModels.Type(), project, File("Users.sql", TokenQuery("ListFrom", directive)));
+        var output = Emit(TestModels.Type(), project, File("Users.sql", TokenQuery("ListFrom", parameter)));
 
         var source = output.Source.ShouldNotBeNull();
         if (expected)

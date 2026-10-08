@@ -4,7 +4,8 @@ using Microsoft.CodeAnalysis.Diagnostics;
 namespace SqlSource.Generation;
 
 /// <summary>
-/// What the project's <c>SqlSourceTokenValidation</c> property asks for.  A query's own directive comes before it.
+/// What the project's <c>SqlSourceTokenValidation</c> property asks for.  A query's own generator parameter comes
+/// before it.
 /// </summary>
 /// <param name="Validate">
 /// Whether a generated method checks its arguments.  True when the property is missing, empty or not valid.

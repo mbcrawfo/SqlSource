@@ -20,7 +20,7 @@ public class CachingTests
 
         namespace App.Users;
 
-        [SqlQueries]
+        [SqlSourceGenerate]
         public partial class UserQueries
         {
             public static string Get() => Sql.GetUser;
@@ -37,7 +37,7 @@ public class CachingTests
 
             namespace App.Orders;
 
-            [SqlQueries]
+            [SqlSourceGenerate]
             public partial class OrderQueries;
             """
         ),

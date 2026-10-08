@@ -16,8 +16,12 @@ public class SqlMarkerReaderTests
     [InlineData("--\t Name:\tGetUser  ", "Name:GetUser")]
     [InlineData("-- summary: Loads a user.", "Summary:Loads a user.")]
     [InlineData("-- Summary:Loads: a -- user", "Summary:Loads: a -- user")]
-    [InlineData("-- SqlSource: keep-comments  token-ignore=a", "Directives:keep-comments  token-ignore=a")]
-    [InlineData("-- SQLSOURCE: x", "Directives:x")]
+    [InlineData("-- generator: keep-comments  token-ignore=a", "GeneratorParameters:keep-comments  token-ignore=a")]
+    [InlineData("-- GENERATOR: x", "GeneratorParameters:x")]
+    [InlineData("-- dialect: postgres", "Dialect:postgres")]
+    [InlineData("-- DIALECT: MySql", "Dialect:MySql")]
+    [InlineData("--dialect:mysql, ansi-quotes  ", "Dialect:mysql, ansi-quotes")]
+    [InlineData("-- dialect:", "Dialect:")]
     [InlineData("-- name:", "Name:")]
     [InlineData("-- name:   ", "Name:")]
     public void Read_MarkerComment_ReturnsItsKindAndValue(string text, string expected) =>
@@ -50,6 +54,11 @@ public class SqlMarkerReaderTests
     [InlineData("/*\n-- name: A\n*/")]
     [InlineData("'\n-- name: A\n'")]
     [InlineData("$$\n-- name: A\n$$")]
+    [InlineData("-- SqlSource: keep-comments")]
+    [InlineData("-- generators: keep-comments")]
+    [InlineData("-- dialect=mysql")]
+    [InlineData("-- dialects: mysql")]
+    [InlineData("SELECT 1 -- dialect: mysql")]
     public void Read_AnythingElse_IsNotAMarker(string text) => Markers(text).ShouldBeEmpty();
 
     // A # comment is a line comment in MySQL and MariaDB.  A marker starts with two dashes, there as everywhere.
@@ -57,7 +66,8 @@ public class SqlMarkerReaderTests
     [InlineData("# name: A")]
     [InlineData("#-name: A")]
     [InlineData("## summary: x")]
-    [InlineData("#  SqlSource: keep-comments")]
+    [InlineData("#  generator: keep-comments")]
+    [InlineData("# dialect: mysql")]
     public void Read_HashComment_IsNotAMarker(string text) => Markers(text, SqlDialectRules.MySql).ShouldBeEmpty();
 
     // MySQL and MariaDB read two dashes as a comment only when whitespace follows them.

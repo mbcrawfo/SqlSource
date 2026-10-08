@@ -35,12 +35,15 @@ public class HintNameTests
                 "App.Sample.g.cs",
                 "App.Other.g.cs",
                 "App.sample.g.cs",
-                "sqlqueriesattribute.g.cs",
+                "sqlsourcegenerateattribute.g.cs",
                 "Other.Sample.g.cs"
             )
         );
 
-        ambiguous.ShouldBe(["App.Sample.g.cs", "App.sample.g.cs", "sqlqueriesattribute.g.cs"], ignoreOrder: true);
+        ambiguous.ShouldBe(
+            ["App.Sample.g.cs", "App.sample.g.cs", "sqlsourcegenerateattribute.g.cs"],
+            ignoreOrder: true
+        );
     }
 
     [Fact]

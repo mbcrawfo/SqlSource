@@ -11,6 +11,9 @@ internal enum SqlMarkerKind
     /// <summary><c>-- summary:</c> documents a block.</summary>
     Summary,
 
-    /// <summary><c>-- SqlSource:</c> carries directives.</summary>
-    Directives,
+    /// <summary><c>-- generator:</c> carries generator parameters.</summary>
+    GeneratorParameters,
+
+    /// <summary><c>-- dialect:</c> names the dialect of the file.</summary>
+    Dialect,
 }

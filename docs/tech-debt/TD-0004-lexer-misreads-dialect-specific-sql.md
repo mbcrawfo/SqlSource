@@ -14,8 +14,8 @@ The default dialect, `ansi`, is one set of rules for every database.  By design 
 
 A misread has one of two outcomes:
 
-- **An error.**  The quotes or comments no longer balance, and the file gets `UnterminatedQuote` or `UnterminatedBlockComment`.  The file produces nothing until the construct is rewritten.  The `keep-comments` directive does not help, because a lexer error ends the pass.
-- **Silent removal.**  The misread quotes happen to balance, and SQL after them is read as a comment and stripped.  The `keep-comments` directive avoids the removal.
+- **An error.**  The quotes or comments no longer balance, and the file gets `UnterminatedQuote` or `UnterminatedBlockComment`.  The file produces nothing until the construct is rewritten.  The `keep-comments` generator parameter does not help, because a lexer error ends the pass.
+- **Silent removal.**  The misread quotes happen to balance, and SQL after them is read as a comment and stripped.  The `keep-comments` generator parameter avoids the removal.
 
 In [`SqlLexerTests`](../../tests/SqlSource.Tests/Parsing/SqlLexerTests.cs), the `Lex_KnownLimit_*` tests pin the readings of `ansi`.  The `/*!50700` row of `Lex_UnterminatedQuoteOfADialect_ReportsTheOpeningDelimiter` pins the versioned comment, `Lex_UnterminatedBlockComment_IsAnErrorInEveryDialect` pins SQLite's comment, and the last row of `Lex_StringInCockroachDb_IsReadByItsRules` pins the carriage return in a continued string.
 

@@ -5,15 +5,15 @@ namespace SqlSource.Generation;
 /// </summary>
 internal static class AttributeSource
 {
-    public const string HintName = "SqlQueriesAttribute.g.cs";
+    public const string HintName = "SqlSourceGenerateAttribute.g.cs";
 
-    public const string AttributeMetadataName = "SqlSource.SqlQueriesAttribute";
+    public const string AttributeMetadataName = "SqlSource.SqlSourceGenerateAttribute";
 
-    public const string ModeMetadataName = "SqlSource.SqlQueriesMode";
+    public const string LocationMetadataName = "SqlSource.SqlLocation";
 
     public const string PathProperty = "Path";
 
-    public const string ModeProperty = "Mode";
+    public const string LocationProperty = "SqlLocation";
 
     // Only an attribute class can be [Conditional], so the enum stays in the consumer's assembly.  The attribute
     // itself is not applied in metadata unless the consumer defines SQLSOURCE_ATTRIBUTES.
@@ -33,9 +33,9 @@ internal static class AttributeSource
         namespace SqlSource
         {
             /// <summary>
-            /// Where the members generated for a type marked with <see cref="SqlQueriesAttribute" /> go.
+            /// Where the members generated for a type marked with <see cref="SqlSourceGenerateAttribute" /> go.
             /// </summary>
-            internal enum SqlQueriesMode
+            internal enum SqlLocation
             {
                 /// <summary>
                 /// In a private static class named <c>Sql</c>, nested in the type.
@@ -57,7 +57,7 @@ internal static class AttributeSource
                 Inherited = false
             )]
             [global::System.Diagnostics.Conditional("SQLSOURCE_ATTRIBUTES")]
-            internal sealed class SqlQueriesAttribute : global::System.Attribute
+            internal sealed class SqlSourceGenerateAttribute : global::System.Attribute
             {
                 /// <summary>
                 /// A folder or one <c>.sql</c> file, relative to the folder of the file that carries the attribute.
@@ -66,9 +66,10 @@ internal static class AttributeSource
                 public string Path { get; set; }
 
                 /// <summary>
-                /// Where the generated members go.  The default is <see cref="SqlQueriesMode.Nested" />.
+                /// Where the generated members go.  The default is
+                /// <see cref="global::SqlSource.SqlLocation.Nested" />.
                 /// </summary>
-                public SqlQueriesMode Mode { get; set; }
+                public SqlLocation SqlLocation { get; set; }
             }
         }
 

@@ -31,27 +31,29 @@ internal enum SqlParseErrorKind
     SummaryBeforeFirstName,
 
     /// <summary>
-    /// A <c>-- summary:</c> or <c>-- SqlSource:</c> marker has no SQL after it in its block.  No argument.
+    /// A <c>-- summary:</c>, <c>-- generator:</c> or <c>-- dialect:</c> marker has no SQL after it in its block.  No
+    /// argument.
     /// </summary>
     MarkerAtEndOfBlock,
 
-    /// <summary>A directive is not recognised.  Argument: the directive as written.</summary>
-    UnknownDirective,
+    /// <summary>A generator parameter is not recognised.  Argument: the generator parameter as written.</summary>
+    UnknownGeneratorParameter,
 
-    /// <summary>A <c>-- SqlSource:</c> marker has no directives.  No argument.</summary>
-    EmptyDirectiveLine,
-
-    /// <summary>
-    /// A directive lacks a value it needs, has one it does not take, or has one that is not valid.  Argument: the
-    /// directive as written.
-    /// </summary>
-    InvalidDirectiveValue,
+    /// <summary>A <c>-- generator:</c> marker has no generator parameters.  No argument.</summary>
+    EmptyGeneratorLine,
 
     /// <summary>
-    /// Two directives of one scope contradict each other: both validation directives, or two dialects.  Argument: the
-    /// second directive as written.
+    /// A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid; or a
+    /// <c>-- dialect:</c> marker does not name a dialect.  Argument: the parameter as written, or the marker as
+    /// <see cref="SqlDialectMarker.Describe" /> gives it.
     /// </summary>
-    ConflictingDirectives,
+    InvalidMarkerValue,
+
+    /// <summary>
+    /// Two settings contradict each other: both validation parameters in one scope, or two dialects in one file.
+    /// Argument: the second one, as for <see cref="InvalidMarkerValue" />.
+    /// </summary>
+    ConflictingSettings,
 
     /// <summary>A block has no SQL.  No argument.</summary>
     EmptyBlock,
@@ -59,8 +61,6 @@ internal enum SqlParseErrorKind
     /// <summary>A token's name is a reserved C# keyword.  Argument: the name.</summary>
     ReservedTokenName,
 
-    /// <summary>
-    /// A <c>dialect=</c> directive is inside a named query or after SQL.  Argument: the directive as written.
-    /// </summary>
+    /// <summary>A <c>-- dialect:</c> marker is inside a named query or after SQL.  No argument.</summary>
     MisplacedDialect,
 }

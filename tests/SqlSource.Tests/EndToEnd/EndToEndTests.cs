@@ -12,7 +12,7 @@ namespace SqlSource.Tests.EndToEnd;
 public class EndToEndTests
 {
     [Fact]
-    public void NestedMode_DefaultFolder_HasAConstantForEachQueryOfEachFile()
+    public void NestedLocation_DefaultFolder_HasAConstantForEachQueryOfEachFile()
     {
         UserQueries.GetUserSql.ShouldBe("SELECT id, name\nFROM users\nWHERE id = @id;");
         UserQueries.ListUsersSql.ShouldBe("SELECT id, name\nFROM users\nORDER BY name;");
@@ -20,7 +20,7 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void NestedMode_SqlClass_IsPrivateStaticAndHoldsPublicConstants()
+    public void NestedLocation_SqlClass_IsPrivateStaticAndHoldsPublicConstants()
     {
         var sql = typeof(UserQueries).GetNestedType("Sql", BindingFlags.NonPublic).ShouldNotBeNull();
 
@@ -33,7 +33,7 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void DirectMode_PathToAFile_PutsTheConstantsOnTheType()
+    public void DirectLocation_PathToAFile_PutsTheConstantsOnTheType()
     {
         // Evaluated by the compiler: the member is a constant.
         const string Sql = OrderQueries.GetOrder;
@@ -42,7 +42,7 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void DirectMode_QueryWithTokens_IsAMethodThatReplacesEachOccurrence() =>
+    public void DirectLocation_QueryWithTokens_IsAMethodThatReplacesEachOccurrence() =>
         OrderQueries
             .OrdersOf("sales", "u.name = @name")
             .ShouldBe(
@@ -52,37 +52,37 @@ public class EndToEndTests
             );
 
     [Fact]
-    public void NestedMode_QueryWithSeveralTokens_ReplacesEachOccurrence() =>
+    public void NestedLocation_QueryWithSeveralTokens_ReplacesEachOccurrence() =>
         TokenQueries
             .Search("id, name", "users", "name LIKE @pattern")
             .ShouldBe("SELECT id, name\nFROM users\nWHERE name LIKE @pattern\nORDER BY users.id;");
 
-    // SqlSource.Tests.csproj sets SqlSourceTokenValidation to false, and Search has no directive.  That its method
-    // checks nothing shows the property reaching the generator through the MSBuild file the package ships.
+    // SqlSource.Tests.csproj sets SqlSourceTokenValidation to false, and Search has no generator parameter.  That its
+    // method checks nothing shows the property reaching the generator through the MSBuild file the package ships.
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
-    public void ProjectWithValidationOff_QueryWithoutADirective_AcceptsAnArgumentWithoutText(string filter) =>
+    public void ProjectWithValidationOff_QueryWithoutAGeneratorParameter_AcceptsAnArgumentWithoutText(string filter) =>
         TokenQueries
             .Search("id", "users", filter)
             .ShouldBe("SELECT id\nFROM users\nWHERE " + filter + "\nORDER BY users.id;");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryWithoutADirective_FailsOnANullArgumentWhereItIsRead() =>
+    public void ProjectWithValidationOff_QueryWithoutAGeneratorParameter_FailsOnANullArgumentWhereItIsRead() =>
         Should.Throw<NullReferenceException>(() => TokenQueries.Search("id", null!, "1 = 1"));
 
     [Theory]
     [InlineData("")]
     [InlineData(" \t")]
-    public void ProjectWithValidationOff_QueryWithTheDirective_RejectsAnArgumentWithoutText(string filter) =>
+    public void ProjectWithValidationOff_QueryWithTheGeneratorParameter_RejectsAnArgumentWithoutText(string filter) =>
         Should.Throw<ArgumentException>(() => TokenQueries.Checked("users", filter)).ParamName.ShouldBe("filter");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryWithTheDirective_RejectsANullArgument() =>
+    public void ProjectWithValidationOff_QueryWithTheGeneratorParameter_RejectsANullArgument() =>
         Should.Throw<ArgumentNullException>(() => TokenQueries.Checked(null!, "1 = 1")).ParamName.ShouldBe("table");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryWithTheDirective_ReturnsTheSqlForArgumentsWithText() =>
+    public void ProjectWithValidationOff_QueryWithTheGeneratorParameter_ReturnsTheSqlForArgumentsWithText() =>
         TokenQueries.Checked("users", "id = @id").ShouldBe("SELECT id FROM users WHERE id = @id;");
 
     // SqlSource.Tests.csproj sets the SqlSourceDialect property to postgres, on a line of its own.  ANSI would end the
@@ -125,8 +125,8 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void ProjectWithADialect_FileWithADirective_IsReadByTheDialectItNames() =>
-        DialectQueries.ByDirective.ShouldBe("SELECT [it's] FROM #orders;");
+    public void ProjectWithADialect_FileWithAMarker_IsReadByTheDialectItNames() =>
+        DialectQueries.ByMarker.ShouldBe("SELECT [it's] FROM #orders;");
 
     [Fact]
     public void Method_Call_AllocatesTheStringItReturnsAndNothingElse()
@@ -163,14 +163,14 @@ public class EndToEndTests
     public void Attribute_IsNotInTheMetadataOfTheTypesThatCarryIt(Type type) =>
         type.GetCustomAttributesData()
             .Select(attribute => attribute.AttributeType.FullName)
-            .ShouldNotContain("SqlSource.SqlQueriesAttribute");
+            .ShouldNotContain("SqlSource.SqlSourceGenerateAttribute");
 
     [Fact]
     public void AttributeAndEnum_AreInternalTypesOfTheConsumingAssembly()
     {
         var assembly = typeof(EndToEndTests).Assembly;
 
-        assembly.GetType("SqlSource.SqlQueriesAttribute").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
-        assembly.GetType("SqlSource.SqlQueriesMode").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
+        assembly.GetType("SqlSource.SqlSourceGenerateAttribute").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
+        assembly.GetType("SqlSource.SqlLocation").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
     }
 }

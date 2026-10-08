@@ -15,7 +15,7 @@ namespace SqlSource.Generation;
 /// The SQL, split into literal text and tokens.  Never empty.  Without a token it is one literal segment.
 /// </param>
 /// <param name="TokenValidation">
-/// True or false when a validation directive applies to the query, null when the project's setting decides.
+/// True or false when a validation generator parameter applies to the query, null when the project's setting decides.
 /// </param>
 internal sealed record SqlQuery(
     string Name,
