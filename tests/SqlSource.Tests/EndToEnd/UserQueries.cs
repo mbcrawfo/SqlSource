@@ -1,6 +1,6 @@
 namespace SqlSource.Tests.EndToEnd;
 
-// Default folder, nested mode: every .sql file next to this source file, in a private class named Sql.
+// Default folder, nested location: every .sql file next to this source file, in a private class named Sql.
 [SqlSourceGenerate]
 internal static partial class UserQueries
 {

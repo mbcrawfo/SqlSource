@@ -297,7 +297,7 @@ public class FileDiagnosticsTests
     }
 
     [Fact]
-    public void Run_NestedModeAndAQueryNamedSql_IsAnErrorAtTheQuery()
+    public void Run_NestedLocationAndAQueryNamedSql_IsAnErrorAtTheQuery()
     {
         var run = GeneratorHarness.Run(Source, new SqlFile("/app/Repo/Sql.sql", "SELECT 1;\n"));
 
@@ -310,13 +310,13 @@ public class FileDiagnosticsTests
     }
 
     [Fact]
-    public void Run_DirectModeAndATypeNamedWithAKeyword_LeavesAQueryOfThatNameToTheParser()
+    public void Run_DirectLocationAndATypeNamedWithAKeyword_LeavesAQueryOfThatNameToTheParser()
     {
         var run = GeneratorHarness.Run(
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class @class<T> { }
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: Sql\nSELECT 1;\n"),
@@ -329,13 +329,13 @@ public class FileDiagnosticsTests
     }
 
     [Fact]
-    public void Run_DirectModeAndAQueryNamedLikeTheType_IsAnErrorAndItsFileGivesNoMembers()
+    public void Run_DirectLocationAndAQueryNamedLikeTheType_IsAnErrorAndItsFileGivesNoMembers()
     {
         var run = GeneratorHarness.Run(
             """
             using SqlSource;
             namespace App;
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample { }
             """,
             new SqlFile("/app/Repo/A.sql", "-- name: Kept\nSELECT 1;\n"),

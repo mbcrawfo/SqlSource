@@ -9,7 +9,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC003](#sqlsrc003) | Target framework is not supported |
 | [SQLSRC004](#sqlsrc004) | Path matches no SQL file |
 | [SQLSRC005](#sqlsrc005) | Folder has no SQL file |
-| [SQLSRC006](#sqlsrc006) | Mode is not valid |
+| [SQLSRC006](#sqlsrc006) | SqlLocation is not valid |
 | [SQLSRC007](#sqlsrc007) | Type has a member named Sql |
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
@@ -94,22 +94,22 @@ Add a `.sql` file next to the source file, or set `Path` to the folder or file t
 
 ## SQLSRC006
 
-**Mode is not valid**
+**SqlLocation is not valid**
 
-`Mode` was given a value that `SqlQueriesMode` does not define.
+`SqlLocation` was given a value that the `SqlLocation` enum does not define.
 
 ```csharp
-[SqlSourceGenerate(Mode = (SqlQueriesMode)5)]
+[SqlSourceGenerate(SqlLocation = (SqlLocation)5)]
 public partial class UserRepository { }
 ```
 
-Use `SqlQueriesMode.Nested` or `SqlQueriesMode.Direct`.
+Use `SqlLocation.Nested` or `SqlLocation.Direct`.
 
 ## SQLSRC007
 
 **Type has a member named Sql**
 
-In `Nested` mode the queries go in a nested class named `Sql`, and the type already has a member with that name.  The same error is reported when the type itself, or one of its type parameters, is named `Sql`: a nested class cannot share either name.
+With `SqlLocation.Nested` the queries go in a nested class named `Sql`, and the type already has a member with that name.  The same error is reported when the type itself, or one of its type parameters, is named `Sql`: a nested class cannot share either name.
 
 ```csharp
 [SqlSourceGenerate]
@@ -119,7 +119,7 @@ public partial class UserRepository
 }
 ```
 
-Rename the member, the type or the type parameter, or set `Mode = SqlQueriesMode.Direct` so that the queries become members of the type itself.
+Rename the member, the type or the type parameter, or set `SqlLocation = SqlLocation.Direct` so that the queries become members of the type itself.
 
 ## SQLSRC008
 
@@ -133,7 +133,7 @@ Rename one of the queries.
 
 **Query is named like its containing type**
 
-A member cannot have the name of the type that contains it.  In `Nested` mode that type is the generated class, so no query can be named `Sql`.  In `Direct` mode it is the attributed type, so no query can have that type's name.
+A member cannot have the name of the type that contains it.  With `SqlLocation.Nested` that type is the generated class, so no query can be named `Sql`.  With `SqlLocation.Direct` it is the attributed type, so no query can have that type's name.
 
 ```sql
 -- name: Sql

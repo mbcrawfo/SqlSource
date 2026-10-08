@@ -48,7 +48,7 @@ The package is a development dependency.  It adds nothing to your application's 
 | Property | Default | Meaning |
 |----|----|----|
 | `Path` | The folder of the source file that carries the attribute | A folder or one `.sql` file, relative to that folder |
-| `Mode` | `SqlQueriesMode.Nested` | Where the generated members go |
+| `SqlLocation` | `SqlLocation.Nested` | Where the generated members go |
 
 ### Which files belong to a type
 
@@ -58,15 +58,15 @@ The package is a development dependency.  It adds nothing to your application's 
 - `Path` is always relative to the folder of the source file, never to the project.  Both `/` and `\` separate folders, and paths are compared ignoring case, so a project builds the same on every operating system.  Two `.sql` files of a type whose paths differ only by case are therefore an error, [SQLSRC013](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc013).
 - Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
 
-### Modes
+### Locations
 
-| Mode | Generated members | Used as |
+| `SqlLocation` | Generated members | Used as |
 |----|----|----|
-| `SqlQueriesMode.Nested` | Public members in a `private static class Sql` nested in the type | `Sql.GetUser`, inside the type only |
-| `SqlQueriesMode.Direct` | Public members on the type itself | `UserQueries.GetUser`, wherever the type is visible |
+| `SqlLocation.Nested` | Public members in a `private static class Sql` nested in the type | `Sql.GetUser`, inside the type only |
+| `SqlLocation.Direct` | Public members on the type itself | `UserQueries.GetUser`, wherever the type is visible |
 
 ```csharp
-[SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+[SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
 public static partial class UserQueries;
 ```
 
@@ -74,7 +74,7 @@ Each member is a `const string`, or a static method when the query has tokens (s
 
 ### Projects that share internals
 
-SqlSource adds the attribute and `SqlQueriesMode` to each project that uses it, as internal types.  A project that sees the internals of another one, as a test project does through `InternalsVisibleTo`, sees both types twice when both projects use SqlSource.  Each project uses its own copy.  The compiler warns about such a conflict (CS0436), and SqlSource turns that warning off for these two types only, as suppression `SQLSRC901`: nothing has to be added to `NoWarn`, and a conflict between two types of your own is still reported.
+SqlSource adds the attribute and `SqlLocation` to each project that uses it, as internal types.  A project that sees the internals of another one, as a test project does through `InternalsVisibleTo`, sees both types twice when both projects use SqlSource.  Each project uses its own copy.  The compiler warns about such a conflict (CS0436), and SqlSource turns that warning off for these two types only, as suppression `SQLSRC901`: nothing has to be added to `NoWarn`, and a conflict between two types of your own is still reported.
 
 ## SQL files
 

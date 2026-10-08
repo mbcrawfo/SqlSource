@@ -1,7 +1,7 @@
 namespace SqlSource.Generation;
 
 /// <summary>
-/// Where a type's generated members go.  The generator's own form of the <c>SqlQueriesMode</c> it emits.
+/// Where a type's generated members go.  The generator's own form of the <c>SqlLocation</c> it emits.
 /// </summary>
 internal enum MemberPlacement
 {

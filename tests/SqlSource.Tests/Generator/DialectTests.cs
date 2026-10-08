@@ -12,7 +12,7 @@ public class DialectTests
 
         namespace App;
 
-        [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+        [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
         public partial class Sample;
         """;
 

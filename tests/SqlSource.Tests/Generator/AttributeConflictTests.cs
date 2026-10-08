@@ -22,8 +22,8 @@ public class AttributeConflictTests
     [InlineData("using SqlSource;\n[SqlSourceGenerateAttribute]\ninternal partial class Sample { }", "(2,2)-(2,28)")]
     [InlineData("[SqlSource.SqlSourceGenerate]\ninternal partial class Sample { }", "(1,12)-(1,29)")]
     [InlineData("[global::SqlSource.SqlSourceGenerate()]\ninternal partial class Sample { }", "(1,20)-(1,37)")]
-    [InlineData("internal class Sample { object o = typeof(SqlSource.SqlQueriesMode); }", "(1,53)-(1,67)")]
-    [InlineData("internal class Sample { object o = SqlSource.SqlQueriesMode.Direct; }", "(1,36)-(1,60)")]
+    [InlineData("internal class Sample { object o = typeof(SqlSource.SqlLocation); }", "(1,53)-(1,64)")]
+    [InlineData("internal class Sample { object o = SqlSource.SqlLocation.Direct; }", "(1,36)-(1,57)")]
     public async Task Build_UseOfAGeneratedType_IsAConflictOnlyWithoutThePackageAnalyzers(string source, string span)
     {
         var compilerAlone = await GeneratorHarness.BuildAsync(source, [Users], [Other()], packageAnalyzers: false);
@@ -34,11 +34,11 @@ public class AttributeConflictTests
     }
 
     [Fact]
-    public async Task Build_AttributeThatSetsTheMode_HasNoConflictForEitherType()
+    public async Task Build_AttributeThatSetsTheLocation_HasNoConflictForEitherType()
     {
         const string Source = """
             using SqlSource;
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             internal partial class Sample { }
             """;
 
@@ -48,7 +48,7 @@ public class AttributeConflictTests
         Places(compilerAlone)
             .ShouldBe([
                 $"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)",
-                $"CS0436 {GeneratorHarness.SourcePath}(2,27)-(2,41)",
+                $"CS0436 {GeneratorHarness.SourcePath}(2,34)-(2,45)",
             ]);
         build.ShouldBeEmpty();
     }
@@ -90,10 +90,10 @@ public class AttributeConflictTests
     // A type that the project and the other one both declare by hand is a conflict that the user has to know about,
     // whatever its name.
     [Theory]
-    [InlineData("Mine", "SqlQueriesMode")]
+    [InlineData("Mine", "SqlLocation")]
     [InlineData("Mine", "SqlSourceGenerateAttribute")]
     [InlineData("SqlSource", "Shared")]
-    [InlineData("SqlSource.Inner", "SqlQueriesMode")]
+    [InlineData("SqlSource.Inner", "SqlLocation")]
     public async Task Build_UseOfATypeThatBothProjectsDeclare_IsStillAConflict(string @namespace, string name)
     {
         var declaration = $"namespace {@namespace} {{ internal class {name} {{ }} }}\n";

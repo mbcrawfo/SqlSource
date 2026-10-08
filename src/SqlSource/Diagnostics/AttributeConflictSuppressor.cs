@@ -29,7 +29,7 @@ public sealed class AttributeConflictSuppressor : DiagnosticSuppressor
         // The project's own copies.  A type of the same name that the project declares elsewhere is not one of them.
         var assembly = context.Compilation.Assembly;
         var attribute = assembly.GetTypeByMetadataName(AttributeSource.AttributeMetadataName);
-        var mode = assembly.GetTypeByMetadataName(AttributeSource.ModeMetadataName);
+        var location = assembly.GetTypeByMetadataName(AttributeSource.LocationMetadataName);
 
         foreach (var diagnostic in context.ReportedDiagnostics)
         {
@@ -37,7 +37,7 @@ public sealed class AttributeConflictSuppressor : DiagnosticSuppressor
                 UsedType(context, diagnostic) is { } type
                 && (
                     SymbolEqualityComparer.Default.Equals(type, attribute)
-                    || SymbolEqualityComparer.Default.Equals(type, mode)
+                    || SymbolEqualityComparer.Default.Equals(type, location)
                 )
             )
             {

@@ -12,7 +12,7 @@ namespace SqlSource.Tests.EndToEnd;
 public class EndToEndTests
 {
     [Fact]
-    public void NestedMode_DefaultFolder_HasAConstantForEachQueryOfEachFile()
+    public void NestedLocation_DefaultFolder_HasAConstantForEachQueryOfEachFile()
     {
         UserQueries.GetUserSql.ShouldBe("SELECT id, name\nFROM users\nWHERE id = @id;");
         UserQueries.ListUsersSql.ShouldBe("SELECT id, name\nFROM users\nORDER BY name;");
@@ -20,7 +20,7 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void NestedMode_SqlClass_IsPrivateStaticAndHoldsPublicConstants()
+    public void NestedLocation_SqlClass_IsPrivateStaticAndHoldsPublicConstants()
     {
         var sql = typeof(UserQueries).GetNestedType("Sql", BindingFlags.NonPublic).ShouldNotBeNull();
 
@@ -33,7 +33,7 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void DirectMode_PathToAFile_PutsTheConstantsOnTheType()
+    public void DirectLocation_PathToAFile_PutsTheConstantsOnTheType()
     {
         // Evaluated by the compiler: the member is a constant.
         const string Sql = OrderQueries.GetOrder;
@@ -42,7 +42,7 @@ public class EndToEndTests
     }
 
     [Fact]
-    public void DirectMode_QueryWithTokens_IsAMethodThatReplacesEachOccurrence() =>
+    public void DirectLocation_QueryWithTokens_IsAMethodThatReplacesEachOccurrence() =>
         OrderQueries
             .OrdersOf("sales", "u.name = @name")
             .ShouldBe(
@@ -52,7 +52,7 @@ public class EndToEndTests
             );
 
     [Fact]
-    public void NestedMode_QueryWithSeveralTokens_ReplacesEachOccurrence() =>
+    public void NestedLocation_QueryWithSeveralTokens_ReplacesEachOccurrence() =>
         TokenQueries
             .Search("id, name", "users", "name LIKE @pattern")
             .ShouldBe("SELECT id, name\nFROM users\nWHERE name LIKE @pattern\nORDER BY users.id;");
@@ -171,6 +171,6 @@ public class EndToEndTests
         var assembly = typeof(EndToEndTests).Assembly;
 
         assembly.GetType("SqlSource.SqlSourceGenerateAttribute").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
-        assembly.GetType("SqlSource.SqlQueriesMode").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
+        assembly.GetType("SqlSource.SqlLocation").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
     }
 }

@@ -12,7 +12,7 @@ public class TokenValidationTests
 
         namespace App;
 
-        [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+        [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
         public partial class Sample
         {
             public static string List() => ListFrom("users");
@@ -79,7 +79,7 @@ public class TokenValidationTests
 
                     namespace App;
 
-                    [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+                    [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
                     public partial class Sample;
                     """
                 ),

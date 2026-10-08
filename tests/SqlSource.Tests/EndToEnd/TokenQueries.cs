@@ -1,6 +1,6 @@
 namespace SqlSource.Tests.EndToEnd;
 
-// A folder of queries with tokens, nested mode: each is a method of the private Sql class.
+// A folder of queries with tokens, nested location: each is a method of the private Sql class.
 [SqlSourceGenerate(Path = "Tokens")]
 internal static partial class TokenQueries
 {

@@ -24,7 +24,7 @@ public class GeneratedSourceTests
     }
 
     [Fact]
-    public void Run_NestedMode_PutsTheConstantsInAPrivateSqlClass()
+    public void Run_NestedLocation_PutsTheConstantsInAPrivateSqlClass()
     {
         var run = GeneratorHarness.Run(
             """
@@ -103,7 +103,7 @@ public class GeneratedSourceTests
     }
 
     [Fact]
-    public void Run_DirectMode_PutsTheConstantsOnTheType()
+    public void Run_DirectLocation_PutsTheConstantsOnTheType()
     {
         var run = GeneratorHarness.Run(
             """
@@ -111,7 +111,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public static partial class Sample;
 
             public static class Consumer
@@ -266,7 +266,7 @@ public class GeneratedSourceTests
     {
         var run = GeneratorHarness.Run(
             """
-            [SqlSource.SqlSourceGenerate(Mode = SqlSource.SqlQueriesMode.Direct)]
+            [SqlSource.SqlSourceGenerate(SqlLocation = SqlSource.SqlLocation.Direct)]
             public partial struct @class
             {
                 public static string Value => GetUser;
@@ -373,7 +373,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/c.sql", "-- name: Fifth\nSELECT 5;\n"),
@@ -415,7 +415,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(Path = @"{{path}}", Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Path = @"{{path}}", SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: FromRepo\nSELECT 1;\n"),
@@ -469,7 +469,7 @@ public class GeneratedSourceTests
                 public static string Value => Sql.GetUser;
             }
 
-            [SqlSourceGenerate(Path = "Users.sql", Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(Path = "Users.sql", SqlLocation = SqlLocation.Direct)]
             public partial class Second
             {
                 public static string Value => GetUser;
@@ -494,7 +494,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample
             {
                 public static string List() => ListFrom("users", "1 = 1") + GetUser;
@@ -583,7 +583,7 @@ public class GeneratedSourceTests
     }
 
     [Fact]
-    public void Run_QueryWithTokensOnAGenericStructInNestedMode_IsAMethodOfTheSqlClass()
+    public void Run_QueryWithTokensOnAGenericStructInNestedLocation_IsAMethodOfTheSqlClass()
     {
         var run = GeneratorHarness.Run(
             """
@@ -715,7 +715,7 @@ public class GeneratedSourceTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", Sql + "\n")
@@ -742,7 +742,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- summary: a < b & c\n" + Sql + "\n")
@@ -770,7 +770,7 @@ public class GeneratedSourceTests
             namespace App;
 
             /// <summary>Queries.</summary>
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
 
             /// <summary>More queries.</summary>
@@ -797,7 +797,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- summary: a\fb\nSELECT '\f\u001A';\n")
@@ -870,7 +870,7 @@ public class GeneratedSourceTests
 
             namespace App;
 
-            [SqlSourceGenerate(Mode = SqlQueriesMode.{{mode}})]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.{{mode}})]
             public partial class Sample;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: " + name + "\nSELECT 1;\n")
@@ -899,7 +899,7 @@ public class GeneratedSourceTests
                 public virtual string ListFrom(string table) => table;
             }
 
-            [SqlSourceGenerate(Mode = SqlQueriesMode.Direct)]
+            [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample : Base;
             """,
             new SqlFile("/app/Repo/Users.sql", "-- name: ListFrom\nSELECT * FROM {{table}};\n")
@@ -911,7 +911,7 @@ public class GeneratedSourceTests
     }
 
     [Fact]
-    public void Run_NestedModeAndAnInheritedMemberNamedSql_GetsNoWarningInGeneratedCode()
+    public void Run_NestedLocationAndAnInheritedMemberNamedSql_GetsNoWarningInGeneratedCode()
     {
         var run = GeneratorHarness.Run(
             """

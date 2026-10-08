@@ -73,10 +73,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidMode = new(
+    public static readonly DiagnosticDescriptor InvalidSqlLocation = new(
         id: "SQLSRC006",
-        title: "Mode is not valid",
-        messageFormat: "'{0}' is not a value of SqlQueriesMode",
+        title: "SqlLocation is not valid",
+        messageFormat: "'{0}' is not a value of SqlLocation",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -87,7 +87,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor SqlMemberExists = new(
         id: "SQLSRC007",
         title: "Type has a member named Sql",
-        messageFormat: "'{0}' already has a member named 'Sql'.  Rename it, or use SqlQueriesMode.Direct.",
+        messageFormat: "'{0}' already has a member named 'Sql'.  Rename it, or use SqlLocation.Direct.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -341,7 +341,7 @@ internal static class SqlDiagnostics
             UnsupportedTargetFramework,
             PathMatchesNothing,
             FolderHasNoSqlFile,
-            InvalidMode,
+            InvalidSqlLocation,
             SqlMemberExists,
             DuplicateQueryName,
             QueryNamedLikeContainingType,

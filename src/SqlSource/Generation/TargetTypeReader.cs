@@ -153,7 +153,7 @@ internal static class TargetTypeReader
     )
     {
         // An argument that is not a constant has no value here.  The compiler reports it.
-        if (GetNamedArgument(attribute, AttributeSource.ModeProperty) is not { Value: int value })
+        if (GetNamedArgument(attribute, AttributeSource.LocationProperty) is not { Value: int value })
         {
             return MemberPlacement.Nested;
         }
@@ -167,7 +167,7 @@ internal static class TargetTypeReader
             default:
                 diagnostics.Add(
                     DiagnosticInfo.Create(
-                        SqlDiagnostics.InvalidMode,
+                        SqlDiagnostics.InvalidSqlLocation,
                         attributeLocation,
                         value.ToString(CultureInfo.InvariantCulture)
                     )
