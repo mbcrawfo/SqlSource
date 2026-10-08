@@ -19,7 +19,7 @@ Settled with the owner after the format was proposed.  The open questions in sec
 | Range and multirange | Both carry `subtype`. |
 | `source_database` on SQL Server | Not stored; adding `database` to `origin` is additive. |
 | The JSON Schema | Shipped in the repository under `schemas/`, one file per format version, by phase 2. |
-| `_WARNING` | The first property of every file, a sentence saying the tool wrote it and regenerates it.  The underscore and the capitals make it stand out from the data. |
+| `_WARNING` | The first property of every file, a sentence or two saying the tool wrote it and regenerates it.  The underscore and the capitals make it stand out from the data. |
 | `matchesTable` | Added after the proposal, for table models.  An object with the shape of `origin` without `column`, or `null`, on entries with rows. |
 | Provenance | Added after the proposal, from the diagnostics design: `nullableSource` on every column, `plan` and `tableMatch` on every entry with rows, and `inferred-from-copies` as a third `typeSource`.  Informational: the generator never branches on them.  They say which step decided a value, so that a bug report holding only the entry already names the step. |
 
@@ -52,12 +52,12 @@ A file whose `queries` would be empty is deleted by the tool, never written empt
 | Key | Type | Written | Meaning |
 |----|----|----|----|
 | `hash` | string | always | Lowercase hex SHA-256, 64 characters, of `engine + "\n" + SQL` exactly as phase 1 defines it: the comment-stripped emitted SQL with `\n` endings, each token rendered as `{{name:default}}` with its resolved default, followed by the `-- param:` declarations in effect.  Algorithm and input are fixed by `formatVersion`; no prefix. |
-| `engine` | string | always | The canonical name of the file's dialect, options stripped: `postgres`, `mssql`, `cockroachdb`.  It selects the shape of every `type` object in the entry (section 2). |
+| `engine` | string | always | The canonical name of the file's dialect, options stripped: `postgres`, `mssql`.  It selects the shape of every `type` object in the entry (section 2). |
 | `database` | string | always | The logical database name the query was described against, resolved by the epic's directive/metadata/property rule.  Informational to the generator. |
 | `serverVersion` | string | always | Informational.  PostgreSQL: `server_version` cut at the first space (`"16.4"`, since a Debian image reports `16.4 (Debian 16.4-1.pgdg120+1)`).  SQL Server: `SERVERPROPERTY('ProductVersion')` (`"16.0.4135.4"`).  A short, deterministic value rather than the `@@VERSION` banner, so a diff shows a server change in one word. |
 | `resultKind` | `"rows"` or `"none"` | always | Whether the statement produces a result set. |
 | `matchesTable` | object or `null` | iff `resultKind` is `"rows"` | `{ "schema", "table" }` of the table whose column list the result is exactly, by the epic's rule under Models: every column originates in that table, the names are the table's unchanged, the columns are the table's full list in the table's order, and each column's nullability is the table column's.  `null` when no table matches.  The generator names the model after the table. |
-| `plan` | `"not-needed"`, `"walked"`, `"unavailable"` or `"skipped"` | iff `resultKind` is `"rows"` | Whether the nullability plan walk ran: not needed because the query has no outer-join keyword; walked; unavailable because `EXPLAIN` failed, which the log shows; skipped because the engine has no walk, SQL Server and CockroachDB.  Provenance. |
+| `plan` | `"not-needed"`, `"walked"`, `"unavailable"` or `"skipped"` | iff `resultKind` is `"rows"` | Whether the nullability plan walk ran: not needed because the query has no outer-join keyword; walked; unavailable because `EXPLAIN` failed, which the log shows; skipped because the engine has no walk, SQL Server.  Provenance. |
 | `tableMatch` | string | iff `resultKind` is `"rows"` | The first failing check of the table match, in a fixed order: `"matched"`, `"no-origin"`, `"several-tables"`, `"names-differ"`, `"columns-differ"`, `"order-differs"`, `"nullability-differs"`.  Provenance for `matchesTable`. |
 | `parameters` | array | always | In parameter order; empty when the query has none. |
 | `columns` | array | iff `resultKind` is `"rows"` | In result order.  Absent, not empty, when there is no result set. |
@@ -82,7 +82,7 @@ Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar an
 | `name` | string | always | Exactly as the server returned it, override suffix included: `"deleted_at?"`.  The sidecar records the description; the generator strips the suffix and applies the override. |
 | `type` | object | always | The engine's type object (section 2).  Never `null`: a column whose type the server cannot name is a tool error, not an entry. |
 | `nullable` | boolean or `null` | always | What the server and the tool's inference established; `null` is unknown.  The policy that makes unknown nullable stays out of the file so a reader can tell "the server said nullable" from "nobody knows". |
-| `nullableSource` | string | always | Which layer decided `nullable`: `"server"`, the engine reports it (every SQL Server column); `"catalog"`, the origin's `NOT NULL` flag, and on PostgreSQL the walk found the origin on no null-extending side; `"outer-join"`, the walk found it on one; `"view"`, the origin is a view; `"no-origin"`; `"heuristic"`, the plan was unavailable or the origin was not found in it and an outer-join keyword made the column nullable.  Inside the walk `outer-join` beats `view` beats `catalog`.  The `!`/`?` override is never a source: the generator applies it.  Provenance. |
+| `nullableSource` | string | always | Which layer decided `nullable`: `"server"`, the engine reports it (every SQL Server column); `"catalog"`, the origin's `NOT NULL` flag, and on PostgreSQL the walk found the origin on no null-extending side; `"outer-join"`, the walk found it on one; `"view"`, the origin is a view; `"no-origin"`, which always comes with `nullable: null`; `"heuristic"`, the plan was unavailable or the origin was not found in it and an outer-join keyword made the column nullable.  Inside the walk `outer-join` beats `view` beats `catalog`.  The `!`/`?` override is never a source: the generator applies it.  Provenance. |
 | `origin` | object or `null` | always | `{ "schema", "table", "column" }` of the base column, or `null` for an expression, aggregate, cast, set operation or `USING` column.  `schema` may be `null` for an engine without schemas; `table` and `column` are strings. |
 | `identity` | boolean or `null` | always | Identity column (`attidentity`, `is_identity_column`).  `null` when the engine cannot say. |
 | `computed` | boolean or `null` | always | Generated or computed column (`attgenerated`, `is_computed_column`).  `null` when the engine cannot say. |
@@ -91,8 +91,8 @@ Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar an
 
 1. **Unknown keys are ignored**, at every level, including inside type objects.  This is what makes section 3's additive changes free.
 2. **A missing key that the tables mark "always" is read as `null`**, and `null` means unknown or not applicable, except the keys a reader cannot do without, whose absence is malformed: `formatVersion`, `toolVersion` and `queries` at the top level; `hash`, `engine`, `resultKind` and `parameters` on an entry, and `columns` when `resultKind` is `"rows"`; `name`, `ordinal` and `nullable` on a parameter; `ordinal`, `name`, `type` and `nullable` on a column; `name` on a type object.  A reader therefore never distinguishes absent from `null` for the rest; the writer always writes the core keys so that diffs are uniform, and writes facets and engine-specific keys only when they have a value.
-3. **A key of the wrong JSON type**, a non-integer `formatVersion`, a duplicate query key, an `ordinal` that is not its index, `columns` present when `resultKind` is `"none"`, or a type object missing a key its engine requires, is a malformed file: one error at the file, no models from its queries, and the rest of the project is unaffected.
-4. **Unknown enumeration values** are handled per field: an unknown `engine` is an error at the sidecar naming the engine, an unknown `kind` inside a type is the "unsupported type" diagnostic at the column, an unknown `typeSource` reads as `"inferred"`, an unknown provenance value (`nullableSource`, `plan`, `tableMatch`) is ignored since the generator never reads them, an unknown `resultKind` is malformed.
+3. **A key of the wrong JSON type**, a non-integer `formatVersion`, a duplicate query key, an `ordinal` that is not its index, `columns` present when `resultKind` is `"none"`, or a type object missing a key the schema requires for its engine, is a malformed file: one error at the file, no models from its queries, and the rest of the project is unaffected.
+4. **Unknown enumeration values** are handled per field: an unknown `engine` is an error at the sidecar naming the engine, an unknown `kind` inside a type is the "unsupported type" diagnostic at the column, an unknown `typeSource` or other provenance value (`nullableSource`, `plan`, `tableMatch`) is ignored since the generator never reads them, an unknown `resultKind` is malformed.
 5. **Key order is not significant to a reader.**
 6. **Strings are compared ordinally**, except parameter names, which the generator already compares ignoring case.
 7. Everything a reader needs about a query is inside its entry; only the two versions come from the top level.
@@ -111,7 +111,7 @@ B looks like the forward-compatible one, but the core is where the trouble lives
 
 **Recommendation: A, with one shared convention.**  Every engine's type object has a required `name`: the type as that engine spells it, facets included, deterministic, so that a reader that knows nothing about the engine, the tool's own `--check` diff, a documentation generator, a reviewer, can show it.  Everything else in the object is the engine's own vocabulary.  A new engine adds a new `engine` value and a new object shape under section 3's additive rule; the old generator rejects the engine by name and is otherwise untouched.  The JSON Schema selects the shape with `if`/`then` on `engine`.
 
-### 2.2 PostgreSQL (`postgres`, `cockroachdb`)
+### 2.2 PostgreSQL (`postgres`)
 
 | Key | Type | Written | Meaning |
 |----|----|----|----|
@@ -1025,7 +1025,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 0
           },
           "nullable": false,
-          "nullableSource": "no-origin",
+          "nullableSource": "server",
           "origin": null,
           "identity": null,
           "computed": null
@@ -1047,7 +1047,7 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
   "title": "SqlSource sidecar, format version 1",
   "description": "Written by `sqlsource describe` beside a .sql file and read by the SqlSource source generator. This schema is strict and describes what the current tool writes; the generator's reader ignores keys it does not know.",
   "type": "object",
-  "required": ["_WARNING", "formatVersion", "toolVersion", "queries"],
+  "required": ["_WARNING", "$schema", "formatVersion", "toolVersion", "queries"],
   "additionalProperties": false,
   "properties": {
     "_WARNING": { "type": "string" },
@@ -1055,11 +1055,11 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
     "formatVersion": { "const": 1 },
     "toolVersion": {
       "type": "string",
-      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.-]+)?$"
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
     },
     "queries": {
       "type": "object",
-      "propertyNames": { "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+      "propertyNames": { "minLength": 1 },
       "additionalProperties": { "$ref": "#/$defs/query" }
     }
   },
@@ -1073,7 +1073,7 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
       "additionalProperties": false,
       "properties": {
         "hash": { "$ref": "#/$defs/hash" },
-        "engine": { "type": "string", "enum": ["postgres", "cockroachdb", "mssql"] },
+        "engine": { "type": "string", "enum": ["postgres", "mssql"] },
         "database": { "type": "string", "minLength": 1 },
         "serverVersion": { "type": "string" },
         "resultKind": { "type": "string", "enum": ["rows", "none"] },
@@ -1090,7 +1090,7 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
           "else": { "allOf": [{ "not": { "required": ["columns"] } }, { "not": { "required": ["matchesTable"] } }, { "not": { "required": ["plan"] } }, { "not": { "required": ["tableMatch"] } }] }
         },
         {
-          "if": { "properties": { "engine": { "enum": ["postgres", "cockroachdb"] } } },
+          "if": { "properties": { "engine": { "const": "postgres" } } },
           "then": {
             "properties": {
               "parameters": { "items": { "properties": { "type": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/postgresType" }] } } } },
@@ -1114,7 +1114,7 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
       "required": ["name", "ordinal", "type", "nullable"],
       "additionalProperties": false,
       "properties": {
-        "name": { "type": "string", "pattern": "^[A-Za-z0-9_]+$" },
+        "name": { "type": "string", "minLength": 1 },
         "ordinal": { "$ref": "#/$defs/ordinal" },
         "type": { "type": ["object", "null"] },
         "nullable": { "$ref": "#/$defs/triState" },
@@ -1215,5 +1215,5 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
 5. **SQL Server facets written verbatim** put `"maxLength": 4, "precision": 10, "scale": 0` on every `int`.  If that proves noisy in review, omitting the three when `name` has no parenthesis is the one mechanical rule that needs no type table, and it is additive.
 6. **PostgreSQL `name` qualification.**  Qualifying every type outside `pg_catalog` makes `name` session-independent at the cost of `public.user_status` where a user would write `user_status`.  The override key uses the same qualified form, which argues for it.
 7. **Range and multirange `subtype`.**  Both carry the element type.  If phase 3 maps a multirange to `NpgsqlRange<T>[]` it has what it needs; if it wants the range type's own name, that is an additive key.
-8. **CockroachDB** shares the PostgreSQL shape; whether the generator accepts it for `Models` is the epic's question, not the format's.
+8. **CockroachDB** is out of the epic; when it comes, it shares the PostgreSQL shape and the format needs only a new `engine` value, which is additive.
 9. **Cross-database origins on SQL Server.**  `source_database` is dropped; adding `database` to `origin` is additive when someone needs it.
