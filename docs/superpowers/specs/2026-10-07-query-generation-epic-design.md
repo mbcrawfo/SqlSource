@@ -179,6 +179,9 @@ Decided:
 - One file beside each `.sql` file: `Users.sql` has `Users.sql.json`.  The package's props include `**/*.sql.json` as `AdditionalFiles` the way they include `.sql` files, and the generator pairs the two by path.
 - The file carries two version tags: a format version, which is the compatibility contract between tool and generator, and the version of the tool that wrote it, so that a tool and a generator that are out of step are detected.
 - Each query's entry carries a hash of the SQL it describes.  An entry whose hash does not match the query is stale.
+- The format is a public contract and is specified in the [sidecar format design](2026-10-07-sidecar-format-design.md): the fields, the reader's rules, the engine-specific type objects, the compatibility rules, and a JSON Schema that phase 2 ships under `schemas/`.  In outline: a top level of `$schema`, `formatVersion`, `toolVersion` and `queries`; per query `hash`, `engine`, `database`, `serverVersion`, `resultKind`, `parameters` and `columns`; a flat type object per engine with a required `name` spelled as the engine spells it; tri-state `nullable`, `identity` and `computed`; an `origin` or null.  Only objects, arrays, strings, integers, booleans and null.
+- The sidecar records the description, not the decision: a column's `nullable` is what the server and the tool's inference established, and a column's `name` is as the server returned it, `!` or `?` suffix included.  The generator applies the suffix and the policy.  So the file is a faithful record and the policy can change without a database.
+- A change to the format is additive, with no version bump, when a reader of the previous format that ignores unknown keys still generates correct code from the new file: a new key, a new engine, a new type kind.  A rename, a retyping, a hash change, a new `resultKind` or a new required key bumps `formatVersion`.
 
 Recommended:
 
@@ -187,6 +190,7 @@ Recommended:
 - The format version is an integer.  The generator reads the versions it knows; a higher one is an error that says to update SqlSource, a lower one an error that says to run the tool.  A tool version that differs from the generator's while the format matches is a warning, since the two are released together and the snapshot is still readable.  The tool rewrites an entry whose tool version is not its own, so `describe` after an update refreshes everything without `--force`.
 - Entries are keyed by query name, in the file's order, so a diff follows the `.sql` file.
 - A schema fingerprint per origin table, to catch a schema change behind unchanged SQL without a database, is not in this epic.  `--check` in CI is the answer the epic gives.
+- A file with a query whose database has no connection in the run is not written, rather than mixing old and new entries under one `toolVersion`.
 
 What the generator does with a sidecar:
 
@@ -261,33 +265,30 @@ A suffix on the parameter in the SQL, `@id?`, was rejected: it is valid on neith
 
 ### Types in C#
 
-Recommended: the default C# type for a database type is **the type the driver boxes**.  A generated method reads with `GetFieldValue<T>` and could ask for any type the driver converts to, but the models also serve a project that runs them through Dapper or its own code, where the boxed type is the one that arrives without conversion.  One default serves both.  The rows that need a decision:
+Decided:
 
-| Database type | Default | Why, and the alternative |
-|----|----|----|
-| PostgreSQL `date`, `time` | `DateOnly`, `TimeOnly` | Npgsql 10 boxes these.  Npgsql 9 and earlier box `DateTime` and `TimeSpan`; a project option switches. |
-| SQL Server `date`, `time` | `DateTime`, `TimeSpan` | What SqlClient boxes.  `DateOnly` and `TimeOnly` are reachable through Dapper 2.1.86 and later; a project option switches. |
-| `timestamptz` | `DateTime` with `Kind.Utc` | What Npgsql 6 and later box.  `DateTimeOffset` is always offset zero; an option. |
-| `timestamp`, `datetime2`, `datetime` | `DateTime` | Kind Unspecified on both. |
-| `numeric`, `decimal`, `money` | `decimal` | Both drivers.  SQL precision 38 exceeds .NET's 28; the facets are kept in the description for a later diagnostic. |
-| `json`, `jsonb`, `xml`, SQL Server `json` | `string` | Both drivers box `string`.  Npgsql's POCO mapping is opt-in and not AOT-safe. |
-| `uuid`, `uniqueidentifier` | `Guid` | |
-| `bytea`, `varbinary`, `rowversion` | `byte[]` | |
-| PostgreSQL array | `T[]` of the mapped element | Npgsql's default.  An array that holds nulls needs `T?[]` for a value type and the server cannot say; a mapping override is the fix. |
-| PostgreSQL domain | Its base type's mapping | The server reports the domain; the describer resolves it. |
-| PostgreSQL enum | `string` | Requires `EnableUnmappedTypes()` on the data source in Npgsql 8 and later, which the README must say.  A project that calls `MapEnum<T>()` maps the enum's name to `T` with the override. |
-| PostgreSQL range, geometric types, `interval` | `NpgsqlRange<T>`, `NpgsqlPoint` and so on, `TimeSpan` | The model references `NpgsqlTypes`, which a project that uses Npgsql has. |
-| PostgreSQL composite, `record` | Unsupported in this epic | A diagnostic that names the column. |
-| `sql_variant` | `object` | |
-| `hierarchyid`, `geography`, `geometry` | Unsupported in this epic | Need `Microsoft.SqlServer.Types`; a diagnostic, and the override. |
-| SQL Server `vector` | Unsupported in this epic | SqlClient 6.1 and later only. |
-| Anything else | A diagnostic that names the type and the override | |
+- The type map covers **every type the driver can read**.  This outline does not enumerate them; each phase that adds an engine researches the driver's full list and populates the map, with a test per row.
+- Major libraries that extend the drivers' types get maps out of the box.  In the first version: NodaTime, through `Npgsql.NodaTime` on PostgreSQL and by conversion on SQL Server, where no plugin exists and the EF Core provider's conventions are followed; NetTopologySuite, through `Npgsql.NetTopologySuite` and `NetTopologySuite.IO.SqlServerBytes`; `JsonDocument` and `JsonElement`, built into Npgsql and by parsing on SQL Server; `SqlJson` on SqlClient 6.0 and later; and `BigInteger` for an unbounded `numeric`.  Left to the override or a later phase: Newtonsoft through `Npgsql.Json.NET`, `Npgsql.GeoJSON`, Pgvector, `SqlVector`, `Microsoft.SqlServer.Types` for `hierarchyid` and spatial, and the strongly-typed-id generators, which wrap a primitive the driver already reads.
+- A library's map is switched on by detection from the compilation, keyed on the plugin assembly where one exists, since a reference to `Npgsql.NodaTime` is the signal that the data source calls `UseNodaTime()`; and a property per library, `SqlSourceNodaTime`, overrides detection either way, since a project can reference NodaTime for other reasons and keep `DateTime` at the database layer.  The README says which `Use...()` call each plugin needs on the data source.
+- A map row has one of three shapes: a driver type read with `GetFieldValue<T>`; a plugin type read the same way once the plugin is registered; or a converted type, with a read and a write expression the generator inlines.  The third is what NodaTime on SQL Server needs, and it is the mechanism the override uses to map a column to a strongly-typed id.
+- The driver floor is **Npgsql 8.0 and Microsoft.Data.SqlClient 5.1**, tested against Npgsql 8, 9 and 10 and SqlClient 5.1, 6.1 and 7.  Npgsql 8 is the oldest line still patched and the first with the opt-in model the enum policy relies on.  SqlClient 5.1 is the first that reads `DateOnly` and `TimeOnly`; its mappings for every type in scope equal 7.1's.
+- The map tracks the driver by **feature, detected from the compilation by symbol**, never by version number.  SqlClient's assembly version is the major alone, `6.0.0.0` for both 6.0 and 6.1, so a version cannot tell the json release from the vector release; a symbol can.  The markers are the features themselves: `NpgsqlDataSourceBuilder.EnableUnmappedTypes` for Npgsql 8, `NpgsqlTypes.NpgsqlCube` for Npgsql 10, `Microsoft.Data.SqlTypes.SqlJson` for SqlClient 6.0, `SqlVector<T>` for 6.1.  The probe is one `Select` over the compilation that returns a small value-equal record of flags and assembly versions, as the .NET floor probe is today, combined after the parse so that typing never re-reads a file.  The versions serve diagnostics only.
 
+Recommended, the policies the maps follow:
+
+- The default C# type for a database type is **the type the driver boxes**.  A generated method reads with `GetFieldValue<T>` and could ask for any type the driver converts to, but the models also serve a project that runs them through Dapper or its own code, where the boxed type is the one that arrives without conversion.  One default serves both.
+- Where the two drivers disagree, each follows its own driver: PostgreSQL `date` and `time` are `DateOnly` and `TimeOnly`, which Npgsql 10 boxes; SQL Server's are `DateTime` and `TimeSpan`, which SqlClient boxes.  A project option switches either.  `timestamptz` is `DateTime` with `Kind.Utc`, with `DateTimeOffset` as an option.
+- `json`, `jsonb`, `xml` and SQL Server's `json` are `string` by default; a library map can change that.
+- A PostgreSQL array is `T[]` of the mapped element.  An array that holds nulls needs `T?[]` for a value type and the server cannot say; the override is the fix.
+- A PostgreSQL domain maps as its base type.  A PostgreSQL enum is `string` by default, which needs `EnableUnmappedTypes()` on the data source in Npgsql 8 and later, and the override maps it to a C# enum for a project that calls `MapEnum<T>()`.
+- A type the driver reads only with an extra package, `hierarchyid` and `geography` through `Microsoft.SqlServer.Types`, PostGIS through NetTopologySuite, is covered by that library's map, not by the base map.  A type the driver cannot read at all is a diagnostic that names the type and the override.
 - A nullable column is the C# type with `?`: `Nullable<T>` for a value type, the annotation for a reference type.
 - Facets, `varchar(50)` and `decimal(18,2)`, are dropped from the type, as every surveyed tool drops them, and kept in the description; the generator puts them in the member's documentation.
 - The override is a project-level mapping from a database type name to a C# type, `timestamptz` to `DateTimeOffset`, `public.status` to `MyApp.Status`.  Its MSBuild form is phase 3's; its property starts with `SqlSource`, as every property of the package does.  A per-column C# type override, SQLx's `AS "created: DateTimeOffset"`, is not in this epic.
 - The type map lives in the generator and never in the snapshot, so a better mapping needs no database, and one snapshot serves two projects that map differently.
-- The map yields two things for a parameter: the C# type, and what the generated method sets on the `DbParameter`: `DbType` where it is enough, or the provider's own type, `NpgsqlDbType` or `SqlDbType`, where it is not, such as `jsonb`, an array or an enum on PostgreSQL, and the facets for `SqlParameter`'s size, precision and scale.  The description already carries the facets.
+- The map yields two things for a parameter: the C# type, and what the generated method sets on the `DbParameter`: `DbType` where it is enough; on PostgreSQL, `NpgsqlParameter.DataTypeName` with the type's name where it is not, `jsonb`, `int[]`, `public.user_status`, which the sidecar already holds, which Npgsql has accepted since 4.0 and which from 10.0 takes precedence; on SQL Server, `SqlDbType` with the facets for size, precision and scale, which the description carries.  Generated code never names an `NpgsqlDbType` member, so it compiles against every supported Npgsql without a conditional.
+- Below the floor: one error per project naming the version found and the floor; models are still emitted, execution methods are not.  Driver absent: models are emitted, since a models-only project is legitimate, with an error only at a column whose type lives in `NpgsqlTypes`.  Newer than the generator knows: emit for the newest known flags and report an informational diagnostic, not a warning, since `TreatWarningsAsErrors` is common.  The README states the floor per dialect, as Kiota documents the runtime versions its output needs.
+- Npgsql 10's change of `date` and `time` to `DateOnly` and `TimeOnly` affects only non-generic reads.  `GetFieldValue<DateOnly>` works from Npgsql 6 and `GetFieldValue<DateTime>` still works on 10, so the generated methods are unaffected and the type map's default need not vary by driver version; the probe can at most warn when a project option disagrees with what the referenced driver boxes.
 
 ### Generated types
 
@@ -364,7 +365,7 @@ Theory tests over the rule under each dialect, including `@` inside strings, com
 
 1. `src/SqlSource.Tool`: the console application, its package, its command line, its exit codes and its error output format.
 2. Finding the unit of a run, listing a solution's projects, the `SqlSourceImported` marker, the manifest target in `SqlSource.targets` and its format, and running it to get the compiler's view of the `.sql` files with their dialects, databases and outputs.  Resolving the three settings per query with the shared code, and leaving out every project, file and query whose output is `Sql`.
-3. The snapshot model, the shared reader and writer, and the format version.
+3. The snapshot model, the shared reader and writer, and the format version, as the [sidecar format design](2026-10-07-sidecar-format-design.md) specifies; the JSON Schema under `schemas/`.
 4. `IQueryDescriber`, the engine-neutral `QueryDescription`, and the PostgreSQL describer over Npgsql, with nullability inference.
 5. `sqlsource describe`, `--check`, `--force`, `--database`, the connection options and the environment variables.  Token defaults substituted before describing; a token without one is an error.
 6. Publishing for the second package.
@@ -395,7 +396,7 @@ The PostgreSQL describer:
 
 1. **Parameters.**  `NpgsqlCommand.DeriveParameters()` on the original SQL.  It sends `Parse` with no types and `Describe`, and sets each parameter's `PostgresType`, a resolved object: a base type, a domain with its base, an array with its element, an enum with its labels, a range with its subtype, a composite with its fields.  Npgsql does the `@name` rewriting here, which is the lexer check under Parameters.  A `-- param:` type is declared instead.
 2. **Columns.**  `ExecuteReader(CommandBehavior.SchemaOnly | CommandBehavior.KeyInfo)` with the parameters typed from step 1, then `GetColumnSchema()`.  `SchemaOnly` sends `Parse` and `Describe` only.  `KeyInfo` makes Npgsql join `pg_attribute` for every column with a table origin and fill `AllowDBNull` from `attnotnull`, with `BaseSchemaName`, `BaseTableName` and `BaseColumnName`.  A column with no origin keeps `AllowDBNull` null.
-3. **Nullability through outer joins.**  The protocol does not report it.  `EXPLAIN (VERBOSE, FORMAT JSON)` of the query, and a walk of the plan that marks an output nullable when it is produced on the inner side of a `Left` join, the outer side of a `Right` join, or either side of a `Full` join.  Match plan outputs to result columns by origin relation, which the `RowDescription` and the plan's `Relation Name` and `Alias` both give, rather than by the text of the output expression as SQLx does; SQLx's one open bug is a `LEFT JOIN` the planner ran as a `Hash Right Join`, which a walk that reads join sides correctly handles.  On PostgreSQL 16 and later, `EXPLAIN (GENERIC_PLAN)` takes the `$n` form directly.  Below 16, `PREPARE` the statement, `SET plan_cache_mode = force_generic_plan`, and `EXPLAIN EXECUTE stmt(NULL, ...)`, then `DEALLOCATE`, which is SQLx's path.  A column whose origin relation the walk cannot find in the plan, and every column of a query whose plan could not be obtained, falls back to a keyword heuristic: if the lexer sees `LEFT`, `RIGHT`, `FULL` or `OUTER` outside strings and comments, the column is nullable.  Then the override, then the policy.
+3. **Nullability through outer joins.**  The protocol does not report it.  `EXPLAIN (VERBOSE, FORMAT JSON)` of the query, and a walk of the plan that marks an output nullable when it is produced on the inner side of a `Left` join, the outer side of a `Right` join, or either side of a `Full` join.  Match plan outputs to result columns by origin relation, which the `RowDescription` and the plan's `Relation Name` and `Alias` both give, rather than by the text of the output expression as SQLx does; SQLx's one open bug is a `LEFT JOIN` the planner ran as a `Hash Right Join`, which a walk that reads join sides correctly handles.  On PostgreSQL 16 and later, `EXPLAIN (GENERIC_PLAN)` takes the `$n` form directly.  Below 16, `PREPARE` the statement, `SET plan_cache_mode = force_generic_plan`, and `EXPLAIN EXECUTE stmt(NULL, ...)`, then `DEALLOCATE`, which is SQLx's path.  A column whose origin relation the walk cannot find in the plan, and every column of a query whose plan could not be obtained, falls back to a keyword heuristic: if the lexer sees `LEFT`, `RIGHT`, `FULL` or `OUTER` outside strings and comments, the column is nullable.  That is what the sidecar records.  The override suffix and the policy that unknown means nullable are the generator's, applied when it reads.
 4. CockroachDB is this describer with step 3 skipped: it rejects the `EXPLAIN` form and the `SET`, as SQLx found.
 
 The server's errors and what the tool says:
@@ -429,7 +430,7 @@ The snapshot round trip and the command line without a database.  The describer 
 
 1. The generator's pipeline reads `.sql.json` sidecars as a second file kind, paired by path, parsed with the shared reader into a value-equal record, cached like a parsed `.sql` file.  `SqlSourceOutput` takes effect: `Models` and `CodeGen` queries need an entry, `Sql` queries do not, and a `Models` or `CodeGen` query with a token that has no default is an error.
 2. Hash and version comparison per query, and the diagnostics under The sidecar.
-3. The PostgreSQL type map and the project-level mapping override.
+3. The PostgreSQL type map, every type Npgsql reads; the driver probe with its feature flags and floor diagnostics; the library maps for NodaTime, NetTopologySuite, `JsonDocument` and `BigInteger` with their detection and properties; and the project-level mapping override.
 4. Emission of the input and output types with documentation, and the override suffix stripped from names.
 5. The PostgreSQL end-to-end project.
 6. The README section on models.
@@ -460,7 +461,7 @@ Generator tests over sidecars: every row of the state table, the type map, namin
 ### Scope
 
 1. The SQL Server describer over Microsoft.Data.SqlClient.
-2. The SQL Server type map.
+2. The SQL Server type map, every type SqlClient reads, its driver probe, and the library maps for NodaTime by conversion, NetTopologySuite through the bytes reader, `JsonDocument` and `SqlJson`.
 3. The SQL Server end-to-end project.
 4. The README's SQL Server additions.
 
@@ -470,7 +471,7 @@ The describer:
 
 1. **Parameters.**  `sp_describe_undeclared_parameters @tsql` returns one row per undeclared `@name` with `suggested_system_type_name`, facets included, and `suggested_user_type_*` for alias and CLR types.  The engine takes the type from the innermost enclosing comparison, assignment, function argument, `INSERT` value or `CAST`.  A parameter used more than once is error 11508, which the common optional-filter pattern `WHERE (@name IS NULL OR name = @name)` triggers.  The tool renames each occurrence, `@name` to `@name_1`, `@name_2`, with the lexer, describes, and accepts the result when every copy came back the same type; copies that disagree are an error that names the parameter and the two types.  This is FSharp.Data.SqlClient's workaround without its T-SQL parser.  A `-- param:` type is declared in `@params` instead.
 2. **Columns.**  `sys.dm_exec_describe_first_result_set(@tsql, @params, 1)`, the table-valued form that returns a failure as a row with `error_number`, `error_message` and `error_type` instead of raising it.  `@params` is a declaration string built from step 1; the procedure requires every parameter declared, which is why parameters come first.  Browse information fills `source_schema`, `source_table` and `source_column` and adds hidden key columns that the tool drops by `is_hidden = 1`.  A batch with no result set returns no rows.  A column with `name` null, `SELECT 1`, is an error that asks for an alias.
-3. **Nullability** is the engine's: outer joins, `CASE`, `ISNULL` never null, `COALESCE` null unless every argument is non-null, and "1 if it can't be determined".  The tool takes it as given, then the override.
+3. **Nullability** is the engine's: outer joins, `CASE`, `ISNULL` never null, `COALESCE` null unless every argument is non-null, and "1 if it can't be determined".  The tool records it as given; the override is the generator's.
 
 The errors to expect:
 
@@ -518,7 +519,7 @@ The describer against a SQL Server container.  The SQL Server end-to-end project
 ### Technical notes
 
 - `GetFieldValue<DateOnly>` and `GetFieldValue<TimeOnly>` work on Microsoft.Data.SqlClient 5.1 and later and on Npgsql 6 and later; the type map's options for those types are honoured by asking for the chosen type.
-- `NpgsqlDbType` is needed for a parameter whose PostgreSQL type `DbType` cannot name: arrays, `jsonb`, enums, ranges.  Generated code that sets it references Npgsql, which a project that uses PostgreSQL has; the generator finds the provider by the file's dialect.
+- A parameter whose PostgreSQL type `DbType` cannot name, an array, `jsonb`, an enum, a range, is bound by setting `NpgsqlParameter.DataTypeName` to the type's name from the sidecar.  Generated code therefore casts to or constructs an `NpgsqlParameter`, which it does for the `postgres` dialect anyway, and never names an `NpgsqlDbType` member.  SQL Server's `json` binds as `nvarchar` on every version; `SqlDbTypeExtensions.Json`, in the `Microsoft.Data` namespace, waits for a phase that maps `SqlJson` and is gated on its flag.
 - A `SqlParameter` for `decimal` needs precision and scale set, or the server rounds; for `nvarchar(n)` a size, or the plan cache fragments.  The description's facets give both.
 
 ### Testing
@@ -549,7 +550,7 @@ The items under Workflow.  The target runs the tool through `dotnet sqlsource`, 
 - Using a token's default as the C# default value of the generated method's parameter.  A default is a sample for describing; whether it should also be a run-time default is a separate question.
 - Synchronous execution methods, streaming results as `IAsyncEnumerable<T>`, and bulk operations.  The method shapes in this epic are one row, a list and a count.
 - Sharing a type between queries that read the same columns, as sqlc does with table structs.  The origin fields are kept so that it can be added.
-- Per-column C# type overrides.  Composite, `record`, CLR and `vector` types.  Table-valued parameters.
+- Per-column C# type overrides.  Table-valued parameters.
 - A schema fingerprint in the snapshot.  Starting a database from the tool.
 
 ## Research
@@ -560,6 +561,8 @@ The epic was preceded by research into both approaches, which this outline conde
 - **Database-backed, prior art.**  SQLx's `.sqlx/query-<sha256>.json` holds `db_name`, `query`, `describe` with columns, parameters and a tri-state `nullable` list, and `hash`; `cargo sqlx prepare --check` for CI; `DATABASE_URL` for online and `SQLX_OFFLINE` for offline.  pgtyped speaks the protocol directly and does no outer-join analysis.  Prisma TypedSQL requires a database for `prisma generate --sql`.  FSharp.Data.SqlClient has used the two SQL Server procedures since 2014 and documents their limits.  SqlBound, a .NET package at release-candidate stage, does a prepare step with a committed JSON snapshot and a source generator.
 - **Other engines** and what they can answer without executing: MySQL's `COM_STMT_PREPARE` gives column types, a `NOT_NULL` flag and origins but reports every parameter as `VARCHAR`; SQLite gives declared types for table columns only and nothing for parameters; Oracle's `OCI_DESCRIBE_ONLY` gives column types and nullability but the client declares bind types; DuckDB infers parameter types and gives column types but no nullability or origin.
 - **Type mappings** of Npgsql 10 and Microsoft.Data.SqlClient, and Dapper's constructor and name matching, are as stated under Types in C# and Generated types.
+- **Driver versions.**  Npgsql's assembly version is its package version; SqlClient's is the major alone, verified from the packages' metadata.  Npgsql 8, 9 and 10 and SqlClient 6.1 and 7 are the serviced lines; SqlClient 6.1 is the LTS until 2028.  `NpgsqlParameter.DataTypeName` has existed since Npgsql 4.0.  Dapper.AOT checks no driver version and stays on the ADO.NET surface; the EF Core Npgsql provider pins the driver major through its package graph; Kiota documents the exact runtime versions its output needs.
+- **Type libraries.**  NodaTime has 338 million downloads and a first-party Npgsql plugin with 26 million; NetTopologySuite 249 million, with 36 million for the Npgsql plugin and 92 million for the SQL Server bytes reader.  `Microsoft.SqlServer.Types` is under a proprietary licence with redistribution limits.  Npgsql's own type plugins are exactly four: NodaTime, NetTopologySuite, GeoJSON and Json.NET; Pgvector is the only third-party one with comparable use.
 
 ### Sources
 
@@ -575,4 +578,6 @@ Prior art, static: sqlc [config](https://docs.sqlc.dev/en/latest/reference/confi
 
 Other engines: MySQL [COM_STMT_PREPARE](https://dev.mysql.com/doc/dev/mysql-server/latest/page_protocol_com_stmt_prepare.html), [bug 23385](https://bugs.mysql.com/bug.php?id=23385); SQLite [column_decltype](https://sqlite.org/c3ref/column_decltype.html), [table_column_metadata](https://sqlite.org/c3ref/table_column_metadata.html); SQLx [sqlx-sqlite explain.rs](https://github.com/launchbadge/sqlx/blob/main/sqlx-sqlite/src/connection/explain.rs); Oracle [OCI statement functions](https://docs.oracle.com/en/database/oracle/oracle-database/19/lnoci/statement-functions.html); [DuckDB prepared statements](https://duckdb.org/docs/current/clients/c/prepared.html).
 
-Dapper, Roslyn and MSBuild: [DefaultTypeMap.cs](https://github.com/DapperLib/Dapper/blob/main/Dapper/DefaultTypeMap.cs), [PR 2228 DateOnly](https://github.com/DapperLib/Dapper/pull/2228), [incremental generators cookbook](https://github.com/dotnet/roslyn/blob/main/docs/features/incremental-generators.cookbook.md), [analyzer banned symbols](https://github.com/dotnet/roslyn/blob/main/src/RoslynAnalyzers/Microsoft.CodeAnalysis.Analyzers/Core/AnalyzerBannedSymbols.txt), [Testcontainers modules](https://dotnet.testcontainers.org/modules/).
+Drivers and libraries: [Npgsql release notes](https://www.npgsql.org/doc/release-notes/10.0.html), [NodaTime plugin](https://www.npgsql.org/doc/types/nodatime.html), [NetTopologySuite plugin](https://www.npgsql.org/doc/types/nts.html), [DataTypeName.cs](https://github.com/npgsql/npgsql/blob/main/src/Npgsql/Internal/Postgres/DataTypeName.cs), [SqlClient support lifecycle](https://learn.microsoft.com/en-us/sql/connect/ado-net/sqlclient-driver-support-lifecycle), SqlClient release notes [7.1](https://github.com/dotnet/SqlClient/blob/main/release-notes/7.1/7.1.0.md), [SqlDbTypeExtensions](https://learn.microsoft.com/en-us/dotnet/api/microsoft.data.sqldbtypeextensions), [NetTopologySuite.IO.SqlServerBytes](https://github.com/NetTopologySuite/NetTopologySuite.IO.SqlServerBytes), [EFCore.SqlServer.NodaTime](https://github.com/StevenRasmussen/EFCore.SqlServer.NodaTime), [Compilation.ReferencedAssemblyNames](https://learn.microsoft.com/en-us/dotnet/api/microsoft.codeanalysis.compilation.referencedassemblynames), [Kiota](https://learn.microsoft.com/en-us/openapi/kiota/using), [Dapper.AOT](https://aot.dapperlib.dev/gettingstarted).
+
+Dapper, Roslyn and MSBuild: [DefaultTypeMap.cs](https://github.com/DapperLib/Dapper/blob/main/Dapper/DefaultTypeMap.cs), [PR 2051 DateOnly](https://github.com/DapperLib/Dapper/pull/2051), [incremental generators cookbook](https://github.com/dotnet/roslyn/blob/main/docs/features/incremental-generators.cookbook.md), [analyzer banned symbols](https://github.com/dotnet/roslyn/blob/main/src/RoslynAnalyzers/Microsoft.CodeAnalysis.Analyzers/Core/AnalyzerBannedSymbols.txt), [Testcontainers modules](https://dotnet.testcontainers.org/modules/).
