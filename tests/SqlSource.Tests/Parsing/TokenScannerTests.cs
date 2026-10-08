@@ -150,6 +150,35 @@ public class TokenScannerTests
         error.Arguments.ShouldBe(["default"]);
     }
 
+    // Pins the result for openers that have no "}}" after them: each is literal text, however many there are, and
+    // whatever the name after the opener is.
+    [Theory]
+    [InlineData("{{a: {{b: {{c:")]
+    [InlineData("x {{a: y {{b: z {{a: w")]
+    [InlineData("{{1a: {{b: {{")]
+    public void Scan_UnclosedOpenersWithDefaults_AreAllLiteral(string sql)
+    {
+        Scan(sql).ShouldBe(["L:" + sql]);
+        Defaults(sql).ShouldBeEmpty();
+    }
+
+    // Pins the rule that a default runs to the first "}}", even over another opener: the first token is `a` with a
+    // default that holds the openers after it, and the closed token inside it is not a token of its own.
+    [Fact]
+    public void Scan_UnclosedOpenersBeforeAClosedToken_TakeTheFirstOpenersDefaultToTheFirstClose()
+    {
+        Defaults("{{a: {{b: {{c:x}}").ShouldBe(["a={{b: {{c:x"]);
+        Scan("{{a: {{b: {{c:x}}").ShouldBe(["T:a"]);
+    }
+
+    // Pins that an opener whose name is not an identifier stays literal, and does not hide a closed token after it.
+    [Fact]
+    public void Scan_OpenerWithABadNameBeforeAClosedToken_StaysLiteral()
+    {
+        Scan("{{1a: {{b:x}}").ShouldBe(["L:{{1a: ", "T:b"]);
+        Defaults("{{1a: {{b:x}}").ShouldBe(["b=x"]);
+    }
+
     private static string[] Defaults(string sql, params string[] ignoredNames) =>
         [
             .. TokenScanner

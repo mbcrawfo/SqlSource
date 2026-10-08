@@ -23,9 +23,13 @@ internal static class TokenScanner
         ImmutableArray<SqlTokenOccurrence>.Builder? occurrences = null;
         var literalStart = 0;
         var index = 0;
+
+        // From this offset on there is no "}}": a search for one found none.  A later opener with a default need not
+        // search again, so a block of many unclosed openers costs one search and not one for each.
+        var noCloseFrom = int.MaxValue;
         while (index < sql.Length)
         {
-            if (!TryReadToken(sql, index, out var name, out var defaultSpan, out var end))
+            if (!TryReadToken(sql, index, ref noCloseFrom, out var name, out var defaultSpan, out var end))
             {
                 index++;
             }
@@ -91,6 +95,21 @@ internal static class TokenScanner
     /// <returns>True when a token starts at <paramref name="start" />.</returns>
     public static bool TryReadToken(string sql, int start, out string name, out TextSpan? defaultSpan, out int end)
     {
+        var noCloseFrom = int.MaxValue;
+        return TryReadToken(sql, start, ref noCloseFrom, out name, out defaultSpan, out end);
+    }
+
+    // noCloseFrom is what the caller has learned from earlier calls on the same SQL: no "}}" starts at or after that
+    // offset.  A search that finds none lowers it.
+    private static bool TryReadToken(
+        string sql,
+        int start,
+        ref int noCloseFrom,
+        out string name,
+        out TextSpan? defaultSpan,
+        out int end
+    )
+    {
         name = string.Empty;
         defaultSpan = null;
         end = 0;
@@ -107,28 +126,28 @@ internal static class TokenScanner
         }
 
         var after = SkipBlanks(sql, nameEnd);
-        int close;
-        if (CharAt(sql, after) == ':')
-        {
-            close = sql.IndexOf("}}", after + 1, StringComparison.Ordinal);
-            if (close < 0)
-            {
-                return false;
-            }
-        }
-        else if (CharAt(sql, after) == '}' && CharAt(sql, after + 1) == '}')
-        {
-            close = after;
-        }
-        else
+        var hasDefault = CharAt(sql, after) == ':';
+        if (!hasDefault && (CharAt(sql, after) != '}' || CharAt(sql, after + 1) != '}'))
         {
             return false;
         }
 
+        // The name is checked before the search for the closing braces, so that text such as "{{1a:" costs none.
         name = sql.Substring(nameStart, nameEnd - nameStart);
         if (!SqlIdentifier.IsValid(name))
         {
             return false;
+        }
+
+        var close = after;
+        if (hasDefault)
+        {
+            close = after + 1 >= noCloseFrom ? -1 : sql.IndexOf("}}", after + 1, StringComparison.Ordinal);
+            if (close < 0)
+            {
+                noCloseFrom = Math.Min(noCloseFrom, after + 1);
+                return false;
+            }
         }
 
         if (close > after)
