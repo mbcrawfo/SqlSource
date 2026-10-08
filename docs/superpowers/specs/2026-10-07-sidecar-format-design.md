@@ -20,6 +20,7 @@ Settled with the owner after the format was proposed.  The open questions in sec
 | `source_database` on SQL Server | Not stored; adding `database` to `origin` is additive. |
 | The JSON Schema | Shipped in the repository under `schemas/`, one file per format version, by phase 2. |
 | `matchesTable` | Added after the proposal, for table models.  An object with the shape of `origin` without `column`, or `null`, on entries with rows. |
+| Provenance | Added after the proposal, from the diagnostics design: `nullableSource` on every column, `plan` and `tableMatch` on every entry with rows, and `inferred-from-copies` as a third `typeSource`.  Informational: the generator never branches on them.  They say which step decided a value, so that a bug report holding only the entry already names the step. |
 
 ## 0. Prior art
 
@@ -55,6 +56,8 @@ A file whose `queries` would be empty is deleted by the tool, never written empt
 | `resultKind` | `"rows"` or `"none"` | always | Whether the statement produces a result set. |
 | `parameters` | array | always | In parameter order; empty when the query has none. |
 | `columns` | array | iff `resultKind` is `"rows"` | In result order.  Absent, not empty, when there is no result set. |
+| `plan` | `"not-needed"`, `"walked"`, `"unavailable"` or `"skipped"` | iff `resultKind` is `"rows"` | Whether the nullability plan walk ran: not needed because the query has no outer-join keyword; walked; unavailable because `EXPLAIN` failed, which the log shows; skipped because the engine has no walk, SQL Server and CockroachDB.  Provenance. |
+| `tableMatch` | string | iff `resultKind` is `"rows"` | The first failing check of the table match, in a fixed order: `"matched"`, `"no-origin"`, `"several-tables"`, `"names-differ"`, `"columns-differ"`, `"order-differs"`, `"nullability-differs"`.  Provenance for `matchesTable`. |
 | `matchesTable` | object or `null` | iff `resultKind` is `"rows"` | `{ "schema", "table" }` of the table whose column list the result is exactly, by the epic's rule under Models: every column originates in that table, the names are the table's unchanged, the columns are the table's full list in the table's order, and each column's nullability is the table column's.  `null` when no table matches.  The generator names the model after the table. |
 
 Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar and the hash proves equality; SQLx's copy doubles every diff), a timestamp (it changes on every run), the C# types (the generator's map evolves without a database), and anything about tokens beyond what the hash covers.  Names and defaults are in the SQL, the sample is reconstructible from it, and the method's `string` parameters come from the lexer.  An entry for a token query is indistinguishable from one for a plain query, which is the point: the describer saw a plain query.
@@ -67,7 +70,7 @@ Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar an
 | `ordinal` | integer | always | Zero-based position; must equal the array index. |
 | `type` | object or `null` | always | The engine's type object (section 2).  `null` when neither the server nor a declaration gave a type, which the two engines in scope never produce but a future one may. |
 | `nullable` | boolean or `null` | always | `true` when a `-- param:` marker says `null`.  Otherwise `null`: no engine reports parameter nullability.  `false` is reserved for a future marker that says "not null". |
-| `typeSource` | `"inferred"` or `"declared"` | when `type` is not `null` | Whether the server inferred the type from the query or resolved a type the user declared with `-- param:`.  Explains a `varchar(8000)` in review. |
+| `typeSource` | `"inferred"`, `"inferred-from-copies"` or `"declared"` | when `type` is not `null` | Whether the server inferred the type from the query, inferred it after the tool renamed each occurrence of a reused SQL Server parameter and every copy agreed, or resolved a type the user declared with `-- param:`.  Explains a `varchar(8000)` in review. |
 
 ### 1.4 A column
 
@@ -77,6 +80,7 @@ Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar an
 | `name` | string | always | Exactly as the server returned it, override suffix included: `"deleted_at?"`.  The sidecar records the description; the generator strips the suffix and applies the override. |
 | `type` | object | always | The engine's type object (section 2).  Never `null`: a column whose type the server cannot name is a tool error, not an entry. |
 | `nullable` | boolean or `null` | always | What the server and the tool's inference established; `null` is unknown.  The policy that makes unknown nullable stays out of the file so a reader can tell "the server said nullable" from "nobody knows". |
+| `nullableSource` | string | always | Which layer decided `nullable`: `"server"`, the engine reports it (every SQL Server column); `"catalog"`, the origin's `NOT NULL` flag, and on PostgreSQL the walk found the origin on no null-extending side; `"outer-join"`, the walk found it on one; `"view"`, the origin is a view; `"no-origin"`; `"heuristic"`, the plan was unavailable or the origin was not found in it and an outer-join keyword made the column nullable.  Inside the walk `outer-join` beats `view` beats `catalog`.  The `!`/`?` override is never a source: the generator applies it.  Provenance. |
 | `origin` | object or `null` | always | `{ "schema", "table", "column" }` of the base column, or `null` for an expression, aggregate, cast, set operation or `USING` column.  `schema` may be `null` for an engine without schemas; `table` and `column` are strings. |
 | `identity` | boolean or `null` | always | Identity column (`attidentity`, `is_identity_column`).  `null` when the engine cannot say. |
 | `computed` | boolean or `null` | always | Generated or computed column (`attgenerated`, `is_computed_column`).  `null` when the engine cannot say. |
@@ -86,7 +90,7 @@ Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar an
 1. **Unknown keys are ignored**, at every level, including inside type objects.  This is what makes section 3's additive changes free.
 2. **A missing key that the tables mark "always" is read as `null`**, and `null` means unknown or not applicable.  A reader therefore never distinguishes absent from `null`; the writer always writes the core keys so that diffs are uniform, and writes facets and engine-specific keys only when they have a value.
 3. **A key of the wrong JSON type**, a non-integer `formatVersion`, a duplicate query key, an `ordinal` that is not its index, `columns` present when `resultKind` is `"none"`, or a type object missing a key its engine requires, is a malformed file: one error at the file, no models from its queries, and the rest of the project is unaffected.
-4. **Unknown enumeration values** are handled per field: an unknown `engine` is an error at the sidecar naming the engine, an unknown `kind` inside a type is the "unsupported type" diagnostic at the column, an unknown `typeSource` reads as `"inferred"`, an unknown `resultKind` is malformed.
+4. **Unknown enumeration values** are handled per field: an unknown `engine` is an error at the sidecar naming the engine, an unknown `kind` inside a type is the "unsupported type" diagnostic at the column, an unknown `typeSource` reads as `"inferred"`, an unknown provenance value (`nullableSource`, `plan`, `tableMatch`) is ignored since the generator never reads them, an unknown `resultKind` is malformed.
 5. **Key order is not significant to a reader.**
 6. **Strings are compared ordinally**, except parameter names, which the generator already compares ignoring case.
 7. Everything a reader needs about a query is inside its entry; only the two versions come from the top level.
@@ -224,6 +228,8 @@ LIMIT @limit;
       "serverVersion": "16.4",
       "resultKind": "rows",
       "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
       "parameters": [
         {
           "name": "id",
@@ -249,6 +255,7 @@ LIMIT @limit;
             "internalName": "int4"
           },
           "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -268,6 +275,7 @@ LIMIT @limit;
             "length": 100
           },
           "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -293,6 +301,7 @@ LIMIT @limit;
             }
           },
           "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -311,6 +320,7 @@ LIMIT @limit;
             "internalName": "timestamptz"
           },
           "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -329,6 +339,7 @@ LIMIT @limit;
             "internalName": "timestamptz"
           },
           "nullable": true,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -346,6 +357,8 @@ LIMIT @limit;
       "serverVersion": "16.4",
       "resultKind": "rows",
       "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "columns-differ",
       "parameters": [
         {
           "name": "name",
@@ -408,6 +421,7 @@ LIMIT @limit;
             "internalName": "int4"
           },
           "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -426,6 +440,7 @@ LIMIT @limit;
             "internalName": "timestamptz"
           },
           "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -464,6 +479,8 @@ LIMIT @limit;
       "serverVersion": "16.4",
       "resultKind": "rows",
       "matchesTable": null,
+      "plan": "not-needed",
+      "tableMatch": "no-origin",
       "parameters": [
         {
           "name": "statuses",
@@ -512,6 +529,7 @@ LIMIT @limit;
             "internalName": "int4"
           },
           "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -531,6 +549,7 @@ LIMIT @limit;
             "length": 100
           },
           "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -555,6 +574,7 @@ LIMIT @limit;
             }
           },
           "nullable": true,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -578,6 +598,7 @@ LIMIT @limit;
             ]
           },
           "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -596,6 +617,7 @@ LIMIT @limit;
             "internalName": "int4"
           },
           "nullable": null,
+          "nullableSource": "no-origin",
           "origin": null,
           "identity": null,
           "computed": null
@@ -610,6 +632,7 @@ LIMIT @limit;
             "internalName": "text"
           },
           "nullable": null,
+          "nullableSource": "no-origin",
           "origin": null,
           "identity": null,
           "computed": null
@@ -662,6 +685,8 @@ ORDER BY {{orderBy:Id DESC}};
       "serverVersion": "16.0.4135.4",
       "resultKind": "rows",
       "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
       "parameters": [
         {
           "name": "id",
@@ -687,6 +712,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 0
           },
           "nullable": false,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -709,6 +735,7 @@ ORDER BY {{orderBy:Id DESC}};
             }
           },
           "nullable": false,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -727,6 +754,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 2
           },
           "nullable": false,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -745,6 +773,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 0
           },
           "nullable": true,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -763,6 +792,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 0
           },
           "nullable": false,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -780,6 +810,8 @@ ORDER BY {{orderBy:Id DESC}};
       "serverVersion": "16.0.4135.4",
       "resultKind": "rows",
       "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "columns-differ",
       "parameters": [
         {
           "name": "customerId",
@@ -833,6 +865,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 0
           },
           "nullable": false,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -851,6 +884,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 0
           },
           "nullable": false,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -889,6 +923,8 @@ ORDER BY {{orderBy:Id DESC}};
       "serverVersion": "16.0.4135.4",
       "resultKind": "rows",
       "matchesTable": null,
+      "plan": "skipped",
+      "tableMatch": "no-origin",
       "parameters": [
         {
           "name": "top",
@@ -926,6 +962,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 0
           },
           "nullable": false,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -944,6 +981,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 2
           },
           "nullable": false,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -962,6 +1000,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 4
           },
           "nullable": true,
+          "nullableSource": "server",
           "origin": {
             "schema": "dbo",
             "table": "Orders",
@@ -980,6 +1019,7 @@ ORDER BY {{orderBy:Id DESC}};
             "scale": 0
           },
           "nullable": false,
+          "nullableSource": "no-origin",
           "origin": null,
           "identity": null,
           "computed": null
@@ -1032,13 +1072,15 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
         "resultKind": { "type": "string", "enum": ["rows", "none"] },
         "parameters": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
         "columns": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/column" } },
-        "matchesTable": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/tableRef" }] }
+        "matchesTable": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/tableRef" }] },
+        "plan": { "type": "string", "enum": ["not-needed", "walked", "unavailable", "skipped"] },
+        "tableMatch": { "type": "string", "enum": ["matched", "no-origin", "several-tables", "names-differ", "columns-differ", "order-differs", "nullability-differs"] }
       },
       "allOf": [
         {
           "if": { "properties": { "resultKind": { "const": "rows" } } },
-          "then": { "required": ["columns", "matchesTable"] },
-          "else": { "allOf": [{ "not": { "required": ["columns"] } }, { "not": { "required": ["matchesTable"] } }] }
+          "then": { "required": ["columns", "matchesTable", "plan", "tableMatch"] },
+          "else": { "allOf": [{ "not": { "required": ["columns"] } }, { "not": { "required": ["matchesTable"] } }, { "not": { "required": ["plan"] } }, { "not": { "required": ["tableMatch"] } }] }
         },
         {
           "if": { "properties": { "engine": { "enum": ["postgres", "cockroachdb"] } } },
@@ -1069,20 +1111,21 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
         "ordinal": { "$ref": "#/$defs/ordinal" },
         "type": { "type": ["object", "null"] },
         "nullable": { "$ref": "#/$defs/triState" },
-        "typeSource": { "type": "string", "enum": ["inferred", "declared"] }
+        "typeSource": { "type": "string", "enum": ["inferred", "inferred-from-copies", "declared"] }
       },
       "if": { "properties": { "type": { "type": "object" } } },
       "then": { "required": ["typeSource"] }
     },
     "column": {
       "type": "object",
-      "required": ["ordinal", "name", "type", "nullable", "origin", "identity", "computed"],
+      "required": ["ordinal", "name", "type", "nullable", "nullableSource", "origin", "identity", "computed"],
       "additionalProperties": false,
       "properties": {
         "ordinal": { "$ref": "#/$defs/ordinal" },
         "name": { "type": "string" },
         "type": { "type": "object" },
         "nullable": { "$ref": "#/$defs/triState" },
+        "nullableSource": { "type": "string", "enum": ["server", "catalog", "outer-join", "view", "no-origin", "heuristic"] },
         "origin": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/origin" }] },
         "identity": { "$ref": "#/$defs/triState" },
         "computed": { "$ref": "#/$defs/triState" }
