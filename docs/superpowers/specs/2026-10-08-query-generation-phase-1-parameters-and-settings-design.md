@@ -11,10 +11,10 @@ Everything the later phases read from a `.sql` file, from the attribute and from
 ```sql
 -- dialect: postgres
 -- output: models
--- token: {{filter:AND deleted_at IS NULL}}
 
 -- name: FindUsers -> many
 -- summary: Finds users by name.
+-- token: {{filter:AND deleted_at IS NULL}}
 -- param: @since timestamptz not null
 -- param: @page int
 -- output-model: UserRow
@@ -46,12 +46,13 @@ Success is:
 
 From the epic, unchanged: the `@name` rule; the parameter list rule; token defaults and their markers; `-- token-ignore:` as a marker; the hash's definition; the `-> shape` suffix; the settings and their precedence; generator parameters at every level, each level setting the list whole; `SqlSourceTokenValidation` and `SQLSRC010` removed; `InternalsVisibleTo` for the tool.
 
-Settled with the owner for this phase.  The first three change the epic, and the outline is updated in the commit that adds this spec:
+Settled with the owner for this phase.  The first four change the epic, and the outline is updated in the commit that adds this spec:
 
 | Decision | Choice | Why |
 |----|----|----|
 | Method location | Set by the attribute's `MethodLocation` only.  No marker, no `SqlSourceMethodLocation` property, no metadata | It is a property of the type, as `SqlLocation` is: where a type's members go is decided where the type is declared. |
 | `not null` on `-- param:` | Accepted: `-- param: @since timestamptz not null` | It is redundant, since a parameter is non-nullable unless it says `null`, but it is what a column definition says and what a user will write. |
+| The `-- token:` marker | Inside a query only.  Not in the preamble | A default is a sample for one query's SQL.  A token of the same name in another query stands in other SQL, and its sample is that query's to give. |
 | `keep-comments` outside a marker | The parser always builds the comment-stripped SQL, and builds the SQL with comments as well when it may be wanted | The parameter is the only one that changes what the parser builds, and the levels above the markers resolve after the parse, per type and query.  See Two forms of a query's SQL. |
 | How the settings are modelled | One all-nullable record, `SettingsLevel`, filled by each source, and one `Resolve` that takes the first value of each field | The epic asks for one rule and no sibling types. |
 | Values from a fixed list | Matched ignoring case, and ignoring hyphens and spaces inside the value: `CodeGen`, `codegen`, `code-gen`; `sealed record`, `SealedRecord` | One rule for the marker, the property and the metadata, whichever spelling the reader of each expects. |
@@ -90,7 +91,7 @@ The rule is phase 0's: a line comment that starts its line and reads `-- word: r
 | `dialect` | yes | no | As today |
 | `generator` | yes | yes | Generator parameters, below |
 | `param` | no | yes | `@name [type] [null \| not null]` |
-| `token` | yes | yes | Exactly one `{{name:default}}` |
+| `token` | no | yes | Exactly one `{{name:default}}` |
 | `token-ignore` | no | yes | One token name |
 | `database` | yes | yes | A database name |
 | `output` | yes | yes | `sql`, `models` or `codegen` |
@@ -149,7 +150,7 @@ The parameter stays in the SQL as written.  Nothing is generated from the list i
 Two errors come from the rule:
 
 - `SQLSRC117`: a `-- param:` marker without a type for a parameter that the static SQL does not hold.  Such a parameter reaches the query only through a token, so nothing else can type it.  At the marker.
-- `SQLSRC118`: a parameter that appears in the resolved default of one of the query's tokens, and in neither the static SQL nor a marker.  At the parameter, in the SQL or in the `-- token:` marker that holds the default.  Reported once for a place, however many queries a preamble's marker serves.
+- `SQLSRC118`: a parameter that appears in the resolved default of one of the query's tokens, and in neither the static SQL nor a marker.  At the parameter, in the SQL or in the `-- token:` marker that holds the default.
 
 A marker that names a parameter with a type, which neither the SQL nor any default holds, is not an error: a fragment passed at run time may use it.
 
@@ -158,14 +159,13 @@ A marker that names a parameter with a type, which neither the SQL nor any defau
 - `{{name:default}}` is the token `name`.  The name is as today, with blanks allowed around it; the default is everything after the first `:` up to the first `}}`, trimmed, and may be empty or span lines.  `{{cast:x::int}}` has the default `x::int`.
 - The generated method is unchanged: one `string` parameter for each token name, and the SQL with the argument in the token's place.  A default reaches no generated code.
 - A token whose name a `-- token-ignore:` marker of its query lists stays literal text, default included.
-- `-- token: {{name:default}}` gives a default by marker.  Its value is exactly one token with a default: text outside the braces, or a token with no colon, is `SQLSRC111`.  A name that is a reserved keyword is `SQLSRC114`.  The default is taken as written, and is lexed alone under the file's dialect to find its parameters; a quote or a block comment that does not close inside it is `SQLSRC111`.
+- `-- token: {{name:default}}`, inside a query, gives a default by marker, for a token that the query writes several times or whose sample is long.  Its value is exactly one token with a default: text outside the braces, or a token with no colon, is `SQLSRC111`.  A name that is a reserved keyword is `SQLSRC114`.  The default is taken as written, and is lexed alone under the file's dialect to find its parameters; a quote or a block comment that does not close inside it is `SQLSRC111`.
 - `-- token-ignore: name` takes one identifier.  Several markers accumulate.
 
-A token's **resolved default** in a query is the first of: the query's own default, inline or by a marker in the query; the preamble's marker for that name; none.
+A token's **resolved default** is the one its query gives it, inline or by marker, or none.
 
-- Two defaults for one token at query level that differ are `SQLSRC112` at the second in file order: two inline occurrences, two markers, or one of each.  Occurrences without a default beside one with a default are fine.
-- Two preamble markers for one token that differ are `SQLSRC112` at the second.
-- A marker for a token that no query holds is not an error.
+- Two defaults for one token that differ are `SQLSRC112` at the second in file order: two inline occurrences, two markers, or one of each.  Occurrences without a default beside one with a default are fine.
+- A marker for a token that its query does not hold is not an error.
 
 ### Generator parameters
 
@@ -269,7 +269,7 @@ Plain data and the readers of values, with no file access, no symbols and no pip
 - **`TokenScanner`** reads the default, and its result gains each token's extent in the scanned SQL and its default.  The reader of one token is shared with the `-- token:` marker.
 - **`SqlMarkerReader`** knows the new words.  A word that is the start of another, `token:` and `token-ignore:`, is no problem: the colon is part of what is matched.
 - **`SqlGeneratorParameterScope`** holds a scope's `GeneratorParameters?` and reads through `GeneratorParameterList`.  `TokenValidation`, `IgnoredTokens` and `KeepComments` go.
-- **`SqlMarkerScope`**, new: what the markers of one scope give, the preamble or one query.  It holds a `SettingsLevel` being built, the scope's token defaults, and for a query its declarations, ignored tokens, model names and summary.  `SqlFileParser.ReadPreamble` and `ReadBlock` hand it each marker with whether the marker is allowed there; it reports `SQLSRC111`, `SQLSRC112` and `SQLSRC116`.  This is what keeps `SqlFileParser` from growing a branch for each word.
+- **`SqlMarkerScope`**, new: what the markers of one scope give, the preamble or one query.  It holds a `SettingsLevel` being built, and for a query its token defaults, declarations, ignored tokens, model names and summary.  `SqlFileParser.ReadPreamble` and `ReadBlock` hand it each marker with whether the marker is allowed there; it reports `SQLSRC111`, `SQLSRC112` and `SQLSRC116`.  This is what keeps `SqlFileParser` from growing a branch for each word.
 - **`SqlFileParser`** takes a second input, whether comments may be wanted, and its result gains the file's dialect as it is after the header.  `ReadBlock` builds the stripped SQL, scans it, sorts each parameter into static or in-a-default by the tokens' extents, applies the parameter list rule, and builds the kept SQL when it is wanted.  Errors with one kind, one span and the same arguments are reported once.
 - **`SqlBlock`** becomes:
 
@@ -346,10 +346,10 @@ What an edit costs:
 
 One pull request, one commit for each step.  Each leaves `./pre-commit-validation.sh` passing, and each brings its tests, its diagnostics' four places, and the parts of `README.md`, `docs/diagnostics.md` and `src/SqlSource/AGENTS.md` it makes wrong.
 
-1. This spec, and the epic outline: the row links here and says In progress, and the three owner decisions are recorded.  The one line of the sidecar format design that reserves `nullable: false`.
+1. This spec, and the epic outline: the row links here and says In progress, and the four owner decisions are recorded.  The one line of the sidecar format design that reserves `nullable: false`.
 2. The `Parameter` lexeme, the prefix in the rules, and the static parameter list on `SqlBlock` and `SqlQuery`.
-3. Token defaults: `{{name:default}}`, the `-- token:` marker, `Tokens`, and static against in-a-default parameters.
-4. `-- token-ignore:`, and `token-ignore=` dropped; `SQLSRC116`, which this is the first marker to need.
+3. Token defaults: `{{name:default}}`, the `-- token:` marker, `Tokens`, and static against in-a-default parameters; `SQLSRC116`, which this is the first marker to need.
+4. `-- token-ignore:`, and `token-ignore=` dropped.
 5. `-- param:`, the parameter list rule, `SQLSRC117` and `SQLSRC118`.
 6. The hash.
 7. The `-> shape` suffix.
@@ -369,7 +369,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 | `SqlDialectRulesTests` | The prefix is a cell of the table, for every dialect and option set |
 | `TokenScannerTests` | A default, an empty one, one with `:` and one over two lines; `{{a:` with no close is literal; an ignored name keeps its default as text |
 | `SqlMarkerReaderTests` | Each new word, in any case; a word that only starts like one is not a marker |
-| `SqlFileParserTests` | For each marker: its value, each scope, the same value twice, two values, after the last SQL, with the span and argument of each error.  The parameter list in each order the rule gives; `SQLSRC117`; `SQLSRC118` in the SQL and in a preamble marker, once for two queries; `null`, `not null` and neither.  A token's resolved default from each source and each conflict.  A query's list replacing the preamble's; `default`.  The file with no `-- name:`.  The kept form built and not built, for each of its conditions |
+| `SqlFileParserTests` | For each marker: its value, each scope, the same value twice, two values, after the last SQL, with the span and argument of each error.  The parameter list in each order the rule gives; `SQLSRC117`; `SQLSRC118` in the SQL and in a marker; `null`, `not null` and neither.  A token's default inline and by marker, and each conflict.  A query's list replacing the preamble's; `default`.  The file with no `-- name:`.  The kept form built and not built, for each of its conditions |
 | `SqlQueryHashTests` | A known input gives a known hash.  The same for `\r\n` and `\n`, with and without `keep-comments`, and with a comment edited.  Different for a default, an empty default against none, a declaration, a type, `null` against `not null` against neither, a token's name, a parameter's case, and the engine |
 | `Settings/` tests | Each reader's valid and invalid values, the list rule included.  `Resolve` for each member from each level, and its default.  The own enums against the emitted text |
 | `Generator/` tests, on both Roslyn versions | `keep-comments` and `no-token-validation` from the property, the metadata, the attribute, the preamble and the query, each winning over the one below it, and `default` undoing each.  Two types that claim one file with different `Parameters` get different SQL.  `SQLSRC006` for each attribute property and `SQLSRC014` for each property and metadata, once for a value.  The attribute file compiles as C# 7.3 without warnings, and the suppressor covers each generated type and nothing else |
