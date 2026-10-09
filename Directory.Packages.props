@@ -8,6 +8,12 @@
         <PackageVersion Include="Dapper" Version="2.1.89" />
         <PackageVersion Include="GitHubActionsTestLogger" Version="3.0.5" />
         <!--
+            A validator of JSON Schema, for tests/SqlSource.Tests alone: nothing that ships references it.  Its
+            source is MIT and its binaries come under the Open Source Maintenance Fee.  The owner chose it with
+            that known; see the spec of phase 2.1 of query generation.
+        -->
+        <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
+        <!--
             Central transitive pinning applies this pin to every project, and the Roslyn 5.9.0 that
             tests/SqlSource.Tests references requires at least this version.
         -->

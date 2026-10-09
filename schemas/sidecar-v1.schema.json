@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json",
+  "title": "SqlSource sidecar, format version 1",
+  "description": "Written by `sqlsource describe` beside a .sql file and read by the SqlSource source generator. This schema is strict and describes what the current tool writes; the generator's reader ignores keys it does not know.",
+  "type": "object",
+  "required": ["_WARNING", "$schema", "formatVersion", "toolVersion", "queries"],
+  "additionalProperties": false,
+  "properties": {
+    "_WARNING": { "type": "string" },
+    "$schema": { "type": "string", "format": "uri" },
+    "formatVersion": { "const": 1 },
+    "toolVersion": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+    },
+    "queries": {
+      "type": "object",
+      "propertyNames": { "minLength": 1 },
+      "additionalProperties": { "$ref": "#/$defs/query" }
+    }
+  },
+  "$defs": {
+    "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "triState": { "type": ["boolean", "null"] },
+    "ordinal": { "type": "integer", "minimum": 0 },
+    "query": {
+      "type": "object",
+      "required": ["hash", "engine", "database", "serverVersion", "resultKind", "parameters"],
+      "additionalProperties": false,
+      "properties": {
+        "hash": { "$ref": "#/$defs/hash" },
+        "engine": { "type": "string", "enum": ["postgres", "mssql"] },
+        "database": { "type": "string", "minLength": 1 },
+        "serverVersion": { "type": "string" },
+        "resultKind": { "type": "string", "enum": ["rows", "none"] },
+        "parameters": { "type": "array", "items": { "$ref": "#/$defs/parameter" } },
+        "columns": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/column" } },
+        "matchesTable": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/tableRef" }] },
+        "plan": { "type": "string", "enum": ["not-needed", "walked", "unavailable", "skipped"] },
+        "tableMatch": { "type": "string", "enum": ["matched", "no-origin", "several-tables", "names-differ", "columns-differ", "order-differs", "nullability-differs"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "resultKind": { "const": "rows" } } },
+          "then": { "required": ["columns", "matchesTable", "plan", "tableMatch"] },
+          "else": { "allOf": [{ "not": { "required": ["columns"] } }, { "not": { "required": ["matchesTable"] } }, { "not": { "required": ["plan"] } }, { "not": { "required": ["tableMatch"] } }] }
+        },
+        {
+          "if": { "properties": { "engine": { "const": "postgres" } } },
+          "then": {
+            "properties": {
+              "parameters": { "items": { "properties": { "type": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/postgresType" }] } } } },
+              "columns": { "items": { "properties": { "type": { "$ref": "#/$defs/postgresType" } } } }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "engine": { "const": "mssql" } } },
+          "then": {
+            "properties": {
+              "parameters": { "items": { "properties": { "type": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/mssqlType" }] } } } },
+              "columns": { "items": { "properties": { "type": { "$ref": "#/$defs/mssqlType" } } } }
+            }
+          }
+        }
+      ]
+    },
+    "parameter": {
+      "type": "object",
+      "required": ["name", "ordinal", "type", "nullable"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "ordinal": { "$ref": "#/$defs/ordinal" },
+        "type": { "type": ["object", "null"] },
+        "nullable": { "$ref": "#/$defs/triState" },
+        "typeSource": { "type": "string", "enum": ["inferred", "inferred-from-copies", "declared"] }
+      },
+      "if": { "properties": { "type": { "type": "object" } } },
+      "then": { "required": ["typeSource"] }
+    },
+    "column": {
+      "type": "object",
+      "required": ["ordinal", "name", "type", "nullable", "nullableSource", "origin", "identity", "computed"],
+      "additionalProperties": false,
+      "properties": {
+        "ordinal": { "$ref": "#/$defs/ordinal" },
+        "name": { "type": "string" },
+        "type": { "type": "object" },
+        "nullable": { "$ref": "#/$defs/triState" },
+        "nullableSource": { "type": "string", "enum": ["server", "catalog", "outer-join", "view", "no-origin", "heuristic"] },
+        "origin": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/origin" }] },
+        "identity": { "$ref": "#/$defs/triState" },
+        "computed": { "$ref": "#/$defs/triState" }
+      }
+    },
+    "tableRef": {
+      "type": "object",
+      "required": ["schema", "table"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "type": ["string", "null"] },
+        "table": { "type": "string", "minLength": 1 }
+      }
+    },
+    "origin": {
+      "type": "object",
+      "required": ["schema", "table", "column"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "type": ["string", "null"] },
+        "table": { "type": "string", "minLength": 1 },
+        "column": { "type": "string", "minLength": 1 }
+      }
+    },
+    "postgresType": {
+      "type": "object",
+      "required": ["name", "kind", "schema", "internalName"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["base", "array", "domain", "enum", "range", "multirange", "composite"] },
+        "schema": { "type": "string", "minLength": 1 },
+        "internalName": { "type": "string", "minLength": 1 },
+        "length": { "type": "integer", "minimum": 0 },
+        "precision": { "type": "integer", "minimum": 0 },
+        "scale": { "type": "integer", "minimum": -1000, "maximum": 1000 },
+        "element": { "$ref": "#/$defs/postgresType" },
+        "base": { "$ref": "#/$defs/postgresType" },
+        "labels": { "type": "array", "items": { "type": "string" } },
+        "subtype": { "$ref": "#/$defs/postgresType" }
+      },
+      "allOf": [
+        { "if": { "properties": { "kind": { "const": "array" } } }, "then": { "required": ["element"] }, "else": { "not": { "required": ["element"] } } },
+        { "if": { "properties": { "kind": { "const": "domain" } } }, "then": { "required": ["base"] }, "else": { "not": { "required": ["base"] } } },
+        { "if": { "properties": { "kind": { "const": "enum" } } }, "then": { "required": ["labels"] }, "else": { "not": { "required": ["labels"] } } },
+        { "if": { "properties": { "kind": { "enum": ["range", "multirange"] } } }, "then": { "required": ["subtype"] }, "else": { "not": { "required": ["subtype"] } } }
+      ]
+    },
+    "mssqlType": {
+      "type": "object",
+      "required": ["name", "maxLength", "precision", "scale"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "maxLength": { "type": "integer", "minimum": -1 },
+        "precision": { "type": "integer", "minimum": 0 },
+        "scale": { "type": "integer", "minimum": 0 },
+        "userType": {
+          "type": "object",
+          "required": ["schema", "name"],
+          "additionalProperties": false,
+          "properties": {
+            "schema": { "type": "string", "minLength": 1 },
+            "name": { "type": "string", "minLength": 1 },
+            "assemblyQualifiedName": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    }
+  }
+}

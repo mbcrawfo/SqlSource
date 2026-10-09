@@ -32,6 +32,11 @@ indent_size = 4
 max_line_length = off
 end_of_line = lf
 
+# The schema of a sidecar, as the sidecar format design gives it.
+[schemas/*.json]
+max_line_length = off
+end_of_line = lf
+
 # Files formatted by CSharpier
 [*.{cs,csproj,props,targets,slnx}]
 end_of_line = lf
