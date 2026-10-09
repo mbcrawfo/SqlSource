@@ -818,6 +818,102 @@ public class SqlFileParserTests
             .Parameters.Select(static parameter => parameter.Name)
             .ShouldBe(["a"]);
 
+    // SQL Server rejects a parameter with the name of a variable that the batch declares, so the name is never both.
+    [Fact]
+    public void Parse_VariableThatSqlServerSqlDeclares_IsNotAParameterWhereverItIsWritten()
+    {
+        const string Sql = "DECLARE @n int = @start, @m int;\nSELECT @N + @m, @end WHERE x > @n";
+
+        var block = Blocks("-- name: Q\n" + Sql + "\n", dialect: SqlDialect.SqlServer).ShouldHaveSingleItem();
+
+        Parameters(block).ShouldBe(["start:<none>:<unsaid>", "end:<none>:<unsaid>"]);
+        SqlFileParserTests.Sql(block).ShouldBe(Sql);
+    }
+
+    // A query is one batch.
+    [Fact]
+    public void Parse_VariableThatAnotherQueryOfTheFileDeclares_IsAParameter()
+    {
+        var blocks = Blocks(
+            "-- name: A\nDECLARE @n int = 1;\nSELECT @n\n-- name: B\nSELECT @n\n",
+            dialect: SqlDialect.SqlServer
+        );
+
+        blocks
+            .Select(Parameters)
+            .ShouldBe([
+                [],
+                ["n:<none>:<unsaid>"],
+            ]);
+    }
+
+    // The comments of a query are no part of its SQL, and a marker is a comment.
+    [Fact]
+    public void Parse_DeclarationWithCommentsAndAMarkerInside_IsStillRead() =>
+        Blocks(
+                "-- name: Q\nDECLARE /* first */ @n int, -- then\n-- summary: S.\n    @m int;\nSELECT @n, @m, @p\n",
+                dialect: SqlDialect.SqlServer
+            )
+            .ShouldHaveSingleItem()
+            .Parameters.Select(static parameter => parameter.Name)
+            .ShouldBe(["p"]);
+
+    [Theory]
+    [InlineData(nameof(SqlDialect.Ansi))]
+    [InlineData(nameof(SqlDialect.PostgreSql))]
+    [InlineData(nameof(SqlDialect.CockroachDb))]
+    [InlineData(nameof(SqlDialect.MySql))]
+    [InlineData(nameof(SqlDialect.MariaDb))]
+    [InlineData(nameof(SqlDialect.Sqlite))]
+    [InlineData(nameof(SqlDialect.Oracle))]
+    public void Parse_DeclareUnderADialectWithoutDeclaredVariables_LeavesTheNameAParameter(string dialect) =>
+        Blocks("-- name: Q\nDECLARE @n int = @start;\nSELECT @n\n", dialect: Enum.Parse<SqlDialect>(dialect))
+            .ShouldHaveSingleItem()
+            .Parameters.Select(static parameter => parameter.Name)
+            .ShouldBe(["n", "start"]);
+
+    // A variable in a default is not a parameter that a token brings, so it needs no declaration.
+    [Fact]
+    public void Parse_DeclaredVariableInADefault_NeedsNoParamMarker() =>
+        Blocks(
+                "-- name: Q\n-- token: {{g:OFFSET @n}}\nDECLARE @n int = 1;\nSELECT 1 {{f:LIMIT @N}} {{g}}\n",
+                dialect: SqlDialect.SqlServer
+            )
+            .ShouldHaveSingleItem()
+            .Parameters.ShouldBeEmpty();
+
+    [Fact]
+    public void Parse_ParameterInADefaultBesideADeclaredVariable_MustStillBeDeclared()
+    {
+        const string Text = "-- name: Q\nDECLARE @n int = 1;\nSELECT 1 {{f:LIMIT @n OFFSET @b}}\n";
+
+        Errors(Text, dialect: SqlDialect.SqlServer)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, SpanOf(Text, "@b"), "@b")]);
+    }
+
+    [Fact]
+    public void Parse_InputModelOnAQueryWhoseOnlyNamesAreDeclaredVariables_IsAnError()
+    {
+        const string Text = "-- name: Q\n-- input-model: FindArgs\nDECLARE @n int = 1;\nSELECT @n\n";
+
+        Errors(Text, dialect: SqlDialect.SqlServer)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InputModelWithoutParameters,
+                    SpanOf(Text, "-- input-model: FindArgs")
+                ),
+            ]);
+    }
+
+    // The way back for a name that is read as a variable and is not one.
+    [Fact]
+    public void Parse_ParamMarkerWithATypeForADeclaredVariable_MakesItAParameter() =>
+        Parameters(
+                Blocks("-- name: Q\n-- param: @n int\nDECLARE @n int;\nSELECT @n, @a\n", dialect: SqlDialect.SqlServer)
+                    .ShouldHaveSingleItem()
+            )
+            .ShouldBe(["a:<none>:<unsaid>", "n:int:<unsaid>:declared"]);
+
     private static string[] Tokens(SqlBlock block) =>
         [.. block.Tokens.Select(static token => token.Name + "=" + (token.Default ?? "<none>"))];
 

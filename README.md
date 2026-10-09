@@ -265,6 +265,7 @@ SELECT 'C:\temp\' AS path;
 | `--` is a comment with no whitespace after it | Yes | Yes | Yes | Yes | No | No | Yes | Yes |
 | `#` starts a comment | No | No | No | No | Yes | Yes | No | No |
 | Kept as hints, besides `/*+ ... */` and `/*! ... */` | | | | | | `/*M! ... */` | | `--+ ...` |
+| A name declared with `DECLARE @name` is a local variable, not a parameter (see Parameters, below) | No | Yes | No | No | No | No | No | No |
 
 Four details:
 
@@ -315,7 +316,8 @@ WHERE created_at >= @since AND (@name IS NULL OR name = @name) {{paging:LIMIT 20
 - The form is `@name`, then a type, then `null` or `not null`; the type and the last part are each optional.  The type is in the database's own words and is not checked here: `decimal(18,2)`, `double precision`.
 - `not null` says what saying nothing says.  It is accepted because it is what a column definition says.
 - A parameter that the query's SQL does not hold, because it comes only with a token, must be declared with its type: without one it is the error [SQLSRC117](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc117).  A parameter that appears only in a token's default and is not declared is [SQLSRC118](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc118).
-- A T-SQL local variable or a MySQL user variable is read as a parameter, and so is `@x` written for PostgreSQL's absolute value of `x`: write `abs(x)`.
+- Under `mssql`, a name that the query declares with `DECLARE` is a local variable and not a parameter, wherever the query writes it: the only parameter of `DECLARE @n int = @start; SELECT @n` is `@start`.  A list of declarations ends at a `;` or at the word that starts the next statement.  If a name is taken for a variable and is a parameter, a `-- param:` marker with its type makes it one.  Under every other dialect the name is read as a parameter.
+- A MySQL user variable is read as a parameter, and so are the parameters of a procedure that the SQL creates, and `@x` written for PostgreSQL's absolute value of `x`: write `abs(x)`.
 
 ## Tokens
 

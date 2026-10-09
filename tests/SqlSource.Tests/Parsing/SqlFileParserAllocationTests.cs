@@ -27,6 +27,8 @@ public class SqlFileParserAllocationTests
     [InlineData(nameof(SqlDialect.Ansi), false, false)]
     [InlineData(nameof(SqlDialect.MySql), false, false)]
     [InlineData(nameof(SqlDialect.Oracle), false, false)]
+    // Each query has a parameter, so each is searched for a declared variable.
+    [InlineData(nameof(SqlDialect.SqlServer), false, false)]
     // The file names its own dialect, so its header is read before the rest.
     [InlineData(nameof(SqlDialect.Ansi), true, false)]
     // The preamble keeps comments, so each query is built in both forms.

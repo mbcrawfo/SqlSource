@@ -9,7 +9,7 @@ Next id: `TD-0023`
 | ID | Status | Added | Impact | Description |
 |----|----|----|----|----|
 | [TD-0003](TD-0003-run-number-limited-by-assembly-version.md) | Open | 2026-10-05 | Low | A run number above 65534 fails the build, because it is a part of the assembly version |
-| [TD-0004](TD-0004-lexer-misreads-dialect-specific-sql.md) | Open | 2026-10-05 | Low | A few constructs are misread whatever the dialect: a MySQL versioned comment that holds `*/` in a string, a block comment of SQLite left open at the end of a file, a carriage return alone as a line end in MySQL, SQLite and CockroachDB |
+| [TD-0004](TD-0004-lexer-misreads-dialect-specific-sql.md) | Open | 2026-10-05 | Low | A few constructs are misread whatever the dialect: a MySQL versioned comment that holds `*/` in a string, a block comment of SQLite left open at the end of a file, a carriage return alone as a line end in MySQL, SQLite and CockroachDB, a user variable of MySQL or MariaDB read as a parameter |
 | [TD-0006](TD-0006-attribute-conflicts-across-friend-assemblies.md) | Open | 2026-10-05 | Low | Two projects that share internals and both use SqlSource each hold the generated attribute; the package hides the compiler's warning CS0436 for it and does not remove the conflict |
 | [TD-0012](TD-0012-token-method-shapes-are-compiled-but-not-run.md) | Open | 2026-10-06 | Low | A token-only query and one with more than seven tokens are compiled in tests and never run, and awkward token names are compiled as C# 12 only |
 | [TD-0013](TD-0013-sql-edit-reads-every-attributed-type-again.md) | Open | 2026-10-06 | Low | An edit to a `.sql` file makes the compiler read every attributed type again, because the attribute is added in a post-initialization step |

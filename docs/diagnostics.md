@@ -515,7 +515,7 @@ Declare the parameter with its type: `-- param: @page int`.
 
 **Query has no parameters**
 
-An `-- input-model:` marker names the type of a query's parameters, and this query has none: no `@name` in its SQL and no `-- param:` marker.
+An `-- input-model:` marker names the type of a query's parameters, and this query has none: no `@name` in its SQL and no `-- param:` marker.  Under the `mssql` dialect a name that the query declares with `DECLARE` is a local variable, and is not a parameter.
 
 ```sql
 -- name: CountUsers

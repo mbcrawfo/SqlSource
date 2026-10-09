@@ -11,7 +11,8 @@ namespace SqlSource.Parsing;
 /// <remarks>
 /// The list is the parameters of the query's static SQL in order of first appearance, then the parameters that a
 /// <c>-- param:</c> marker declares and the static SQL does not hold, in marker order.  Static means outside every
-/// token: a parameter inside <c>{{name:default}}</c> is part of a sample.  Names compare ignoring case.
+/// token: a parameter inside <c>{{name:default}}</c> is part of a sample.  Names compare ignoring case.  A name that
+/// the SQL declares as a local variable is not a parameter at any place: <see cref="SqlDeclaredVariables" />.
 /// </remarks>
 internal static class SqlParameterList
 {
@@ -22,6 +23,7 @@ internal static class SqlParameterList
     public static EquatableArray<SqlQueryParameter> Create(
         SqlDialectRules rules,
         SqlBlockText sql,
+        SqlDeclaredVariables? variables,
         EquatableArray<SqlTokenOccurrence> occurrences,
         EquatableArray<SqlToken> tokens,
         IReadOnlyList<SqlTokenDefault> markerDefaults,
@@ -45,6 +47,11 @@ internal static class SqlParameterList
             while (token < occurrences.Count && occurrences[token].Span.End <= span.Start)
             {
                 token++;
+            }
+
+            if (variables?.Holds(sql.Text.AsSpan(span.Start + 1, span.Length - 1)) == true)
+            {
+                continue;
             }
 
             if (token < occurrences.Count && occurrences[token].Span.Start <= span.Start)
@@ -74,7 +81,7 @@ internal static class SqlParameterList
 
         if (inDefaults is not null)
         {
-            ReportUndeclared(parameters, inDefaults, sql, rules, errors);
+            ReportUndeclared(parameters, inDefaults, variables, sql, rules, errors);
         }
 
         return parameters.Count == 0
@@ -134,6 +141,7 @@ internal static class SqlParameterList
     private static void ReportUndeclared(
         ImmutableArray<SqlQueryParameter>.Builder parameters,
         List<DefaultParameter> inDefaults,
+        SqlDeclaredVariables? variables,
         SqlBlockText sql,
         SqlDialectRules rules,
         List<SqlParseError> errors
@@ -141,7 +149,8 @@ internal static class SqlParameterList
     {
         foreach (var parameter in inDefaults)
         {
-            if (IndexOf(parameters, parameter.Text.AsSpan(parameter.Span.Start + 1, parameter.Span.Length - 1)) >= 0)
+            var name = parameter.Text.AsSpan(parameter.Span.Start + 1, parameter.Span.Length - 1);
+            if (IndexOf(parameters, name) >= 0 || variables?.Holds(name) == true)
             {
                 continue;
             }
