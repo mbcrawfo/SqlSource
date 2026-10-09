@@ -31,6 +31,7 @@
         <PackageVersion Include="Roslynator.Analyzers" Version="5.0.0" />
         <PackageVersion Include="Shouldly" Version="4.3.0" />
         <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
+        <PackageVersion Include="System.CommandLine" Version="2.0.12" />
         <PackageVersion Include="xunit.analyzers" Version="2.1.0" />
         <PackageVersion Include="xunit.v3" Version="4.0.1" />
     </ItemGroup>

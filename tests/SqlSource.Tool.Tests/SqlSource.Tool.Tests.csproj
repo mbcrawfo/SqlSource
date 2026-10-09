@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="GitHubActionsTestLogger" />
+        <!-- The version the tool itself references: central pinning would otherwise hold it at the generator's. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="xunit.v3" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
+        <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+    </ItemGroup>
+</Project>
