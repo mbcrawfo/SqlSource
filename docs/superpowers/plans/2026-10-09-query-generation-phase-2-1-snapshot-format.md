@@ -6078,10 +6078,17 @@ internal static class SidecarComparer
         committed == described ? null : new SidecarDifference(path, Json(committed), Json(described));
 
     // A member that one side has and the other lacks.  Null when both have it or both lack it.
-    private static SidecarDifference? Presence(string path, bool committed, bool described, string present, string absent) =>
-        committed == described
-            ? null
-            : new SidecarDifference(path, committed ? present : absent, described ? present : absent);
+    private static SidecarDifference? Presence(string path, bool committed, bool described, string present, string absent)
+    {
+        if (committed == described)
+        {
+            return null;
+        }
+
+        return committed
+            ? new SidecarDifference(path, present, absent)
+            : new SidecarDifference(path, absent, present);
+    }
 
     private static SidecarDifference Length(string array, int committed, int described) =>
         new(array + ".length", Json(committed), Json(described));

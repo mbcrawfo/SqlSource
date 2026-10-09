@@ -1,3 +1,4 @@
+using System;
 using Microsoft.CodeAnalysis.Text;
 
 namespace SqlSource.Snapshot;
@@ -33,4 +34,13 @@ internal sealed record SidecarEntry(
     string? TableMatch,
     EquatableArray<SidecarParameter> Parameters,
     EquatableArray<SidecarColumn>? Columns
-);
+)
+{
+    /// <summary>
+    /// Whether the entry describes the query with this hash against this database.  The name of a database is
+    /// compared ignoring case: two names that differ only in case read one connection variable.
+    /// </summary>
+    public bool IsCurrentFor(string hash, string database) =>
+        string.Equals(Hash, hash, StringComparison.Ordinal)
+        && string.Equals(Database, database, StringComparison.OrdinalIgnoreCase);
+}
