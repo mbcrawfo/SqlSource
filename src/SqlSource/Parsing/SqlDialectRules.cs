@@ -78,6 +78,7 @@ internal sealed class SqlDialectRules
         {
             Dialect = SqlDialect.SqlServer,
             NestedComments = true,
+            DeclaredVariables = true,
         };
 
     public static SqlDialectRules PostgreSql { get; } =
@@ -113,6 +114,12 @@ internal sealed class SqlDialectRules
 
     /// <summary>The character that starts a parameter, as in <c>@id</c>.</summary>
     public char ParameterPrefix { get; }
+
+    /// <summary>
+    /// Whether a name that a query declares with <c>DECLARE</c> is a local variable and not a parameter, as in
+    /// T-SQL.  <see cref="SqlDeclaredVariables" /> finds the names.
+    /// </summary>
+    public bool DeclaredVariables { get; private init; }
 
     /// <summary>Whether a <c>/*</c> inside a block comment opens a comment that needs its own <c>*/</c>.</summary>
     public bool NestedComments { get; private init; }

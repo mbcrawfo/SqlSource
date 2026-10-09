@@ -277,9 +277,14 @@ internal static class SqlFileParser
             // A query without markers has no scope, and so no defaults and no declarations.
             var tokenDefaults = scope?.TokenDefaults ?? [];
             var tokens = SqlTokenList.Create(text, sql, scanned.Occurrences, tokenDefaults, _errors);
+
+            // A variable is written in the SQL where it is declared, so SQL without parameters declares none.
+            var variables =
+                sql.Parameters.Length == 0 ? null : SqlDeclaredVariables.Find(text, lexemes, start, end, rules);
             var parameters = SqlParameterList.Create(
                 rules,
                 sql,
+                variables,
                 scanned.Occurrences,
                 tokens,
                 tokenDefaults,
