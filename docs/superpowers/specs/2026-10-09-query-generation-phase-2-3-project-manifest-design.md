@@ -30,8 +30,8 @@ Success is:
 
 - For a project, or for each project of a solution that uses SqlSource, the tool holds a `ProjectManifest`: the project's `.sql` files with their trimmed metadata, its trimmed `SqlSource` properties, its `Compile` files, and the constants its code is compiled with.
 - What the manifest lists is what the project file says: a file removed with `Remove`, `SqlSourceIncludeFiles` set to `false` and a value written over several lines all show as they do in a build.  A file that a target adds is listed when the target hooks `SqlSourceTrimMetadataOfFiles`, and not otherwise: see What the manifest does not see.
-- A project that targets several frameworks gives one manifest.
-- A project that was never restored is an error, in a solution as well as alone, so that a run on a fresh checkout does not pass by finding nothing.
+- A project that targets several frameworks gives one manifest, for the first of them.
+- A project that was never restored, or not since SqlSource was added to it, is an error, in a solution as well as alone, so that a run on a fresh checkout does not pass by finding nothing.
 - Nothing a build does changes: the new target runs only when it is asked for by name.
 
 ## Decisions
@@ -53,7 +53,7 @@ Settled in this spec, with what the spikes behind it found:
 | The manifest's format | Lines of `key=value` | MSBuild cannot write a Windows path into JSON without escaping it in a target for each item.  A line needs no escaping but for a line break, which no path of a project holds. |
 | Where the file is written | Where `SqlSourceManifestFile` says; under `obj` when it is not set.  The tool sets it, to a file in a temporary folder of its own | The tool then reads a path it chose, parses nothing MSBuild prints for it, and writes nothing into the project. |
 | The framework's constants | The target depends on the SDK's `AddImplicitDefineConstants` when the project has a `TargetFramework` | Run by name, a project has `TRACE;DEBUG` alone: the SDK adds `NET10_0`, `NET8_0_OR_GREATER` and the rest in that target, which hooks the compile.  Without them an attribute under `#if NET8_0_OR_GREATER` is not found.  The name is the SDK's own, which `docs/tech-debt` records. |
-| Several target frameworks | The first of `TargetFrameworks`, passed as `-p:TargetFramework=` | Run by name on such a project, the target runs in the outer build with no framework.  `AdditionalFiles` almost never differ by framework. |
+| Several target frameworks | The first of `TargetFrameworks`, passed as `-p:TargetFramework=`, and that one alone | Run by name on such a project, the target runs in the outer build with no framework.  `AdditionalFiles` almost never differ by framework, and a manifest for each framework would multiply every run for the project that has none that do.  What the others would add is not seen, which `docs/tech-debt` records. |
 | How a solution is read | `Microsoft.VisualStudio.SolutionPersistence` | It reads `.sln` and `.slnx` and is what the `dotnet` command uses.  The output of `dotnet sln list` is translated. |
 | The configuration | The project's default.  No `--configuration` | A file or a constant that depends on the configuration is rare, and an option can be added without breaking anything. |
 
@@ -113,6 +113,7 @@ Asked for by name, the target runs after the two trims and nothing else of a bui
 - A `.sql` file that a target adds is in the manifest only when that target hooks `SqlSourceTrimMetadataOfFiles`, the hook the package's own comment names.  One that hooks `BeforeBuild`, or anything else, has not run.  From phase 5 the generator needs an entry for the queries of such a file, and the tool cannot write one until the file is in the manifest.
 - `docs/tech-debt/TD-0016` says today that a target hooking `BeforeBuild` "is not affected".  That holds for the build and not for the tool, and this sub-phase amends the item to say so.
 - A new tech-debt item records the limit and its fix: a target that adds a `.sql` file hooks `SqlSourceTrimMetadataOfFiles`.  Phase 9's run inside a build sees every file, since the build has run the hooks by then.
+- For a project that targets several frameworks the manifest is the first one's, on purpose.  A `.sql` file or a `Compile` file that the project lists only under a condition on another framework, and an attribute under `#if` for a constant only another framework defines, are not in it, so the queries they bring are never described.  The generator compiles for every framework, so from phase 5 the build of that other framework reports such a query as having no entry: the gap is loud, not silent.  A second tech-debt item records it, with its fix: a manifest for each framework, and the union of their needs.
 
 ## The tool's side
 
@@ -126,7 +127,7 @@ The program is `dotnet`: the value of `DOTNET_HOST_PATH` when the host has it, a
 
 For each project, two runs:
 
-1. **Evaluate.**  `dotnet msbuild <project> -nologo -getProperty:SqlSourceImported -getProperty:TargetFramework -getProperty:TargetFrameworks -getProperty:ProjectAssetsFile`.  MSBuild prints the four as JSON.
+1. **Evaluate.**  `dotnet msbuild <project> -nologo -getProperty:SqlSourceImported -getProperty:TargetFramework -getProperty:TargetFrameworks -getProperty:ProjectAssetsFile -getItem:PackageReference`.  MSBuild prints the four properties and the items as JSON.
 2. **Write.**  Only when `SqlSourceImported` is `true`: `dotnet msbuild <project> -nologo -t:SqlSourceWriteManifest -p:SqlSourceManifestFile=<file>`, with `-p:TargetFramework=<first>` when `TargetFramework` is empty and `TargetFrameworks` is not.  The file is one the tool names, in a temporary folder it makes for the run and deletes after it.
 
 In a solution, both runs also pass what `dotnet build` of that solution gives a project: `SolutionDir`, with its closing separator, `SolutionPath`, `SolutionName`, `SolutionFileName` and `SolutionExt`.  A project that imports a file through `$(SolutionDir)` then evaluates as it does in a build.
@@ -137,11 +138,16 @@ Projects are evaluated at most eight at a time, and never more than the machine 
 
 ### Whether a project uses SqlSource
 
-| `SqlSourceImported` | The file `ProjectAssetsFile` names | The project |
-|----|----|----|
-| `true` | | Uses SqlSource |
-| Anything else | Exists | Does not use SqlSource |
-| Anything else | Does not exist | Was never restored: `SQLSRC220` |
+The first row that holds:
+
+| `SqlSourceImported` | A `PackageReference` named `SqlSource` | The file `ProjectAssetsFile` names | The project |
+|----|----|----|----|
+| `true` | | | Uses SqlSource |
+| Anything else | Present | | Was not restored since the package was added: `SQLSRC220` |
+| Anything else | Absent | Does not exist | Was never restored: `SQLSRC220` |
+| Anything else | Absent | Exists | Does not use SqlSource |
+
+The second row is the project that gained its reference to SqlSource after its last restore: the assets file is there, and the package's props are not.  A `PackageReference` is an item of the project's evaluation, so it shows without a restore, and its name is compared ignoring case.  SqlSource is a development dependency and reaches no project through another, so a project with no such item and an assets file does not use it.
 
 A project that takes SqlSource by path, as this repository's tests do, has `SqlSourceImported` whether it was restored or not.
 
@@ -183,7 +189,7 @@ In `ToolDiagnostics`, with the four places each needs.
 | `SQLSRC205` | Project could not be evaluated | `MSBuild could not evaluate '{0}'` | The project file |
 | `SQLSRC206` | Project manifest cannot be read | `The project manifest of '{0}' cannot be read: {1}` | The project file; what is wrong |
 | `SQLSRC207` | Project is not in the run | `'{0}' is not a project of '{1}'` | The path given; the unit |
-| `SQLSRC220` | Project was not restored | `'{0}' has not been restored, so 'sqlsource' cannot tell whether it uses SqlSource` | The project file |
+| `SQLSRC220` | Project was not restored | `'{0}' has not been restored, or not since the SqlSource package was added to it` | The project file |
 
 `SQLSRC204` has a `help:` line, `add the SqlSource package to the project`, and `SQLSRC220` has one, `run 'dotnet restore'`.  `SQLSRC220` is out of the order of the others because it was added after `SQLSRC208` to `SQLSRC219` were given to the later sub-phases.
 
@@ -197,7 +203,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 
 1. The epic outline: the row of 2.3 says In progress.
 2. `SqlSourceImported` in the props, with its test in `BuildFileTests`.
-3. `SqlSourceWriteManifest` in the targets, with `BuildFileTests` and the fixture projects that prove what it writes.  The two tech-debt items, and `TD-0016` amended.
+3. `SqlSourceWriteManifest` in the targets, with `BuildFileTests` and the fixture projects that prove what it writes.  The three tech-debt items, and `TD-0016` amended.
 4. `ManifestReader` and `ProjectManifest`, with `SQLSRC206`.
 5. `IProcessRunner`, the two runs and `SQLSRC205`.
 6. The projects of a run: a project, a solution, `--project`, `SQLSRC204`, `SQLSRC207` and `SQLSRC220`.
@@ -221,8 +227,9 @@ The fixture projects are under `tests/SqlSource.Tool.Tests/Fixtures/Projects/`, 
 | Fixture | Shows |
 |----|----|
 | `Single` | One framework: the example of this spec, with a property and a metadata written over several lines, and `NET8_0_OR_GREATER` among its constants |
-| `Multi` | Two frameworks: one manifest, for the first, with that framework's constants |
+| `Multi` | Two frameworks: one manifest, for the first, with that framework's constants.  A `.sql` file and a `Compile` file that the project lists only for the second are not in it: the test pins the limit, and names the tech-debt item |
 | `Plain` | No SqlSource: `SqlSourceImported` is empty.  Restored, it does not use SqlSource; with no `obj`, it was not restored |
+| `StaleRestore` | A `PackageReference` to SqlSource, no props of the package, and an assets file the test puts there: `SQLSRC220` |
 | `LateFile` | A `Directory.Build.targets` whose target hooks `SqlSourceTrimMetadataOfFiles` and adds a `.sql` file with metadata: the file is listed, trimmed |
 | `BuildHookFile` | A target that hooks `BeforeBuild` and adds a `.sql` file: the file is not listed.  The test pins the limit, and names the tech-debt item |
 | `OwnFiles` | `SqlSourceIncludeFiles` is `false` and the project lists two of its three `.sql` files: two are listed |
@@ -241,7 +248,7 @@ These tests start MSBuild, so each takes a second or two.  They run with the res
 - `src/SqlSource/AGENTS.md`: the manifest target hooks nothing on purpose; its format is a contract with the tool, by the rules above; a new setting of the package is a new name in the target; it depends on a target of the SDK by name.
 - `src/SqlSource.Tool/AGENTS.md`: every process goes through `IProcessRunner`; the tool never restores and never builds; MSBuild's output is parsed only as the JSON of `-getProperty`; the tool writes nothing into a project.
 - `docs/diagnostics.md`: `SQLSRC204` to `SQLSRC207`, and `SQLSRC220`.
-- `docs/tech-debt`: two items, each with the next free id.  The manifest does not hold a `.sql` file that a target adds, unless the target hooks `SqlSourceTrimMetadataOfFiles`.  And the manifest target depends on `AddImplicitDefineConstants`, a target of the SDK whose name is not a contract; the fix is for the tool to work the constants out from `TargetFramework`.  `TD-0016` is amended as above.  One more item for any character the manifest cannot carry, if the fixtures find one.
+- `docs/tech-debt`: three items, each with the next free id.  The manifest does not hold a `.sql` file that a target adds, unless the target hooks `SqlSourceTrimMetadataOfFiles`.  The manifest of a project with several target frameworks is the first one's alone.  And the manifest target depends on `AddImplicitDefineConstants`, a target of the SDK whose name is not a contract; the fix is for the tool to work the constants out from `TargetFramework`.  `TD-0016` is amended as above.  One more item for any character the manifest cannot carry, if the fixtures find one.
 - `README.md`: nothing in it changes.  `SqlSourceImported` and the target are for the tool, and the tool is documented with phase 5, which also says which hook a target that adds a `.sql` file uses.
 - The epic outline: in steps 1 and 8.
 

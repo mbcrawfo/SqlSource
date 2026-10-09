@@ -106,6 +106,7 @@ internal interface IDescribeSession : IAsyncDisposable
 
 - A describer never throws for what a server or a user can cause: it returns a failure.  An exception from one is a bug, and `SQLSRC200`.
 - A describer gets the SQL as text and lexes it itself, with the generator's lexer, when it needs the lexemes.
+- `OpenRequest` is the one thing that holds a connection's value.  A describer hands it to its driver and puts it, or a part of it, in nothing it returns: not in a failure's arguments, its server lines or its help.  Sub-phase 2.6 gives a describer a log, and that log removes the value from what it is given.
 - `DescriberRegistry` maps a `SqlDialect` to its describer.  `ToolHost` gains `Describers`; the real host's is empty in this sub-phase.
 
 ### The exchange

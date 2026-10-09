@@ -47,7 +47,7 @@ Settled in this spec:
 | The summary under `--check` | `same`, `differ` and `failed`, each query in one of them | "Described" says nothing under `--check`, where every query is. |
 | Time | `ToolHost` gains a `TimeProvider` | The log holds a time and a duration, and a test must be able to fix both. |
 | The log's option over its variable | `--log` wins over `SQLSOURCE_LOG` | As the command line wins for a connection. |
-| How a describer logs | `OpenRequest` gains the run's log | Phase 3 then adds events and changes nothing here. |
+| How a describer logs | `OpenAsync` takes a log beside its request, and that log removes the connection's value from every event | Phase 3 then adds events and changes nothing here.  The request holds the secret, so the log is not part of it, and what a describer writes cannot be trusted to leave the secret out. |
 
 ## Out of scope
 
@@ -109,7 +109,7 @@ It has a `help:` line: `run 'dotnet sqlsource describe' and commit the sidecars`
 
 ## `--verbose`
 
-Lines of prose on standard output, each starting `sqlsource: `, in the order things happen:
+Lines of prose on standard output, each starting with `sqlsource:` and a space, in the order things happen:
 
 - The unit, and how it was found.
 - Each project: read, with its target framework and the number of `.sql` files; or left out, because it does not use SqlSource or `--project` does not name it.
@@ -143,7 +143,14 @@ Every object has `event`, the event's name, and `time`, the moment in UTC as ISO
 - **A string over 1 MiB**, counted in UTF-8, is cut to that size, and its object gains `"truncated": true`.  Nothing in phase 2 is that long; the rule is here because the writer is.
 - A reader ignores an event and a key it does not know.  The log is for people and carries no version.
 
-`IRunLog` is the interface: one method that takes an event's name and its members.  `NullRunLog` is what a run without `--log` has.  `OpenRequest` gains `Log`, so that a describer writes into the same file; an event of a describer has a name that starts with its engine, `postgres.`.
+`IRunLog` is the interface: one method that takes an event's name and its members.  The members are names and values, and a value is what JSON can hold: a string, a number, a boolean, null, a list of values, or names and values again.  `NullRunLog` is what a run without `--log` has.
+
+A describer writes into the same file, through a log of its own:
+
+- `IQueryDescriber.OpenAsync` gains a parameter, the log, beside the request.  The request holds the connection's value and the log is where events go, and the two are kept apart.
+- The log a describer is given is a `SessionRunLog` over the run's: it replaces every occurrence of that database's connection value with `***`, in every string of an event at any depth, names included, before the event reaches the file.  A describer that logs the value by mistake, or passes on a driver's message that holds it, leaks nothing.
+- It removes the whole value and nothing less.  A part of it, a password alone, is not known to the tool, which does not read a connection string.  The rule of sub-phase 2.5 stands for that: a describer logs no part of the value, and phase 3 turns its driver's logging of parameters and of connection details off.
+- An event of a describer has a name that starts with its engine, `postgres.`.
 
 A run that exits `1`, without `--log`, ends with one line on standard error:
 
@@ -168,7 +175,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 3. The comparison and `SQLSRC219`, without filters.
 4. The comparison under filters, and the summary line.
 5. `TimeProvider` on `ToolHost`.  `IRunLog`, the writer of the file, `--log` and `SQLSOURCE_LOG`, with `run.start`, `run.end` and `diagnostic`.
-6. The other events, and `Log` on `OpenRequest`.
+6. The other events, the log parameter of `OpenAsync`, and `SessionRunLog`.
 7. `--verbose`.
 8. The line that ends a failed run.
 9. The documents, and the close of phase 2.
@@ -180,7 +187,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 | `CheckTests` | Sidecars written by `describe`, then `--check`: exit `0`, nothing reported, every query `same`.  A sidecar of a higher format version: a difference, not `SQLSRC221`.  A sidecar that cannot be read: one difference, and its queries under `differ`.  Each row of the table of differences, with the id, the position and the text.  A changed `toolVersion` alone: exit `0`.  Each member that the comparison ignores, changed in the file: exit `0`.  A query that fails: exit `1`, and exit `1` with a difference beside it.  No connection: `SQLSRC213` and exit `1`.  With `--force`: the same.  No file's time or content changes in any case, and no sidecar is made or deleted |
 | `CheckFilterTests` | `--database` with a difference in the other database's entry: exit `0`.  An entry of a deleted query whose `database` is named, and one whose is not.  A file filter.  The sixth row only without a filter, and not under `--project` alone.  For each filter, `--check` after `describe` with the same filter exits `0` |
 | `RunLogTests` | Each event of the table, with its members, for a run that describes, skips and fails, with a fixed `TimeProvider`: the times and the durations are exact.  The order.  Every line is one JSON object.  `--log` over the variable; the variable alone; neither.  A path that cannot be written.  The file is emptied by a second run.  A string of 2 MiB is cut and marked |
-| `RedactionTests` | `--connection name=value`, `--connection=name=value` and `--connection:name=value`: `arguments` holds the name and no value.  A wrong command line writes no log.  The `SecretTests` of sub-phase 2.5, with `--verbose` and `--log`: neither writer nor the file holds the marker word |
+| `RedactionTests` | `--connection name=value`, `--connection=name=value` and `--connection:name=value`: `arguments` holds the name and no value.  A wrong command line writes no log.  A describer of the tests that logs its connection's value, as a member, inside a longer string, in a nested list and as a member's name: the file holds `***` in each place and the value nowhere.  The `SecretTests` of sub-phase 2.5, with `--verbose` and `--log`: neither writer nor the file holds the marker word |
 | `VerboseTests` | A line for each thing the list names, for a run over two projects and two databases.  Without the option: errors and summaries alone.  With `--log` and not `--verbose`: the console is as without either |
 | `ExitCodeTests` | Each of `0`, `1` and `2`, and the line that ends a failed run: there for `1` without `--log`, not for `2`, not with `--log` |
 | A describer of the tests that logs | Its event is in the file, in order, between the `database.open` and the `query` it belongs to |
@@ -188,7 +195,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 ## Documentation
 
 - `docs/diagnostics.md`: `SQLSRC219`.
-- `src/SqlSource.Tool/AGENTS.md`: `--check` shares the run and replaces only its last step; the exit code's three values and which errors give which; an event's name and members are read by people and by phase 10's bundle, so a member is added and not renamed; nothing hands the log a connection's value, and `RedactionTests` holds the tool to that.
+- `src/SqlSource.Tool/AGENTS.md`: `--check` shares the run and replaces only its last step; the exit code's three values and which errors give which; an event's name and members are read by people and by phase 10's bundle, so a member is added and not renamed; nothing hands the log a connection's value, a describer's log removes it all the same, and `RedactionTests` holds the tool to both.
 - `CONTRIBUTING.md`: nothing changes, unless the tool's tests gained a step a developer must know.
 - `README.md` and `docs/publishing.md`: nothing in them changes.  The tool's commands reach the readme with phase 5.
 - `docs/deferred`: as under Closing phase 2.
