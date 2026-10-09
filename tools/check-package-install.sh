@@ -3,8 +3,8 @@
 # Then removes a .sql file the project uses and checks that the next build, an incremental one, fails for it.
 # The project is tools/package-install.  It is copied out of the repository first, so that nothing of the repository's
 # own build applies to it, and it restores from the folder that holds the package and from nowhere else.
-# Usage: check-package-install.sh [directory]   The directory holds one SqlSource.*.nupkg.  Without it, the package is
-# packed into a temporary directory first.
+# Usage: check-package-install.sh [directory]   The directory holds one SqlSource.<version>.nupkg, and may hold the
+# package of the tool beside it.  Without it, the package is packed into a temporary directory first.
 set -euo pipefail
 
 PACKAGE_ID='SqlSource'
@@ -34,15 +34,16 @@ else
     dotnet pack src/SqlSource/SqlSource.csproj --output "$directory" --nologo --verbosity quiet
 fi
 
+# A version starts with a digit, and that is what keeps the pattern from matching SqlSource.Tool.<version>.nupkg.
 packages=()
-for package in "$directory/$PACKAGE_ID".*.nupkg; do
+for package in "$directory/$PACKAGE_ID".[0-9]*.nupkg; do
     if [[ -f "$package" ]]; then
         packages+=("$package")
     fi
 done
 
 if [[ ${#packages[@]} -ne 1 ]]; then
-    echo "check-package-install: expected one $PACKAGE_ID.*.nupkg in $directory, found ${#packages[@]}" >&2
+    echo "check-package-install: expected one $PACKAGE_ID.<version>.nupkg in $directory, found ${#packages[@]}" >&2
     exit 1
 fi
 
