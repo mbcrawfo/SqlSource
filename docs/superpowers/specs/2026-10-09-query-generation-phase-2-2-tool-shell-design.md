@@ -26,7 +26,7 @@ Success is:
 - `dotnet pack SqlSource.slnx` writes two packages, `SqlSource` and `SqlSource.Tool`, with one version.
 - The packed tool installs into an empty folder and runs on a machine that has only the repository's SDK.
 - `Cli.Run(args)` runs the whole command in process, and a test can give it its own output, working directory and environment.
-- Every error the tool prints goes through one reporter, in the compiler's format, with an id that `docs/diagnostics.md` explains.
+- Every error the tool prints goes through one reporter, in the compiler's format, with an id that `docs/diagnostics.md` explains.  A wrong command line is the one exception: `Cli` writes its lines itself, with no id.
 - The generator's package is byte for byte what it was, apart from the new descriptors in its assembly.
 
 ## Decisions
@@ -44,11 +44,11 @@ Settled in this spec:
 | Decision | Choice | Why |
 |----|----|----|
 | Exit codes | `0` success; `1` an error was reported, a wrong command line included; `2` `--check` found a difference and nothing failed | The epic's recommendation.  A build needs to tell "failed" from "differs", and nothing else. |
-| An exception | Caught in `Cli`, reported as `SQLSRC200` with its type and message, exit `1`.  The stack trace is printed when `SQLSOURCE_DEBUG` is set | A stack trace as the tool's last word reads as a crash of the user's build. |
+| An exception | Caught in `Cli`, reported as `SQLSRC200` with its type and message, exit `1`.  The stack trace is printed when `SQLSOURCE_DEBUG` is set to anything but the empty string | A stack trace as the tool's last word reads as a crash of the user's build. |
 | Where errors go | The standard error stream.  Everything else goes to standard output | A caller can keep the two apart, and MSBuild reads both. |
 | Paths in a message | Full paths | An IDE's error list resolves them from anywhere, and a path relative to the working directory is wrong inside a build. |
 | The `see:` line | Every error ends with one, the descriptor's help link | The id's section is where the fix is explained. |
-| A wrong command line | Reported by the tool, not by System.CommandLine: an unknown option by its name alone, and any other token that is not expected by its position, never by its text | Sub-phase 2.5 adds an option whose value is a secret.  A misspelt `--conection` followed by a connection string must not print the string, and System.CommandLine's own messages repeat the token they reject. |
+| A wrong command line | Reported by the tool, not by System.CommandLine, and not through the reporter: an unknown option by its name alone, and any other token that is not expected by its position, never by its text.  Exit `1` | Sub-phase 2.5 adds an option whose value is a secret.  A misspelt `--conection` followed by a connection string must not print the string, and System.CommandLine's own messages repeat the token they reject. |
 | Options | Each sub-phase adds the options it gives an effect.  This one has `--help` and `--version` | `--help` never lists an option that does nothing. |
 | Where the 2xx descriptors live | `src/SqlSource/Diagnostics/ToolDiagnostics.cs`, with an `All` of its own | `SqlDiagnostics.cs` is the generator's and is long already.  The document test and the release tracking cover both. |
 | The packed tool's check | A new script, `tools/check-tool-install.sh`, installs the packed tool into a temporary folder and runs it | A tool carries its whole dependency closure.  Only running the packed tool shows that the closure loads and that the roll-forward works. |
@@ -69,12 +69,14 @@ sqlsource describe [<path>] [--help]
 ```
 
 - The root command with no subcommand prints the help and exits `0`.  System.CommandLine's default is an error, "Required command was not provided", so the root has an action of its own.
-- `--version` prints the informational version of the tool's assembly.
+- `--version` prints the informational version of the tool's assembly.  System.CommandLine's own action reads the entry assembly, which under a test is the test host, so the tool has an action of its own.
 - `describe` takes at most one `<path>` in this sub-phase.  Sub-phase 2.4 lets it take more.
 - **A wrong command line** exits `1` with one line on standard error for each thing wrong, and nothing on standard output: System.CommandLine's default, which also prints the help, is replaced.  The tool writes the lines itself:
-  - A token that starts with `-` and is no option of the command is `sqlsource: unknown option '<name>'`, where the name is the token cut at its first `=` or `:`.  This holds for a token where a `<path>` could stand, so that a misspelt option is never taken for a path.  When there is one, nothing else of the command line is looked at.
-  - Any other token that is not expected is `sqlsource: unexpected argument at position <n>`.
-  - An option with no value, or with one it cannot take, is named by the option alone.
+  - A token that starts with `-` and is no option of the command is `sqlsource: unknown option '<name>'`, where the name is the token cut at its first `=` or `:`.  This holds for a token where a `<path>` could stand, so that a misspelt option is never taken for a path.  Only the first such token is reported, and when there is one, nothing else of the command line is looked at or reported: the token after a misspelt option may be its value.
+  - Any other token that is not expected is `sqlsource: unexpected argument at position <n>`, where `<n>` counts the arguments as the tool was given them, from one: `sqlsource descrbe` is position 1.
+  - An option with no value, or with one it cannot take, is named by the option alone: `sqlsource: option '<name>' needs a value` and `sqlsource: option '<name>' takes no value`.
+  - Response files and the bundling of short options are turned off in System.CommandLine, so a token that starts with `@` is an argument like any other and is never read as a file name or printed.  `--` is not special: it is an unknown option, and a path that starts with `-` is written `./-dir`.
+  - These lines do not go through the reporter and have no id.  `Cli` writes them to the host's `Error` and returns `1`.
 
 ### The unit of a run
 
@@ -107,7 +109,7 @@ Projects/             RunUnit and its finder
 - **`Cli`** is `public static class Cli`, public because the end-to-end projects of phase 5 call it, with `public static int Run(string[] args)`, which runs with the real host, and `internal static Task<int> RunAsync(string[] args, ToolHost host, CancellationToken cancellationToken)`, which the tests call.  `Run` cancels on Ctrl+C; a cancelled run prints nothing more and exits `1`.
 - **`ToolHost`** is a record of what the tool does not own: `Out` and `Error`, two `TextWriter`s; `WorkingDirectory`; and `GetEnvironmentVariable`, a function from a name to a value or null.  `ToolHost.Create()` gives the real one.  Later sub-phases add members: the process runner in 2.3, the describers in 2.5.  Nothing in the tool reads `Console`, `Environment` or the current directory except through it.
 - **`ToolDiagnostic`** is one error as data: a descriptor, a path or null, a line and column or null, the arguments of the message, and continuation lines, each a label and a text.
-- **`Reporter`** writes a `ToolDiagnostic` to the host's `Error` and counts what it wrote.  The exit code comes from it.
+- **`Reporter`** writes a `ToolDiagnostic` to the host's `Error` and counts what it wrote.  The exit code comes from it, except for a wrong command line, which is `1` without it.
 
 ### The format of an error
 
@@ -133,7 +135,7 @@ In `Diagnostics/ToolDiagnostics.cs` of the generator assembly: errors, tagged `N
 | `SQLSRC200` | The tool failed unexpectedly | `sqlsource failed unexpectedly: {0}: {1}` | The exception's type; its message |
 | `SQLSRC201` | No project or solution found | `'{0}' holds no .sln, .slnx or .csproj file` | The directory |
 | `SQLSRC202` | More than one project or solution found | `'{0}' holds more than one .sln, .slnx or .csproj file.  Name the one to run on.` | The directory |
-| `SQLSRC203` | Path is not a project or a solution | `'{0}' is not a .sln, .slnx or .csproj file, or a directory that holds one` | The path as given |
+| `SQLSRC203` | Path is not a project or a solution | `'{0}' is not a .sln, .slnx or .csproj file, or a directory that holds one` | The full path |
 
 A message of two sentences ends with a period, as the analyzer rule RS1032 requires and the messages of `SqlDiagnostics` do.
 
@@ -150,11 +152,11 @@ The ids `SQLSRC200` to `SQLSRC221` are assigned across the six sub-phases, in th
 
 ### Analyzer rules
 
-The repository builds with `AnalysisLevel` `latest-all` and warnings as errors, and three rules are wrong for a console program.  `.editorconfig` turns each off for `src/SqlSource.Tool/`, with its reason, as that file's own comments ask; none is silenced with `NoWarn`.
+The repository builds with `AnalysisLevel` `latest-all` and warnings as errors, and three rules are wrong for a console program.  `.editorconfig` turns each off, for `src/SqlSource.Tool/` or for one file of it, with its reason, as that file's own comments ask; none is silenced with `NoWarn`.
 
 | Rule | Why it is wrong here |
 |----|----|
-| CA1515, make public types internal | `Cli` is public on purpose |
+| CA1515, make public types internal | Only for `Cli.cs`: `Cli` is public on purpose, and any other public type of the tool is a mistake |
 | CA2007, call `ConfigureAwait` | A console program has no synchronization context |
 | CA1031, do not catch general exceptions | Only for `Cli.cs`: the one catch that turns an exception into `SQLSRC200` |
 
@@ -183,8 +185,8 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 
 1. The epic outline: the row of 2.2 says In progress.
 2. The two projects, empty but for `Program.cs` and one test, in the solution, with lock files.  `Cli.Run` returns `0`.
-3. `ToolHost`, `ToolDiagnostic`, `Reporter`, `ToolDiagnostics` with `SQLSRC200`, and the catch of an exception.
-4. The root command, `--version` and `--help`.
+3. `ToolHost`, `ToolDiagnostic`, `Reporter`, and `ToolDiagnostics` with `SQLSRC200`.
+4. The root command, `--version` and `--help`, and the catch of an exception: until a command writes, nothing of the tool can throw.
 5. `describe`, the unit of a run, and `SQLSRC201` to `SQLSRC203`.
 6. The package: `tools/check-package.sh`, `tools/check-package-install.sh`, `tools/check-tool-install.sh`, `pre-commit-validation.sh` and `build.yml`.
 7. `publish.yml` and `docs/publishing.md`.
@@ -196,7 +198,7 @@ In `tests/SqlSource.Tool.Tests`: `net10.0`, xUnit v3, Shouldly, as `tests/SqlSou
 
 | Where | Cases |
 |----|----|
-| `CliTests` | No arguments prints the help, exit `0`.  `--version`.  `--help` of the root and of `describe`.  An unknown option and an unknown command: exit `1`, a message on the error writer, nothing on the other.  An unknown option with `=value`, with `:value` and followed by a value: the message holds the option's name and not the value.  An unknown option where the path could stand is not taken for a path.  A host whose step throws: `SQLSRC200`, exit `1`, and no stack trace unless `SQLSOURCE_DEBUG` is set.  A cancelled token: exit `1` |
+| `CliTests` | No arguments prints the help, exit `0`.  `--version`.  `--help` of the root and of `describe`.  An unknown option and an unknown command: exit `1`, a message on the error writer, nothing on the other.  An unknown option with `=value`, with `:value` and followed by a value: the message holds the option's name and not the value.  Two unknown options: one line, for the first.  An unknown option where the path could stand is not taken for a path.  An unexpected argument: its position and not its text.  `--help=x`: the option's name and not the value.  A token that starts with `@` is not read as a file.  `--`.  A host whose `Out` throws under `--version`: `SQLSRC200`, exit `1`, and no stack trace unless `SQLSOURCE_DEBUG` is set and not empty.  A cancelled token: exit `1` |
 | `ReporterTests` | Each of the three first lines.  Continuation lines in order, and `see:` last.  A message with braces and quotes in an argument.  The count |
 | `RunUnitTests` | Each row of the table of the unit.  One of each kind alone; two of one kind; a solution beside a project; an extension in capitals; a relative and an absolute path; a directory given; a path that is not there; a `.slnf` and an `.fsproj` |
 | `tests/SqlSource.Tests/Diagnostics/` | The document test and the descriptor tests cover `ToolDiagnostics.All`: an error, not configurable, a help link that is the id's section |
@@ -207,9 +209,9 @@ In `tests/SqlSource.Tool.Tests`: `net10.0`, xUnit v3, Shouldly, as `tests/SqlSou
 - `.editorconfig`: as under Analyzer rules.
 - `CONTRIBUTING.md`: the two projects in Build and test; the two packages and the three scripts under Package; the new step under Checks and Continuous integration; the coverage command's filter.
 - `docs/publishing.md`: the release pushes two packages; the table of versions holds for both; the note under External configuration.
-- `docs/diagnostics.md`: a part for the errors of the `sqlsource` tool, with `SQLSRC200` to `SQLSRC203`.
+- `docs/diagnostics.md`: `SQLSRC200` to `SQLSRC203`, in the one table and the one run of sections, since `DiagnosticsDocumentTests` reads every `## ` heading as an id.  The introduction, which says that every problem is a build error, says as well that an id from 200 is an error the `sqlsource` tool prints.
 - `src/SqlSource/AGENTS.md`: `ToolDiagnostics`, and the rule on ids.
-- `src/SqlSource.Tool/AGENTS.md`, new: the tool shares the generator's code and never copies it; everything from outside comes through `ToolHost`; every error goes through `Reporter` with a descriptor; the exit codes; the format of an error, and that only the first column tells a first line from a continuation; a wrong command line is reported by the tool and never repeats a token's text.  It ends with the maintenance footer.
+- `src/SqlSource.Tool/AGENTS.md`, new: the tool shares the generator's code and never copies it; everything from outside comes through `ToolHost`; every error goes through `Reporter` with a descriptor, a wrong command line alone excepted; the exit codes; the format of an error, and that only the first column tells a first line from a continuation; a wrong command line is reported by the tool and never repeats a token's text; the package's readme is shown on nuget.org, so its links are absolute URLs.  It ends with the maintenance footer.
 - `README.md`: nothing in it changes.
 - `docs/tech-debt` and `docs/deferred`: nothing is expected.
 - The epic outline: in steps 1 and 8.
