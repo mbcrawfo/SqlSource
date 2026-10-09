@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is a build error, and none can be turned off or made a warning.  An error in a `.sql` file is reported at its line and column in that file.  A `.sql` file with an error produces no members until the error is fixed.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning.  The generator reports its errors in the build.  An error in a `.sql` file is reported at its line and column in that file, and a `.sql` file with an error produces no members until the error is fixed.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error.
 
 | Id | Title |
 |----|----|
@@ -36,8 +36,9 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC117](#sqlsrc117) | Parameter has no type |
 | [SQLSRC118](#sqlsrc118) | Parameter is not declared |
 | [SQLSRC119](#sqlsrc119) | Query has no parameters |
+| [SQLSRC200](#sqlsrc200) | The tool failed unexpectedly |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
@@ -524,3 +525,16 @@ SELECT COUNT(*) FROM users;
 ```
 
 Remove the marker.
+
+## SQLSRC200
+
+**The tool failed unexpectedly**
+
+`sqlsource` stopped on an exception that it has no error of its own for.  The message holds the type of the exception and its message.
+
+```console
+$ dotnet sqlsource describe /srv/locked
+sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.UnauthorizedAccessException: Access to the path '/srv/locked' is denied.
+```
+
+When the message names something of your machine, as this one does, fix that.  Otherwise it is a bug in the tool: set the environment variable `SQLSOURCE_DEBUG` to any value, run the command again, and [report it](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
