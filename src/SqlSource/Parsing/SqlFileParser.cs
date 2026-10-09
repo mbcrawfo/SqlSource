@@ -19,15 +19,23 @@ internal static class SqlFileParser
     /// Parses <paramref name="text" />.  <paramref name="fileName" /> is the file's name with its extension and without
     /// a directory; it names the block of a file that has no <c>-- name:</c> marker.  <paramref name="dialect" /> is
     /// the dialect, with its options, that the project gives the file.  A <c>-- dialect:</c> marker in the file's
-    /// header replaces it whole for the text after the marker.
+    /// header replaces it whole for the text after the marker.  <paramref name="commentsWanted" /> says that a level
+    /// the parser cannot see, a property, the metadata of the file's item or the attribute of a type that claims the
+    /// file, may ask for <c>keep-comments</c>: the SQL of a query with no list of its own is then built with its
+    /// comments too.
     /// </summary>
-    public static SqlFileParseResult Parse(string text, string fileName, SqlDialectChoice dialect = default)
+    public static SqlFileParseResult Parse(
+        string text,
+        string fileName,
+        SqlDialectChoice dialect = default,
+        bool commentsWanted = false
+    )
     {
         var lexer = new SqlLexer(text, SqlDialectRules.For(dialect));
         var headerEnd = SqlDialectMarker.Apply(lexer, text);
         var lexed = lexer.ReadToEnd();
         return lexed.Error is null
-            ? new Parser(text, fileName, lexed.Lexemes, headerEnd, lexer.Rules).Run()
+            ? new Parser(text, fileName, lexed.Lexemes, headerEnd, lexer.Rules, commentsWanted).Run()
             : new SqlFileParseResult(
                 EquatableArray<SqlBlock>.Empty,
                 new EquatableArray<SqlParseError>(ImmutableArray.Create(lexed.Error)),
@@ -40,7 +48,8 @@ internal static class SqlFileParser
         string fileName,
         EquatableArray<SqlLexeme> lexemes,
         int headerEnd,
-        SqlDialectRules rules
+        SqlDialectRules rules,
+        bool commentsWanted
     )
     {
         private static readonly TextSpan FileStart = new(0, 0);
@@ -255,11 +264,11 @@ internal static class SqlFileParser
                 return;
             }
 
-            // A query that has a list uses it whole.  One that has none uses the preamble's.
-            var list = scope?.Generator.Parameters ?? preamble?.Generator.Parameters;
-            var keepComments = list is { } given && (given & GeneratorParameters.KeepComments) != 0;
-            var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments);
-            var scanned = TokenScanner.Scan(sql.Text, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
+            // The stripped SQL is what the query is: its tokens, its parameters and its hash come from it.
+            var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: false);
+            var ignoredTokens = scope?.IgnoredTokens ?? SqlMarkerScope.NoNames;
+            var scanned = TokenScanner.Scan(sql.Text, ignoredTokens);
+            var firstScanError = _errors.Count;
             foreach (var error in scanned.Errors)
             {
                 _errors.Add(error with { Span = sql.ToSourceSpan(error.Span) });
@@ -277,19 +286,57 @@ internal static class SqlFileParser
                 scope?.Declarations ?? [],
                 _errors
             );
+
+            // A query that has a list uses it whole, so it alone says whether the comments can be wanted.  A query
+            // without one may get the parameter from a level the parser does not see.
+            var markers = (scope?.Level ?? SettingsLevel.None).Over(preamble?.Level ?? SettingsLevel.None);
+            var keepsComments = markers.Parameters is { } list
+                ? (list & GeneratorParameters.KeepComments) != 0
+                : commentsWanted;
+
             _blocks.Add(
                 new SqlBlock(
                     name,
                     nameSpan,
                     summary.Count == 0 ? null : string.Join(" ", summary),
                     shape,
-                    keepComments,
-                    list is { } decided ? (decided & GeneratorParameters.NoTokenValidation) == 0 : null,
                     scanned.Segments,
+                    keepsComments ? BuildKept(start, end, sql, ignoredTokens, firstScanError) : null,
                     tokens,
-                    parameters
+                    parameters,
+                    markers
                 )
             );
+        }
+
+        // The SQL with its comments, or null when it is the stripped SQL: one form then serves.  A token can stand
+        // in a comment, so this form is scanned too, and an error of its own is one the stripped form did not have
+        // at the same place.
+        private EquatableArray<SqlSegment>? BuildKept(
+            int start,
+            int end,
+            SqlBlockText stripped,
+            ISet<string> ignoredTokens,
+            int firstScanError
+        )
+        {
+            var kept = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: true);
+            if (string.Equals(kept.Text, stripped.Text, StringComparison.Ordinal))
+            {
+                return null;
+            }
+
+            var scanned = TokenScanner.Scan(kept.Text, ignoredTokens);
+            foreach (var error in scanned.Errors)
+            {
+                var located = error with { Span = kept.ToSourceSpan(error.Span) };
+                if (_errors.IndexOf(located, firstScanError) < 0)
+                {
+                    _errors.Add(located);
+                }
+            }
+
+            return scanned.Segments;
         }
 
         // The place is checked first: a marker in the wrong place is reported as that, whatever it names.

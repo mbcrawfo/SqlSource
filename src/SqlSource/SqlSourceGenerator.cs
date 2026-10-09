@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Settings;
 
 namespace SqlSource;
 
@@ -126,7 +127,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(
                 static (input, cancellationToken) =>
                     SqlPath.Normalize(input.Left.File.Path) is { } path && SqlPath.Contains(input.Right, path)
-                        ? SqlFileReader.Read(input.Left, path, cancellationToken)
+                        ? SqlFileReader.Read(input.Left, path, commentsWanted: false, cancellationToken)
                         : null
             )
             .Where(static file => file is not null)
@@ -190,7 +191,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Combine(ambiguousHintNames)
             .Select(static (input, _) => SelectFiles(input.Left.Left, input.Left.Right, input.Right))
             .WithTrackingName(TrackingNames.TypeQueries)
-            .Combine(tokenValidation.Select(static (setting, _) => setting.Validate))
+            .Combine(
+                tokenValidation.Select(
+                    static (setting, _) =>
+                        setting.Validate
+                            ? SettingsLevel.None
+                            : new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }
+                )
+            )
             .Select(static (input, _) => TypeEmitter.Emit(input.Left, input.Right))
             .WithTrackingName(TrackingNames.TypeOutput);
 

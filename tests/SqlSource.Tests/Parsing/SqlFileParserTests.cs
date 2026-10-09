@@ -27,8 +27,8 @@ public class SqlFileParserTests
         block.Name.ShouldBe("GetUser");
         block.NameSpan.ShouldBe(new TextSpan(0, 0));
         block.Summary.ShouldBeNull();
-        block.KeepComments.ShouldBeFalse();
-        block.TokenValidation.ShouldBeNull();
+        block.Markers.ShouldBeSameAs(SettingsLevel.None);
+        block.KeptSegments.ShouldBeNull();
         block.Segments.ShouldBe([new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")]);
     }
 
@@ -42,9 +42,9 @@ public class SqlFileParserTests
         var block = Blocks(Text).ShouldHaveSingleItem();
 
         block.Summary.ShouldBe("First. Second.");
-        block.KeepComments.ShouldBeTrue();
-        block.TokenValidation.ShouldBe(false);
-        Sql(block).ShouldBe("SELECT 1 -- c\nFROM t");
+        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.NoTokenValidation);
+        Sql(block).ShouldBe("SELECT 1\nFROM t");
+        Kept(block).ShouldBe("SELECT 1 -- c\nFROM t");
     }
 
     [Theory]
@@ -100,8 +100,9 @@ public class SqlFileParserTests
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
-        block.KeepComments.ShouldBeTrue();
-        Sql(block).ShouldBe("-- kept\nSELECT 1");
+        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        Sql(block).ShouldBe("SELECT 1");
+        Kept(block).ShouldBe("-- kept\nSELECT 1");
     }
 
     [Fact]
@@ -111,40 +112,62 @@ public class SqlFileParserTests
 
         var blocks = Blocks(Text);
 
-        blocks[0].TokenValidation.ShouldBe(false);
-        blocks[1].TokenValidation.ShouldBe(false);
+        blocks[0].Markers.Parameters.ShouldBe(GeneratorParameters.NoTokenValidation);
+        blocks[1].Markers.Parameters.ShouldBe(GeneratorParameters.NoTokenValidation);
     }
 
     [Theory]
-    // The query has a list: it is the list, whole.
-    [InlineData("keep-comments", "no-token-validation", false, false)]
-    [InlineData("keep-comments no-token-validation", "default", false, true)]
-    [InlineData("no-token-validation", "keep-comments", true, true)]
-    // The query has none: the preamble's.
-    [InlineData("keep-comments no-token-validation", null, true, false)]
-    public void Parse_QueryWithItsOwnGeneratorParameters_ReplacesThePreambles(
-        string preamble,
-        string? query,
-        bool keepComments,
-        bool? tokenValidation
-    )
+    // The query's own list decides, whatever the file's input says.
+    [InlineData("-- name: Q\n-- generator: keep-comments\nSELECT 1 -- c\n", false, "SELECT 1 -- c")]
+    [InlineData("-- name: Q\n-- generator: sort-input\nSELECT 1 -- c\n", true, null)]
+    [InlineData("-- name: Q\n-- generator: default\nSELECT 1 -- c\n", true, null)]
+    // The preamble's list, for a query without one.
+    [InlineData("-- generator: keep-comments\n-- name: Q\nSELECT 1 -- c\n", false, "SELECT 1 -- c")]
+    [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default\nSELECT 1 -- c\n", true, null)]
+    [InlineData("-- generator: sort-input\n-- name: Q\nSELECT 1 -- c\n", true, null)]
+    // No list at all: the file's input.
+    [InlineData("-- name: Q\nSELECT 1 -- c\n", true, "SELECT 1 -- c")]
+    [InlineData("-- name: Q\nSELECT 1 -- c\n", false, null)]
+    // Nothing to keep: one form serves.
+    [InlineData("-- name: Q\nSELECT 1\n", true, null)]
+    public void Parse_KeptForm_IsBuiltOnlyWhenItMayBeWanted(string text, bool commentsWanted, string? expected)
     {
-        var text =
-            "-- generator: "
-            + preamble
-            + "\n-- name: Q\n"
-            + (query is null ? string.Empty : "-- generator: " + query + "\n")
-            + "SELECT 1 -- c\n";
+        var block = Block(text, commentsWanted);
 
-        var block = Blocks(text).ShouldHaveSingleItem();
-
-        block.KeepComments.ShouldBe(keepComments);
-        block.TokenValidation.ShouldBe(tokenValidation);
+        Sql(block).ShouldBe("SELECT 1");
+        Kept(block).ShouldBe(expected);
     }
 
     [Fact]
-    public void Parse_QueryWithoutAnyGeneratorParameters_LeavesValidationToTheProject() =>
-        Blocks("-- name: Q\nSELECT 1\n").ShouldHaveSingleItem().TokenValidation.ShouldBeNull();
+    public void Parse_TokenThatStandsOnlyInAComment_IsATokenOfTheKeptFormAlone()
+    {
+        var block = Block("-- name: Q\n-- generator: keep-comments\nSELECT 1 /* {{note}} */ FROM {{t:users}}\n", false);
+
+        Sql(block).ShouldBe("SELECT 1   FROM {{t}}");
+        Kept(block).ShouldBe("SELECT 1 /* {{note}} */ FROM {{t}}");
+        Tokens(block).ShouldBe(["t=users"]);
+    }
+
+    [Theory]
+    [InlineData("SELECT {{class}} -- c\n", "{{class}}")]
+    [InlineData("SELECT 1 -- {{class}}\n", "{{class}}")]
+    public void Parse_ReservedTokenInEitherForm_IsReportedOnce(string sql, string at)
+    {
+        var text = "-- name: Q\n-- generator: keep-comments\n" + sql;
+
+        Errors(text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(text, at), "class")]);
+    }
+
+    [Fact]
+    public void Parse_QueryWithoutMarkers_SharesTheEmptyLevel() =>
+        Blocks("-- name: Q\nSELECT 1\n").ShouldHaveSingleItem().Markers.ShouldBeSameAs(SettingsLevel.None);
+
+    [Theory]
+    [InlineData("-- generator: keep-comments\n-- name: Q\nSELECT 1\n", 1)]
+    [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: sort-input\nSELECT 1\n", 4)]
+    [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default\nSELECT 1\n", 0)]
+    public void Parse_Markers_HoldTheQuerysListOverThePreambles(string text, int expected) =>
+        ((int?)Blocks(text).ShouldHaveSingleItem().Markers.Parameters).ShouldBe(expected);
 
     [Fact]
     public void Parse_BlockGeneratorParameter_DoesNotLeakIntoTheNextBlock()
@@ -155,8 +178,7 @@ public class SqlFileParserTests
 
         var blocks = Blocks(Text);
 
-        blocks[1].KeepComments.ShouldBeFalse();
-        blocks[1].TokenValidation.ShouldBeNull();
+        blocks[1].Markers.ShouldBeSameAs(SettingsLevel.None);
         Sql(blocks[1]).ShouldBe("SELECT {{x}}");
         blocks[1].Segments[1].ShouldBe(new SqlSegment(SqlSegmentKind.Token, "x"));
     }
@@ -276,7 +298,7 @@ public class SqlFileParserTests
         var block = Blocks(text).ShouldHaveSingleItem();
 
         block.Summary.ShouldBe("s");
-        block.TokenValidation.ShouldBe(false);
+        block.Markers.Parameters.ShouldBe(GeneratorParameters.NoTokenValidation);
         Sql(block).ShouldBe(expectedSql);
     }
 
@@ -326,11 +348,10 @@ public class SqlFileParserTests
     {
         const string Text = "-- name: A\n-- generator: keep-comments\nSELECT '{{a}}' -- {{b}}";
 
-        Blocks(Text)
-            .ShouldHaveSingleItem()
-            .Segments.Where(static segment => segment.Kind == SqlSegmentKind.Token)
-            .Select(static segment => segment.Text)
-            .ShouldBe(["a", "b"]);
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        TokenNames(block.Segments).ShouldBe(["a"]);
+        TokenNames(block.KeptSegments.ShouldNotBeNull()).ShouldBe(["a", "b"]);
     }
 
     [Fact]
@@ -457,7 +478,9 @@ public class SqlFileParserTests
         windowsBlocks.Select(Sql).ShouldBe(["SELECT 1\nFROM {{t}}", "SELECT 'x\ny'"]);
         windowsBlocks.Select(Sql).ShouldBe(unixBlocks.Select(Sql));
         windowsBlocks.Select(static block => block.Summary).ShouldBe(["S", null]);
-        windowsBlocks.Select(static block => block.TokenValidation).ShouldBe([false, false]);
+        windowsBlocks
+            .Select(static block => block.Markers.Parameters)
+            .ShouldBe([GeneratorParameters.NoTokenValidation, GeneratorParameters.NoTokenValidation]);
     }
 
     [Theory]
@@ -568,7 +591,7 @@ public class SqlFileParserTests
         const string Text =
             "-- generator: keep-comments\n-- name: A\nSELECT E'it' -- first\n    '\\'s' AS note; -- c\n";
 
-        Sql(Blocks(Text, dialect: SqlDialect.PostgreSql).ShouldHaveSingleItem())
+        Kept(Blocks(Text, dialect: SqlDialect.PostgreSql).ShouldHaveSingleItem())
             .ShouldBe("SELECT E'it' -- first\n    '\\'s' AS note; -- c");
     }
 
@@ -604,7 +627,7 @@ public class SqlFileParserTests
 
         Sql(block).ShouldBe("SELECT q'[it's]' --+ h");
         block.Summary.ShouldBe("S");
-        block.KeepComments.ShouldBeTrue();
+        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments);
     }
 
     // The header is read under the dialect of the project, and the rest of the file under the marker's.
@@ -1241,6 +1264,25 @@ public class SqlFileParserTests
         result.Blocks.ShouldBeEmpty();
         return [.. result.Errors];
     }
+
+    private static string[] TokenNames(EquatableArray<SqlSegment> segments) =>
+        [
+            .. segments
+                .Where(static segment => segment.Kind == SqlSegmentKind.Token)
+                .Select(static segment => segment.Text),
+        ];
+
+    private static string? Kept(SqlBlock block) =>
+        block.KeptSegments is { } segments
+            ? string.Concat(
+                segments.Select(static segment =>
+                    segment.Kind == SqlSegmentKind.Token ? "{{" + segment.Text + "}}" : segment.Text
+                )
+            )
+            : null;
+
+    private static SqlBlock Block(string text, bool commentsWanted) =>
+        SqlFileParser.Parse(text, "Query.sql", default, commentsWanted).Blocks.ShouldHaveSingleItem();
 
     private static string Sql(SqlBlock block) =>
         string.Concat(

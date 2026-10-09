@@ -14,23 +14,24 @@ namespace SqlSource.Parsing;
 /// <param name="Shape">
 /// The shape the name marker gives, or null when it gives none.  It has no effect yet.
 /// </param>
-/// <param name="KeepComments">Whether comments were kept in the SQL.</param>
-/// <param name="TokenValidation">
-/// True or false when a validation generator parameter applies to the block, null when none does.
+/// <param name="Segments">The SQL without comments, split into literal text and tokens.  Never empty.</param>
+/// <param name="KeptSegments">
+/// The SQL with its comments and blank lines, or null when that form was not built: because nothing can ask for it,
+/// or because it is the same text as <paramref name="Segments" />.
 /// </param>
-/// <param name="Segments">The SQL, split into literal text and tokens.  Never empty.</param>
 /// <param name="Tokens">
 /// The query's tokens, each once, in order of first appearance, with its default.  Empty when the SQL has none.
 /// </param>
 /// <param name="Parameters">The query's parameters, in order of first appearance.  Empty when it has none.</param>
+/// <param name="Markers">What the query's markers say about the settings, over those of its file's preamble.</param>
 internal sealed record SqlBlock(
     string Name,
     TextSpan NameSpan,
     string? Summary,
     ResultShape? Shape,
-    bool KeepComments,
-    bool? TokenValidation,
     EquatableArray<SqlSegment> Segments,
+    EquatableArray<SqlSegment>? KeptSegments,
     EquatableArray<SqlToken> Tokens,
-    EquatableArray<SqlQueryParameter> Parameters
+    EquatableArray<SqlQueryParameter> Parameters,
+    SettingsLevel Markers
 );

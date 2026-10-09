@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using SqlSource.Settings;
 
 namespace SqlSource.Parsing;
 
@@ -28,6 +29,10 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
 
     /// <summary>The scope's generator parameters.</summary>
     public SqlGeneratorParameterScope Generator { get; } = new();
+
+    /// <summary>What the scope's markers say about the settings.</summary>
+    public SettingsLevel Level =>
+        Generator.Parameters is { } parameters ? new SettingsLevel { Parameters = parameters } : SettingsLevel.None;
 
     /// <summary>The defaults the scope's <c>-- token:</c> markers give, in marker order, each name once.</summary>
     public IReadOnlyList<SqlTokenDefault> TokenDefaults => _tokenDefaults ?? (IReadOnlyList<SqlTokenDefault>)[];

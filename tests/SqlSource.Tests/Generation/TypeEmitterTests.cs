@@ -4,6 +4,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Parsing;
+using SqlSource.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.Generation;
@@ -223,7 +224,7 @@ public class TypeEmitterTests
                 TestModels.Array(File("Users.sql", Query("GetUser", "SELECT 1;"))),
                 "App.UserRepository.g.cs"
             ),
-            validateTokens: true
+            SettingsLevel.None
         );
 
         output.ShouldBe(new TypeOutput("App.UserRepository.g.cs", null, TestModels.Array(problem)));
@@ -472,6 +473,44 @@ public class TypeEmitterTests
     }
 
     [Fact]
+    public void Emit_QueryThatKeepsItsComments_EmitsTheKeptForm()
+    {
+        var query = new SqlQuery(
+            "GetUser",
+            NameLocation("Users.sql"),
+            null,
+            null,
+            TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")),
+            TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1; -- kept")),
+            EquatableArray<SqlToken>.Empty,
+            EquatableArray<SqlQueryParameter>.Empty,
+            new SettingsLevel { Parameters = GeneratorParameters.KeepComments }
+        );
+
+        Emit(TestModels.Type(), File("Users.sql", query))
+            .Source.ShouldNotBeNull()
+            .ShouldContain("\"SELECT 1; -- kept\"");
+    }
+
+    [Fact]
+    public void Emit_QueryThatKeepsCommentsButHasNoKeptForm_EmitsTheStrippedOne()
+    {
+        var query = new SqlQuery(
+            "GetUser",
+            NameLocation("Users.sql"),
+            null,
+            null,
+            TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")),
+            null,
+            EquatableArray<SqlToken>.Empty,
+            EquatableArray<SqlQueryParameter>.Empty,
+            new SettingsLevel { Parameters = GeneratorParameters.KeepComments }
+        );
+
+        Emit(TestModels.Type(), File("Users.sql", query)).Source.ShouldNotBeNull().ShouldContain("\"SELECT 1;\"");
+    }
+
+    [Fact]
     public void Emit_SameInput_GivesEqualOutput()
     {
         static TypeOutput Create() => Emit(TestModels.Type(), File("Users.sql", Query("GetUser", "SELECT 1;")));
@@ -493,6 +532,8 @@ public class TypeEmitterTests
                 HintName.Create(type)
             ),
             validateTokens
+                ? SettingsLevel.None
+                : new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }
         );
 
     private static ParsedSqlFile File(string fileName, params SqlQuery[] queries) =>
@@ -505,9 +546,10 @@ public class TypeEmitterTests
             summary,
             null,
             TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, sql)),
-            EquatableArray<SqlToken>.Empty,
             null,
-            EquatableArray<SqlQueryParameter>.Empty
+            EquatableArray<SqlToken>.Empty,
+            EquatableArray<SqlQueryParameter>.Empty,
+            SettingsLevel.None
         );
 
     // "SELECT * FROM {{table}};", which is a method with one parameter.
@@ -522,9 +564,15 @@ public class TypeEmitterTests
                 new SqlSegment(SqlSegmentKind.Token, "table"),
                 new SqlSegment(SqlSegmentKind.Literal, ";")
             ),
+            null,
             TestModels.Array(new SqlToken("table", null)),
-            tokenValidation,
-            EquatableArray<SqlQueryParameter>.Empty
+            EquatableArray<SqlQueryParameter>.Empty,
+            tokenValidation switch
+            {
+                false => new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation },
+                true => new SettingsLevel { Parameters = GeneratorParameters.None },
+                null => SettingsLevel.None,
+            }
         );
 
     private static LocationInfo NameLocation(string file) =>

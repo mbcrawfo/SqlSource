@@ -37,6 +37,7 @@ public class SqlQueryHashTests
     [Theory]
     [InlineData("-- name: Q\r\nSELECT 1;\r\n")]
     [InlineData("-- name: Q\n-- summary: Text.\nSELECT 1; -- a comment\n")]
+    [InlineData("-- name: Q\n-- generator: keep-comments\nSELECT 1; -- kept\n")]
     [InlineData("-- name: Q\n\n  /* a comment */\nSELECT 1;\n\n")]
     [InlineData("-- name: Other\nSELECT 1;\n")]
     public void Compute_ChangeThatLeavesTheSqlAlone_GivesTheSameHash(string text) => Hash(text).ShouldBe(Hash(Simple));

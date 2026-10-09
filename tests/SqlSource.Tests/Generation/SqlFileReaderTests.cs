@@ -32,9 +32,10 @@ public class SqlFileReaderTests
                 "Loads one user.",
                 null,
                 TestModels.Array(Literal("SELECT 1;")),
-                EquatableArray<SqlToken>.Empty,
                 null,
-                EquatableArray<SqlQueryParameter>.Empty
+                EquatableArray<SqlToken>.Empty,
+                EquatableArray<SqlQueryParameter>.Empty,
+                SettingsLevel.None
             ),
             new SqlQuery(
                 "ListUsers",
@@ -42,9 +43,10 @@ public class SqlFileReaderTests
                 null,
                 null,
                 TestModels.Array(Literal("SELECT 2\nFROM t;")),
-                EquatableArray<SqlToken>.Empty,
                 null,
-                EquatableArray<SqlQueryParameter>.Empty
+                EquatableArray<SqlToken>.Empty,
+                EquatableArray<SqlQueryParameter>.Empty,
+                SettingsLevel.None
             ),
         ]);
     }
@@ -62,9 +64,10 @@ public class SqlFileReaderTests
                 null,
                 null,
                 TestModels.Array(Literal("SELECT 1;")),
-                EquatableArray<SqlToken>.Empty,
                 null,
-                EquatableArray<SqlQueryParameter>.Empty
+                EquatableArray<SqlToken>.Empty,
+                EquatableArray<SqlQueryParameter>.Empty,
+                SettingsLevel.None
             ),
         ]);
     }
@@ -146,8 +149,9 @@ public class SqlFileReaderTests
         var file = Read(Text);
 
         file.Errors.ShouldBeEmpty();
-        file.Queries.Select(query => query.TokenValidation).ShouldBe([false, true]);
-        Read("SELECT {{a}};\n").Queries.ShouldHaveSingleItem().TokenValidation.ShouldBeNull();
+        file.Queries.Select(query => query.Markers.Parameters)
+            .ShouldBe([GeneratorParameters.NoTokenValidation, GeneratorParameters.None]);
+        Read("SELECT {{a}};\n").Queries.ShouldHaveSingleItem().Markers.ShouldBeSameAs(SettingsLevel.None);
     }
 
     [Fact]
@@ -170,6 +174,17 @@ public class SqlFileReaderTests
         file.Errors.ShouldBe([
             DiagnosticInfo.Create(SqlDiagnostics.EmptyBlock, Location(new TextSpan(0, 0), 0, 0, 0, 0)),
         ]);
+    }
+
+    [Theory]
+    [InlineData(true, "SELECT 1; -- c")]
+    [InlineData(false, null)]
+    public void Read_CommentsWanted_BuildsTheKeptFormOfAQueryWithoutAList(bool commentsWanted, string? expected)
+    {
+        var query = Read("SELECT 1; -- c\n", commentsWanted: commentsWanted).Queries.ShouldHaveSingleItem();
+
+        query.Segments.ShouldBe(TestModels.Array(Literal("SELECT 1;")));
+        query.KeptSegments.ShouldBe(expected is null ? null : TestModels.Array(Literal(expected)));
     }
 
     [Fact]
@@ -218,6 +233,7 @@ public class SqlFileReaderTests
         var file = SqlFileReader.Read(
             new FileDialect(text, SqlDialect.MySql, "nope"),
             "app/Repo/Users.sql",
+            commentsWanted: false,
             TestContext.Current.CancellationToken
         );
 
@@ -229,13 +245,15 @@ public class SqlFileReaderTests
         string? text,
         string path = Path,
         SqlDialect dialect = SqlDialect.Ansi,
-        string? invalidDialect = null
+        string? invalidDialect = null,
+        bool commentsWanted = false
     ) =>
         SqlFileReader.Read(
             new InMemoryAdditionalText(path, text),
             SqlPath.Normalize(path)!,
             dialect,
             invalidDialect,
+            commentsWanted,
             TestContext.Current.CancellationToken
         );
 

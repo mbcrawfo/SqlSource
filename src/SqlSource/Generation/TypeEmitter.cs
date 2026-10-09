@@ -6,6 +6,7 @@ using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
+using SqlSource.Settings;
 
 namespace SqlSource.Generation;
 
@@ -36,11 +37,8 @@ internal static class TypeEmitter
     /// Writes the file of <paramref name="input" />.
     /// </summary>
     /// <param name="input">The type and its parsed files.</param>
-    /// <param name="validateTokens">
-    /// What the project asks for: whether a method checks its arguments.  A query's own generator parameter comes
-    /// first.
-    /// </param>
-    public static TypeOutput Emit(TypeQueries input, bool validateTokens)
+    /// <param name="property">What the project's properties say.</param>
+    public static TypeOutput Emit(TypeQueries input, SettingsLevel property)
     {
         var type = input.Type.Type;
         if (input.Type.Diagnostics.Count > 0)
@@ -52,7 +50,7 @@ internal static class TypeEmitter
         var members = SelectMembers(type, input.Files, diagnostics);
         return new TypeOutput(
             input.HintName,
-            Write(type, members, validateTokens),
+            Write(type, members, property),
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
         );
     }
@@ -115,7 +113,11 @@ internal static class TypeEmitter
         return members;
     }
 
-    private static string Write(TargetType type, List<(SqlQuery Query, string FileName)> members, bool validateTokens)
+    private static string Write(
+        TargetType type,
+        List<(SqlQuery Query, string FileName)> members,
+        SettingsLevel property
+    )
     {
         var builder = new StringBuilder(Header);
         var depth = 0;
@@ -148,21 +150,18 @@ internal static class TypeEmitter
 
             var (query, fileName) = members[index];
             var summaryXml = GetSummaryXml(query, fileName);
-            if (HasToken(query))
+            var settings = QuerySettings.Resolve(query.Markers, SettingsLevel.None, SettingsLevel.None, property);
+
+            // The member is built from the form that is emitted.  A form that was not built is the other one.
+            var segments = settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments;
+            if (HasToken(segments))
             {
-                MethodWriter.Append(
-                    builder,
-                    indent,
-                    summaryXml,
-                    query.Name,
-                    query.Segments,
-                    query.TokenValidation ?? validateTokens
-                );
+                MethodWriter.Append(builder, indent, summaryXml, query.Name, segments, settings.ValidateTokens);
                 continue;
             }
 
             // Without a token the SQL is one literal segment.
-            var sql = query.Segments[0].Text;
+            var sql = segments[0].Text;
             XmlDocWriter.AppendMember(builder, indent, summaryXml, sql);
             _ = builder
                 .Append(indent)
@@ -181,9 +180,9 @@ internal static class TypeEmitter
         return builder.ToString();
     }
 
-    private static bool HasToken(SqlQuery query)
+    private static bool HasToken(EquatableArray<SqlSegment> segments)
     {
-        foreach (var segment in query.Segments)
+        foreach (var segment in segments)
         {
             if (segment.Kind == SqlSegmentKind.Token)
             {
