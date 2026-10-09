@@ -30,6 +30,10 @@ Console.WriteLine($"comments kept by the attribute: {KeptQueries.GetUser}");
 Console.WriteLine($"dialect of the project: {Queries.ByProperty}");
 Console.WriteLine($"dialect of the item: {Queries.ByMetadata}");
 
+// The item of ByOption.sql says mysql and, on the next line, no-backslash-escapes.  The value reaches the compiler on
+// one line: cut at the line break it would be no dialect, and plain MySQL would not close the string.
+Console.WriteLine($"dialect of the item, with an option on the next line: {Queries.ByOption}");
+
 // A target of Directory.Build.targets adds the item of AddedByATarget.sql, and its metadata says mssql.
 Console.WriteLine($"dialect of an item that a target adds: {Queries.AddedByATarget}");
 

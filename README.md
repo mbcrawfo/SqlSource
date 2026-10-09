@@ -463,6 +463,21 @@ A project that lists its own files can give the metadata where it lists them:
 </ItemGroup>
 ```
 
+### White space in a value
+
+The package removes the white space around the value of each property and metadata above, and makes one space of each run of white space inside it, a line break among it.  So a value may stand on a line of its own, and a value of several words, such as a list of generator parameters or a dialect and its options, may be written over several lines:
+
+```xml
+<PropertyGroup>
+    <SqlSourceGeneratorParameters>
+        keep-comments
+        no-token-validation
+    </SqlSourceGeneratorParameters>
+</PropertyGroup>
+```
+
+A line break inside one word puts a space there: `App.` and `Models` on two lines are `App. Models`, which is not a namespace and is reported as [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).
+
 ## Supported environments
 
 A project that uses SqlSource must target .NET 8 or later; the generated code relies on it, and an older target is reported as [SQLSRC003](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc003).
