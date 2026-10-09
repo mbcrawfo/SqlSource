@@ -3,12 +3,22 @@ using System.Linq;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
 public class SqlFileParserTests
 {
+    [Theory]
+    [InlineData("SELECT 1;\n", "MySql", "MySql")]
+    [InlineData("-- dialect: mssql\nSELECT 1;\n", "MySql", "SqlServer")]
+    [InlineData("-- dialect: nope\nSELECT 'open\n", "Oracle", "Oracle")]
+    public void Parse_Result_NamesTheDialectTheFileWasReadBy(string text, string given, string expected) =>
+        SqlFileParser
+            .Parse(text, "Query.sql", new SqlDialectChoice(Enum.Parse<SqlDialect>(given), SqlDialectOptions.None))
+            .Dialect.ShouldBe(Enum.Parse<SqlDialect>(expected));
+
     [Fact]
     public void Parse_FileWithoutNameMarker_IsOneBlockNamedAfterTheFile()
     {
@@ -17,8 +27,8 @@ public class SqlFileParserTests
         block.Name.ShouldBe("GetUser");
         block.NameSpan.ShouldBe(new TextSpan(0, 0));
         block.Summary.ShouldBeNull();
-        block.KeepComments.ShouldBeFalse();
-        block.TokenValidation.ShouldBeNull();
+        block.Markers.ShouldBeSameAs(SettingsLevel.None);
+        block.KeptSegments.ShouldBeNull();
         block.Segments.ShouldBe([new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")]);
     }
 
@@ -32,9 +42,9 @@ public class SqlFileParserTests
         var block = Blocks(Text).ShouldHaveSingleItem();
 
         block.Summary.ShouldBe("First. Second.");
-        block.KeepComments.ShouldBeTrue();
-        block.TokenValidation.ShouldBe(false);
-        Sql(block).ShouldBe("SELECT 1 -- c\nFROM t");
+        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.NoTokenValidation);
+        Sql(block).ShouldBe("SELECT 1\nFROM t");
+        Kept(block).ShouldBe("SELECT 1 -- c\nFROM t");
     }
 
     [Theory]
@@ -90,69 +100,85 @@ public class SqlFileParserTests
 
         var block = Blocks(Text).ShouldHaveSingleItem();
 
-        block.KeepComments.ShouldBeTrue();
-        Sql(block).ShouldBe("-- kept\nSELECT 1");
+        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        Sql(block).ShouldBe("SELECT 1");
+        Kept(block).ShouldBe("-- kept\nSELECT 1");
     }
 
     [Fact]
     public void Parse_PreambleGeneratorParameters_ApplyToEveryBlock()
     {
-        const string Text =
-            "-- generator: no-token-validation token-ignore=x\n"
-            + "-- name: A\nSELECT {{x}}\n"
-            + "-- name: B\nSELECT {{x}} {{y}}\n";
+        const string Text = "-- generator: no-token-validation\n" + "-- name: A\nSELECT 1\n" + "-- name: B\nSELECT 2\n";
 
         var blocks = Blocks(Text);
 
-        blocks[0].TokenValidation.ShouldBe(false);
-        blocks[1].TokenValidation.ShouldBe(false);
-        blocks[0].Segments.ShouldBe([new SqlSegment(SqlSegmentKind.Literal, "SELECT {{x}}")]);
-        blocks[1]
-            .Segments.ShouldBe([
-                new SqlSegment(SqlSegmentKind.Literal, "SELECT {{x}} "),
-                new SqlSegment(SqlSegmentKind.Token, "y"),
-            ]);
+        blocks[0].Markers.Parameters.ShouldBe(GeneratorParameters.NoTokenValidation);
+        blocks[1].Markers.Parameters.ShouldBe(GeneratorParameters.NoTokenValidation);
+    }
+
+    [Theory]
+    // The query's own list decides, whatever the file's input says.
+    [InlineData("-- name: Q\n-- generator: keep-comments\nSELECT 1 -- c\n", false, "SELECT 1 -- c")]
+    [InlineData("-- name: Q\n-- generator: sort-input\nSELECT 1 -- c\n", true, null)]
+    [InlineData("-- name: Q\n-- generator: default\nSELECT 1 -- c\n", true, null)]
+    // The preamble's list, for a query without one.
+    [InlineData("-- generator: keep-comments\n-- name: Q\nSELECT 1 -- c\n", false, "SELECT 1 -- c")]
+    [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default\nSELECT 1 -- c\n", true, null)]
+    [InlineData("-- generator: sort-input\n-- name: Q\nSELECT 1 -- c\n", true, null)]
+    // No list at all: the file's input.
+    [InlineData("-- name: Q\nSELECT 1 -- c\n", true, "SELECT 1 -- c")]
+    [InlineData("-- name: Q\nSELECT 1 -- c\n", false, null)]
+    // Nothing to keep: one form serves.
+    [InlineData("-- name: Q\nSELECT 1\n", true, null)]
+    public void Parse_KeptForm_IsBuiltOnlyWhenItMayBeWanted(string text, bool commentsWanted, string? expected)
+    {
+        var block = Block(text, commentsWanted);
+
+        Sql(block).ShouldBe("SELECT 1");
+        Kept(block).ShouldBe(expected);
     }
 
     [Fact]
-    public void Parse_BlockValidationGeneratorParameter_OverridesThePreamble()
+    public void Parse_TokenThatStandsOnlyInAComment_IsATokenOfTheKeptFormAlone()
     {
-        const string Text =
-            "-- generator: no-token-validation\n"
-            + "-- name: A\n-- generator: token-validation\nSELECT 1\n"
-            + "-- name: B\nSELECT 2\n";
+        var block = Block("-- name: Q\n-- generator: keep-comments\nSELECT 1 /* {{note}} */ FROM {{t:users}}\n", false);
 
-        var blocks = Blocks(Text);
+        Sql(block).ShouldBe("SELECT 1   FROM {{t}}");
+        Kept(block).ShouldBe("SELECT 1 /* {{note}} */ FROM {{t}}");
+        Tokens(block).ShouldBe(["t=users"]);
+    }
 
-        blocks[0].TokenValidation.ShouldBe(true);
-        blocks[1].TokenValidation.ShouldBe(false);
+    [Theory]
+    [InlineData("SELECT {{class}} -- c\n", "{{class}}")]
+    [InlineData("SELECT 1 -- {{class}}\n", "{{class}}")]
+    public void Parse_ReservedTokenInEitherForm_IsReportedOnce(string sql, string at)
+    {
+        var text = "-- name: Q\n-- generator: keep-comments\n" + sql;
+
+        Errors(text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(text, at), "class")]);
     }
 
     [Fact]
-    public void Parse_BlockTokenIgnore_AddsToThePreamble()
-    {
-        const string Text =
-            "-- generator: token-ignore=x\n-- name: A\n-- generator: token-ignore=y\nSELECT {{x}} {{y}} {{z}}\n";
+    public void Parse_QueryWithoutMarkers_SharesTheEmptyLevel() =>
+        Blocks("-- name: Q\nSELECT 1\n").ShouldHaveSingleItem().Markers.ShouldBeSameAs(SettingsLevel.None);
 
-        Blocks(Text)
-            .ShouldHaveSingleItem()
-            .Segments.ShouldBe([
-                new SqlSegment(SqlSegmentKind.Literal, "SELECT {{x}} {{y}} "),
-                new SqlSegment(SqlSegmentKind.Token, "z"),
-            ]);
-    }
+    [Theory]
+    [InlineData("-- generator: keep-comments\n-- name: Q\nSELECT 1\n", 1)]
+    [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: sort-input\nSELECT 1\n", 4)]
+    [InlineData("-- generator: keep-comments\n-- name: Q\n-- generator: default\nSELECT 1\n", 0)]
+    public void Parse_Markers_HoldTheQuerysListOverThePreambles(string text, int expected) =>
+        ((int?)Blocks(text).ShouldHaveSingleItem().Markers.Parameters).ShouldBe(expected);
 
     [Fact]
     public void Parse_BlockGeneratorParameter_DoesNotLeakIntoTheNextBlock()
     {
         const string Text =
-            "-- name: A\n-- generator: keep-comments token-validation token-ignore=x\nSELECT 1 -- c\n"
+            "-- name: A\n-- generator: keep-comments no-token-validation\n-- token-ignore: x\nSELECT {{x}} -- c\n"
             + "-- name: B\nSELECT {{x}} -- c\n";
 
         var blocks = Blocks(Text);
 
-        blocks[1].KeepComments.ShouldBeFalse();
-        blocks[1].TokenValidation.ShouldBeNull();
+        blocks[1].Markers.ShouldBeSameAs(SettingsLevel.None);
         Sql(blocks[1]).ShouldBe("SELECT {{x}}");
         blocks[1].Segments[1].ShouldBe(new SqlSegment(SqlSegmentKind.Token, "x"));
     }
@@ -238,10 +264,7 @@ public class SqlFileParserTests
 
     [Theory]
     [InlineData("-- name: A\nSELECT 1\n\n-- summary: Loads B.\n-- name: B\nSELECT 2", "-- summary: Loads B.")]
-    [InlineData(
-        "-- name: A\nSELECT 1\n  -- generator: token-ignore=x\n-- name: B\nSELECT 2",
-        "-- generator: token-ignore=x"
-    )]
+    [InlineData("-- name: A\nSELECT 1\n  -- token-ignore: x\n-- name: B\nSELECT 2", "-- token-ignore: x")]
     [InlineData("-- name: A\nSELECT 1\n-- summary: last", "-- summary: last")]
     [InlineData("SELECT 1\n-- generator: keep-comments\n", "-- generator: keep-comments")]
     [InlineData("-- name: A\nSELECT 1\n-- summary: s\n-- a comment\n/* another */\n", "-- summary: s")]
@@ -275,7 +298,7 @@ public class SqlFileParserTests
         var block = Blocks(text).ShouldHaveSingleItem();
 
         block.Summary.ShouldBe("s");
-        block.TokenValidation.ShouldBe(false);
+        block.Markers.Parameters.ShouldBe(GeneratorParameters.NoTokenValidation);
         Sql(block).ShouldBe(expectedSql);
     }
 
@@ -325,11 +348,10 @@ public class SqlFileParserTests
     {
         const string Text = "-- name: A\n-- generator: keep-comments\nSELECT '{{a}}' -- {{b}}";
 
-        Blocks(Text)
-            .ShouldHaveSingleItem()
-            .Segments.Where(static segment => segment.Kind == SqlSegmentKind.Token)
-            .Select(static segment => segment.Text)
-            .ShouldBe(["a", "b"]);
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        TokenNames(block.Segments).ShouldBe(["a"]);
+        TokenNames(block.KeptSegments.ShouldNotBeNull()).ShouldBe(["a", "b"]);
     }
 
     [Fact]
@@ -356,7 +378,7 @@ public class SqlFileParserTests
     [Fact]
     public void Parse_ReservedKeywordTokenThatIsIgnored_IsLiteral()
     {
-        const string Text = "-- name: A\n-- generator: token-ignore=class\nSELECT {{class}}";
+        const string Text = "-- name: A\n-- token-ignore: class\nSELECT {{class}}";
 
         Sql(Blocks(Text).ShouldHaveSingleItem()).ShouldBe("SELECT {{class}}");
     }
@@ -377,9 +399,9 @@ public class SqlFileParserTests
     [Theory]
     [InlineData("-- generator: keep-comment", nameof(SqlParseErrorKind.UnknownGeneratorParameter), "keep-comment")]
     [InlineData("-- generator:", nameof(SqlParseErrorKind.EmptyGeneratorLine), "-- generator:")]
-    [InlineData("-- generator: token-ignore=", nameof(SqlParseErrorKind.InvalidMarkerValue), "token-ignore=")]
+    [InlineData("-- generator: keep-comments=", nameof(SqlParseErrorKind.InvalidMarkerValue), "keep-comments=")]
     [InlineData(
-        "-- generator: token-validation no-token-validation",
+        "-- generator: default no-token-validation",
         nameof(SqlParseErrorKind.ConflictingSettings),
         "no-token-validation"
     )]
@@ -456,7 +478,9 @@ public class SqlFileParserTests
         windowsBlocks.Select(Sql).ShouldBe(["SELECT 1\nFROM {{t}}", "SELECT 'x\ny'"]);
         windowsBlocks.Select(Sql).ShouldBe(unixBlocks.Select(Sql));
         windowsBlocks.Select(static block => block.Summary).ShouldBe(["S", null]);
-        windowsBlocks.Select(static block => block.TokenValidation).ShouldBe([false, false]);
+        windowsBlocks
+            .Select(static block => block.Markers.Parameters)
+            .ShouldBe([GeneratorParameters.NoTokenValidation, GeneratorParameters.NoTokenValidation]);
     }
 
     [Theory]
@@ -567,7 +591,7 @@ public class SqlFileParserTests
         const string Text =
             "-- generator: keep-comments\n-- name: A\nSELECT E'it' -- first\n    '\\'s' AS note; -- c\n";
 
-        Sql(Blocks(Text, dialect: SqlDialect.PostgreSql).ShouldHaveSingleItem())
+        Kept(Blocks(Text, dialect: SqlDialect.PostgreSql).ShouldHaveSingleItem())
             .ShouldBe("SELECT E'it' -- first\n    '\\'s' AS note; -- c");
     }
 
@@ -603,7 +627,7 @@ public class SqlFileParserTests
 
         Sql(block).ShouldBe("SELECT q'[it's]' --+ h");
         block.Summary.ShouldBe("S");
-        block.KeepComments.ShouldBeTrue();
+        block.Markers.Parameters.ShouldBe(GeneratorParameters.KeepComments);
     }
 
     // The header is read under the dialect of the project, and the rest of the file under the marker's.
@@ -757,13 +781,648 @@ public class SqlFileParserTests
     [Fact]
     public void Parse_SameTextUnderTwoDialects_GivesUnequalResultsOnlyWhereTheyReadItDifferently()
     {
-        SqlFileParser
-            .Parse("SELECT 1 # c", "Query.sql", SqlDialect.MySql)
-            .ShouldNotBe(SqlFileParser.Parse("SELECT 1 # c", "Query.sql", SqlDialect.Ansi));
-        SqlFileParser
-            .Parse("SELECT 1 -- c", "Query.sql", SqlDialect.MySql)
-            .ShouldBe(SqlFileParser.Parse("SELECT 1 -- c", "Query.sql", SqlDialect.Ansi));
+        // The result names the dialect it was read by, so only what was read is compared.
+        ReadOf("SELECT 1 # c", SqlDialect.MySql).ShouldNotBe(ReadOf("SELECT 1 # c", SqlDialect.Ansi));
+        ReadOf("SELECT 1 -- c", SqlDialect.MySql).ShouldBe(ReadOf("SELECT 1 -- c", SqlDialect.Ansi));
     }
+
+    private static (EquatableArray<SqlBlock> Blocks, EquatableArray<SqlParseError> Errors) ReadOf(
+        string text,
+        SqlDialect dialect
+    )
+    {
+        var result = SqlFileParser.Parse(text, "Query.sql", dialect);
+        return (result.Blocks, result.Errors);
+    }
+
+    [Theory]
+    [InlineData("SELECT @a, @b, @a", new[] { "a", "b" })]
+    [InlineData("SELECT @Id, @ID, @id", new[] { "Id" })]
+    [InlineData("SELECT '@x', @y -- @z", new[] { "y" })]
+    [InlineData("SELECT @@ROWCOUNT, a @> b", new string[0])]
+    public void Parse_Parameters_AreThoseOfTheSqlInOrderOfFirstAppearance(string sql, string[] expected)
+    {
+        var block = Blocks("-- name: Q\n" + sql + "\n").ShouldHaveSingleItem();
+
+        block.Parameters.Select(static parameter => parameter.Name).ShouldBe(expected);
+        block.Parameters.ShouldAllBe(static parameter =>
+            parameter.Type == null && parameter.Nullable == null && !parameter.IsDeclared
+        );
+        Sql(block).ShouldBe(sql.Replace(" -- @z", string.Empty, StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Parse_KeptComment_HoldsNoParameter() =>
+        Blocks("-- name: Q\n-- generator: keep-comments\nSELECT @a -- @b\n")
+            .ShouldHaveSingleItem()
+            .Parameters.Select(static parameter => parameter.Name)
+            .ShouldBe(["a"]);
+
+    private static string[] Tokens(SqlBlock block) =>
+        [.. block.Tokens.Select(static token => token.Name + "=" + (token.Default ?? "<none>"))];
+
+    [Fact]
+    public void Parse_Tokens_AreListedOnceInOrderOfFirstAppearanceWithTheirDefaults()
+    {
+        const string Text =
+            "-- name: Q\n-- token: {{filter:AND x = 1}}\nSELECT {{cols}} FROM {{table:users}} "
+            + "WHERE 1 = 1 {{filter}} {{table}} {{filter}}\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        Tokens(block).ShouldBe(["cols=<none>", "table=users", "filter=AND x = 1"]);
+        Sql(block).ShouldBe("SELECT {{cols}} FROM {{table}} WHERE 1 = 1 {{filter}} {{table}} {{filter}}");
+    }
+
+    [Fact]
+    public void Parse_TokenMarkerForATokenTheQueryLacks_IsNotAnError() =>
+        Tokens(Blocks("-- name: Q\n-- token: {{other:x}}\nSELECT {{a}}\n").ShouldHaveSingleItem())
+            .ShouldBe(["a=<none>"]);
+
+    [Fact]
+    public void Parse_TheSameDefaultTwice_IsNotAConflict() =>
+        Tokens(
+                Blocks("-- name: Q\n-- token: {{a:x}}\n-- token: {{a:x}}\nSELECT {{a:x}} {{a: x }}\n")
+                    .ShouldHaveSingleItem()
+            )
+            .ShouldBe(["a=x"]);
+
+    [Theory]
+    // Two inline defaults: at the second.
+    [InlineData("-- name: Q\nSELECT {{a:x}} {{a:y}}\n", "{{a:y}}", "{{a:y}}")]
+    // Two markers: at the second marker's value.
+    [InlineData("-- name: Q\n-- token: {{a:x}}\n-- token: {{a:y}}\nSELECT {{a}}\n", "{{a:y}}", "token: {{a:y}}")]
+    // A marker, then an inline default: at the inline one.
+    [InlineData("-- name: Q\n-- token: {{a:x}}\nSELECT {{a:y}}\n", "{{a:y}}", "{{a:y}}")]
+    // An inline default, then a marker: at the marker's value.
+    [InlineData("-- name: Q\nSELECT {{a:y}}\n-- token: {{a:x}}\nFROM t\n", "{{a:x}}", "token: {{a:x}}")]
+    public void Parse_TwoDefaultsForOneTokenThatDiffer_ConflictAtTheSecond(string text, string at, string argument) =>
+        Errors(text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.ConflictingSettings, SpanOf(text, at), argument)]);
+
+    [Theory]
+    [InlineData("{{a}}")]
+    [InlineData("{{a:x}} y")]
+    [InlineData("x {{a:y}}")]
+    [InlineData("{{a:x}}{{b:y}}")]
+    [InlineData("see below")]
+    [InlineData("{{a:'open}}")]
+    [InlineData("{{a:/* open}}")]
+    public void Parse_TokenMarkerThatIsNotOneTokenWithADefault_IsInvalid(string value)
+    {
+        var text = "-- name: Q\n-- token: " + value + "\nSELECT {{a}}\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "token: " + value),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenMarkerWithoutAValue_IsInvalidAtTheMarker()
+    {
+        const string Text = "-- name: Q\n-- token:\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(Text, "-- token:"), "token:"),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenMarkerWithAReservedName_IsAnError()
+    {
+        const string Text = "-- name: Q\n-- token: {{class:x}}\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{class:x}}"), "class"),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenMarkerInThePreamble_IsNotAllowedThere()
+    {
+        const string Text = "-- token: {{a:x}}\n-- name: Q\nSELECT {{a}}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.MarkerNotAllowedHere,
+                    SpanOf(Text, "-- token: {{a:x}}"),
+                    "token",
+                    "inside a query"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenMarkerInAFileWithoutNameMarker_IsAllowed() =>
+        Tokens(Blocks("-- token: {{a:x}}\nSELECT {{a}}\n").ShouldHaveSingleItem()).ShouldBe(["a=x"]);
+
+    private static string[] Parameters(SqlBlock block) =>
+        [
+            .. block.Parameters.Select(static parameter =>
+                parameter.Name
+                + ":"
+                + (parameter.Type ?? "<none>")
+                + ":"
+                + Nullability(parameter.Nullable)
+                + (parameter.IsDeclared ? ":declared" : string.Empty)
+            ),
+        ];
+
+    private static string Nullability(bool? nullable)
+    {
+        if (nullable is not { } value)
+        {
+            return "<unsaid>";
+        }
+
+        return value ? "null" : "not null";
+    }
+
+    [Theory]
+    [InlineData("@a", "a:<none>:<unsaid>:declared")]
+    [InlineData("@a int", "a:int:<unsaid>:declared")]
+    [InlineData("@a null", "a:<none>:null:declared")]
+    [InlineData("@a not null", "a:<none>:not null:declared")]
+    [InlineData("@a timestamptz null", "a:timestamptz:null:declared")]
+    [InlineData("@a decimal(18, 2) not null", "a:decimal(18, 2):not null:declared")]
+    [InlineData("@a double precision", "a:double precision:<unsaid>:declared")]
+    // As people type it.
+    [InlineData("@a\tint\tNULL", "a:int:null:declared")]
+    [InlineData("@a int NOT  NULL", "a:int:not null:declared")]
+    [InlineData("@A int", "a:int:<unsaid>:declared")]
+    // A type that only ends in the letters of the word.
+    [InlineData("@a mynull", "a:mynull:<unsaid>:declared")]
+    [InlineData("@a knot null", "a:knot:null:declared")]
+    public void Parse_ParamMarker_GivesItsParameterATypeAndNullability(string value, string expected) =>
+        Parameters(Blocks("-- name: Q\n-- param: " + value + "\nSELECT @a\n").ShouldHaveSingleItem())
+            .ShouldBe([expected]);
+
+    [Fact]
+    public void Parse_ParamMarkerWithWindowsLineEndings_IsRead() =>
+        Parameters(Blocks("-- name: Q\r\n-- param: @a int null  \r\nSELECT @a\r\n").ShouldHaveSingleItem())
+            .ShouldBe(["a:int:null:declared"]);
+
+    [Fact]
+    public void Parse_ParameterList_IsTheSqlsParametersThenTheDeclaredOnesInMarkerOrder()
+    {
+        const string Text =
+            "-- name: Q\n-- param: @z int\n-- param: @b text null\n-- param: @y int\nSELECT @a, @b {{f}}\n";
+
+        Parameters(Blocks(Text).ShouldHaveSingleItem())
+            .ShouldBe([
+                "a:<none>:<unsaid>",
+                "b:text:null:declared",
+                "z:int:<unsaid>:declared",
+                "y:int:<unsaid>:declared",
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TheSameDeclarationTwice_IsNotAConflict() =>
+        Parameters(
+                Blocks("-- name: Q\n-- param: @a int null\n-- param: @A int null\nSELECT @a\n").ShouldHaveSingleItem()
+            )
+            .ShouldBe(["a:int:null:declared"]);
+
+    [Theory]
+    [InlineData("@a text")]
+    [InlineData("@a int null")]
+    [InlineData("@a INT")]
+    [InlineData("@a")]
+    public void Parse_TwoDeclarationsOfOneParameterThatDiffer_Conflict(string second)
+    {
+        var text = "-- name: Q\n-- param: @a int\n-- param: " + second + "\nSELECT @a\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    new TextSpan(
+                        text.IndexOf("-- param: " + second + "\n", StringComparison.Ordinal) + 10,
+                        second.Length
+                    ),
+                    "param: " + second
+                ),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("a int")]
+    [InlineData("@")]
+    [InlineData("@ a")]
+    [InlineData("@a-b int")]
+    [InlineData("@a,@b")]
+    [InlineData(":a int")]
+    public void Parse_ParamMarkerWithoutAPrefixedNameOnItsOwn_IsInvalid(string value)
+    {
+        var text = "-- name: Q\n-- param: " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "param: " + value),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_ParamMarkerWithoutAValue_IsInvalid()
+    {
+        const string Text = "-- name: Q\n-- param:\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(Text, "-- param:"), "param:"),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_ParamMarkerInThePreamble_IsNotAllowedThere()
+    {
+        const string Text = "-- param: @a int\n-- name: Q\nSELECT @a\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.MarkerNotAllowedHere,
+                    SpanOf(Text, "-- param: @a int"),
+                    "param",
+                    "inside a query"
+                ),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("@page")]
+    [InlineData("@page null")]
+    [InlineData("@page not null")]
+    public void Parse_DeclaredOnlyParameterWithoutAType_IsAnError(string value)
+    {
+        var text = "-- name: Q\n-- param: " + value + "\nSELECT 1 {{tail:LIMIT @page}}\n";
+
+        Errors(text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.MissingParameterType, SpanOf(text, value), "@page")]);
+    }
+
+    [Fact]
+    public void Parse_ParameterOnlyInAnInlineDefault_MustBeDeclared()
+    {
+        const string Text = "-- name: Q\nSELECT @a {{f:AND x = @b AND y = @a}}\n";
+
+        Errors(Text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, SpanOf(Text, "@b"), "@b")]);
+    }
+
+    [Fact]
+    public void Parse_ParameterOnlyInAMarkersDefault_MustBeDeclared()
+    {
+        const string Text = "-- name: Q\n-- token: {{f:AND x = @b AND y = '@c'}}\nSELECT 1 {{f}}\n";
+
+        Errors(Text).ShouldBe([SqlParseError.Create(SqlParseErrorKind.UndeclaredParameter, SpanOf(Text, "@b"), "@b")]);
+    }
+
+    [Fact]
+    public void Parse_ParameterInADefaultThatIsDeclaredWithAType_IsADeclaredOnlyParameter() =>
+        Parameters(
+                Blocks("-- name: Q\n-- param: @b int\n-- token: {{g:OFFSET @b}}\nSELECT @a {{f:LIMIT @b}} {{g}}\n")
+                    .ShouldHaveSingleItem()
+            )
+            .ShouldBe(["a:<none>:<unsaid>", "b:int:<unsaid>:declared"]);
+
+    // The query does not hold the token, so its marker's default is not the query's.
+    [Fact]
+    public void Parse_ParameterInTheDefaultOfATokenTheQueryLacks_IsNotChecked() =>
+        Blocks("-- name: Q\n-- token: {{other:@x}}\nSELECT 1\n").ShouldHaveSingleItem().Parameters.ShouldBeEmpty();
+
+    // A fragment passed at run time may use it.
+    [Fact]
+    public void Parse_DeclaredParameterThatNothingHolds_IsKept() =>
+        Parameters(Blocks("-- name: Q\n-- param: @later int\nSELECT 1 {{f}}\n").ShouldHaveSingleItem())
+            .ShouldBe(["later:int:<unsaid>:declared"]);
+
+    [Fact]
+    public void Parse_ParamMarkerInAFileWithoutNameMarker_IsAllowed() =>
+        Parameters(Blocks("-- param: @a int\nSELECT @a\n").ShouldHaveSingleItem())
+            .ShouldBe(["a:int:<unsaid>:declared"]);
+
+    [Fact]
+    public void Parse_ParameterInsideAToken_IsNotAParameterOfTheSql()
+    {
+        var block = Blocks("-- name: Q\n-- param: @b int\nSELECT @a {{f:AND x = @b}} {{t}}@c\n").ShouldHaveSingleItem();
+
+        block.Parameters.Select(static parameter => parameter.Name).ShouldBe(["a", "c", "b"]);
+    }
+
+    [Fact]
+    public void Parse_ParameterInsideAnIgnoredToken_IsAParameterOfTheSql() =>
+        Blocks("-- name: Q\n-- token-ignore: f\nSELECT {{f:@b}}\n")
+            .ShouldHaveSingleItem()
+            .Parameters.Select(static parameter => parameter.Name)
+            .ShouldBe(["b"]);
+
+    [Fact]
+    public void Parse_TokenIgnoreMarkers_KeepEachNamedTokenAsText()
+    {
+        const string Text =
+            "-- name: Q\n-- token-ignore: a\n-- TOKEN-IGNORE: b\nSELECT '{{a}}', '{{b:x}}', {{c}}\n"
+            + "-- name: R\nSELECT {{a}}\n";
+
+        var blocks = Blocks(Text);
+
+        Sql(blocks[0]).ShouldBe("SELECT '{{a}}', '{{b:x}}', {{c}}");
+        Tokens(blocks[0]).ShouldBe(["c=<none>"]);
+        // One query's marker does not reach the next.
+        Tokens(blocks[1]).ShouldBe(["a=<none>"]);
+    }
+
+    [Theory]
+    [InlineData("a b")]
+    [InlineData("a-b")]
+    [InlineData("{{a}}")]
+    [InlineData("1a")]
+    public void Parse_TokenIgnoreMarkerThatIsNotOneName_IsInvalid(string value)
+    {
+        var text = "-- name: Q\n-- token-ignore: " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(text, value),
+                    "token-ignore: " + value
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenIgnoreMarkerWithoutAName_IsInvalidAtTheMarker()
+    {
+        const string Text = "-- name: Q\n-- token-ignore:\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(Text, "-- token-ignore:"),
+                    "token-ignore:"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenIgnoreMarkerInThePreamble_IsNotAllowedThere()
+    {
+        const string Text = "-- token-ignore: a\n-- name: Q\nSELECT {{a}}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.MarkerNotAllowedHere,
+                    SpanOf(Text, "-- token-ignore: a"),
+                    "token-ignore",
+                    "inside a query"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TokenIgnoreAsAGeneratorParameter_IsNotKnown()
+    {
+        const string Text = "-- name: Q\n-- generator: token-ignore=a\nSELECT {{a}}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.UnknownGeneratorParameter,
+                    SpanOf(Text, "token-ignore=a"),
+                    "token-ignore=a"
+                ),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("-- name: A", "A", null)]
+    [InlineData("-- name: A -> many", "A", "Many")]
+    [InlineData("-- name: A->one", "A", "One")]
+    [InlineData("-- name: A  ->  One-Optional  ", "A", "OneOptional")]
+    [InlineData("-- name: A -> rowcount", "A", "RowCount")]
+    [InlineData("-- name: A -> none", "A", "None")]
+    public void Parse_NameMarker_ReadsTheNameAndTheShape(string marker, string name, string? shape)
+    {
+        var text = marker + "\nSELECT 1\n";
+
+        var block = Blocks(text).ShouldHaveSingleItem();
+
+        block.Name.ShouldBe(name);
+        block.NameSpan.ShouldBe(SpanOf(text, name));
+        block.Shape.ShouldBe(shape is null ? null : Enum.Parse<ResultShape>(shape));
+    }
+
+    [Theory]
+    [InlineData("A ->", "->")]
+    [InlineData("A -> several", "-> several")]
+    [InlineData("A -> one -> many", "-> one -> many")]
+    [InlineData("A -> one, many", "-> one, many")]
+    public void Parse_NameMarkerWithAShapeThatIsNotOne_IsInvalidAtWhatFollowsTheName(string value, string at)
+    {
+        var text = "-- name: " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, at), "name: " + value)]);
+    }
+
+    [Fact]
+    public void Parse_NameMarkerWithAShapeAndNoName_IsAnInvalidName()
+    {
+        const string Text = "-- name: -> one\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidName, SpanOf(Text, "-- name: -> one"), string.Empty),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_FileWithoutNameMarker_HasNoShape() =>
+        Blocks("SELECT 1\n").ShouldHaveSingleItem().Shape.ShouldBeNull();
+
+    [Theory]
+    [InlineData("-- output: models\n-- database: billing\n-- name: Q\nSELECT 1\n", "Models", "billing")]
+    [InlineData("-- output: models\n-- name: Q\n-- output: SQL\n-- database: app\nSELECT 1\n", "Sql", "app")]
+    [InlineData("-- database: billing\n-- name: Q\n-- output: code-gen\nSELECT 1\n", "CodeGen", "billing")]
+    [InlineData("-- output: sql\n-- output: Sql\n-- database: a\n-- database: a\nSELECT 1\n", "Sql", "a")]
+    public void Parse_OutputAndDatabaseMarkers_AreCarriedWithTheQuerysOverThePreambles(
+        string text,
+        string output,
+        string database
+    )
+    {
+        var markers = Blocks(text).ShouldHaveSingleItem().Markers;
+
+        markers.Output.ShouldBe(Enum.Parse<OutputKind>(output));
+        markers.Database.ShouldBe(database);
+        markers.Parameters.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("output", "models", "sql")]
+    [InlineData("database", "billing", "Billing")]
+    public void Parse_TwoValuesOfOneMarkerInOneScope_ConflictAtTheSecond(string word, string first, string second)
+    {
+        var text = "-- name: Q\n-- " + word + ": " + first + "\n-- " + word + ": " + second + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.ConflictingSettings, SpanOf(text, second), word + ": " + second),
+            ]);
+    }
+
+    // A comment that only starts like a marker is a marker now, and says so at its value.
+    [Theory]
+    [InlineData("output", "the rows we need")]
+    [InlineData("output", "model")]
+    [InlineData("database", "see the wiki")]
+    [InlineData("database", "a/b")]
+    public void Parse_MarkerWithAValueItDoesNotTake_IsInvalidAtTheValue(string word, string value)
+    {
+        var text = "-- name: Q\n-- " + word + ": " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), word + ": " + value),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("output")]
+    [InlineData("database")]
+    public void Parse_MarkerWithoutAValue_IsInvalidAtTheMarker(string word)
+    {
+        var text = "-- name: Q\n-- " + word + ":\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(text, "-- " + word + ":"),
+                    word + ":"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_PreambleSettings_AreOneLevelSharedByTheQueriesThatHaveNoMarkersOfTheirOwn()
+    {
+        var blocks = Blocks("-- output: models\n-- name: A\nSELECT 1\n-- name: B\nSELECT 2\n");
+
+        blocks[0].Markers.Output.ShouldBe(OutputKind.Models);
+        blocks[1].Markers.ShouldBeSameAs(blocks[0].Markers);
+    }
+
+    [Fact]
+    public void Parse_ModelMarkers_AreCarriedWithTheQuerysOverThePreambles()
+    {
+        const string Text =
+            "-- input-model-suffix: Args\n-- output-model-suffix: Row\n-- model-namespace: App.Models\n"
+            + "-- input-model-type: class\n-- output-model-type: record\n-- collection-type: list\n"
+            + "-- name: Q\n-- output-model-type: sealed class\n-- collection-type: IReadOnlyList\n"
+            + "-- input-model: FindArgs\n-- output-model: App.Shared.UserRow\nSELECT @a\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        block.Markers.ShouldBe(
+            new SettingsLevel
+            {
+                InputModelSuffix = "Args",
+                OutputModelSuffix = "Row",
+                ModelNamespace = "App.Models",
+                InputModelType = ModelKind.Class,
+                OutputModelType = ModelKind.SealedClass,
+                CollectionType = CollectionKind.IReadOnlyList,
+            }
+        );
+        block.InputModelName.ShouldBe("FindArgs");
+        block.OutputModelName.ShouldBe("App.Shared.UserRow");
+    }
+
+    [Theory]
+    // A marker for the file, written inside a query; and a marker for a query, written before the first one.
+    [InlineData("input-model-suffix", "Args", false, "before the file's first query")]
+    [InlineData("output-model-suffix", "Row", false, "before the file's first query")]
+    [InlineData("model-namespace", "App", false, "before the file's first query")]
+    [InlineData("input-model", "FindArgs", true, "inside a query")]
+    [InlineData("output-model", "UserRow", true, "inside a query")]
+    public void Parse_ModelMarkerInTheWrongScope_IsNotAllowedThere(
+        string word,
+        string value,
+        bool inPreamble,
+        string allowed
+    )
+    {
+        var marker = "-- " + word + ": " + value;
+        var text = inPreamble ? marker + "\n-- name: Q\nSELECT @a\n" : "-- name: Q\n" + marker + "\nSELECT @a\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.MarkerNotAllowedHere, SpanOf(text, marker), word, allowed),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("input-model-suffix", "A B")]
+    [InlineData("output-model-suffix", "A.B")]
+    [InlineData("model-namespace", "App.")]
+    [InlineData("input-model-type", "struct")]
+    [InlineData("output-model-type", "sealed")]
+    [InlineData("collection-type", "HashSet")]
+    [InlineData("input-model", "class")]
+    [InlineData("output-model", "User Row")]
+    public void Parse_ModelMarkerWithAValueItDoesNotTake_IsInvalidAtTheValue(string word, string value)
+    {
+        var text = "-- " + word + ": " + value + "\nSELECT @a\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), word + ": " + value),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TwoNamesForOneModel_ConflictAtTheSecond()
+    {
+        const string Text = "-- name: Q\n-- output-model: A\n-- output-model: B\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    new TextSpan(Text.IndexOf("-- output-model: B", StringComparison.Ordinal) + 17, 1),
+                    "output-model: B"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_InputModelOnAQueryWithoutParameters_IsAnError()
+    {
+        const string Text = "-- name: Q\n-- input-model: FindArgs\nSELECT 1 {{f}}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InputModelWithoutParameters,
+                    SpanOf(Text, "-- input-model: FindArgs")
+                ),
+            ]);
+    }
+
+    // A parameter that only a marker declares is a parameter.
+    [Fact]
+    public void Parse_InputModelOnAQueryWithADeclaredOnlyParameter_IsFine() =>
+        Blocks("-- name: Q\n-- param: @page int\n-- input-model: FindArgs\nSELECT 1 {{f}}\n")
+            .ShouldHaveSingleItem()
+            .InputModelName.ShouldBe("FindArgs");
 
     private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialectChoice dialect = default)
     {
@@ -782,6 +1441,25 @@ public class SqlFileParserTests
         result.Blocks.ShouldBeEmpty();
         return [.. result.Errors];
     }
+
+    private static string[] TokenNames(EquatableArray<SqlSegment> segments) =>
+        [
+            .. segments
+                .Where(static segment => segment.Kind == SqlSegmentKind.Token)
+                .Select(static segment => segment.Text),
+        ];
+
+    private static string? Kept(SqlBlock block) =>
+        block.KeptSegments is { } segments
+            ? string.Concat(
+                segments.Select(static segment =>
+                    segment.Kind == SqlSegmentKind.Token ? "{{" + segment.Text + "}}" : segment.Text
+                )
+            )
+            : null;
+
+    private static SqlBlock Block(string text, bool commentsWanted) =>
+        SqlFileParser.Parse(text, "Query.sql", default, commentsWanted).Blocks.ShouldHaveSingleItem();
 
     private static string Sql(SqlBlock block) =>
         string.Concat(

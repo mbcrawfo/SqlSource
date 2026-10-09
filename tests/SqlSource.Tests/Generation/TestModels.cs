@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Settings;
 
 namespace SqlSource.Tests.Generation;
 
@@ -23,12 +24,15 @@ internal static class TestModels
         string filePath = SourceFile,
         string @namespace = "App",
         TypeDeclaration[]? types = null,
-        DiagnosticInfo[]? diagnostics = null
+        DiagnosticInfo[]? diagnostics = null,
+        SettingsLevel? settings = null
     ) =>
         new(
             @namespace,
             Array(types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]),
             placement,
+            MethodPlacement.ExtensionClass,
+            settings ?? SettingsLevel.None,
             path,
             filePath,
             AttributeLocation,

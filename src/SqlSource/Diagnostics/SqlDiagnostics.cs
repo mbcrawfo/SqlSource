@@ -73,10 +73,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidSqlLocation = new(
+    public static readonly DiagnosticDescriptor InvalidAttributeValue = new(
         id: "SQLSRC006",
-        title: "SqlLocation is not valid",
-        messageFormat: "'{0}' is not a value of SqlLocation",
+        title: "Attribute value is not valid",
+        messageFormat: "'{0}' is not a valid value of {1}",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -118,17 +118,6 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidTokenValidation = new(
-        id: "SQLSRC010",
-        title: "SqlSourceTokenValidation is not valid",
-        messageFormat: "The MSBuild property SqlSourceTokenValidation is '{0}'.  It must be 'true' or 'false'.",
-        category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLinkBase + "sqlsrc010",
-        customTags: WellKnownDiagnosticTags.NotConfigurable
-    );
-
     public static readonly DiagnosticDescriptor InvalidDialect = new(
         id: "SQLSRC011",
         title: "SqlSourceDialect is not valid",
@@ -160,6 +149,17 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc013",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor InvalidSettingValue = new(
+        id: "SQLSRC014",
+        title: "MSBuild setting is not valid",
+        messageFormat: "'{0}' is not a valid value of {1}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc014",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -244,8 +244,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor MarkerAtEndOfBlock = new(
         id: "SQLSRC108",
         title: "Marker has no SQL after it",
-        messageFormat: "A '-- summary:', '-- generator:' or '-- dialect:' marker comes before the SQL it describes, "
-            + "and no SQL follows this one in its query",
+        messageFormat: "A marker comes before the SQL it describes, and no SQL follows this one in its query",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -330,6 +329,51 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor MarkerNotAllowedHere = new(
+        id: "SQLSRC116",
+        title: "Marker is not allowed here",
+        messageFormat: "The '-- {0}:' marker is allowed only {1}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc116",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor MissingParameterType = new(
+        id: "SQLSRC117",
+        title: "Parameter has no type",
+        messageFormat: "'{0}' is not in the SQL of its query, so its '-- param:' marker must give its type",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc117",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor UndeclaredParameter = new(
+        id: "SQLSRC118",
+        title: "Parameter is not declared",
+        messageFormat: "'{0}' appears only in the default of a token.  Declare it with a '-- param:' marker that "
+            + "gives its type.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc118",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor InputModelWithoutParameters = new(
+        id: "SQLSRC119",
+        title: "Query has no parameters",
+        messageFormat: "The query has no parameters, so '-- input-model:' names nothing",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc119",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -340,14 +384,14 @@ internal static class SqlDiagnostics
             UnsupportedTargetFramework,
             PathMatchesNothing,
             FolderHasNoSqlFile,
-            InvalidSqlLocation,
+            InvalidAttributeValue,
             SqlMemberExists,
             DuplicateQueryName,
             QueryNamedLikeContainingType,
-            InvalidTokenValidation,
             InvalidDialect,
             UnsupportedLanguageVersion,
             PathDiffersOnlyByCase,
+            InvalidSettingValue,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,
@@ -362,7 +406,11 @@ internal static class SqlDiagnostics
             ConflictingSettings,
             EmptyBlock,
             ReservedTokenName,
-            MisplacedDialect
+            MisplacedDialect,
+            MarkerNotAllowedHere,
+            MissingParameterType,
+            UndeclaredParameter,
+            InputModelWithoutParameters
         );
 
     /// <summary>
@@ -386,6 +434,10 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.EmptyBlock => EmptyBlock,
             SqlParseErrorKind.ReservedTokenName => ReservedTokenName,
             SqlParseErrorKind.MisplacedDialect => MisplacedDialect,
+            SqlParseErrorKind.MarkerNotAllowedHere => MarkerNotAllowedHere,
+            SqlParseErrorKind.MissingParameterType => MissingParameterType,
+            SqlParseErrorKind.UndeclaredParameter => UndeclaredParameter,
+            SqlParseErrorKind.InputModelWithoutParameters => InputModelWithoutParameters,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No descriptor is defined for this kind."),
         };
 }

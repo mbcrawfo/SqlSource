@@ -4,6 +4,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Parsing;
+using SqlSource.Settings;
 using SqlSource.Tests.Generator;
 using Xunit;
 
@@ -29,14 +30,26 @@ public class SqlFileReaderTests
                 "GetUser",
                 Location(new TextSpan(9, 7), 0, 9, 0, 16),
                 "Loads one user.",
+                null,
                 TestModels.Array(Literal("SELECT 1;")),
+                null,
+                EquatableArray<SqlToken>.Empty,
+                EquatableArray<SqlQueryParameter>.Empty,
+                SettingsLevel.None,
+                null,
                 null
             ),
             new SqlQuery(
                 "ListUsers",
                 Location(new TextSpan(70, 9), 4, 9, 4, 18),
                 null,
+                null,
                 TestModels.Array(Literal("SELECT 2\nFROM t;")),
+                null,
+                EquatableArray<SqlToken>.Empty,
+                EquatableArray<SqlQueryParameter>.Empty,
+                SettingsLevel.None,
+                null,
                 null
             ),
         ]);
@@ -53,11 +66,36 @@ public class SqlFileReaderTests
                 "CountUsers",
                 new LocationInfo("C:\\app\\Repo\\CountUsers.sql", new TextSpan(0, 0), default),
                 null,
+                null,
                 TestModels.Array(Literal("SELECT 1;")),
+                null,
+                EquatableArray<SqlToken>.Empty,
+                EquatableArray<SqlQueryParameter>.Empty,
+                SettingsLevel.None,
+                null,
                 null
             ),
         ]);
     }
+
+    [Fact]
+    public void Read_QueryWithTokens_CopiesThem() =>
+        Read("-- name: Q\n-- token: {{b:y}}\nSELECT {{a:x}}, {{b}};\n")
+            .Queries.ShouldHaveSingleItem()
+            .Tokens.ShouldBe([new SqlToken("a", "x"), new SqlToken("b", "y")]);
+
+    [Fact]
+    public void Read_QueryWithAShape_CopiesIt() =>
+        Read("-- name: Q -> one-optional\nSELECT 1;\n")
+            .Queries.ShouldHaveSingleItem()
+            .Shape.ShouldBe(ResultShape.OneOptional);
+
+    [Fact]
+    public void Read_QueryWithParameters_CopiesThem() =>
+        Read("-- name: Q\nSELECT @a, @b;\n")
+            .Queries.ShouldHaveSingleItem()
+            .Parameters.Select(static parameter => parameter.Name)
+            .ShouldBe(["a", "b"]);
 
     [Fact]
     public void Read_FileWithErrors_GivesEachErrorWithItsLineAndColumnAndNoQueries()
@@ -112,19 +150,20 @@ public class SqlFileReaderTests
     {
         const string Text =
             "-- generator: no-token-validation\n-- name: FromFile\nSELECT {{a}};\n"
-            + "-- name: Own\n-- generator: token-validation\nSELECT {{b}};\n";
+            + "-- name: Own\n-- generator: default\nSELECT {{b}};\n";
 
         var file = Read(Text);
 
         file.Errors.ShouldBeEmpty();
-        file.Queries.Select(query => query.TokenValidation).ShouldBe([false, true]);
-        Read("SELECT {{a}};\n").Queries.ShouldHaveSingleItem().TokenValidation.ShouldBeNull();
+        file.Queries.Select(query => query.Markers.Parameters)
+            .ShouldBe([GeneratorParameters.NoTokenValidation, GeneratorParameters.None]);
+        Read("SELECT {{a}};\n").Queries.ShouldHaveSingleItem().Markers.ShouldBeSameAs(SettingsLevel.None);
     }
 
     [Fact]
     public void Read_IgnoredToken_IsLiteralTextOfAConstant()
     {
-        var file = Read("-- generator: token-ignore=raw\nSELECT '{{raw}}';\n");
+        var file = Read("-- token-ignore: raw\nSELECT '{{raw}}';\n");
 
         file.Queries.ShouldHaveSingleItem().Segments.ShouldBe([Literal("SELECT '{{raw}}';")]);
     }
@@ -141,6 +180,17 @@ public class SqlFileReaderTests
         file.Errors.ShouldBe([
             DiagnosticInfo.Create(SqlDiagnostics.EmptyBlock, Location(new TextSpan(0, 0), 0, 0, 0, 0)),
         ]);
+    }
+
+    [Theory]
+    [InlineData(true, "SELECT 1; -- c")]
+    [InlineData(false, null)]
+    public void Read_CommentsWanted_BuildsTheKeptFormOfAQueryWithoutAList(bool commentsWanted, string? expected)
+    {
+        var query = Read("SELECT 1; -- c\n", commentsWanted: commentsWanted).Queries.ShouldHaveSingleItem();
+
+        query.Segments.ShouldBe(TestModels.Array(Literal("SELECT 1;")));
+        query.KeptSegments.ShouldBe(expected is null ? null : TestModels.Array(Literal(expected)));
     }
 
     [Fact]
@@ -165,6 +215,13 @@ public class SqlFileReaderTests
     }
 
     [Fact]
+    public void Read_Dialect_IsNamedOnTheFileByTheOneItWasReadBy()
+    {
+        Read("SELECT 1;\n", dialect: SqlDialect.MySql).Dialect.ShouldBe(SqlDialect.MySql);
+        Read("-- dialect: postgres\nSELECT 1;\n", dialect: SqlDialect.MySql).Dialect.ShouldBe(SqlDialect.PostgreSql);
+    }
+
+    [Fact]
     public void Read_InvalidDialectOfTheFile_IsCarriedAndTheFileIsStillParsed()
     {
         var file = Read("SELECT 1;\n", invalidDialect: "pgsql");
@@ -175,31 +232,46 @@ public class SqlFileReaderTests
     }
 
     [Fact]
-    public void Read_FileDialect_ReadsTheFileWithItsDialectAndCarriesItsInvalidValue()
+    public void Read_FileParseInput_ReadsTheFileWithItsDialectAndCarriesItsInvalidValue()
     {
         var text = new InMemoryAdditionalText(Path, "SELECT 1 # c\n");
 
         var file = SqlFileReader.Read(
-            new FileDialect(text, SqlDialect.MySql, "nope"),
-            "app/Repo/Users.sql",
+            new FileParseInput(text, "app/Repo/Users.sql", SqlDialect.MySql, "nope", false),
             TestContext.Current.CancellationToken
         );
 
+        file.NormalizedPath.ShouldBe("app/Repo/Users.sql");
         file.Queries.ShouldHaveSingleItem().Segments.ShouldBe(TestModels.Array(Literal("SELECT 1")));
         file.InvalidDialect.ShouldBe("nope");
+    }
+
+    [Fact]
+    public void Read_FileParseInputThatWantsComments_BuildsTheKeptForm()
+    {
+        var text = new InMemoryAdditionalText(Path, "SELECT 1; -- c\n");
+
+        var file = SqlFileReader.Read(
+            new FileParseInput(text, "app/Repo/Users.sql", SqlDialect.Ansi, null, true),
+            TestContext.Current.CancellationToken
+        );
+
+        file.Queries.ShouldHaveSingleItem().KeptSegments.ShouldBe(TestModels.Array(Literal("SELECT 1; -- c")));
     }
 
     private static ParsedSqlFile Read(
         string? text,
         string path = Path,
         SqlDialect dialect = SqlDialect.Ansi,
-        string? invalidDialect = null
+        string? invalidDialect = null,
+        bool commentsWanted = false
     ) =>
         SqlFileReader.Read(
             new InMemoryAdditionalText(path, text),
             SqlPath.Normalize(path)!,
             dialect,
             invalidDialect,
+            commentsWanted,
             TestContext.Current.CancellationToken
         );
 

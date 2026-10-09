@@ -1,4 +1,5 @@
 using SqlSource.Diagnostics;
+using SqlSource.Settings;
 
 namespace SqlSource.Generation;
 
@@ -8,6 +9,8 @@ namespace SqlSource.Generation;
 /// <param name="Namespace">The namespace as it is written in code.  Empty for the global namespace.</param>
 /// <param name="Types">The containing types from the outermost to the type itself.  Never empty.</param>
 /// <param name="Placement">Where the members go.</param>
+/// <param name="MethodPlacement">Where the type's methods go.  It has no effect yet.</param>
+/// <param name="Settings">What the attribute says about the settings.</param>
 /// <param name="Path">The attribute's <c>Path</c>, or null when it is not set or is empty.</param>
 /// <param name="FilePath">The path of the source file that carries the attribute.</param>
 /// <param name="AttributeLocation">Where the attribute is.</param>
@@ -16,6 +19,8 @@ internal sealed record TargetType(
     string Namespace,
     EquatableArray<TypeDeclaration> Types,
     MemberPlacement Placement,
+    MethodPlacement MethodPlacement,
+    SettingsLevel Settings,
     string? Path,
     string FilePath,
     LocationInfo AttributeLocation,

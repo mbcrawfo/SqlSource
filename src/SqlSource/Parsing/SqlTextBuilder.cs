@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.Generic;
+using Microsoft.CodeAnalysis.Text;
 
 namespace SqlSource.Parsing;
 
@@ -27,7 +28,7 @@ internal static class SqlTextBuilder
     {
         if (start >= end)
         {
-            return new SqlBlockText(string.Empty, []);
+            return new SqlBlockText(string.Empty, [], []);
         }
 
         // The output is never longer than its source: each character written stands for a different character read.
@@ -55,6 +56,9 @@ internal static class SqlTextBuilder
     {
         private readonly List<(int Output, int Source)> _runs = [];
 
+        // Created at the first parameter: most blocks have none.
+        private List<TextSpan>? _parameters;
+
         // The length of the finished output: whole lines, with no line break after the last one.
         private int _finished;
 
@@ -78,6 +82,13 @@ internal static class SqlTextBuilder
             {
                 _isMarkerLine = true;
             }
+            else if (lexeme.Kind == SqlLexemeKind.Parameter)
+            {
+                // A parameter is on a line with content and never on a marker's line, so the line is kept and the
+                // offset stands.
+                (_parameters ??= []).Add(new TextSpan(_position, lexeme.Span.Length));
+                AppendLines(lexeme);
+            }
             else if (keepComments || lexeme.Kind == SqlLexemeKind.Text)
             {
                 AppendLines(lexeme);
@@ -93,7 +104,11 @@ internal static class SqlTextBuilder
         public SqlBlockText Finish()
         {
             EndLine();
-            return new SqlBlockText(new string(buffer, 0, _finished), [.. _runs]);
+            return new SqlBlockText(
+                new string(buffer, 0, _finished),
+                [.. _runs],
+                _parameters is null ? [] : [.. _parameters]
+            );
         }
 
         // Text and kept comments: a line terminator ends the output line.

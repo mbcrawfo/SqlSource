@@ -31,8 +31,7 @@ internal enum SqlParseErrorKind
     SummaryBeforeFirstName,
 
     /// <summary>
-    /// A <c>-- summary:</c>, <c>-- generator:</c> or <c>-- dialect:</c> marker has no SQL after it in its block.  No
-    /// argument.
+    /// A marker has no SQL after it in its block.  No argument.
     /// </summary>
     MarkerAtEndOfBlock,
 
@@ -63,4 +62,26 @@ internal enum SqlParseErrorKind
 
     /// <summary>A <c>-- dialect:</c> marker is inside a named query or after SQL.  No argument.</summary>
     MisplacedDialect,
+
+    /// <summary>
+    /// A marker stands where it is not allowed: one for a query in the preamble, or one for the file inside a query.
+    /// Arguments: the marker's word, and where it is allowed.
+    /// </summary>
+    MarkerNotAllowedHere,
+
+    /// <summary>
+    /// A <c>-- param:</c> marker gives no type for a parameter that the query's SQL does not hold.  Argument: the
+    /// parameter, with its prefix.
+    /// </summary>
+    MissingParameterType,
+
+    /// <summary>
+    /// A parameter stands only in the default of a token.  Argument: the parameter, with its prefix.
+    /// </summary>
+    UndeclaredParameter,
+
+    /// <summary>
+    /// A <c>-- input-model:</c> marker is on a query that has no parameters.  No argument.
+    /// </summary>
+    InputModelWithoutParameters,
 }

@@ -25,4 +25,9 @@ internal enum SqlLexemeKind
     /// <c>/*M!</c> or a line that starts <c>--+</c>.  Never stripped.
     /// </summary>
     Hint,
+
+    /// <summary>
+    /// A parameter: the dialect's prefix and a name, as in <c>@id</c>.  SQL content, copied as written.
+    /// </summary>
+    Parameter,
 }

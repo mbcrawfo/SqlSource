@@ -59,6 +59,10 @@ public class SqlDiagnosticsTests
     }
 
     [Fact]
+    public void ForParseError_InputModelWithoutParameters_IsSqlsrc119() =>
+        SqlDiagnostics.ForParseError(SqlParseErrorKind.InputModelWithoutParameters).Id.ShouldBe("SQLSRC119");
+
+    [Fact]
     public void InvalidDialect_Message_ListsTheNamesThatAreAccepted() =>
         SqlDiagnostics
             .InvalidDialect.MessageFormat.ToString(CultureInfo.InvariantCulture)

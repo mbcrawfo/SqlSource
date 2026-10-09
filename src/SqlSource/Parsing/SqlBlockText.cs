@@ -10,9 +10,15 @@ namespace SqlSource.Parsing;
 /// Where the SQL came from.  Each entry says that the text from offset <c>Output</c> onward was copied from the file
 /// starting at offset <c>Source</c>, up to the next entry.  The entries are ordered by <c>Output</c>.
 /// </param>
-internal sealed class SqlBlockText(string text, (int Output, int Source)[] runs)
+/// <param name="parameters">Where each parameter of the SQL is in the text, prefix included, in order.</param>
+internal sealed class SqlBlockText(string text, (int Output, int Source)[] runs, TextSpan[] parameters)
 {
     public string Text { get; } = text;
+
+    /// <summary>
+    /// Where each parameter of the SQL is in <see cref="Text" />, prefix included, in order.
+    /// </summary>
+    public TextSpan[] Parameters { get; } = parameters;
 
     /// <summary>
     /// Converts a non-empty span of <see cref="Text" /> that lies on one line into the span of the file's text that it

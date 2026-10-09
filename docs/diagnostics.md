@@ -9,14 +9,14 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC003](#sqlsrc003) | Target framework is not supported |
 | [SQLSRC004](#sqlsrc004) | Path matches no SQL file |
 | [SQLSRC005](#sqlsrc005) | Folder has no SQL file |
-| [SQLSRC006](#sqlsrc006) | SqlLocation is not valid |
+| [SQLSRC006](#sqlsrc006) | Attribute value is not valid |
 | [SQLSRC007](#sqlsrc007) | Type has a member named Sql |
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
-| [SQLSRC010](#sqlsrc010) | SqlSourceTokenValidation is not valid |
 | [SQLSRC011](#sqlsrc011) | SqlSourceDialect is not valid |
 | [SQLSRC012](#sqlsrc012) | Language version is not supported |
 | [SQLSRC013](#sqlsrc013) | SQL file paths differ only by case |
+| [SQLSRC014](#sqlsrc014) | MSBuild setting is not valid |
 | [SQLSRC101](#sqlsrc101) | Quote is not closed |
 | [SQLSRC102](#sqlsrc102) | Comment is not closed |
 | [SQLSRC103](#sqlsrc103) | Query name is not valid |
@@ -32,10 +32,14 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC113](#sqlsrc113) | Query has no SQL |
 | [SQLSRC114](#sqlsrc114) | Token name is a keyword |
 | [SQLSRC115](#sqlsrc115) | Dialect marker is misplaced |
+| [SQLSRC116](#sqlsrc116) | Marker is not allowed here |
+| [SQLSRC117](#sqlsrc117) | Parameter has no type |
+| [SQLSRC118](#sqlsrc118) | Parameter is not declared |
+| [SQLSRC119](#sqlsrc119) | Query has no parameters |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
-`SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the two types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
+`SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
 ## SQLSRC001
 
@@ -94,16 +98,16 @@ Add a `.sql` file next to the source file, or set `Path` to the folder or file t
 
 ## SQLSRC006
 
-**SqlLocation is not valid**
+**Attribute value is not valid**
 
-`SqlLocation` was given a value that the `SqlLocation` enum does not define.
+A property of `[SqlSourceGenerate]` has a value it does not take.  The message names the property and the value: a number that is no member of the property's enum, or a word in `Parameters` that is not a generator parameter.
 
 ```csharp
-[SqlSourceGenerate(SqlLocation = (SqlLocation)5)]
+[SqlSourceGenerate(SqlLocation = (SqlLocation)5, Parameters = "keep-coments")]
 public partial class UserRepository { }
 ```
 
-Use `SqlLocation.Nested` or `SqlLocation.Direct`.
+Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  `Output` takes `GeneratorOutput.Sql`, `GeneratorOutput.Models` or `GeneratorOutput.CodeGen`.  `InputModelType` and `OutputModelType` take `GeneratorModelType.Record`, `SealedRecord`, `Class` or `SealedClass`; `CollectionType` takes a member of `GeneratorCollectionType`; `MethodLocation` takes a member of `MethodLocation`.  `InputModelSuffix` and `OutputModelSuffix` take characters that can be part of an identifier, and `ModelNamespace` takes a namespace such as `App.Models`; a value that is empty or only white space is not set.  The type gets no members until the value is fixed.
 
 ## SQLSRC007
 
@@ -142,22 +146,6 @@ SELECT 1;
 
 Rename the query.
 
-## SQLSRC010
-
-**SqlSourceTokenValidation is not valid**
-
-The MSBuild property `SqlSourceTokenValidation` decides whether the method of a query with tokens checks its arguments.  It accepts `true` and `false`, in any case, and the project gives it another value.  The error has no file and line, because the compiler does not tell a generator where a property was set: look in the project file, in `Directory.Build.props`, and at a `-p:` argument of the build command.
-
-```xml
-<PropertyGroup>
-    <SqlSourceTokenValidation>off</SqlSourceTokenValidation>
-</PropertyGroup>
-```
-
-Set it to `false` to turn validation off for the project, or remove it to keep the default, which is to validate.  While the value is wrong the generated methods validate.
-
-The compiler hands a generator only the part of a value before the first `;` or `#`.  So `false;true` is read as `false` and is not reported, and `off;false` is reported as `off`.
-
 ## SQLSRC011
 
 **SqlSourceDialect is not valid**
@@ -181,7 +169,7 @@ The error has no file and line, because the compiler does not tell a generator w
 
 Correct the name, or remove the setting to get the default, `ansi`.  While a value is wrong the files it covers are read as `ansi`; a file whose own metadata is wrong does not fall back to the project's property.
 
-The compiler hands a generator only the part of a value before the first `;` or `#`, as for [SQLSRC010](#sqlsrc010).
+The compiler hands a generator only the part of a value before the first `;` or `#`, as for [SQLSRC014](#sqlsrc014).
 
 ## SQLSRC012
 
@@ -219,6 +207,24 @@ A project that lists one file twice, with spellings that differ by case, gets th
 Write `Update` in place of `Include` to change the item the package adds, and spell the path as it is on disk.
 
 The error is reported only for a `.sql` file that a type uses.
+
+## SQLSRC014
+
+**MSBuild setting is not valid**
+
+An MSBuild property of SqlSource, or the metadata of that name on an `AdditionalFiles` item, has a value it does not take.  The message names the setting and the value.  The error has no file and line, because the compiler does not tell a generator where a property or the metadata of an item was set: look in the project file, in `Directory.Build.props` and `Directory.Build.targets`, and at a `-p:` argument of the build command.
+
+```xml
+<PropertyGroup>
+    <SqlSourceGeneratorParameters>keep-coments</SqlSourceGeneratorParameters>
+</PropertyGroup>
+```
+
+Correct the value, or remove it to keep the default.  While it is wrong the setting is not set.  In a list of generator parameters the other words still apply, with one exception: `default` beside another parameter makes the whole list wrong, so `default no-token-validation` is reported whole and sets no list.  The same value in several places is reported once, and the metadata of a file that no type claims is not reported.
+
+`SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceInputModelType` and `SqlSourceOutputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `SqlSourceCollectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `SqlSourceInputModelSuffix` and `SqlSourceOutputModelSuffix` take characters that can be part of an identifier, and `SqlSourceModelNamespace` takes a namespace such as `App.Models`.  `SqlSourceDatabase` is not checked by the generator.  Where a type's methods go is set by the attribute alone, so there is no property for it.
+
+The compiler hands a generator only the part of a value before the first `;` or `#`.
 
 ## SQLSRC101
 
@@ -260,6 +266,8 @@ SELECT 1;
 
 Rename the query, for example to `GetUser`.
 
+The name ends at `->`, when the marker has one.
+
 ## SQLSRC104
 
 **Query name is used twice**
@@ -285,7 +293,7 @@ Add a `-- name:` marker at the top of the file, or rename the file.  If the file
 
 **SQL before the first name**
 
-In a file that has `-- name:` markers, only comments, `-- generator:` lines and a `-- dialect:` marker may come before the first one.  SQL there would belong to no query.
+In a file that has `-- name:` markers, only comments and the markers that describe the whole file may come before the first one: the table of [SQLSRC116](#sqlsrc116) has the list.  SQL there would belong to no query.
 
 ```sql
 SET search_path TO app;
@@ -314,7 +322,7 @@ Move the summary below the `-- name:` marker.
 
 **Marker has no SQL after it**
 
-A `-- summary:`, `-- generator:` or `-- dialect:` marker comes before the SQL it describes.  This one is the last thing in its query, which usually means it was written above the next `-- name:` marker and was meant for that query.
+A marker comes before the SQL it describes.  This one stands after the last SQL of its query, where a reader would take it to belong to the next one.  That usually means it was written above the next `-- name:` marker and was meant for that query.
 
 ```sql
 -- name: GetUser
@@ -330,7 +338,7 @@ Move the marker below the `-- name:` marker of the query it describes, or delete
 
 **Generator parameter is not known**
 
-A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `token-validation`, `no-token-validation` and `token-ignore=name`.
+A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` and `default`.  `token-validation` is gone because omitting `no-token-validation` says it.  `token-ignore` was a generator parameter and is a marker now: `-- token-ignore: name`, inside the query.
 
 ```sql
 -- generator: keep-comment
@@ -350,18 +358,28 @@ Add a generator parameter, or delete the line.
 
 **Marker value is not valid**
 
-A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid; or a `-- dialect:` marker does not name a dialect.
+A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:` or `-- collection-type:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
 
-- `token-ignore` needs a value that is a C# identifier, as in `token-ignore=table`.
-- No other generator parameter takes a value.
+- No generator parameter takes a value: `keep-comments=1` is this error.
+- What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
 - `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
 
 ```sql
--- generator: token-ignore
 -- generator: keep-comments=true
 -- dialect: pgsql
 -- dialect: mysql keep-comments
 ```
+
+- `-- output:` takes `sql`, `models` or `codegen`.  `-- database:` takes one word of letters, digits, `-`, `_` and `.`.
+- `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.  `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`.
+- `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`.
+- `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  Neither is a reserved keyword, and no generic type is named.
+
+A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
+
+A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else; and a quote or a block comment inside the default must close there.
+
+A `-- param:` marker starts with the parameter as the SQL writes it, `@name`, alone or followed by a space.
 
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
@@ -371,10 +389,14 @@ Add the missing value, correct the one that is wrong, or remove the one that doe
 
 Two settings contradict each other.  The error is at the second.
 
-- `token-validation` and `no-token-validation` both appear in one scope.  A scope is the lines before the first `-- name:` marker, or one query.
+- `default` beside another generator parameter in one scope: `default` is the empty list, and a list that holds something is not empty.  A scope is the lines before the first `-- name:` marker, or one query.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
+- Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
+- Two `-- param:` markers for one parameter that give different types or different nullability.
+- Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different) in one scope.
+- Two markers of any other setting of the models and the collection type that give different values in one scope: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
 
-Remove one of the two.  A validation parameter in a query overrides the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
+Remove one of the two.  A query's list replaces the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
 ## SQLSRC113
 
@@ -399,7 +421,9 @@ A token `{{name}}` becomes a parameter of a generated method, so its name must n
 SELECT * FROM {{class}};
 ```
 
-Rename the token.  If the braces are literal text and not a token, add `-- generator: token-ignore=class` to the query.
+The same holds for the name in a `-- token:` marker.
+
+Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
 
 ## SQLSRC115
 
@@ -425,3 +449,78 @@ SELECT 1;
 ```
 
 A file cannot mix dialects.  Put the queries for another database in a file of their own.
+
+## SQLSRC116
+
+**Marker is not allowed here**
+
+A marker stands in the wrong part of its file.  Some markers describe one query and go inside it, after its `-- name:` line; some describe the whole file and go before the first `-- name:` line.  The message says which this one is.
+
+```sql
+-- token: {{filter:AND deleted_at IS NULL}}
+
+-- name: ListUsers
+SELECT id FROM users WHERE 1 = 1 {{filter}};
+```
+
+Move the marker to where the message says.  A file with no `-- name:` line is one query, and takes every marker.
+
+| Marker | Before the first `-- name:` line | Inside a query |
+|----|----|----|
+| `-- name:` | no | starts one |
+| `-- summary:` | no | yes |
+| `-- dialect:` | yes | no |
+| `-- generator:` | yes | yes |
+| `-- param:` | no | yes |
+| `-- token:` | no | yes |
+| `-- token-ignore:` | no | yes |
+| `-- database:` | yes | yes |
+| `-- output:` | yes | yes |
+| `-- input-model-suffix:`, `-- output-model-suffix:` | yes | no |
+| `-- model-namespace:` | yes | no |
+| `-- input-model-type:`, `-- output-model-type:` | yes | yes |
+| `-- input-model:`, `-- output-model:` | no | yes |
+| `-- collection-type:` | yes | yes |
+
+The table is this error's, with two exceptions.  A `-- summary:` before the first `-- name:` marker is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
+
+## SQLSRC117
+
+**Parameter has no type**
+
+A `-- param:` marker names a parameter that is not in the SQL of its query.  Such a parameter reaches the query only inside the text of a token, so nothing but the marker can say what type it has.
+
+```sql
+-- name: ListUsers
+-- param: @page
+SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
+```
+
+Give the type, in the database's own words: `-- param: @page int`.
+
+## SQLSRC118
+
+**Parameter is not declared**
+
+A parameter appears in the default of a token, in the SQL or in a `-- token:` marker, and nowhere else in the query.  A default is a sample, and a type taken from a sample alone would be a guess.
+
+```sql
+-- name: ListUsers
+SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
+```
+
+Declare the parameter with its type: `-- param: @page int`.
+
+## SQLSRC119
+
+**Query has no parameters**
+
+An `-- input-model:` marker names the type of a query's parameters, and this query has none: no `@name` in its SQL and no `-- param:` marker.
+
+```sql
+-- name: CountUsers
+-- input-model: CountArgs
+SELECT COUNT(*) FROM users;
+```
+
+Remove the marker.

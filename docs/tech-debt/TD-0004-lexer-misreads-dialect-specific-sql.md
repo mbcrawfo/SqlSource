@@ -9,6 +9,9 @@ A file is read by the rules of its dialect and of the dialect's options: [`SqlDi
 | A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */` | MySQL, MariaDB | The comment ends at the first `*/`.  The server reads the body as SQL when its version is high enough, and as a comment when it is not, so where it ends depends on the server. |
 | A block comment that is still open at the end of the file | SQLite | `UnterminatedBlockComment` |
 | A carriage return with no line feed after it | MySQL, SQLite, CockroachDB | As the end of a line, as in every dialect.  These databases end a `--` comment only at a line feed, and CockroachDB counts a line break between the parts of a continued string only there too. |
+| `@x` written for the absolute value of `x`, with no space | PostgreSQL | As the parameter `x`.  Npgsql reads it the same way; write `abs(x)` or `@ x`. |
+| A local variable, `DECLARE @n int`, or a user variable, `SET @n := 1` | SQL Server, MySQL, MariaDB | As a parameter, at each place it is written. |
+| A parameter inside a hint, `/*+ ... @p ... */` or `/*! ... @p ... */` | Every dialect | Not as a parameter: a hint is copied whole and is not searched. |
 
 The default dialect, `ansi`, is one set of rules for every database.  By design it also misreads what the table in `README.md` says it does not read: backslash escapes in plain strings, `[...]` identifiers, `q'...'` strings, `#` comments, `--` that needs whitespace, and comments that do not nest.  Setting the dialect fixes those, and only those: each construct in the table above is still misread under its own dialect.
 
@@ -27,7 +30,7 @@ In [`SqlLexerTests`](../../tests/SqlSource.Tests/Parsing/SqlLexerTests.cs), the 
 
 ## Impact
 
-Low: the constructs are rare.  A user of one gets either an error that names an unterminated quote or comment in valid SQL (`SQLSRC101`, `SQLSRC102`), or a generated constant that is missing part of the query.  The second is silent at build time, though the truncated SQL will almost always fail when it runs.  `README.md` lists the constructs.
+Low: the constructs are rare.  A user of one gets either an error that names an unterminated quote or comment in valid SQL (`SQLSRC101`, `SQLSRC102`), or a generated constant that is missing part of the query.  The second is silent at build time, though the truncated SQL will almost always fail when it runs.  `README.md` lists the constructs.  The parameter rows matter from the phase that generates a type for each parameter; until then a parameter list has no effect.
 
 ## Proposed fix
 

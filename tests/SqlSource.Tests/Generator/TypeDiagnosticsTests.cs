@@ -278,7 +278,8 @@ public class TypeDiagnosticsTests
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{35 + location.Length}): '{value}' is not a value of SqlLocation",
+            $"SQLSRC006 /app/Repo/Sample.cs(3,2)-(3,{35 + location.Length}): '{value}' is not a valid value of "
+                + "SqlLocation",
         ]);
         run.Sources.Keys.ShouldBe([AttributeOnly]);
         run.CompilationErrors.ShouldBeEmpty();

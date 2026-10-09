@@ -14,6 +14,19 @@ internal static class SqlMarkerReader
         ("summary:", SqlMarkerKind.Summary),
         ("generator:", SqlMarkerKind.GeneratorParameters),
         ("dialect:", SqlMarkerKind.Dialect),
+        ("token:", SqlMarkerKind.Token),
+        ("token-ignore:", SqlMarkerKind.TokenIgnore),
+        ("param:", SqlMarkerKind.Param),
+        ("database:", SqlMarkerKind.Database),
+        ("output:", SqlMarkerKind.Output),
+        ("input-model-suffix:", SqlMarkerKind.InputModelSuffix),
+        ("output-model-suffix:", SqlMarkerKind.OutputModelSuffix),
+        ("model-namespace:", SqlMarkerKind.ModelNamespace),
+        ("input-model-type:", SqlMarkerKind.InputModelType),
+        ("output-model-type:", SqlMarkerKind.OutputModelType),
+        ("input-model:", SqlMarkerKind.InputModel),
+        ("output-model:", SqlMarkerKind.OutputModel),
+        ("collection-type:", SqlMarkerKind.CollectionType),
     ];
 
     /// <summary>
@@ -53,6 +66,32 @@ internal static class SqlMarkerReader
         }
 
         return null;
+    }
+
+    /// <summary>The word of a marker, without its colon: <c>token</c>.</summary>
+    public static string WordOf(SqlMarkerKind kind)
+    {
+        foreach (var (keyword, candidate) in Keywords)
+        {
+            if (candidate == kind)
+            {
+                return keyword.Substring(0, keyword.Length - 1);
+            }
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// The marker as a message names it: its word, a colon, a space and its value, or the word and the colon for a
+    /// marker without a value.
+    /// </summary>
+    public static string Describe(string text, SqlMarker marker)
+    {
+        var word = WordOf(marker.Kind) + ":";
+        return marker.ValueSpan.IsEmpty
+            ? word
+            : word + " " + text.Substring(marker.ValueSpan.Start, marker.ValueSpan.Length);
     }
 
     // Only blanks may come before the comment on its line.  The lexer guarantees that a line break found this way is

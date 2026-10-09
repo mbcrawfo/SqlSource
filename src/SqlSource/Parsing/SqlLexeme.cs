@@ -15,7 +15,7 @@ internal readonly record struct SqlLexeme(SqlLexemeKind Kind, TextSpan Span)
     /// </summary>
     public TextSpan? GetContentSpan(string text)
     {
-        if (Kind is SqlLexemeKind.Quoted or SqlLexemeKind.Hint)
+        if (Kind is SqlLexemeKind.Quoted or SqlLexemeKind.Hint or SqlLexemeKind.Parameter)
         {
             return Span;
         }

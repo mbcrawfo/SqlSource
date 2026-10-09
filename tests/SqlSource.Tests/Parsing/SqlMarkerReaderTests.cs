@@ -16,12 +16,32 @@ public class SqlMarkerReaderTests
     [InlineData("--\t Name:\tGetUser  ", "Name:GetUser")]
     [InlineData("-- summary: Loads a user.", "Summary:Loads a user.")]
     [InlineData("-- Summary:Loads: a -- user", "Summary:Loads: a -- user")]
-    [InlineData("-- generator: keep-comments  token-ignore=a", "GeneratorParameters:keep-comments  token-ignore=a")]
+    [InlineData("-- generator: keep-comments  sort-input", "GeneratorParameters:keep-comments  sort-input")]
     [InlineData("-- GENERATOR: x", "GeneratorParameters:x")]
     [InlineData("-- dialect: postgres", "Dialect:postgres")]
     [InlineData("-- DIALECT: MySql", "Dialect:MySql")]
     [InlineData("--dialect:mysql, ansi-quotes  ", "Dialect:mysql, ansi-quotes")]
     [InlineData("-- dialect:", "Dialect:")]
+    [InlineData("-- token-ignore: a", "TokenIgnore:a")]
+    [InlineData("-- TOKEN-IGNORE:a", "TokenIgnore:a")]
+    [InlineData("-- param: @a int", "Param:@a int")]
+    [InlineData("--PARAM:@a", "Param:@a")]
+    [InlineData("-- param:", "Param:")]
+    [InlineData("-- output: sql", "Output:sql")]
+    [InlineData("-- OUTPUT:code-gen", "Output:code-gen")]
+    [InlineData("-- database: a", "Database:a")]
+    [InlineData("--Database:  billing-v2 ", "Database:billing-v2")]
+    [InlineData("-- input-model-suffix: A", "InputModelSuffix:A")]
+    [InlineData("-- output-model-suffix: A", "OutputModelSuffix:A")]
+    [InlineData("-- model-namespace: A.B", "ModelNamespace:A.B")]
+    [InlineData("-- input-model-type: class", "InputModelType:class")]
+    [InlineData("-- OUTPUT-MODEL-TYPE:sealed record", "OutputModelType:sealed record")]
+    [InlineData("-- input-model: A", "InputModel:A")]
+    [InlineData("-- output-model: A.B", "OutputModel:A.B")]
+    [InlineData("-- collection-type: list", "CollectionType:list")]
+    [InlineData("-- token: {{a:b}}", "Token:{{a:b}}")]
+    [InlineData("-- TOKEN: x", "Token:x")]
+    [InlineData("--token:", "Token:")]
     [InlineData("-- name:", "Name:")]
     [InlineData("-- name:   ", "Name:")]
     public void Read_MarkerComment_ReturnsItsKindAndValue(string text, string expected) =>
@@ -58,6 +78,18 @@ public class SqlMarkerReaderTests
     [InlineData("-- generators: keep-comments")]
     [InlineData("-- dialect=mysql")]
     [InlineData("-- dialects: mysql")]
+    [InlineData("-- params: @a")]
+    [InlineData("-- param @a")]
+    [InlineData("-- outputs: x")]
+    [InlineData("-- output sql")]
+    [InlineData("-- databases: x")]
+    [InlineData("-- input-models: A")]
+    [InlineData("-- input-model A")]
+    [InlineData("-- collection: list")]
+    [InlineData("SELECT 1 -- database: a")]
+    [InlineData("SELECT 1 -- param: @a")]
+    [InlineData("-- tokens: x")]
+    [InlineData("-- token x")]
     [InlineData("SELECT 1 -- dialect: mysql")]
     public void Read_AnythingElse_IsNotAMarker(string text) => Markers(text).ShouldBeEmpty();
 
@@ -106,6 +138,28 @@ public class SqlMarkerReaderTests
 
         _ = marker.ShouldNotBeNull();
         marker.Value.ValueSpan.IsEmpty.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void WordOf_EveryKind_IsTheKeywordWithoutItsColon()
+    {
+        SqlMarkerReader.WordOf(SqlMarkerKind.Token).ShouldBe("token");
+        SqlMarkerReader.WordOf(SqlMarkerKind.GeneratorParameters).ShouldBe("generator");
+        SqlMarkerReader.WordOf(SqlMarkerKind.Param).ShouldBe("param");
+        SqlMarkerReader.WordOf(SqlMarkerKind.Output).ShouldBe("output");
+        SqlMarkerReader.WordOf(SqlMarkerKind.Database).ShouldBe("database");
+    }
+
+    [Theory]
+    [InlineData("-- token: {{a:b}}", "token: {{a:b}}")]
+    [InlineData("--  token:  x  ", "token: x")]
+    [InlineData("-- token:", "token:")]
+    public void Describe_Marker_IsItsWordAndItsValue(string text, string expected)
+    {
+        var marker = SqlMarkerReader.Read(text, SqlLexer.Lex(text, SqlDialectRules.Ansi).Lexemes[0]);
+
+        _ = marker.ShouldNotBeNull();
+        SqlMarkerReader.Describe(text, marker.Value).ShouldBe(expected);
     }
 
     private static string[] Markers(string text) => Markers(text, SqlDialectRules.Ansi);

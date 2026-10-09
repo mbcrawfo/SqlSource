@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Parsing;
+using SqlSource.Settings;
 using SqlSource.Tests.Generator;
 using Xunit;
 
@@ -111,11 +112,13 @@ public class DialectSettingTests
     {
         var file = new InMemoryAdditionalText(Path, "SELECT 1;");
 
-        var resolved = FileDialect.Resolve(file, DialectSetting.Parse(metadata), DialectSetting.Parse(property));
+        var resolved = Resolve(file, metadata, property);
 
         resolved.File.ShouldBeSameAs(file);
+        resolved.NormalizedPath.ShouldBe("app/Repo/Users.sql");
         resolved.Dialect.ShouldBe(new SqlDialectChoice(Enum.Parse<SqlDialect>(dialect), SqlDialectOptions.None));
-        resolved.InvalidValue.ShouldBe(invalid);
+        resolved.InvalidDialect.ShouldBe(invalid);
+        resolved.CommentsWanted.ShouldBeFalse();
     }
 
     // A value replaces the one it wins over whole: the option of the property is not added to the metadata.
@@ -124,11 +127,7 @@ public class DialectSettingTests
     {
         var file = new InMemoryAdditionalText(Path, "SELECT 1;");
 
-        var resolved = FileDialect.Resolve(
-            file,
-            DialectSetting.Parse("mysql"),
-            DialectSetting.Parse("mysql,ansi-quotes")
-        );
+        var resolved = Resolve(file, "mysql", "mysql,ansi-quotes");
 
         resolved.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.None));
     }
@@ -138,7 +137,7 @@ public class DialectSettingTests
     {
         var file = new InMemoryAdditionalText(Path, "SELECT 1;");
 
-        var resolved = FileDialect.Resolve(file, DialectSetting.Parse(null), DialectSetting.Parse("mysql,ansi-quotes"));
+        var resolved = Resolve(file, null, "mysql,ansi-quotes");
 
         resolved.Dialect.ShouldBe(new SqlDialectChoice(SqlDialect.MySql, SqlDialectOptions.AnsiQuotes));
     }
@@ -148,8 +147,57 @@ public class DialectSettingTests
     {
         var file = new InMemoryAdditionalText(Path, "SELECT 1;");
 
-        FileDialect
-            .Resolve(file, DialectSetting.Parse("mysql"), DialectSetting.Parse(null))
-            .ShouldBe(FileDialect.Resolve(file, DialectSetting.Parse(" MySQL "), DialectSetting.Parse("oracle")));
+        Resolve(file, "mysql", null).ShouldBe(Resolve(file, " MySQL ", "oracle"));
     }
+
+    [Theory]
+    // The metadata's list decides when it gives one; else the property's.
+    [InlineData(null, false, false, false)]
+    [InlineData(null, true, false, true)]
+    [InlineData("keep-comments", false, false, true)]
+    [InlineData("sort-input", true, false, false)]
+    [InlineData("default", true, false, false)]
+    // A type that claims the file asks for comments: wanted, whatever MSBuild says.
+    [InlineData("default", false, true, true)]
+    [InlineData(null, false, true, true)]
+    public void Resolve_CommentsWanted_IsWhatAnyLevelOutsideTheFileCanAskFor(
+        string? fileParameters,
+        bool projectKeepsComments,
+        bool claimedByATypeThatKeepsComments,
+        bool expected
+    ) =>
+        Resolve(
+            new InMemoryAdditionalText(Path, ""),
+            null,
+            null,
+            fileParameters,
+            projectKeepsComments,
+            claimedByATypeThatKeepsComments ? ["app/Repo/Users.sql"] : []
+        )
+            .CommentsWanted.ShouldBe(expected);
+
+    private static FileParseInput Resolve(
+        InMemoryAdditionalText file,
+        string? metadata,
+        string? project,
+        string? fileParameters = null,
+        bool projectKeepsComments = false,
+        params string[] commentPaths
+    ) =>
+        FileParseInput.Resolve(
+            new FileMetadata(
+                file,
+                DialectSetting.Parse(metadata),
+                fileParameters is null
+                    ? null
+                    : new FileSettings(
+                        "app/Repo/Users.sql",
+                        new SettingsLevel { Parameters = GeneratorParameterList.Parse(fileParameters, []) },
+                        EquatableArray<InvalidSetting>.Empty
+                    )
+            ),
+            DialectSetting.Parse(project),
+            projectKeepsComments,
+            TestModels.Array(commentPaths)
+        );
 }

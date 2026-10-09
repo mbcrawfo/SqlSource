@@ -133,6 +133,24 @@ public class SqlDialectNameTests
     public void Accepted_ListsTheNameOfEveryDialect() =>
         SqlDialectName.Accepted.ShouldBe("ansi, mssql, postgres, cockroachdb, mysql, mariadb, sqlite and oracle");
 
+    [Theory]
+    [InlineData("Ansi", "ansi")]
+    [InlineData("SqlServer", "mssql")]
+    [InlineData("PostgreSql", "postgres")]
+    [InlineData("CockroachDb", "cockroachdb")]
+    [InlineData("MySql", "mysql")]
+    [InlineData("MariaDb", "mariadb")]
+    [InlineData("Sqlite", "sqlite")]
+    [InlineData("Oracle", "oracle")]
+    public void Canonical_Dialect_IsItsFirstName(string dialect, string expected)
+    {
+        var name = SqlDialectName.Canonical(Enum.Parse<SqlDialect>(dialect));
+
+        name.ShouldBe(expected);
+        SqlDialectName.TryParse(name, out var parsed).ShouldBeTrue();
+        parsed.Dialect.ShouldBe(Enum.Parse<SqlDialect>(dialect));
+    }
+
     [Fact]
     public void Ansi_IsTheDefaultValue() => default(SqlDialect).ShouldBe(SqlDialect.Ansi);
 }

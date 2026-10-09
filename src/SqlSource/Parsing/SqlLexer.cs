@@ -5,7 +5,7 @@ using SqlSource.Parsing.Quoting;
 namespace SqlSource.Parsing;
 
 /// <summary>
-/// Splits SQL text into quoted regions, comments, hints and plain text.
+/// Splits SQL text into quoted regions, comments, hints, parameters and plain text.
 /// </summary>
 /// <remarks>
 /// The lexer reads by the <see cref="SqlDialectRules" /> it holds and names no dialect and no quoting form.  It knows
@@ -116,6 +116,11 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
             ReadBlockComment(start);
             PassGap(allowed: false);
         }
+        else if (current == Rules.ParameterPrefix && TryFindParameterEnd(start, out var parameterEnd))
+        {
+            Add(SqlLexemeKind.Parameter, start, parameterEnd);
+            PassGap(allowed: false);
+        }
         else if (Rules.ReaderFor(current) is { } reader)
         {
             ReadQuoted(reader, start);
@@ -125,6 +130,29 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
             Position++;
             PassGap(allowed: false);
         }
+    }
+
+    /// <summary>
+    /// Whether <paramref name="value" /> can be part of a parameter's name: a letter, a digit or <c>_</c>.
+    /// </summary>
+    internal static bool IsParameterNameCharacter(char value) => char.IsLetterOrDigit(value) || value == '_';
+
+    // A parameter is the prefix and a name.  The prefix follows neither another prefix nor a character of a name:
+    // "@@rowcount" is a function, and the "@" of "user@host" stands inside a word.
+    private bool TryFindParameterEnd(int start, out int end)
+    {
+        end = start + 1;
+        if (start > 0 && (text[start - 1] == Rules.ParameterPrefix || IsParameterNameCharacter(text[start - 1])))
+        {
+            return false;
+        }
+
+        while (end < text.Length && IsParameterNameCharacter(text[end]))
+        {
+            end++;
+        }
+
+        return end > start + 1;
     }
 
     // Checks the text of the gap up to end, where something other than plain text starts.  Anything but whitespace

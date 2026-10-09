@@ -71,7 +71,7 @@ Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar an
 | `name` | string | always | The bare name, prefix removed, with the case of its first appearance.  The prefix is a dialect rule, not data. |
 | `ordinal` | integer | always | Zero-based position; must equal the array index. |
 | `type` | object or `null` | always | The engine's type object (section 2).  `null` when neither the server nor a declaration gave a type, which the two engines in scope never produce but a future one may. |
-| `nullable` | boolean or `null` | always | `true` when a `-- param:` marker says `null`.  Otherwise `null`: no engine reports parameter nullability.  `false` is reserved for a future marker that says "not null". |
+| `nullable` | boolean or `null` | always | `true` when a `-- param:` marker says `null`, and `false` when it says `not null`.  Otherwise `null`: no engine reports parameter nullability.  A reader treats `false` and `null` alike: a parameter is non-nullable unless it says `null`. |
 | `typeSource` | `"inferred"`, `"inferred-from-copies"` or `"declared"` | when `type` is not `null` | Whether the server inferred the type from the query, inferred it after the tool renamed each occurrence of a reused SQL Server parameter and every copy agreed, or resolved a type the user declared with `-- param:`.  Explains a `varchar(8000)` in review. |
 
 ### 1.4 A column
