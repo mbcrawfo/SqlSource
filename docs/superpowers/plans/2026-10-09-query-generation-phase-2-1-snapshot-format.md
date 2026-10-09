@@ -979,9 +979,8 @@ public class SidecarTokenizerTests
     [InlineData("\"\\u0041\"", "A")]
     [InlineData("\"\\u00e9\\u00E9\"", "éé")]
     [InlineData("\"\\u0000\"", "\0")]
-    // A surrogate pair, and one half alone, which JSON allows.
+    // A surrogate pair.
     [InlineData("\"\\uD83D\\uDE00\"", "😀")]
-    [InlineData("\"\\uD83D\"", "\uD83D")]
     [InlineData("\"a\\tb\\nc\"", "a\tb\nc")]
     [InlineData("\"\\u0041bc\\\\\"", "Abc\\")]
     public void GetString_StringWithAnEscape_IsNotPlainAndIsDecoded(string json, string expected)
@@ -990,6 +989,17 @@ public class SidecarTokenizerTests
 
         token.ShouldBe(new SidecarToken(SidecarTokenKind.String, new TextSpan(0, json.Length)));
         SidecarTokenizer.GetString(json, token).ShouldBe(expected);
+    }
+
+    // JSON allows half a surrogate pair alone.  An attribute cannot hold one, so it is built here.
+    [Fact]
+    public void GetString_EscapeOfOneSurrogateAlone_IsThatCharacter()
+    {
+        const string Json = "\"\\uD83D\"";
+
+        SidecarTokenizer
+            .GetString(Json, new SidecarTokenizer(Json).Next())
+            .ShouldBe(((char)0xD83D).ToString());
     }
 
     [Theory]
@@ -1261,10 +1271,8 @@ internal struct SidecarTokenizer(string text, int position = 0)
     /// </summary>
     public const int MaxDepth = 64;
 
-    private int _position = position;
-
     /// <summary>The offset after the last token read.</summary>
-    public readonly int Position => _position;
+    public int Position { get; private set; } = position;
 
     /// <summary>The value of a string token.  A string without an escape costs one <c>Substring</c>.</summary>
     public static string GetString(string text, SidecarToken token)
@@ -1274,7 +1282,9 @@ internal struct SidecarTokenizer(string text, int position = 0)
         return token.IsPlain ? text.Substring(start, length) : Unescape(text, start, start + length);
     }
 
-    /// <summary>Whether a string token's value is <paramref name="value" />.  A plain string allocates nothing.</summary>
+    /// <summary>
+    /// Whether a string token's value is <paramref name="value" />.  A plain string allocates nothing.
+    /// </summary>
     public static bool StringEquals(string text, SidecarToken token, string value) =>
         token.IsPlain
             ? token.Span.Length - 2 == value.Length
@@ -1322,17 +1332,17 @@ internal struct SidecarTokenizer(string text, int position = 0)
     /// <summary>Reads the next token, after any white space.</summary>
     public SidecarToken Next()
     {
-        while (_position < text.Length && (text[_position] is ' ' or '\t' or '\n' or '\r'))
+        while (Position < text.Length && (text[Position] is ' ' or '\t' or '\n' or '\r'))
         {
-            _position++;
+            Position++;
         }
 
-        if (_position >= text.Length)
+        if (Position >= text.Length)
         {
             return new SidecarToken(SidecarTokenKind.End, new TextSpan(text.Length, 0));
         }
 
-        return text[_position] switch
+        return text[Position] switch
         {
             '{' => Punctuation(SidecarTokenKind.ObjectStart),
             '}' => Punctuation(SidecarTokenKind.ObjectEnd),
@@ -1345,7 +1355,7 @@ internal struct SidecarTokenizer(string text, int position = 0)
             'f' => Literal("false", SidecarTokenKind.False),
             'n' => Literal("null", SidecarTokenKind.Null),
             '-' or (>= '0' and <= '9') => ReadNumber(),
-            _ => InvalidAt(_position),
+            _ => InvalidAt(Position),
         };
     }
 
@@ -1358,22 +1368,29 @@ internal struct SidecarTokenizer(string text, int position = 0)
     public bool TrySkipValue(SidecarToken first, int depth, out TextSpan error)
     {
         error = default;
-        switch (first.Kind)
+        if (
+            first.Kind
+            is SidecarTokenKind.String
+                or SidecarTokenKind.Number
+                or SidecarTokenKind.True
+                or SidecarTokenKind.False
+                or SidecarTokenKind.Null
+        )
         {
-            case SidecarTokenKind.String
-            or SidecarTokenKind.Number
-            or SidecarTokenKind.True
-            or SidecarTokenKind.False
-            or SidecarTokenKind.Null:
-                return true;
-            case SidecarTokenKind.ObjectStart when depth < MaxDepth:
-                return TrySkipObject(depth + 1, out error);
-            case SidecarTokenKind.ArrayStart when depth < MaxDepth:
-                return TrySkipArray(depth + 1, out error);
-            default:
-                error = first.Span;
-                return false;
+            return true;
         }
+
+        if (depth < MaxDepth && first.Kind == SidecarTokenKind.ObjectStart)
+        {
+            return TrySkipObject(depth + 1, out error);
+        }
+
+        if (depth < MaxDepth && first.Kind == SidecarTokenKind.ArrayStart)
+        {
+            return TrySkipArray(depth + 1, out error);
+        }
+
+        return Fail(first, out error);
     }
 
     private static bool Fail(SidecarToken token, out TextSpan error)
@@ -1539,33 +1556,33 @@ internal struct SidecarTokenizer(string text, int position = 0)
 
     private SidecarToken Punctuation(SidecarTokenKind kind)
     {
-        var token = new SidecarToken(kind, new TextSpan(_position, 1));
-        _position++;
+        var token = new SidecarToken(kind, new TextSpan(Position, 1));
+        Position++;
         return token;
     }
 
     private SidecarToken Literal(string word, SidecarTokenKind kind)
     {
-        var start = _position;
+        var start = Position;
         if (string.CompareOrdinal(text, start, word, 0, word.Length) != 0)
         {
             return InvalidAt(start);
         }
 
-        _position = start + word.Length;
+        Position = start + word.Length;
         return new SidecarToken(kind, new TextSpan(start, word.Length));
     }
 
     // Ends the read: nothing after text that is not JSON can be trusted.
     private SidecarToken InvalidAt(int index)
     {
-        _position = text.Length;
+        Position = text.Length;
         return new SidecarToken(SidecarTokenKind.Invalid, new TextSpan(index, index < text.Length ? 1 : 0));
     }
 
     private SidecarToken ReadString()
     {
-        var start = _position;
+        var start = Position;
         var plain = true;
         var index = start + 1;
         while (index < text.Length)
@@ -1573,8 +1590,8 @@ internal struct SidecarTokenizer(string text, int position = 0)
             var character = text[index];
             if (character == '"')
             {
-                _position = index + 1;
-                return new SidecarToken(SidecarTokenKind.String, TextSpan.FromBounds(start, _position), plain);
+                Position = index + 1;
+                return new SidecarToken(SidecarTokenKind.String, TextSpan.FromBounds(start, Position), plain);
             }
 
             if (character < ' ')
@@ -1602,7 +1619,7 @@ internal struct SidecarTokenizer(string text, int position = 0)
 
     private SidecarToken ReadNumber()
     {
-        var start = _position;
+        var start = Position;
         var first = text[start] == '-' ? start + 1 : start;
         var index = SkipDigits(first);
         if (index == first)
@@ -1642,7 +1659,7 @@ internal struct SidecarTokenizer(string text, int position = 0)
             index = end;
         }
 
-        _position = index;
+        Position = index;
         return new SidecarToken(SidecarTokenKind.Number, TextSpan.FromBounds(start, index), plain);
     }
 
