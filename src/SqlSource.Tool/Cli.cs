@@ -7,6 +7,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Diagnostics;
+using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool;
@@ -75,7 +76,7 @@ public static class Cli
             // A run that was cancelled prints nothing more, whatever it was asked to do.
             cancellationToken.ThrowIfCancellationRequested();
 
-            var root = BuildCommands();
+            var root = BuildCommands(host, reporter);
 
             var wrong = UsageCheck.Check(root, args);
             if (wrong.Count > 0)
@@ -121,7 +122,7 @@ public static class Cli
         }
     }
 
-    private static Command BuildCommands()
+    private static Command BuildCommands(ToolHost host, Reporter reporter)
     {
         var version = new Option<bool>("--version")
         {
@@ -136,11 +137,32 @@ public static class Cli
         {
             new HelpOption("--help", "-h", "-?"),
             version,
+            Describe(host, reporter),
         };
 
         // System.CommandLine's own answer to no command is an error.
         root.SetAction(static parsed => new HelpAction().Invoke(parsed));
         return root;
+    }
+
+    private static Command Describe(ToolHost host, Reporter reporter)
+    {
+        var path = new Argument<string?>("path")
+        {
+            Description =
+                "A .sln, .slnx or .csproj file, or a directory that holds exactly one.  The current directory "
+                + "when left out.",
+            Arity = ArgumentArity.ZeroOrOne,
+        };
+
+        var describe = new Command("describe", "Finds the project or the solution to describe") { path };
+        describe.SetAction(parsed =>
+        {
+            // The unit is all this sub-phase finds.  An error of it is in the reporter, where the exit code is taken.
+            _ = RunUnitFinder.Find(parsed.GetValue(path), host.WorkingDirectory, reporter);
+            return 0;
+        });
+        return describe;
     }
 
     private static ToolDiagnostic Failure(Exception exception, ToolHost host)

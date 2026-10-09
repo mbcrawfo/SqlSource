@@ -37,6 +37,9 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC118](#sqlsrc118) | Parameter is not declared |
 | [SQLSRC119](#sqlsrc119) | Query has no parameters |
 | [SQLSRC200](#sqlsrc200) | The tool failed unexpectedly |
+| [SQLSRC201](#sqlsrc201) | No project or solution found |
+| [SQLSRC202](#sqlsrc202) | More than one project or solution found |
+| [SQLSRC203](#sqlsrc203) | Path is not a project or a solution |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1.
 
@@ -538,3 +541,35 @@ sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.UnauthorizedA
 ```
 
 When the message names something of your machine, as this one does, fix that.  Otherwise it is a bug in the tool: set the environment variable `SQLSOURCE_DEBUG` to any value, run the command again, and [report it](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
+
+## SQLSRC201
+
+**No project or solution found**
+
+`sqlsource describe` was given a directory, or none and so the current one, that holds no `.sln`, `.slnx` or `.csproj` file.  The tool looks in that directory alone, not in the folders below it.
+
+Run the command from the folder of the project or the solution, or name the one to run on:
+
+```console
+$ dotnet sqlsource describe src/App/App.csproj
+```
+
+## SQLSRC202
+
+**More than one project or solution found**
+
+`sqlsource describe` was given a directory, or none and so the current one, that holds more than one `.sln`, `.slnx` or `.csproj` file.  The tool does not choose between them, as `dotnet build` does not.
+
+Name the one to run on:
+
+```console
+$ dotnet sqlsource describe App.slnx
+```
+
+## SQLSRC203
+
+**Path is not a project or a solution**
+
+The path given to `sqlsource describe` does not exist, or is a file that is not a `.sln`, `.slnx` or `.csproj` file.  A solution filter, `.slnf`, and a project of another language are not read.  The message holds the full path the tool looked at: a relative path is resolved against the current directory.  An empty path is this error too, which is what a variable that is not set gives in a shell.
+
+Give the path of a solution, of a C# project, or of a directory that holds exactly one of them.

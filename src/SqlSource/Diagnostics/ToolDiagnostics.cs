@@ -23,8 +23,42 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor NoRunUnit = new(
+        id: "SQLSRC201",
+        title: "No project or solution found",
+        messageFormat: "'{0}' holds no .sln, .slnx or .csproj file",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc201",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SeveralRunUnits = new(
+        id: "SQLSRC202",
+        title: "More than one project or solution found",
+        messageFormat: "'{0}' holds more than one .sln, .slnx or .csproj file.  Name the one to run on.",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc202",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor NotARunUnit = new(
+        id: "SQLSRC203",
+        title: "Path is not a project or a solution",
+        messageFormat: "'{0}' is not a .sln, .slnx or .csproj file, or a directory that holds one",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc203",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
-    public static ImmutableArray<DiagnosticDescriptor> All { get; } = ImmutableArray.Create(UnexpectedFailure);
+    public static ImmutableArray<DiagnosticDescriptor> All { get; } =
+        ImmutableArray.Create(UnexpectedFailure, NoRunUnit, SeveralRunUnits, NotARunUnit);
 }
