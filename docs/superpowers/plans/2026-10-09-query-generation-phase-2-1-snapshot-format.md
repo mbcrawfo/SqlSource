@@ -117,7 +117,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
   - `sealed record SidecarOrigin(string? Schema, string? Table, string? Column)`; `sealed record SidecarTable(string? Schema, string? Table)`.
   - `abstract record SidecarType(string Name)`; `sealed record PostgresType(string Name, string Kind, string Schema, string InternalName, int? Length, int? Precision, int? Scale, PostgresType? Element, PostgresType? Base, EquatableArray<string>? Labels, PostgresType? Subtype)` with `bool TryGetKind(out PostgresTypeKind kind)`; `sealed record SqlServerType(string Name, int MaxLength, int Precision, int Scale, SqlServerUserType? UserType)`; `sealed record SqlServerUserType(string? Schema, string? Name, string? AssemblyQualifiedName)`; `sealed record OtherEngineType(string Name)`.
   - `enum PostgresTypeKind { Base, Array, Domain, Enum, Range, Multirange, Composite }`.
-  - `static class SidecarFormat`: `const int Version = 1`, `const string SchemaUrl`, `const string Warning`, `static string PathFor(string sqlPath)`.
+  - `static class SidecarFormat`: `const int Version = 1`, `const string SchemaId`, `const string Warning`, `static string PathFor(string sqlPath)`.
   - `static class SidecarValues` with nested `Engine`, `ResultKind`, `Plan`, `TableMatch`, `TypeSource`, `NullableSource`, `Kind`, each of `const string` members.
   - `static class SidecarKeys`: a `const string` for each key of the format.
 - Produces, namespace `SqlSource`: `static class PackageVersion` with `static string Prefix { get; }`.
@@ -340,7 +340,7 @@ public class SidecarModelTests
     public void SidecarFormat_IsVersionOneOfTheSchemaInTheRepository()
     {
         SidecarFormat.Version.ShouldBe(1);
-        SidecarFormat.SchemaUrl.ShouldBe(
+        SidecarFormat.SchemaId.ShouldBe(
             "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json"
         );
         SidecarFormat.Warning.ShouldBe(
@@ -409,11 +409,12 @@ internal sealed record Sidecar(int FormatVersion, string ToolVersion, EquatableA
     /// <summary>Returns the entry of the query with this name, compared ordinally, or null.</summary>
     public SidecarEntry? Find(string name)
     {
-        foreach (var entry in Queries)
+        // By index: Sonar asks for LINQ in place of a foreach that returns its item, and LINQ would box the array.
+        for (var index = 0; index < Queries.Count; index++)
         {
-            if (string.Equals(entry.Name, name, StringComparison.Ordinal))
+            if (string.Equals(Queries[index].Name, name, StringComparison.Ordinal))
             {
-                return entry;
+                return Queries[index];
             }
         }
 
@@ -671,7 +672,7 @@ internal static class SidecarFormat
     public const int Version = 1;
 
     /// <summary>The value of <c>$schema</c>, and the <c>$id</c> of <c>schemas/sidecar-v1.schema.json</c>.</summary>
-    public const string SchemaUrl =
+    public const string SchemaId =
         "https://raw.githubusercontent.com/mbcrawfo/SqlSource/main/schemas/sidecar-v1.schema.json";
 
     /// <summary>The value of <c>_WARNING</c>, the first line a reader of a file sees.</summary>
@@ -4163,7 +4164,7 @@ public class SidecarWriterTests
                     "\n",
                     "{",
                     "  \"_WARNING\": \"" + SidecarFormat.Warning + "\",",
-                    "  \"$schema\": \"" + SidecarFormat.SchemaUrl + "\",",
+                    "  \"$schema\": \"" + SidecarFormat.SchemaId + "\",",
                     "  \"formatVersion\": 1,",
                     "  \"toolVersion\": \"1.2.3\",",
                     "  \"queries\": {",
@@ -5065,7 +5066,7 @@ internal static class SidecarWriter
         var json = new SidecarJsonBuilder();
         json.BeginObject(null);
         json.WriteString(SidecarKeys.Warning, SidecarFormat.Warning);
-        json.WriteString(SidecarKeys.SchemaUrl, SidecarFormat.SchemaUrl);
+        json.WriteString(SidecarKeys.SchemaUrl, SidecarFormat.SchemaId);
         json.WriteNumber(SidecarKeys.FormatVersion, sidecar.FormatVersion);
         json.WriteString(SidecarKeys.ToolVersion, sidecar.ToolVersion);
         json.BeginObject(SidecarKeys.Queries);
@@ -6242,7 +6243,7 @@ public class SidecarSchemaTests
     {
         using var schema = JsonDocument.Parse(SchemaText);
 
-        schema.RootElement.GetProperty("$id").GetString().ShouldBe(SidecarFormat.SchemaUrl);
+        schema.RootElement.GetProperty("$id").GetString().ShouldBe(SidecarFormat.SchemaId);
     }
 
     // The schema says what this tool writes, and the reader rules say what any version tolerates.
