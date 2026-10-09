@@ -1,7 +1,4 @@
 using System;
-using System.Globalization;
-using Microsoft.CodeAnalysis.CSharp;
-using SqlSource.Parsing;
 
 namespace SqlSource.Settings;
 
@@ -59,10 +56,7 @@ internal static class SettingValue
     {
         foreach (var character in value)
         {
-            if (
-                !SyntaxFacts.IsIdentifierPartCharacter(character)
-                || char.GetUnicodeCategory(character) == UnicodeCategory.Format
-            )
+            if (!SqlIdentifier.IsPartCharacter(character))
             {
                 return false;
             }
