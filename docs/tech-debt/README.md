@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0018`
+Next id: `TD-0022`
 
 ## Active items
 
@@ -15,6 +15,10 @@ Next id: `TD-0018`
 | [TD-0013](TD-0013-sql-edit-reads-every-attributed-type-again.md) | Open | 2026-10-06 | Low | An edit to a `.sql` file makes the compiler read every attributed type again, because the attribute is added in a post-initialization step |
 | [TD-0016](TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) | Open | 2026-10-06 | Low | A `.sql` file that a target adds loses its dialect, and any other metadata the package reads, when the target hooks `GenerateMSBuildEditorConfigFileCore` and is declared after the package's targets |
 | [TD-0017](TD-0017-value-written-over-several-lines-is-cut-at-its-first-line-break.md) | Open | 2026-10-08 | Medium | A property or metadata of the package whose value has a line break inside it, as a list of generator parameters written one word on each line has, reaches the generator cut at the line break, and nothing is reported |
+| [TD-0018](TD-0018-token-and-parameter-lists-are-built-in-quadratic-time.md) | Open | 2026-10-08 | Low | The distinct count and the name lookup of a query's tokens, and the lookup of its parameters, are quadratic in their number: a query with 6,000 distinct tokens took about 0.45 s to parse |
+| [TD-0019](TD-0019-change-to-claimed-files-reads-every-claimed-file-again.md) | Open | 2026-10-08 | Low | A change to the set of claimed files, such as a file added to a type's folder or a changed `Path`, reads every claimed file again |
+| [TD-0020](TD-0020-settings-and-parsing-folders-depend-on-each-other.md) | Open | 2026-10-08 | Low | `Settings/` uses `SqlIdentifier` of `Parsing/`, and `Parsing/` uses `Settings/` |
+| [TD-0021](TD-0021-comments-and-token-defaults.md) | Open | 2026-10-08 | Low | A `--` comment inside an inline default swallows its closing braces, a `-- token:` default is compared as written while an inline one is compared without comments, and a comment can be scanned for tokens where no type keeps comments |
 
 ## Columns
 

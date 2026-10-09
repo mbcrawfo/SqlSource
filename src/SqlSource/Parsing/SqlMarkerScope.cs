@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using SqlSource.Settings;
 
 namespace SqlSource.Parsing;
@@ -18,8 +19,8 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
 
     private const string BeforeTheFirstQuery = "before the file's first query";
 
-    /// <summary>The names of a scope that has none.  Shared, and never changed.</summary>
-    public static readonly ISet<string> NoNames = new HashSet<string>();
+    /// <summary>The names of a scope that has none.  Shared by every parse, so it cannot be written to.</summary>
+    public static readonly ISet<string> NoNames = ImmutableHashSet<string>.Empty;
 
     private List<SqlTokenDefault>? _tokenDefaults;
 

@@ -293,7 +293,7 @@ Add a `-- name:` marker at the top of the file, or rename the file.  If the file
 
 **SQL before the first name**
 
-In a file that has `-- name:` markers, only comments and the markers that describe the whole file may come before the first one: [SQLSRC116](#sqlsrc116) has the list.  SQL there would belong to no query.
+In a file that has `-- name:` markers, only comments and the markers that describe the whole file may come before the first one: the table of [SQLSRC116](#sqlsrc116) has the list.  SQL there would belong to no query.
 
 ```sql
 SET search_path TO app;
@@ -358,7 +358,7 @@ Add a generator parameter, or delete the line.
 
 **Marker value is not valid**
 
-A generator parameter has a value it does not take; a `-- dialect:` marker does not name a dialect; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
+A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:` or `-- collection-type:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
 
 - No generator parameter takes a value: `keep-comments=1` is this error.
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
@@ -481,6 +481,8 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 | `-- input-model-type:`, `-- output-model-type:` | yes | yes |
 | `-- input-model:`, `-- output-model:` | no | yes |
 | `-- collection-type:` | yes | yes |
+
+The table is this error's, with two exceptions.  A `-- summary:` before the first `-- name:` marker is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
 
 ## SQLSRC117
 

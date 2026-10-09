@@ -598,7 +598,13 @@ public class TypeEmitterTests
         );
 
     private static ParsedSqlFile File(string fileName, params SqlQuery[] queries) =>
-        new("app/Repo/" + fileName, fileName, TestModels.Array(queries), TestModels.Array<DiagnosticInfo>());
+        new(
+            "app/Repo/" + fileName,
+            fileName,
+            TestModels.Array(queries),
+            TestModels.Array<DiagnosticInfo>(),
+            SqlDialect.Ansi
+        );
 
     private static SqlQuery Query(string name, string sql, string? summary = null, string file = "Users.sql") =>
         new(

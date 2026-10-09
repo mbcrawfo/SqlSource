@@ -14,9 +14,5 @@ namespace SqlSource.Generation;
 internal sealed record FileMetadata(AdditionalText File, DialectSetting Dialect, FileSettings? Settings)
 {
     public static FileMetadata Read(AdditionalText file, AnalyzerConfigOptions fileOptions) =>
-        new(
-            file,
-            DialectSetting.ReadMetadata(fileOptions),
-            SqlPath.Normalize(file.Path) is { } path ? FileSettings.Read(path, fileOptions) : null
-        );
+        new(file, DialectSetting.ReadMetadata(fileOptions), FileSettings.Read(file.Path, fileOptions));
 }

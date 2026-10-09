@@ -101,6 +101,37 @@ public class SettingLevelTests
         run.Sources.Keys.ShouldNotContain("App.Sample.g.cs");
     }
 
+    // The markers that have no effect yet, in a preamble and in a query: the type's file is the one of the same file
+    // without them.
+    [Theory]
+    [InlineData(
+        "-- name: Q\nSELECT id FROM users WHERE id = @id;\n",
+        "-- database: main\n-- output: models\n-- input-model-suffix: Args\n-- output-model-suffix: Row\n"
+            + "-- model-namespace: App.Models\n-- input-model-type: sealed record\n-- output-model-type: class\n"
+            + "-- collection-type: ImmutableArray\n\n"
+            + "-- name: Q -> one\n-- param: @id int not null\n-- database: other\n-- output: codegen\n"
+            + "-- input-model: QueryArgs\n-- output-model: App.Models.QueryRow\n-- collection-type: List\n"
+            + "SELECT id FROM users WHERE id = @id;\n"
+    )]
+    [InlineData(
+        "-- name: Q\nSELECT id FROM {{table}} WHERE {{filter}};\n",
+        "-- output: models\n\n-- name: Q -> many\n-- param: @since timestamptz not null\n"
+            + "-- param: @page int\n-- token: {{filter:created_at > @since}}\n"
+            + "SELECT id FROM {{table:users}} WHERE {{filter}};\n"
+    )]
+    public void Run_MarkersWithoutAnEffect_GiveTheFileOfTheSameQueryWithoutThem(string plainSql, string markedSql)
+    {
+        var plain = GeneratorHarness.Run(Source(null), new SqlFile("/app/Repo/Q.sql", plainSql));
+
+        var run = GeneratorHarness.Run(Source(null), new SqlFile("/app/Repo/Q.sql", markedSql));
+
+        plain.Diagnostics.ShouldBeEmpty();
+        run.Diagnostics.ShouldBeEmpty();
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
+    }
+
     [Fact]
     public void Run_MethodLocationAsAPropertyOrAMarker_IsNotASetting()
     {

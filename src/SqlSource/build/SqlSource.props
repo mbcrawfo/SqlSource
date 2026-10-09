@@ -19,8 +19,7 @@
         SqlSourceOutput says what is generated for a query.  SqlSourceInputModelSuffix, SqlSourceOutputModelSuffix,
         SqlSourceModelNamespace, SqlSourceInputModelType, SqlSourceOutputModelType and SqlSourceCollectionType say
         what the models of a query are called, where they are and what shape they have, and what a method returns
-        many rows in.  SqlSourceDatabase is trimmed and is not listed: the tool
-        reads it, and the generator does not.
+        many rows in.  SqlSourceDatabase is trimmed and is not listed: the tool reads it, and the generator does not.
         None of this is under the condition above: a project that lists its own .sql files still needs it.
 
         The metadata is listed for SqlSourceSettingsFile and not for AdditionalFiles.  The SDK writes a section for

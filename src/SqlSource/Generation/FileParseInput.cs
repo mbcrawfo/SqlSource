@@ -20,7 +20,9 @@ namespace SqlSource.Generation;
 /// <param name="CommentsWanted">
 /// Whether a level the parser cannot see may ask for <c>keep-comments</c>: the metadata's list, or the property's
 /// when the metadata gives none, or the attribute of a type that claims the file.  It may be true where no query
-/// ends up keeping its comments; it is never false where one does.
+/// ends up keeping its comments; it is never false where one does, apart from two paths that differ only by
+/// case, with the metadata on the later one: that is <c>SQLSRC013</c>, and the emitter falls back to the stripped
+/// form.
 /// </param>
 internal sealed record FileParseInput(
     AdditionalText File,

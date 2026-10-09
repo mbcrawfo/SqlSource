@@ -74,7 +74,7 @@ public static partial class UserQueries;
 
 Each member is a `const string`, or a static method when the query has tokens (see Tokens, below).  Both are documented with the query's summary and its SQL.
 
-### Parameters
+### The `Parameters` property
 
 `Parameters` holds generator parameters for the queries of the type's files, as a `-- generator:` line holds them (see Generator parameters, below):
 
@@ -121,7 +121,7 @@ Words are matched ignoring case.  A marker that describes one query goes inside 
 | `summary` | no | yes | Text |
 | `dialect` | yes | no | A dialect and its options (see Dialects) |
 | `generator` | yes | yes | Generator parameters |
-| `param` | no | yes | `@name`, a type, `null` or `not null` (see Parameters) |
+| `param` | no | yes | `@name`, a type, `null` or `not null` (see Parameters, below) |
 | `token` | no | yes | One `{{name:default}}` (see Tokens) |
 | `token-ignore` | no | yes | A token's name |
 | `database` | yes | yes | A database's name |
@@ -132,11 +132,11 @@ Words are matched ignoring case.  A marker that describes one query goes inside 
 | `input-model`, `output-model` | no | yes | A type's name, or its full name |
 | `collection-type` | yes | yes | A collection type |
 
-A marker inside a query wins over the same marker before the first query.  Writing a marker twice in one place is fine when the value is the same, and the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112) when it is not.  A marker where its column says no is the error [SQLSRC116](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc116).  A comment of yours that happens to start with one of these words and a colon is read as a marker: reword it.
+A marker inside a query wins over the same marker before the first query.  Writing a marker twice in one place is fine when the value is the same, and the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112) when it is not.  A marker where its column says no is the error [SQLSRC116](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc116), with two exceptions: a `-- summary:` before the first `-- name:` line is [SQLSRC107](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc107), and a `-- dialect:` that is inside a query or after SQL is [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc115).  A comment of yours that happens to start with one of these words and a colon is read as a marker: reword it.
 
 ### What reaches the generated SQL
 
-- Every marker line is removed (see Markers, below).
+- Every marker line is removed (see Markers, above).
 - Comments are removed: a line comment is deleted and a block comment becomes one space.  Lines left blank are removed.
 - Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.  So are MariaDB's `/*M! ... */` and Oracle's `--+ ...` when the dialect is theirs.
 - Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect (see Dialects, below).
@@ -345,7 +345,7 @@ var sql = Sql.ListFrom("users", "name DESC");
 
 ### Defaults
 
-A token can carry a default: `{{name:default}}`.  The default is everything after the first `:` up to the closing `}}`, without the white space around it, so `{{cast:x::int}}` is the token `cast` with the default `x::int`.  It may be empty, `{{extraWhere:}}`, and may run over several lines.
+A token can carry a default: `{{name:default}}`.  The default is everything after the first `:` up to the closing `}}`, without the white space around it, so `{{cast:x::int}}` is the token `cast` with the default `x::int`.  It may be empty, `{{extraWhere:}}`, and may run over several lines.  Do not put a `--` comment inside a default: it runs to the end of its line and takes the closing braces with it, so the token ends at the next `}}` or not at all.
 
 ```sql
 -- name: ListUsers

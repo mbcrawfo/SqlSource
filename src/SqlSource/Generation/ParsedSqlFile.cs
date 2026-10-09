@@ -20,6 +20,6 @@ internal sealed record ParsedSqlFile(
     string FileName,
     EquatableArray<SqlQuery> Queries,
     EquatableArray<DiagnosticInfo> Errors,
-    SqlDialect Dialect = SqlDialect.Ansi,
+    SqlDialect Dialect,
     string? InvalidDialect = null
 );

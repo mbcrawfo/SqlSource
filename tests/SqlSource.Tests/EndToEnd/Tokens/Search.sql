@@ -1,10 +1,12 @@
 -- Queries with tokens.  The test project turns token validation off, so only Checked, whose own list is the default,
 -- checks its arguments.
 
--- name: Search
+-- name: Search -> many
 -- summary: Finds rows of a table.
+-- param: @pattern text not null
+-- token: {{filter:name LIKE @pattern}}
 SELECT {{columns}}
-FROM {{ table }}
+FROM {{ table:users }}
 WHERE {{filter}}
 ORDER BY {{table}}.id;
 

@@ -14,12 +14,22 @@ namespace SqlSource.Generation;
 /// <param name="Invalid">The values that are not valid.</param>
 internal sealed record FileSettings(string NormalizedPath, SettingsLevel Level, EquatableArray<InvalidSetting> Invalid)
 {
-    /// <summary>Reads a file's metadata.  Null for a file that sets nothing, which is almost every file.</summary>
-    public static FileSettings? Read(string normalizedPath, AnalyzerConfigOptions fileOptions)
+    /// <summary>
+    /// Reads a file's metadata.  Null for a file that sets nothing, which is almost every file, and for one whose path
+    /// cannot be normalized.  The path is normalized only for a file that has settings.
+    /// </summary>
+    /// <param name="path">The file's path as the compiler gives it.</param>
+    /// <param name="fileOptions">The options of the file's item.</param>
+    public static FileSettings? Read(string path, AnalyzerConfigOptions fileOptions)
     {
         List<InvalidSetting>? invalid = null;
         var level = MSBuildSettings.Read(fileOptions, MSBuildSettings.Metadata, ref invalid);
         if (ReferenceEquals(level, SettingsLevel.None) && invalid is null)
+        {
+            return null;
+        }
+
+        if (SqlPath.Normalize(path) is not { } normalizedPath)
         {
             return null;
         }

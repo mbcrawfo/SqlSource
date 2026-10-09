@@ -187,8 +187,9 @@ internal static class TargetTypeReader
         }
     }
 
-    // A word that is no generator parameter is reported, and the other words apply.  A value without text is a
-    // property that is not set.
+    // A word that is no generator parameter is reported, and a type with a diagnostic gets no members, so nothing of
+    // this level applies then; every property is still read, so that all the problems of the attribute are reported
+    // together.  A value without text is a property that is not set.
     private static SettingsLevel ReadSettings(
         AttributeData attribute,
         LocationInfo attributeLocation,
