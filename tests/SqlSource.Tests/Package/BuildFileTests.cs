@@ -75,11 +75,12 @@ public partial class BuildFileTests
     }
 
     // The compiler reads a property, and the metadata of an item, from a file with one line for each.  A value on a
-    // line of its own would arrive empty, so the package trims each one.  GenerateMSBuildEditorConfigFileCore is the
-    // target of the SDK that writes the file.  A trim that runs before it sees a value wherever it was set, in
-    // Directory.Build.targets or by another target, and runs in every build that writes the file, a design-time
-    // build too.  A trim outside a target would see only what is set before NuGet imports the file.  The target that
-    // collects the files with metadata runs there for the same reasons.
+    // line of its own would arrive empty, and one written over several lines would be cut at its first line break,
+    // so the package trims each one.  GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the
+    // file.  A trim that runs before it sees a value wherever it was set, in Directory.Build.targets or by another
+    // target, and runs in every build that writes the file, a design-time build too.  A trim outside a target would
+    // see only what is set before NuGet imports the file.  The target that collects the files with metadata runs
+    // there for the same reasons.
     [Fact]
     public void Targets_EveryTarget_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
     {
@@ -92,9 +93,9 @@ public partial class BuildFileTests
         root.Elements().SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
-    // SqlSource.Tests.csproj writes its dialect and its generator parameters on lines of their own, and
-    // tools/package-install sets one in Directory.Build.targets, so the end-to-end tests and the check of the
-    // installed package show the trimming at work; this pins that each property has it.
+    // SqlSource.Tests.csproj writes its dialect on a line of its own and its generator parameters one on each line,
+    // and tools/package-install sets the parameters that way in Directory.Build.targets, so the end-to-end tests and
+    // the check of the installed package show the trimming at work; this pins that each property has it.
     [Fact]
     public void Targets_EveryPropertyOfThePackage_IsTrimmed()
     {
@@ -106,7 +107,7 @@ public partial class BuildFileTests
             .ToList();
 
         trimmed.Select(element => element.Name.LocalName).ShouldBe(Settings.Concat(TrimmedOnly), ignoreOrder: true);
-        trimmed.ShouldAllBe(element => element.Value == $"$({element.Name.LocalName}.Trim())");
+        trimmed.ShouldAllBe(element => element.Value == Trimmed(element.Name.LocalName));
         trimmed.SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
@@ -132,7 +133,7 @@ public partial class BuildFileTests
         {
             target.Descendants(name + "AsWritten").ShouldHaveSingleItem().Value.ShouldBe($"%(AdditionalFiles.{name})");
             var metadata = item.Elements(name).ShouldHaveSingleItem();
-            metadata.Value.ShouldBe($"$({name}AsWritten.Trim())");
+            metadata.Value.ShouldBe(Trimmed(name + "AsWritten"));
             metadata.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe($"'$({name}AsWritten)' != ''");
         }
 
@@ -221,6 +222,11 @@ public partial class BuildFileTests
 
     private static IEnumerable<XAttribute> ConditionsAround(XElement element) =>
         element.AncestorsAndSelf().SelectMany(ancestor => ancestor.Attributes("Condition"));
+
+    // What a trim is: the white space around the value goes, and each run of white space inside it, a line break
+    // among it, becomes one space.  The value is then on one line, which is all the compiler reads of it.
+    private static string Trimmed(string property) =>
+        $@"$([System.Text.RegularExpressions.Regex]::Replace($({property}), '\s+', ' ').Trim())";
 
     private static XDocument Load(string file) => XDocument.Load(Path.Combine(AppContext.BaseDirectory, "build", file));
 

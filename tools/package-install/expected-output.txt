@@ -6,5 +6,6 @@ comments kept by the attribute: SELECT id, name FROM users /* by key */ WHERE id
 dialect of the project: SELECT E'it'
     '\'s -- not a comment' AS note;
 dialect of the item: SELECT 'it\'s' AS note, 5--3 AS eight;
+dialect of the item, with an option on the next line: SELECT 'C:\temp\' AS path;
 dialect of an item that a target adds: SELECT [it's] FROM #orders;
 dialect of the file's marker: SELECT [it's] FROM #staged;

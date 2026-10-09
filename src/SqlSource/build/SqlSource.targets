@@ -4,8 +4,13 @@
 
         The compiler reads each property that SqlSource.props lists, and each metadata of an AdditionalFiles item that
         it lists, from a file that the build writes with one line for each value.  A value on a line of its own, as an
-        element written over several lines has it, would arrive empty there and be taken for the default.  Trimming it
-        makes that form mean what it says.
+        element written over several lines has it, would arrive empty there and be taken for the default, and a list
+        with one word on each line would arrive as its first word.  Each trim removes the white space around a value
+        and makes one space of each run of white space inside it, a line break among it, so that both forms mean what
+        they say.  No value of the package has a meaning for white space beyond separating its words.
+
+        A trim is on one line however long it is: white space around the expression would be part of the value.  So
+        the check of the line length is off for the target of the properties, as it is for the one of the metadata.
 
         GenerateMSBuildEditorConfigFileCore is the target of the SDK that writes the file.  The trims run before it and
         not where this file is imported: Directory.Build.targets is imported later, and a target can add an item while
@@ -16,20 +21,22 @@
         .sql file that it adds is not trimmed and not collected, and does not reach the compiler.  A target that adds a
         .sql file hooks SqlSourceTrimMetadataOfFiles instead, which runs it first wherever it is declared.  TD-0016.
     -->
+    <!-- editorconfig-checker-disable -->
     <Target Name="SqlSourceTrimProperties" BeforeTargets="GenerateMSBuildEditorConfigFileCore">
         <PropertyGroup>
-            <SqlSourceDialect>$(SqlSourceDialect.Trim())</SqlSourceDialect>
-            <SqlSourceGeneratorParameters>$(SqlSourceGeneratorParameters.Trim())</SqlSourceGeneratorParameters>
-            <SqlSourceOutput>$(SqlSourceOutput.Trim())</SqlSourceOutput>
-            <SqlSourceInputModelSuffix>$(SqlSourceInputModelSuffix.Trim())</SqlSourceInputModelSuffix>
-            <SqlSourceOutputModelSuffix>$(SqlSourceOutputModelSuffix.Trim())</SqlSourceOutputModelSuffix>
-            <SqlSourceModelNamespace>$(SqlSourceModelNamespace.Trim())</SqlSourceModelNamespace>
-            <SqlSourceInputModelType>$(SqlSourceInputModelType.Trim())</SqlSourceInputModelType>
-            <SqlSourceOutputModelType>$(SqlSourceOutputModelType.Trim())</SqlSourceOutputModelType>
-            <SqlSourceCollectionType>$(SqlSourceCollectionType.Trim())</SqlSourceCollectionType>
-            <SqlSourceDatabase>$(SqlSourceDatabase.Trim())</SqlSourceDatabase>
+            <SqlSourceDialect>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDialect), '\s+', ' ').Trim())</SqlSourceDialect>
+            <SqlSourceGeneratorParameters>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceGeneratorParameters), '\s+', ' ').Trim())</SqlSourceGeneratorParameters>
+            <SqlSourceOutput>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutput), '\s+', ' ').Trim())</SqlSourceOutput>
+            <SqlSourceInputModelSuffix>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceInputModelSuffix), '\s+', ' ').Trim())</SqlSourceInputModelSuffix>
+            <SqlSourceOutputModelSuffix>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelSuffix), '\s+', ' ').Trim())</SqlSourceOutputModelSuffix>
+            <SqlSourceModelNamespace>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceModelNamespace), '\s+', ' ').Trim())</SqlSourceModelNamespace>
+            <SqlSourceInputModelType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceInputModelType), '\s+', ' ').Trim())</SqlSourceInputModelType>
+            <SqlSourceOutputModelType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelType), '\s+', ' ').Trim())</SqlSourceOutputModelType>
+            <SqlSourceCollectionType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceCollectionType), '\s+', ' ').Trim())</SqlSourceCollectionType>
+            <SqlSourceDatabase>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDatabase), '\s+', ' ').Trim())</SqlSourceDatabase>
         </PropertyGroup>
     </Target>
+    <!-- editorconfig-checker-enable -->
     <!--
         Outputs makes this run once for each combination of values that the metadata have, with only the items of that
         combination in reach.  Each value goes through a property because MSBuild puts metadata into an expression as
@@ -66,25 +73,25 @@
         <ItemGroup Condition="'$(SqlSourceDialectAsWritten)$(SqlSourceGeneratorParametersAsWritten)$(SqlSourceOutputAsWritten)$(SqlSourceInputModelSuffixAsWritten)$(SqlSourceOutputModelSuffixAsWritten)$(SqlSourceModelNamespaceAsWritten)$(SqlSourceInputModelTypeAsWritten)$(SqlSourceOutputModelTypeAsWritten)$(SqlSourceCollectionTypeAsWritten)$(SqlSourceDatabaseAsWritten)' != ''">
             <AdditionalFiles>
                 <SqlSourceDialect Condition="'$(SqlSourceDialectAsWritten)' != ''"
-                    >$(SqlSourceDialectAsWritten.Trim())</SqlSourceDialect>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDialectAsWritten), '\s+', ' ').Trim())</SqlSourceDialect>
                 <SqlSourceGeneratorParameters Condition="'$(SqlSourceGeneratorParametersAsWritten)' != ''"
-                    >$(SqlSourceGeneratorParametersAsWritten.Trim())</SqlSourceGeneratorParameters>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceGeneratorParametersAsWritten), '\s+', ' ').Trim())</SqlSourceGeneratorParameters>
                 <SqlSourceOutput Condition="'$(SqlSourceOutputAsWritten)' != ''"
-                    >$(SqlSourceOutputAsWritten.Trim())</SqlSourceOutput>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputAsWritten), '\s+', ' ').Trim())</SqlSourceOutput>
                 <SqlSourceInputModelSuffix Condition="'$(SqlSourceInputModelSuffixAsWritten)' != ''"
-                    >$(SqlSourceInputModelSuffixAsWritten.Trim())</SqlSourceInputModelSuffix>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceInputModelSuffixAsWritten), '\s+', ' ').Trim())</SqlSourceInputModelSuffix>
                 <SqlSourceOutputModelSuffix Condition="'$(SqlSourceOutputModelSuffixAsWritten)' != ''"
-                    >$(SqlSourceOutputModelSuffixAsWritten.Trim())</SqlSourceOutputModelSuffix>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelSuffixAsWritten), '\s+', ' ').Trim())</SqlSourceOutputModelSuffix>
                 <SqlSourceModelNamespace Condition="'$(SqlSourceModelNamespaceAsWritten)' != ''"
-                    >$(SqlSourceModelNamespaceAsWritten.Trim())</SqlSourceModelNamespace>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceModelNamespaceAsWritten), '\s+', ' ').Trim())</SqlSourceModelNamespace>
                 <SqlSourceInputModelType Condition="'$(SqlSourceInputModelTypeAsWritten)' != ''"
-                    >$(SqlSourceInputModelTypeAsWritten.Trim())</SqlSourceInputModelType>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceInputModelTypeAsWritten), '\s+', ' ').Trim())</SqlSourceInputModelType>
                 <SqlSourceOutputModelType Condition="'$(SqlSourceOutputModelTypeAsWritten)' != ''"
-                    >$(SqlSourceOutputModelTypeAsWritten.Trim())</SqlSourceOutputModelType>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelTypeAsWritten), '\s+', ' ').Trim())</SqlSourceOutputModelType>
                 <SqlSourceCollectionType Condition="'$(SqlSourceCollectionTypeAsWritten)' != ''"
-                    >$(SqlSourceCollectionTypeAsWritten.Trim())</SqlSourceCollectionType>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceCollectionTypeAsWritten), '\s+', ' ').Trim())</SqlSourceCollectionType>
                 <SqlSourceDatabase Condition="'$(SqlSourceDatabaseAsWritten)' != ''"
-                    >$(SqlSourceDatabaseAsWritten.Trim())</SqlSourceDatabase>
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDatabaseAsWritten), '\s+', ' ').Trim())</SqlSourceDatabase>
             </AdditionalFiles>
         </ItemGroup>
     </Target>
