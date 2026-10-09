@@ -445,11 +445,11 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
-A word that is not a generator parameter is the error [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).  The compiler hands a generator only the part of a value before the first `;` or `#`, so separate the words with spaces.  Write them on one line: the value may stand on a line of its own, but a line break between two words cuts the list there.
+A word that is not a generator parameter is the error [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).  The compiler hands a generator only the part of a value before the first `;` or `#`, so separate the words with spaces or with line breaks: the list may be written with one word on each line.
 
 ### Settings for models and methods
 
-`SqlSourceOutput`, `SqlSourceDatabase`, `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix`, `SqlSourceModelNamespace`, `SqlSourceInputModelType`, `SqlSourceOutputModelType` and `SqlSourceCollectionType` are each a property for the project, and each is also metadata of an `AdditionalFiles` item.  See Settings for models and methods, above.  Write each on one line.
+`SqlSourceOutput`, `SqlSourceDatabase`, `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix`, `SqlSourceModelNamespace`, `SqlSourceInputModelType`, `SqlSourceOutputModelType` and `SqlSourceCollectionType` are each a property for the project, and each is also metadata of an `AdditionalFiles` item.  See Settings for models and methods, above.
 
 ### Dialect
 
@@ -462,6 +462,21 @@ A project that lists its own files can give the metadata where it lists them:
     <AdditionalFiles Include="Queries/**/*.sql" SqlSourceDialect="postgres" />
 </ItemGroup>
 ```
+
+### White space in a value
+
+The package removes the white space around the value of each property and metadata above, and makes one space of each run of white space inside it, a line break among it.  So a value may stand on a line of its own, and a value of several words, such as a list of generator parameters or a dialect and its options, may be written over several lines:
+
+```xml
+<PropertyGroup>
+    <SqlSourceGeneratorParameters>
+        keep-comments
+        no-token-validation
+    </SqlSourceGeneratorParameters>
+</PropertyGroup>
+```
+
+A line break inside one word puts a space there: `App.` and `Models` on two lines are `App. Models`, which is not a namespace and is reported as [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).
 
 ## Supported environments
 
