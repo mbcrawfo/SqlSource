@@ -34,7 +34,7 @@ The source generator.  It is loaded into the C# compiler of whoever consumes it,
 
 ## `Settings/`
 
-Plain data and the readers of values: no file access, no symbols, no pipeline types.  `Parsing/` and `Generation/` both use it, and the command-line tool will.  It is not free of `Parsing/`: `SettingValue` uses `SqlIdentifier`, so the two folders depend on each other (`docs/tech-debt/TD-0020-settings-and-parsing-folders-depend-on-each-other.md`).
+Plain data and the readers of values: no file access, no symbols, no pipeline types.  `Parsing/` and `Generation/` both use it, and the command-line tool will.  It uses nothing from `Parsing/`, `Generation/` or `Diagnostics/`, and must stay so: a rule that it shares with another folder goes in the root namespace, as `SqlIdentifier` does.
 
 - **`SettingsLevel` is one source's say, and `QuerySettings.Resolve` is the one rule.**  A new setting is a nullable member of the level, a line in `Over`, a member of `QuerySettings` with its default, and a line in each reader that has it.  `SettingsLevel.None` is shared: a reader that finds nothing returns it, and never a new empty level.
 - **The generator's own form of an emitted enum has its numbers.**  `OutputKind` stands for `GeneratorOutput` as `MemberPlacement` stands for `SqlLocation`, `ModelKind` for `GeneratorModelType`, `CollectionKind` for `GeneratorCollectionType` and `MethodPlacement` for `MethodLocation`; `tests/SqlSource.Tests/Generation/AttributeSourceTests.cs` compares each pair.
