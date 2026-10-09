@@ -13,7 +13,7 @@ $ dotnet sqlsource describe --check
 src/App/Queries/Users.sql(3,10): error SQLSRC219: The sidecar is out of date for 'GetUser': columns[2].nullable is true, and the database says false
     help: run 'dotnet sqlsource describe' and commit the sidecars
     see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc219
-postgres (postgres): 19 described, 1 differ, 0 failed
+postgres (postgres): 19 same, 1 differ, 0 failed
 $ echo $?
 2
 ```
@@ -44,6 +44,8 @@ Settled in this spec:
 | A query that fails under `--check` | An error, and exit `1`, whatever else differs | "Could not check" is not "differs".  A build must tell the two apart. |
 | Where a difference is reported | At the query in the `.sql` file; at the sidecar for a difference that has no query | A user fixes it from the `.sql` file.  An entry for a query that is gone has only the sidecar to point at. |
 | One difference for an entry | The first, named by its path | The fix is the same for one difference or ten: run `describe`. |
+| The summary under `--check` | `same`, `differ` and `failed`, each query in one of them | "Described" says nothing under `--check`, where every query is. |
+| Time | `ToolHost` gains a `TimeProvider` | The log holds a time and a duration, and a test must be able to fix both. |
 | The log's option over its variable | `--log` wins over `SQLSOURCE_LOG` | As the command line wins for a connection. |
 | How a describer logs | `OpenRequest` gains the run's log | Phase 3 then adds events and changes nothing here. |
 
@@ -58,7 +60,7 @@ Settled in this spec:
 
 ```
 sqlsource describe [<path>...] [--project <path>]... [--database <name>]...
-                   [--connection <[name=]value>]... [--force] [--check]
+                   [--connection <name>=<value>]... [--force] [--check]
                    [--verbose] [--log <path>]
 ```
 
@@ -75,24 +77,25 @@ A difference is `SQLSRC219`.  Its second argument says what differs.
 | Condition | Reported at | What differs |
 |----|----|----|
 | The file has selected queries that need an entry, and no sidecar | The first such query | `the sidecar does not exist` |
-| The sidecar cannot be read, or its `formatVersion` is not the tool's | The sidecar | `the sidecar cannot be read`, or `the sidecar has format <n>, and this tool writes <m>` |
+| The sidecar cannot be read, or its `formatVersion` is not the tool's, higher or lower | The sidecar | `the sidecar cannot be read`, or `the sidecar has format <n>, and this tool writes <m>`.  Once: its queries are not reported one by one, and each counts under `differ` |
 | A selected query that needs an entry has none in the sidecar | The query | `the sidecar has no entry` |
 | `SidecarComparer.FindDifference` finds a difference between the entry on disk and the one described | The query | `<path> is <committed>, and the database says <described>` |
 | The sidecar has an entry for a name that no query of the file has, or for a query that needs none | The entry's line in the sidecar | `the query is not in the file`, or `the query needs no entry` |
 | The file has no query that needs an entry, and a sidecar | The sidecar | `no query of the file needs an entry` |
 
 - The file's `toolVersion` is not compared.  A sidecar whose `toolVersion` is not the tool's is compared as any other.
-- **Under a filter**, the first, third and fourth rows hold for selected queries alone.  The fifth holds for an entry whose own `database` is one of `--database`, or for every entry when no `--database` is given.  The second holds for a file with a selected query.  The sixth holds only for a run with no filter at all.
+- **Under a filter**, the first, third and fourth rows hold for selected queries alone.  The second and the fifth hold for a file with a selected query that needs an entry, and the fifth then for an entry whose own `database` is one of `--database`, or for every entry when no `--database` is given.  The sixth holds only for a run with no filter at all: no `--project`, no `--database` and no `.sql` path.  This is the scope of what sub-phase 2.5 writes and deletes, so `--check` reports what `describe` with the same filters would change.
+- A sidecar of a higher format version is a difference here, by the second row, and not the `SQLSRC221` of `describe`: `--check` writes nothing.
 - A query that failed to describe is compared with nothing.  Its error is reported and the exit code is `1`.
 - A file that is not `Ready` is compared with nothing: the plan's error stands.
 
 The summary line under `--check`:
 
 ```
-<name> (<engine>): <n> described, <n> differ, <n> failed
+<name> (<engine>): <n> same, <n> differ, <n> failed
 ```
 
-A query counts under `differ` when a difference was reported at it.  Differences reported at a sidecar are in no count; they still decide the exit code.
+Each selected query that needs an entry is in one count: `failed` when it could not be described, `differ` when a difference was reported at it or at the whole of its sidecar by the first two rows, and `same` otherwise.  A difference of the fifth or the sixth row is in no count; it still decides the exit code.  The `no connection` form of sub-phase 2.5 never shows: under `--check` a selected database with no connection is an error.
 
 **The exit code** is `1` when any error but `SQLSRC219` was reported, else `2` when `SQLSRC219` was, else `0`.
 
@@ -111,31 +114,31 @@ Lines of prose on standard output, each starting `sqlsource: `, in the order thi
 - The unit, and how it was found.
 - Each project: read, with its target framework and the number of `.sql` files; or left out, because it does not use SqlSource or `--project` does not name it.
 - Each claimed file: its dialect, the types that claim it, and its state.  The number of files no type claims, in one line for a project.
-- Each database: its dialect, where its connection came from, `--connection` or the name of a variable, and the server's version once a session is open.
+- Each database: its dialect, where its connection came from, `--connection` or the name of a variable, or that it has none, and the server's version once a session is open.
 - Each query that needs an entry: described, with the time it took; skipped, because its entry is current; failed; or not selected.
 - Each sidecar: written, unchanged, deleted or left as it was; under `--check`, the same or different.
 
-Without `--verbose` the run prints errors, the summary lines, and nothing else.
+Without `--verbose` the run prints errors, the summary lines, sub-phase 2.3's line for a run in which no project uses SqlSource, the line that ends a failed run, and nothing else.
 
 ## The log
 
-`--log <path>`, or `SQLSOURCE_LOG` when the option is not given.  The file is created, or emptied, when the run starts; a path that cannot be written is `SQLSRC218` and the run does not start.  It is UTF-8 with `\n` line endings, one JSON object on a line, written as the run goes so that a run that is stopped leaves what it did.
+`--log <path>`, or `SQLSOURCE_LOG` when the option is not given.  The file is created, or emptied, when the run starts, after the command line was read; a path that cannot be written is `SQLSRC218`, with `written`, and the run does not start.  It is UTF-8 with `\n` line endings, one JSON object on a line, written as the run goes so that a run that is stopped leaves what it did.
 
-Every object has `event`, the event's name, and `time`, the moment in UTC as ISO 8601 with milliseconds.
+Every object has `event`, the event's name, and `time`, the moment in UTC as ISO 8601 with milliseconds, from the host's `TimeProvider`, as every duration is.
 
 | Event | When | Holds |
 |----|----|----|
 | `run.start` | First | `toolVersion`, `formatVersion`, `runtime`, `os`, and `arguments`: the command line, with the value of each `--connection` replaced |
-| `project` | For each project of the unit | `path`, `usesSqlSource`, `inRun`, `targetFramework`, `sqlFiles`, `compileFiles` |
+| `project` | For each project of the unit | `path`, `inRun`; and for one that was evaluated, `usesSqlSource`, `targetFramework`, `sqlFiles`, `compileFiles`.  A project that `--project` leaves out is not evaluated |
 | `file` | For each claimed file | `path`, `project`, `dialect`, `state`, `claims`, `queries` |
-| `database` | For each database with a query to describe | `name`, `engine`, `connectionSource`, `describer`: whether one is registered |
+| `database` | For each selected database | `name`, `engine`, `connectionSource`: `--connection`, a variable's name, or `none`; `describer`: whether one is registered |
 | `database.open` | When a session opens or fails to | `name`, `serverVersion`, `driver`, `settings`, or `error` |
 | `query` | For each query that needs an entry | `file`, `name`, `database`, `hash`, `selected`, `decision`: `described`, `skipped`, `failed` or `left-out`; `durationMs` for one described; `error`, the id, for one that failed |
 | `sidecar` | For each `Ready` file | `path`, `action`: `written`, `unchanged`, `deleted`, `held-back`, `same` or `differs` |
 | `diagnostic` | For each error the reporter writes | `id`, `path`, `line`, `column`, `message`, and the continuation lines |
 | `run.end` | Last | `exitCode`, `durationMs`, and the counts of each database |
 
-- **A connection's value never reaches the log.**  The log's writer is never handed one, and `arguments` is built by a function that replaces what follows `--connection`, in both of its forms, `--connection x` and `--connection=x`: a named value keeps its name, `billing=***`, and one with no name is `***`.
+- **A connection's value never reaches the log.**  The log's writer is never handed one, and `arguments` is built from the parsed command line, not from its text: every token that was bound to `--connection` is replaced, whichever way it was written, `--connection x`, `--connection=x` or `--connection:x`, and keeps its name, `billing=***`.  A command line that was wrong is not logged at all: the run ended before the log was opened.
 - **Never written**: a host, a user or a database's own name; the environment.
 - **A string over 1 MiB**, counted in UTF-8, is cut to that size, and its object gains `"truncated": true`.  Nothing in phase 2 is that long; the rule is here because the writer is.
 - A reader ignores an event and a key it does not know.  The log is for people and carries no version.
@@ -164,7 +167,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 2. `--check`: every query described, nothing written, and the exit code's three values.
 3. The comparison and `SQLSRC219`, without filters.
 4. The comparison under filters, and the summary line.
-5. `IRunLog`, the writer of the file, `--log` and `SQLSOURCE_LOG`, with `run.start`, `run.end` and `diagnostic`.
+5. `TimeProvider` on `ToolHost`.  `IRunLog`, the writer of the file, `--log` and `SQLSOURCE_LOG`, with `run.start`, `run.end` and `diagnostic`.
 6. The other events, and `Log` on `OpenRequest`.
 7. `--verbose`.
 8. The line that ends a failed run.
@@ -174,10 +177,10 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 
 | Where | Cases |
 |----|----|
-| `CheckTests` | Sidecars written by `describe`, then `--check`: exit `0`, nothing reported.  Each row of the table of differences, with the id, the position and the text.  A changed `toolVersion` alone: exit `0`.  Each member that the comparison ignores, changed in the file: exit `0`.  A query that fails: exit `1`, and exit `1` with a difference beside it.  No connection: `SQLSRC213` and exit `1`.  With `--force`: the same.  No file's time or content changes in any case, and no sidecar is made or deleted |
-| `CheckFilterTests` | `--database` with a difference in the other database's entry: exit `0`.  An entry of a deleted query whose `database` is named, and one whose is not.  A file filter.  The sixth row only without a filter |
-| `RunLogTests` | Each event of the table, with its members, for a run that describes, skips and fails.  The order.  Every line is one JSON object.  `--log` over the variable; the variable alone; neither.  A path that cannot be written.  The file is emptied by a second run.  A string of 2 MiB is cut and marked |
-| `RedactionTests` | `--connection name=value`, `--connection value`, `--connection=name=value` and `--connection=value`: `arguments` holds no value.  The `SecretTests` of sub-phase 2.5, with `--verbose` and `--log`: neither writer nor the file holds the marker word |
+| `CheckTests` | Sidecars written by `describe`, then `--check`: exit `0`, nothing reported, every query `same`.  A sidecar of a higher format version: a difference, not `SQLSRC221`.  A sidecar that cannot be read: one difference, and its queries under `differ`.  Each row of the table of differences, with the id, the position and the text.  A changed `toolVersion` alone: exit `0`.  Each member that the comparison ignores, changed in the file: exit `0`.  A query that fails: exit `1`, and exit `1` with a difference beside it.  No connection: `SQLSRC213` and exit `1`.  With `--force`: the same.  No file's time or content changes in any case, and no sidecar is made or deleted |
+| `CheckFilterTests` | `--database` with a difference in the other database's entry: exit `0`.  An entry of a deleted query whose `database` is named, and one whose is not.  A file filter.  The sixth row only without a filter, and not under `--project` alone.  For each filter, `--check` after `describe` with the same filter exits `0` |
+| `RunLogTests` | Each event of the table, with its members, for a run that describes, skips and fails, with a fixed `TimeProvider`: the times and the durations are exact.  The order.  Every line is one JSON object.  `--log` over the variable; the variable alone; neither.  A path that cannot be written.  The file is emptied by a second run.  A string of 2 MiB is cut and marked |
+| `RedactionTests` | `--connection name=value`, `--connection=name=value` and `--connection:name=value`: `arguments` holds the name and no value.  A wrong command line writes no log.  The `SecretTests` of sub-phase 2.5, with `--verbose` and `--log`: neither writer nor the file holds the marker word |
 | `VerboseTests` | A line for each thing the list names, for a run over two projects and two databases.  Without the option: errors and summaries alone.  With `--log` and not `--verbose`: the console is as without either |
 | `ExitCodeTests` | Each of `0`, `1` and `2`, and the line that ends a failed run: there for `1` without `--log`, not for `2`, not with `--log` |
 | A describer of the tests that logs | Its event is in the file, in order, between the `database.open` and the `query` it belongs to |

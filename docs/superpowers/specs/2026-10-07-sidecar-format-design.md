@@ -31,7 +31,7 @@ Settled with the owner after the format was proposed.  The open questions in sec
 
 ## 1. The format
 
-A sidecar is one UTF-8 JSON object, no BOM, `\n` line endings, two-space indent, one key or array element per line, a trailing newline.  Keys are written in the order the tables below list them and never sorted.  Only objects, arrays, strings, integers (signed 32-bit), booleans and `null` appear.
+A sidecar is one UTF-8 JSON object, no BOM, `\n` line endings, two-space indent, one key or array element per line, a trailing newline.  Keys are written in the order the tables below list them and never sorted.  Only objects, arrays, strings, integers (signed 32-bit), booleans and `null` appear.  An empty array is `[]` on the line of its key.  A string is written with `\"` and `\\`, with `\b`, `\f`, `\n`, `\r` and `\t` for those characters, and with `\u00XX` for every other character below U+0020; every other character is written as it is, `/` and characters outside ASCII included.
 
 ### 1.1 Top level
 
@@ -94,7 +94,7 @@ Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar an
 3. **A key of the wrong JSON type**, a non-integer `formatVersion`, a duplicate query key, an `ordinal` that is not its index, `columns` present when `resultKind` is `"none"`, or a type object missing a key the schema requires for its engine, is a malformed file: one error at the file, no models from its queries, and the rest of the project is unaffected.
 4. **Unknown enumeration values** are handled per field: an unknown `engine` is an error at the sidecar naming the engine, an unknown `kind` inside a type is the "unsupported type" diagnostic at the column, an unknown `typeSource` or other provenance value (`nullableSource`, `plan`, `tableMatch`) is ignored since the generator never reads them, an unknown `resultKind` is malformed.
 5. **Key order is not significant to a reader.**
-6. **Strings are compared ordinally**, except parameter names, which the generator already compares ignoring case.
+6. **Strings are compared ordinally**, except parameter names, which the generator already compares ignoring case, and `database`, which the tool compares ignoring case: two names that differ only in case read one connection variable, so they are one database.
 7. Everything a reader needs about a query is inside its entry; only the two versions come from the top level.
 
 ## 2. Engine-specific types

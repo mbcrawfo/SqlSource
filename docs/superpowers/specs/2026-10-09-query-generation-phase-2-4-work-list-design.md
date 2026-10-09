@@ -63,7 +63,7 @@ Settled in this spec:
 - Describing, connections, sidecars and the summary.  Sub-phase 2.5.
 - `--check`, `--verbose` and `--log`.  Sub-phase 2.6.
 - The diagnostics of a type: not partial, file-local, a `Path` that matches nothing, a case collision of two paths.  The build reports them.
-- A `.sql` file that two projects of one run list with different dialects.  See Tech debt.
+- A `.sql` file that two projects list.  It is planned, and `docs/tech-debt` records what goes wrong.
 
 ## The command line
 
@@ -71,7 +71,8 @@ Settled in this spec:
 sqlsource describe [<path>...] [--project <path>]... [--database <name>]...
 ```
 
-- Each `<path>` whose extension is `.sql`, ignoring case, is a file filter.  At most one other `<path>` may be given, and it is the unit, by the rules of sub-phase 2.2; a second is a wrong command line: a message on standard error and exit `1`.
+- Each `<path>` whose extension is `.sql`, ignoring case, is a file filter.  It is resolved against the working directory, put through `SqlPath.Normalize`, and compared with the plan's files by `SqlPath.Comparer`.
+- A token that starts with `-` is never a `<path>`: sub-phase 2.2's rule for an unknown option holds for every position.  At most one other `<path>` may be given, and it is the unit, by the rules of sub-phase 2.2; a second is a wrong command line: a message on standard error and exit `1`.
 - With file filters and no unit, the unit is found from the working directory, not from the files.
 - `--database` takes a database name, by the rule of the `-- database:` marker, and may be given several times.  A value that is not a name is a wrong command line: a message on standard error and exit `1`.
 
@@ -86,7 +87,7 @@ sqlsource describe [<path>...] [--project <path>]... [--database <name>]...
 
 | Argument | Read | Anything else |
 |----|----|----|
-| `Path` | A string literal: regular, verbatim or raw.  `null` and `default` are not set, and neither is a string that is empty or white space, as in the generator | `SQLSRC208` at the expression: a constant, `nameof`, a concatenation, an interpolated string |
+| `Path` | A string literal: regular, verbatim or raw.  `null`, `default` and the empty string are not set.  A string of white space is a path, as in the generator, where it matches nothing | `SQLSRC208` at the expression: a constant, `nameof`, a concatenation, an interpolated string |
 | `Output` | A member access whose name is `Sql`, `Models` or `CodeGen` and whose left side ends in the identifier `GeneratorOutput` | `SQLSRC208` at the expression: a cast of a number, a constant.  A member access with another name is not set; the compiler rejects it |
 
 A claim whose argument is `SQLSRC208` is not planned: its files may be described for another type, and are not for this one.
@@ -107,7 +108,7 @@ What this reader cannot see is in `docs/tech-debt`: an alias for the attribute, 
 | Value | Rule |
 |----|----|
 | Needs an entry | For any claim of its file, `QuerySettings.Resolve(query.Markers, claim, metadata, property).Output` is `Models` or `CodeGen`.  The claim's level holds its `Output` and nothing else |
-| Database | `query.Markers.Database`, else the file's `SqlSourceDatabase` metadata, else the property, else `SqlDialectName.Canonical` of the file's dialect |
+| Database | `query.Markers.Database`, else the file's `SqlSourceDatabase` metadata, else the property, else `SqlDialectName.Canonical` of the file's dialect.  Only for a query that needs an entry: a query that needs none belongs to no database |
 | Hash | `SqlQueryHash.Compute` over the file's dialect and the query's segments, tokens and parameters.  Only for a query that needs an entry |
 | Selected | The query's project is in the run, and its file is one of the file filters or there are none, and its database is one of `--database` or there are none |
 
@@ -117,11 +118,11 @@ A `.sql` file that two projects list is planned once, under the first project in
 
 | Type | Holds |
 |----|----|
-| `RunPlan` | The files, in order of project and then of path; the databases, each with its name as first spelled and its dialect |
-| `PlannedFile` | The `.sql` file's path; the sidecar's path, from `SidecarFormat.PathFor`; the project; the dialect; a state, `Ready`, `HasParseErrors` or `NotDescribable`; its queries in the file's order |
+| `RunPlan` | The files, in order of project and then of path; the databases, which are those of the queries that need an entry, each with its name as first spelled and its dialect |
+| `PlannedFile` | The `.sql` file's path; the project; the dialect; a state, `Ready`, `HasParseErrors` or `NotDescribable`; its queries in the file's order |
 | `PlannedQuery` | The parsed `SqlQuery`; whether it needs an entry; its database; its hash; whether it is selected; a problem, none, `TokenWithoutDefault` or `DatabaseDialectConflict` |
 
-A file that is `Ready` and has no query that needs an entry stays in the plan: sub-phase 2.5 deletes a sidecar it finds beside it.
+A file that is `Ready` and has no query that needs an entry stays in the plan: sub-phase 2.5 deletes a sidecar it finds beside it.  The plan holds no path of a sidecar; sub-phase 2.5 works it out, so that this sub-phase needs nothing of sub-phase 2.1.
 
 ### What is wrong with a plan
 
@@ -132,7 +133,7 @@ A file that is `Ready` and has no query that needs an entry stays in the plan: s
 | `SqlSourceOutput` or `SqlSourceDatabase` is not valid, as a property or as the metadata of a claimed file | `SQLSRC014`, at the project file, once for each setting and value | The value is not set |
 | A file has a query that needs an entry, and its dialect is not `postgres` or `mssql` | `SQLSRC209`, once for the file | The file is `NotDescribable` |
 | A query that needs an entry has a token with no default | `SQLSRC210`, once for each such token | The query's problem is `TokenWithoutDefault` |
-| A database has two dialects | `SQLSRC211`, at the first query of each file whose dialect is not the database's first | Every query of that database in that file has the problem `DatabaseDialectConflict` |
+| A database has two dialects, among the queries that need an entry | `SQLSRC211`, at the first such query of each file whose dialect is not the database's first | Every query of that database in that file that needs an entry has the problem `DatabaseDialectConflict` |
 | A file filter names no claimed file of a project in the run | `SQLSRC212` | The run goes on |
 
 The dialects that can be described are a list of two in the generator assembly, `SqlDescribableDialects` in `Parsing/`, beside `SqlDialectName`.  Phase 5 reads the same list.
@@ -146,8 +147,8 @@ In `ToolDiagnostics`, with the four places each needs.  `SQLSRC209` and `SQLSRC2
 | Id | Title | Message | Arguments |
 |----|----|----|----|
 | `SQLSRC208` | Attribute argument is not a literal | `'{0}' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here` | `Path` or `Output` |
-| `SQLSRC209` | Output needs a dialect that can be described | `The output '{0}' needs a dialect that can be described, and the dialect of this file is '{1}'.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'` | The output; the dialect's name |
-| `SQLSRC210` | Token has no default | `The token '{0}' has no default.  A query whose output is '{1}' is described with a sample in its place` | The token; the output |
+| `SQLSRC209` | Output needs a dialect that can be described | `The output '{0}' needs a dialect that can be described, and the dialect of this file is '{1}'.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.` | The output; the dialect's name |
+| `SQLSRC210` | Token has no default | `The token '{0}' has no default.  A query whose output is '{1}' is described with a sample in its place.` | The token; the output |
 | `SQLSRC211` | Database has two dialects | `The database '{0}' has the dialect '{1}' here and '{2}' in '{3}'` | The database; this file's dialect; the first dialect; the file that gave it |
 | `SQLSRC212` | File is not in the run | `'{0}' is not a .sql file that a type of the run claims` | The path given |
 
@@ -164,7 +165,7 @@ It finds the unit and the projects, builds the plan, reports what is wrong with 
 One pull request, one commit for each step.  Each leaves `./pre-commit-validation.sh` passing and brings its tests and the documents it makes wrong.
 
 1. The epic outline: the row of 2.4 says In progress.
-2. In the generator: `SqlPath.ToSortedSet`, `PathResolver.FindFiles`, `SqlDescribableDialects`, and the way into `SqlFileReader.Read` without the compiler's file.  No behaviour of the generator changes.
+2. In the generator: `SqlPath.ToSortedSet`, `PathResolver.FindFiles`, `SqlDescribableDialects`, and the way into `SqlFileReader.Read` without the compiler's file.  No behaviour of the generator changes.  `PathResolver.Resolve` is a hot path, so the pull request states its time and allocation before and after, as `src/SqlSource/AGENTS.md` requires.
 3. The attribute reader, with `SQLSRC208`, and the tech-debt item.
 4. The test helper that builds a project in a temporary folder and answers MSBuild's two runs, below.
 5. The plan for one project: claims, files, settings, parsing, and the values of a query but for `Selected`.  Parse errors, `SQLSRC011` and `SQLSRC014`.
@@ -180,19 +181,19 @@ A helper of the test project, `TestProject`, writes C# and `.sql` files to a tem
 
 | Where | Cases |
 |----|----|
-| `AttributeReaderTests` | The attribute by its short and long name, qualified and with `global::`; on a class, a struct, a record and a nested type; with `[type: ...]`; in a list with another attribute.  Not on a method or an assembly.  `Path` as each kind of literal, `null`, empty and white space.  `Output` as each member, qualified and not.  `SQLSRC208` for each form the table names, with its position.  A file that does not hold the word is not parsed.  An attribute inside `#if` for a constant of the manifest, and for one that is not.  C# of the newest version in the file |
+| `AttributeReaderTests` | The attribute by its short and long name, qualified and with `global::`; on a class, a struct, a record and a nested type; with `[type: ...]`; in a list with another attribute.  Not on a method or an assembly.  `Path` as each kind of literal, `null`, empty and white space.  `Output` as each member, qualified and not.  `SQLSRC208` for each form the table names, with its position.  A file that does not hold the word is not parsed.  An attribute inside `#if` for a constant of the manifest, and for one that is not; inside `#if NET8_0_OR_GREATER`, with the constants a manifest of sub-phase 2.3 holds.  C# of the newest version in the file |
 | `RunPlannerTests` | The example of this spec.  No `Path`, a folder, a file.  Two types that claim one file with two outputs: the union.  A file no type claims is not read, though it does not parse.  The output from each of its five levels, and the database from each of its four and from the dialect.  Database names that differ in case are one.  The hash equals `SqlQueryHash.Compute` called by the test.  A file read with a byte order mark hashes as without.  A file with `\r\n` |
-| `RunPlannerErrorTests` | Each row of the table of what is wrong, with the id, the position and the effect.  `SQLSRC209` once for a file with three such queries, and not for a file whose queries are all `Sql`.  `SQLSRC210` for two tokens of one query.  `SQLSRC211` across two files and across two projects |
+| `RunPlannerErrorTests` | Each row of the table of what is wrong, with the id, the position and the effect.  A file of another dialect whose queries are all `Sql` gives its database no second dialect.  `SQLSRC209` once for a file with three such queries, and not for a file whose queries are all `Sql`.  `SQLSRC210` for two tokens of one query.  `SQLSRC211` across two files and across two projects |
 | `FilterTests` | Each filter alone and together; a filter that selects nothing; a `.sql` path with a unit and without; two units; `SQLSRC212`; a `--database` value that is not a name |
-| `GeneratorParityTests` | For each of a set of sources and file lists, the generator runs with step tracking, and the `TypeFiles` it gives are compared with the tool's claims and their files: the same types by file, the same `Path`, the same `Output`, the same files in the same order |
+| `GeneratorParityTests` | The test project links `tests/SqlSource.Tests/Generator/GeneratorHarness.cs` and the helpers it uses, as `tests/SqlSource.Tests.RoslynFloor` does.  For each of a set of sources and file lists, the generator runs with step tracking, and the `TypeFiles` it gives are compared with the tool's claims and their files: the same types by file, the same `Path`, the same `Output`, the same files in the same order |
 | `tests/SqlSource.Tests` | `SqlPath.ToSortedSet` and `PathResolver.FindFiles` are covered by the tests that covered them as private methods; `PathResolverAllocationTests` passes with its budget as it is; `SqlDescribableDialects` has a test of its two members |
 
 ## Documentation
 
 - `src/SqlSource/AGENTS.md`: `SqlDescribableDialects`; that `PathResolver.FindFiles`, `SqlPath.ToSortedSet` and `MSBuildSettings.Read` are also the tool's, so a change to one changes what the tool describes.
 - `src/SqlSource.Tool/AGENTS.md`: the attribute reader is syntax only and reads two arguments; the plan must agree with the generator, and `GeneratorParityTests` is what holds it to that; a rule that both need goes into the generator assembly.
-- `docs/diagnostics.md`: `SQLSRC208` to `SQLSRC212`.
-- `docs/tech-debt`: two items, each with the next free id.  The attribute reader is syntax only: an alias, a type that shadows the attribute's name, and an attribute under `#if` in another configuration are misread.  And a `.sql` file that two projects of one run list is planned under the first, so a second project that gives it another dialect gets a sidecar its build calls stale.
+- `docs/diagnostics.md`: `SQLSRC208` to `SQLSRC212`.  The section of `SQLSRC014` says today that the generator does not check `SqlSourceDatabase`; it gains that the tool does.  The part on the tool says that it also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, under the generator's ids.
+- `docs/tech-debt`: two items, each with the next free id.  The attribute reader is syntax only: an alias, a type that shadows the attribute's name, and an attribute under `#if` in another configuration are misread.  And a `.sql` file that two projects list has one sidecar and no owner: in one run it is planned under the first project, so a second that gives it another dialect gets a sidecar its build calls stale; and a run that does not hold both projects, a project as the unit or `--project`, sees the needs of one alone and may write a sidecar without the entries the other needs.
 - `README.md`, `CONTRIBUTING.md` and `docs/publishing.md`: nothing in them changes.
 - The epic outline: in steps 1 and 10.
 
