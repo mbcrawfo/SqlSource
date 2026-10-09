@@ -66,6 +66,7 @@ public class SidecarWriterTests
         SidecarWriter.Write(SidecarOf()).ShouldEndWith("  \"queries\": {}\n}\n");
 
     // The format design, section 1.  The character is given by its code, so that a test's name holds none.
+    // The comparison is case-sensitive, as Shouldly's is not unless asked: the hex digits are in upper case.
     [Theory]
     [InlineData(0x22, "\\\"")]
     [InlineData(0x5C, "\\\\")]
@@ -84,8 +85,8 @@ public class SidecarWriterTests
 
         var text = SidecarWriter.Write(sidecar);
 
-        text.ShouldContain("    \"a" + escape + "b\": {\n");
-        text.ShouldContain("\"database\": \"a" + escape + "b\",\n");
+        text.ShouldContain("    \"a" + escape + "b\": {\n", Case.Sensitive);
+        text.ShouldContain("\"database\": \"a" + escape + "b\",\n", Case.Sensitive);
     }
 
     // Every other character is written as it is: a solidus, DEL, a line separator, a letter outside ASCII, a pair of

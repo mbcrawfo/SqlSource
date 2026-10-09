@@ -4236,8 +4236,8 @@ public class SidecarWriterTests
 
         var text = SidecarWriter.Write(sidecar);
 
-        text.ShouldContain("    \"a" + escape + "b\": {\n");
-        text.ShouldContain("\"database\": \"a" + escape + "b\",\n");
+        text.ShouldContain("    \"a" + escape + "b\": {\n", Case.Sensitive);
+        text.ShouldContain("\"database\": \"a" + escape + "b\",\n", Case.Sensitive);
     }
 
     // Every other character is written as it is: a solidus, DEL, a line separator, a letter outside ASCII, a pair of
