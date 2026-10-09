@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0024`
+Next id: `TD-0025`
 
 ## Active items
 
@@ -19,6 +19,7 @@ Next id: `TD-0024`
 | [TD-0021](TD-0021-comments-and-token-defaults.md) | Open | 2026-10-08 | Low | A `--` comment inside an inline default swallows its closing braces, a `-- token:` default is compared as written while an inline one is compared without comments, and a comment can be scanned for tokens where no type keeps comments |
 | [TD-0022](TD-0022-query-that-keeps-its-comments-is-built-and-scanned-twice.md) | Open | 2026-10-08 | Low | A query that keeps its comments has its SQL built and scanned for tokens twice, so its parse allocates and takes about twice as much |
 | [TD-0023](TD-0023-unknown-option-and-path-are-printed-as-given.md) | Open | 2026-10-09 | Low | The `sqlsource` tool prints the name of an unknown option and the path of `describe` as they were typed, so a secret typed as either reaches its output |
+| [TD-0024](TD-0024-gaps-of-the-tools-shell.md) | Open | 2026-10-09 | Low | Small gaps of the `sqlsource` tool's shell: its reporter is not safe for several threads, a path with a line break breaks an error's one line, an unreadable directory and any driver's exception are `SQLSRC200`, three settings have no test, Ctrl+C is always swallowed, and the package carries `.pdb` and `.xml` files |
 
 ## Columns
 
