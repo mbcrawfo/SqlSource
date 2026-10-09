@@ -10,10 +10,13 @@
         <IsPackable>false</IsPackable>
         <!--
             Token validation is off, so that EndToEnd/ shows the property reaching the generator through the MSBuild
-            files: a query there without a list of its own does not check its arguments.  The value is on a line of
-            its own on purpose.  The compiler would read that as empty, and SqlSource.targets is what trims it.
+            files: a query there without a list of its own does not check its arguments.  The list has one word on
+            each line on purpose, and the word that the tests can see is the second.  The compiler reads one line of
+            a value, so it would read this as empty, and SqlSource.targets is what puts the list on one line.  Each
+            value below that is written over several lines is so for the same reason.
         -->
         <SqlSourceGeneratorParameters>
+            sort-input
             no-token-validation
         </SqlSourceGeneratorParameters>
         <SqlSourceDialect>
@@ -28,11 +31,13 @@
         </AdditionalFiles>
         <AdditionalFiles Update="EndToEnd/Dialects/ByOption.sql">
             <SqlSourceDialect>
-                mysql, no-backslash-escapes
+                mysql,
+                no-backslash-escapes
             </SqlSourceDialect>
         </AdditionalFiles>
         <AdditionalFiles Update="EndToEnd/Parameters/Kept.sql">
             <SqlSourceGeneratorParameters>
+                no-token-validation
                 keep-comments
             </SqlSourceGeneratorParameters>
         </AdditionalFiles>

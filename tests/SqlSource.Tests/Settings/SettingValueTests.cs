@@ -96,6 +96,7 @@ public class SettingValueTests
     [InlineData("A B", false)]
     [InlineData("A-B", false)]
     [InlineData("A.B", false)]
+    [InlineData("A​B", false)]
     public void IsSuffix_CharactersThatCanFollowTheFirstOfAnIdentifier_IsASuffix(string value, bool expected) =>
         SettingValue.IsSuffix(value.AsSpan()).ShouldBe(expected);
 

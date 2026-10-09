@@ -59,9 +59,10 @@ public class EndToEndTests
             .Search("id, name", "users", "name LIKE @pattern")
             .ShouldBe("SELECT id, name\nFROM users\nWHERE name LIKE @pattern\nORDER BY users.id;");
 
-    // SqlSource.Tests.csproj sets SqlSourceGeneratorParameters to no-token-validation, on a line of its own, and
-    // Search has no list of its own.  That its method checks nothing shows the property reaching the generator
-    // through the MSBuild files the package ships, trimmed.
+    // SqlSource.Tests.csproj sets SqlSourceGeneratorParameters to sort-input and no-token-validation, one on each
+    // line, and Search has no list of its own.  That its method checks nothing shows the property reaching the
+    // generator through the MSBuild files the package ships, trimmed and whole: cut at its first line break, the
+    // list would be sort-input alone.
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
@@ -100,15 +101,17 @@ public class EndToEndTests
     public void ProjectWithADialect_FileWithMetadata_IsReadByTheDialectOfItsItem() =>
         DialectQueries.ByMetadata.ShouldBe("SELECT 'it\\'s' AS note, 5--3 AS eight;");
 
-    // The item of ByOption.sql names an option after the dialect, with a comma and a space, over several lines.
-    // Plain MySQL would not close the string, and this project would not build.
+    // The item of ByOption.sql names an option after the dialect, with a comma, on a line of its own.  Cut at the
+    // line break the value would end at the comma and be no dialect, and plain MySQL would not close the string:
+    // either way this project would not build.
     [Fact]
     public void ProjectWithADialect_FileWithAnOptionInItsMetadata_IsReadByThatOption() =>
         DialectQueries.ByOption.ShouldBe("SELECT 'C:\\temp\\' AS path;");
 
     // The build copies the file it wrote for the compiler of this project to the output folder.  It has a section for
     // each item whose metadata the package shows to the compiler.  A section for every .sql file would make the file,
-    // and the build, grow with files that set nothing.  A value with an option arrives whole, comma included.
+    // and the build, grow with files that set nothing.  A value with an option arrives whole, comma included, and
+    // one that the project writes over several lines arrives on one line, with one space for each line break.
     [Fact]
     public void ProjectWithMetadata_FileTheBuildWritesForTheCompiler_NamesOnlyTheFilesWithMetadata()
     {
@@ -138,7 +141,8 @@ public class EndToEndTests
             [
                 "/ByMetadata.sql] build_metadata.SqlSourceSettingsFile.SqlSourceDialect = mysql",
                 "/ByOption.sql] build_metadata.SqlSourceSettingsFile.SqlSourceDialect = mysql, no-backslash-escapes",
-                "/Kept.sql] build_metadata.SqlSourceSettingsFile.SqlSourceGeneratorParameters = keep-comments",
+                "/Kept.sql] build_metadata.SqlSourceSettingsFile.SqlSourceGeneratorParameters = "
+                    + "no-token-validation keep-comments",
             ],
             ignoreOrder: true
         );
@@ -148,9 +152,9 @@ public class EndToEndTests
     public void ProjectWithADialect_FileWithAMarker_IsReadByTheDialectItNames() =>
         DialectQueries.ByMarker.ShouldBe("SELECT [it's] FROM #orders;");
 
-    // The item of Kept.sql has SqlSourceGeneratorParameters metadata, written over several lines.  That the comment
-    // is there shows the metadata reaching the generator through the MSBuild files the package ships, trimmed, and
-    // replacing the project's list.
+    // The item of Kept.sql has SqlSourceGeneratorParameters metadata, with keep-comments as the second of two words
+    // and one word on each line.  That the comment is there shows the metadata reaching the generator through the
+    // MSBuild files the package ships, trimmed and whole, and replacing the project's list.
     [Fact]
     public void ProjectWithParameters_FileWithMetadata_UsesTheListOfItsItem() =>
         ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the metadata */ AS one;");
