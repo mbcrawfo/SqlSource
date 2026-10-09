@@ -56,6 +56,17 @@ public class CachingTests
         var edited = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1, 2;\n");
         var result = Run(driver.ReplaceAdditionalText(_users, edited), compilation);
 
+        // Only the edited file was read: the other one, and the claimed paths, are the inputs the read had.
+        ParseInputs(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Modified,
+                    [_orders.Path] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -158,6 +169,20 @@ public class CachingTests
 
         AllReasons(result, TrackingNames.SqlPaths).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.TypeFiles).ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+
+        // The files that were read before were not read again: each is the input it was, and so are the claimed
+        // paths.  The new file is not listed, here or under ParsedFile: the read gives nothing for a file that no type
+        // claims, and the driver tracks a step only when something it gave reaches an output.
+        ParseInputs(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Cached,
+                    [_orders.Path] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
             .Keys.ShouldBe(["Users.sql", "Orders.sql"], ignoreOrder: true);
         AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
@@ -224,6 +249,19 @@ public class CachingTests
         );
 
         AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
+
+        // No file was read: the two inputs of the read, the file with what its parse depends on and the claimed
+        // paths, are the ones it had.
+        ParseInputs(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Cached,
+                    [_orders.Path] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.TypeQueries).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
 
@@ -275,7 +313,7 @@ public class CachingTests
         );
 
         AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Modified]);
-        Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path)
+        ParseInputs(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
@@ -284,6 +322,7 @@ public class CachingTests
                 },
                 ignoreOrder: true
             );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -329,7 +368,7 @@ public class CachingTests
         );
 
         AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path)
+        ParseInputs(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
@@ -338,6 +377,7 @@ public class CachingTests
                 },
                 ignoreOrder: true
             );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -436,8 +476,19 @@ public class CachingTests
         var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider("sort-input")), compilation);
 
         AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
-        AllReasons(result, TrackingNames.FileParseInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+
+        // No file was read: the two inputs of the read, the file with what its parse depends on and the claimed
+        // paths, are the ones it had.
+        ParseInputs(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Cached,
+                    [_orders.Path] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.TypeOutput)
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
@@ -458,6 +509,23 @@ public class CachingTests
             compilation
         );
 
+        AllReasons(result, TrackingNames.FileSettings).ShouldBe([IncrementalStepRunReason.New]);
+
+        // No file was read.  The metadata of Users.sql is an input of the step that resolves what its parse depends
+        // on, so that step ran for it, and gave the value it had: the file's settings are no part of that value.
+        // Were they, this would be Modified and the file would be read on every edit of its metadata.  ParsedFile
+        // cannot show it: it is the step after the read, and is Cached for a file that is read again and gives an
+        // equal value.
+        ParseInputs(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Unchanged,
+                    [_orders.Path] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
             .ShouldBe(
@@ -479,7 +547,10 @@ public class CachingTests
         var result = Run(driver, WithParametersOnUserQueries(compilation, "keep-comments"));
 
         AllReasons(result, TrackingNames.CommentPaths).ShouldBe([IncrementalStepRunReason.Modified]);
-        Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path)
+
+        // Users.sql is read again, as it has to be: its type now asks for comments.  Orders.sql is not: the step that
+        // resolves its input ran, because the list of paths it takes changed, and gave the value it had.
+        ParseInputs(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
@@ -488,6 +559,7 @@ public class CachingTests
                 },
                 ignoreOrder: true
             );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)["Orders.sql"]
             .ShouldBe(IncrementalStepRunReason.Cached);
     }
@@ -501,8 +573,19 @@ public class CachingTests
         var result = Run(driver, WithParametersOnUserQueries(compilation, "sort-input"));
 
         AllReasons(result, TrackingNames.CommentPaths).ShouldBe([IncrementalStepRunReason.Cached]);
-        AllReasons(result, TrackingNames.FileParseInput)
-            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+
+        // No file was read: the two inputs of the read, the file with what its parse depends on and the claimed
+        // paths, are the ones it had.
+        ParseInputs(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Cached,
+                    [_orders.Path] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
             .ShouldBe(
@@ -531,7 +614,7 @@ public class CachingTests
             compilation
         );
 
-        Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path)
+        ParseInputs(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
@@ -540,6 +623,7 @@ public class CachingTests
                 },
                 ignoreOrder: true
             );
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
         Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -610,12 +694,22 @@ public class CachingTests
             .SelectMany(run => run.Outputs)
             .ToDictionary(output => key((T)output.Value), output => output.Reason);
 
-    // A step that gave no output in the run, as FileSettings does when no file has metadata, is not among the
-    // tracked steps.
-    private static IncrementalStepRunReason[] AllReasons(GeneratorDriverRunResult result, string step) =>
-        result.Results.Single().TrackedSteps.TryGetValue(step, out var runs)
-            ? [.. runs.SelectMany(run => run.Outputs).Select(output => output.Reason)]
-            : [];
+    // Why the input of each file's read is what it is, by the file's path.  The read is the step before the one named
+    // ParsedFile, which reports a file that was read again and gave an equal value as Cached.  So that a file was not
+    // read is shown by its input here, and by ClaimedPaths, the other input of every read: neither is Modified or New.
+    private static Dictionary<string, IncrementalStepRunReason> ParseInputs(GeneratorDriverRunResult result) =>
+        Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path);
+
+    // A step that is not among the tracked steps fails the test: it has lost its name.  FileSettings is the one
+    // exception, as it gives nothing, and so is not tracked, in a run where no file has metadata.
+    // Run_MetadataOfOneFileGainsAParameter_ParsesNoFileAndEmitsOnlyItsType reads it in a run where one has.
+    private static IncrementalStepRunReason[] AllReasons(GeneratorDriverRunResult result, string step)
+    {
+        var steps = result.Results.Single().TrackedSteps;
+        return step == TrackingNames.FileSettings && !steps.ContainsKey(step)
+            ? []
+            : [.. steps[step].SelectMany(run => run.Outputs).Select(output => output.Reason)];
+    }
 
     // The steps that add source and report diagnostics.
     private static IncrementalStepRunReason[] OutputReasons(GeneratorDriverRunResult result) =>

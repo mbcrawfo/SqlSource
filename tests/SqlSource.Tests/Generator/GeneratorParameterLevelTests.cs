@@ -123,6 +123,28 @@ public class GeneratorParameterLevelTests
         run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
     }
 
+    // The metadata of a file that a type claims, with no property beside it.
+    [Fact]
+    public void Run_MetadataWithAWordThatIsNoParameter_IsAnErrorWithoutAPositionAndTheOthersApply()
+    {
+        var run = GeneratorHarness.Run(
+            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [
+                new SqlFile(
+                    "/app/Repo/Users.sql",
+                    "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n",
+                    Metadata: new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments nope" }
+                ),
+            ]
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC014 (1,1)-(1,1): 'nope' is not a valid value of SqlSourceGeneratorParameters",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
+    }
+
     [Fact]
     public void Run_TheSameInvalidWordInThePropertyAndInTwoFiles_IsReportedOnce()
     {
