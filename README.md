@@ -105,7 +105,7 @@ A name can be followed by `->` and a shape: `-- name: GetUser -> one-optional`. 
 
 A file with no `-- name:` line is one query, named after the file: `CountUsers.sql` becomes `CountUsers`.
 
-Before the first `-- name:` line a file may hold comments, such as a licence header, `-- generator:` lines that apply to every query in the file, and a `-- dialect:` marker (see Dialects, below).
+Before the first `-- name:` line a file may hold comments, such as a licence header, and the markers that apply to every query in the file: `-- generator:` lines, a `-- dialect:` marker (see Dialects, below) and the others that the table under Markers allows there.
 
 ### Summaries
 
@@ -132,7 +132,7 @@ Words are matched ignoring case.  A marker that describes one query goes inside 
 | `input-model`, `output-model` | no | yes | A type's name, or its full name |
 | `collection-type` | yes | yes | A collection type |
 
-A marker inside a query wins over the same marker before the first query.  Writing a marker twice in one place is fine when the value is the same, and the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112) when it is not.  A comment of yours that happens to start with one of these words and a colon is read as a marker: reword it.
+A marker inside a query wins over the same marker before the first query.  Writing a marker twice in one place is fine when the value is the same, and the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112) when it is not.  A marker where its column says no is the error [SQLSRC116](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc116).  A comment of yours that happens to start with one of these words and a colon is read as a marker: reword it.
 
 ### What reaches the generated SQL
 
@@ -151,7 +151,7 @@ A `-- generator:` line holds one or more generator parameters, separated by spac
 | `keep-comments` | Comments and blank lines stay in the SQL |
 | `no-token-validation` | The query's method does not check its arguments (see Tokens, below) |
 | `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` | None yet: they shape what a later release generates |
-| `default` | The empty list: every default.  It stands alone |
+| `default` | The empty list: every default.  It stands alone, or repeated |
 
 ```sql
 -- name: Report

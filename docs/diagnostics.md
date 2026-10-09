@@ -293,7 +293,7 @@ Add a `-- name:` marker at the top of the file, or rename the file.  If the file
 
 **SQL before the first name**
 
-In a file that has `-- name:` markers, only comments, `-- generator:` lines and a `-- dialect:` marker may come before the first one.  SQL there would belong to no query.
+In a file that has `-- name:` markers, only comments and the markers that describe the whole file may come before the first one: [SQLSRC116](#sqlsrc116) has the list.  SQL there would belong to no query.
 
 ```sql
 SET search_path TO app;
