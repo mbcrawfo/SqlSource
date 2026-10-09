@@ -6,8 +6,8 @@ using Consumer;
 // A constant: the generator was loaded, and the package handed the .sql files to the compiler.
 Console.WriteLine($"constant: {Queries.GetUser}");
 
-// Directory.Build.targets sets SqlSourceGeneratorParameters to no-token-validation for the project.  Without it, the
-// empty argument throws.
+// Directory.Build.targets sets SqlSourceGeneratorParameters for the project, to a list whose second word, on a line
+// of its own, is no-token-validation.  Without it, the empty argument throws.
 Console.WriteLine($"validation off: {Queries.ListUsers("users", "")}");
 
 // The query's own list, `default`, replaces the project's, so this one checks.
@@ -21,7 +21,8 @@ catch (ArgumentException exception)
     Console.WriteLine($"validation on: {exception.GetType().Name} for {exception.ParamName}");
 }
 
-// The item of Kept.sql says keep-comments, and so does the attribute of KeptQueries, which claims Users.sql again.
+// The item of Kept.sql says keep-comments, as the second word of its list and on a line of its own, and so does the
+// attribute of KeptQueries, which claims Users.sql again.
 Console.WriteLine($"comments kept by the item: {Queries.Kept}");
 Console.WriteLine($"comments kept by the attribute: {KeptQueries.GetUser}");
 

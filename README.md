@@ -445,11 +445,11 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
-A word that is not a generator parameter is the error [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).  The compiler hands a generator only the part of a value before the first `;` or `#`, so separate the words with spaces.  Write them on one line: the value may stand on a line of its own, but a line break between two words cuts the list there.
+A word that is not a generator parameter is the error [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).  The compiler hands a generator only the part of a value before the first `;` or `#`, so separate the words with spaces or with line breaks: the list may be written with one word on each line.
 
 ### Settings for models and methods
 
-`SqlSourceOutput`, `SqlSourceDatabase`, `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix`, `SqlSourceModelNamespace`, `SqlSourceInputModelType`, `SqlSourceOutputModelType` and `SqlSourceCollectionType` are each a property for the project, and each is also metadata of an `AdditionalFiles` item.  See Settings for models and methods, above.  Write each on one line.
+`SqlSourceOutput`, `SqlSourceDatabase`, `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix`, `SqlSourceModelNamespace`, `SqlSourceInputModelType`, `SqlSourceOutputModelType` and `SqlSourceCollectionType` are each a property for the project, and each is also metadata of an `AdditionalFiles` item.  See Settings for models and methods, above.
 
 ### Dialect
 

@@ -1,10 +1,12 @@
 <Project>
     <!--
         The .NET SDK imports this file after the targets of every package, so nothing that the package does where it
-        is imported sees what is set here.  Each value is on a line of its own on purpose, as in Consumer.csproj.
+        is imported sees what is set here.  Each value is on a line of its own on purpose, as in Consumer.csproj, and
+        the list has one word on each line, with the word that Program.cs shows as the second.
     -->
     <PropertyGroup>
         <SqlSourceGeneratorParameters>
+            sort-input
             no-token-validation
         </SqlSourceGeneratorParameters>
     </PropertyGroup>

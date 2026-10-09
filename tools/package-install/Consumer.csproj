@@ -14,8 +14,9 @@
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <!--
             The value is on a line of its own on purpose.  The compiler would read that as empty, and the package's
-            build/SqlSource.targets is what trims it.  Directory.Build.targets sets SqlSourceGeneratorParameters the
-            same way.
+            build/SqlSource.targets is what trims it.  The list of Kept.sql has one word on each line, which the
+            compiler would read as empty too and the same targets put on one line, and Directory.Build.targets sets
+            SqlSourceGeneratorParameters the same way.
         -->
         <SqlSourceDialect>
             postgres
@@ -30,6 +31,7 @@
         </AdditionalFiles>
         <AdditionalFiles Update="Queries/Kept.sql">
             <SqlSourceGeneratorParameters>
+                no-token-validation
                 keep-comments
             </SqlSourceGeneratorParameters>
         </AdditionalFiles>
