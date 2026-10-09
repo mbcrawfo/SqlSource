@@ -11,23 +11,31 @@ public class SqlFileParserAllocationTests
 {
     // The generator parses a file again each time it is edited in the IDE, so what a parse allocates is tracked here.
     // A parse of this file allocated 9.7 bytes for each character of input when the budget was set, the same in Debug,
-    // in Release and under coverage.  The budget leaves room for differences between runtimes, not for a regression:
-    // lower it when the parser improves, and do not raise it to make a change pass.
+    // in Release and under coverage, and allocates 11.4 since a query carries its parameters and its tokens.  The
+    // budget leaves room for differences between runtimes, not for a regression: lower it when the parser improves,
+    // and do not raise it to make a change pass.
     private const double BudgetInBytesPerCharacter = 12;
+
+    // A query that keeps its comments has two forms of its SQL, each built and scanned for tokens, so its parse costs
+    // about twice a plain one.  A parse of this file with a preamble that keeps comments allocated 20.3 bytes for
+    // each character when this budget was set.  It is a budget of its own, with the same room and the same rule.
+    private const double BudgetInBytesPerCharacterWithComments = 24;
 
     private const int Queries = 50;
 
     [Theory]
-    [InlineData(nameof(SqlDialect.Ansi), false)]
-    [InlineData(nameof(SqlDialect.MySql), false)]
-    [InlineData(nameof(SqlDialect.Oracle), false)]
+    [InlineData(nameof(SqlDialect.Ansi), false, false)]
+    [InlineData(nameof(SqlDialect.MySql), false, false)]
+    [InlineData(nameof(SqlDialect.Oracle), false, false)]
     // The file names its own dialect, so its header is read before the rest.
-    [InlineData(nameof(SqlDialect.Ansi), true)]
-    public void Parse_TypicalFile_AllocatesWithinItsBudget(string dialectName, bool hasDialect)
+    [InlineData(nameof(SqlDialect.Ansi), true, false)]
+    // The preamble keeps comments, so each query is built in both forms.
+    [InlineData(nameof(SqlDialect.Ansi), false, true)]
+    public void Parse_TypicalFile_AllocatesWithinItsBudget(string dialectName, bool hasDialect, bool keepsComments)
     {
         const int Iterations = 20;
         var dialect = Enum.Parse<SqlDialect>(dialectName);
-        var text = CreateFile(hasDialect);
+        var text = CreateFile(hasDialect, keepsComments);
         SqlFileParser.Parse(text, "Queries.sql", dialect).Blocks.Count.ShouldBe(Queries);
 
         // The first parses pay for one-off work: JIT compilation, static initialisers and the shared buffer pool.
@@ -44,15 +52,18 @@ public class SqlFileParserAllocationTests
 
         var allocated = GC.GetAllocatedBytesForCurrentThread() - before;
 
-        (allocated / (double)(Iterations * text.Length)).ShouldBeLessThan(BudgetInBytesPerCharacter);
+        (allocated / (double)(Iterations * text.Length)).ShouldBeLessThan(
+            keepsComments ? BudgetInBytesPerCharacterWithComments : BudgetInBytesPerCharacter
+        );
     }
 
     // A file like the ones the generator is written for: a preamble, and queries that mix line comments, block
     // comments, string literals, tokens and blank lines.
-    private static string CreateFile(bool hasDialect)
+    private static string CreateFile(bool hasDialect, bool keepsComments)
     {
         var file = new StringBuilder("-- Copyright (c) Example\n")
             .Append(hasDialect ? "-- dialect: postgres\n" : string.Empty)
+            .Append(keepsComments ? "-- generator: keep-comments\n" : string.Empty)
             .Append('\n');
         for (var query = 0; query < Queries; query++)
         {

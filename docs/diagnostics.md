@@ -220,7 +220,7 @@ An MSBuild property of SqlSource, or the metadata of that name on an `Additional
 </PropertyGroup>
 ```
 
-Correct the value, or remove it to keep the default.  While it is wrong the setting is not set; in a list of generator parameters the other words still apply.  The same value in several places is reported once, and the metadata of a file that no type claims is not reported.
+Correct the value, or remove it to keep the default.  While it is wrong the setting is not set.  In a list of generator parameters the other words still apply, with one exception: `default` beside another parameter makes the whole list wrong, so `default no-token-validation` is reported whole and sets no list.  The same value in several places is reported once, and the metadata of a file that no type claims is not reported.
 
 `SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceInputModelType` and `SqlSourceOutputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `SqlSourceCollectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `SqlSourceInputModelSuffix` and `SqlSourceOutputModelSuffix` take characters that can be part of an identifier, and `SqlSourceModelNamespace` takes a namespace such as `App.Models`.  `SqlSourceDatabase` is not checked by the generator.  Where a type's methods go is set by the attribute alone, so there is no property for it.
 

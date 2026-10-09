@@ -358,7 +358,7 @@ ORDER BY {{orderBy:name}};
 A default is a sample of what the caller will pass.  It changes nothing that is generated today: the method still takes each token as a `string`, and nothing uses the default at run time.  It is there for the tool that will describe a query to its database, which needs SQL it can send.
 
 - A `-- token:` marker inside a query gives the default for a token that the query writes several times, or whose sample is long.  Its value is exactly what the SQL would hold: one token with its default.
-- Two defaults for one token of a query must be the same.  Two that differ are the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112).
+- Two defaults for one token of a query must be the same.  Two that differ are the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112).  A comment makes two that look the same differ: a default in the SQL is read without its comments, and a `-- token:` marker's is read as written, so `{{f:a /* c */ b}}` in both places is that error.  Keep comments out of defaults.
 - `{{a:b}}` in SQL that does not mean a token, the text of a template for example, is kept as written by a `-- token-ignore: a` marker.
 
 **Tokens are for trusted text only.**  A token is replaced by string concatenation.  Nothing is escaped, quoted or checked for safety, so a value that a user can influence is a SQL injection.  Use a token for a fragment that your own code chooses, such as a table name from a fixed list, and a query parameter for every value.
