@@ -2417,11 +2417,11 @@ public class SidecarReaderTests
 
     // A second formatVersion is a mistake in any version, wherever the first one stopped the search for it.
     [Theory]
-    [InlineData("{'formatVersion': 2, 'x': {}, 'formatVersion':2}")]
-    [InlineData("{'formatVersion': 2, 'x': {}, 'formatVersion':1}")]
-    [InlineData("{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {}, 'formatVersion':2}")]
+    [InlineData("{'formatVersion': 2, 'x': {}, 'formatVersion' :2}")]
+    [InlineData("{'formatVersion': 2, 'x': {}, 'formatVersion' :1}")]
+    [InlineData("{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {}, 'formatVersion' :2}")]
     public void Read_SecondFormatVersion_IsDuplicateKey(string text) =>
-        ShouldBeMalformed(Q(text), SidecarErrorKind.DuplicateKey, "'formatVersion':", 15, "formatVersion");
+        ShouldBeMalformed(Q(text), SidecarErrorKind.DuplicateKey, "'formatVersion' :", 15, "formatVersion");
 
     [Fact]
     public void Read_EngineTheReaderDoesNotKnow_ReadsEachTypeAsItsName()
@@ -2792,9 +2792,10 @@ namespace SqlSource.Tests.Snapshot;
 public class SidecarReaderAllocationTests
 {
     // From phase 5 the generator reads a sidecar again each time the file changes, so what a read allocates is
-    // tracked here.  The budget leaves room for differences between runtimes, not for a regression: lower it when
-    // the reader improves, and do not raise it to make a change pass.
-    private const double BudgetInBytesPerCharacter = 1000;
+    // tracked here.  A read of the first example allocated 1.4 bytes for each character when the budget was set, the
+    // same in Debug and in Release.  The budget leaves room for differences between runtimes, not for a regression:
+    // lower it when the reader improves, and do not raise it to make a change pass.
+    private const double BudgetInBytesPerCharacter = 1.7;
 
     [Fact]
     public void Read_UsersExample_AllocatesWithinItsBudget()
@@ -2947,7 +2948,9 @@ internal sealed class SidecarCursor(string text)
     /// <summary>The span of the key that <see cref="NextKey" /> returned last, quotes included.</summary>
     public TextSpan KeySpan { get; private set; }
 
-    /// <summary>The offset after the last token.  Setting it moves the cursor: a value may be read out of order.</summary>
+    /// <summary>
+    /// The offset after the last token.  Setting it moves the cursor: a value may be read out of order.
+    /// </summary>
     public int Position
     {
         get => _tokens.Position;
@@ -3091,18 +3094,17 @@ internal sealed class SidecarCursor(string text)
     public bool? ReadBoolean(string key)
     {
         var token = Next();
-        switch (token.Kind)
+        if (token.Kind is SidecarTokenKind.True or SidecarTokenKind.False)
         {
-            case SidecarTokenKind.True:
-                return true;
-            case SidecarTokenKind.False:
-                return false;
-            case SidecarTokenKind.Null:
-                return null;
-            default:
-                WrongType(token, key);
-                return null;
+            return token.Kind == SidecarTokenKind.True;
         }
+
+        if (token.Kind != SidecarTokenKind.Null)
+        {
+            WrongType(token, key);
+        }
+
+        return null;
     }
 
     /// <summary>

@@ -27,6 +27,11 @@ end_of_line = lf
 [*.sql]
 indent_size = 4
 
+# Sidecars in the layout the tool writes, where a line is as long as its value.
+[tests/SqlSource.Tests/Snapshot/Examples/*.json]
+max_line_length = off
+end_of_line = lf
+
 # Files formatted by CSharpier
 [*.{cs,csproj,props,targets,slnx}]
 end_of_line = lf

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Linq;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Tests.Snapshot;
@@ -99,4 +100,11 @@ internal static class TestSidecars
     }
 
     public static Sidecar SidecarOf(params SidecarEntry[] entries) => new(SidecarFormat.Version, "1.2.3", Of(entries));
+
+    // A sidecar that was read, as one that was built: an entry the tool builds has no span.
+    public static Sidecar WithoutSpans(Sidecar sidecar) =>
+        sidecar with
+        {
+            Queries = Of(sidecar.Queries.Select(entry => entry with { NameSpan = default }).ToArray()),
+        };
 }

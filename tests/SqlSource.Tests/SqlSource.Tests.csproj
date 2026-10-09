@@ -52,6 +52,8 @@
     <ItemGroup>
         <!-- Diagnostics/DiagnosticsDocumentTests.cs reads the document from the output folder. -->
         <None Include="../../docs/diagnostics.md" Link="docs/diagnostics.md" CopyToOutputDirectory="PreserveNewest" />
+        <!-- Snapshot/SidecarExamples.cs reads the examples of the sidecar format design from the output folder. -->
+        <None Update="Snapshot/Examples/*.json" CopyToOutputDirectory="PreserveNewest" />
         <!-- Package/BuildFileTests.cs reads the MSBuild files from the output folder. -->
         <None
             Include="../../src/SqlSource/build/SqlSource.props"
