@@ -15,6 +15,8 @@ internal static class AttributeSource
 
     public const string LocationProperty = "SqlLocation";
 
+    public const string ParametersProperty = "Parameters";
+
     // Only an attribute class can be [Conditional], so the enum stays in the consumer's assembly.  The attribute
     // itself is not applied in metadata unless the consumer defines SQLSOURCE_ATTRIBUTES.
     //
@@ -70,6 +72,12 @@ internal static class AttributeSource
                 /// <see cref="global::SqlSource.SqlLocation.Nested" />.
                 /// </summary>
                 public SqlLocation SqlLocation { get; set; }
+
+                /// <summary>
+                /// Generator parameters for the queries of the type's files, separated by spaces, as a
+                /// <c>-- generator:</c> line holds them.  A line in a file comes first.
+                /// </summary>
+                public string Parameters { get; set; }
             }
         }
 

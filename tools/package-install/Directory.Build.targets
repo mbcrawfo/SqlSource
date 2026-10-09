@@ -4,9 +4,9 @@
         is imported sees what is set here.  Each value is on a line of its own on purpose, as in Consumer.csproj.
     -->
     <PropertyGroup>
-        <SqlSourceTokenValidation>
-            false
-        </SqlSourceTokenValidation>
+        <SqlSourceGeneratorParameters>
+            no-token-validation
+        </SqlSourceGeneratorParameters>
     </PropertyGroup>
     <ItemGroup>
         <AdditionalFiles Remove="Queries/AddedByATarget.sql" />

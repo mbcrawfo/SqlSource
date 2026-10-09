@@ -18,6 +18,9 @@ internal sealed record SettingsLevel
     /// <summary>The list of generator parameters, whole, or null when the level gives no list.</summary>
     public GeneratorParameters? Parameters { get; init; }
 
+    /// <summary>Whether the level gives a list that has <c>keep-comments</c>.</summary>
+    public bool KeepsComments => Parameters is { } list && (list & GeneratorParameters.KeepComments) != 0;
+
     /// <summary>
     /// This level over <paramref name="other" />: each member from this level when it has one, and from
     /// <paramref name="other" /> when it has not.

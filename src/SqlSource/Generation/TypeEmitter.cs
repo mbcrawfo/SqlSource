@@ -47,7 +47,7 @@ internal static class TypeEmitter
         }
 
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
-        var members = SelectMembers(type, input.Files, diagnostics);
+        var members = SelectMembers(type, input.Files, input.FileSettings, diagnostics);
         return new TypeOutput(
             input.HintName,
             Write(type, members, property),
@@ -56,18 +56,20 @@ internal static class TypeEmitter
     }
 
     // A file contributes all of its queries or none: one that has a query with a name that cannot be used here is
-    // left out, with a diagnostic for each such query.
-    private static List<(SqlQuery Query, string FileName)> SelectMembers(
+    // left out, with a diagnostic for each such query.  Each query goes with what the metadata of its file's item says.
+    private static List<(SqlQuery Query, string FileName, SettingsLevel Metadata)> SelectMembers(
         TargetType type,
         EquatableArray<ParsedSqlFile> files,
+        EquatableArray<SettingsLevel> fileSettings,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics
     )
     {
         var containingTypeName = type.Placement == MemberPlacement.Nested ? NestedClassName : type.Name;
-        var members = new List<(SqlQuery Query, string FileName)>();
+        var members = new List<(SqlQuery Query, string FileName, SettingsLevel Metadata)>();
         var fileOfName = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var file in files)
+        for (var index = 0; index < files.Count; index++)
         {
+            var file = files[index];
             var isUsable = true;
             foreach (var query in file.Queries)
             {
@@ -106,7 +108,7 @@ internal static class TypeEmitter
             foreach (var query in file.Queries)
             {
                 fileOfName.Add(query.Name, file.FileName);
-                members.Add((query, file.FileName));
+                members.Add((query, file.FileName, fileSettings[index]));
             }
         }
 
@@ -115,7 +117,7 @@ internal static class TypeEmitter
 
     private static string Write(
         TargetType type,
-        List<(SqlQuery Query, string FileName)> members,
+        List<(SqlQuery Query, string FileName, SettingsLevel Metadata)> members,
         SettingsLevel property
     )
     {
@@ -148,9 +150,9 @@ internal static class TypeEmitter
                 _ = builder.Append('\n');
             }
 
-            var (query, fileName) = members[index];
+            var (query, fileName, metadata) = members[index];
             var summaryXml = GetSummaryXml(query, fileName);
-            var settings = QuerySettings.Resolve(query.Markers, SettingsLevel.None, SettingsLevel.None, property);
+            var settings = QuerySettings.Resolve(query.Markers, type.Settings, metadata, property);
 
             // The member is built from the form that is emitted.  A form that was not built is the other one.
             var segments = settings.KeepComments ? query.KeptSegments ?? query.Segments : query.Segments;

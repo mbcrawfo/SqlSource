@@ -86,6 +86,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (paths, _) => ToSortedSet(paths))
             .WithTrackingName(TrackingNames.ClaimedPaths);
 
+        // The files of the types whose attribute asks for comments.  Almost always none, so this value almost never
+        // changes.
+        var commentPaths = typeFiles
+            .SelectMany(
+                static (type, _) => type.Type.Settings.KeepsComments ? type.Files : EquatableArray<string>.Empty
+            )
+            .Collect()
+            .Select(static (paths, _) => ToSortedSet(paths))
+            .WithTrackingName(TrackingNames.CommentPaths);
+
         // Reported for a file that a type claims only, as every other problem of a file is.
         context.RegisterSourceOutput(
             caseCollisions.Combine(claimedPaths),
@@ -109,25 +119,38 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             )
             .WithTrackingName(TrackingNames.ProjectDialect);
 
-        // Each file with the dialect that MSBuild gives it.  The dialect is resolved here, before the parse, so that
-        // a change to the property parses only the files that fall back to it.
-        var fileDialects = sqlFiles
+        // What the project's properties say about the settings, which is the same value until one of them changes.
+        var projectSettings = context
+            .AnalyzerConfigOptionsProvider.Select(static (options, _) => ProjectSettings.Read(options.GlobalOptions))
+            .WithTrackingName(TrackingNames.ProjectSettings);
+
+        // Whether the property's list asks for comments.  It is an input of the parse, so it is a value of its own
+        // that changes only when the answer does.
+        var projectKeepsComments = projectSettings.Select(static (settings, _) => settings.Level.KeepsComments);
+
+        // What the metadata of each file's item says: its dialect and its settings.
+        var fileMetadata = sqlFiles
             .Combine(context.AnalyzerConfigOptionsProvider)
+            .Select(static (input, _) => FileMetadata.Read(input.Left, input.Right.GetOptions(input.Left)));
+
+        // Stage one of the settings: each file with what its parse depends on.  It is resolved here, before the
+        // parse, so that a change to a property parses only the files whose input it changes.
+        var fileInputs = fileMetadata
+            .Combine(projectDialect)
+            .Combine(projectKeepsComments.Combine(commentPaths))
             .Select(
                 static (input, _) =>
-                    (File: input.Left, Metadata: DialectSetting.ReadMetadata(input.Right.GetOptions(input.Left)))
+                    FileParseInput.Resolve(input.Left.Left, input.Left.Right, input.Right.Left, input.Right.Right)
             )
-            .Combine(projectDialect)
-            .Select(static (input, _) => FileDialect.Resolve(input.Left.File, input.Left.Metadata, input.Right))
-            .WithTrackingName(TrackingNames.FileDialect);
+            .WithTrackingName(TrackingNames.FileParseInput);
 
         // A file that no type claims is never read.
-        var parsedFiles = fileDialects
+        var parsedFiles = fileInputs
             .Combine(claimedPaths)
             .Select(
                 static (input, cancellationToken) =>
-                    SqlPath.Normalize(input.Left.File.Path) is { } path && SqlPath.Contains(input.Right, path)
-                        ? SqlFileReader.Read(input.Left, path, commentsWanted: false, cancellationToken)
+                    input.Left.NormalizedPath is { } path && SqlPath.Contains(input.Right, path)
+                        ? SqlFileReader.Read(input.Left, cancellationToken)
                         : null
             )
             .Where(static file => file is not null)
@@ -156,6 +179,37 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
+        // Stage two of the settings: the metadata of the files that have any, which are few.  It never reaches the
+        // parse of a file.
+        var filesSettings = fileMetadata
+            .Select(static (metadata, _) => metadata.Settings)
+            .Where(static settings => settings is not null)
+            .Select(static (settings, _) => settings!)
+            .WithTrackingName(TrackingNames.FileSettings)
+            .Collect()
+            .Select(static (settings, _) => ToSortedSettings(settings))
+            .WithTrackingName(TrackingNames.FilesSettings);
+
+        // Not located, and once for each setting and value.  The metadata of a file that no type claims is not
+        // reported, as nothing else about such a file is.
+        context.RegisterSourceOutput(
+            projectSettings.Combine(filesSettings).Combine(claimedPaths),
+            static (output, input) =>
+            {
+                foreach (var setting in FindInvalidSettings(input.Left.Left, input.Left.Right, input.Right))
+                {
+                    output.ReportDiagnostic(
+                        Diagnostic.Create(
+                            SqlDiagnostics.InvalidSettingValue,
+                            Location.None,
+                            setting.Value,
+                            setting.Name
+                        )
+                    );
+                }
+            }
+        );
+
         // Two types whose files would have names equal ignoring case.  Almost always none, so this value almost
         // never changes and costs the steps after it nothing.
         var ambiguousHintNames = typeFiles
@@ -164,41 +218,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (names, _) => HintName.FindAmbiguous(names))
             .WithTrackingName(TrackingNames.AmbiguousHintNames);
 
-        // The project's setting, which is the same value until the property itself changes.
-        var tokenValidation = context
-            .AnalyzerConfigOptionsProvider.Select(
-                static (options, _) => TokenValidationSetting.Read(options.GlobalOptions)
-            )
-            .WithTrackingName(TrackingNames.TokenValidation);
-
-        // Not located: the compiler does not say where an MSBuild property was set.
-        context.RegisterSourceOutput(
-            tokenValidation,
-            static (output, setting) =>
-            {
-                if (setting.InvalidValue is { } value)
-                {
-                    output.ReportDiagnostic(
-                        Diagnostic.Create(SqlDiagnostics.InvalidTokenValidation, Location.None, value)
-                    );
-                }
-            }
-        );
-
-        // The setting joins after a type's queries are selected, so that it never reaches the parse of a file.
+        // The properties join after a type's queries are selected, so that they never reach the parse of a file.
         var typeOutputs = typeFiles
             .Combine(parsedFiles)
-            .Combine(ambiguousHintNames)
-            .Select(static (input, _) => SelectFiles(input.Left.Left, input.Left.Right, input.Right))
-            .WithTrackingName(TrackingNames.TypeQueries)
-            .Combine(
-                tokenValidation.Select(
-                    static (setting, _) =>
-                        setting.Validate
-                            ? SettingsLevel.None
-                            : new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }
-                )
+            .Combine(ambiguousHintNames.Combine(filesSettings))
+            .Select(
+                static (input, _) => SelectFiles(input.Left.Left, input.Left.Right, input.Right.Left, input.Right.Right)
             )
+            .WithTrackingName(TrackingNames.TypeQueries)
+            .Combine(projectSettings.Select(static (settings, _) => settings.Level))
             .Select(static (input, _) => TypeEmitter.Emit(input.Left, input.Right))
             .WithTrackingName(TrackingNames.TypeOutput);
 
@@ -233,6 +261,35 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ToImmutableArray()
         );
 
+    // One entry for each path, the first the project lists, in the order of SqlPath.Comparer.
+    private static EquatableArray<FileSettings> ToSortedSettings(ImmutableArray<FileSettings> settings) =>
+        new(
+            settings
+                .GroupBy(static file => file.NormalizedPath, SqlPath.Comparer)
+                .Select(static group => group.First())
+                .OrderBy(static file => file.NormalizedPath, SqlPath.Comparer)
+                .ToImmutableArray()
+        );
+
+    // Each setting and value once, in ordinal order, so that the errors of a build do not depend on the order of its
+    // files.
+    private static IEnumerable<InvalidSetting> FindInvalidSettings(
+        ProjectSettings project,
+        EquatableArray<FileSettings> files,
+        EquatableArray<string> claimedPaths
+    )
+    {
+        var found = new HashSet<InvalidSetting>(project.Invalid);
+        foreach (var file in files.Where(file => SqlPath.Contains(claimedPaths, file.NormalizedPath)))
+        {
+            found.UnionWith(file.Invalid);
+        }
+
+        return found
+            .OrderBy(static setting => setting.Name, StringComparer.Ordinal)
+            .ThenBy(static setting => setting.Value, StringComparer.Ordinal);
+    }
+
     // Each value once, in ordinal order, so that the errors of a build do not depend on the order of its files.
     private static SortedSet<string> FindInvalidDialects(EquatableArray<ParsedSqlFile> files, DialectSetting project)
     {
@@ -256,24 +313,31 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private static TypeQueries SelectFiles(
         TypeFiles type,
         EquatableArray<ParsedSqlFile> parsedFiles,
-        EquatableArray<string> ambiguousHintNames
+        EquatableArray<string> ambiguousHintNames,
+        EquatableArray<FileSettings> filesSettings
     )
     {
         var files = ImmutableArray.CreateBuilder<ParsedSqlFile>(type.Files.Count);
+        var settings = ImmutableArray.CreateBuilder<SettingsLevel>(type.Files.Count);
 
         // A search for each of the type's files, so that the cost does not grow with the files of other types.
         foreach (var path in type.Files)
         {
             var index = SqlPath.IndexOf(parsedFiles, path, static file => file.NormalizedPath);
-            if (index >= 0)
+            if (index < 0)
             {
-                files.Add(parsedFiles[index]);
+                continue;
             }
+
+            files.Add(parsedFiles[index]);
+            var settingsIndex = SqlPath.IndexOf(filesSettings, path, static file => file.NormalizedPath);
+            settings.Add(settingsIndex < 0 ? SettingsLevel.None : filesSettings[settingsIndex].Level);
         }
 
         return new TypeQueries(
             type,
             new EquatableArray<ParsedSqlFile>(files.ToImmutable()),
+            new EquatableArray<SettingsLevel>(settings.ToImmutable()),
             HintName.MakeUnique(HintName.Create(type.Type), ambiguousHintNames)
         );
     }

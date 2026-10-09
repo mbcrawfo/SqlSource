@@ -18,6 +18,9 @@ public class GeneratorParameterListTests
     [InlineData("  keep-comments\tsort-input  keep-comments ", 5)]
     [InlineData("default", 0)]
     [InlineData(" Default ", 0)]
+    // The word twice is still the empty list, as it is on two -- generator: lines.
+    [InlineData("default default", 0)]
+    [InlineData(" default\tDEFAULT  default ", 0)]
     public void Parse_ValidList_IsItsParameters(string value, int expected)
     {
         var invalid = new List<string>();
@@ -58,12 +61,16 @@ public class GeneratorParameterListTests
         invalid.ShouldBe(["nope"]);
     }
 
-    [Fact]
-    public void Parse_DefaultBesideAnotherWord_IsInvalidWhole()
+    [Theory]
+    [InlineData(" default  keep-comments ", "default  keep-comments")]
+    [InlineData("keep-comments default", "keep-comments default")]
+    [InlineData("default nope", "default nope")]
+    [InlineData("default default sort-input", "default default sort-input")]
+    public void Parse_DefaultBesideAnotherWord_IsInvalidWhole(string value, string expected)
     {
         var invalid = new List<string>();
 
-        GeneratorParameterList.Parse(" default  keep-comments ", invalid).ShouldBeNull();
-        invalid.ShouldBe(["default  keep-comments"]);
+        GeneratorParameterList.Parse(value, invalid).ShouldBeNull();
+        invalid.ShouldBe([expected]);
     }
 }

@@ -9,7 +9,7 @@ namespace SqlSource.Settings;
 /// </summary>
 /// <remarks>
 /// A list is words separated by white space.  Each level that gives a list gives it whole: nothing is added to the
-/// list of a level below.  The word <c>default</c>, alone, is the empty list.
+/// list of a level below.  The word <c>default</c>, alone or repeated, is the empty list.
 /// </remarks>
 internal static class GeneratorParameterList
 {
@@ -49,7 +49,7 @@ internal static class GeneratorParameterList
     /// <summary>
     /// Reads a list that is not in a marker.  Null when the value is empty or holds no word that is a parameter:
     /// the level then gives no list.  A word that is no parameter is added to <paramref name="invalid" /> and the
-    /// other words apply.  <c>default</c> beside another word makes the whole value invalid.
+    /// other words apply.  <c>default</c> beside a word other than itself makes the whole value invalid.
     /// </summary>
     public static GeneratorParameters? Parse(string? value, List<string> invalid)
     {
@@ -61,8 +61,8 @@ internal static class GeneratorParameterList
 
         var whole = rest;
         GeneratorParameters? parameters = null;
-        var words = 0;
         var hasDefault = false;
+        var hasOther = false;
         while (!rest.IsEmpty)
         {
             var length = 0;
@@ -73,12 +73,14 @@ internal static class GeneratorParameterList
 
             var word = rest.Slice(0, length);
             rest = rest.Slice(length).TrimStart();
-            words++;
             if (IsDefault(word))
             {
                 hasDefault = true;
+                continue;
             }
-            else if (TryFind(word, out var parameter))
+
+            hasOther = true;
+            if (TryFind(word, out var parameter))
             {
                 parameters = (parameters ?? GeneratorParameters.None) | parameter;
             }
@@ -93,7 +95,7 @@ internal static class GeneratorParameterList
             return parameters;
         }
 
-        if (words == 1)
+        if (!hasOther)
         {
             return GeneratorParameters.None;
         }

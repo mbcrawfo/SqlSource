@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0017`
+Next id: `TD-0018`
 
 ## Active items
 
@@ -13,7 +13,8 @@ Next id: `TD-0017`
 | [TD-0006](TD-0006-attribute-conflicts-across-friend-assemblies.md) | Open | 2026-10-05 | Low | Two projects that share internals and both use SqlSource each hold the generated attribute; the package hides the compiler's warning CS0436 for it and does not remove the conflict |
 | [TD-0012](TD-0012-token-method-shapes-are-compiled-but-not-run.md) | Open | 2026-10-06 | Low | A token-only query and one with more than seven tokens are compiled in tests and never run, and awkward token names are compiled as C# 12 only |
 | [TD-0013](TD-0013-sql-edit-reads-every-attributed-type-again.md) | Open | 2026-10-06 | Low | An edit to a `.sql` file makes the compiler read every attributed type again, because the attribute is added in a post-initialization step |
-| [TD-0016](TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) | Open | 2026-10-06 | Low | A `.sql` file that a target adds loses its dialect metadata when the target hooks `GenerateMSBuildEditorConfigFileCore` and is declared after the package's targets |
+| [TD-0016](TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) | Open | 2026-10-06 | Low | A `.sql` file that a target adds loses its dialect, and any other metadata the package reads, when the target hooks `GenerateMSBuildEditorConfigFileCore` and is declared after the package's targets |
+| [TD-0017](TD-0017-value-written-over-several-lines-is-cut-at-its-first-line-break.md) | Open | 2026-10-08 | Medium | A property or metadata of the package whose value has a line break inside it, as a list of generator parameters written one word on each line has, reaches the generator cut at the line break, and nothing is reported |
 
 ## Columns
 

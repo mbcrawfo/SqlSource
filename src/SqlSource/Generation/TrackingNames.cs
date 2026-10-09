@@ -19,19 +19,25 @@ internal static class TrackingNames
 
     public const string ClaimedPaths = nameof(ClaimedPaths);
 
+    public const string CommentPaths = nameof(CommentPaths);
+
     public const string ProjectDialect = nameof(ProjectDialect);
 
-    public const string FileDialect = nameof(FileDialect);
+    public const string ProjectSettings = nameof(ProjectSettings);
+
+    public const string FileParseInput = nameof(FileParseInput);
 
     public const string ParsedFile = nameof(ParsedFile);
 
     public const string ParsedFiles = nameof(ParsedFiles);
 
+    public const string FileSettings = nameof(FileSettings);
+
+    public const string FilesSettings = nameof(FilesSettings);
+
     public const string AmbiguousHintNames = nameof(AmbiguousHintNames);
 
     public const string TypeQueries = nameof(TypeQueries);
-
-    public const string TokenValidation = nameof(TokenValidation);
 
     public const string TypeOutput = nameof(TypeOutput);
 }

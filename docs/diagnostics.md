@@ -9,14 +9,14 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC003](#sqlsrc003) | Target framework is not supported |
 | [SQLSRC004](#sqlsrc004) | Path matches no SQL file |
 | [SQLSRC005](#sqlsrc005) | Folder has no SQL file |
-| [SQLSRC006](#sqlsrc006) | SqlLocation is not valid |
+| [SQLSRC006](#sqlsrc006) | Attribute value is not valid |
 | [SQLSRC007](#sqlsrc007) | Type has a member named Sql |
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
-| [SQLSRC010](#sqlsrc010) | SqlSourceTokenValidation is not valid |
 | [SQLSRC011](#sqlsrc011) | SqlSourceDialect is not valid |
 | [SQLSRC012](#sqlsrc012) | Language version is not supported |
 | [SQLSRC013](#sqlsrc013) | SQL file paths differ only by case |
+| [SQLSRC014](#sqlsrc014) | MSBuild setting is not valid |
 | [SQLSRC101](#sqlsrc101) | Quote is not closed |
 | [SQLSRC102](#sqlsrc102) | Comment is not closed |
 | [SQLSRC103](#sqlsrc103) | Query name is not valid |
@@ -38,7 +38,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
-`SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the two types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
+`SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
 ## SQLSRC001
 
@@ -97,16 +97,16 @@ Add a `.sql` file next to the source file, or set `Path` to the folder or file t
 
 ## SQLSRC006
 
-**SqlLocation is not valid**
+**Attribute value is not valid**
 
-`SqlLocation` was given a value that the `SqlLocation` enum does not define.
+A property of `[SqlSourceGenerate]` has a value it does not take.  The message names the property and the value: a number that is no member of the property's enum, or a word in `Parameters` that is not a generator parameter.
 
 ```csharp
-[SqlSourceGenerate(SqlLocation = (SqlLocation)5)]
+[SqlSourceGenerate(SqlLocation = (SqlLocation)5, Parameters = "keep-coments")]
 public partial class UserRepository { }
 ```
 
-Use `SqlLocation.Nested` or `SqlLocation.Direct`.
+Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  The type gets no members until the value is fixed.
 
 ## SQLSRC007
 
@@ -145,22 +145,6 @@ SELECT 1;
 
 Rename the query.
 
-## SQLSRC010
-
-**SqlSourceTokenValidation is not valid**
-
-The MSBuild property `SqlSourceTokenValidation` decides whether the method of a query with tokens checks its arguments.  It accepts `true` and `false`, in any case, and the project gives it another value.  The error has no file and line, because the compiler does not tell a generator where a property was set: look in the project file, in `Directory.Build.props`, and at a `-p:` argument of the build command.
-
-```xml
-<PropertyGroup>
-    <SqlSourceTokenValidation>off</SqlSourceTokenValidation>
-</PropertyGroup>
-```
-
-Set it to `false` to turn validation off for the project, or remove it to keep the default, which is to validate.  While the value is wrong the generated methods validate.
-
-The compiler hands a generator only the part of a value before the first `;` or `#`.  So `false;true` is read as `false` and is not reported, and `off;false` is reported as `off`.
-
 ## SQLSRC011
 
 **SqlSourceDialect is not valid**
@@ -184,7 +168,7 @@ The error has no file and line, because the compiler does not tell a generator w
 
 Correct the name, or remove the setting to get the default, `ansi`.  While a value is wrong the files it covers are read as `ansi`; a file whose own metadata is wrong does not fall back to the project's property.
 
-The compiler hands a generator only the part of a value before the first `;` or `#`, as for [SQLSRC010](#sqlsrc010).
+The compiler hands a generator only the part of a value before the first `;` or `#`, as for [SQLSRC014](#sqlsrc014).
 
 ## SQLSRC012
 
@@ -222,6 +206,22 @@ A project that lists one file twice, with spellings that differ by case, gets th
 Write `Update` in place of `Include` to change the item the package adds, and spell the path as it is on disk.
 
 The error is reported only for a `.sql` file that a type uses.
+
+## SQLSRC014
+
+**MSBuild setting is not valid**
+
+An MSBuild property of SqlSource, or the metadata of that name on an `AdditionalFiles` item, has a value it does not take.  The message names the setting and the value.  The error has no file and line, because the compiler does not tell a generator where a property or the metadata of an item was set: look in the project file, in `Directory.Build.props` and `Directory.Build.targets`, and at a `-p:` argument of the build command.
+
+```xml
+<PropertyGroup>
+    <SqlSourceGeneratorParameters>keep-coments</SqlSourceGeneratorParameters>
+</PropertyGroup>
+```
+
+Correct the value, or remove it to keep the default.  While it is wrong the setting is not set; in a list of generator parameters the other words still apply.  The same value in several places is reported once, and the metadata of a file that no type claims is not reported.
+
+The compiler hands a generator only the part of a value before the first `;` or `#`.
 
 ## SQLSRC101
 

@@ -9,13 +9,13 @@
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
         <!--
-            Off, so that EndToEnd/ shows the property reaching the generator through the MSBuild files: a query there
-            without a generator parameter does not check its arguments.  The value is on a line of its own on
-            purpose.  The compiler would read that as empty, and SqlSource.targets is what trims it.
+            Token validation is off, so that EndToEnd/ shows the property reaching the generator through the MSBuild
+            files: a query there without a list of its own does not check its arguments.  The value is on a line of
+            its own on purpose.  The compiler would read that as empty, and SqlSource.targets is what trims it.
         -->
-        <SqlSourceTokenValidation>
-            false
-        </SqlSourceTokenValidation>
+        <SqlSourceGeneratorParameters>
+            no-token-validation
+        </SqlSourceGeneratorParameters>
         <SqlSourceDialect>
             postgres
         </SqlSourceDialect>
@@ -30,6 +30,11 @@
             <SqlSourceDialect>
                 mysql, no-backslash-escapes
             </SqlSourceDialect>
+        </AdditionalFiles>
+        <AdditionalFiles Update="EndToEnd/Parameters/Kept.sql">
+            <SqlSourceGeneratorParameters>
+                keep-comments
+            </SqlSourceGeneratorParameters>
         </AdditionalFiles>
     </ItemGroup>
     <ItemGroup>

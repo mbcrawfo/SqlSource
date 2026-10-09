@@ -222,6 +222,7 @@ public class TypeEmitterTests
             new TypeQueries(
                 typeFiles,
                 TestModels.Array(File("Users.sql", Query("GetUser", "SELECT 1;"))),
+                TestModels.Array(SettingsLevel.None),
                 "App.UserRepository.g.cs"
             ),
             SettingsLevel.None
@@ -418,6 +419,45 @@ public class TypeEmitterTests
     }
 
     [Fact]
+    public void Emit_FourLevels_ResolveForEachQuery()
+    {
+        var keep = new SettingsLevel { Parameters = GeneratorParameters.KeepComments };
+        var none = new SettingsLevel { Parameters = GeneratorParameters.None };
+        static SqlQuery Kept(string name, SettingsLevel markers) =>
+            new(
+                name,
+                NameLocation("Users.sql"),
+                null,
+                null,
+                TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1;")),
+                TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1; -- " + name)),
+                EquatableArray<SqlToken>.Empty,
+                EquatableArray<SqlQueryParameter>.Empty,
+                markers
+            );
+
+        var output = TypeEmitter.Emit(
+            new TypeQueries(
+                new TypeFiles(
+                    TestModels.Type(settings: none),
+                    TestModels.Array<string>(),
+                    TestModels.Array<DiagnosticInfo>()
+                ),
+                TestModels.Array(
+                    File("Users.sql", Kept("FromTheAttribute", SettingsLevel.None), Kept("FromItsMarker", keep))
+                ),
+                TestModels.Array(keep),
+                "App.UserRepository.g.cs"
+            ),
+            keep
+        );
+
+        // The attribute's empty list beats the metadata and the property; a query's own marker beats the attribute.
+        output.Source.ShouldNotBeNull().ShouldNotContain("-- FromTheAttribute");
+        output.Source.ShouldContain("-- FromItsMarker");
+    }
+
+    [Fact]
     public void Emit_MethodNamedLikeAConstantOfAnEarlierFile_IsTheSameErrorAsForTwoConstants()
     {
         var output = Emit(
@@ -525,15 +565,30 @@ public class TypeEmitterTests
         Emit(type, validateTokens: true, files);
 
     private static TypeOutput Emit(TargetType type, bool validateTokens, params ParsedSqlFile[] files) =>
+        Emit(
+            type,
+            validateTokens
+                ? SettingsLevel.None
+                : new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation },
+            Array.ConvertAll(files, static _ => SettingsLevel.None),
+            files
+        );
+
+    // The levels of the files' metadata, one for each file, and the level of the project's properties.
+    private static TypeOutput Emit(
+        TargetType type,
+        SettingsLevel property,
+        SettingsLevel[] fileSettings,
+        params ParsedSqlFile[] files
+    ) =>
         TypeEmitter.Emit(
             new TypeQueries(
                 new TypeFiles(type, TestModels.Array<string>(), TestModels.Array<DiagnosticInfo>()),
                 TestModels.Array(files),
+                TestModels.Array(fileSettings),
                 HintName.Create(type)
             ),
-            validateTokens
-                ? SettingsLevel.None
-                : new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation }
+            property
         );
 
     private static ParsedSqlFile File(string fileName, params SqlQuery[] queries) =>

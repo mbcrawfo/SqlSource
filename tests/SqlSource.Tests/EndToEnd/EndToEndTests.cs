@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
@@ -57,8 +58,9 @@ public class EndToEndTests
             .Search("id, name", "users", "name LIKE @pattern")
             .ShouldBe("SELECT id, name\nFROM users\nWHERE name LIKE @pattern\nORDER BY users.id;");
 
-    // SqlSource.Tests.csproj sets SqlSourceTokenValidation to false, and Search has no generator parameter.  That its
-    // method checks nothing shows the property reaching the generator through the MSBuild file the package ships.
+    // SqlSource.Tests.csproj sets SqlSourceGeneratorParameters to no-token-validation, on a line of its own, and
+    // Search has no list of its own.  That its method checks nothing shows the property reaching the generator
+    // through the MSBuild files the package ships, trimmed.
     [Theory]
     [InlineData("")]
     [InlineData("  ")]
@@ -74,15 +76,15 @@ public class EndToEndTests
     [Theory]
     [InlineData("")]
     [InlineData(" \t")]
-    public void ProjectWithValidationOff_QueryWithTheGeneratorParameter_RejectsAnArgumentWithoutText(string filter) =>
+    public void ProjectWithValidationOff_QueryWithItsOwnList_RejectsAnArgumentWithoutText(string filter) =>
         Should.Throw<ArgumentException>(() => TokenQueries.Checked("users", filter)).ParamName.ShouldBe("filter");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryWithTheGeneratorParameter_RejectsANullArgument() =>
+    public void ProjectWithValidationOff_QueryWithItsOwnList_RejectsANullArgument() =>
         Should.Throw<ArgumentNullException>(() => TokenQueries.Checked(null!, "1 = 1")).ParamName.ShouldBe("table");
 
     [Fact]
-    public void ProjectWithValidationOff_QueryWithTheGeneratorParameter_ReturnsTheSqlForArgumentsWithText() =>
+    public void ProjectWithValidationOff_QueryWithItsOwnList_ReturnsTheSqlForArgumentsWithText() =>
         TokenQueries.Checked("users", "id = @id").ShouldBe("SELECT id FROM users WHERE id = @id;");
 
     // SqlSource.Tests.csproj sets the SqlSourceDialect property to postgres, on a line of its own.  ANSI would end the
@@ -107,18 +109,35 @@ public class EndToEndTests
     // each item whose metadata the package shows to the compiler.  A section for every .sql file would make the file,
     // and the build, grow with files that set nothing.  A value with an option arrives whole, comma included.
     [Fact]
-    public void ProjectWithADialect_FileTheBuildWritesForTheCompiler_NamesOnlyTheFilesWithMetadata()
+    public void ProjectWithMetadata_FileTheBuildWritesForTheCompiler_NamesOnlyTheFilesWithMetadata()
     {
         var lines = File.ReadAllLines(Path.Combine(AppContext.BaseDirectory, "build", "compiler.editorconfig"));
 
-        var sections = lines
-            .Where(line => line.StartsWith('[') && line.EndsWith(".sql]", StringComparison.Ordinal))
-            .Select(section => section[section.LastIndexOf('/')..] + " " + lines[Array.IndexOf(lines, section) + 1]);
+        var values = new List<string>();
+        var section = string.Empty;
+        foreach (var line in lines)
+        {
+            if (line.StartsWith('['))
+            {
+                section = line.EndsWith(".sql]", StringComparison.Ordinal)
+                    ? line[line.LastIndexOf('/')..]
+                    : string.Empty;
+            }
+            else if (
+                section.Length > 0
+                && line.Contains(" = ", StringComparison.Ordinal)
+                && !line.EndsWith(" = ", StringComparison.Ordinal)
+            )
+            {
+                values.Add(section + " " + line);
+            }
+        }
 
-        sections.ShouldBe(
+        values.ShouldBe(
             [
-                "/ByMetadata.sql] build_metadata.SqlSourceDialectFile.SqlSourceDialect = mysql",
-                "/ByOption.sql] build_metadata.SqlSourceDialectFile.SqlSourceDialect = mysql, no-backslash-escapes",
+                "/ByMetadata.sql] build_metadata.SqlSourceSettingsFile.SqlSourceDialect = mysql",
+                "/ByOption.sql] build_metadata.SqlSourceSettingsFile.SqlSourceDialect = mysql, no-backslash-escapes",
+                "/Kept.sql] build_metadata.SqlSourceSettingsFile.SqlSourceGeneratorParameters = keep-comments",
             ],
             ignoreOrder: true
         );
@@ -127,6 +146,20 @@ public class EndToEndTests
     [Fact]
     public void ProjectWithADialect_FileWithAMarker_IsReadByTheDialectItNames() =>
         DialectQueries.ByMarker.ShouldBe("SELECT [it's] FROM #orders;");
+
+    // The item of Kept.sql has SqlSourceGeneratorParameters metadata, written over several lines.  That the comment
+    // is there shows the metadata reaching the generator through the MSBuild files the package ships, trimmed, and
+    // replacing the project's list.
+    [Fact]
+    public void ProjectWithParameters_FileWithMetadata_UsesTheListOfItsItem() =>
+        ParameterQueries.Kept.ShouldBe("SELECT 1 /* kept by the metadata */ AS one;");
+
+    [Fact]
+    public void ProjectWithParameters_TwoTypesClaimOneFile_EachUsesItsOwnAttribute()
+    {
+        ParameterQueries.Shared.ShouldBe("SELECT 2   AS two;");
+        KeptQueries.Shared.ShouldBe("SELECT 2 /* kept by the attribute */ AS two;");
+    }
 
     [Fact]
     public void Method_Call_AllocatesTheStringItReturnsAndNothingElse()
@@ -160,6 +193,8 @@ public class EndToEndTests
     [InlineData(typeof(Outer.Counts))]
     [InlineData(typeof(TokenQueries))]
     [InlineData(typeof(DialectQueries))]
+    [InlineData(typeof(ParameterQueries))]
+    [InlineData(typeof(KeptQueries))]
     public void Attribute_IsNotInTheMetadataOfTheTypesThatCarryIt(Type type) =>
         type.GetCustomAttributesData()
             .Select(attribute => attribute.AttributeType.FullName)

@@ -49,6 +49,7 @@ The package is a development dependency.  It adds nothing to your application's 
 |----|----|----|
 | `Path` | The folder of the source file that carries the attribute | A folder or one `.sql` file, relative to that folder |
 | `SqlLocation` | `SqlLocation.Nested` | Where the generated members go |
+| `Parameters` | Not set | Generator parameters for the queries of the type's files |
 
 ### Which files belong to a type
 
@@ -72,9 +73,20 @@ public static partial class UserQueries;
 
 Each member is a `const string`, or a static method when the query has tokens (see Tokens, below).  Both are documented with the query's summary and its SQL.
 
+### Parameters
+
+`Parameters` holds generator parameters for the queries of the type's files, as a `-- generator:` line holds them (see Generator parameters, below):
+
+```csharp
+[SqlSourceGenerate(Path = "Reports", Parameters = "keep-comments")]
+internal static partial class Reports;
+```
+
+Two types that claim one file can ask for different things, and each gets its own SQL.
+
 ### Projects that share internals
 
-SqlSource adds the attribute and `SqlLocation` to each project that uses it, as internal types.  A project that sees the internals of another one, as a test project does through `InternalsVisibleTo`, sees both types twice when both projects use SqlSource.  Each project uses its own copy.  The compiler warns about such a conflict (CS0436), and SqlSource turns that warning off for these two types only, as suppression `SQLSRC901`: nothing has to be added to `NoWarn`, and a conflict between two types of your own is still reported.
+SqlSource adds the attribute and `SqlLocation` to each project that uses it, as internal types.  A project that sees the internals of another one, as a test project does through `InternalsVisibleTo`, sees both types twice when both projects use SqlSource.  Each project uses its own copy.  The compiler warns about such a conflict (CS0436), and SqlSource turns that warning off for the types it adds to every project and for nothing else, as suppression `SQLSRC901`: nothing has to be added to `NoWarn`, and a conflict between two types of your own is still reported.
 
 ## SQL files
 
@@ -120,6 +132,16 @@ SELECT /* the database logs this comment */ id FROM users;
 ```
 
 **A list replaces; it never adds.**  The `-- generator:` lines inside a query are that query's list.  The lines before the first `-- name:` line are the list of every query in the file that has none of its own.  A query whose file says `keep-comments` and which itself says `no-token-validation` does not keep its comments: it restates `keep-comments` if it wants it.  `-- generator: default` gives a query every default, whatever its file says.
+
+The same list can be given above the file, and the rule is the same at every level.  The list for a query, for a type that claims its file, is the first of these that gives one, whole:
+
+1. The `-- generator:` lines inside the query.
+2. The `-- generator:` lines before the file's first `-- name:` line.
+3. `Parameters` on the type's attribute.
+4. `SqlSourceGeneratorParameters` metadata on the file's `AdditionalFiles` item.
+5. The MSBuild property `SqlSourceGeneratorParameters`.
+
+A level that wants what the level below it gives restates it.  `default` at any level is the empty list.
 
 ## Dialects
 
@@ -317,15 +339,11 @@ A default is a sample of what the caller will pass.  It changes nothing that is 
 
 By default the method checks each argument with `ArgumentException.ThrowIfNullOrWhiteSpace`: null throws `ArgumentNullException`, and an empty or blank string throws `ArgumentException`.  The check is that a value is present, not that it is safe.
 
-An empty fragment can be what you want, for an optional clause for example, so the check can be turned off.  Three switches decide, and the first one that applies wins:
-
-1. The generator parameters inside the query, when it has any: with `no-token-validation` the method checks nothing, and without it the method checks.
-2. Otherwise the generator parameters before the first `-- name:` line, the same way.
-3. Otherwise the MSBuild property `SqlSourceTokenValidation`, which covers the project.  It accepts `true` and `false`; any other value is the error [SQLSRC010](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc010).
+An empty fragment can be what you want, for an optional clause for example, so the check can be turned off with the `no-token-validation` generator parameter, at any level:
 
 ```xml
 <PropertyGroup>
-    <SqlSourceTokenValidation>false</SqlSourceTokenValidation>
+    <SqlSourceGeneratorParameters>no-token-validation</SqlSourceGeneratorParameters>
 </PropertyGroup>
 ```
 
@@ -364,9 +382,20 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
-### Token validation
+### Generator parameters
 
-`SqlSourceTokenValidation` turns the argument checks of the generated methods off for a project when it is `false`.  See Tokens, above.
+`SqlSourceGeneratorParameters` holds generator parameters, separated by spaces.  It is a property for the project and metadata of an `AdditionalFiles` item for some of its files.  See Generator parameters, above.
+
+```xml
+<PropertyGroup>
+    <SqlSourceGeneratorParameters>no-token-validation</SqlSourceGeneratorParameters>
+</PropertyGroup>
+<ItemGroup>
+    <AdditionalFiles Update="Reports/**/*.sql" SqlSourceGeneratorParameters="keep-comments" />
+</ItemGroup>
+```
+
+A word that is not a generator parameter is the error [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).  The compiler hands a generator only the part of a value before the first `;` or `#`, so separate the words with spaces.  Write them on one line: the value may stand on a line of its own, but a line break between two words cuts the list there.
 
 ### Dialect
 

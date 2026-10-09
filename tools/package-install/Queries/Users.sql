@@ -1,5 +1,5 @@
 -- name: GetUser
-SELECT id, name FROM users WHERE id = @id;
+SELECT id, name FROM users /* by key */ WHERE id = @id;
 
 -- name: ListUsers
 SELECT id, name FROM {{table}} {{whereClause}};

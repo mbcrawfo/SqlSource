@@ -52,16 +52,19 @@ internal static class GeneratorHarness
         bool supportedFramework = true,
         LanguageVersion languageVersion = LanguageVersion.CSharp12,
         MetadataReference[]? references = null,
-        string? tokenValidation = null,
-        string? dialect = null
+        string? generatorParameters = null,
+        string? dialect = null,
+        IReadOnlyDictionary<string, string?>? properties = null
     )
     {
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
         var options = new TestOptionsProvider(
-            tokenValidation,
+            generatorParameters,
             dialect,
-            sqlFiles.Where(file => file.Dialect is not null).ToDictionary(file => file.Path, file => file.Dialect!)
+            sqlFiles.Where(file => file.Dialect is not null).ToDictionary(file => file.Path, file => file.Dialect!),
+            properties,
+            sqlFiles.Where(file => file.Metadata is not null).ToDictionary(file => file.Path, file => file.Metadata!)
         );
         var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), parseOptions, options)
             .RunGeneratorsAndUpdateCompilation(
@@ -209,8 +212,14 @@ internal sealed class LoadedAssembly : IAnalyzerAssemblyLoader
     public Assembly LoadFromPath(string fullPath) => typeof(SqlSourceGenerator).Assembly;
 }
 
-// Dialect is the SqlSourceDialect metadata of the file's AdditionalFiles item, and null is a file without it.
-internal sealed record SqlFile(string Path, string? Text, string? Dialect = null)
+// Dialect is the SqlSourceDialect metadata of the file's AdditionalFiles item, and Metadata its other metadata by
+// MSBuild name.  Null is a file without it.
+internal sealed record SqlFile(
+    string Path,
+    string? Text,
+    string? Dialect = null,
+    IReadOnlyDictionary<string, string>? Metadata = null
+)
 {
     public AdditionalText ToAdditionalText() => new InMemoryAdditionalText(Path, Text);
 }

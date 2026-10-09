@@ -255,14 +255,12 @@ public class DialectTests
         var run = GeneratorHarness.Run(
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
             [new SqlFile("/app/Repo/Q.sql", Query)],
-            tokenValidation: "mysql",
+            generatorParameters: "mysql",
             dialect: "false"
         );
 
         run.Diagnostics.Count.ShouldBe(2);
-        run.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.StartsWith("SQLSRC010 (1,1)-(1,1): The MSBuild property ")
-        );
+        run.Diagnostics.ShouldContain(diagnostic => diagnostic.StartsWith("SQLSRC014 (1,1)-(1,1): '"));
         run.Diagnostics.ShouldContain("SQLSRC011 (1,1)-(1,1): 'false" + Invalid);
     }
 

@@ -126,12 +126,15 @@ public class CachingTests
             TrackingNames.UnsupportedLanguageVersion,
             TrackingNames.TypeFiles,
             TrackingNames.ClaimedPaths,
+            TrackingNames.CommentPaths,
             TrackingNames.ProjectDialect,
-            TrackingNames.FileDialect,
+            TrackingNames.ProjectSettings,
+            TrackingNames.FileParseInput,
             TrackingNames.ParsedFile,
             TrackingNames.ParsedFiles,
+            TrackingNames.FileSettings,
+            TrackingNames.FilesSettings,
             TrackingNames.TypeQueries,
-            TrackingNames.TokenValidation,
             TrackingNames.TypeOutput,
         ];
         foreach (var step in steps)
@@ -206,7 +209,7 @@ public class CachingTests
     }
 
     [Fact]
-    public void Run_TokenValidationPropertyChanged_EmitsEveryTypeAgainAndParsesNoFile()
+    public void Run_GeneratorParametersPropertyChanged_EmitsEveryTypeAgainAndParsesNoFile()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var users = new InMemoryAdditionalText(
@@ -215,9 +218,12 @@ public class CachingTests
         );
         var driver = FirstRun(compilation, users);
 
-        var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider("false")), compilation);
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider("no-token-validation")),
+            compilation
+        );
 
-        AllReasons(result, TrackingNames.TokenValidation).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
         AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.TypeQueries).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
 
@@ -246,9 +252,10 @@ public class CachingTests
         // What the IDE does when any other property or an .editorconfig changes: new options, the same value.
         var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null)), compilation);
 
-        AllReasons(result, TrackingNames.TokenValidation).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        AllReasons(result, TrackingNames.FileDialect).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileParseInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
@@ -268,7 +275,7 @@ public class CachingTests
         );
 
         AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Modified]);
-        Reasons<FileDialect>(result, TrackingNames.FileDialect, file => file.File.Path)
+        Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
@@ -322,7 +329,7 @@ public class CachingTests
         );
 
         AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Unchanged]);
-        Reasons<FileDialect>(result, TrackingNames.FileDialect, file => file.File.Path)
+        Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
@@ -364,12 +371,197 @@ public class CachingTests
 
         // Every file was parsed again, under the new dialect.  The file's value names the dialect it was read by, so
         // it is not equal, and each type's output was worked out again; it came out equal, so nothing was emitted.
-        AllReasons(result, TrackingNames.FileDialect)
+        AllReasons(result, TrackingNames.FileParseInput)
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
         AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
         AllReasons(result, TrackingNames.TypeOutput)
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+
+        // The step that reports the problems of the files ran again, for files and a dialect that are not the ones it
+        // had, and reported the same nothing.  The steps that add source did not run.
+        var outputs = OutputReasons(result);
+        outputs.ShouldAllBe(reason =>
+            reason == IncrementalStepRunReason.Cached || reason == IncrementalStepRunReason.Unchanged
+        );
+        outputs.Count(reason => reason == IncrementalStepRunReason.Unchanged).ShouldBe(1);
         result.Diagnostics.ShouldBeEmpty();
+    }
+
+    // Every file is read again.  Orders.sql has no comment to keep, so it gives an equal value: the step named
+    // ParsedFile is the one after the read, which reports such a value as taken from the previous run.
+    [Fact]
+    public void Run_KeepCommentsTurnedOnByTheProperty_ParsesTheFilesAgainAndOnlyThose()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var users = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1; -- c\n");
+        var driver = FirstRun(compilation, users);
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider("keep-comments")),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.FileParseInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("SELECT 1; -- c");
+    }
+
+    [Fact]
+    public void Run_PropertyGainsAParameterThatIsNotKeepComments_ParsesNoFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRun(compilation);
+
+        var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider("sort-input")), compilation);
+
+        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.FileParseInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeOutput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+    }
+
+    [Fact]
+    public void Run_MetadataOfOneFileGainsAParameter_ParsesNoFileAndEmitsOnlyItsType()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRun(compilation);
+        var metadata = new Dictionary<string, IReadOnlyDictionary<string, string>>
+        {
+            [_users.Path] = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "sort-input" },
+        };
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null, fileMetadata: metadata)),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Unchanged,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+    }
+
+    [Fact]
+    public void Run_AttributeGainsKeepComments_ParsesOnlyTheFilesOfThatType()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRun(compilation);
+
+        var result = Run(driver, WithParametersOnUserQueries(compilation, "keep-comments"));
+
+        AllReasons(result, TrackingNames.CommentPaths).ShouldBe([IncrementalStepRunReason.Modified]);
+        Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Modified,
+                    [_orders.Path] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)["Orders.sql"]
+            .ShouldBe(IncrementalStepRunReason.Cached);
+    }
+
+    [Fact]
+    public void Run_AttributeGainsAParameterThatIsNotKeepComments_ParsesNoFileAndEmitsOnlyItsType()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRun(compilation);
+
+        var result = Run(driver, WithParametersOnUserQueries(compilation, "sort-input"));
+
+        AllReasons(result, TrackingNames.CommentPaths).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.FileParseInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Unchanged,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+    }
+
+    [Fact]
+    public void Run_MetadataOfOneFileGainsKeepComments_ParsesOnlyThatFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var users = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1; -- c\n");
+        var driver = FirstRun(compilation, users);
+        var metadata = new Dictionary<string, IReadOnlyDictionary<string, string>>
+        {
+            [_users.Path] = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments" },
+        };
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null, fileMetadata: metadata)),
+            compilation
+        );
+
+        Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Modified,
+                    [_orders.Path] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<TypeOutput>(result, TrackingNames.TypeOutput, output => output.HintName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.OrderQueries.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("SELECT 1; -- c");
     }
 
     private GeneratorDriver FirstRun(Compilation compilation) => FirstRun(compilation, _users);
@@ -387,6 +579,22 @@ public class CachingTests
         return driver;
     }
 
+    // The compilation with a list of generator parameters on the attribute of UserQueries.
+    private static Compilation WithParametersOnUserQueries(Compilation compilation, string parameters) =>
+        compilation.ReplaceSyntaxTree(
+            compilation.SyntaxTrees.Single(tree => tree.FilePath == UsersSourcePath),
+            CSharpSyntaxTree.ParseText(
+                UsersSource.Replace(
+                    "[SqlSourceGenerate]",
+                    "[SqlSourceGenerate(Parameters = \"" + parameters + "\")]",
+                    StringComparison.Ordinal
+                ),
+                GeneratorHarness.ParseOptions,
+                UsersSourcePath,
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        );
+
     private static GeneratorDriverRunResult Run(GeneratorDriver driver, Compilation compilation) =>
         driver.RunGenerators(compilation, TestContext.Current.CancellationToken).GetRunResult();
 
@@ -402,8 +610,12 @@ public class CachingTests
             .SelectMany(run => run.Outputs)
             .ToDictionary(output => key((T)output.Value), output => output.Reason);
 
+    // A step that gave no output in the run, as FileSettings does when no file has metadata, is not among the
+    // tracked steps.
     private static IncrementalStepRunReason[] AllReasons(GeneratorDriverRunResult result, string step) =>
-        [.. result.Results.Single().TrackedSteps[step].SelectMany(run => run.Outputs).Select(output => output.Reason)];
+        result.Results.Single().TrackedSteps.TryGetValue(step, out var runs)
+            ? [.. runs.SelectMany(run => run.Outputs).Select(output => output.Reason)]
+            : [];
 
     // The steps that add source and report diagnostics.
     private static IncrementalStepRunReason[] OutputReasons(GeneratorDriverRunResult result) =>

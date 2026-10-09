@@ -73,10 +73,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidSqlLocation = new(
+    public static readonly DiagnosticDescriptor InvalidAttributeValue = new(
         id: "SQLSRC006",
-        title: "SqlLocation is not valid",
-        messageFormat: "'{0}' is not a value of SqlLocation",
+        title: "Attribute value is not valid",
+        messageFormat: "'{0}' is not a valid value of {1}",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -118,17 +118,6 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor InvalidTokenValidation = new(
-        id: "SQLSRC010",
-        title: "SqlSourceTokenValidation is not valid",
-        messageFormat: "The MSBuild property SqlSourceTokenValidation is '{0}'.  It must be 'true' or 'false'.",
-        category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLinkBase + "sqlsrc010",
-        customTags: WellKnownDiagnosticTags.NotConfigurable
-    );
-
     public static readonly DiagnosticDescriptor InvalidDialect = new(
         id: "SQLSRC011",
         title: "SqlSourceDialect is not valid",
@@ -160,6 +149,17 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc013",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor InvalidSettingValue = new(
+        id: "SQLSRC014",
+        title: "MSBuild setting is not valid",
+        messageFormat: "'{0}' is not a valid value of {1}",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc014",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -373,14 +373,14 @@ internal static class SqlDiagnostics
             UnsupportedTargetFramework,
             PathMatchesNothing,
             FolderHasNoSqlFile,
-            InvalidSqlLocation,
+            InvalidAttributeValue,
             SqlMemberExists,
             DuplicateQueryName,
             QueryNamedLikeContainingType,
-            InvalidTokenValidation,
             InvalidDialect,
             UnsupportedLanguageVersion,
             PathDiffersOnlyByCase,
+            InvalidSettingValue,
             UnterminatedQuote,
             UnterminatedBlockComment,
             InvalidName,

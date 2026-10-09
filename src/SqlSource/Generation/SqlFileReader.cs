@@ -13,17 +13,23 @@ namespace SqlSource.Generation;
 internal static class SqlFileReader
 {
     /// <summary>
-    /// Parses <paramref name="file" /> with the dialect that MSBuild gives it.  A <c>-- dialect:</c> marker in the
-    /// file replaces that dialect.  <paramref name="commentsWanted" /> says that a level the parser cannot see may ask
-    /// for <c>keep-comments</c>; <see cref="SqlFileParser.Parse" /> says what the parser then builds.
+    /// Parses <paramref name="file" />, whose path a type claims, with what MSBuild gives it.  A
+    /// <c>-- dialect:</c> marker in the file replaces the dialect.
     /// </summary>
-    public static ParsedSqlFile Read(
-        FileDialect file,
-        string normalizedPath,
-        bool commentsWanted,
-        CancellationToken cancellationToken
-    ) => Read(file.File, normalizedPath, file.Dialect, file.InvalidValue, commentsWanted, cancellationToken);
+    public static ParsedSqlFile Read(FileParseInput file, CancellationToken cancellationToken) =>
+        Read(
+            file.File,
+            file.NormalizedPath ?? string.Empty,
+            file.Dialect,
+            file.InvalidDialect,
+            file.CommentsWanted,
+            cancellationToken
+        );
 
+    /// <summary>
+    /// Parses <paramref name="file" />.  <paramref name="commentsWanted" /> says that a level the parser cannot see
+    /// may ask for <c>keep-comments</c>; <see cref="SqlFileParser.Parse" /> says what the parser then builds.
+    /// </summary>
     public static ParsedSqlFile Read(
         AdditionalText file,
         string normalizedPath,

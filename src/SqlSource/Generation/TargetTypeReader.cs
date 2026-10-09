@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Diagnostics;
+using SqlSource.Settings;
 
 namespace SqlSource.Generation;
 
@@ -56,6 +57,7 @@ internal static class TargetTypeReader
                 : symbol.ContainingNamespace.ToDisplayString(NamespaceFormat),
             new EquatableArray<TypeDeclaration>(types),
             placement,
+            ReadSettings(attribute, attributeLocation, diagnostics),
             ReadPath(attribute),
             reference.SyntaxTree.FilePath,
             attributeLocation,
@@ -167,13 +169,47 @@ internal static class TargetTypeReader
             default:
                 diagnostics.Add(
                     DiagnosticInfo.Create(
-                        SqlDiagnostics.InvalidSqlLocation,
+                        SqlDiagnostics.InvalidAttributeValue,
                         attributeLocation,
-                        value.ToString(CultureInfo.InvariantCulture)
+                        value.ToString(CultureInfo.InvariantCulture),
+                        AttributeSource.LocationProperty
                     )
                 );
                 return MemberPlacement.Nested;
         }
+    }
+
+    // A word that is no generator parameter is reported, and the other words apply.  A value without text is a
+    // property that is not set.
+    private static SettingsLevel ReadSettings(
+        AttributeData attribute,
+        LocationInfo attributeLocation,
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+    )
+    {
+        var level = SettingsLevel.None;
+        if (GetNamedArgument(attribute, AttributeSource.ParametersProperty) is { Value: string list })
+        {
+            var words = new List<string>();
+            if (GeneratorParameterList.Parse(list, words) is { } parameters)
+            {
+                level = level with { Parameters = parameters };
+            }
+
+            foreach (var word in words)
+            {
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
+                        SqlDiagnostics.InvalidAttributeValue,
+                        attributeLocation,
+                        word,
+                        AttributeSource.ParametersProperty
+                    )
+                );
+            }
+        }
+
+        return level;
     }
 
     private static TypedConstant? GetNamedArgument(AttributeData attribute, string name)

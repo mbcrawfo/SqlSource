@@ -226,19 +226,31 @@ public class SqlFileReaderTests
     }
 
     [Fact]
-    public void Read_FileDialect_ReadsTheFileWithItsDialectAndCarriesItsInvalidValue()
+    public void Read_FileParseInput_ReadsTheFileWithItsDialectAndCarriesItsInvalidValue()
     {
         var text = new InMemoryAdditionalText(Path, "SELECT 1 # c\n");
 
         var file = SqlFileReader.Read(
-            new FileDialect(text, SqlDialect.MySql, "nope"),
-            "app/Repo/Users.sql",
-            commentsWanted: false,
+            new FileParseInput(text, "app/Repo/Users.sql", SqlDialect.MySql, "nope", false),
             TestContext.Current.CancellationToken
         );
 
+        file.NormalizedPath.ShouldBe("app/Repo/Users.sql");
         file.Queries.ShouldHaveSingleItem().Segments.ShouldBe(TestModels.Array(Literal("SELECT 1")));
         file.InvalidDialect.ShouldBe("nope");
+    }
+
+    [Fact]
+    public void Read_FileParseInputThatWantsComments_BuildsTheKeptForm()
+    {
+        var text = new InMemoryAdditionalText(Path, "SELECT 1; -- c\n");
+
+        var file = SqlFileReader.Read(
+            new FileParseInput(text, "app/Repo/Users.sql", SqlDialect.Ansi, null, true),
+            TestContext.Current.CancellationToken
+        );
+
+        file.Queries.ShouldHaveSingleItem().KeptSegments.ShouldBe(TestModels.Array(Literal("SELECT 1; -- c")));
     }
 
     private static ParsedSqlFile Read(

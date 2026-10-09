@@ -14,8 +14,8 @@
         <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
         <!--
             The value is on a line of its own on purpose.  The compiler would read that as empty, and the package's
-            build/SqlSource.targets is what trims it.  Directory.Build.targets sets SqlSourceTokenValidation the same
-            way.
+            build/SqlSource.targets is what trims it.  Directory.Build.targets sets SqlSourceGeneratorParameters the
+            same way.
         -->
         <SqlSourceDialect>
             postgres
@@ -27,6 +27,11 @@
             <SqlSourceDialect>
                 mysql
             </SqlSourceDialect>
+        </AdditionalFiles>
+        <AdditionalFiles Update="Queries/Kept.sql">
+            <SqlSourceGeneratorParameters>
+                keep-comments
+            </SqlSourceGeneratorParameters>
         </AdditionalFiles>
     </ItemGroup>
 </Project>

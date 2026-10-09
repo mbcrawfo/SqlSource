@@ -25,6 +25,12 @@ public partial class BuildFileTests
         "MSBuildProjectFile",
     ];
 
+    // What the generator reads: each as a property of the project and as metadata of a file's item.
+    private static readonly string[] Settings = ["SqlSourceDialect", "SqlSourceGeneratorParameters"];
+
+    // What the targets trim and the generator does not read.
+    private static readonly string[] TrimmedOnly = [];
+
     private static readonly XDocument Props = Load("SqlSource.props");
 
     private static readonly XDocument Targets = Load("SqlSource.targets");
@@ -34,9 +40,7 @@ public partial class BuildFileTests
     {
         var items = Props.Descendants("CompilerVisibleProperty").ToList();
 
-        items
-            .Select(item => item.Attribute("Include").ShouldNotBeNull().Value)
-            .ShouldBe(["SqlSourceTokenValidation", "SqlSourceDialect"]);
+        items.Select(item => item.Attribute("Include").ShouldNotBeNull().Value).ShouldBe(Settings, ignoreOrder: true);
 
         // A project that sets SqlSourceIncludeFiles to false lists its own .sql files, and still needs the
         // properties.  So nothing may put a condition on the items.
@@ -45,16 +49,18 @@ public partial class BuildFileTests
 
     // The SDK writes a section into the file the compiler reads for every item of the type that is named here,
     // whether the item has the metadata or not.  AdditionalFiles would be every .sql file of the project.
-    // SqlSourceDialectFile holds only the files that have a dialect: see
-    // Targets_FilesWithADialect_AreTheItemsWhoseMetadataTheCompilerReads.
+    // SqlSourceSettingsFile holds only the files that have any: see
+    // Targets_FilesWithMetadata_AreTheItemsWhoseMetadataTheCompilerReads.
     [Fact]
-    public void Props_DialectMetadataOfASqlFile_ReachesTheCompilerInEveryProject()
+    public void Props_MetadataOfASqlFile_ReachesTheCompilerInEveryProject()
     {
-        var item = Props.Descendants("CompilerVisibleItemMetadata").ShouldHaveSingleItem();
+        var items = Props.Descendants("CompilerVisibleItemMetadata").ToList();
 
-        item.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("SqlSourceDialectFile");
-        item.Attribute("MetadataName").ShouldNotBeNull().Value.ShouldBe("SqlSourceDialect");
-        ConditionsAround(item).ShouldBeEmpty();
+        items.ShouldAllBe(item => item.Attribute("Include")!.Value == "SqlSourceSettingsFile");
+        items
+            .Select(item => item.Attribute("MetadataName").ShouldNotBeNull().Value)
+            .ShouldBe(Settings, ignoreOrder: true);
+        items.SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
     // The compiler reads a property, and the metadata of an item, from a file with one line for each.  A value on a
@@ -62,7 +68,7 @@ public partial class BuildFileTests
     // target of the SDK that writes the file.  A trim that runs before it sees a value wherever it was set, in
     // Directory.Build.targets or by another target, and runs in every build that writes the file, a design-time
     // build too.  A trim outside a target would see only what is set before NuGet imports the file.  The target that
-    // collects the files with a dialect runs there for the same reasons.
+    // collects the files with metadata runs there for the same reasons.
     [Fact]
     public void Targets_EveryTarget_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
     {
@@ -75,58 +81,74 @@ public partial class BuildFileTests
         root.Elements().SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
-    // SqlSource.Tests.csproj writes its dialect and its setting for token validation on lines of their own, and
+    // SqlSource.Tests.csproj writes its dialect and its generator parameters on lines of their own, and
     // tools/package-install sets one in Directory.Build.targets, so the end-to-end tests and the check of the
     // installed package show the trimming at work; this pins that each property has it.
-    [Theory]
-    [InlineData("SqlSourceTokenValidation")]
-    [InlineData("SqlSourceDialect")]
-    public void Targets_PropertyOfThePackage_IsTrimmed(string property)
+    [Fact]
+    public void Targets_EveryPropertyOfThePackage_IsTrimmed()
     {
-        // The metadata of an item has the name of the property, so only a property group is looked at.
-        var element = Targets.Descendants("PropertyGroup").Elements(property).ShouldHaveSingleItem();
+        var trimmed = Targets
+            .Descendants("Target")
+            .Single(target => target.Attribute("Name")!.Value == "SqlSourceTrimProperties")
+            .Descendants("PropertyGroup")
+            .Elements()
+            .ToList();
 
-        element.Value.ShouldBe($"$({property}.Trim())");
-        ConditionsAround(element).ShouldBeEmpty();
+        trimmed.Select(element => element.Name.LocalName).ShouldBe(Settings.Concat(TrimmedOnly), ignoreOrder: true);
+        trimmed.ShouldAllBe(element => element.Value == $"$({element.Name.LocalName}.Trim())");
+        trimmed.SelectMany(ConditionsAround).ShouldBeEmpty();
     }
 
-    // The target runs once for each value that the metadata has, and only the items with that value are in reach of
-    // it.  The value goes through a property so that it is never text inside a property function: see
-    // Targets_ItemMetadata_IsNeverTheArgumentOfAPropertyFunction.
+    // The target runs once for each combination of values that the metadata has, with only the items of that
+    // combination in reach.  Each value goes through a property so that it is never text inside a property
+    // function: see Targets_ItemMetadata_IsNeverTheArgumentOfAPropertyFunction.  Most files have no metadata, and
+    // they are one batch with nothing to trim: nothing is written back to them, and a value that is not set is not
+    // written at all.
     [Fact]
-    public void Targets_DialectMetadataOfEverySqlFile_IsTrimmed()
+    public void Targets_MetadataOfEverySqlFile_IsTrimmed()
     {
+        var names = Settings.Concat(TrimmedOnly).ToList();
         var item = Targets.Descendants("AdditionalFiles").ShouldHaveSingleItem();
         var target = item.Ancestors("Target").ShouldHaveSingleItem();
 
-        target.Attribute("Outputs").ShouldNotBeNull().Value.ShouldBe("%(AdditionalFiles.SqlSourceDialect)");
+        target.Attribute("Name").ShouldNotBeNull().Value.ShouldBe("SqlSourceTrimMetadataOfFiles");
         target
-            .Descendants("SqlSourceDialectAsWritten")
-            .ShouldHaveSingleItem()
-            .Value.ShouldBe("%(AdditionalFiles.SqlSourceDialect)");
+            .Attribute("Outputs")
+            .ShouldNotBeNull()
+            .Value.Split('|')
+            .ShouldBe(names.Select(name => $"%(AdditionalFiles.{name})"), ignoreOrder: true);
+        foreach (var name in names)
+        {
+            target.Descendants(name + "AsWritten").ShouldHaveSingleItem().Value.ShouldBe($"%(AdditionalFiles.{name})");
+            var metadata = item.Elements(name).ShouldHaveSingleItem();
+            metadata.Value.ShouldBe($"$({name}AsWritten.Trim())");
+            metadata.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe($"'$({name}AsWritten)' != ''");
+        }
+
         item.Attributes().ShouldBeEmpty();
-        // Most files have no metadata, and they are one batch with nothing to trim.  It is not written back to them.
+        item.Elements().Count().ShouldBe(names.Count);
         item.Parent.ShouldNotBeNull()
             .Attribute("Condition")
             .ShouldNotBeNull()
-            .Value.ShouldBe("'$(SqlSourceDialectAsWritten)' != ''");
-        item.Elements().ShouldHaveSingleItem().Name.LocalName.ShouldBe("SqlSourceDialect");
-        item.Elements().ShouldHaveSingleItem().Value.ShouldBe("$(SqlSourceDialectAsWritten.Trim())");
+            .Value.ShouldBe("'" + string.Concat(names.Select(name => $"$({name}AsWritten)")) + "' != ''");
     }
 
-    // The compiler reads the metadata from the items of SqlSourceDialectFile, and the files without a dialect are
-    // not among them.  The collecting has to come after the trim: the values it copies are trimmed by then, and a
-    // file whose value was only white space is left out.  MSBuild does not promise an order for two targets that hook
+    // The compiler reads the metadata from the items of SqlSourceSettingsFile, and the files without any are not
+    // among them.  The collecting has to come after the trim: the values it copies are trimmed by then, and a file
+    // whose values were only white space is left out.  MSBuild does not promise an order for two targets that hook
     // the same one, so the target says what it depends on.
     [Fact]
-    public void Targets_FilesWithADialect_AreTheItemsWhoseMetadataTheCompilerReads()
+    public void Targets_FilesWithMetadata_AreTheItemsWhoseMetadataTheCompilerReads()
     {
-        var item = Targets.Descendants("SqlSourceDialectFile").ShouldHaveSingleItem();
+        var item = Targets.Descendants("SqlSourceSettingsFile").ShouldHaveSingleItem();
         var target = item.Ancestors("Target").ShouldHaveSingleItem();
 
         item.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("@(AdditionalFiles)");
-        item.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe("'%(AdditionalFiles.SqlSourceDialect)' != ''");
-        target.Attribute("DependsOnTargets").ShouldNotBeNull().Value.ShouldBe("SqlSourceTrimDialectOfFiles");
+        item.Attribute("Condition")
+            .ShouldNotBeNull()
+            .Value.ShouldBe("'" + string.Concat(Settings.Select(name => $"%(AdditionalFiles.{name})")) + "' != ''");
+        target.Attribute("Name").ShouldNotBeNull().Value.ShouldBe("SqlSourceCollectSettingsFiles");
+        target.Attribute("DependsOnTargets").ShouldNotBeNull().Value.ShouldBe("SqlSourceTrimMetadataOfFiles");
     }
 
     // A file that is removed has no timestamp left to compare, so the build after it compiles again only when an
