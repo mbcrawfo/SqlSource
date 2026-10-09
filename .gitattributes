@@ -10,3 +10,7 @@
 *.props text eol=lf
 *.targets text eol=lf
 *.slnx text eol=lf
+
+# A sidecar is compared byte for byte with what the writer gives, which uses LF
+*.sql.json text eol=lf
+schemas/*.json text eol=lf

@@ -43,7 +43,9 @@
         </AdditionalFiles>
     </ItemGroup>
     <ItemGroup>
+        <PackageReference Include="Bogus" />
         <PackageReference Include="GitHubActionsTestLogger" />
+        <PackageReference Include="JsonSchema.Net" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
         <PackageReference Include="Shouldly" />
@@ -52,6 +54,14 @@
     <ItemGroup>
         <!-- Diagnostics/DiagnosticsDocumentTests.cs reads the document from the output folder. -->
         <None Include="../../docs/diagnostics.md" Link="docs/diagnostics.md" CopyToOutputDirectory="PreserveNewest" />
+        <!-- Snapshot/SidecarExamples.cs reads the examples of the sidecar format design from the output folder. -->
+        <None Update="Snapshot/Examples/*.json" CopyToOutputDirectory="PreserveNewest" />
+        <!-- Snapshot/SidecarSchemaTests.cs reads the schema from the output folder. -->
+        <None
+            Include="../../schemas/sidecar-v1.schema.json"
+            Link="schemas/sidecar-v1.schema.json"
+            CopyToOutputDirectory="PreserveNewest"
+        />
         <!-- Package/BuildFileTests.cs reads the MSBuild files from the output folder. -->
         <None
             Include="../../src/SqlSource/build/SqlSource.props"

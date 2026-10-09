@@ -31,7 +31,7 @@ Settled with the owner after the format was proposed.  The open questions in sec
 
 ## 1. The format
 
-A sidecar is one UTF-8 JSON object, no BOM, `\n` line endings, two-space indent, one key or array element per line, a trailing newline.  Keys are written in the order the tables below list them and never sorted.  Only objects, arrays, strings, integers (signed 32-bit), booleans and `null` appear.  An empty array is `[]` on the line of its key.  A string is written with `\"` and `\\`, with `\b`, `\f`, `\n`, `\r` and `\t` for those characters, and with `\u00XX` for every other character below U+0020; every other character is written as it is, `/` and characters outside ASCII included.
+A sidecar is one UTF-8 JSON object, no BOM, `\n` line endings, two-space indent, one key or array element per line, a trailing newline.  Keys are written in the order the tables below list them and never sorted.  Only objects, arrays, strings, integers (signed 32-bit), booleans and `null` appear.  An empty array is `[]` on the line of its key.  A string is written with `\"` and `\\`, with `\b`, `\f`, `\n`, `\r` and `\t` for those characters, and with `\u00XX`, its hex digits in upper case, for every other character below U+0020; every other character is written as it is, `/` and characters outside ASCII included.
 
 ### 1.1 Top level
 
