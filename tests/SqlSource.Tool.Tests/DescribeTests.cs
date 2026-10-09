@@ -99,4 +99,19 @@ public class DescribeTests
                 + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc201\n"
         );
     }
+
+    [Fact]
+    public async Task Run_ResponseFileWhereThePathStands_IsAPathLikeAnyOther()
+    {
+        using var run = new CliRun();
+        var path = run.Folder.WriteFile("@args.rsp", "--help");
+        _ = run.Folder.WriteFile("args.rsp", "--help");
+
+        // System.CommandLine would read the file and run what it holds.
+        var result = await run.RunAsync("describe", "@args.rsp");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldStartWith($"sqlsource : error SQLSRC203: '{path}' is not a .sln, .slnx or .csproj file");
+    }
 }

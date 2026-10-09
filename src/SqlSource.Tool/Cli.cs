@@ -2,6 +2,7 @@ using System;
 using System.CommandLine;
 using System.CommandLine.Help;
 using System.CommandLine.Invocation;
+using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Threading;
@@ -22,7 +23,10 @@ public static class Cli
     /// </summary>
     internal const string DebugVariable = "SQLSOURCE_DEBUG";
 
-    private static readonly ParserConfiguration Parser = new()
+    /// <summary>
+    /// How System.CommandLine reads a command line for the tool.
+    /// </summary>
+    internal static readonly ParserConfiguration Parser = new()
     {
         // A token is read as it stands: "@name" is no file to read, and "-ab" is not "-a -b".
         ResponseFileTokenReplacer = null,
@@ -44,8 +48,28 @@ public static class Cli
     /// <c>0</c> on success, <c>1</c> when an error was reported, a wrong command line included, and <c>2</c> when
     /// <c>--check</c> found a difference and nothing failed.
     /// </returns>
-    public static int Run(string[] args)
+    public static int Run(string[] args) => Run(args, ToolHost.Create, Console.Error);
+
+    /// <summary>
+    /// Runs the command with a host that is made here, and listens for Ctrl+C.
+    /// </summary>
+    /// <param name="args">The command line.</param>
+    /// <param name="createHost">Makes the host.  The real one asks for the current directory, which can throw.</param>
+    /// <param name="error">Where the error goes when there is no host to report to.</param>
+    internal static int Run(string[] args, Func<ToolHost> createHost, TextWriter error)
     {
+        ToolHost host;
+        try
+        {
+            host = createHost();
+        }
+        catch (Exception exception)
+        {
+            // RunAsync's catch reports to the host, and there is none.
+            new Reporter(error).Report(Failure(exception, Environment.GetEnvironmentVariable));
+            return 1;
+        }
+
         using var interrupt = new CancellationTokenSource();
         void Cancel(object? sender, ConsoleCancelEventArgs e)
         {
@@ -57,7 +81,7 @@ public static class Cli
         Console.CancelKeyPress += Cancel;
         try
         {
-            return RunAsync(args, ToolHost.Create(), interrupt.Token).GetAwaiter().GetResult();
+            return RunAsync(args, host, interrupt.Token).GetAwaiter().GetResult();
         }
         finally
         {
@@ -78,11 +102,11 @@ public static class Cli
 
             var root = BuildCommands(host, reporter);
 
-            var wrong = UsageCheck.Check(root, args);
-            if (wrong.Count > 0)
+            var usage = UsageCheck.Check(root, args);
+            if (usage.Messages.Count > 0)
             {
                 // These lines have no id and do not go through the reporter.
-                foreach (var line in wrong)
+                foreach (var line in usage.Messages)
                 {
                     await host.Error.WriteLineAsync(line);
                 }
@@ -91,10 +115,11 @@ public static class Cli
             }
 
             var parsed = root.Parse(args, Parser);
-            if (parsed.Errors.Count > 0)
+            if (parsed.Errors.Count > 0 || !usage.IsReadTheSameBy(parsed))
             {
-                // UsageCheck lets nothing through that System.CommandLine rejects, as far as the tests know.  If
-                // something is, System.CommandLine's message is not written: it may repeat a token.
+                // UsageCheck lets nothing through that System.CommandLine rejects or reads another way, as far as
+                // the tests know.  If something is, nothing runs, and System.CommandLine's message is not written:
+                // it may repeat a token.
                 await host.Error.WriteLineAsync("sqlsource: the command line is not valid");
                 return 1;
             }
@@ -117,7 +142,7 @@ public static class Cli
         }
         catch (Exception exception)
         {
-            reporter.Report(Failure(exception, host));
+            reporter.Report(Failure(exception, host.GetEnvironmentVariable));
             return 1;
         }
     }
@@ -165,14 +190,14 @@ public static class Cli
         return describe;
     }
 
-    private static ToolDiagnostic Failure(Exception exception, ToolHost host)
+    private static ToolDiagnostic Failure(Exception exception, Func<string, string?> getEnvironmentVariable)
     {
         var failure = ToolDiagnostic.Create(
             ToolDiagnostics.UnexpectedFailure,
             exception.GetType().FullName ?? exception.GetType().Name,
             exception.Message
         );
-        if (string.IsNullOrEmpty(host.GetEnvironmentVariable(DebugVariable)))
+        if (string.IsNullOrEmpty(getEnvironmentVariable(DebugVariable)))
         {
             return failure;
         }

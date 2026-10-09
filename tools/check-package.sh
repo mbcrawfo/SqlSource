@@ -80,7 +80,10 @@ check_entries "$generator" "${GENERATOR_REQUIRED[@]}"
 check_entries "$tool" "${TOOL_REQUIRED[@]}"
 
 # The generator is loaded by the compiler from analyzers/.  A file under lib/ would become a reference of the consumer.
-if unzip -Z1 "$generator" | grep --quiet '^lib/'; then
+# The listing is read from a variable: in a pipe, grep stops at its first match, unzip dies of the closed pipe, and
+# pipefail makes that a failure, which reads here as "no file under lib/".
+generator_entries="$(unzip -Z1 "$generator")"
+if grep --quiet '^lib/' <<<"$generator_entries"; then
     echo "check-package: $generator holds files under lib/" >&2
     status=1
 fi

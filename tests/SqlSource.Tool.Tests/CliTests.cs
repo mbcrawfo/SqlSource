@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -210,6 +211,27 @@ public class CliTests
         var result = await run.RunCancelledAsync("--version");
 
         result.ShouldBe(new CliResult(1, "", ""));
+    }
+
+    [Fact]
+    public void Run_HostThatCannotBeMade_IsReportedAsSqlsrc200()
+    {
+        // A working directory that was deleted: asking for it throws, before there is a host to report to.
+        using var error = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
+
+        var exitCode = Cli.Run(
+            ["--version"],
+            () => throw new FileNotFoundException("Unable to find the specified file."),
+            error
+        );
+
+        exitCode.ShouldBe(1);
+        error
+            .ToString()
+            .ShouldStartWith(
+                "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: "
+                    + "System.IO.FileNotFoundException: Unable to find the specified file.\n"
+            );
     }
 
     // Stands in for a standard output that fails: every write throws.

@@ -232,5 +232,5 @@ dotnet_diagnostic.CA2007.severity = none
 # CA1515 (make types internal): Cli is the tool's public entry, which the end-to-end test projects call.  Any other
 # public type of the tool is a mistake, so the rule stays on for the rest of the project.
 dotnet_diagnostic.CA1515.severity = none
-# CA1031 (catch a specific exception): the one catch that turns any exception into SQLSRC200.
+# CA1031 (catch a specific exception): the two catches that turn any exception into SQLSRC200.
 dotnet_diagnostic.CA1031.severity = none

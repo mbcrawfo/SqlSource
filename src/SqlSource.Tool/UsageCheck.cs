@@ -17,14 +17,14 @@ namespace SqlSource.Tool;
 internal static class UsageCheck
 {
     /// <summary>
-    /// The lines to write, each a whole message.  Empty for a command line with nothing wrong.
+    /// Reads a command line: the command it names, that command's arguments, and what is wrong with it.
     /// </summary>
-    public static IReadOnlyList<string> Check(Command root, IReadOnlyList<string> args)
+    public static Usage Check(Command root, IReadOnlyList<string> args)
     {
         var messages = new List<string>();
+        var arguments = new List<string>();
         var command = root;
         var options = root.Options.ToList();
-        var arguments = 0;
 
         var index = 0;
         while (index < args.Count)
@@ -33,41 +33,53 @@ internal static class UsageCheck
             if (token.StartsWith('-'))
             {
                 var name = NameOf(token);
-                var option = options.Find(option => option.Name == name || option.Aliases.Contains(name));
+                var option = Find(options, name);
                 if (option is null)
                 {
                     // The token after a misspelt option may be its value, so nothing after it is read, and nothing
                     // found before it is reported beside it.
-                    return [$"sqlsource: unknown option '{name}'"];
+                    return new Usage(command, arguments, [$"sqlsource: unknown option '{name}'"]);
                 }
 
-                var hasValue = token.Length > name.Length;
+                var hasSeparator = token.Length > name.Length;
                 if (option.Arity.MaximumNumberOfValues == 0)
                 {
-                    if (hasValue)
+                    if (hasSeparator)
                     {
                         messages.Add($"sqlsource: option '{name}' takes no value");
                     }
                 }
-                else if (!hasValue && option.Arity.MinimumNumberOfValues > 0)
+                else if (hasSeparator)
                 {
-                    // The next token is the value, whatever it starts with.
-                    if (index == args.Count)
+                    // "--name=" is what --name="$UNSET" gives.  System.CommandLine reads it as an option without a
+                    // value and takes the next token for one, so every token after it would be read one place off.
+                    if (token.Length == name.Length + 1)
                     {
                         messages.Add($"sqlsource: option '{name}' needs a value");
                     }
-
-                    index++;
+                }
+                else if (option.Arity.MinimumNumberOfValues > 0)
+                {
+                    // The next token is the value, whatever it starts with, unless it names an option of this
+                    // command or is "--": System.CommandLine takes neither for a value.
+                    if (index == args.Count || IsOption(args[index], options))
+                    {
+                        messages.Add($"sqlsource: option '{name}' needs a value");
+                    }
+                    else
+                    {
+                        index++;
+                    }
                 }
             }
-            else if (arguments == 0 && command.Subcommands.FirstOrDefault(sub => sub.Name == token) is { } sub)
+            else if (arguments.Count == 0 && command.Subcommands.FirstOrDefault(sub => sub.Name == token) is { } sub)
             {
                 command = sub;
                 options = [.. options.Where(static option => option.Recursive), .. sub.Options];
             }
-            else if (arguments < command.Arguments.Sum(static argument => argument.Arity.MaximumNumberOfValues))
+            else if (arguments.Count < command.Arguments.Sum(static argument => argument.Arity.MaximumNumberOfValues))
             {
-                arguments++;
+                arguments.Add(token);
             }
             else
             {
@@ -75,8 +87,14 @@ internal static class UsageCheck
             }
         }
 
-        return messages;
+        return new Usage(command, arguments, messages);
     }
+
+    private static Option? Find(List<Option> options, string name) =>
+        options.Find(option => option.Name == name || option.Aliases.Contains(name));
+
+    private static bool IsOption(string token, List<Option> options) =>
+        token == "--" || (token.StartsWith('-') && Find(options, NameOf(token)) is not null);
 
     private static string NameOf(string token)
     {
