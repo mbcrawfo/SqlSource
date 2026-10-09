@@ -85,4 +85,48 @@ public class QuerySettingsTests
 
         query.Over(preamble).ShouldBe(new SettingsLevel { Output = OutputKind.Sql, Database = "billing" });
     }
+
+    [Fact]
+    public void Resolve_ModelSettings_HaveTheirDefaults()
+    {
+        var settings = QuerySettings.Resolve(
+            SettingsLevel.None,
+            SettingsLevel.None,
+            SettingsLevel.None,
+            SettingsLevel.None
+        );
+
+        settings.InputModelSuffix.ShouldBe("Params");
+        settings.OutputModelSuffix.ShouldBe("Dto");
+        settings.ModelNamespace.ShouldBeNull();
+        settings.InputModelType.ShouldBe(ModelKind.SealedRecord);
+        settings.OutputModelType.ShouldBe(ModelKind.SealedRecord);
+        settings.CollectionType.ShouldBe(CollectionKind.Array);
+    }
+
+    [Fact]
+    public void Resolve_EachModelSetting_ComesFromTheMostSpecificLevelThatHasIt()
+    {
+        var property = new SettingsLevel
+        {
+            InputModelSuffix = "In",
+            OutputModelSuffix = "Out",
+            ModelNamespace = "P",
+            InputModelType = ModelKind.Class,
+            OutputModelType = ModelKind.Class,
+            CollectionType = CollectionKind.List,
+        };
+        var metadata = new SettingsLevel { OutputModelSuffix = "Row", ModelNamespace = "M" };
+        var attribute = new SettingsLevel { ModelNamespace = "A", InputModelType = ModelKind.Record };
+        var markers = new SettingsLevel { CollectionType = CollectionKind.IReadOnlyList };
+
+        var settings = QuerySettings.Resolve(markers, attribute, metadata, property);
+
+        settings.InputModelSuffix.ShouldBe("In");
+        settings.OutputModelSuffix.ShouldBe("Row");
+        settings.ModelNamespace.ShouldBe("A");
+        settings.InputModelType.ShouldBe(ModelKind.Record);
+        settings.OutputModelType.ShouldBe(ModelKind.Class);
+        settings.CollectionType.ShouldBe(CollectionKind.IReadOnlyList);
+    }
 }

@@ -56,7 +56,9 @@ public class SqlModelTests
                 kept,
                 new EquatableArray<SqlToken>([new SqlToken("table", tokenDefault)]),
                 new EquatableArray<SqlQueryParameter>([new SqlQueryParameter(parameter, null, null, false)]),
-                markers ?? SettingsLevel.None
+                markers ?? SettingsLevel.None,
+                null,
+                null
             );
         }
 

@@ -16,7 +16,10 @@
         and metadata the generator reads.  Each setting is a property for the project and metadata of an
         AdditionalFiles item for one file or for the files of a glob.  SqlSourceDialect names the database whose rules
         the .sql files are read by, and SqlSourceGeneratorParameters holds generator parameters, separated by spaces.
-        SqlSourceOutput says what is generated for a query.  SqlSourceDatabase is trimmed and is not listed: the tool
+        SqlSourceOutput says what is generated for a query.  SqlSourceInputModelSuffix, SqlSourceOutputModelSuffix,
+        SqlSourceModelNamespace, SqlSourceInputModelType, SqlSourceOutputModelType and SqlSourceCollectionType say
+        what the models of a query are called, where they are and what shape they have, and what a method returns
+        many rows in.  SqlSourceDatabase is trimmed and is not listed: the tool
         reads it, and the generator does not.
         None of this is under the condition above: a project that lists its own .sql files still needs it.
 
@@ -33,8 +36,20 @@
         <CompilerVisibleProperty Include="SqlSourceDialect" />
         <CompilerVisibleProperty Include="SqlSourceGeneratorParameters" />
         <CompilerVisibleProperty Include="SqlSourceOutput" />
+        <CompilerVisibleProperty Include="SqlSourceInputModelSuffix" />
+        <CompilerVisibleProperty Include="SqlSourceOutputModelSuffix" />
+        <CompilerVisibleProperty Include="SqlSourceModelNamespace" />
+        <CompilerVisibleProperty Include="SqlSourceInputModelType" />
+        <CompilerVisibleProperty Include="SqlSourceOutputModelType" />
+        <CompilerVisibleProperty Include="SqlSourceCollectionType" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceDialect" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceGeneratorParameters" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceOutput" />
+        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceInputModelSuffix" />
+        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceOutputModelSuffix" />
+        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceModelNamespace" />
+        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceInputModelType" />
+        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceOutputModelType" />
+        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceCollectionType" />
     </ItemGroup>
 </Project>

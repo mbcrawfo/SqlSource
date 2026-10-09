@@ -31,6 +31,7 @@ internal static class TestModels
             @namespace,
             Array(types ?? [new TypeDeclaration("class", "UserRepository", "UserRepository", string.Empty, 0)]),
             placement,
+            MethodPlacement.ExtensionClass,
             settings ?? SettingsLevel.None,
             path,
             filePath,

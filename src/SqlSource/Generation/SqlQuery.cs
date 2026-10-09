@@ -28,6 +28,12 @@ namespace SqlSource.Generation;
 /// </param>
 /// <param name="Parameters">The query's parameters, in order of first appearance.  Empty when it has none.</param>
 /// <param name="Markers">What the query's markers say about the settings, over those of its file's preamble.</param>
+/// <param name="InputModelName">
+/// The full name or the name a <c>-- input-model:</c> marker gives the type of the query's parameters, or null.
+/// </param>
+/// <param name="OutputModelName">
+/// The full name or the name an <c>-- output-model:</c> marker gives the type of the query's rows, or null.
+/// </param>
 internal sealed record SqlQuery(
     string Name,
     LocationInfo NameLocation,
@@ -37,5 +43,7 @@ internal sealed record SqlQuery(
     EquatableArray<SqlSegment>? KeptSegments,
     EquatableArray<SqlToken> Tokens,
     EquatableArray<SqlQueryParameter> Parameters,
-    SettingsLevel Markers
+    SettingsLevel Markers,
+    string? InputModelName,
+    string? OutputModelName
 );

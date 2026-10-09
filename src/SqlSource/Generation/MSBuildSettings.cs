@@ -19,6 +19,18 @@ internal static class MSBuildSettings
 
     public const string OutputName = "SqlSourceOutput";
 
+    public const string InputModelSuffixName = "SqlSourceInputModelSuffix";
+
+    public const string OutputModelSuffixName = "SqlSourceOutputModelSuffix";
+
+    public const string ModelNamespaceName = "SqlSourceModelNamespace";
+
+    public const string InputModelTypeName = "SqlSourceInputModelType";
+
+    public const string OutputModelTypeName = "SqlSourceOutputModelType";
+
+    public const string CollectionTypeName = "SqlSourceCollectionType";
+
     /// <summary>Where the compiler puts the properties of the project.</summary>
     public static SettingKeys Property { get; } = new("build_property.");
 
@@ -34,27 +46,83 @@ internal static class MSBuildSettings
     /// </summary>
     public static SettingsLevel Read(AnalyzerConfigOptions options, SettingKeys keys, ref List<InvalidSetting>? invalid)
     {
-        var level = SettingsLevel.None;
-        if (options.TryGetValue(keys.GeneratorParameters, out var list) && !string.IsNullOrWhiteSpace(list))
+        var level = new SettingsLevel
         {
-            var words = new List<string>();
-            if (GeneratorParameterList.Parse(list, words) is { } parameters)
-            {
-                level = level with { Parameters = parameters };
-            }
+            Parameters = ReadParameters(options, keys.GeneratorParameters, ref invalid),
+            Output = ReadChoice<OutputKind>(options, keys.Output, OutputName, ref invalid),
+            InputModelSuffix = ReadText(
+                options,
+                keys.InputModelSuffix,
+                InputModelSuffixName,
+                SettingValue.IsSuffix,
+                ref invalid
+            ),
+            OutputModelSuffix = ReadText(
+                options,
+                keys.OutputModelSuffix,
+                OutputModelSuffixName,
+                SettingValue.IsSuffix,
+                ref invalid
+            ),
+            ModelNamespace = ReadText(
+                options,
+                keys.ModelNamespace,
+                ModelNamespaceName,
+                SettingValue.IsNamespace,
+                ref invalid
+            ),
+            InputModelType = ReadChoice<ModelKind>(options, keys.InputModelType, InputModelTypeName, ref invalid),
+            OutputModelType = ReadChoice<ModelKind>(options, keys.OutputModelType, OutputModelTypeName, ref invalid),
+            CollectionType = ReadChoice<CollectionKind>(options, keys.CollectionType, CollectionTypeName, ref invalid),
+        };
 
-            foreach (var word in words)
-            {
-                (invalid ??= []).Add(new InvalidSetting(GeneratorParametersName, word));
-            }
+        return level.Equals(SettingsLevel.None) ? SettingsLevel.None : level;
+    }
+
+    private static GeneratorParameters? ReadParameters(
+        AnalyzerConfigOptions options,
+        string key,
+        ref List<InvalidSetting>? invalid
+    )
+    {
+        if (!options.TryGetValue(key, out var list) || string.IsNullOrWhiteSpace(list))
+        {
+            return null;
         }
 
-        if (ReadChoice<OutputKind>(options, keys.Output, OutputName, ref invalid) is { } output)
+        var words = new List<string>();
+        var parameters = GeneratorParameterList.Parse(list, words);
+        foreach (var word in words)
         {
-            level = level with { Output = output };
+            (invalid ??= []).Add(new InvalidSetting(GeneratorParametersName, word));
         }
 
-        return level;
+        return parameters;
+    }
+
+    private delegate bool Validator(ReadOnlySpan<char> value);
+
+    private static string? ReadText(
+        AnalyzerConfigOptions options,
+        string key,
+        string name,
+        Validator isValid,
+        ref List<InvalidSetting>? invalid
+    )
+    {
+        if (!options.TryGetValue(key, out var written) || string.IsNullOrWhiteSpace(written))
+        {
+            return null;
+        }
+
+        var value = written.Trim();
+        if (isValid(value.AsSpan()))
+        {
+            return value;
+        }
+
+        (invalid ??= []).Add(new InvalidSetting(name, value));
+        return null;
     }
 
     private static T? ReadChoice<T>(
@@ -85,5 +153,17 @@ internal static class MSBuildSettings
         public string GeneratorParameters { get; } = prefix + GeneratorParametersName;
 
         public string Output { get; } = prefix + OutputName;
+
+        public string InputModelSuffix { get; } = prefix + InputModelSuffixName;
+
+        public string OutputModelSuffix { get; } = prefix + OutputModelSuffixName;
+
+        public string ModelNamespace { get; } = prefix + ModelNamespaceName;
+
+        public string InputModelType { get; } = prefix + InputModelTypeName;
+
+        public string OutputModelType { get; } = prefix + OutputModelTypeName;
+
+        public string CollectionType { get; } = prefix + CollectionTypeName;
     }
 }

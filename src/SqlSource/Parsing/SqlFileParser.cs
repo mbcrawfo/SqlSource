@@ -287,6 +287,11 @@ internal static class SqlFileParser
                 _errors
             );
 
+            if (scope?.InputModel is { } inputModel && parameters.Count == 0)
+            {
+                AddError(SqlParseErrorKind.InputModelWithoutParameters, inputModel.Marker.Span);
+            }
+
             // A query that has a list uses it whole, so it alone says whether the comments can be wanted.  A query
             // without one may get the parameter from a level the parser does not see.
             var markers = (scope?.Level ?? SettingsLevel.None).Over(preamble?.Level ?? SettingsLevel.None);
@@ -304,7 +309,9 @@ internal static class SqlFileParser
                     keepsComments ? BuildKept(start, end, sql, ignoredTokens, firstScanError) : null,
                     tokens,
                     parameters,
-                    markers
+                    markers,
+                    scope?.InputModel?.Name,
+                    scope?.OutputModel
                 )
             );
         }

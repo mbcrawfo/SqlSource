@@ -27,6 +27,24 @@ internal sealed record SettingsLevel
     /// </summary>
     public string? Database { get; init; }
 
+    /// <summary>What ends the name of the type of a query's parameters.</summary>
+    public string? InputModelSuffix { get; init; }
+
+    /// <summary>What ends the name of the type of a row of a query's result.</summary>
+    public string? OutputModelSuffix { get; init; }
+
+    /// <summary>The namespace of the query's models.</summary>
+    public string? ModelNamespace { get; init; }
+
+    /// <summary>The shape of the type of a query's parameters.</summary>
+    public ModelKind? InputModelType { get; init; }
+
+    /// <summary>The shape of the type of a row of a query's result.</summary>
+    public ModelKind? OutputModelType { get; init; }
+
+    /// <summary>The type a method returns many rows in.</summary>
+    public CollectionKind? CollectionType { get; init; }
+
     /// <summary>Whether the level gives a list that has <c>keep-comments</c>.</summary>
     public bool KeepsComments => Parameters is { } list && (list & GeneratorParameters.KeepComments) != 0;
 
@@ -51,6 +69,12 @@ internal sealed record SettingsLevel
             Parameters = Parameters ?? other.Parameters,
             Output = Output ?? other.Output,
             Database = Database ?? other.Database,
+            InputModelSuffix = InputModelSuffix ?? other.InputModelSuffix,
+            OutputModelSuffix = OutputModelSuffix ?? other.OutputModelSuffix,
+            ModelNamespace = ModelNamespace ?? other.ModelNamespace,
+            InputModelType = InputModelType ?? other.InputModelType,
+            OutputModelType = OutputModelType ?? other.OutputModelType,
+            CollectionType = CollectionType ?? other.CollectionType,
         };
     }
 }

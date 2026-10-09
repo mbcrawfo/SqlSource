@@ -1320,6 +1320,110 @@ public class SqlFileParserTests
         blocks[1].Markers.ShouldBeSameAs(blocks[0].Markers);
     }
 
+    [Fact]
+    public void Parse_ModelMarkers_AreCarriedWithTheQuerysOverThePreambles()
+    {
+        const string Text =
+            "-- input-model-suffix: Args\n-- output-model-suffix: Row\n-- model-namespace: App.Models\n"
+            + "-- input-model-type: class\n-- output-model-type: record\n-- collection-type: list\n"
+            + "-- name: Q\n-- output-model-type: sealed class\n-- collection-type: IReadOnlyList\n"
+            + "-- input-model: FindArgs\n-- output-model: App.Shared.UserRow\nSELECT @a\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        block.Markers.ShouldBe(
+            new SettingsLevel
+            {
+                InputModelSuffix = "Args",
+                OutputModelSuffix = "Row",
+                ModelNamespace = "App.Models",
+                InputModelType = ModelKind.Class,
+                OutputModelType = ModelKind.SealedClass,
+                CollectionType = CollectionKind.IReadOnlyList,
+            }
+        );
+        block.InputModelName.ShouldBe("FindArgs");
+        block.OutputModelName.ShouldBe("App.Shared.UserRow");
+    }
+
+    [Theory]
+    // A marker for the file, written inside a query; and a marker for a query, written before the first one.
+    [InlineData("input-model-suffix", "Args", false, "before the file's first query")]
+    [InlineData("output-model-suffix", "Row", false, "before the file's first query")]
+    [InlineData("model-namespace", "App", false, "before the file's first query")]
+    [InlineData("input-model", "FindArgs", true, "inside a query")]
+    [InlineData("output-model", "UserRow", true, "inside a query")]
+    public void Parse_ModelMarkerInTheWrongScope_IsNotAllowedThere(
+        string word,
+        string value,
+        bool inPreamble,
+        string allowed
+    )
+    {
+        var marker = "-- " + word + ": " + value;
+        var text = inPreamble ? marker + "\n-- name: Q\nSELECT @a\n" : "-- name: Q\n" + marker + "\nSELECT @a\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.MarkerNotAllowedHere, SpanOf(text, marker), word, allowed),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("input-model-suffix", "A B")]
+    [InlineData("output-model-suffix", "A.B")]
+    [InlineData("model-namespace", "App.")]
+    [InlineData("input-model-type", "struct")]
+    [InlineData("output-model-type", "sealed")]
+    [InlineData("collection-type", "HashSet")]
+    [InlineData("input-model", "class")]
+    [InlineData("output-model", "User Row")]
+    public void Parse_ModelMarkerWithAValueItDoesNotTake_IsInvalidAtTheValue(string word, string value)
+    {
+        var text = "-- " + word + ": " + value + "\nSELECT @a\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), word + ": " + value),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TwoNamesForOneModel_ConflictAtTheSecond()
+    {
+        const string Text = "-- name: Q\n-- output-model: A\n-- output-model: B\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    new TextSpan(Text.IndexOf("-- output-model: B", StringComparison.Ordinal) + 17, 1),
+                    "output-model: B"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_InputModelOnAQueryWithoutParameters_IsAnError()
+    {
+        const string Text = "-- name: Q\n-- input-model: FindArgs\nSELECT 1 {{f}}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InputModelWithoutParameters,
+                    SpanOf(Text, "-- input-model: FindArgs")
+                ),
+            ]);
+    }
+
+    // A parameter that only a marker declares is a parameter.
+    [Fact]
+    public void Parse_InputModelOnAQueryWithADeclaredOnlyParameter_IsFine() =>
+        Blocks("-- name: Q\n-- param: @page int\n-- input-model: FindArgs\nSELECT 1 {{f}}\n")
+            .ShouldHaveSingleItem()
+            .InputModelName.ShouldBe("FindArgs");
+
     private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialectChoice dialect = default)
     {
         var result = SqlFileParser.Parse(text, fileName, dialect);

@@ -17,9 +17,19 @@ public partial class AttributeSourceTests
     [Theory]
     [InlineData("SqlLocation", nameof(MemberPlacement))]
     [InlineData("GeneratorOutput", nameof(OutputKind))]
+    [InlineData("GeneratorModelType", nameof(ModelKind))]
+    [InlineData("GeneratorCollectionType", nameof(CollectionKind))]
+    [InlineData("MethodLocation", nameof(MethodPlacement))]
     public void EmittedEnum_HasTheMembersAndNumbersOfTheGeneratorsOwnForm(string emitted, string ownName)
     {
-        var own = new[] { typeof(MemberPlacement), typeof(OutputKind) }.Single(type => type.Name == ownName);
+        var own = new[]
+        {
+            typeof(MemberPlacement),
+            typeof(OutputKind),
+            typeof(ModelKind),
+            typeof(CollectionKind),
+            typeof(MethodPlacement),
+        }.Single(type => type.Name == ownName);
         var body = Regex
             .Match(AttributeSource.Text, @"internal enum " + emitted + @"\s*\{(?<body>[^}]*)\}")
             .Groups["body"]

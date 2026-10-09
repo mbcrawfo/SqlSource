@@ -433,7 +433,9 @@ public class TypeEmitterTests
                 TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1; -- " + name)),
                 EquatableArray<SqlToken>.Empty,
                 EquatableArray<SqlQueryParameter>.Empty,
-                markers
+                markers,
+                null,
+                null
             );
 
         var output = TypeEmitter.Emit(
@@ -524,7 +526,9 @@ public class TypeEmitterTests
             TestModels.Array(new SqlSegment(SqlSegmentKind.Literal, "SELECT 1; -- kept")),
             EquatableArray<SqlToken>.Empty,
             EquatableArray<SqlQueryParameter>.Empty,
-            new SettingsLevel { Parameters = GeneratorParameters.KeepComments }
+            new SettingsLevel { Parameters = GeneratorParameters.KeepComments },
+            null,
+            null
         );
 
         Emit(TestModels.Type(), File("Users.sql", query))
@@ -544,7 +548,9 @@ public class TypeEmitterTests
             null,
             EquatableArray<SqlToken>.Empty,
             EquatableArray<SqlQueryParameter>.Empty,
-            new SettingsLevel { Parameters = GeneratorParameters.KeepComments }
+            new SettingsLevel { Parameters = GeneratorParameters.KeepComments },
+            null,
+            null
         );
 
         Emit(TestModels.Type(), File("Users.sql", query)).Source.ShouldNotBeNull().ShouldContain("\"SELECT 1;\"");
@@ -604,7 +610,9 @@ public class TypeEmitterTests
             null,
             EquatableArray<SqlToken>.Empty,
             EquatableArray<SqlQueryParameter>.Empty,
-            SettingsLevel.None
+            SettingsLevel.None,
+            null,
+            null
         );
 
     // "SELECT * FROM {{table}};", which is a method with one parameter.
@@ -627,7 +635,9 @@ public class TypeEmitterTests
                 false => new SettingsLevel { Parameters = GeneratorParameters.NoTokenValidation },
                 true => new SettingsLevel { Parameters = GeneratorParameters.None },
                 null => SettingsLevel.None,
-            }
+            },
+            null,
+            null
         );
 
     private static LocationInfo NameLocation(string file) =>

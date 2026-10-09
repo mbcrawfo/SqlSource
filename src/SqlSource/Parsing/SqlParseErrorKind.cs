@@ -79,4 +79,9 @@ internal enum SqlParseErrorKind
     /// A parameter stands only in the default of a token.  Argument: the parameter, with its prefix.
     /// </summary>
     UndeclaredParameter,
+
+    /// <summary>
+    /// A <c>-- input-model:</c> marker is on a query that has no parameters.  No argument.
+    /// </summary>
+    InputModelWithoutParameters,
 }

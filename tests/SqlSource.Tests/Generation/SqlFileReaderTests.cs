@@ -35,7 +35,9 @@ public class SqlFileReaderTests
                 null,
                 EquatableArray<SqlToken>.Empty,
                 EquatableArray<SqlQueryParameter>.Empty,
-                SettingsLevel.None
+                SettingsLevel.None,
+                null,
+                null
             ),
             new SqlQuery(
                 "ListUsers",
@@ -46,7 +48,9 @@ public class SqlFileReaderTests
                 null,
                 EquatableArray<SqlToken>.Empty,
                 EquatableArray<SqlQueryParameter>.Empty,
-                SettingsLevel.None
+                SettingsLevel.None,
+                null,
+                null
             ),
         ]);
     }
@@ -67,7 +71,9 @@ public class SqlFileReaderTests
                 null,
                 EquatableArray<SqlToken>.Empty,
                 EquatableArray<SqlQueryParameter>.Empty,
-                SettingsLevel.None
+                SettingsLevel.None,
+                null,
+                null
             ),
         ]);
     }

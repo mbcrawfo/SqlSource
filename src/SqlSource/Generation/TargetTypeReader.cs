@@ -59,6 +59,12 @@ internal static class TargetTypeReader
                 : symbol.ContainingNamespace.ToDisplayString(NamespaceFormat),
             new EquatableArray<TypeDeclaration>(types),
             placement,
+            ReadChoice<MethodPlacement>(
+                attribute,
+                AttributeSource.MethodLocationProperty,
+                attributeLocation,
+                diagnostics
+            ) ?? MethodPlacement.ExtensionClass,
             ReadSettings(attribute, attributeLocation, diagnostics),
             ReadPath(attribute),
             reference.SyntaxTree.FilePath,
@@ -189,37 +195,110 @@ internal static class TargetTypeReader
         ImmutableArray<DiagnosticInfo>.Builder diagnostics
     )
     {
-        var level = SettingsLevel.None;
-        if (GetNamedArgument(attribute, AttributeSource.ParametersProperty) is { Value: string list })
+        var level = new SettingsLevel
         {
-            var words = new List<string>();
-            if (GeneratorParameterList.Parse(list, words) is { } parameters)
-            {
-                level = level with { Parameters = parameters };
-            }
+            Parameters = ReadParameters(attribute, attributeLocation, diagnostics),
+            Output = ReadChoice<OutputKind>(attribute, AttributeSource.OutputProperty, attributeLocation, diagnostics),
+            InputModelSuffix = ReadText(
+                attribute,
+                AttributeSource.InputModelSuffixProperty,
+                static value => SettingValue.IsSuffix(value.AsSpan()),
+                attributeLocation,
+                diagnostics
+            ),
+            OutputModelSuffix = ReadText(
+                attribute,
+                AttributeSource.OutputModelSuffixProperty,
+                static value => SettingValue.IsSuffix(value.AsSpan()),
+                attributeLocation,
+                diagnostics
+            ),
+            ModelNamespace = ReadText(
+                attribute,
+                AttributeSource.ModelNamespaceProperty,
+                static value => SettingValue.IsNamespace(value.AsSpan()),
+                attributeLocation,
+                diagnostics
+            ),
+            InputModelType = ReadChoice<ModelKind>(
+                attribute,
+                AttributeSource.InputModelTypeProperty,
+                attributeLocation,
+                diagnostics
+            ),
+            OutputModelType = ReadChoice<ModelKind>(
+                attribute,
+                AttributeSource.OutputModelTypeProperty,
+                attributeLocation,
+                diagnostics
+            ),
+            CollectionType = ReadChoice<CollectionKind>(
+                attribute,
+                AttributeSource.CollectionTypeProperty,
+                attributeLocation,
+                diagnostics
+            ),
+        };
 
-            foreach (var word in words)
-            {
-                diagnostics.Add(
-                    DiagnosticInfo.Create(
-                        SqlDiagnostics.InvalidAttributeValue,
-                        attributeLocation,
-                        word,
-                        AttributeSource.ParametersProperty
-                    )
-                );
-            }
+        // A type that sets nothing shares the empty level.
+        return level.Equals(SettingsLevel.None) ? SettingsLevel.None : level;
+    }
+
+    private static GeneratorParameters? ReadParameters(
+        AttributeData attribute,
+        LocationInfo attributeLocation,
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+    )
+    {
+        if (GetNamedArgument(attribute, AttributeSource.ParametersProperty) is not { Value: string list })
+        {
+            return null;
         }
 
+        var words = new List<string>();
+        var parameters = GeneratorParameterList.Parse(list, words);
+        foreach (var word in words)
+        {
+            diagnostics.Add(
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.InvalidAttributeValue,
+                    attributeLocation,
+                    word,
+                    AttributeSource.ParametersProperty
+                )
+            );
+        }
+
+        return parameters;
+    }
+
+    // A string that is empty or white space is not set, as Path is.
+    private static string? ReadText(
+        AttributeData attribute,
+        string property,
+        Func<string, bool> isValid,
+        LocationInfo attributeLocation,
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+    )
+    {
         if (
-            ReadChoice<OutputKind>(attribute, AttributeSource.OutputProperty, attributeLocation, diagnostics) is
-            { } output
+            GetNamedArgument(attribute, property) is not { Value: string written }
+            || string.IsNullOrWhiteSpace(written)
         )
         {
-            level = level with { Output = output };
+            return null;
         }
 
-        return level;
+        var value = written.Trim();
+        if (isValid(value))
+        {
+            return value;
+        }
+
+        diagnostics.Add(
+            DiagnosticInfo.Create(SqlDiagnostics.InvalidAttributeValue, attributeLocation, value, property)
+        );
+        return null;
     }
 
     // An enum argument arrives as its number.  A number that is no member of the generator's own form of the enum

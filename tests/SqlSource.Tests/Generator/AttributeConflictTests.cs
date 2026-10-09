@@ -75,6 +75,31 @@ public class AttributeConflictTests
         build.ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Build_AttributeThatSetsTheModelsAndTheMethods_HasNoConflictForTheEnums()
+    {
+        const string Source = """
+            using SqlSource;
+            [SqlSourceGenerate(
+                InputModelType = GeneratorModelType.Class,
+                CollectionType = GeneratorCollectionType.List,
+                MethodLocation = MethodLocation.Internal)]
+            internal partial class Sample { }
+            """;
+
+        var compilerAlone = await GeneratorHarness.BuildAsync(Source, [Users], [Other()], packageAnalyzers: false);
+        var build = await GeneratorHarness.BuildAsync(Source, [Users], [Other()]);
+
+        Places(compilerAlone)
+            .ShouldBe([
+                $"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)",
+                $"CS0436 {GeneratorHarness.SourcePath}(3,22)-(3,40)",
+                $"CS0436 {GeneratorHarness.SourcePath}(4,22)-(4,45)",
+                $"CS0436 {GeneratorHarness.SourcePath}(5,22)-(5,36)",
+            ]);
+        build.ShouldBeEmpty();
+    }
+
     // The case that fails a build: a project that treats warnings as errors.
     [Fact]
     public async Task Build_WarningsAsErrors_HasNoConflictForAGeneratedType()

@@ -21,6 +21,12 @@
             <SqlSourceDialect>$(SqlSourceDialect.Trim())</SqlSourceDialect>
             <SqlSourceGeneratorParameters>$(SqlSourceGeneratorParameters.Trim())</SqlSourceGeneratorParameters>
             <SqlSourceOutput>$(SqlSourceOutput.Trim())</SqlSourceOutput>
+            <SqlSourceInputModelSuffix>$(SqlSourceInputModelSuffix.Trim())</SqlSourceInputModelSuffix>
+            <SqlSourceOutputModelSuffix>$(SqlSourceOutputModelSuffix.Trim())</SqlSourceOutputModelSuffix>
+            <SqlSourceModelNamespace>$(SqlSourceModelNamespace.Trim())</SqlSourceModelNamespace>
+            <SqlSourceInputModelType>$(SqlSourceInputModelType.Trim())</SqlSourceInputModelType>
+            <SqlSourceOutputModelType>$(SqlSourceOutputModelType.Trim())</SqlSourceOutputModelType>
+            <SqlSourceCollectionType>$(SqlSourceCollectionType.Trim())</SqlSourceCollectionType>
             <SqlSourceDatabase>$(SqlSourceDatabase.Trim())</SqlSourceDatabase>
         </PropertyGroup>
     </Target>
@@ -43,15 +49,21 @@
     <Target
         Name="SqlSourceTrimMetadataOfFiles"
         BeforeTargets="GenerateMSBuildEditorConfigFileCore"
-        Outputs="%(AdditionalFiles.SqlSourceDialect)|%(AdditionalFiles.SqlSourceGeneratorParameters)|%(AdditionalFiles.SqlSourceOutput)|%(AdditionalFiles.SqlSourceDatabase)"
+        Outputs="%(AdditionalFiles.SqlSourceDialect)|%(AdditionalFiles.SqlSourceGeneratorParameters)|%(AdditionalFiles.SqlSourceOutput)|%(AdditionalFiles.SqlSourceInputModelSuffix)|%(AdditionalFiles.SqlSourceOutputModelSuffix)|%(AdditionalFiles.SqlSourceModelNamespace)|%(AdditionalFiles.SqlSourceInputModelType)|%(AdditionalFiles.SqlSourceOutputModelType)|%(AdditionalFiles.SqlSourceCollectionType)|%(AdditionalFiles.SqlSourceDatabase)"
     >
         <PropertyGroup>
             <SqlSourceDialectAsWritten>%(AdditionalFiles.SqlSourceDialect)</SqlSourceDialectAsWritten>
             <SqlSourceGeneratorParametersAsWritten>%(AdditionalFiles.SqlSourceGeneratorParameters)</SqlSourceGeneratorParametersAsWritten>
             <SqlSourceOutputAsWritten>%(AdditionalFiles.SqlSourceOutput)</SqlSourceOutputAsWritten>
+            <SqlSourceInputModelSuffixAsWritten>%(AdditionalFiles.SqlSourceInputModelSuffix)</SqlSourceInputModelSuffixAsWritten>
+            <SqlSourceOutputModelSuffixAsWritten>%(AdditionalFiles.SqlSourceOutputModelSuffix)</SqlSourceOutputModelSuffixAsWritten>
+            <SqlSourceModelNamespaceAsWritten>%(AdditionalFiles.SqlSourceModelNamespace)</SqlSourceModelNamespaceAsWritten>
+            <SqlSourceInputModelTypeAsWritten>%(AdditionalFiles.SqlSourceInputModelType)</SqlSourceInputModelTypeAsWritten>
+            <SqlSourceOutputModelTypeAsWritten>%(AdditionalFiles.SqlSourceOutputModelType)</SqlSourceOutputModelTypeAsWritten>
+            <SqlSourceCollectionTypeAsWritten>%(AdditionalFiles.SqlSourceCollectionType)</SqlSourceCollectionTypeAsWritten>
             <SqlSourceDatabaseAsWritten>%(AdditionalFiles.SqlSourceDatabase)</SqlSourceDatabaseAsWritten>
         </PropertyGroup>
-        <ItemGroup Condition="'$(SqlSourceDialectAsWritten)$(SqlSourceGeneratorParametersAsWritten)$(SqlSourceOutputAsWritten)$(SqlSourceDatabaseAsWritten)' != ''">
+        <ItemGroup Condition="'$(SqlSourceDialectAsWritten)$(SqlSourceGeneratorParametersAsWritten)$(SqlSourceOutputAsWritten)$(SqlSourceInputModelSuffixAsWritten)$(SqlSourceOutputModelSuffixAsWritten)$(SqlSourceModelNamespaceAsWritten)$(SqlSourceInputModelTypeAsWritten)$(SqlSourceOutputModelTypeAsWritten)$(SqlSourceCollectionTypeAsWritten)$(SqlSourceDatabaseAsWritten)' != ''">
             <AdditionalFiles>
                 <SqlSourceDialect Condition="'$(SqlSourceDialectAsWritten)' != ''"
                     >$(SqlSourceDialectAsWritten.Trim())</SqlSourceDialect>
@@ -59,6 +71,18 @@
                     >$(SqlSourceGeneratorParametersAsWritten.Trim())</SqlSourceGeneratorParameters>
                 <SqlSourceOutput Condition="'$(SqlSourceOutputAsWritten)' != ''"
                     >$(SqlSourceOutputAsWritten.Trim())</SqlSourceOutput>
+                <SqlSourceInputModelSuffix Condition="'$(SqlSourceInputModelSuffixAsWritten)' != ''"
+                    >$(SqlSourceInputModelSuffixAsWritten.Trim())</SqlSourceInputModelSuffix>
+                <SqlSourceOutputModelSuffix Condition="'$(SqlSourceOutputModelSuffixAsWritten)' != ''"
+                    >$(SqlSourceOutputModelSuffixAsWritten.Trim())</SqlSourceOutputModelSuffix>
+                <SqlSourceModelNamespace Condition="'$(SqlSourceModelNamespaceAsWritten)' != ''"
+                    >$(SqlSourceModelNamespaceAsWritten.Trim())</SqlSourceModelNamespace>
+                <SqlSourceInputModelType Condition="'$(SqlSourceInputModelTypeAsWritten)' != ''"
+                    >$(SqlSourceInputModelTypeAsWritten.Trim())</SqlSourceInputModelType>
+                <SqlSourceOutputModelType Condition="'$(SqlSourceOutputModelTypeAsWritten)' != ''"
+                    >$(SqlSourceOutputModelTypeAsWritten.Trim())</SqlSourceOutputModelType>
+                <SqlSourceCollectionType Condition="'$(SqlSourceCollectionTypeAsWritten)' != ''"
+                    >$(SqlSourceCollectionTypeAsWritten.Trim())</SqlSourceCollectionType>
                 <SqlSourceDatabase Condition="'$(SqlSourceDatabaseAsWritten)' != ''"
                     >$(SqlSourceDatabaseAsWritten.Trim())</SqlSourceDatabase>
             </AdditionalFiles>
@@ -81,7 +105,7 @@
         <ItemGroup>
             <SqlSourceSettingsFile
                 Include="@(AdditionalFiles)"
-                Condition="'%(AdditionalFiles.SqlSourceDialect)%(AdditionalFiles.SqlSourceGeneratorParameters)%(AdditionalFiles.SqlSourceOutput)' != ''"
+                Condition="'%(AdditionalFiles.SqlSourceDialect)%(AdditionalFiles.SqlSourceGeneratorParameters)%(AdditionalFiles.SqlSourceOutput)%(AdditionalFiles.SqlSourceInputModelSuffix)%(AdditionalFiles.SqlSourceOutputModelSuffix)%(AdditionalFiles.SqlSourceModelNamespace)%(AdditionalFiles.SqlSourceInputModelType)%(AdditionalFiles.SqlSourceOutputModelType)%(AdditionalFiles.SqlSourceCollectionType)' != ''"
             />
         </ItemGroup>
     </Target>

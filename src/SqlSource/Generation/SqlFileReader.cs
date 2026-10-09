@@ -69,7 +69,9 @@ internal static class SqlFileReader
                     block.KeptSegments,
                     block.Tokens,
                     block.Parameters,
-                    block.Markers
+                    block.Markers,
+                    block.InputModelName,
+                    block.OutputModelName
                 )
             );
         }

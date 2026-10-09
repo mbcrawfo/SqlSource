@@ -35,6 +35,7 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC116](#sqlsrc116) | Marker is not allowed here |
 | [SQLSRC117](#sqlsrc117) | Parameter has no type |
 | [SQLSRC118](#sqlsrc118) | Parameter is not declared |
+| [SQLSRC119](#sqlsrc119) | Query has no parameters |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
 
@@ -106,7 +107,7 @@ A property of `[SqlSourceGenerate]` has a value it does not take.  The message n
 public partial class UserRepository { }
 ```
 
-Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  `Output` takes `GeneratorOutput.Sql`, `GeneratorOutput.Models` or `GeneratorOutput.CodeGen`.  The type gets no members until the value is fixed.
+Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  `Output` takes `GeneratorOutput.Sql`, `GeneratorOutput.Models` or `GeneratorOutput.CodeGen`.  `InputModelType` and `OutputModelType` take `GeneratorModelType.Record`, `SealedRecord`, `Class` or `SealedClass`; `CollectionType` takes a member of `GeneratorCollectionType`; `MethodLocation` takes a member of `MethodLocation`.  `InputModelSuffix` and `OutputModelSuffix` take characters that can be part of an identifier, and `ModelNamespace` takes a namespace such as `App.Models`; a value that is empty or only white space is not set.  The type gets no members until the value is fixed.
 
 ## SQLSRC007
 
@@ -221,7 +222,7 @@ An MSBuild property of SqlSource, or the metadata of that name on an `Additional
 
 Correct the value, or remove it to keep the default.  While it is wrong the setting is not set; in a list of generator parameters the other words still apply.  The same value in several places is reported once, and the metadata of a file that no type claims is not reported.
 
-`SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceDatabase` is not checked by the generator.
+`SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceInputModelType` and `SqlSourceOutputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `SqlSourceCollectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `SqlSourceInputModelSuffix` and `SqlSourceOutputModelSuffix` take characters that can be part of an identifier, and `SqlSourceModelNamespace` takes a namespace such as `App.Models`.  `SqlSourceDatabase` is not checked by the generator.  Where a type's methods go is set by the attribute alone, so there is no property for it.
 
 The compiler hands a generator only the part of a value before the first `;` or `#`.
 
@@ -370,6 +371,9 @@ A generator parameter has a value it does not take; a `-- dialect:` marker does 
 ```
 
 - `-- output:` takes `sql`, `models` or `codegen`.  `-- database:` takes one word of letters, digits, `-`, `_` and `.`.
+- `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.  `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`.
+- `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`.
+- `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  Neither is a reserved keyword, and no generic type is named.
 
 A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
@@ -390,6 +394,7 @@ Two settings contradict each other.  The error is at the second.
 - Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
 - Two `-- param:` markers for one parameter that give different types or different nullability.
 - Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different) in one scope.
+- Two markers of any other setting of the models and the collection type that give different values in one scope: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
 
 Remove one of the two.  A query's list replaces the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
@@ -471,6 +476,11 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 | `-- token-ignore:` | no | yes |
 | `-- database:` | yes | yes |
 | `-- output:` | yes | yes |
+| `-- input-model-suffix:`, `-- output-model-suffix:` | yes | no |
+| `-- model-namespace:` | yes | no |
+| `-- input-model-type:`, `-- output-model-type:` | yes | yes |
+| `-- input-model:`, `-- output-model:` | no | yes |
+| `-- collection-type:` | yes | yes |
 
 ## SQLSRC117
 
@@ -498,3 +508,17 @@ SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
 ```
 
 Declare the parameter with its type: `-- param: @page int`.
+
+## SQLSRC119
+
+**Query has no parameters**
+
+An `-- input-model:` marker names the type of a query's parameters, and this query has none: no `@name` in its SQL and no `-- param:` marker.
+
+```sql
+-- name: CountUsers
+-- input-model: CountArgs
+SELECT COUNT(*) FROM users;
+```
+
+Remove the marker.

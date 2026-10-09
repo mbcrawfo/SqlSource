@@ -363,6 +363,17 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor InputModelWithoutParameters = new(
+        id: "SQLSRC119",
+        title: "Query has no parameters",
+        messageFormat: "The query has no parameters, so '-- input-model:' names nothing",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc119",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -398,7 +409,8 @@ internal static class SqlDiagnostics
             MisplacedDialect,
             MarkerNotAllowedHere,
             MissingParameterType,
-            UndeclaredParameter
+            UndeclaredParameter,
+            InputModelWithoutParameters
         );
 
     /// <summary>
@@ -425,6 +437,7 @@ internal static class SqlDiagnostics
             SqlParseErrorKind.MarkerNotAllowedHere => MarkerNotAllowedHere,
             SqlParseErrorKind.MissingParameterType => MissingParameterType,
             SqlParseErrorKind.UndeclaredParameter => UndeclaredParameter,
+            SqlParseErrorKind.InputModelWithoutParameters => InputModelWithoutParameters,
             _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "No descriptor is defined for this kind."),
         };
 }

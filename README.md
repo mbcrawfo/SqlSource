@@ -85,13 +85,13 @@ internal static partial class Reports;
 
 Two types that claim one file can ask for different things, and each gets its own SQL.
 
-### Output
+### The other properties
 
-`Output` says what is generated for the queries of the type's files; see Settings for models and methods, below.
+`Output`, `InputModelSuffix`, `OutputModelSuffix`, `ModelNamespace`, `InputModelType`, `OutputModelType`, `MethodLocation` and `CollectionType` are settings for what later releases generate from a query; see Settings for models and methods, below.
 
 ### Projects that share internals
 
-SqlSource adds the attribute and its enums (`SqlLocation` and `GeneratorOutput`) to each project that uses it, as internal types.  A project that sees the internals of another one, as a test project does through `InternalsVisibleTo`, sees each of them twice when both projects use SqlSource.  Each project uses its own copy.  The compiler warns about such a conflict (CS0436), and SqlSource turns that warning off for these types only, as suppression `SQLSRC901`: nothing has to be added to `NoWarn`, and a conflict between two types of your own is still reported.
+SqlSource adds the attribute and its enums (`SqlLocation`, `GeneratorOutput`, `GeneratorModelType`, `GeneratorCollectionType` and `MethodLocation`) to each project that uses it, as internal types.  A project that sees the internals of another one, as a test project does through `InternalsVisibleTo`, sees each of them twice when both projects use SqlSource.  Each project uses its own copy.  The compiler warns about such a conflict (CS0436), and SqlSource turns that warning off for these types only, as suppression `SQLSRC901`: nothing has to be added to `NoWarn`, and a conflict between two types of your own is still reported.
 
 ## SQL files
 
@@ -126,6 +126,11 @@ Words are matched ignoring case.  A marker that describes one query goes inside 
 | `token-ignore` | no | yes | A token's name |
 | `database` | yes | yes | A database's name |
 | `output` | yes | yes | `sql`, `models` or `codegen` |
+| `input-model-suffix`, `output-model-suffix` | yes | no | What ends a model's name |
+| `model-namespace` | yes | no | A namespace |
+| `input-model-type`, `output-model-type` | yes | yes | `record`, `sealed record`, `class` or `sealed class` |
+| `input-model`, `output-model` | no | yes | A type's name, or its full name |
+| `collection-type` | yes | yes | A collection type |
 
 A marker inside a query wins over the same marker before the first query.  Writing a marker twice in one place is fine when the value is the same, and the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112) when it is not.  A comment of yours that happens to start with one of these words and a colon is read as a marker: reword it.
 
@@ -386,8 +391,19 @@ These settings are read and checked today, and have no effect yet.  They belong 
 |----|----|----|----|----|
 | Output | `sql`, `models`, `codegen` | `SqlSourceOutput` | `Output` | `-- output:` |
 | Database | A name: letters, digits, `-`, `_`, `.` | `SqlSourceDatabase` | | `-- database:` |
+| Suffix of a model's name | Characters of an identifier | `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix` | `InputModelSuffix`, `OutputModelSuffix` | `-- input-model-suffix:`, `-- output-model-suffix:`, before the first query only |
+| Namespace of the models | A namespace | `SqlSourceModelNamespace` | `ModelNamespace` | `-- model-namespace:`, before the first query only |
+| Shape of a model | `record`, `sealed record`, `class`, `sealed class` | `SqlSourceInputModelType`, `SqlSourceOutputModelType` | `InputModelType`, `OutputModelType` | `-- input-model-type:`, `-- output-model-type:` |
+| Name of one query's model | A type's name, or its full name | | | `-- input-model:`, `-- output-model:`, inside a query only |
+| Collection type | `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList` | `SqlSourceCollectionType` | `CollectionType` | `-- collection-type:` |
+| Where the methods go | `ExtensionClass`, `Public`, `Internal`, `Private` | | `MethodLocation` | |
+| Shape of a result | `many`, `one`, `one-optional`, `none`, `rowcount` | | | `-- name: Name -> shape` |
+| Parameters | See Parameters | | | `-- param:` |
+| Generator parameters `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` | | `SqlSourceGeneratorParameters` | `Parameters` | `-- generator:` |
 
 A value from a list is matched ignoring case, hyphens and spaces: `CodeGen`, `codegen` and `code-gen` are the same.  The most specific place wins: a marker inside a query, then one before the file's first query, then the attribute, then the metadata of the file's item, then the property.
+
+Where the methods go is decided where the type is declared, as `SqlLocation` is: it is a property of the attribute and nothing else.
 
 ## Errors
 
@@ -430,6 +446,10 @@ To turn the default off and list the files yourself:
 ```
 
 A word that is not a generator parameter is the error [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).  The compiler hands a generator only the part of a value before the first `;` or `#`, so separate the words with spaces.  Write them on one line: the value may stand on a line of its own, but a line break between two words cuts the list there.
+
+### Settings for models and methods
+
+`SqlSourceOutput`, `SqlSourceDatabase`, `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix`, `SqlSourceModelNamespace`, `SqlSourceInputModelType`, `SqlSourceOutputModelType` and `SqlSourceCollectionType` are each a property for the project, and each is also metadata of an `AdditionalFiles` item.  See Settings for models and methods, above.  Write each on one line.
 
 ### Dialect
 

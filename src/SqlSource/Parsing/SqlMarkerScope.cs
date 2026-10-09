@@ -31,6 +31,22 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
 
     private string? _database;
 
+    private string? _inputModelSuffix;
+
+    private string? _outputModelSuffix;
+
+    private string? _modelNamespace;
+
+    private ModelKind? _inputModelType;
+
+    private ModelKind? _outputModelType;
+
+    private CollectionKind? _collectionType;
+
+    private string? _inputModel;
+
+    private string? _outputModel;
+
     /// <summary>The scope's generator parameters.</summary>
     public SqlGeneratorParameterScope Generator { get; } = new();
 
@@ -43,6 +59,12 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
         get => field ??= BuildLevel();
         private set;
     }
+
+    /// <summary>The name a <c>-- input-model:</c> marker gives, with the first such marker, or null.</summary>
+    public (string Name, SqlMarker Marker)? InputModel { get; private set; }
+
+    /// <summary>The name an <c>-- output-model:</c> marker gives, or null.</summary>
+    public string? OutputModel => _outputModel;
 
     /// <summary>The defaults the scope's <c>-- token:</c> markers give, in marker order, each name once.</summary>
     public IReadOnlyList<SqlTokenDefault> TokenDefaults => _tokenDefaults ?? (IReadOnlyList<SqlTokenDefault>)[];
@@ -99,6 +121,50 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
         {
             SetText(ref _database, marker, SettingValue.IsDatabaseName(Value(marker)));
         }
+        else
+        {
+            ReadModelSetting(marker);
+        }
+    }
+
+    private void ReadModelSetting(SqlMarker marker)
+    {
+        if (marker.Kind == SqlMarkerKind.InputModelSuffix)
+        {
+            SetText(ref _inputModelSuffix, marker, SettingValue.IsSuffix(Value(marker)));
+        }
+        else if (marker.Kind == SqlMarkerKind.OutputModelSuffix)
+        {
+            SetText(ref _outputModelSuffix, marker, SettingValue.IsSuffix(Value(marker)));
+        }
+        else if (marker.Kind == SqlMarkerKind.ModelNamespace)
+        {
+            SetText(ref _modelNamespace, marker, SettingValue.IsNamespace(Value(marker)));
+        }
+        else if (marker.Kind == SqlMarkerKind.InputModelType)
+        {
+            SetChoice(ref _inputModelType, marker);
+        }
+        else if (marker.Kind == SqlMarkerKind.OutputModelType)
+        {
+            SetChoice(ref _outputModelType, marker);
+        }
+        else if (marker.Kind == SqlMarkerKind.CollectionType)
+        {
+            SetChoice(ref _collectionType, marker);
+        }
+        else if (marker.Kind == SqlMarkerKind.InputModel)
+        {
+            SetText(ref _inputModel, marker, SettingValue.IsTypeName(Value(marker)));
+            if (_inputModel is { } inputModel && InputModel is null)
+            {
+                InputModel = (inputModel, marker);
+            }
+        }
+        else if (marker.Kind == SqlMarkerKind.OutputModel)
+        {
+            SetText(ref _outputModel, marker, SettingValue.IsTypeName(Value(marker)));
+        }
     }
 
     private static bool IsAllowedInQuery(SqlMarkerKind kind) =>
@@ -108,19 +174,47 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
                 or SqlMarkerKind.TokenIgnore
                 or SqlMarkerKind.Param
                 or SqlMarkerKind.Database
-                or SqlMarkerKind.Output;
+                or SqlMarkerKind.Output
+                or SqlMarkerKind.InputModelType
+                or SqlMarkerKind.OutputModelType
+                or SqlMarkerKind.CollectionType
+                or SqlMarkerKind.InputModel
+                or SqlMarkerKind.OutputModel;
 
     private static bool IsAllowedInPreamble(SqlMarkerKind kind) =>
-        kind is SqlMarkerKind.GeneratorParameters or SqlMarkerKind.Database or SqlMarkerKind.Output;
+        kind
+            is SqlMarkerKind.GeneratorParameters
+                or SqlMarkerKind.Database
+                or SqlMarkerKind.Output
+                or SqlMarkerKind.InputModelSuffix
+                or SqlMarkerKind.OutputModelSuffix
+                or SqlMarkerKind.ModelNamespace
+                or SqlMarkerKind.InputModelType
+                or SqlMarkerKind.OutputModelType
+                or SqlMarkerKind.CollectionType;
 
     private SettingsLevel BuildLevel() =>
-        Generator.Parameters is null && _output is null && _database is null
+        Generator.Parameters is null
+        && _output is null
+        && _database is null
+        && _inputModelSuffix is null
+        && _outputModelSuffix is null
+        && _modelNamespace is null
+        && _inputModelType is null
+        && _outputModelType is null
+        && _collectionType is null
             ? SettingsLevel.None
             : new SettingsLevel
             {
                 Parameters = Generator.Parameters,
                 Output = _output,
                 Database = _database,
+                InputModelSuffix = _inputModelSuffix,
+                OutputModelSuffix = _outputModelSuffix,
+                ModelNamespace = _modelNamespace,
+                InputModelType = _inputModelType,
+                OutputModelType = _outputModelType,
+                CollectionType = _collectionType,
             };
 
     private ReadOnlySpan<char> Value(SqlMarker marker) => text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length);

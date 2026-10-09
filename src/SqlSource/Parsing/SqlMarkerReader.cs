@@ -19,6 +19,14 @@ internal static class SqlMarkerReader
         ("param:", SqlMarkerKind.Param),
         ("database:", SqlMarkerKind.Database),
         ("output:", SqlMarkerKind.Output),
+        ("input-model-suffix:", SqlMarkerKind.InputModelSuffix),
+        ("output-model-suffix:", SqlMarkerKind.OutputModelSuffix),
+        ("model-namespace:", SqlMarkerKind.ModelNamespace),
+        ("input-model-type:", SqlMarkerKind.InputModelType),
+        ("output-model-type:", SqlMarkerKind.OutputModelType),
+        ("input-model:", SqlMarkerKind.InputModel),
+        ("output-model:", SqlMarkerKind.OutputModel),
+        ("collection-type:", SqlMarkerKind.CollectionType),
     ];
 
     /// <summary>

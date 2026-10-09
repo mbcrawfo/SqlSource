@@ -58,4 +58,66 @@ public class SettingValueTests
     [InlineData("a=b", false)]
     public void IsDatabaseName_OneWordOfLettersDigitsAndThreeMarks_IsAName(string value, bool expected) =>
         SettingValue.IsDatabaseName(value.AsSpan()).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("record", 0)]
+    [InlineData("sealed record", 1)]
+    [InlineData("Sealed-Record", 1)]
+    [InlineData("SealedRecord", 1)]
+    [InlineData("class", 2)]
+    [InlineData("sealed class", 3)]
+    public void TryReadChoice_ModelType_IsRead(string value, int expected)
+    {
+        SettingValue.TryReadChoice<ModelKind>(value.AsSpan(), out var kind).ShouldBeTrue();
+
+        ((int)kind).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("IEnumerable", 0)]
+    [InlineData("ilist", 3)]
+    [InlineData("list", 6)]
+    [InlineData("Array", 5)]
+    [InlineData("immutable-array", 7)]
+    [InlineData("ImmutableList", 8)]
+    [InlineData("IImmutableList", 9)]
+    public void TryReadChoice_CollectionType_IsRead(string value, int expected)
+    {
+        SettingValue.TryReadChoice<CollectionKind>(value.AsSpan(), out var kind).ShouldBeTrue();
+
+        ((int)kind).ShouldBe(expected);
+    }
+
+    [Theory]
+    [InlineData("Dto", true)]
+    [InlineData("_Row2", true)]
+    [InlineData("2", true)]
+    [InlineData("", false)]
+    [InlineData("A B", false)]
+    [InlineData("A-B", false)]
+    [InlineData("A.B", false)]
+    public void IsSuffix_CharactersThatCanFollowTheFirstOfAnIdentifier_IsASuffix(string value, bool expected) =>
+        SettingValue.IsSuffix(value.AsSpan()).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("App", true)]
+    [InlineData("App.Data.Models", true)]
+    [InlineData("", false)]
+    [InlineData("App.", false)]
+    [InlineData(".App", false)]
+    [InlineData("App..Data", false)]
+    [InlineData("App.class", false)]
+    [InlineData("App.1st", false)]
+    [InlineData("global::App", false)]
+    public void IsNamespace_IdentifiersJoinedByPeriods_IsANamespace(string value, bool expected) =>
+        SettingValue.IsNamespace(value.AsSpan()).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("UserRow", true)]
+    [InlineData("App.Models.UserRow", true)]
+    [InlineData("class", false)]
+    [InlineData("User Row", false)]
+    [InlineData("UserRow<T>", false)]
+    public void IsTypeName_AnIdentifierOrAFullName_IsATypeName(string value, bool expected) =>
+        SettingValue.IsTypeName(value.AsSpan()).ShouldBe(expected);
 }

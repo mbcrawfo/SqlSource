@@ -75,6 +75,61 @@ public class MSBuildSettingsTests
         settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceOutput", "nope")]);
     }
 
+    [Theory]
+    [MemberData(nameof(ModelSettings))]
+    public void ReadProject_ModelSetting_IsReadOrIsInvalidAndNotSet(string name, string valid, string invalid)
+    {
+        var read = ProjectSettings.Read(Provider(name, " " + valid + " ").GlobalOptions);
+        var rejected = ProjectSettings.Read(Provider(name, invalid).GlobalOptions);
+
+        Resolve(read.Level).ShouldNotBe(Resolve(SettingsLevel.None));
+        read.Invalid.ShouldBeEmpty();
+        Resolve(rejected.Level).ShouldBe(Resolve(SettingsLevel.None));
+        rejected.Level.ShouldBeSameAs(SettingsLevel.None);
+        rejected.Invalid.ShouldBe([new InvalidSetting(name, invalid)]);
+    }
+
+    [Theory]
+    [MemberData(nameof(ModelSettings))]
+    public void ReadFile_ModelSetting_IsReadOrIsInvalidAndNotSet(string name, string valid, string invalid)
+    {
+        var read = ReadFileMetadata(new Dictionary<string, string> { [name] = valid });
+        var rejected = ReadFileMetadata(new Dictionary<string, string> { [name] = invalid });
+
+        Resolve(read.ShouldNotBeNull().Level).ShouldNotBe(Resolve(SettingsLevel.None));
+        read.Invalid.ShouldBeEmpty();
+        Resolve(rejected.ShouldNotBeNull().Level).ShouldBe(Resolve(SettingsLevel.None));
+        rejected.Invalid.ShouldBe([new InvalidSetting(name, invalid)]);
+    }
+
+    [Fact]
+    public void ReadProject_ModelSettings_AreReadIntoTheirMembers()
+    {
+        var properties = new Dictionary<string, string?>
+        {
+            ["SqlSourceInputModelSuffix"] = "Args",
+            ["SqlSourceOutputModelSuffix"] = "Row",
+            ["SqlSourceModelNamespace"] = "App.Models",
+            ["SqlSourceInputModelType"] = "sealed class",
+            ["SqlSourceOutputModelType"] = "Record",
+            ["SqlSourceCollectionType"] = "immutable-array",
+        };
+
+        var level = ProjectSettings.Read(new TestOptionsProvider(null, properties: properties).GlobalOptions).Level;
+
+        level.ShouldBe(
+            new SettingsLevel
+            {
+                InputModelSuffix = "Args",
+                OutputModelSuffix = "Row",
+                ModelNamespace = "App.Models",
+                InputModelType = ModelKind.SealedClass,
+                OutputModelType = ModelKind.Record,
+                CollectionType = CollectionKind.ImmutableArray,
+            }
+        );
+    }
+
     [Fact]
     public void ReadFile_NothingSet_IsNull() =>
         FileSettings
@@ -100,6 +155,23 @@ public class MSBuildSettingsTests
         settings.ShouldNotBeNull().Level.Parameters.ShouldBe(GeneratorParameters.None);
         settings.NormalizedPath.ShouldBe("app/Repo/Users.sql");
     }
+
+    public static TheoryData<string, string, string> ModelSettings =>
+        new()
+        {
+            { "SqlSourceInputModelSuffix", "Args", "A B" },
+            { "SqlSourceOutputModelSuffix", "Row", "A.B" },
+            { "SqlSourceModelNamespace", "App.Models", "App." },
+            { "SqlSourceInputModelType", "sealed class", "struct" },
+            { "SqlSourceOutputModelType", "Class", "sealed" },
+            { "SqlSourceCollectionType", "IReadOnlyList", "HashSet" },
+        };
+
+    private static TestOptionsProvider Provider(string name, string value) =>
+        new(null, properties: new Dictionary<string, string?> { [name] = value });
+
+    private static QuerySettings Resolve(SettingsLevel level) =>
+        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None, level);
 
     private static Dictionary<string, string> Output(string value) => new() { ["SqlSourceOutput"] = value };
 

@@ -15,6 +15,12 @@ internal static class AttributeSource
 
     public const string OutputMetadataName = "SqlSource.GeneratorOutput";
 
+    public const string ModelTypeMetadataName = "SqlSource.GeneratorModelType";
+
+    public const string CollectionTypeMetadataName = "SqlSource.GeneratorCollectionType";
+
+    public const string MethodLocationMetadataName = "SqlSource.MethodLocation";
+
     public const string PathProperty = "Path";
 
     public const string LocationProperty = "SqlLocation";
@@ -23,13 +29,34 @@ internal static class AttributeSource
 
     public const string OutputProperty = "Output";
 
+    public const string InputModelSuffixProperty = "InputModelSuffix";
+
+    public const string OutputModelSuffixProperty = "OutputModelSuffix";
+
+    public const string ModelNamespaceProperty = "ModelNamespace";
+
+    public const string InputModelTypeProperty = "InputModelType";
+
+    public const string OutputModelTypeProperty = "OutputModelType";
+
+    public const string MethodLocationProperty = "MethodLocation";
+
+    public const string CollectionTypeProperty = "CollectionType";
+
     /// <summary>
     /// The metadata name of every type that <see cref="Text" /> declares.  A project that sees the internals of
     /// another one that uses SqlSource sees each of them twice, and <c>AttributeConflictSuppressor</c> turns the
     /// compiler's warning off for exactly these.
     /// </summary>
     public static ImmutableArray<string> GeneratedTypes { get; } =
-        ImmutableArray.Create(AttributeMetadataName, LocationMetadataName, OutputMetadataName);
+        ImmutableArray.Create(
+            AttributeMetadataName,
+            LocationMetadataName,
+            OutputMetadataName,
+            ModelTypeMetadataName,
+            CollectionTypeMetadataName,
+            MethodLocationMetadataName
+        );
 
     // Only an attribute class can be [Conditional], so the enums stay in the consumer's assembly.  The attribute
     // itself is not applied in metadata unless the consumer defines SQLSOURCE_ATTRIBUTES.
@@ -86,7 +113,115 @@ internal static class AttributeSource
             }
 
             /// <summary>
-            /// Generates a member for each query in the <c>.sql</c> files of the type.
+            /// The shape of a type that SqlSource generates for a query.
+            /// </summary>
+            internal enum GeneratorModelType
+            {
+                /// <summary>
+                /// A positional record.
+                /// </summary>
+                Record = 0,
+
+                /// <summary>
+                /// A sealed positional record.
+                /// </summary>
+                SealedRecord = 1,
+
+                /// <summary>
+                /// A class with a property for each member.
+                /// </summary>
+                Class = 2,
+
+                /// <summary>
+                /// A sealed class with a property for each member.
+                /// </summary>
+                SealedClass = 3,
+            }
+
+            /// <summary>
+            /// The type a generated method returns many rows in.  Every one is filled before the method returns.
+            /// </summary>
+            internal enum GeneratorCollectionType
+            {
+                /// <summary>
+                /// <c>IEnumerable&lt;T&gt;</c>, over an array.
+                /// </summary>
+                IEnumerable = 0,
+
+                /// <summary>
+                /// <c>ICollection&lt;T&gt;</c>, over a list.
+                /// </summary>
+                ICollection = 1,
+
+                /// <summary>
+                /// <c>IReadOnlyCollection&lt;T&gt;</c>, over an array.
+                /// </summary>
+                IReadOnlyCollection = 2,
+
+                /// <summary>
+                /// <c>IList&lt;T&gt;</c>, over a list.
+                /// </summary>
+                IList = 3,
+
+                /// <summary>
+                /// <c>IReadOnlyList&lt;T&gt;</c>, over an array.
+                /// </summary>
+                IReadOnlyList = 4,
+
+                /// <summary>
+                /// An array.
+                /// </summary>
+                Array = 5,
+
+                /// <summary>
+                /// <c>List&lt;T&gt;</c>.
+                /// </summary>
+                List = 6,
+
+                /// <summary>
+                /// <c>ImmutableArray&lt;T&gt;</c>.
+                /// </summary>
+                ImmutableArray = 7,
+
+                /// <summary>
+                /// <c>ImmutableList&lt;T&gt;</c>.
+                /// </summary>
+                ImmutableList = 8,
+
+                /// <summary>
+                /// <c>IImmutableList&lt;T&gt;</c>, over an immutable list.
+                /// </summary>
+                IImmutableList = 9,
+            }
+
+            /// <summary>
+            /// Where the methods that run the queries of a type go.
+            /// </summary>
+            internal enum MethodLocation
+            {
+                /// <summary>
+                /// In a generated static class beside the type, as extension methods of <c>DbConnection</c>.
+                /// </summary>
+                ExtensionClass = 0,
+
+                /// <summary>
+                /// On the type, as public static methods.
+                /// </summary>
+                Public = 1,
+
+                /// <summary>
+                /// On the type, as internal static methods.
+                /// </summary>
+                Internal = 2,
+
+                /// <summary>
+                /// On the type, as private static methods.
+                /// </summary>
+                Private = 3,
+            }
+
+            /// <summary>
+            /// Generates code for each query in the <c>.sql</c> files of the type.
             /// </summary>
             [global::System.AttributeUsage(
                 global::System.AttributeTargets.Class | global::System.AttributeTargets.Struct,
@@ -113,6 +248,46 @@ internal static class AttributeSource
                 /// <see cref="global::SqlSource.GeneratorOutput.CodeGen" />.  A marker in a file comes first.
                 /// </summary>
                 public GeneratorOutput Output { get; set; }
+
+                /// <summary>
+                /// What ends the name of the type of a query's parameters.  The default is <c>Params</c>.
+                /// </summary>
+                public string InputModelSuffix { get; set; }
+
+                /// <summary>
+                /// What ends the name of the type of a row of a query's result.  The default is <c>Dto</c>.
+                /// </summary>
+                public string OutputModelSuffix { get; set; }
+
+                /// <summary>
+                /// The namespace of the types generated for the queries.  The default is the namespace of this
+                /// type.
+                /// </summary>
+                public string ModelNamespace { get; set; }
+
+                /// <summary>
+                /// The shape of the type of a query's parameters.  The default is
+                /// <see cref="global::SqlSource.GeneratorModelType.SealedRecord" />.
+                /// </summary>
+                public GeneratorModelType InputModelType { get; set; }
+
+                /// <summary>
+                /// The shape of the type of a row of a query's result.  The default is
+                /// <see cref="global::SqlSource.GeneratorModelType.SealedRecord" />.
+                /// </summary>
+                public GeneratorModelType OutputModelType { get; set; }
+
+                /// <summary>
+                /// Where the methods that run the queries go.  The default is
+                /// <see cref="global::SqlSource.MethodLocation.ExtensionClass" />.
+                /// </summary>
+                public MethodLocation MethodLocation { get; set; }
+
+                /// <summary>
+                /// The type a method returns many rows in.  The default is
+                /// <see cref="global::SqlSource.GeneratorCollectionType.Array" />.
+                /// </summary>
+                public GeneratorCollectionType CollectionType { get; set; }
 
                 /// <summary>
                 /// Generator parameters for the queries of the type's files, separated by spaces, as a

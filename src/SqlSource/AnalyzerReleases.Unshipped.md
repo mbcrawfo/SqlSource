@@ -36,3 +36,4 @@ SQLSRC115 | SqlSource | Error | Dialect marker is misplaced
 SQLSRC116 | SqlSource | Error | Marker is not allowed here
 SQLSRC117 | SqlSource | Error | Parameter has no type
 SQLSRC118 | SqlSource | Error | Parameter is not declared
+SQLSRC119 | SqlSource | Error | Query has no parameters
