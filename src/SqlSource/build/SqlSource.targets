@@ -20,6 +20,8 @@
         <PropertyGroup>
             <SqlSourceDialect>$(SqlSourceDialect.Trim())</SqlSourceDialect>
             <SqlSourceGeneratorParameters>$(SqlSourceGeneratorParameters.Trim())</SqlSourceGeneratorParameters>
+            <SqlSourceOutput>$(SqlSourceOutput.Trim())</SqlSourceOutput>
+            <SqlSourceDatabase>$(SqlSourceDatabase.Trim())</SqlSourceDatabase>
         </PropertyGroup>
     </Target>
     <!--
@@ -33,35 +35,44 @@
         not written to it as an empty value.
 
         A property as written is on one line however long its name is: white space around the value would be part of
-        it, and the condition of the item group would then hold for every file.  So the check of the line length is
-        off for those lines.
+        it, and the condition of the item group would then hold for every file.  The names of the metadata make the
+        list of Outputs and the condition long too, and neither can be wrapped.  So the check of the line length is
+        off for the whole target.
     -->
+    <!-- editorconfig-checker-disable -->
     <Target
         Name="SqlSourceTrimMetadataOfFiles"
         BeforeTargets="GenerateMSBuildEditorConfigFileCore"
-        Outputs="%(AdditionalFiles.SqlSourceDialect)|%(AdditionalFiles.SqlSourceGeneratorParameters)"
+        Outputs="%(AdditionalFiles.SqlSourceDialect)|%(AdditionalFiles.SqlSourceGeneratorParameters)|%(AdditionalFiles.SqlSourceOutput)|%(AdditionalFiles.SqlSourceDatabase)"
     >
-        <!-- editorconfig-checker-disable -->
         <PropertyGroup>
             <SqlSourceDialectAsWritten>%(AdditionalFiles.SqlSourceDialect)</SqlSourceDialectAsWritten>
             <SqlSourceGeneratorParametersAsWritten>%(AdditionalFiles.SqlSourceGeneratorParameters)</SqlSourceGeneratorParametersAsWritten>
+            <SqlSourceOutputAsWritten>%(AdditionalFiles.SqlSourceOutput)</SqlSourceOutputAsWritten>
+            <SqlSourceDatabaseAsWritten>%(AdditionalFiles.SqlSourceDatabase)</SqlSourceDatabaseAsWritten>
         </PropertyGroup>
-        <!-- editorconfig-checker-enable -->
-        <ItemGroup Condition="'$(SqlSourceDialectAsWritten)$(SqlSourceGeneratorParametersAsWritten)' != ''">
+        <ItemGroup Condition="'$(SqlSourceDialectAsWritten)$(SqlSourceGeneratorParametersAsWritten)$(SqlSourceOutputAsWritten)$(SqlSourceDatabaseAsWritten)' != ''">
             <AdditionalFiles>
                 <SqlSourceDialect Condition="'$(SqlSourceDialectAsWritten)' != ''"
                     >$(SqlSourceDialectAsWritten.Trim())</SqlSourceDialect>
                 <SqlSourceGeneratorParameters Condition="'$(SqlSourceGeneratorParametersAsWritten)' != ''"
                     >$(SqlSourceGeneratorParametersAsWritten.Trim())</SqlSourceGeneratorParameters>
+                <SqlSourceOutput Condition="'$(SqlSourceOutputAsWritten)' != ''"
+                    >$(SqlSourceOutputAsWritten.Trim())</SqlSourceOutput>
+                <SqlSourceDatabase Condition="'$(SqlSourceDatabaseAsWritten)' != ''"
+                    >$(SqlSourceDatabaseAsWritten.Trim())</SqlSourceDatabase>
             </AdditionalFiles>
         </ItemGroup>
     </Target>
+    <!-- editorconfig-checker-enable -->
     <!--
         The compiler reads the metadata from the items of SqlSourceSettingsFile: see SqlSource.props.  These are the
         files that have any of the metadata, and a project has few of them.  This depends on the trim, so that it
         copies trimmed values and leaves out a file whose values were only white space.  MSBuild does not promise an
-        order for two targets that hook the same one.
+        order for two targets that hook the same one.  SqlSourceDatabase is trimmed above and not collected: the
+        compiler is not shown it.  The condition is long, and cannot be wrapped.
     -->
+    <!-- editorconfig-checker-disable -->
     <Target
         Name="SqlSourceCollectSettingsFiles"
         BeforeTargets="GenerateMSBuildEditorConfigFileCore"
@@ -70,10 +81,11 @@
         <ItemGroup>
             <SqlSourceSettingsFile
                 Include="@(AdditionalFiles)"
-                Condition="'%(AdditionalFiles.SqlSourceDialect)%(AdditionalFiles.SqlSourceGeneratorParameters)' != ''"
+                Condition="'%(AdditionalFiles.SqlSourceDialect)%(AdditionalFiles.SqlSourceGeneratorParameters)%(AdditionalFiles.SqlSourceOutput)' != ''"
             />
         </ItemGroup>
     </Target>
+    <!-- editorconfig-checker-enable -->
     <!--
         Makes the build after a .sql file is deleted, renamed or moved compile again.  A file that is gone has no
         timestamp to compare, and the SDK's own record of what the compiler was given does not hold AdditionalFiles.

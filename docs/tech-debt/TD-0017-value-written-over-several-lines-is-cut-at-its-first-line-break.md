@@ -15,7 +15,7 @@ A list of generator parameters that is written with one word on each line theref
 </PropertyGroup>
 ```
 
-The build writes `build_property.SqlSourceGeneratorParameters = keep-comments` and then a line that holds only `no-token-validation`, which the compiler ignores.  The generator sees `keep-comments` alone.  Nothing is reported: the methods of the project check their arguments.  The same happens to the metadata of an `AdditionalFiles` item, and to `SqlSourceDialect` when an option is on a line after the name of the dialect.
+The build writes `build_property.SqlSourceGeneratorParameters = keep-comments` and then a line that holds only `no-token-validation`, which the compiler ignores.  The generator sees `keep-comments` alone.  Nothing is reported: the methods of the project check their arguments.  The same happens to the metadata of an `AdditionalFiles` item, and to `SqlSourceDialect` when an option is on a line after the name of the dialect.  A value of `SqlSourceOutput`, such as `code` and `gen` on two lines, or of `SqlSourceDatabase`, is cut the same way.
 
 ## Why it exists
 

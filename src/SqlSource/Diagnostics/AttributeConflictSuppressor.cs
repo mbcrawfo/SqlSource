@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -28,17 +29,20 @@ public sealed class AttributeConflictSuppressor : DiagnosticSuppressor
     {
         // The project's own copies.  A type of the same name that the project declares elsewhere is not one of them.
         var assembly = context.Compilation.Assembly;
-        var attribute = assembly.GetTypeByMetadataName(AttributeSource.AttributeMetadataName);
-        var location = assembly.GetTypeByMetadataName(AttributeSource.LocationMetadataName);
+        var generated = new List<INamedTypeSymbol>(AttributeSource.GeneratedTypes.Length);
+        foreach (var name in AttributeSource.GeneratedTypes)
+        {
+            if (assembly.GetTypeByMetadataName(name) is { } own)
+            {
+                generated.Add(own);
+            }
+        }
 
         foreach (var diagnostic in context.ReportedDiagnostics)
         {
             if (
                 UsedType(context, diagnostic) is { } type
-                && (
-                    SymbolEqualityComparer.Default.Equals(type, attribute)
-                    || SymbolEqualityComparer.Default.Equals(type, location)
-                )
+                && generated.Exists(own => SymbolEqualityComparer.Default.Equals(type, own))
             )
             {
                 context.ReportSuppression(Suppression.Create(Descriptor, diagnostic));

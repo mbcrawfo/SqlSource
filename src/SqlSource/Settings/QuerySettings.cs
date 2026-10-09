@@ -4,7 +4,8 @@ namespace SqlSource.Settings;
 /// The settings in effect for one query, for one type that claims its file.
 /// </summary>
 /// <param name="Parameters">The list of generator parameters.</param>
-internal readonly record struct QuerySettings(GeneratorParameters Parameters)
+/// <param name="Output">What is generated for the query.  It has no effect yet.</param>
+internal readonly record struct QuerySettings(GeneratorParameters Parameters, OutputKind Output)
 {
     /// <summary>Whether comments and blank lines stay in the query's SQL.</summary>
     public bool KeepComments => (Parameters & GeneratorParameters.KeepComments) != 0;
@@ -27,6 +28,7 @@ internal readonly record struct QuerySettings(GeneratorParameters Parameters)
                 ?? attribute.Parameters
                 ?? metadata.Parameters
                 ?? property.Parameters
-                ?? GeneratorParameters.None
+                ?? GeneratorParameters.None,
+            markers.Output ?? attribute.Output ?? metadata.Output ?? property.Output ?? OutputKind.CodeGen
         );
 }

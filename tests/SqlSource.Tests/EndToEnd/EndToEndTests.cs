@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Reflection;
 using Shouldly;
+using SqlSource.Generation;
 using Xunit;
 
 namespace SqlSource.Tests.EndToEnd;
@@ -205,7 +206,10 @@ public class EndToEndTests
     {
         var assembly = typeof(EndToEndTests).Assembly;
 
-        assembly.GetType("SqlSource.SqlSourceGenerateAttribute").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
-        assembly.GetType("SqlSource.SqlLocation").ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
+        AttributeSource.GeneratedTypes.ShouldNotBeEmpty();
+        foreach (var name in AttributeSource.GeneratedTypes)
+        {
+            assembly.GetType(name).ShouldNotBeNull().IsNotPublic.ShouldBeTrue();
+        }
     }
 }

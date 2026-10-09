@@ -9,7 +9,7 @@ namespace SqlSource.Tests.Generator;
 
 // A project that sees the internals of another one that uses SqlSource, as a test project sees the project it tests.
 // Both hold the generated attribute and enum, and the compiler warns (CS0436) at every use of either name in this
-// project's own code.  The package turns that warning off, for those two types only.
+// project's own code.  The package turns that warning off, for the generated types only.
 public class AttributeConflictTests
 {
     private const string InternalsVisible =
@@ -24,6 +24,8 @@ public class AttributeConflictTests
     [InlineData("[global::SqlSource.SqlSourceGenerate()]\ninternal partial class Sample { }", "(1,20)-(1,37)")]
     [InlineData("internal class Sample { object o = typeof(SqlSource.SqlLocation); }", "(1,53)-(1,64)")]
     [InlineData("internal class Sample { object o = SqlSource.SqlLocation.Direct; }", "(1,36)-(1,57)")]
+    [InlineData("internal class Sample { object o = typeof(SqlSource.GeneratorOutput); }", "(1,53)-(1,68)")]
+    [InlineData("internal class Sample { object o = SqlSource.GeneratorOutput.Sql; }", "(1,36)-(1,61)")]
     public async Task Build_UseOfAGeneratedType_IsAConflictOnlyWithoutThePackageAnalyzers(string source, string span)
     {
         var compilerAlone = await GeneratorHarness.BuildAsync(source, [Users], [Other()], packageAnalyzers: false);
@@ -49,6 +51,26 @@ public class AttributeConflictTests
             .ShouldBe([
                 $"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)",
                 $"CS0436 {GeneratorHarness.SourcePath}(2,34)-(2,45)",
+            ]);
+        build.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Build_AttributeThatSetsTheOutput_HasNoConflictForTheEnum()
+    {
+        const string Source = """
+            using SqlSource;
+            [SqlSourceGenerate(Output = GeneratorOutput.Sql)]
+            internal partial class Sample { }
+            """;
+
+        var compilerAlone = await GeneratorHarness.BuildAsync(Source, [Users], [Other()], packageAnalyzers: false);
+        var build = await GeneratorHarness.BuildAsync(Source, [Users], [Other()]);
+
+        Places(compilerAlone)
+            .ShouldBe([
+                $"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)",
+                $"CS0436 {GeneratorHarness.SourcePath}(2,29)-(2,44)",
             ]);
         build.ShouldBeEmpty();
     }
@@ -92,6 +114,7 @@ public class AttributeConflictTests
     [Theory]
     [InlineData("Mine", "SqlLocation")]
     [InlineData("Mine", "SqlSourceGenerateAttribute")]
+    [InlineData("Mine", "GeneratorOutput")]
     [InlineData("SqlSource", "Shared")]
     [InlineData("SqlSource.Inner", "SqlLocation")]
     public async Task Build_UseOfATypeThatBothProjectsDeclare_IsStillAConflict(string @namespace, string name)

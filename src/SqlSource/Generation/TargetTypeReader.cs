@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -8,6 +9,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Diagnostics;
 using SqlSource.Settings;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Generation;
 
@@ -209,7 +211,47 @@ internal static class TargetTypeReader
             }
         }
 
+        if (
+            ReadChoice<OutputKind>(attribute, AttributeSource.OutputProperty, attributeLocation, diagnostics) is
+            { } output
+        )
+        {
+            level = level with { Output = output };
+        }
+
         return level;
+    }
+
+    // An enum argument arrives as its number.  A number that is no member of the generator's own form of the enum
+    // was written with a cast, and is reported.  An argument that is not a constant has no value here; the compiler
+    // reports it.
+    private static T? ReadChoice<T>(
+        AttributeData attribute,
+        string property,
+        LocationInfo attributeLocation,
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+    )
+        where T : struct, Enum
+    {
+        if (GetNamedArgument(attribute, property) is not { Value: int value })
+        {
+            return null;
+        }
+
+        if (Enum.IsDefined(typeof(T), value))
+        {
+            return (T)Enum.ToObject(typeof(T), value);
+        }
+
+        diagnostics.Add(
+            DiagnosticInfo.Create(
+                SqlDiagnostics.InvalidAttributeValue,
+                attributeLocation,
+                value.ToString(CultureInfo.InvariantCulture),
+                property
+            )
+        );
+        return null;
     }
 
     private static TypedConstant? GetNamedArgument(AttributeData attribute, string name)

@@ -27,4 +27,10 @@ internal enum SqlMarkerKind
     /// <c>-- param:</c> declares a parameter of its query: its type, whether it is nullable, or both.
     /// </summary>
     Param,
+
+    /// <summary><c>-- database:</c> names the database of a query, or of every query of its file.</summary>
+    Database,
+
+    /// <summary><c>-- output:</c> says what is generated for a query, or for every query of its file.</summary>
+    Output,
 }

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Diagnostics;
 using SqlSource.Settings;
@@ -15,6 +16,8 @@ namespace SqlSource.Generation;
 internal static class MSBuildSettings
 {
     public const string GeneratorParametersName = "SqlSourceGeneratorParameters";
+
+    public const string OutputName = "SqlSourceOutput";
 
     /// <summary>Where the compiler puts the properties of the project.</summary>
     public static SettingKeys Property { get; } = new("build_property.");
@@ -46,12 +49,41 @@ internal static class MSBuildSettings
             }
         }
 
+        if (ReadChoice<OutputKind>(options, keys.Output, OutputName, ref invalid) is { } output)
+        {
+            level = level with { Output = output };
+        }
+
         return level;
+    }
+
+    private static T? ReadChoice<T>(
+        AnalyzerConfigOptions options,
+        string key,
+        string name,
+        ref List<InvalidSetting>? invalid
+    )
+        where T : struct, Enum
+    {
+        if (!options.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (SettingValue.TryReadChoice<T>(value.AsSpan().Trim(), out var choice))
+        {
+            return choice;
+        }
+
+        (invalid ??= []).Add(new InvalidSetting(name, value.Trim()));
+        return null;
     }
 
     /// <summary>The keys of the settings under one prefix, built once.</summary>
     internal sealed class SettingKeys(string prefix)
     {
         public string GeneratorParameters { get; } = prefix + GeneratorParametersName;
+
+        public string Output { get; } = prefix + OutputName;
     }
 }

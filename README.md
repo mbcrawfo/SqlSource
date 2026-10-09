@@ -50,6 +50,7 @@ The package is a development dependency.  It adds nothing to your application's 
 | `Path` | The folder of the source file that carries the attribute | A folder or one `.sql` file, relative to that folder |
 | `SqlLocation` | `SqlLocation.Nested` | Where the generated members go |
 | `Parameters` | Not set | Generator parameters for the queries of the type's files |
+| `Output` | `GeneratorOutput.CodeGen` | What is generated for the queries of the type's files |
 
 ### Which files belong to a type
 
@@ -84,13 +85,17 @@ internal static partial class Reports;
 
 Two types that claim one file can ask for different things, and each gets its own SQL.
 
+### Output
+
+`Output` says what is generated for the queries of the type's files; see Settings for models and methods, below.
+
 ### Projects that share internals
 
-SqlSource adds the attribute and `SqlLocation` to each project that uses it, as internal types.  A project that sees the internals of another one, as a test project does through `InternalsVisibleTo`, sees both types twice when both projects use SqlSource.  Each project uses its own copy.  The compiler warns about such a conflict (CS0436), and SqlSource turns that warning off for the types it adds to every project and for nothing else, as suppression `SQLSRC901`: nothing has to be added to `NoWarn`, and a conflict between two types of your own is still reported.
+SqlSource adds the attribute and its enums (`SqlLocation` and `GeneratorOutput`) to each project that uses it, as internal types.  A project that sees the internals of another one, as a test project does through `InternalsVisibleTo`, sees each of them twice when both projects use SqlSource.  Each project uses its own copy.  The compiler warns about such a conflict (CS0436), and SqlSource turns that warning off for these types only, as suppression `SQLSRC901`: nothing has to be added to `NoWarn`, and a conflict between two types of your own is still reported.
 
 ## SQL files
 
-A line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows, is a marker.  Nothing else in a comment is read.  The markers are `-- name:`, `-- summary:`, `-- generator:`, `-- dialect:` and `-- token:`, written in any case, and each has its own form for the rest of the line.
+A line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows, is a marker.  Nothing else in a comment is read.  See Markers, below, for the words and where each may stand.
 
 ### Queries
 
@@ -106,9 +111,27 @@ Before the first `-- name:` line a file may hold comments, such as a licence hea
 
 A `-- summary:` line inside a query becomes the documentation of its member.  Several are joined with a space.  A query without one is documented with its name and its file.
 
+### Markers
+
+Words are matched ignoring case.  A marker that describes one query goes inside it, after its `-- name:` line and before its last SQL; one that describes the file goes before the first `-- name:` line.  A file with no `-- name:` line is one query and takes both kinds.
+
+| Marker | Before the first query | Inside a query | Value |
+|----|----|----|----|
+| `name` | | starts one | A name, and optionally `->` and a shape |
+| `summary` | no | yes | Text |
+| `dialect` | yes | no | A dialect and its options (see Dialects) |
+| `generator` | yes | yes | Generator parameters |
+| `param` | no | yes | `@name`, a type, `null` or `not null` (see Parameters) |
+| `token` | no | yes | One `{{name:default}}` (see Tokens) |
+| `token-ignore` | no | yes | A token's name |
+| `database` | yes | yes | A database's name |
+| `output` | yes | yes | `sql`, `models` or `codegen` |
+
+A marker inside a query wins over the same marker before the first query.  Writing a marker twice in one place is fine when the value is the same, and the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112) when it is not.  A comment of yours that happens to start with one of these words and a colon is read as a marker: reword it.
+
 ### What reaches the generated SQL
 
-- Every marker line is removed: `-- name:`, `-- summary:`, `-- generator:`, `-- dialect:`, `-- token:`, `-- token-ignore:` and `-- param:`.
+- Every marker line is removed (see Markers, below).
 - Comments are removed: a line comment is deleted and a block comment becomes one space.  Lines left blank are removed.
 - Optimizer hints, `/*+ ... */` and `/*! ... */`, are kept.  So are MariaDB's `/*M! ... */` and Oracle's `--+ ...` when the dialect is theirs.
 - Strings and quoted identifiers are copied exactly as written.  Where one starts and ends depends on the dialect (see Dialects, below).
@@ -354,6 +377,17 @@ SELECT id, name FROM users {{whereClause}};
 ```
 
 With validation off the method checks nothing.  An empty argument leaves nothing where its token was, and a null argument throws `NullReferenceException`.
+
+## Settings for models and methods
+
+These settings are read and checked today, and have no effect yet.  They belong to what later releases generate from a query: types for its parameters and its result, and a method that runs it.  They are listed so that a value SqlSource rejects can be looked up.
+
+| Setting | Values | Property and metadata | Attribute | Marker |
+|----|----|----|----|----|
+| Output | `sql`, `models`, `codegen` | `SqlSourceOutput` | `Output` | `-- output:` |
+| Database | A name: letters, digits, `-`, `_`, `.` | `SqlSourceDatabase` | | `-- database:` |
+
+A value from a list is matched ignoring case, hyphens and spaces: `CodeGen`, `codegen` and `code-gen` are the same.  The most specific place wins: a marker inside a query, then one before the file's first query, then the attribute, then the metadata of the file's item, then the property.
 
 ## Errors
 

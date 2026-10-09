@@ -31,6 +31,23 @@ internal static class SettingValue
         return false;
     }
 
+    /// <summary>
+    /// Whether <paramref name="value" /> names a database: one word of letters, digits, <c>-</c>, <c>_</c> and
+    /// <c>.</c>.  The tool makes the name of an environment variable from it, so the rule is narrow on purpose.
+    /// </summary>
+    public static bool IsDatabaseName(ReadOnlySpan<char> value)
+    {
+        foreach (var character in value)
+        {
+            if (!char.IsLetterOrDigit(character) && character is not ('-' or '_' or '.'))
+            {
+                return false;
+            }
+        }
+
+        return !value.IsEmpty;
+    }
+
     private static bool Matches(ReadOnlySpan<char> value, string name)
     {
         var matched = 0;

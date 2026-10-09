@@ -27,12 +27,22 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
 
     private List<SqlParameterDeclaration>? _declarations;
 
+    private OutputKind? _output;
+
+    private string? _database;
+
     /// <summary>The scope's generator parameters.</summary>
     public SqlGeneratorParameterScope Generator { get; } = new();
 
-    /// <summary>What the scope's markers say about the settings.</summary>
-    public SettingsLevel Level =>
-        Generator.Parameters is { } parameters ? new SettingsLevel { Parameters = parameters } : SettingsLevel.None;
+    /// <summary>
+    /// What the scope's markers say about the settings.  The shared empty level when they say nothing, and one
+    /// instance for every read until another marker is applied, so that the queries of a file share their preamble's.
+    /// </summary>
+    public SettingsLevel Level
+    {
+        get => field ??= BuildLevel();
+        private set;
+    }
 
     /// <summary>The defaults the scope's <c>-- token:</c> markers give, in marker order, each name once.</summary>
     public IReadOnlyList<SqlTokenDefault> TokenDefaults => _tokenDefaults ?? (IReadOnlyList<SqlTokenDefault>)[];
@@ -50,6 +60,7 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
     /// </summary>
     public void Read(SqlMarker marker, bool inQuery, bool inPreamble)
     {
+        Level = null!; // Built again at the next read of Level.
         if (!((inQuery && IsAllowedInQuery(marker.Kind)) || (inPreamble && IsAllowedInPreamble(marker.Kind))))
         {
             errors.Add(
@@ -80,6 +91,14 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
         {
             ReadParam(marker);
         }
+        else if (marker.Kind == SqlMarkerKind.Output)
+        {
+            SetChoice(ref _output, marker);
+        }
+        else if (marker.Kind == SqlMarkerKind.Database)
+        {
+            SetText(ref _database, marker, SettingValue.IsDatabaseName(Value(marker)));
+        }
     }
 
     private static bool IsAllowedInQuery(SqlMarkerKind kind) =>
@@ -87,9 +106,62 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
             is SqlMarkerKind.GeneratorParameters
                 or SqlMarkerKind.Token
                 or SqlMarkerKind.TokenIgnore
-                or SqlMarkerKind.Param;
+                or SqlMarkerKind.Param
+                or SqlMarkerKind.Database
+                or SqlMarkerKind.Output;
 
-    private static bool IsAllowedInPreamble(SqlMarkerKind kind) => kind is SqlMarkerKind.GeneratorParameters;
+    private static bool IsAllowedInPreamble(SqlMarkerKind kind) =>
+        kind is SqlMarkerKind.GeneratorParameters or SqlMarkerKind.Database or SqlMarkerKind.Output;
+
+    private SettingsLevel BuildLevel() =>
+        Generator.Parameters is null && _output is null && _database is null
+            ? SettingsLevel.None
+            : new SettingsLevel
+            {
+                Parameters = Generator.Parameters,
+                Output = _output,
+                Database = _database,
+            };
+
+    private ReadOnlySpan<char> Value(SqlMarker marker) => text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length);
+
+    // A value from a fixed list.  The same value twice is fine; another value is a conflict, and the first stands.
+    private void SetChoice<T>(ref T? field, SqlMarker marker)
+        where T : struct, Enum
+    {
+        if (!SettingValue.TryReadChoice<T>(Value(marker), out var value))
+        {
+            AddInvalid(marker);
+        }
+        else if (field is { } existing && !EqualityComparer<T>.Default.Equals(existing, value))
+        {
+            AddConflict(marker);
+        }
+        else
+        {
+            field = value;
+        }
+    }
+
+    // A value that is text, taken as written.  It is compared as written, so "billing" and "Billing" are two.
+    private void SetText(ref string? field, SqlMarker marker, bool isValid)
+    {
+        if (!isValid)
+        {
+            AddInvalid(marker);
+            return;
+        }
+
+        var value = Value(marker).ToString();
+        if (field is not null && !string.Equals(field, value, StringComparison.Ordinal))
+        {
+            AddConflict(marker);
+        }
+        else
+        {
+            field = value;
+        }
+    }
 
     // The value is exactly one token with a default, as the SQL would write it.  The default is lexed alone, as the
     // parameter list reads it later: a quote or a comment that does not close inside it would swallow what follows.

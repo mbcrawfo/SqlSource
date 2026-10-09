@@ -106,7 +106,7 @@ A property of `[SqlSourceGenerate]` has a value it does not take.  The message n
 public partial class UserRepository { }
 ```
 
-Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  The type gets no members until the value is fixed.
+Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  `Output` takes `GeneratorOutput.Sql`, `GeneratorOutput.Models` or `GeneratorOutput.CodeGen`.  The type gets no members until the value is fixed.
 
 ## SQLSRC007
 
@@ -220,6 +220,8 @@ An MSBuild property of SqlSource, or the metadata of that name on an `Additional
 ```
 
 Correct the value, or remove it to keep the default.  While it is wrong the setting is not set; in a list of generator parameters the other words still apply.  The same value in several places is reported once, and the metadata of a file that no type claims is not reported.
+
+`SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceDatabase` is not checked by the generator.
 
 The compiler hands a generator only the part of a value before the first `;` or `#`.
 
@@ -367,6 +369,8 @@ A generator parameter has a value it does not take; a `-- dialect:` marker does 
 -- dialect: mysql keep-comments
 ```
 
+- `-- output:` takes `sql`, `models` or `codegen`.  `-- database:` takes one word of letters, digits, `-`, `_` and `.`.
+
 A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
 A `-- token:` marker holds exactly one token with a default, `{{name:default}}`, and nothing else; and a quote or a block comment inside the default must close there.
@@ -385,6 +389,7 @@ Two settings contradict each other.  The error is at the second.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 - Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
 - Two `-- param:` markers for one parameter that give different types or different nullability.
+- Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different) in one scope.
 
 Remove one of the two.  A query's list replaces the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
@@ -454,6 +459,18 @@ SELECT id FROM users WHERE 1 = 1 {{filter}};
 ```
 
 Move the marker to where the message says.  A file with no `-- name:` line is one query, and takes every marker.
+
+| Marker | Before the first `-- name:` line | Inside a query |
+|----|----|----|
+| `-- name:` | no | starts one |
+| `-- summary:` | no | yes |
+| `-- dialect:` | yes | no |
+| `-- generator:` | yes | yes |
+| `-- param:` | no | yes |
+| `-- token:` | no | yes |
+| `-- token-ignore:` | no | yes |
+| `-- database:` | yes | yes |
+| `-- output:` | yes | yes |
 
 ## SQLSRC117
 

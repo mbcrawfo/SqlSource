@@ -27,6 +27,10 @@ public class SqlMarkerReaderTests
     [InlineData("-- param: @a int", "Param:@a int")]
     [InlineData("--PARAM:@a", "Param:@a")]
     [InlineData("-- param:", "Param:")]
+    [InlineData("-- output: sql", "Output:sql")]
+    [InlineData("-- OUTPUT:code-gen", "Output:code-gen")]
+    [InlineData("-- database: a", "Database:a")]
+    [InlineData("--Database:  billing-v2 ", "Database:billing-v2")]
     [InlineData("-- token: {{a:b}}", "Token:{{a:b}}")]
     [InlineData("-- TOKEN: x", "Token:x")]
     [InlineData("--token:", "Token:")]
@@ -68,6 +72,10 @@ public class SqlMarkerReaderTests
     [InlineData("-- dialects: mysql")]
     [InlineData("-- params: @a")]
     [InlineData("-- param @a")]
+    [InlineData("-- outputs: x")]
+    [InlineData("-- output sql")]
+    [InlineData("-- databases: x")]
+    [InlineData("SELECT 1 -- database: a")]
     [InlineData("SELECT 1 -- param: @a")]
     [InlineData("-- tokens: x")]
     [InlineData("-- token x")]
@@ -127,6 +135,8 @@ public class SqlMarkerReaderTests
         SqlMarkerReader.WordOf(SqlMarkerKind.Token).ShouldBe("token");
         SqlMarkerReader.WordOf(SqlMarkerKind.GeneratorParameters).ShouldBe("generator");
         SqlMarkerReader.WordOf(SqlMarkerKind.Param).ShouldBe("param");
+        SqlMarkerReader.WordOf(SqlMarkerKind.Output).ShouldBe("output");
+        SqlMarkerReader.WordOf(SqlMarkerKind.Database).ShouldBe("database");
     }
 
     [Theory]

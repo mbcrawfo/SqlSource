@@ -18,6 +18,15 @@ internal sealed record SettingsLevel
     /// <summary>The list of generator parameters, whole, or null when the level gives no list.</summary>
     public GeneratorParameters? Parameters { get; init; }
 
+    /// <summary>What is generated for a query.</summary>
+    public OutputKind? Output { get; init; }
+
+    /// <summary>
+    /// The name of the database a query belongs to.  The generator carries it from a marker and never reads it; the
+    /// tool does.
+    /// </summary>
+    public string? Database { get; init; }
+
     /// <summary>Whether the level gives a list that has <c>keep-comments</c>.</summary>
     public bool KeepsComments => Parameters is { } list && (list & GeneratorParameters.KeepComments) != 0;
 
@@ -37,6 +46,11 @@ internal sealed record SettingsLevel
             return other;
         }
 
-        return new SettingsLevel { Parameters = Parameters ?? other.Parameters };
+        return new SettingsLevel
+        {
+            Parameters = Parameters ?? other.Parameters,
+            Output = Output ?? other.Output,
+            Database = Database ?? other.Database,
+        };
     }
 }

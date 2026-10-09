@@ -1247,6 +1247,79 @@ public class SqlFileParserTests
     public void Parse_FileWithoutNameMarker_HasNoShape() =>
         Blocks("SELECT 1\n").ShouldHaveSingleItem().Shape.ShouldBeNull();
 
+    [Theory]
+    [InlineData("-- output: models\n-- database: billing\n-- name: Q\nSELECT 1\n", "Models", "billing")]
+    [InlineData("-- output: models\n-- name: Q\n-- output: SQL\n-- database: app\nSELECT 1\n", "Sql", "app")]
+    [InlineData("-- database: billing\n-- name: Q\n-- output: code-gen\nSELECT 1\n", "CodeGen", "billing")]
+    [InlineData("-- output: sql\n-- output: Sql\n-- database: a\n-- database: a\nSELECT 1\n", "Sql", "a")]
+    public void Parse_OutputAndDatabaseMarkers_AreCarriedWithTheQuerysOverThePreambles(
+        string text,
+        string output,
+        string database
+    )
+    {
+        var markers = Blocks(text).ShouldHaveSingleItem().Markers;
+
+        markers.Output.ShouldBe(Enum.Parse<OutputKind>(output));
+        markers.Database.ShouldBe(database);
+        markers.Parameters.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("output", "models", "sql")]
+    [InlineData("database", "billing", "Billing")]
+    public void Parse_TwoValuesOfOneMarkerInOneScope_ConflictAtTheSecond(string word, string first, string second)
+    {
+        var text = "-- name: Q\n-- " + word + ": " + first + "\n-- " + word + ": " + second + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.ConflictingSettings, SpanOf(text, second), word + ": " + second),
+            ]);
+    }
+
+    // A comment that only starts like a marker is a marker now, and says so at its value.
+    [Theory]
+    [InlineData("output", "the rows we need")]
+    [InlineData("output", "model")]
+    [InlineData("database", "see the wiki")]
+    [InlineData("database", "a/b")]
+    public void Parse_MarkerWithAValueItDoesNotTake_IsInvalidAtTheValue(string word, string value)
+    {
+        var text = "-- name: Q\n-- " + word + ": " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), word + ": " + value),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("output")]
+    [InlineData("database")]
+    public void Parse_MarkerWithoutAValue_IsInvalidAtTheMarker(string word)
+    {
+        var text = "-- name: Q\n-- " + word + ":\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(text, "-- " + word + ":"),
+                    word + ":"
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_PreambleSettings_AreOneLevelSharedByTheQueriesThatHaveNoMarkersOfTheirOwn()
+    {
+        var blocks = Blocks("-- output: models\n-- name: A\nSELECT 1\n-- name: B\nSELECT 2\n");
+
+        blocks[0].Markers.Output.ShouldBe(OutputKind.Models);
+        blocks[1].Markers.ShouldBeSameAs(blocks[0].Markers);
+    }
+
     private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialectChoice dialect = default)
     {
         var result = SqlFileParser.Parse(text, fileName, dialect);

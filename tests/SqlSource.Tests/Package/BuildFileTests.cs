@@ -26,10 +26,10 @@ public partial class BuildFileTests
     ];
 
     // What the generator reads: each as a property of the project and as metadata of a file's item.
-    private static readonly string[] Settings = ["SqlSourceDialect", "SqlSourceGeneratorParameters"];
+    private static readonly string[] Settings = ["SqlSourceDialect", "SqlSourceGeneratorParameters", "SqlSourceOutput"];
 
     // What the targets trim and the generator does not read.
-    private static readonly string[] TrimmedOnly = [];
+    private static readonly string[] TrimmedOnly = ["SqlSourceDatabase"];
 
     private static readonly XDocument Props = Load("SqlSource.props");
 

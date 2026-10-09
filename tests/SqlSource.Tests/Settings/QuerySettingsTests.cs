@@ -59,4 +59,30 @@ public class QuerySettingsTests
 
     [Fact]
     public void None_IsEqualToALevelThatSetsNothing() => new SettingsLevel().ShouldBe(SettingsLevel.None);
+
+    [Fact]
+    public void Resolve_Output_IsCodeGenUnlessALevelSaysOtherwise()
+    {
+        var sql = new SettingsLevel { Output = OutputKind.Sql };
+        var models = new SettingsLevel { Output = OutputKind.Models };
+
+        QuerySettings
+            .Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None, SettingsLevel.None)
+            .Output.ShouldBe(OutputKind.CodeGen);
+        QuerySettings
+            .Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None, sql)
+            .Output.ShouldBe(OutputKind.Sql);
+        QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, models, sql).Output.ShouldBe(OutputKind.Models);
+        QuerySettings.Resolve(SettingsLevel.None, sql, models, models).Output.ShouldBe(OutputKind.Sql);
+        QuerySettings.Resolve(models, sql, sql, sql).Output.ShouldBe(OutputKind.Models);
+    }
+
+    [Fact]
+    public void Over_MembersAreTakenOneByOne()
+    {
+        var query = new SettingsLevel { Output = OutputKind.Sql };
+        var preamble = new SettingsLevel { Output = OutputKind.Models, Database = "billing" };
+
+        query.Over(preamble).ShouldBe(new SettingsLevel { Output = OutputKind.Sql, Database = "billing" });
+    }
 }

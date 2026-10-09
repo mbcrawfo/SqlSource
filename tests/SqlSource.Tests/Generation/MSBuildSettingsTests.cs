@@ -30,6 +30,52 @@ public class MSBuildSettingsTests
     }
 
     [Fact]
+    public void ReadProject_Output_IsReadAsAChoice()
+    {
+        var settings = ProjectSettings.Read(
+            new TestOptionsProvider(
+                null,
+                properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = " Models " }
+            ).GlobalOptions
+        );
+
+        settings.Level.Output.ShouldBe(OutputKind.Models);
+        settings.Invalid.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadProject_OutputThatIsNoChoice_IsInvalidAndNotSet()
+    {
+        var settings = ProjectSettings.Read(
+            new TestOptionsProvider(
+                null,
+                properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = "nope" }
+            ).GlobalOptions
+        );
+
+        settings.Level.Output.ShouldBeNull();
+        settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceOutput", "nope")]);
+    }
+
+    [Fact]
+    public void ReadFile_Output_IsReadAsAChoice()
+    {
+        var settings = ReadFileMetadata(Output("models"));
+
+        settings.ShouldNotBeNull().Level.Output.ShouldBe(OutputKind.Models);
+        settings.Invalid.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadFile_OutputThatIsNoChoice_IsInvalidAndNotSet()
+    {
+        var settings = ReadFileMetadata(Output("nope"));
+
+        settings.ShouldNotBeNull().Level.Output.ShouldBeNull();
+        settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceOutput", "nope")]);
+    }
+
+    [Fact]
     public void ReadFile_NothingSet_IsNull() =>
         FileSettings
             .Read(Path, new TestOptionsProvider(null).GetOptions(new InMemoryAdditionalText(Path, "")))
@@ -54,6 +100,17 @@ public class MSBuildSettingsTests
         settings.ShouldNotBeNull().Level.Parameters.ShouldBe(GeneratorParameters.None);
         settings.NormalizedPath.ShouldBe("app/Repo/Users.sql");
     }
+
+    private static Dictionary<string, string> Output(string value) => new() { ["SqlSourceOutput"] = value };
+
+    private static FileSettings? ReadFileMetadata(Dictionary<string, string> metadata) =>
+        FileSettings.Read(
+            "app/Repo/Users.sql",
+            new TestOptionsProvider(
+                null,
+                fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>> { [Path] = metadata }
+            ).GetOptions(new InMemoryAdditionalText(Path, ""))
+        );
 
     [Fact]
     public void ProjectSettings_ReadTwice_AreEqual() =>

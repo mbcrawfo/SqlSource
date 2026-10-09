@@ -16,6 +16,8 @@
         and metadata the generator reads.  Each setting is a property for the project and metadata of an
         AdditionalFiles item for one file or for the files of a glob.  SqlSourceDialect names the database whose rules
         the .sql files are read by, and SqlSourceGeneratorParameters holds generator parameters, separated by spaces.
+        SqlSourceOutput says what is generated for a query.  SqlSourceDatabase is trimmed and is not listed: the tool
+        reads it, and the generator does not.
         None of this is under the condition above: a project that lists its own .sql files still needs it.
 
         The metadata is listed for SqlSourceSettingsFile and not for AdditionalFiles.  The SDK writes a section for
@@ -30,7 +32,9 @@
     <ItemGroup>
         <CompilerVisibleProperty Include="SqlSourceDialect" />
         <CompilerVisibleProperty Include="SqlSourceGeneratorParameters" />
+        <CompilerVisibleProperty Include="SqlSourceOutput" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceDialect" />
         <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceGeneratorParameters" />
+        <CompilerVisibleItemMetadata Include="SqlSourceSettingsFile" MetadataName="SqlSourceOutput" />
     </ItemGroup>
 </Project>
