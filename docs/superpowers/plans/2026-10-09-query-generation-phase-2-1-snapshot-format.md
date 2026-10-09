@@ -4358,7 +4358,8 @@ public class SidecarWriterTests
         var text = SidecarWriter.Write(TestSidecars.SidecarOf(entry));
 
         text.ShouldContain(
-            "      \"matchesTable\": null,\n      \"plan\": null,\n      \"tableMatch\": null,\n      \"parameters\": [],\n"
+            "      \"matchesTable\": null,\n      \"plan\": null,\n"
+                + "      \"tableMatch\": null,\n      \"parameters\": [],\n"
         );
         text.ShouldContain("      \"columns\": null\n    }");
     }
@@ -4640,11 +4641,12 @@ internal sealed class SidecarFaker(int seed, bool lenient)
         var hash = _random.String2(64, "0123456789abcdef");
         var database = OrNull(Word());
         var serverVersion = OrNull("16.4");
-        var table = rows && _random.Bool() ? new SidecarTable(_random.Bool() ? Word() : null, OrNull(Word())) : null;
+        var table = rows && _random.Bool() ? new SidecarTable(MaybeWord(), OrNull(Word())) : null;
         var plan = rows ? Provenance(Plans) : null;
         var tableMatch = rows ? Provenance(TableMatches) : null;
         var parameters = Many(0, 3, index => Parameter(index, engine));
-        var columns = rows ? Many(lenient ? 0 : 1, 4, index => Column(index, engine)) : null;
+        var fewest = lenient ? 0 : 1;
+        var columns = rows ? Many(fewest, 4, index => Column(index, engine)) : null;
         return new SidecarEntry(
             name,
             default,
@@ -4676,7 +4678,7 @@ internal sealed class SidecarFaker(int seed, bool lenient)
         var nullable = Pick<bool?>(true, false, null);
         var nullableSource = Provenance(NullableSources);
         var origin = _random.Bool()
-            ? new SidecarOrigin(_random.Bool() ? Word() : null, OrNull(Word()), OrNull(Word()))
+            ? new SidecarOrigin(MaybeWord(), OrNull(Word()), OrNull(Word()))
             : null;
         var identity = Pick<bool?>(true, false, null);
         var computed = Pick<bool?>(true, false, null);
@@ -4733,7 +4735,7 @@ internal sealed class SidecarFaker(int seed, bool lenient)
         var precision = _random.Int(0, 38);
         var scale = _random.Int(0, 38);
         var userType = _random.Bool(0.3f)
-            ? new SqlServerUserType(OrNull(Word()), OrNull(Word()), _random.Bool() ? Word() : null)
+            ? new SqlServerUserType(OrNull(Word()), OrNull(Word()), MaybeWord())
             : null;
         return new SqlServerType(name, maxLength, precision, scale, userType);
     }
@@ -4760,6 +4762,8 @@ internal sealed class SidecarFaker(int seed, bool lenient)
     }
 
     private string Word() => _random.String2(_random.Int(1, 10), Letters);
+
+    private string? MaybeWord() => _random.Bool() ? Word() : null;
 
     // A name: mostly a word, sometimes one with a character that must be escaped or that is not ASCII.
     private string Text(bool orEmpty = false)
@@ -4991,7 +4995,7 @@ internal sealed class SidecarJsonBuilder
         for (var index = 0; index < value.Length; index++)
         {
             var character = value[index];
-            if (character >= ' ' && character != '"' && character != '\\')
+            if (character is >= ' ' and not '"' and not '\\')
             {
                 continue;
             }

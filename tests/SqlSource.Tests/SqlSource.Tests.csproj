@@ -43,6 +43,7 @@
         </AdditionalFiles>
     </ItemGroup>
     <ItemGroup>
+        <PackageReference Include="Bogus" />
         <PackageReference Include="GitHubActionsTestLogger" />
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
         <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
