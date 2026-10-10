@@ -20,7 +20,7 @@ Low today.  The first is a secret in the tool's output from sub-phase 2.5 on, an
 
 1. Catch the exceptions of a driver where a connection is opened and a query described, and report each with an id of its own and without the connection's text, so that none reaches the general catch.
 2. Let a second Ctrl+C end the process: leave `ConsoleCancelEventArgs.Cancel` false once the token is cancelled.
-3. With the first option that takes a value, add a test that gives it twice and expects the tool's own line and nothing of the command line in the output.
+3. With the first option that may be given only once, add a test that gives it twice and expects the tool's own line and nothing of the command line in the output.  `--project`, the first option that takes a value, may be given several times, so it cannot serve.
 
 ## Trigger
 

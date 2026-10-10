@@ -24,6 +24,10 @@ internal sealed class CliRun : IDisposable
 
     public Task<CliResult> RunAsync(params string[] args) => InvokeAsync(args, TestContext.Current.CancellationToken);
 
+    // A run that the test ends itself.
+    public Task<CliResult> RunAsync(CancellationToken cancellationToken, params string[] args) =>
+        InvokeAsync(args, cancellationToken);
+
     public async Task<CliResult> RunCancelledAsync(params string[] args)
     {
         using var cancelled = new CancellationTokenSource();

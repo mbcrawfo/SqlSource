@@ -38,6 +38,7 @@
             takes a current compiler and not the generator's pin, as tests/SqlSource.Tests does.
         -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
+        <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" />
         <PackageReference Include="System.CommandLine" />
     </ItemGroup>
     <ItemGroup>

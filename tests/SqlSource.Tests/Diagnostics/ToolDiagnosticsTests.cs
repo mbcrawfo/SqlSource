@@ -98,6 +98,26 @@ public class ToolDiagnosticsTests
             .ShouldBe("The project manifest of '/work/App.csproj' cannot be read: it names no project");
 
     [Fact]
+    public void ProjectNotInRun_Message_HoldsThePathAndTheUnit() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ProjectNotInRun.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/Other/Other.csproj",
+                "/work/App.slnx"
+            )
+            .ShouldBe("'/work/Other/Other.csproj' is not a project of '/work/App.slnx'");
+
+    [Fact]
+    public void SolutionCannotBeRead_Message_HoldsTheSolutionAndTheReason() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.SolutionCannotBeRead.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/App.sln",
+                "Not a solution file."
+            )
+            .ShouldBe("'/work/App.sln' cannot be read: Not a solution file.");
+
+    [Fact]
     public void DirectoryCannotBeRead_Message_HoldsTheDirectoryAndTheReason() =>
         string.Format(
                 CultureInfo.InvariantCulture,

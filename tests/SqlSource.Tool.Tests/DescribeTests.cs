@@ -1,3 +1,6 @@
+using System.IO;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
@@ -83,6 +86,155 @@ public class DescribeTests
         var result = await run.RunAsync("describe");
 
         result.ShouldBe(new CliResult(0, "", ""));
+    }
+
+    [Fact]
+    public async Task Run_Help_ShowsTheProjectOption()
+    {
+        using var run = new CliRun();
+
+        var result = await run.RunAsync("describe", "--help");
+
+        result.ExitCode.ShouldBe(0);
+        result.Out.ShouldContain("--project <path>");
+        run.Processes.Requests.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData("describe", "--project")]
+    [InlineData("describe", "--project=")]
+    [InlineData("describe", "App.slnx", "--project", Secret, "--project")]
+    public async Task Run_ProjectOptionWithoutAValue_NamesTheOptionAndRunsNothing(params string[] args)
+    {
+        using var run = new CliRun();
+        _ = run.Folder.WriteFile("App.slnx", "<Solution />");
+
+        var result = await run.RunAsync(args);
+
+        result.ShouldBe(new CliResult(1, "", "sqlsource: option '--project' needs a value\n"));
+        run.Processes.Requests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Run_Solution_ReadsItsProjectsAndPrintsNothing()
+    {
+        using var run = new CliRun();
+        _ = run.Folder.WriteFile(
+            "App.slnx",
+            "<Solution><Project Path=\"A/A.csproj\" /><Project Path=\"B/B.csproj\" /></Solution>"
+        );
+
+        var result = await run.RunAsync("describe");
+
+        result.ShouldBe(new CliResult(0, "", ""));
+        // Two runs of MSBuild for each of the two projects.
+        run.Processes.Requests.Count.ShouldBe(4);
+        Directory.EnumerateFileSystemEntries(run.Folder.PathOf("tmp")).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Run_ProjectOptionGivenTwice_RestrictsTheRunToBoth()
+    {
+        using var run = new CliRun();
+        var a = run.Folder.WriteFile("A/A.csproj");
+        var c = run.Folder.WriteFile("C/C.csproj");
+        _ = run.Folder.WriteFile(
+            "App.slnx",
+            "<Solution><Project Path=\"A/A.csproj\" /><Project Path=\"B/B.csproj\" />"
+                + "<Project Path=\"C/C.csproj\" /></Solution>"
+        );
+
+        var result = await run.RunAsync("describe", "--project", "A/A.csproj", "App.slnx", "--project=" + c);
+
+        result.ShouldBe(new CliResult(0, "", ""));
+        run.Processes.Requests.Select(request => request.Arguments[1]).Distinct().ShouldBe([a, c], ignoreOrder: true);
+    }
+
+    [Fact]
+    public async Task Run_ProjectOptionOutsideTheSolution_IsSqlsrc207AndExitsWithOne()
+    {
+        using var run = new CliRun();
+        var solution = run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"A/A.csproj\" /></Solution>");
+
+        var result = await run.RunAsync("describe", "--project", "Other.csproj");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldBe(
+            $"sqlsource : error SQLSRC207: '{run.Folder.PathOf("Other.csproj")}' is not a project of '{solution}'\n"
+                + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc207\n"
+        );
+    }
+
+    [Fact]
+    public async Task Run_ProjectThatDoesNotUseSqlSource_IsSqlsrc204AndExitsWithOne()
+    {
+        using var run = new CliRun();
+        var project = run.Folder.WriteFile("App.csproj");
+        // Restored, and nothing of the package.
+        run.Processes.Default = new FakeProject { Imported = "", ProjectAssetsFile = project };
+
+        var result = await run.RunAsync("describe");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldStartWith($"{project} : error SQLSRC204: '{project}' does not use SqlSource\n");
+    }
+
+    // A run that had nothing to do says so, and is no error: a solution may gain its first query later.
+    [Fact]
+    public async Task Run_SolutionWhereNoProjectUsesSqlSource_SaysSoAndExitsWithZero()
+    {
+        using var run = new CliRun();
+        var solution = run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"A/A.csproj\" /></Solution>");
+        run.Processes.Default = new FakeProject { Imported = "", ProjectAssetsFile = solution };
+
+        var result = await run.RunAsync("describe");
+
+        result.ShouldBe(new CliResult(0, $"sqlsource: no project of '{solution}' uses SqlSource\n", ""));
+    }
+
+    [Fact]
+    public async Task Run_SolutionWithNoProject_SaysThatNoProjectUsesSqlSource()
+    {
+        using var run = new CliRun();
+        var solution = run.Folder.WriteFile("App.slnx", "<Solution />");
+
+        var result = await run.RunAsync("describe");
+
+        result.ShouldBe(new CliResult(0, $"sqlsource: no project of '{solution}' uses SqlSource\n", ""));
+        run.Processes.Requests.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Run_SolutionThatCannotBeRead_IsSqlsrc223AndSaysNothingElse()
+    {
+        using var run = new CliRun();
+        var solution = run.Folder.WriteFile("App.sln", "this is not a solution\n");
+
+        var result = await run.RunAsync("describe");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldStartWith($"{solution} : error SQLSRC223: '{solution}' cannot be read: ");
+    }
+
+    [Fact]
+    public async Task Run_CancelledWhileMSBuildRuns_ExitsWithOneAndPrintsNothing()
+    {
+        using var run = new CliRun();
+        _ = run.Folder.WriteFile("App.csproj");
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        run.Processes.BeforeAnswer = async (_, token) =>
+        {
+            await cancel.CancelAsync();
+            await Task.Delay(Timeout.Infinite, token);
+        };
+
+        var result = await run.RunAsync(cancel.Token, "describe");
+
+        result.ShouldBe(new CliResult(1, "", ""));
+        Directory.EnumerateFileSystemEntries(run.Folder.PathOf("tmp")).ShouldBeEmpty();
     }
 
     [Fact]
