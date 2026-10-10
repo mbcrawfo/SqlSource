@@ -18,14 +18,28 @@ namespace SqlSource.Tool.Describing;
 /// <remarks>
 /// It works from each selected query's described entry and not from a file's target: under a filter, a file with a
 /// query that was left out has none.  What it compares is within what <c>describe</c> with the same filters would
-/// change, so a difference is one that <c>describe</c> mends.
+/// change, but plain <c>describe</c> skips a query whose hash and database are as they were.  So the help line of a
+/// difference names the command that mends it: <c>describe --force</c> for what the database reports, an update of
+/// the tool for a sidecar of a higher format version, and plain <c>describe</c> for the rest.
 /// </remarks>
 internal static class SidecarCheck
 {
-    private static readonly ContinuationLine Help = new(
+    private static readonly ContinuationLine Describe = new(
         "help",
         "run 'dotnet sqlsource describe' and commit the sidecars"
     );
+
+    // The tool skips a query whose SQL is as it was, so only --force describes it again.
+    private static readonly ContinuationLine DescribeAgain = new(
+        "help",
+        "run 'dotnet sqlsource describe --force' and commit the sidecars"
+    );
+
+    // The same help as SQLSRC221, which a run that writes gives for the same sidecar.
+    private static readonly ContinuationLine Update = new("help", "update the SqlSource.Tool package");
+
+    // What differs, and the help that names the command which mends it: decided together.
+    private sealed record Found(string Text, ContinuationLine Help);
 
     /// <summary>
     /// Compares each file, in the files' order, and sets <see cref="QueryWork.Differs" /> on each query that a
@@ -45,7 +59,7 @@ internal static class SidecarCheck
         // The one difference this step does not decide: a sidecar is deleted only where FileOutcomes says so.
         if (outcome.Action == FileAction.Delete)
         {
-            return Of(outcome, [AtSidecar(outcome.SidecarPath, sql, "no query of the file needs an entry")]);
+            return Of(outcome, [AtSidecar(outcome.SidecarPath, sql, "no query of the file needs an entry", Describe)]);
         }
 
         var selected = file
@@ -78,7 +92,7 @@ internal static class SidecarCheck
         var differences = new List<ToolDiagnostic>();
         foreach (var query in described)
         {
-            if (DifferenceOf(query, sidecar) is { } what)
+            if (DifferenceOf(query, sidecar) is { } found)
             {
                 query.Differs = true;
                 differences.Add(
@@ -87,9 +101,9 @@ internal static class SidecarCheck
                             ToolDiagnostics.SidecarOutOfDate,
                             query.Planned.Query.NameLocation,
                             query.Planned.Query.Name,
-                            what
+                            found.Text
                         )
-                        .WithLines(Help)
+                        .WithLines(found.Help)
                 );
             }
         }
@@ -111,43 +125,54 @@ internal static class SidecarCheck
                     sql,
                     "the sidecar does not exist"
                 )
-                .WithLines(Help);
+                .WithLines(Describe);
         }
 
+        if (onDisk.FormatVersion is not { } version)
+        {
+            return AtSidecar(onDisk.Path, sql, "the sidecar cannot be read", Describe);
+        }
+
+        // A lower version is written again by describe; a higher one is a newer tool's, which describe leaves alone.
         return AtSidecar(
             onDisk.Path,
             sql,
-            onDisk.FormatVersion is { } version
-                ? string.Create(
-                    CultureInfo.InvariantCulture,
-                    $"the sidecar has format {version}, and this tool writes {SidecarFormat.Version}"
-                )
-                : "the sidecar cannot be read"
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"the sidecar has format {version}, and this tool writes {SidecarFormat.Version}"
+            ),
+            version > SidecarFormat.Version ? Update : Describe
         );
     }
 
     // What differs for a query that was described, or null.
-    private static string? DifferenceOf(QueryWork query, Sidecar sidecar)
+    private static Found? DifferenceOf(QueryWork query, Sidecar sidecar)
     {
         if (sidecar.Find(query.Planned.Query.Name) is not { } committed)
         {
-            return "the sidecar has no entry";
+            return new Found("the sidecar has no entry", Describe);
         }
 
         var described =
             query.Entry ?? throw new InvalidOperationException($"'{query.Planned.Query.Name}' has no entry.");
-        return SidecarComparer.FindDifference(committed, described) is { } difference ? TextOf(difference) : null;
+        return SidecarComparer.FindDifference(committed, described) is { } difference ? FoundOf(difference) : null;
     }
 
-    // The hash, the engine and the database are the project's: the database says nothing of them.  Two hashes of 64
-    // characters tell nobody anything.
-    private static string TextOf(SidecarDifference difference) =>
+    // The hash, the engine and the database are the project's: the database says nothing of them, and describe
+    // mends them.  Two hashes of 64 characters tell nobody anything.  What the database says is skipped by describe
+    // while the query's SQL is as it was, so it needs --force.
+    private static Found FoundOf(SidecarDifference difference) =>
         difference.Path switch
         {
-            SidecarKeys.Hash => "the query has changed since it was described",
-            SidecarKeys.Engine or SidecarKeys.Database =>
+            SidecarKeys.Hash => new Found("the query has changed since it was described", Describe),
+            SidecarKeys.Engine or SidecarKeys.Database => new Found(
                 $"{difference.Path} is {difference.Committed}, and the project says {difference.Described}",
-            _ => $"{difference.Path} is {difference.Committed}, and the database says {difference.Described}",
+                Describe
+            ),
+            _ => new Found(
+                $"{difference.Path} is {difference.Committed}, and the database says {difference.Described}",
+                DescribeAgain
+            ),
         };
 
     // An entry for a name that no query of the file has, or for a query that needs none: writing drops it.
@@ -177,12 +202,12 @@ internal static class SidecarCheck
                     entry.Name,
                     query is null ? "the query is not in the file" : "the query needs no entry"
                 )
-                .WithLines(Help);
+                .WithLines(Describe);
         }
     }
 
-    private static ToolDiagnostic AtSidecar(string sidecarPath, string sql, string what) =>
-        ToolDiagnostic.ForFile(ToolDiagnostics.SidecarOutOfDate, sidecarPath, sql, what).WithLines(Help);
+    private static ToolDiagnostic AtSidecar(string sidecarPath, string sql, string what, ContinuationLine help) =>
+        ToolDiagnostic.ForFile(ToolDiagnostics.SidecarOutOfDate, sidecarPath, sql, what).WithLines(help);
 
     private static FileCheck Of(FileOutcome outcome, IEnumerable<ToolDiagnostic> differences) =>
         new(outcome.File, outcome.SidecarPath, WasCompared: true, new EquatableArray<ToolDiagnostic>([.. differences]));

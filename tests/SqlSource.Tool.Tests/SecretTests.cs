@@ -290,6 +290,36 @@ public sealed class SecretTests : IDisposable
         File.Exists(_users + ".json").ShouldBeFalse();
     }
 
+    // --check prints what differs, and a text of the describer is among it.  The guard on a description comes first,
+    // so the comparison that would print the value is never reached.
+    [Fact]
+    public async Task Check_DescriberThatPutsTheValueInAColumnOfAQueryThatDiffers_EndsTheRunAndPrintsNothingOfIt()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Value;
+        (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
+        _scene.Describer.Descriptions["Good"] = new QueryDescription(
+            SidecarResultKind.Rows,
+            EquatableArray<DescribedParameter>.Empty,
+            new EquatableArray<SidecarColumn>([
+                new SidecarColumn(0, Value, new OtherEngineType("int4"), null, null, null, null, null),
+            ]),
+            null,
+            null,
+            null
+        );
+
+        var result = await _scene.DescribeAsync("--check");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldNotContain(Marker);
+        result.Error.ShouldNotContain(Marker);
+        result.Error.ShouldStartWith(
+            "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: The "
+                + "describer put the connection's value in its description of the query 'Good'.\n"
+        );
+        result.Error.ShouldNotContain("SQLSRC219");
+    }
+
     // What is written to a sidecar is not printed, and is the server's own word.
     [Fact]
     public async Task Run_QueriesDescribed_PrintNothingOfTheConnection()

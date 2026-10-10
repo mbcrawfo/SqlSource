@@ -102,7 +102,10 @@ public sealed class CheckTests : IDisposable
         (await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken)).ShouldBe(newer);
     }
 
+    // The help line depends on what differs: the command that mends it.
     private const string Help = "    help: run 'dotnet sqlsource describe' and commit the sidecars\n";
+    private const string ForceHelp = "    help: run 'dotnet sqlsource describe --force' and commit the sidecars\n";
+    private const string UpdateHelp = "    help: update the SqlSource.Tool package\n";
 
     // A statement that produces rows, where the describer of the tests says none unless told.
     private static readonly QueryDescription Rows = new(
@@ -115,9 +118,9 @@ public sealed class CheckTests : IDisposable
     );
 
     // One SQLSRC219 as the reporter writes it.  The origin is a path with a position, or a path and a space.
-    private static string Difference(string origin, string subject, string what) =>
+    private static string Difference(string origin, string subject, string what, string help = Help) =>
         $"{origin}: error SQLSRC219: The sidecar is out of date for '{subject}': {what}\n"
-        + $"{Help}{DescribeScene.See}219\n";
+        + $"{help}{DescribeScene.See}219\n";
 
     // Where a key stands in a text, as the reporter writes a position: "(line,column)", each counted from one.
     private static string PositionOf(string text, string key)
@@ -190,7 +193,11 @@ public sealed class CheckTests : IDisposable
             Difference(
                 $"{Sidecar} ",
                 _users,
-                $"the sidecar has format {version}, and this tool writes {SidecarFormat.Version}"
+                $"the sidecar has format {version}, and this tool writes {SidecarFormat.Version}",
+                // A newer tool's file is left alone by describe, and an older one is written again.
+                version > SidecarFormat.Version
+                    ? UpdateHelp
+                    : Help
             )
         );
     }
@@ -236,7 +243,12 @@ public sealed class CheckTests : IDisposable
 
         result.ExitCode.ShouldBe(2);
         result.Error.ShouldBe(
-            Difference($"{_users}(4,10)", "ListUsers", "resultKind is \"none\", and the database says \"rows\"")
+            Difference(
+                $"{_users}(4,10)",
+                "ListUsers",
+                "resultKind is \"none\", and the database says \"rows\"",
+                ForceHelp
+            )
         );
         await ShouldBeUntouchedAsync(before);
     }
