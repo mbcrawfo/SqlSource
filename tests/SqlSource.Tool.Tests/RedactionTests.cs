@@ -134,6 +134,20 @@ public sealed class RedactionTests : IDisposable
         open.GetProperty("settings").GetProperty("***").GetString().ShouldBe("***");
     }
 
+    // A line of "--verbose" that holds what a describer gave is written as an error is.
+    [Fact]
+    public async Task Run_VerboseWithADescriberThatGivesItsConnectionAsItsServersVersion_SaysTheMark()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Value;
+        _scene.Describer.Server = _scene.Describer.Server with { Version = Value };
+
+        var result = await _scene.DescribeAsync("--verbose");
+
+        result.Out.ShouldNotContain(Marker);
+        result.Error.ShouldNotContain(Marker);
+        result.Out.ShouldContain("sqlsource: database 'postgres': server ***\n");
+    }
+
     // Every text of a failure and of an exception is in a "diagnostic", and was cleaned before it was reported.
     [Fact]
     public async Task Run_DescriberThatReturnsAndThrowsItsConnection_LeavesNoValueInADiagnostic()

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing;
@@ -38,10 +39,24 @@ internal static class RunEvents
         }
 
         trace.Log.Write("project", [.. members]);
+        trace.Say(
+            evaluation switch
+            {
+                null => $"project '{path}' is left out: --project does not name it",
+                { Manifest: { } read } => string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"project '{path}': {read.TargetFramework}, {read.Files.Length} .sql files"
+                ),
+                { State: ProjectState.DoesNotUseSqlSource } =>
+                    $"project '{path}' is left out: it does not use SqlSource",
+                _ => $"project '{path}' could not be read",
+            }
+        );
     }
 
     /// <summary>A file that a type claims.</summary>
-    public static void File(RunTrace trace, PlannedFile file) =>
+    public static void File(RunTrace trace, PlannedFile file)
+    {
         trace.Log.Write(
             "file",
             new("path", file.Path),
@@ -62,6 +77,14 @@ internal static class RunEvents
             ),
             new("queries", file.Queries.Count)
         );
+        var claims = file.Claims.Select(static claim =>
+            string.Create(CultureInfo.InvariantCulture, $"{claim.SourcePath}({claim.Position.Line + 1})")
+        );
+        trace.Say(
+            $"file '{file.Path}': {SqlDialectName.Canonical(file.Dialect)}, {StateInWords(file.State)}, "
+                + $"claimed by {string.Join(", ", claims)}"
+        );
+    }
 
     /// <summary>A selected database: where its connection came from, never what it is.</summary>
     public static void Database(
@@ -69,7 +92,8 @@ internal static class RunEvents
         PlannedDatabase database,
         DatabaseConnection connection,
         bool hasDescriber
-    ) =>
+    )
+    {
         trace.Log.Write(
             "database",
             new("name", database.Name),
@@ -77,9 +101,15 @@ internal static class RunEvents
             new("connectionSource", connection.Source ?? "none"),
             new("describer", hasDescriber)
         );
+        trace.Say(
+            $"database '{database.Name}' ({SqlDialectName.Canonical(database.Dialect)}): "
+                + (connection.Source is { } source ? $"connection from {source}" : "no connection")
+        );
+    }
 
     /// <summary>A session that opened.  Every member but the name is the describer's text.</summary>
-    public static void Opened(RunTrace trace, PlannedDatabase database, ServerInfo server) =>
+    public static void Opened(RunTrace trace, PlannedDatabase database, ServerInfo server)
+    {
         trace.Log.Write(
             "database.open",
             new("name", database.Name),
@@ -93,13 +123,18 @@ internal static class RunEvents
                 ])
             )
         );
+        trace.Say($"database '{database.Name}': server {server.Version}");
+    }
 
     /// <summary>A session that did not open.</summary>
     /// <param name="trace">The run's, without the connection's value.</param>
     /// <param name="database">The database.</param>
     /// <param name="error">The id of the error that was reported.</param>
-    public static void NotOpened(RunTrace trace, PlannedDatabase database, string error) =>
+    public static void NotOpened(RunTrace trace, PlannedDatabase database, string error)
+    {
         trace.Log.Write("database.open", new("name", database.Name), new("error", error));
+        trace.Say($"database '{database.Name}': no session");
+    }
 
     /// <summary>What the run decided for a query that needs an entry.</summary>
     /// <param name="trace">The run's.</param>
@@ -129,6 +164,21 @@ internal static class RunEvents
         }
 
         trace.Log.Write("query", [.. members]);
+        string decision;
+        if (!planned.IsSelected)
+        {
+            decision = "not selected";
+        }
+        else if (query.State == QueryState.Described)
+        {
+            decision = string.Create(CultureInfo.InvariantCulture, $"described in {durationMs ?? 0} ms");
+        }
+        else
+        {
+            decision = query.State == QueryState.Skipped ? "skipped, its entry is current" : "failed";
+        }
+
+        trace.Say($"query '{planned.Query.Name}' in '{planned.Query.NameLocation.Path}': {decision}");
     }
 
     /// <summary>What the run did with a sidecar, or under <c>--check</c> what it found.</summary>
@@ -138,8 +188,48 @@ internal static class RunEvents
     /// <c>written</c>, <c>unchanged</c>, <c>deleted</c>, <c>held-back</c> or <c>failed</c>; <c>same</c> or
     /// <c>differs</c> under <c>--check</c>.
     /// </param>
-    public static void Sidecar(RunTrace trace, string path, string action) =>
+    public static void Sidecar(RunTrace trace, string path, string action)
+    {
         trace.Log.Write("sidecar", new("path", path), new("action", action));
+        var said = action switch
+        {
+            "held-back" => "left as it was",
+            "failed" => "could not be changed",
+            "same" => "the same",
+            "differs" => "different",
+            _ => action,
+        };
+        trace.Say($"sidecar '{path}': {said}");
+    }
+
+    /// <summary>
+    /// The unit of the run and how it was found.  The log has it in <c>arguments</c> and its projects.
+    /// </summary>
+    /// <param name="trace">The run's.</param>
+    /// <param name="unit">The solution or project the run is on.</param>
+    /// <param name="wasGiven">Whether the command line gave it, and not the working directory.</param>
+    public static void Unit(RunTrace trace, RunUnit unit, bool wasGiven) =>
+        trace.Say(
+            $"unit '{unit.Path}', a {(unit.Kind == RunUnitKind.Solution ? "solution" : "project")}, "
+                + (wasGiven ? "from the path given" : "found in the working directory")
+        );
+
+    /// <summary>How many <c>.sql</c> files of a project no type claims: the tool reads none of them.</summary>
+    /// <param name="trace">The run's.</param>
+    /// <param name="projectPath">The full path of the project file.</param>
+    /// <param name="files">How many files of the project no type claims.</param>
+    public static void Unclaimed(RunTrace trace, string projectPath, int files)
+    {
+        if (files > 0)
+        {
+            trace.Say(
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"project '{projectPath}': {files} .sql files that no type claims"
+                )
+            );
+        }
+    }
 
     // Nothing says whether a project that was not restored, or that MSBuild failed on, uses SqlSource.
     private static LogValue UsesSqlSource(ProjectState state) =>
@@ -158,6 +248,15 @@ internal static class RunEvents
             PlannedFileState.Ready => "ready",
             PlannedFileState.HasParseErrors => "has-parse-errors",
             PlannedFileState.NotDescribable => "not-describable",
+            _ => throw new InvalidOperationException($"Unknown state {state}."),
+        };
+
+    private static string StateInWords(PlannedFileState state) =>
+        state switch
+        {
+            PlannedFileState.Ready => "ready",
+            PlannedFileState.HasParseErrors => "has parse errors",
+            PlannedFileState.NotDescribable => "cannot be described",
             _ => throw new InvalidOperationException($"Unknown state {state}."),
         };
 

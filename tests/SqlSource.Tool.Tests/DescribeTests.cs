@@ -99,6 +99,7 @@ public class DescribeTests
         result.Out.ShouldContain("--project <path>");
         result.Out.ShouldContain("--check");
         result.Out.ShouldContain("--log <path>");
+        result.Out.ShouldContain("--verbose");
         run.Processes.Requests.ShouldBeEmpty();
     }
 

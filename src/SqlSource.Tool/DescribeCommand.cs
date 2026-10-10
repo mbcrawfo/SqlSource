@@ -35,6 +35,8 @@ internal static class DescribeCommand
 
     private const string CheckOption = "--check";
 
+    private const string VerboseOption = "--verbose";
+
     internal const string LogOption = "--log";
 
     /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
@@ -96,6 +98,12 @@ internal static class DescribeCommand
             Arity = ArgumentArity.Zero,
         };
 
+        var verbose = new Option<bool>(VerboseOption)
+        {
+            Description = "Say what the run decides for each project, file, database and query, as it goes.",
+            Arity = ArgumentArity.Zero,
+        };
+
         var log = new Option<string>(LogOption)
         {
             Description =
@@ -113,6 +121,7 @@ internal static class DescribeCommand
             connection,
             force,
             check,
+            verbose,
             log,
         };
         describe.SetAction(
@@ -212,6 +221,9 @@ internal static class DescribeCommand
         parsed.CommandResult.Command.Name == Name
         && ReferenceEquals(parsed.Action, parsed.CommandResult.Command.Action);
 
+    /// <summary>Whether a <c>describe</c> that runs was given <c>--verbose</c>.</summary>
+    public static bool IsVerbose(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(VerboseOption);
+
     /// <summary>
     /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when
     /// the run has none.  A command line that does not run <c>describe</c> has none: the help must not empty the
@@ -297,6 +309,7 @@ internal static class DescribeCommand
             return null;
         }
 
+        RunEvents.Unit(reporter.Trace, unit, wasGiven: unitPath is not null);
         var manifests = await RunProjects.FindAsync(
             unit,
             parsed.GetValue<string[]>(ProjectOption) ?? [],
@@ -321,6 +334,16 @@ internal static class DescribeCommand
             host.WorkingDirectory
         );
         var result = RunPlanner.Plan(manifests, filters, cancellationToken);
+        foreach (var manifest in manifests)
+        {
+            var claimed = result.Plan.Files.Count(file =>
+                file.Claims.Any(claim =>
+                    string.Equals(claim.ProjectPath, manifest.ProjectPath, StringComparison.Ordinal)
+                )
+            );
+            RunEvents.Unclaimed(reporter.Trace, manifest.ProjectPath, ListedFiles.Read(manifest).Paths.Count - claimed);
+        }
+
         foreach (var file in result.Plan.Files)
         {
             RunEvents.File(reporter.Trace, file);

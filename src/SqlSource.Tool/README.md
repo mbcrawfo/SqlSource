@@ -40,6 +40,8 @@ billing (postgres): 15 same, 1 differ, 0 failed
 
 The exit code is `0`; `1` when anything else was reported as an error, when the command line is wrong, or when the run was cancelled; and `2` when `--check` found a sidecar out of date and nothing else failed.
 
+`--verbose` says what the run decides as it goes, a line for each project, file, database, query and sidecar, each starting with `sqlsource:`.  Without it the tool prints its errors and the lines of its summary, and nothing else.
+
 `--log <path>` writes what the run did to a file, one JSON object on a line: what ran and on what, each project, file, database and query with what the run decided for it, each error, and how the run ended.  `SQLSOURCE_LOG` gives the path when the option does not.  The file is overwritten by each run, and the console stays as it is without the option.  A log holds no connection string: the value of each `--connection` is written as `***` with its name, and so is a value that a database's driver repeats in a message.  It does hold the paths of your files and the names of your queries and databases, so read it before you attach it to an issue.
 
 `describe` takes a `.sln`, `.slnx` or `.csproj` file, or a directory that holds exactly one, and the current directory when none is given.  In a solution it runs on the C# projects that use the SqlSource package; `--project`, which may be given several times, names the ones to run on.

@@ -153,6 +153,10 @@ public static class Cli
                     return 1;
                 }
 
+                // What the run says of itself: to the log, when it has one, and to the person watching under
+                // --verbose.
+                IRunLog events = NullRunLog.Instance;
+
                 // After the command line was read, so that a wrong one is never logged, and before anything runs.
                 if (DescribeCommand.LogPathOf(parsed, host.GetEnvironmentVariable) is { } given)
                 {
@@ -166,7 +170,7 @@ public static class Cli
                         return 1;
                     }
 
-                    reporter.Trace = new RunTrace(log);
+                    events = log;
                     log.Write(
                         "run.start",
                         new("toolVersion", PackageVersion.Prefix),
@@ -175,6 +179,11 @@ public static class Cli
                         new("os", RuntimeInformation.OSDescription),
                         new("arguments", LoggedArguments.Of(usage, args))
                     );
+                }
+
+                if (DescribeCommand.Runs(parsed))
+                {
+                    reporter.Trace = new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null);
                 }
 
                 var invocation = new InvocationConfiguration

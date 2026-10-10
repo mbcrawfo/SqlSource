@@ -97,6 +97,17 @@ public sealed class SecretTests : IDisposable
     }
 
     [Fact]
+    public async Task Run_ValueOnTheCommandLineAndEveryErrorWithVerbose_IsNeverSaid()
+    {
+        AddEveryError();
+
+        var result = await _scene.DescribeAsync("--connection", "postgres=" + Value, "--verbose");
+
+        ShouldHold(result, "213,214,216,217,218,221,999");
+        result.Out.ShouldContain("sqlsource: database 'postgres' (postgres): connection from --connection\n");
+    }
+
+    [Fact]
     public async Task Run_ValueInTheVariableOfTheNameAndEveryError_IsNeverPrinted()
     {
         AddEveryError();

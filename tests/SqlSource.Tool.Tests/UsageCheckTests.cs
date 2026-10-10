@@ -301,6 +301,7 @@ public class UsageCheckTests
             "--force",
             "--force=V",
             "--check",
+            "--verbose",
             "--log",
             "--log=L",
             "--help",
