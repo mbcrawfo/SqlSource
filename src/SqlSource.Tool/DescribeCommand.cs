@@ -1,6 +1,10 @@
+using System.Collections.Generic;
 using System.CommandLine;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Generation;
+using SqlSource.Settings;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
@@ -19,14 +23,17 @@ internal static class DescribeCommand
 
     private const string ProjectOption = "--project";
 
+    private const string DatabaseOption = "--database";
+
     public static Command Create(ToolHost host, Reporter reporter)
     {
-        var path = new Argument<string?>(PathArgument)
+        // Several, so that System.CommandLine takes a .sql path beside the unit.  CheckUsage holds them to one unit.
+        var path = new Argument<string[]>(PathArgument)
         {
             Description =
-                "A .sln, .slnx or .csproj file, or a directory that holds exactly one.  The current directory "
-                + "when left out.",
-            Arity = ArgumentArity.ZeroOrOne,
+                "A .sln, .slnx or .csproj file, or a directory that holds exactly one; the current directory when "
+                + "left out.  A path that ends in .sql restricts the run to that file, and may be given several times.",
+            Arity = ArgumentArity.ZeroOrMore,
         };
 
         // One value each time it is given, and it may be given several times: UsageCheck reads the token after it as
@@ -39,10 +46,22 @@ internal static class DescribeCommand
             AllowMultipleArgumentsPerToken = false,
         };
 
+        // Accepted and checked, and not shown: it selects queries, and nothing this version prints depends on which
+        // are selected.  Sub-phase 2.5 gives it an effect and shows it.
+        var database = new Option<string[]>(DatabaseOption)
+        {
+            Description = "A database to describe the queries of.  May be given several times.",
+            HelpName = "name",
+            Arity = ArgumentArity.OneOrMore,
+            AllowMultipleArgumentsPerToken = false,
+            Hidden = true,
+        };
+
         var describe = new Command(Name, "Finds the queries of the projects that a database must describe")
         {
             path,
             project,
+            database,
         };
         describe.SetAction(
             async (parsed, cancellationToken) =>
@@ -53,6 +72,44 @@ internal static class DescribeCommand
             }
         );
         return describe;
+    }
+
+    /// <summary>
+    /// What is wrong with a command line of <c>describe</c> by the command's own rules, each a whole line to write.
+    /// A line names a position and never repeats a token.  Empty for another command.
+    /// </summary>
+    /// <remarks>
+    /// A path that ends in <c>.sql</c> is a filter and any other is the unit, of which there is one.  A value of
+    /// <c>--database</c> is a database name, by the rule of the <c>-- database:</c> marker.
+    /// </remarks>
+    public static IReadOnlyList<string> CheckUsage(Usage usage)
+    {
+        if (usage.Command.Name != Name)
+        {
+            return [];
+        }
+
+        var messages = new List<string>();
+        var units = 0;
+        foreach (var value in usage.Values)
+        {
+            if (value.Option is null)
+            {
+                if (!SqlPath.IsSqlFile(value.Text) && ++units > 1)
+                {
+                    messages.Add($"sqlsource: unexpected argument at position {value.Position}");
+                }
+            }
+            else if (value.Option.Name == DatabaseOption && !SettingValue.IsDatabaseName(value.Text))
+            {
+                messages.Add(
+                    $"sqlsource: the value of option '{DatabaseOption}' at position {value.Position} is not a "
+                        + "database name"
+                );
+            }
+        }
+
+        return messages;
     }
 
     /// <summary>
@@ -70,7 +127,10 @@ internal static class DescribeCommand
         CancellationToken cancellationToken
     )
     {
-        if (RunUnitFinder.Find(parsed.GetValue<string?>(PathArgument), host.WorkingDirectory, reporter) is not { } unit)
+        // With file filters and no unit, the unit is found from the working directory, not from the files.
+        var paths = parsed.GetValue<string[]>(PathArgument) ?? [];
+        var unitPath = paths.FirstOrDefault(static path => !SqlPath.IsSqlFile(path));
+        if (RunUnitFinder.Find(unitPath, host.WorkingDirectory, reporter) is not { } unit)
         {
             return null;
         }
@@ -93,7 +153,12 @@ internal static class DescribeCommand
             return null;
         }
 
-        var result = RunPlanner.Plan(manifests, cancellationToken);
+        var filters = RunFilters.Create(
+            paths.Where(SqlPath.IsSqlFile),
+            parsed.GetValue<string[]>(DatabaseOption) ?? [],
+            host.WorkingDirectory
+        );
+        var result = RunPlanner.Plan(manifests, filters, cancellationToken);
         foreach (var error in result.Errors)
         {
             reporter.Report(error);

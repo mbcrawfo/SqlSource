@@ -31,7 +31,7 @@ public class DescribeTests
         var result = await run.RunAsync("describe", "--help");
 
         result.ExitCode.ShouldBe(0);
-        result.Out.ShouldContain("sqlsource describe [<path>]");
+        result.Out.ShouldContain("sqlsource describe [<path>...]");
         result.Error.ShouldBeEmpty();
     }
 

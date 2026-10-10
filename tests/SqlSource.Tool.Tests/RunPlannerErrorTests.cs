@@ -18,7 +18,11 @@ public sealed class RunPlannerErrorTests : IDisposable
     public void Dispose() => _folder.Dispose();
 
     private static RunPlanResult Plan(params TestProject[] projects) =>
-        RunPlanner.Plan([.. projects.Select(project => project.Manifest())], TestContext.Current.CancellationToken);
+        RunPlanner.Plan(
+            [.. projects.Select(project => project.Manifest())],
+            RunFilters.None,
+            TestContext.Current.CancellationToken
+        );
 
     private static string Type(string name, string arguments = "") =>
         $"[SqlSource.SqlSourceGenerate({arguments})]\ninternal static partial class {name};\n";

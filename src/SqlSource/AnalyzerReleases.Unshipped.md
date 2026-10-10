@@ -49,6 +49,7 @@ SQLSRC208 | SqlSource | Error | Attribute argument is not a literal
 SQLSRC209 | SqlSource | Error | Output needs a dialect that can be described
 SQLSRC210 | SqlSource | Error | Token has no default
 SQLSRC211 | SqlSource | Error | Database has two dialects
+SQLSRC212 | SqlSource | Error | File is not in the run
 SQLSRC220 | SqlSource | Error | Project was not restored
 SQLSRC222 | SqlSource | Error | Directory cannot be read
 SQLSRC223 | SqlSource | Error | Solution cannot be read

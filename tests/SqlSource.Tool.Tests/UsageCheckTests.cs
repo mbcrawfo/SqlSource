@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using System.CommandLine;
+using System.IO;
 using System.Linq;
 using Shouldly;
+using SqlSource.Tool.Reporting;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -220,4 +222,101 @@ public class UsageCheckTests
         UsageCheck
             .Check(Root(), ["describe", "--oops\nsrc/App.cs(1,1): error CS0000: forged"])
             .Messages.ShouldBe(["sqlsource: unknown option '--oops src/App.cs(1,1)'"]);
+
+    [Fact]
+    public void Check_ValuesOfOptionsAndArguments_AreGivenWithTheirPositions()
+    {
+        var usage = UsageCheck.Check(
+            Root(),
+            ["describe", "--project", "A.csproj", "App.slnx", "--project=B.csproj", "-c:x"]
+        );
+
+        usage.Messages.ShouldBeEmpty();
+        usage
+            .Values.Select(value => (value.Option?.Name, value.Text, value.Position))
+            .ShouldBe([
+                ("--project", "A.csproj", 3),
+                (null, "App.slnx", 4),
+                ("--project", "B.csproj", 5),
+                ("--connection", "x", 6),
+            ]);
+    }
+
+    // The same as the test above it, for the commands of the tool itself, whose "describe" takes several paths and
+    // has rules of its own.
+    [Fact]
+    public void Check_EveryAcceptedCommandLineOfTheTool_IsReadTheSameBySystemCommandLine()
+    {
+        string[] vocabulary =
+        [
+            "describe",
+            "--project",
+            "--project=P",
+            "--database",
+            "--database=D",
+            "--database=",
+            "--help",
+            "--",
+            "V",
+            "W",
+            "Q.sql",
+            "R.SQL",
+        ];
+        using var folder = new TempFolder();
+        var root = Cli.BuildCommands(
+            Hosts.Create(folder.Path, new FakeProcessRunner(), folder.Path),
+            new Reporter(TextWriter.Null)
+        );
+        var disagreements = new List<string>();
+
+        foreach (var args in Sequences(vocabulary, 4))
+        {
+            var usage = UsageCheck.Check(root, args);
+            var parsed = root.Parse(args, Cli.Parser);
+            if (
+                usage.Messages.Count == 0
+                && DescribeCommand.CheckUsage(usage).Count == 0
+                && parsed.Errors.Count == 0
+                && !usage.IsReadTheSameBy(parsed)
+            )
+            {
+                disagreements.Add(string.Join(' ', args));
+            }
+        }
+
+        disagreements.Count.ShouldBe(0, string.Join(" | ", disagreements.Take(10)));
+    }
+
+    [Theory]
+    [InlineData("describe", "App.csproj", "Q.sql", "R.sql")]
+    [InlineData("describe", "Q.sql", "App.csproj", "R.SQL")]
+    [InlineData("describe", "Q.sql")]
+    [InlineData("describe", "--database", "billing", "--database=app-v2.main")]
+    public void CheckUsage_PathsAndDatabasesOfDescribe_GiveNoLine(params string[] args) =>
+        DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), args)).ShouldBeEmpty();
+
+    [Fact]
+    public void CheckUsage_SecondPathThatIsNoSqlFile_IsReportedByItsPosition() =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(ToolRoot(), ["describe", "App.csproj", "Q.sql", Secret, "--project", "P"]))
+            .ShouldBe(["sqlsource: unexpected argument at position 4"]);
+
+    [Theory]
+    [InlineData(3, "describe", "--database", "not a name")]
+    [InlineData(2, "describe", "--database=" + Secret + "!")]
+    [InlineData(3, "describe", "--database", "")]
+    public void CheckUsage_DatabaseThatIsNoName_IsReportedByItsPositionAndNotItsText(
+        int position,
+        params string[] args
+    ) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(ToolRoot(), args))
+            .ShouldBe([$"sqlsource: the value of option '--database' at position {position} is not a database name"]);
+
+    [Fact]
+    public void CheckUsage_AnotherCommand_GivesNoLine() =>
+        DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), ["--version"])).ShouldBeEmpty();
+
+    private static Command ToolRoot() =>
+        Cli.BuildCommands(Hosts.Create("/work", new FakeProcessRunner(), "/tmp"), new Reporter(TextWriter.Null));
 }

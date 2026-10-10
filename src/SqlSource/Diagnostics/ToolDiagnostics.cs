@@ -147,6 +147,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor FileNotInRun = new(
+        id: "SQLSRC212",
+        title: "File is not in the run",
+        messageFormat: "'{0}' is not a .sql file that a type of the run claims",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc212",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ProjectNotRestored = new(
         id: "SQLSRC220",
         title: "Project was not restored",
@@ -197,6 +208,7 @@ internal static class ToolDiagnostics
             OutputNeedsDescribableDialect,
             TokenHasNoDefault,
             DatabaseHasTwoDialects,
+            FileNotInRun,
             ProjectNotRestored,
             DirectoryCannotBeRead,
             SolutionCannotBeRead

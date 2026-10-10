@@ -27,7 +27,11 @@ internal static class RunPlanner
     /// <summary>The setting that the tool reads and the generator does not.</summary>
     public const string DatabaseSetting = "SqlSourceDatabase";
 
-    public static RunPlanResult Plan(ImmutableArray<ProjectManifest> manifests, CancellationToken cancellationToken)
+    public static RunPlanResult Plan(
+        ImmutableArray<ProjectManifest> manifests,
+        RunFilters filters,
+        CancellationToken cancellationToken
+    )
     {
         var errors = ImmutableArray.CreateBuilder<ToolDiagnostic>();
 
@@ -58,6 +62,7 @@ internal static class RunPlanner
         }
 
         var databases = AssignDatabases(files, errors);
+        Select(files, filters, errors);
 
         return new RunPlanResult(
             new RunPlan(new EquatableArray<PlannedFile>([.. files]), databases),
@@ -410,6 +415,44 @@ internal static class RunPlanner
 
         public string? File { get; set; }
     }
+
+    // Says which queries the filters take.  A file filter that names no planned file is SQLSRC212, and the run goes
+    // on.  Under --database a query that needs no entry is not selected: it belongs to no database.
+    private static void Select(
+        List<PlannedFile> files,
+        RunFilters filters,
+        ImmutableArray<ToolDiagnostic>.Builder errors
+    )
+    {
+        if (filters.IsEmpty)
+        {
+            return;
+        }
+
+        var named = new HashSet<string>(filters.Files.Select(static filter => filter.NormalizedPath), SqlPath.Comparer);
+        var planned = new HashSet<string>(files.Select(static file => file.NormalizedPath), SqlPath.Comparer);
+        for (var index = 0; index < files.Count; index++)
+        {
+            var file = files[index];
+            var isNamed = filters.Files.IsEmpty || named.Contains(file.NormalizedPath);
+            files[index] = file with
+            {
+                Queries = new EquatableArray<PlannedQuery>([
+                    .. file.Queries.Select(query => query with { IsSelected = isNamed && IsNamed(query, filters) }),
+                ]),
+            };
+        }
+
+        errors.AddRange(
+            filters
+                .Files.Where(filter => !planned.Contains(filter.NormalizedPath))
+                .Select(static filter => ToolDiagnostic.Create(ToolDiagnostics.FileNotInRun, filter.Path))
+        );
+    }
+
+    private static bool IsNamed(PlannedQuery query, RunFilters filters) =>
+        filters.Databases.IsEmpty
+        || (query.Database is { } database && filters.Databases.Contains(database, StringComparer.OrdinalIgnoreCase));
 
     // One claimed file as one project sees it.
     private sealed record ClaimedFile(

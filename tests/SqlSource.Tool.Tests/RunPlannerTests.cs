@@ -16,7 +16,11 @@ public sealed class RunPlannerTests : IDisposable
     public void Dispose() => _folder.Dispose();
 
     private static RunPlanResult Plan(params TestProject[] projects) =>
-        RunPlanner.Plan([.. projects.Select(project => project.Manifest())], TestContext.Current.CancellationToken);
+        RunPlanner.Plan(
+            [.. projects.Select(project => project.Manifest())],
+            RunFilters.None,
+            TestContext.Current.CancellationToken
+        );
 
     // A type with the attribute, in a file of its own.
     private static string Type(string name, string arguments = "") =>

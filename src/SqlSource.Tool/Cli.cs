@@ -102,10 +102,11 @@ public static class Cli
             var root = BuildCommands(host, reporter);
 
             var usage = UsageCheck.Check(root, args);
-            if (usage.Messages.Count > 0)
+            var messages = usage.Messages.Count > 0 ? usage.Messages : DescribeCommand.CheckUsage(usage);
+            if (messages.Count > 0)
             {
                 // These lines have no id and do not go through the reporter.
-                foreach (var line in usage.Messages)
+                foreach (var line in messages)
                 {
                     await host.Error.WriteLineAsync(line);
                 }

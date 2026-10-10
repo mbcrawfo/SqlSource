@@ -48,6 +48,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC209](#sqlsrc209) | Output needs a dialect that can be described |
 | [SQLSRC210](#sqlsrc210) | Token has no default |
 | [SQLSRC211](#sqlsrc211) | Database has two dialects |
+| [SQLSRC212](#sqlsrc212) | File is not in the run |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
@@ -702,6 +703,19 @@ Each query that is described belongs to one logical database: the one its `-- da
 ```
 
 Give the queries of one of the two files another database, or the dialect of the other file.  The database keeps the dialect of the first file that names it, in the order of the projects and then of the files' paths.  The error is reported once for each other file, at its first query of that database, and no query of that database in that file is described until it is mended.  A query whose output is `sql` belongs to no database and is not counted, and neither is a file that already has [SQLSRC209](#sqlsrc209).
+
+## SQLSRC212
+
+**File is not in the run**
+
+A path given to `sqlsource describe` that ends in `.sql` restricts the run to that file.  The run holds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it is on, and this path is none of them.  The message holds the full path the tool looked at: a relative path is resolved against the current directory.
+
+```console
+$ dotnet sqlsource describe Queries/User.sql
+sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file that a type of the run claims
+```
+
+Check the spelling of the path.  If the file exists, it is either not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it, or no type claims it: a type claims the `.sql` files in the folder of its own source file, or the ones its `Path` names.  With `--project`, the file must be claimed by a type of one of the projects named.  The rest of the run goes on.
 
 ## SQLSRC220
 

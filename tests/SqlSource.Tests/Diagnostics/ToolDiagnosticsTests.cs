@@ -178,4 +178,13 @@ public class ToolDiagnosticsTests
                 "/work/App/Users.sql"
             )
             .ShouldBe("The database 'main' has the dialect 'mssql' here and 'postgres' in '/work/App/Users.sql'");
+
+    [Fact]
+    public void FileNotInRun_Message_HoldsThePath() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.FileNotInRun.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/App/User.sql"
+            )
+            .ShouldBe("'/work/App/User.sql' is not a .sql file that a type of the run claims");
 }

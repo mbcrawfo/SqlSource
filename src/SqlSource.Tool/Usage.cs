@@ -10,8 +10,14 @@ namespace SqlSource.Tool;
 /// </summary>
 /// <param name="Command">The command the line names: the root, or the last command of it.</param>
 /// <param name="Arguments">The tokens that are arguments of that command, in order.</param>
+/// <param name="Values">The arguments and the values of options, in order, each with its position.</param>
 /// <param name="Messages">What is wrong, each a whole line to write.  Empty when nothing is.</param>
-internal sealed record Usage(Command Command, IReadOnlyList<string> Arguments, IReadOnlyList<string> Messages)
+internal sealed record Usage(
+    Command Command,
+    IReadOnlyList<string> Arguments,
+    IReadOnlyList<UsageValue> Values,
+    IReadOnlyList<string> Messages
+)
 {
     /// <summary>
     /// Whether System.CommandLine found the same command with the same arguments.  When it did not, a token that
