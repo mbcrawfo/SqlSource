@@ -202,6 +202,28 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor SidecarNotWritten = new(
+        id: "SQLSRC217",
+        title: "Sidecar was not written",
+        messageFormat: "The sidecar of '{0}' was not written, because not every query of the file has an entry",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc217",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor FileCannotBeChanged = new(
+        id: "SQLSRC218",
+        title: "File could not be changed",
+        messageFormat: "'{0}' could not be {1}: {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc218",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ProjectNotRestored = new(
         id: "SQLSRC220",
         title: "Project was not restored",
@@ -268,6 +290,8 @@ internal static class ToolDiagnostics
             DatabasesShareConnectionVariable,
             UnnamedConnectionNotUsed,
             NoDescriberForDialect,
+            SidecarNotWritten,
+            FileCannotBeChanged,
             ProjectNotRestored,
             SidecarOfNewerTool,
             DirectoryCannotBeRead,

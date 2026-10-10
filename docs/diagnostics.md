@@ -53,6 +53,8 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC214](#sqlsrc214) | Two databases share a connection variable |
 | [SQLSRC215](#sqlsrc215) | Connection names no database |
 | [SQLSRC216](#sqlsrc216) | No describer for the dialect |
+| [SQLSRC217](#sqlsrc217) | Sidecar was not written |
+| [SQLSRC218](#sqlsrc218) | File could not be changed |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
 | [SQLSRC221](#sqlsrc221) | Sidecar was written by a newer tool |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
@@ -771,6 +773,32 @@ The query must be described, its dialect is one whose databases can be asked, an
 ```
 
 Update the tool, with `dotnet tool update SqlSource.Tool`, to a version that describes the dialect; this version describes none.  Until then, set the output of the queries to `sql`, with `SqlSourceOutput` or an `-- output: sql` marker, to use their constants and methods without types.  The error is reported at each query that the run would have described, and each counts as failed.
+
+## SQLSRC217
+
+**Sidecar was not written**
+
+A sidecar is written whole or not at all: when every query of its `.sql` file that needs an entry was described in this run or already has a current one.  Here the run described a query of the file and could not write the result, because another query of the file has neither.  The lines under the message name each such query and say why: it `failed`, with an error of its own above, or it is `not in this run`, because `--database` or a `.sql` path left it out and its entry is missing or out of date.
+
+```console
+/work/App/Queries/Users.sql : error SQLSRC217: The sidecar of '/work/App/Queries/Users.sql' was not written, because not every query of the file has an entry
+    query: GetInvoice: not in this run
+    help: describe the whole file, or fix the queries that failed
+```
+
+Mend the queries that failed, or run `describe` without the filter that left a query out, so that every query of the file is described in one run.  The sidecar on the disk is as it was before the run.  The error is there so that a description that was not saved does not look like a success; a file that was held back with none of its queries described has only the errors of those queries.
+
+## SQLSRC218
+
+**File could not be changed**
+
+The tool could not write a sidecar, or could not delete one that its `.sql` file no longer needs.  The message says which, and ends with the reason the operating system gave.
+
+```console
+/work/App/Queries/Users.sql.json : error SQLSRC218: '/work/App/Queries/Users.sql.json' could not be written: Access to the path '/work/App/Queries/Users.sql.json' is denied.
+```
+
+Give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  A sidecar is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one and never a part of either.  The rest of the run goes on.
 
 ## SQLSRC220
 

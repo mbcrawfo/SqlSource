@@ -243,4 +243,28 @@ public class ToolDiagnosticsTests
                 "1"
             )
             .ShouldBe("'/work/Users.sql.json' has format 2, and this tool writes format 1");
+
+    [Fact]
+    public void SidecarNotWritten_Message_HoldsTheSqlFile() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.SidecarNotWritten.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/Users.sql"
+            )
+            .ShouldBe(
+                "The sidecar of '/work/Users.sql' was not written, because not every query of the file has an entry"
+            );
+
+    [Theory]
+    [InlineData("written")]
+    [InlineData("deleted")]
+    public void FileCannotBeChanged_Message_HoldsTheFileWhatWasTriedAndTheReason(string tried) =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.FileCannotBeChanged.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/Users.sql.json",
+                tried,
+                "Access is denied."
+            )
+            .ShouldBe($"'/work/Users.sql.json' could not be {tried}: Access is denied.");
 }

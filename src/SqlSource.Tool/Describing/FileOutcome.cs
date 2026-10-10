@@ -4,7 +4,7 @@ using SqlSource.Tool.Planning;
 namespace SqlSource.Tool.Describing;
 
 /// <summary>
-/// What a run does with the sidecar of one file, as data.  <c>SidecarStore</c> applies it to the disk, and
+/// What a run does with the sidecar of one file, as data.  <see cref="SidecarStore" /> applies it to the disk, and
 /// sub-phase 2.6 compares in its place.
 /// </summary>
 /// <param name="File">The file of the plan.</param>
