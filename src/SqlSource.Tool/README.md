@@ -31,7 +31,11 @@ billing (postgres): 4 described, 12 skipped, 0 failed
 reports (postgres): no connection, 5 skipped
 ```
 
-`--check` is the command for a build server.  It describes every query of the run, as `--force` does, compares what the database says with the sidecars that are there, and changes no file.  A sidecar that is out of date is [`SQLSRC219`](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc219), which says what differs and where, and which command mends it: `describe --force` for a difference that the database reports, since plain `describe` skips a query whose SQL is as it was.  It compares what changes generated code and not the versions of the tool or of the server, so a sidecar that a developer wrote passes on a server of another patch.  Every database of the run needs a connection.
+`--check` is the command for a build server.  It describes every query of the run, as `--force` does, compares what the database says with the sidecars that are there, and changes no file.  A sidecar that is out of date is [`SQLSRC219`](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc219), which says what differs and where, and which command mends it: `describe --force` for a difference that the database reports, since plain `describe` skips a query whose SQL is as it was.  It compares what changes generated code and not the versions of the tool or of the server, so a sidecar that a developer wrote passes on a server of another patch.  Every database of the run needs a connection.  With `--database`, `--project` or a `.sql` path it compares what `describe` with the same filters would change, and nothing else.  Its summary counts each query as the same, as one that differs, or as one that could not be described:
+
+```console
+billing (postgres): 15 same, 1 differ, 0 failed
+```
 
 The exit code is `0`; `1` when anything else was reported as an error, when the command line is wrong, or when the run was cancelled; and `2` when `--check` found a sidecar out of date and nothing else failed.
 

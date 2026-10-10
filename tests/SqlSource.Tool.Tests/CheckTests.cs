@@ -54,6 +54,7 @@ public sealed class CheckTests : IDisposable
 
         result.ExitCode.ShouldBe(0);
         result.Error.ShouldBeEmpty();
+        result.Out.ShouldBe("postgres (postgres): 2 same, 0 differ, 0 failed\n");
         // Two by the first run, and two by the check: none is skipped for a current entry.
         _scene.Describer.Described.Count.ShouldBe(4);
         await ShouldBeUntouchedAsync(before);

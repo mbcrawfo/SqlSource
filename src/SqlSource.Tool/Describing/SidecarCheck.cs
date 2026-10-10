@@ -47,12 +47,17 @@ internal static class SidecarCheck
     /// </summary>
     /// <param name="files">The files, with every selected query that needs an entry described or failed.</param>
     /// <param name="outcomes">What <see cref="FileOutcomes" /> decided for the same files, in the same order.</param>
+    /// <param name="databases">
+    /// The names of <c>--database</c>.  An entry for a query that is gone is reported when its own database is one
+    /// of them, or when there are none: a run for one database says nothing of another's entries.
+    /// </param>
     public static ImmutableArray<FileCheck> Compare(
         ImmutableArray<FileWork> files,
-        ImmutableArray<FileOutcome> outcomes
-    ) => [.. files.Select((file, index) => Compare(file, outcomes[index]))];
+        ImmutableArray<FileOutcome> outcomes,
+        ImmutableArray<string> databases
+    ) => [.. files.Select((file, index) => Compare(file, outcomes[index], databases))];
 
-    private static FileCheck Compare(FileWork file, FileOutcome outcome)
+    private static FileCheck Compare(FileWork file, FileOutcome outcome, ImmutableArray<string> databases)
     {
         var sql = file.File.Path;
 
@@ -108,7 +113,7 @@ internal static class SidecarCheck
             }
         }
 
-        differences.AddRange(EntriesWithoutAQuery(file, onDisk, sidecar));
+        differences.AddRange(EntriesWithoutAQuery(file, onDisk, sidecar, databases));
         return Of(outcome, differences);
     }
 
@@ -179,7 +184,8 @@ internal static class SidecarCheck
     private static IEnumerable<ToolDiagnostic> EntriesWithoutAQuery(
         FileWork file,
         SidecarOnDisk onDisk,
-        Sidecar sidecar
+        Sidecar sidecar,
+        ImmutableArray<string> databases
     )
     {
         SourceText? text = null;
@@ -189,6 +195,17 @@ internal static class SidecarCheck
                 string.Equals(candidate.Planned.Query.Name, entry.Name, StringComparison.Ordinal)
             );
             if (query is { Planned.NeedsEntry: true })
+            {
+                continue;
+            }
+
+            if (
+                !databases.IsEmpty
+                && (
+                    entry.Database is not { } database
+                    || !databases.Contains(database, StringComparer.OrdinalIgnoreCase)
+                )
+            )
             {
                 continue;
             }

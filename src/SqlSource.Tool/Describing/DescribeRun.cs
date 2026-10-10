@@ -49,7 +49,7 @@ internal static class DescribeRun
         var outcomes = FileOutcomes.Decide(files, options.HasFilter, reporter.Count > 0, SidecarOnDisk.Read);
         if (options.Check)
         {
-            foreach (var check in SidecarCheck.Compare(files, outcomes))
+            foreach (var check in SidecarCheck.Compare(files, outcomes, options.Databases))
             {
                 foreach (var difference in check.Differences)
                 {
@@ -63,7 +63,14 @@ internal static class DescribeRun
         }
 
         // 5.  The exit code is the reporter's: 1 when anything but SQLSRC219 was reported, else 2 when that was.
-        var lines = RunSummary.Lines([.. plan.Databases], selected, files, connections, options.Databases);
+        var lines = RunSummary.Lines(
+            [.. plan.Databases],
+            selected,
+            files,
+            connections,
+            options.Databases,
+            options.Check
+        );
         foreach (var line in lines)
         {
             await host.Out.WriteLineAsync(line);
