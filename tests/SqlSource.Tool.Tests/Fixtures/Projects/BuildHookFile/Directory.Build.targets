@@ -1,0 +1,18 @@
+<Project>
+    <!--
+        A target that adds a .sql file while a build runs.  The manifest target is run by name and runs no hook of
+        a build, so the file is not in the manifest.  TD-0025.
+    -->
+    <ItemGroup>
+        <AdditionalFiles Remove="Generated/Late.sql" />
+    </ItemGroup>
+    <Target Name="AddSqlFile" BeforeTargets="BeforeBuild">
+        <ItemGroup>
+            <AdditionalFiles Include="Generated/Late.sql">
+                <SqlSourceDialect>
+                    mssql
+                </SqlSourceDialect>
+            </AdditionalFiles>
+        </ItemGroup>
+    </Target>
+</Project>

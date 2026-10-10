@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The constants are written over several lines, and two of them with a space between them where a semicolon
+        could stand.  The compiler takes each for a constant, and the manifest holds them on its one line.
+    -->
+    <Import Project="../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <DefineConstants>
+            $(DefineConstants);
+            FEATURE_A;
+            FEATURE_B FEATURE_C
+        </DefineConstants>
+    </PropertyGroup>
+    <Import Project="../build/SqlSource.targets" />
+</Project>

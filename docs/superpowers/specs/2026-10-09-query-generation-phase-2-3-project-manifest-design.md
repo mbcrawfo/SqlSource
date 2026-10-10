@@ -56,6 +56,9 @@ Settled in this spec, with what the spikes behind it found:
 | Several target frameworks | The first of `TargetFrameworks`, passed as `-p:TargetFramework=`, and that one alone | Run by name on such a project, the target runs in the outer build with no framework.  `AdditionalFiles` almost never differ by framework, and a manifest for each framework would multiply every run for the project that has none that do.  What the others would add is not seen, which `docs/tech-debt` records. |
 | How a solution is read | `Microsoft.VisualStudio.SolutionPersistence` | It reads `.sln` and `.slnx` and is what the `dotnet` command uses.  The output of `dotnet sln list` is translated. |
 | The configuration | The project's default.  No `--configuration` | A file or a constant that depends on the configuration is rare, and an option can be added without breaking anything. |
+| A value the tool gives MSBuild as a property | Escaped as MSBuild escapes: `%` as `%25`, `;` as `%3B`, `,` as `%2C` | MSBuild splits the value of `-p:` at `;` and at `,`: `-p:SolutionDir=/work/Acme, Inc/` is `MSB1006`.  The review of this spec ran it, and the escaped form arrives whole. |
+| A solution that cannot be read | `SQLSRC223`, an error of its own | The user wrote the file, so that it cannot be read is theirs to mend and no failure of the tool, as `SQLSRC222` is for a directory. |
+| A project that NuGet writes no assets file for | Does not use SqlSource | A project whose `ProjectAssetsFile` is empty, one with `packages.config`, has no restore to tell by.  Read as not restored, it would be `SQLSRC220` in every run. |
 
 ## Out of scope
 
@@ -76,6 +79,7 @@ A target, `SqlSourceWriteManifest`:
 
 - It hooks nothing: no `BeforeTargets`, no `AfterTargets`.
 - Its `DependsOnTargets` is a property, `SqlSourceManifestDependsOn`, set beside it: `SqlSourceTrimProperties` and `SqlSourceTrimMetadataOfFiles`, and `AddImplicitDefineConstants` as well when `TargetFramework` is not empty.  The trims make it write trimmed values, and make a target of a project that hooks `SqlSourceTrimMetadataOfFiles` to add a `.sql` file run first.
+- That property is set in a `PropertyGroup` at the root of the file, since a target's own `DependsOnTargets` is read before the target runs.  It is the one element of the file that is not a target, and its second line holds the file's one condition.  `BuildFileTests` says so, and holds every other element to what it asserts today.
 - It writes the file `SqlSourceManifestFile` names, which it sets to `$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.manifest` when nothing set it, with `WriteLinesToFile`, `Overwrite` and `WriteOnlyWhenDifferent`.  It adds the file to `FileWrites` only when it is that default.
 - Every property it sets starts with `SqlSource`, and so does every item type it makes.
 
@@ -121,9 +125,13 @@ In `src/SqlSource.Tool/Projects/`.
 
 ### Running MSBuild
 
-`ToolHost` gains `Processes`, an `IProcessRunner`: one method that runs a program with a list of arguments, a working directory and environment variables to add, and returns its exit code and its two outputs, decoded as UTF-8.  The real one uses `System.Diagnostics.Process` with `ArgumentList`.  The tests give a fake.
+`ToolHost` gains `Processes`, an `IProcessRunner`: one method that runs a program with a list of arguments, a working directory, environment variables to set and to remove, and a cancellation token, and returns its exit code and its two outputs, decoded as UTF-8.  The real one uses `System.Diagnostics.Process` with `ArgumentList`, gives the process no input, reads both outputs while it runs, and kills the process and every process it started when the token is cancelled.  The tests give a fake.
 
-The program is `dotnet`: the value of `DOTNET_HOST_PATH` when the host has it, and `dotnet` on the path otherwise.  The working directory is the project's folder, so that the project's own `global.json` picks the SDK.  Each run sets `DOTNET_CLI_FORCE_UTF8_ENCODING` to `true`, so that a path outside ASCII arrives whole on Windows; that it does is not verified, and the plan checks it or records the gap in `docs/tech-debt`.
+The program is `dotnet`: the value of `DOTNET_HOST_PATH` when the host has it, and `dotnet` on the path otherwise.  The working directory is the project's folder, so that the project's own `global.json` picks the SDK.  Each run sets `DOTNET_CLI_FORCE_UTF8_ENCODING` to `true`, so that a path outside ASCII arrives whole on Windows; that it does is not verified, and the plan checks it or records the gap in `docs/tech-debt`.  Each run also sets `DOTNET_NOLOGO` to `true`, so that the first `dotnet` command on a machine prints no welcome before the JSON.
+
+Each run removes `MSBuildSDKsPath` and `MSBuildExtensionsPath`.  A process that MSBuild starts has both, which the review of this spec saw.  The `dotnet` command is understood to use them in place of its own when they are set, so that a tool started from a build, in a project whose `global.json` picks another SDK, would load the targets of the wrong one: the plan checks that, and whether a test process under `dotnet test` has them.
+
+Every value of a `-p:` switch is escaped as the table of decisions says.  The project file is an argument of its own and needs none.
 
 For each project, two runs, and three for a project with several target frameworks:
 
@@ -132,11 +140,11 @@ For each project, two runs, and three for a project with several target framewor
 
 In a solution, both runs also pass what `dotnet build` of that solution gives a project: `SolutionDir`, with its closing separator, `SolutionPath`, `SolutionName`, `SolutionFileName` and `SolutionExt`.  A project that imports a file through `$(SolutionDir)` then evaluates as it does in a build.
 
-A run that exits with anything but `0`, an evaluation whose output is not the JSON expected, and a second run that leaves no file are `SQLSRC205` at the project file, with the first twenty lines of MSBuild's output as continuation lines labelled `msbuild`.
+A run that exits with anything but `0`, an evaluation whose output is not the JSON expected, and a second run that leaves no file are `SQLSRC205` at the project file, with the first twenty lines that MSBuild wrote as continuation lines labelled `msbuild`: its error output first, where it writes the errors of an evaluation, then its standard output.  Empty lines are not counted.
 
 The second evaluation is not a refinement.  For a project with several target frameworks, NuGet imports a package's props only under a condition on `TargetFramework`, which the review of this spec read in a restored project's `obj/*.nuget.g.props`.  Evaluated with no framework, such a project never has `SqlSourceImported`, and a `PackageReference` that the project lists under a condition on a framework is not among its items either.
 
-Projects are evaluated at most eight at a time, and never more than the machine has processors.  Their errors are reported in the order of the projects, not of completion.
+Projects are evaluated at most eight at a time, and never more than the machine has processors.  Their errors are reported in the order of the projects, not of completion.  A run that is cancelled starts no further process, reports nothing for the ones it killed, and deletes its temporary folder.
 
 ### Whether a project uses SqlSource
 
@@ -146,12 +154,15 @@ The first row that holds:
 |----|----|----|----|
 | `true` | | | Uses SqlSource |
 | Anything else | Present | | Was not restored since the package was added: `SQLSRC220` |
+| Anything else | Absent | `ProjectAssetsFile` is empty | Does not use SqlSource |
 | Anything else | Absent | Does not exist | Was never restored: `SQLSRC220` |
 | Anything else | Absent | Exists | Does not use SqlSource |
 
 The second row is the project that gained its reference to SqlSource after its last restore: the assets file is there, and the package's props are not.  A `PackageReference` is an item of the project's evaluation, so it shows without a restore, and its name is compared ignoring case.  SqlSource is a development dependency and reaches no project through another, so a project with no such item and an assets file does not use it.
 
 A project that takes SqlSource by path, as this repository's tests do, has `SqlSourceImported` whether it was restored or not.
+
+The third row is a project that keeps its packages in `packages.config`: NuGet writes it no assets file, so nothing says whether it was restored.  Such a project imports a package's props by a line of its project file, so one that uses SqlSource has the marker.  The row is reasoned and was not run: this repository has no such project.
 
 ### The projects of a run
 
@@ -165,8 +176,19 @@ A project that takes SqlSource by path, as this repository's tests do, has `SqlS
 - In a solution, the run is the named projects, and only they are evaluated.  Each must be a project of the solution, `SQLSRC207` otherwise, and must use SqlSource, `SQLSRC204` otherwise.
 - With a project as the unit, each named path must be the unit: `SQLSRC207` otherwise.
 - Paths are resolved against the working directory and compared as full paths, ignoring case.
+- A project that is named twice is named once.
+
+`SolutionReader` gives the projects of a solution.  A `.sln` writes a project's path with `\` on every system, so a path is resolved against the solution's folder with either separator.  A project that the solution lists twice is one project.  A solution that the library cannot read is `SQLSRC223` at the solution file, with the library's reason, and the run ends there.
 
 A project with an error is left out and the run goes on with the rest; the exit code is `1`.  A run with no project left and no error prints `sqlsource: no project of '<unit>' uses SqlSource` on standard output and exits `0`.
+
+### The command line
+
+`describe` gains `--project <path>`.  It takes exactly one value each time it is given and may be given several times: an array with `ArgumentArity.OneOrMore`, as `src/SqlSource.Tool/AGENTS.md` asks.  It has an effect in this sub-phase, so `--help` lists it.
+
+`UsageCheck` already reads an option that takes a value.  The tokens of `--project`, alone, with `=` and with a value after it, join the vocabulary of `Check_EveryAcceptedCommandLine_IsReadTheSameBySystemCommandLine`.
+
+A path that `--project` names is printed as a full path, in `SQLSRC204` and `SQLSRC207`, as the path of `describe` is.  So a secret typed after `--project` reaches the output, and `docs/tech-debt/TD-0023` is amended to name the option.  The third gap of `TD-0024` stays open: its fix waits for an option that System.CommandLine rejects when it is given twice, and `--project` may be.  The item is amended to say an option that is given once.
 
 ### Reading the manifest
 
@@ -190,10 +212,11 @@ In `ToolDiagnostics`, with the four places each needs.
 | `SQLSRC204` | Project does not use SqlSource | `'{0}' does not use SqlSource` | The project file |
 | `SQLSRC205` | Project could not be evaluated | `MSBuild could not evaluate '{0}'` | The project file |
 | `SQLSRC206` | Project manifest cannot be read | `The project manifest of '{0}' cannot be read: {1}` | The project file; what is wrong |
-| `SQLSRC207` | Project is not in the run | `'{0}' is not a project of '{1}'` | The path given; the unit |
+| `SQLSRC207` | Project is not in the run | `'{0}' is not a project of '{1}'` | The full path of the path given; the unit |
 | `SQLSRC220` | Project was not restored | `'{0}' has not been restored, or not since the SqlSource package was added to it` | The project file |
+| `SQLSRC223` | Solution cannot be read | `'{0}' cannot be read: {1}` | The solution file; the library's reason |
 
-`SQLSRC204` has a `help:` line, `add the SqlSource package to the project`, and `SQLSRC220` has one, `run 'dotnet restore'`.  `SQLSRC220` is out of the order of the others because it was added after `SQLSRC208` to `SQLSRC219` were given to the later sub-phases.
+`SQLSRC204` has a `help:` line, `add the SqlSource package to the project`, and `SQLSRC220` has one, `run 'dotnet restore'`.  `SQLSRC220` is out of the order of the others because it was added after `SQLSRC208` to `SQLSRC219` were given to the later sub-phases, and `SQLSRC223` because the review of this spec added it after `SQLSRC222`.  The epic outline's table of ids, and the range that `src/SqlSource/AGENTS.md` names, gain it.
 
 ### `describe` after this sub-phase
 
@@ -208,7 +231,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 3. `SqlSourceWriteManifest` in the targets, with `BuildFileTests` and the fixture projects that prove what it writes.  The three tech-debt items, and `TD-0016` amended.
 4. `ManifestReader` and `ProjectManifest`, with `SQLSRC206`.
 5. `IProcessRunner`, the two runs and `SQLSRC205`.
-6. The projects of a run: a project, a solution, `--project`, `SQLSRC204`, `SQLSRC207` and `SQLSRC220`.
+6. The projects of a run: a project, a solution, `--project` and its command line, `SQLSRC204`, `SQLSRC207`, `SQLSRC220` and `SQLSRC223`.  `TD-0023` and `TD-0024` amended.
 7. `tools/check-package-install.sh` runs the target on the installed project.
 8. The documents, and the outline's row set to Done.
 
@@ -216,11 +239,13 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 
 | Where | Cases |
 |----|----|
-| `tests/SqlSource.Tests/Package/BuildFileTests.cs` | The props set `SqlSourceImported` with no condition.  The test that every target hooks `GenerateMSBuildEditorConfigFileCore` holds for every target but `SqlSourceWriteManifest`, which hooks nothing and depends on the two trims, and on `AddImplicitDefineConstants` under the one condition.  The target writes a `Property.` line and a `File.` line for each name of `Settings` and `TrimmedOnly`.  `SdkProperties` gains `MSBuildProjectFullPath`, `TargetFramework`, `LangVersion` and `DefineConstants`, and every other property still starts with `SqlSource` |
+| `tests/SqlSource.Tests/Package/BuildFileTests.cs` | The props set `SqlSourceImported` with no condition.  The test that every target hooks `GenerateMSBuildEditorConfigFileCore` holds for every target but `SqlSourceWriteManifest`, which hooks nothing and depends on the two trims, and on `AddImplicitDefineConstants` under the one condition.  The target writes a `Property.` line and a `File.` line for each name of `Settings` and `TrimmedOnly`.  `SdkProperties` gains `MSBuildProjectFullPath`, `TargetFramework`, `LangVersion` and `DefineConstants`, and every other property still starts with `SqlSource`.  The root of the targets holds its targets and one `PropertyGroup`, which sets `SqlSourceManifestDependsOn` alone, twice, with the one condition on its second line |
 | `ManifestReaderTests` | The example above, written out in full, member by member.  A value that holds `=`; an empty value; an unknown key; an empty line; `\r\n`; a byte order mark.  Each reason of `SQLSRC206`, with its text.  A version of `2` |
-| `ProjectEvaluatorTests`, with a fake runner | The arguments of each run, for one framework and for several, alone and in a solution.  For several, the table is applied to the second evaluation and not the first.  Each row of the table of whether a project uses SqlSource.  A run that exits `1`; output that is not JSON; no file after the second run: each is `SQLSRC205` with MSBuild's lines.  `DOTNET_HOST_PATH` set and not set.  The working directory and the variable.  The temporary folder is gone after the run, and after a run that failed |
-| `SolutionReaderTests` | A `.sln` and a `.slnx` with the same projects give the same list.  A solution folder, a project in another language, a project in a folder above the solution |
-| `RunProjectsTests`, with a fake runner | Each row of the table of projects.  `--project` once and twice, in a solution and with a project as the unit; a path outside the solution; a project that does not use SqlSource, named and not named; a project that was not restored, in a solution and alone.  A project that `--project` does not name is not evaluated.  One project fails and the rest are read.  No project uses SqlSource |
+| `ProjectEvaluatorTests`, with a fake runner | The arguments of each run, for one framework and for several, alone and in a solution.  For several, the table is applied to the second evaluation and not the first.  Each row of the table of whether a project uses SqlSource.  A run that exits `1`; output that is not JSON; no file after the second run: each is `SQLSRC205` with MSBuild's lines.  `DOTNET_HOST_PATH` set and not set.  The working directory, the variables set and the variables removed.  A solution's folder and a temporary folder whose names hold `;`, `,` and `%` are escaped in each `-p:`.  MSBuild's lines: the error output before the standard output, twenty at most, empty ones left out.  A cancelled run starts no further process.  The temporary folder is gone after the run, after a run that failed and after one that was cancelled |
+| `ProcessRunnerTests`, with the real `dotnet` | `dotnet --version` gives exit code `0` and a line of output.  A variable set reaches the process and a variable removed does not.  A process that is cancelled is killed |
+| `SolutionReaderTests` | A `.sln` and a `.slnx` with the same projects give the same list.  A solution folder, a project in another language, a project in a folder above the solution.  A `.sln` whose paths have `\`.  A project listed twice.  A file that is no solution: `SQLSRC223` with the reason |
+| `RunProjectsTests`, with a fake runner | Each row of the table of projects.  `--project` once and twice, in a solution and with a project as the unit; a path outside the solution; a project that does not use SqlSource, named and not named; a project that was not restored, in a solution and alone.  A project that `--project` does not name is not evaluated.  One project fails and the rest are read.  No project uses SqlSource.  One project named twice.  A solution that cannot be read ends the run |
+| `UsageCheckTests` and `DescribeTests` | `--help` of `describe` lists `--project`.  `--project` with no value, and `--project=`, say that it needs a value and print nothing else of the command line.  The vocabulary of `Check_EveryAcceptedCommandLine_IsReadTheSameBySystemCommandLine` holds its tokens |
 | `ManifestTargetTests`, with the real `dotnet msbuild` | The fixture projects below |
 | `tools/check-package-install.sh` | After the build, the script runs the target on the installed project and checks the first line, a `File` line for a `.sql` file of the project, a `File.` line whose value the project writes over several lines, and that the file its `Directory.Build.targets` adds from a `BeforeBuild` hook is not listed |
 
@@ -237,7 +262,7 @@ The fixture projects are under `tests/SqlSource.Tool.Tests/Fixtures/Projects/`, 
 | `BuildHookFile` | A target that hooks `BeforeBuild` and adds a `.sql` file: the file is not listed.  The test pins the limit, and names the tech-debt item |
 | `OwnFiles` | `SqlSourceIncludeFiles` is `false` and the project lists two of its three `.sql` files: two are listed |
 | `OddPaths` | `.sql` and `.cs` files whose names hold `;`, `=`, `%`, `'`, a space and a letter outside ASCII, in a folder whose name does too: each is listed whole |
-| `InSolution` | A project that imports a file through `$(SolutionDir)`: it evaluates in a solution |
+| `InSolution` | A project that imports a file through `$(SolutionDir)`, in a solution whose folder's name holds `,` and `;`: it evaluates in a solution |
 
 No fixture leaves an `obj` folder behind in a project the tool ran on.
 
@@ -250,10 +275,13 @@ These tests start MSBuild, so each takes a second or two.  They run with the res
 - `CONTRIBUTING.md`: the fixture projects and that their tests run `dotnet msbuild`; what `tools/check-package-install.sh` now checks.
 - `src/SqlSource/AGENTS.md`: the manifest target hooks nothing on purpose; its format is a contract with the tool, by the rules above; a new setting of the package is a new name in the target; it depends on a target of the SDK by name.
 - `src/SqlSource.Tool/AGENTS.md`: every process goes through `IProcessRunner`; the tool never restores and never builds; MSBuild's output is parsed only as the JSON of `-getProperty`; the tool writes nothing into a project.
-- `docs/diagnostics.md`: `SQLSRC204` to `SQLSRC207`, and `SQLSRC220`.
-- `docs/tech-debt`: three items, each with the next free id.  The manifest does not hold a `.sql` file that a target adds, unless the target hooks `SqlSourceTrimMetadataOfFiles`.  The manifest of a project with several target frameworks is the first one's alone, and so is the answer to whether it uses SqlSource.  And the manifest target depends on `AddImplicitDefineConstants`, a target of the SDK whose name is not a contract; the fix is for the tool to work the constants out from `TargetFramework`.  `TD-0016` is amended as above.  One more item for any character the manifest cannot carry, if the fixtures find one.
+- `src/SqlSource/AGENTS.md`, under Diagnostics: the ids that the outline assigns end at `SQLSRC223`.
+- `docs/diagnostics.md`: `SQLSRC204` to `SQLSRC207`, `SQLSRC220` and `SQLSRC223`.
+- `Directory.Packages.props` gains `Microsoft.VisualStudio.SolutionPersistence`, the lock files of the tool and of its tests change with it, and `tools/check-package.sh` requires its DLL in the tool's package.
+- `src/SqlSource.Tool/README.md`: what this version does, and that a project is restored before the tool is run.
+- `docs/tech-debt`: three items, each with the next free id.  The manifest does not hold a `.sql` file that a target adds, unless the target hooks `SqlSourceTrimMetadataOfFiles`.  The manifest of a project with several target frameworks is the first one's alone, and so is the answer to whether it uses SqlSource.  And the manifest target depends on `AddImplicitDefineConstants`, a target of the SDK whose name is not a contract; the fix is for the tool to work the constants out from `TargetFramework`.  `TD-0016` is amended as above, and `TD-0023` and `TD-0024` as under The command line.  One more item for any character the manifest cannot carry, if the fixtures find one.
 - `README.md`: nothing in it changes.  `SqlSourceImported` and the target are for the tool, and the tool is documented with phase 5, which also says which hook a target that adds a `.sql` file uses.
-- The epic outline: in steps 1 and 8.
+- The epic outline: in steps 1 and 8.  The commit that amended this spec after its review gave the outline `SQLSRC223` and the row of a project with no assets file.
 
 ## Version
 

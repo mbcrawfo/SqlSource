@@ -23,7 +23,14 @@ public partial class BuildFileTests
         "DefaultExcludesInProjectFolder",
         "IntermediateOutputPath",
         "MSBuildProjectFile",
+        "MSBuildProjectFullPath",
+        "TargetFramework",
+        "LangVersion",
+        "DefineConstants",
     ];
+
+    // The target that writes the project manifest for the sqlsource tool.  It is the one target no build runs.
+    private const string ManifestTarget = "SqlSourceWriteManifest";
 
     // What the generator reads: each as a property of the project and as metadata of a file's item.
     private static readonly string[] Settings =
@@ -45,6 +52,18 @@ public partial class BuildFileTests
     private static readonly XDocument Props = Load("SqlSource.props");
 
     private static readonly XDocument Targets = Load("SqlSource.targets");
+
+    // The sqlsource tool evaluates a project and asks for this property to find out whether the project uses
+    // SqlSource.  A condition would make a project that uses it look like one that does not.
+    [Fact]
+    public void Props_Marker_SaysThatTheProjectUsesSqlSourceInEveryProject()
+    {
+        var marker = Props.Descendants("SqlSourceImported").ShouldHaveSingleItem();
+
+        marker.Value.ShouldBe("true");
+        marker.Parent.ShouldNotBeNull().Name.LocalName.ShouldBe("PropertyGroup");
+        ConditionsAround(marker).ShouldBeEmpty();
+    }
 
     [Fact]
     public void Props_PropertiesOfThePackage_ReachTheCompilerInEveryProject()
@@ -80,18 +99,159 @@ public partial class BuildFileTests
     // file.  A trim that runs before it sees a value wherever it was set, in Directory.Build.targets or by another
     // target, and runs in every build that writes the file, a design-time build too.  A trim outside a target would
     // see only what is set before NuGet imports the file.  The target that collects the files with metadata runs
-    // there for the same reasons.
+    // there for the same reasons.  The target that writes the manifest is the one that is not of a build: see
+    // Targets_ManifestTarget_HooksNothing.
     [Fact]
-    public void Targets_EveryTarget_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
+    public void Targets_EveryTargetOfABuild_RunsBeforeTheBuildWritesTheFileTheCompilerReads()
+    {
+        var targets = Targets
+            .Root.ShouldNotBeNull()
+            .Elements("Target")
+            .Where(target => target.Attribute("Name")!.Value != ManifestTarget)
+            .ToList();
+
+        targets.Count.ShouldBe(4);
+        targets
+            .Select(target => target.Attribute("BeforeTargets")?.Value)
+            .ShouldAllBe(before => before == "GenerateMSBuildEditorConfigFileCore");
+        targets.SelectMany(ConditionsAround).ShouldBeEmpty();
+    }
+
+    // A target's DependsOnTargets is read before the target runs, so the list that the manifest target depends on
+    // is a property set where the file is imported.  Nothing else is outside a target, and the file has no other
+    // condition outside one: a second such element would be read by every project, in every build.
+    [Fact]
+    public void Targets_Root_HoldsTargetsAndTheListThatTheManifestTargetDependsOn()
     {
         var root = Targets.Root.ShouldNotBeNull();
 
-        root.Elements().ShouldAllBe(element => element.Name.LocalName == "Target");
-        root.Elements()
-            .Select(target => target.Attribute("BeforeTargets")?.Value)
-            .ShouldAllBe(before => before == "GenerateMSBuildEditorConfigFileCore");
-        root.Elements().SelectMany(ConditionsAround).ShouldBeEmpty();
+        var group = root.Elements().Where(element => element.Name.LocalName != "Target").ShouldHaveSingleItem();
+        group.Name.LocalName.ShouldBe("PropertyGroup");
+        group.Attributes().ShouldBeEmpty();
+
+        var lines = group.Elements().ToList();
+        lines
+            .Select(line => line.Name.LocalName)
+            .ShouldBe(["SqlSourceManifestDependsOn", "SqlSourceManifestDependsOn"]);
+        lines[0].Attributes().ShouldBeEmpty();
+        lines[0].Value.ShouldBe("SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles");
+        // A project that is not of the SDK has no TargetFramework, and no such target to depend on.
+        lines[1].Attributes().ShouldHaveSingleItem().Name.LocalName.ShouldBe("Condition");
+        lines[1].Attribute("Condition")!.Value.ShouldBe("'$(TargetFramework)' != ''");
+        lines[1].Value.ShouldBe("$(SqlSourceManifestDependsOn);AddImplicitDefineConstants");
     }
+
+    // The tool runs the target by name.  A hook would make every build write the manifest, and a condition would
+    // make a run of the tool find no file.
+    [Fact]
+    public void Targets_ManifestTarget_HooksNothing()
+    {
+        var target = Manifest();
+
+        target
+            .Attributes()
+            .Select(attribute => attribute.Name.LocalName)
+            .ShouldBe(["Name", "DependsOnTargets"], ignoreOrder: true);
+        target.Attribute("DependsOnTargets")!.Value.ShouldBe("$(SqlSourceManifestDependsOn)");
+    }
+
+    // The manifest is what the compiler is given, whole: a setting of the package that is added and has no line
+    // here would be read by the generator and not by the tool.  A property goes through Escape, or a value that
+    // holds a semicolon would be written as several lines.  The lines of a file are one item, so that the metadata
+    // stays under its file.
+    [Fact]
+    public void Targets_ManifestTarget_WritesEverySettingOfTheProjectAndOfEachFile()
+    {
+        var names = Settings.Concat(TrimmedOnly).ToList();
+        var lines = Manifest()
+            .Descendants("SqlSourceManifestLine")
+            .Select(line => line.Attribute("Include").ShouldNotBeNull().Value)
+            .ToList();
+
+        lines[0].ShouldBe("SqlSourceManifest=1");
+        lines
+            .Where(line => line.StartsWith("Property.", StringComparison.Ordinal))
+            .ShouldBe(names.Select(name => $"Property.{name}=$([MSBuild]::Escape($({name})))"), ignoreOrder: true);
+
+        const string Start = "@(SqlSourceManifestSqlFile->'";
+        const string End = "')";
+        var file = lines.Where(line => line.StartsWith(Start, StringComparison.Ordinal)).ShouldHaveSingleItem();
+        file.ShouldEndWith(End);
+        var parts = file[Start.Length..^End.Length].Split("%0a");
+        parts[0].ShouldBe("File=%(FullPath)");
+        parts.Skip(1).ShouldBe(names.Select(name => $"File.{name}=%({name})"), ignoreOrder: true);
+    }
+
+    // The trims of the package do not reach a property of the SDK, and a project may write its constants one on
+    // each line.  A line break inside a value would end its line of the manifest, so each of these is put on one
+    // line the way a trim does it.
+    [Theory]
+    [InlineData("TargetFramework")]
+    [InlineData("LangVersion")]
+    [InlineData("DefineConstants")]
+    public void Targets_ManifestTarget_WritesAPropertyOfTheSdkOnOneLine(string name) =>
+        Manifest()
+            .Descendants("SqlSourceManifestLine")
+            .Select(line => line.Attribute("Include").ShouldNotBeNull().Value)
+            .ShouldContain($"{name}=$([MSBuild]::Escape({Trimmed(name)}))");
+
+    [Fact]
+    public void Targets_ManifestTarget_ListsTheSqlFilesAndTheCompileFiles()
+    {
+        var target = Manifest();
+        var files = target.Descendants("SqlSourceManifestSqlFile").ShouldHaveSingleItem();
+
+        files.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("@(AdditionalFiles)");
+        // MSBuild compares ignoring case, as the generator does for the extension.
+        files.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe("'%(Extension)' == '.sql'");
+        target
+            .Descendants("SqlSourceManifestLine")
+            .Select(line => line.Attribute("Include")!.Value)
+            .ShouldContain("@(Compile->'Compile=%(FullPath)')");
+    }
+
+    // The file is the one SqlSourceManifestFile names, which the tool sets to a file of its own.  A file under obj
+    // belongs to the project, so it is added to FileWrites, which tells "dotnet clean" of it once a build runs the
+    // target; a file the tool named is the tool's to delete.
+    [Fact]
+    public void Targets_ManifestTarget_WritesTheFileThatIsNamedOrOneUnderObj()
+    {
+        var target = Manifest();
+        var write = target.Elements("WriteLinesToFile").ShouldHaveSingleItem();
+        var file = target.Descendants("SqlSourceManifestFile").ShouldHaveSingleItem();
+        var isDefault = target.Descendants("SqlSourceManifestIsDefault").ShouldHaveSingleItem();
+        var written = target.Descendants("FileWrites").ShouldHaveSingleItem();
+
+        write.Attribute("File").ShouldNotBeNull().Value.ShouldBe("$(SqlSourceManifestFile)");
+        write.Attribute("Lines").ShouldNotBeNull().Value.ShouldBe("@(SqlSourceManifestLine)");
+        write.Attribute("Overwrite").ShouldNotBeNull().Value.ShouldBe("true");
+        write.Attribute("WriteOnlyWhenDifferent").ShouldNotBeNull().Value.ShouldBe("true");
+
+        const string NotSet = "'$(SqlSourceManifestFile)' == ''";
+        file.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe(NotSet);
+        file.Value.ShouldBe("$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.manifest");
+        isDefault.Attribute("Condition").ShouldNotBeNull().Value.ShouldBe(NotSet);
+        // The flag is read before the name is given its default, or it would never be set.
+        isDefault.IsBefore(file).ShouldBeTrue();
+        written.Attribute("Include").ShouldNotBeNull().Value.ShouldBe("$(SqlSourceManifestFile)");
+        written
+            .Parent.ShouldNotBeNull()
+            .Attribute("Condition")
+            .ShouldNotBeNull()
+            .Value.ShouldBe("'$(SqlSourceManifestIsDefault)' == 'true'");
+    }
+
+    // The prefix keeps an item type of the package apart from those of the SDK and of other packages, as it does a
+    // property.  FileWrites is the SDK's own, and the target adds to it.
+    [Fact]
+    public void Targets_ManifestTarget_MakesOnlyItemTypesThatStartWithSqlSource() =>
+        Manifest()
+            .Elements("ItemGroup")
+            .Elements()
+            .Select(item => item.Name.LocalName)
+            .Where(name => name != "FileWrites")
+            .Distinct()
+            .ShouldBe(["SqlSourceManifestLine", "SqlSourceManifestSqlFile"], ignoreOrder: true);
 
     // SqlSource.Tests.csproj writes its dialect on a line of its own and its generator parameters one on each line,
     // and tools/package-install sets the parameters that way in Directory.Build.targets, so the end-to-end tests and
@@ -219,6 +379,9 @@ public partial class BuildFileTests
         names.ShouldNotBeEmpty();
         names.ShouldAllBe(name => name.StartsWith(Prefix, StringComparison.Ordinal));
     }
+
+    private static XElement Manifest() =>
+        Targets.Descendants("Target").Single(target => target.Attribute("Name")!.Value == ManifestTarget);
 
     private static IEnumerable<XAttribute> ConditionsAround(XElement element) =>
         element.AncestorsAndSelf().SelectMany(ancestor => ancestor.Attributes("Condition"));

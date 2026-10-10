@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Two target frameworks.  NuGet imports the props and the targets of a package into such a project under a
+        condition on TargetFramework, and so does this: evaluated with no framework, the project has none of the
+        package.  Later/ is listed for the second framework alone.
+    -->
+    <ImportGroup Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net10.0'">
+        <Import Project="../build/SqlSource.props" />
+    </ImportGroup>
+    <PropertyGroup>
+        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+        <SqlSourceDialect>postgres</SqlSourceDialect>
+    </PropertyGroup>
+    <ItemGroup Condition="'$(TargetFramework)' != 'net10.0'">
+        <AdditionalFiles Remove="Later/**" />
+        <Compile Remove="Later/**" />
+    </ItemGroup>
+    <ImportGroup Condition="'$(TargetFramework)' == 'net8.0' or '$(TargetFramework)' == 'net10.0'">
+        <Import Project="../build/SqlSource.targets" />
+    </ImportGroup>
+</Project>

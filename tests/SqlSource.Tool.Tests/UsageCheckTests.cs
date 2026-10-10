@@ -15,13 +15,14 @@ public class UsageCheckTests
     private static Command Root()
     {
         var connection = new Option<string>("--connection", "-c") { Arity = ArgumentArity.ExactlyOne };
+        var project = new Option<string[]>("--project") { Arity = ArgumentArity.OneOrMore };
         var force = new Option<bool>("--force") { Arity = ArgumentArity.Zero };
         var verbose = new Option<bool>("--verbose") { Arity = ArgumentArity.Zero, Recursive = true };
         var path = new Argument<string?>("path") { Arity = ArgumentArity.ZeroOrOne };
         return new Command("sqlsource")
         {
             verbose,
-            new Command("describe") { connection, force, path },
+            new Command("describe") { connection, project, force, path },
         };
     }
 
@@ -35,6 +36,8 @@ public class UsageCheckTests
     [InlineData("describe", "-c", "billing=Host=db", "App.csproj", "--force")]
     [InlineData("--verbose", "describe")]
     [InlineData("describe", "--verbose")]
+    [InlineData("describe", "--project", "A.csproj")]
+    [InlineData("describe", "--project=A.csproj", "App.slnx", "--project", "B.csproj")]
     public void Check_CommandLineWithNothingWrong_GivesNoLine(params string[] args) =>
         UsageCheck.Check(Root(), args).Messages.ShouldBeEmpty();
 
@@ -109,6 +112,23 @@ public class UsageCheckTests
                 "sqlsource: option '--force' takes no value",
             ]);
 
+    // An option that may be given several times takes one value each time, and the token after that is the path.
+    [Fact]
+    public void Check_OptionThatMayBeRepeated_TakesOneValueEachTime()
+    {
+        var usage = UsageCheck.Check(Root(), ["describe", "--project", "A.csproj", "App.slnx", "--project", Secret]);
+
+        usage.Messages.ShouldBeEmpty();
+        usage.Arguments.ShouldBe(["App.slnx"]);
+    }
+
+    [Theory]
+    [InlineData("describe", "--project")]
+    [InlineData("describe", "--project=")]
+    [InlineData("describe", "--project", "--force")]
+    public void Check_RepeatedOptionWithoutAValue_NeedsOne(params string[] args) =>
+        UsageCheck.Check(Root(), args).Messages.ShouldBe(["sqlsource: option '--project' needs a value"]);
+
     [Fact]
     public void Check_CommandLineWithNothingWrong_GivesTheCommandAndItsArguments()
     {
@@ -144,6 +164,9 @@ public class UsageCheckTests
             "--connection=V",
             "--connection:V",
             "-c",
+            "--project",
+            "--project=",
+            "--project=P",
             "--force",
             "--force=V",
             "--verbose",

@@ -141,4 +141,75 @@
             <FileWrites Include="$(SqlSourceFilesCache)" />
         </ItemGroup>
     </Target>
+    <!--
+        What SqlSourceWriteManifest depends on.  A target's DependsOnTargets is read before the target runs, so the
+        list is a property and is set here, where the file is imported: this is the one element of the file that is
+        not a target, and its second line holds the file's one condition.  The trims make the manifest hold trimmed
+        values, and make a target of a project that hooks SqlSourceTrimMetadataOfFiles to add a .sql file run first.
+
+        AddImplicitDefineConstants is a target of the SDK and not a contract: TD-0027.  It adds the constants of the
+        framework, NET10_0 and NET8_0_OR_GREATER among them, which the SDK otherwise adds only on the way to a
+        compile.  A project that is not of the SDK has no TargetFramework and no such target.
+    -->
+    <PropertyGroup>
+        <SqlSourceManifestDependsOn>SqlSourceTrimProperties;SqlSourceTrimMetadataOfFiles</SqlSourceManifestDependsOn>
+        <SqlSourceManifestDependsOn Condition="'$(TargetFramework)' != ''"
+            >$(SqlSourceManifestDependsOn);AddImplicitDefineConstants</SqlSourceManifestDependsOn>
+    </PropertyGroup>
+    <!--
+        Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
+        name.  It hooks nothing on purpose, so no build runs it, and nothing of a build runs before it but the two
+        trims: a .sql file that a target adds is in the manifest only when that target hooks
+        SqlSourceTrimMetadataOfFiles.  TD-0025.
+
+        The file is lines of key=value, and its format is a contract with the tool: see src/SqlSource/AGENTS.md.  The
+        tool names the file with SqlSourceManifestFile; without it the file is under obj, and is added to FileWrites.
+        That reaches "dotnet clean" only from inside a build, so it has no effect until a build runs this target.
+
+        A property goes through Escape, or MSBuild would make an item of each part of a value that holds a
+        semicolon, as DefineConstants does.  A property of the SDK is put on one line first, the way a trim does it:
+        the trims do not reach it, a project may write its constants one on each line, and a line break inside a
+        value would end its line of the file.  The lines of one .sql file are one item, with %0a between them, so that
+        the metadata of a file stays under its File line whatever the order of the items is; the path and the
+        metadata come from the item and are not split.  A setting of the package that is added is a line here, and
+        one in each of the two lists of the trims.
+    -->
+    <!-- editorconfig-checker-disable -->
+    <Target Name="SqlSourceWriteManifest" DependsOnTargets="$(SqlSourceManifestDependsOn)">
+        <PropertyGroup>
+            <SqlSourceManifestIsDefault Condition="'$(SqlSourceManifestFile)' == ''">true</SqlSourceManifestIsDefault>
+            <SqlSourceManifestFile Condition="'$(SqlSourceManifestFile)' == ''"
+                >$(IntermediateOutputPath)$(MSBuildProjectFile).SqlSource.manifest</SqlSourceManifestFile>
+        </PropertyGroup>
+        <ItemGroup>
+            <SqlSourceManifestLine Include="SqlSourceManifest=1" />
+            <SqlSourceManifestLine Include="Project=$([MSBuild]::Escape($(MSBuildProjectFullPath)))" />
+            <SqlSourceManifestLine Include="TargetFramework=$([MSBuild]::Escape($([System.Text.RegularExpressions.Regex]::Replace($(TargetFramework), '\s+', ' ').Trim())))" />
+            <SqlSourceManifestLine Include="LangVersion=$([MSBuild]::Escape($([System.Text.RegularExpressions.Regex]::Replace($(LangVersion), '\s+', ' ').Trim())))" />
+            <SqlSourceManifestLine Include="DefineConstants=$([MSBuild]::Escape($([System.Text.RegularExpressions.Regex]::Replace($(DefineConstants), '\s+', ' ').Trim())))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceDialect=$([MSBuild]::Escape($(SqlSourceDialect)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceDatabase=$([MSBuild]::Escape($(SqlSourceDatabase)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceOutput=$([MSBuild]::Escape($(SqlSourceOutput)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceGeneratorParameters=$([MSBuild]::Escape($(SqlSourceGeneratorParameters)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceInputModelSuffix=$([MSBuild]::Escape($(SqlSourceInputModelSuffix)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceOutputModelSuffix=$([MSBuild]::Escape($(SqlSourceOutputModelSuffix)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceModelNamespace=$([MSBuild]::Escape($(SqlSourceModelNamespace)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceInputModelType=$([MSBuild]::Escape($(SqlSourceInputModelType)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceOutputModelType=$([MSBuild]::Escape($(SqlSourceOutputModelType)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceCollectionType=$([MSBuild]::Escape($(SqlSourceCollectionType)))" />
+            <SqlSourceManifestSqlFile Include="@(AdditionalFiles)" Condition="'%(Extension)' == '.sql'" />
+            <SqlSourceManifestLine Include="@(SqlSourceManifestSqlFile->'File=%(FullPath)%0aFile.SqlSourceDialect=%(SqlSourceDialect)%0aFile.SqlSourceDatabase=%(SqlSourceDatabase)%0aFile.SqlSourceOutput=%(SqlSourceOutput)%0aFile.SqlSourceGeneratorParameters=%(SqlSourceGeneratorParameters)%0aFile.SqlSourceInputModelSuffix=%(SqlSourceInputModelSuffix)%0aFile.SqlSourceOutputModelSuffix=%(SqlSourceOutputModelSuffix)%0aFile.SqlSourceModelNamespace=%(SqlSourceModelNamespace)%0aFile.SqlSourceInputModelType=%(SqlSourceInputModelType)%0aFile.SqlSourceOutputModelType=%(SqlSourceOutputModelType)%0aFile.SqlSourceCollectionType=%(SqlSourceCollectionType)')" />
+            <SqlSourceManifestLine Include="@(Compile->'Compile=%(FullPath)')" />
+        </ItemGroup>
+        <WriteLinesToFile
+            File="$(SqlSourceManifestFile)"
+            Lines="@(SqlSourceManifestLine)"
+            Overwrite="true"
+            WriteOnlyWhenDifferent="true"
+        />
+        <ItemGroup Condition="'$(SqlSourceManifestIsDefault)' == 'true'">
+            <FileWrites Include="$(SqlSourceManifestFile)" />
+        </ItemGroup>
+    </Target>
+    <!-- editorconfig-checker-enable -->
 </Project>

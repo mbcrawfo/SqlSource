@@ -56,6 +56,61 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor ProjectDoesNotUseSqlSource = new(
+        id: "SQLSRC204",
+        title: "Project does not use SqlSource",
+        messageFormat: "'{0}' does not use SqlSource",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc204",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ProjectCannotBeEvaluated = new(
+        id: "SQLSRC205",
+        title: "Project could not be evaluated",
+        messageFormat: "MSBuild could not evaluate '{0}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc205",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ManifestCannotBeRead = new(
+        id: "SQLSRC206",
+        title: "Project manifest cannot be read",
+        messageFormat: "The project manifest of '{0}' cannot be read: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc206",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ProjectNotInRun = new(
+        id: "SQLSRC207",
+        title: "Project is not in the run",
+        messageFormat: "'{0}' is not a project of '{1}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc207",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ProjectNotRestored = new(
+        id: "SQLSRC220",
+        title: "Project was not restored",
+        messageFormat: "'{0}' has not been restored, or not since the SqlSource package was added to it",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc220",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor DirectoryCannotBeRead = new(
         id: "SQLSRC222",
         title: "Directory cannot be read",
@@ -67,9 +122,32 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor SolutionCannotBeRead = new(
+        id: "SQLSRC223",
+        title: "Solution cannot be read",
+        messageFormat: "'{0}' cannot be read: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc223",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
     public static ImmutableArray<DiagnosticDescriptor> All { get; } =
-        ImmutableArray.Create(UnexpectedFailure, NoRunUnit, SeveralRunUnits, NotARunUnit, DirectoryCannotBeRead);
+        ImmutableArray.Create(
+            UnexpectedFailure,
+            NoRunUnit,
+            SeveralRunUnits,
+            NotARunUnit,
+            ProjectDoesNotUseSqlSource,
+            ProjectCannotBeEvaluated,
+            ManifestCannotBeRead,
+            ProjectNotInRun,
+            ProjectNotRestored,
+            DirectoryCannotBeRead,
+            SolutionCannotBeRead
+        );
 }

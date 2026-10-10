@@ -16,10 +16,17 @@ internal sealed class CliRun : IDisposable
 
     public Dictionary<string, string> Environment { get; } = [];
 
+    // Answers every "dotnet msbuild" of the run.  A project it was told nothing about uses SqlSource.
+    public FakeProcessRunner Processes { get; } = new();
+
     // Set to stand in for standard output, for a test of a writer that fails.
     public TextWriter? Out { get; init; }
 
     public Task<CliResult> RunAsync(params string[] args) => InvokeAsync(args, TestContext.Current.CancellationToken);
+
+    // A run that the test ends itself.
+    public Task<CliResult> RunAsync(CancellationToken cancellationToken, params string[] args) =>
+        InvokeAsync(args, cancellationToken);
 
     public async Task<CliResult> RunCancelledAsync(params string[] args)
     {
@@ -34,7 +41,15 @@ internal sealed class CliRun : IDisposable
     {
         using var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
         using var error = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
-        var host = new ToolHost(Out ?? output, error, Folder.Path, name => Environment.GetValueOrDefault(name));
+        var host = new ToolHost(
+            Out ?? output,
+            error,
+            Folder.Path,
+            name => Environment.GetValueOrDefault(name),
+            Processes,
+            Folder.CreateFolder("tmp"),
+            ProcessorCount: 4
+        );
 
         var exitCode = await Cli.RunAsync(args, host, cancellationToken);
 

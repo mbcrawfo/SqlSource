@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- Directory.Build.targets adds a .sql file from a hook of the build. -->
+    <Import Project="../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <SqlSourceDialect>postgres</SqlSourceDialect>
+    </PropertyGroup>
+    <Import Project="../build/SqlSource.targets" />
+</Project>

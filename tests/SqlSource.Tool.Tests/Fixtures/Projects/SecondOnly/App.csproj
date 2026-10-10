@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Two target frameworks, and the package for the second alone, as a PackageReference under a condition on the
+        framework gives.  The tool reads the first framework, so this project does not use SqlSource as the tool
+        sees it.  TD-0026.
+    -->
+    <ImportGroup Condition="'$(TargetFramework)' == 'net10.0'">
+        <Import Project="../build/SqlSource.props" />
+    </ImportGroup>
+    <PropertyGroup>
+        <TargetFrameworks>net8.0;net10.0</TargetFrameworks>
+    </PropertyGroup>
+    <ImportGroup Condition="'$(TargetFramework)' == 'net10.0'">
+        <Import Project="../build/SqlSource.targets" />
+    </ImportGroup>
+</Project>

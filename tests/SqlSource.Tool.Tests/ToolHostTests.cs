@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Shouldly;
+using SqlSource.Tool.Processes;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -17,5 +18,8 @@ public class ToolHostTests
         host.WorkingDirectory.ShouldBe(Directory.GetCurrentDirectory());
         host.GetEnvironmentVariable("PATH").ShouldBe(Environment.GetEnvironmentVariable("PATH"));
         host.GetEnvironmentVariable("SQLSOURCE_NOT_A_VARIABLE").ShouldBeNull();
+        _ = host.Processes.ShouldBeOfType<ProcessRunner>();
+        host.TempDirectory.ShouldBe(Path.GetTempPath());
+        host.ProcessorCount.ShouldBe(Environment.ProcessorCount);
     }
 }

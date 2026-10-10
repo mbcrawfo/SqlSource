@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Imports a file through SolutionDir, which a build of the solution gives each project and a build of the
+        project alone does not: evaluated without it, the import finds no file.
+    -->
+    <Import Project="$(SolutionDir)Shared.props" />
+    <Import Project="../../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+    <Import Project="../../build/SqlSource.targets" />
+</Project>

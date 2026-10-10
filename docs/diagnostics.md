@@ -40,7 +40,13 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC201](#sqlsrc201) | No project or solution found |
 | [SQLSRC202](#sqlsrc202) | More than one project or solution found |
 | [SQLSRC203](#sqlsrc203) | Path is not a project or a solution |
+| [SQLSRC204](#sqlsrc204) | Project does not use SqlSource |
+| [SQLSRC205](#sqlsrc205) | Project could not be evaluated |
+| [SQLSRC206](#sqlsrc206) | Project manifest cannot be read |
+| [SQLSRC207](#sqlsrc207) | Project is not in the run |
+| [SQLSRC220](#sqlsrc220) | Project was not restored |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
+| [SQLSRC223](#sqlsrc223) | Solution cannot be read |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1.
 
@@ -575,6 +581,77 @@ The path given to `sqlsource describe` does not exist, or is a file that is not 
 
 Give the path of a solution, of a C# project, or of a directory that holds exactly one of them.
 
+## SQLSRC204
+
+**Project does not use SqlSource**
+
+The project given to `sqlsource describe`, or named with `--project`, was restored and has nothing of the SqlSource package.  The tool tells by a property that the package's MSBuild files set.  A project of a solution that was not named is not an error: it is left out, and nothing is said.
+
+```console
+$ dotnet sqlsource describe src/Tools/Tools.csproj
+/work/src/Tools/Tools.csproj : error SQLSRC204: '/work/src/Tools/Tools.csproj' does not use SqlSource
+    help: add the SqlSource package to the project
+```
+
+Add the package with `dotnet add package SqlSource` and restore, or run the command on the project that has the queries.  A project with several target frameworks is read by the first of them: one that references SqlSource for a later framework alone is this error.
+
+## SQLSRC205
+
+**Project could not be evaluated**
+
+`sqlsource` asks MSBuild about each project with `dotnet msbuild`: first what the project is, then for the list of what the compiler is given, which a target of the SqlSource package writes.  One of those runs failed.  The lines under the error give the reason, and then the first twenty lines that MSBuild wrote.
+
+```console
+$ dotnet sqlsource describe
+/work/App/App.csproj : error SQLSRC205: MSBuild could not evaluate '/work/App/App.csproj'
+    reason: dotnet msbuild ended with the exit code 1
+    msbuild: /work/App/App.csproj(4,5): error MSB4019: The imported project "/work/Shared.props" was not found.
+```
+
+Mend what MSBuild reports; `dotnet build` of the project reports the same.  When MSBuild says that the target `SqlSourceWriteManifest` does not exist, the SqlSource package of the project is older than the tool: update the package.  When the reason is that the project file does not exist, the solution lists a project that is not on the disk: restore the file, or take the project out of the solution.  When the reason is that `dotnet` could not be started, the .NET SDK is not installed or not on the path: the tool needs it, and not only the runtime it runs on.
+
+## SQLSRC206
+
+**Project manifest cannot be read**
+
+For each project, `sqlsource` has MSBuild write a file that lists what the compiler is given: the project manifest, which the target `SqlSourceWriteManifest` of the SqlSource package writes.  The tool could not read what the target wrote.  The message ends with what is wrong.
+
+```console
+$ dotnet sqlsource describe
+/work/App/App.csproj : error SQLSRC206: The project manifest of '/work/App/App.csproj' cannot be read: it has version '2' of the format and this tool reads version 1.  The SqlSource package and the sqlsource tool are out of step: update the older one
+```
+
+The SqlSource package of the project and the `sqlsource` tool are of different versions.  Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool`.  The two are released together under one version number.
+
+Any other reason, one that names a line for one, means that the target wrote a file the tool does not expect of its own version.  That is a bug in SqlSource: [report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
+
+## SQLSRC207
+
+**Project is not in the run**
+
+A path given with `--project` is not a C# project of the solution that the run is on.  When the run is on a project, the option may name that project and no other.  The message holds the full path the tool looked at: a relative path is resolved against the current directory, not against the folder of the solution.
+
+```console
+$ dotnet sqlsource describe App.slnx --project Tools.csproj
+sqlsource : error SQLSRC207: '/work/Tools.csproj' is not a project of '/work/App.slnx'
+```
+
+Give the path of a `.csproj` file that the solution lists.  `dotnet sln list` shows them.
+
+## SQLSRC220
+
+**Project was not restored**
+
+The tool tells that a project uses SqlSource by the package's MSBuild files, and those reach a project only through a restore.  This project either references the SqlSource package and has nothing of it, so it was not restored since the reference was added, or has no file of a restore at all, so nothing says whether it uses SqlSource.  The tool does not restore: a restore is slow and writes into the project.
+
+```console
+$ dotnet sqlsource describe
+/work/src/App/App.csproj : error SQLSRC220: '/work/src/App/App.csproj' has not been restored, or not since the SqlSource package was added to it
+    help: run 'dotnet restore'
+```
+
+Run `dotnet restore` on the solution or the project, then the command again.  In a solution every C# project is checked, one that has no SQL too: a run on a fresh checkout must not succeed by finding nothing.  A reference that keeps the package's MSBuild files out of the project, `ExcludeAssets="build"` for one, gives this error after a restore as well: remove that from the reference.
+
 ## SQLSRC222
 
 **Directory cannot be read**
@@ -587,3 +664,16 @@ sqlsource : error SQLSRC222: '/srv/locked' cannot be read: Access to the path '/
 ```
 
 Give yourself the right to read the directory.
+
+## SQLSRC223
+
+**Solution cannot be read**
+
+The `.sln` or `.slnx` file that `sqlsource describe` was given, or found in the directory, is not a solution that can be read.  The message ends with the reason of the library that reads it, which is the one the `dotnet` command uses.  A solution that lists one project twice is refused too.
+
+```console
+$ dotnet sqlsource describe
+/work/App.sln : error SQLSRC223: '/work/App.sln' cannot be read: Not a solution file.
+```
+
+Mend the file.  `dotnet sln list` reads it the same way.

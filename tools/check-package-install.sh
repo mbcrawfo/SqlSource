@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Installs the SqlSource package into a project the way a consumer does, runs the project and checks what it prints.
+# Then asks the project what the sqlsource tool asks one: whether it uses SqlSource, and for its project manifest.
 # Then removes a .sql file the project uses and checks that the next build, an incremental one, fails for it.
 # The project is tools/package-install.  It is copied out of the repository first, so that nothing of the repository's
 # own build applies to it, and it restores from the folder that holds the package and from nowhere else.
@@ -108,6 +109,56 @@ if ! diff "$EXPECTED" "$work/actual-output.txt"; then
     exit 1
 fi
 
+# The sqlsource tool asks a project two things, and the installed package answers both.  SqlSourceImported, which
+# build/SqlSource.props sets, says that the project uses SqlSource: NuGet imported the props, which nothing else in
+# the repository shows.  The target SqlSourceWriteManifest of build/SqlSource.targets writes the project manifest: the
+# tool runs it by name, as here, with a file of its own, and nothing of a build runs before it but the package's trims.
+imported="$(dotnet msbuild "$PROJECT" -nologo -getProperty:SqlSourceImported)"
+if [[ "$imported" != 'true' ]]; then
+    echo "check-package-install: a project that references $package does not have SqlSourceImported" >&2
+    exit 1
+fi
+
+manifest="$work/consumer.manifest"
+dotnet msbuild "$PROJECT" -nologo -t:SqlSourceWriteManifest "-p:SqlSourceManifestFile=$manifest" \
+    >"$work/manifest.log" 2>&1 || {
+    cat "$work/manifest.log" >&2
+    echo "check-package-install: the target SqlSourceWriteManifest of $package fails" >&2
+    exit 1
+}
+
+manifest_fails() {
+    cat "$manifest" >&2
+    echo "check-package-install: the project manifest that $package writes $1" >&2
+    exit 1
+}
+
+if [[ "$(head -n 1 "$manifest")" != 'SqlSourceManifest=1' ]]; then
+    manifest_fails 'does not start with its version'
+fi
+
+# A path is as MSBuild gives it, which on macOS is not the spelling of the temporary directory that mktemp gave.
+if ! grep -q '^File=.*/Queries/Users\.sql$' "$manifest"; then
+    manifest_fails 'does not list Queries/Users.sql'
+fi
+
+# The project writes this dialect over two lines, and Directory.Build.targets the property over four.  The lines
+# under a File line are the metadata of that file.
+if ! grep -A 10 '^File=.*/Queries/ByOption\.sql$' "$manifest" |
+    grep -qx 'File.SqlSourceDialect=mysql, no-backslash-escapes'; then
+    manifest_fails 'does not hold the trimmed dialect of Queries/ByOption.sql'
+fi
+
+if ! grep -qx 'Property.SqlSourceGeneratorParameters=sort-input no-token-validation' "$manifest"; then
+    manifest_fails 'does not hold the trimmed property of Directory.Build.targets'
+fi
+
+# Directory.Build.targets adds this file from a hook of the build, which a target that is run by name does not run.
+# docs/tech-debt/TD-0025.  The build above compiled it: expected-output.txt has its query.
+if grep -q 'AddedByATarget\.sql' "$manifest"; then
+    manifest_fails 'lists a file that a target adds from a hook of the build'
+fi
+
 # A .sql file that is removed has no timestamp left to compare, so the build after it compiles again only if an input
 # of the compiler changed.  The target SqlSourceTrackAdditionalFiles of build/SqlSource.targets writes a hash of the
 # list of AdditionalFiles to a file and names that file as an input: the hash, and so the file, changes when a .sql
@@ -127,4 +178,5 @@ if ! grep -q "error CS0117: .*$REMOVED_MEMBER" "$work/rebuild.log"; then
 fi
 
 echo "check-package-install: $package installs into a project, which builds and prints $FIXTURE/$EXPECTED,"
+echo "check-package-install: which has SqlSourceImported and writes its project manifest,"
 echo "check-package-install: and whose next build compiles again after a .sql file is removed"

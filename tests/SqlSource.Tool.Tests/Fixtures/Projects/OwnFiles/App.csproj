@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!-- The project lists its own .sql files, and leaves one of the three out. -->
+    <Import Project="../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <SqlSourceIncludeFiles>false</SqlSourceIncludeFiles>
+    </PropertyGroup>
+    <ItemGroup>
+        <AdditionalFiles Include="Queries/One.sql" />
+        <AdditionalFiles Include="Queries/Two.sql" />
+    </ItemGroup>
+    <Import Project="../build/SqlSource.targets" />
+</Project>
