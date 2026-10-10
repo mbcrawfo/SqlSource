@@ -74,7 +74,9 @@ public sealed class ManifestTargetTests : IDisposable
     {
         var constants = Constants(_fixtures.WriteManifest(_fixtures.Copy("Single")));
 
-        constants.ShouldContain("DEBUG");
+        // Not DEBUG: MSBuild reads the environment for its properties, and a machine that has a variable named
+        // Configuration, as the workflow of this repository has, evaluates the project in that configuration.
+        constants.ShouldContain("TRACE");
         constants.ShouldContain("NET10_0");
         constants.ShouldContain("NET8_0_OR_GREATER");
         constants.ShouldAllBe(constant => constant.Length > 0);
@@ -98,17 +100,16 @@ public sealed class ManifestTargetTests : IDisposable
     public void WriteManifest_NoFileNamed_WritesOneUnderObj()
     {
         var project = _fixtures.Copy("Single");
-        var file = Path.Combine(
-            Path.GetDirectoryName(project)!,
-            "obj",
-            "Debug",
-            "net10.0",
-            "App.csproj.SqlSource.manifest"
-        );
+        var obj = Path.Combine(Path.GetDirectoryName(project)!, "obj");
 
         var (exitCode, output) = FixtureProjects.RunMSBuild(project, ["-t:SqlSourceWriteManifest"]);
 
         exitCode.ShouldBe(0, output);
+        // In the folder of the configuration and the framework, whichever configuration the machine evaluates in.
+        var file = Directory
+            .GetFiles(obj, "App.csproj.SqlSource.manifest", SearchOption.AllDirectories)
+            .ShouldHaveSingleItem();
+        Path.GetFileName(Path.GetDirectoryName(file)).ShouldBe("net10.0");
         File.ReadLines(file).First().ShouldBe("SqlSourceManifest=1");
     }
 
