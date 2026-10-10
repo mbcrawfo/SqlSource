@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Text;
+using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
@@ -122,5 +125,59 @@ public sealed class ReporterTests : IDisposable
         reporter.Report(Failure with { Path = "/work/App/App.csproj" });
 
         reporter.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public void Report_Error_IsWrittenWithOneCallToTheWriter()
+    {
+        // Several threads report.  An error that is several writes can have the lines of another between its own.
+        using var writer = new RecordingWriter();
+        var reporter = new Reporter(writer);
+
+        reporter.Report(Failure.WithLines(new ContinuationLine("help", "try again")));
+
+        writer.Writes.ShouldBe(["sqlsource : " + Message + "    help: try again\n" + See]);
+    }
+
+    [Fact]
+    public void Report_FromManyThreads_KeepsEveryErrorWholeAndCountsIt()
+    {
+        using var writer = new RecordingWriter();
+        var reporter = new Reporter(writer);
+
+        _ = Parallel.For(0, 2000, _ => reporter.Report(Failure));
+
+        reporter.Count.ShouldBe(2000);
+        writer.Writes.Count.ShouldBe(2000);
+        writer.Writes.ShouldAllBe(write => write == "sqlsource : " + Message + See);
+    }
+
+    [Fact]
+    public void Report_PathAndLabelWithLineBreaks_StayOnTheirLines()
+    {
+        var reporter = new Reporter(_error);
+
+        reporter.Report(
+            (Failure with { Path = "/work/odd\nname/App.csproj" }).WithLines(new ContinuationLine("ser\nver", "text"))
+        );
+
+        _error.ToString().ShouldBe("/work/odd name/App.csproj : " + Message + "    ser ver: text\n" + See);
+    }
+
+    // Keeps each call of Write apart.  It is not safe for several threads, as a console's writer need not be.
+    private sealed class RecordingWriter : TextWriter
+    {
+        public RecordingWriter()
+        {
+            NewLine = "\n";
+        }
+
+        public List<string> Writes { get; } = [];
+
+        public override Encoding Encoding => Encoding.UTF8;
+
+        public override void Write(char value) => Writes.Add(value.ToString());
+
+        public override void Write(string? value) => Writes.Add(value ?? "");
     }
 }

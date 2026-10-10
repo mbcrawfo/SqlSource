@@ -187,4 +187,28 @@ public sealed class RunUnitTests : IDisposable
         Find("").ShouldBeNull();
         ShouldHaveReported("SQLSRC203", "");
     }
+
+    [Fact]
+    public void Find_DirectoryThatCannotBeRead_IsSqlsrc222()
+    {
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        {
+            Assert.Skip("Needs a file mode that keeps the owner of a directory out of it.");
+            return;
+        }
+
+        var directory = _folder.CreateFolder("locked");
+        File.SetUnixFileMode(directory, UnixFileMode.None);
+        try
+        {
+            Find("locked").ShouldBeNull();
+            ShouldHaveReported("SQLSRC222", directory);
+            _error.ToString().ShouldContain(" cannot be read: ");
+        }
+        finally
+        {
+            // So that the folder of the test can be deleted.
+            File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+    }
 }

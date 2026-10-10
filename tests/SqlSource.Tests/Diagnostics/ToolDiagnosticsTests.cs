@@ -67,12 +67,24 @@ public class ToolDiagnosticsTests
 
         foreach (var descriptor in ToolDiagnostics.All.Remove(ToolDiagnostics.UnexpectedFailure))
         {
+            // The second argument is for the one that has two: a format ignores an argument it has no place for.
             string.Format(
                     CultureInfo.InvariantCulture,
                     descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                    "/work/app"
+                    "/work/app",
+                    "the reason"
                 )
                 .ShouldContain("'/work/app'", Case.Sensitive, descriptor.Id);
         }
     }
+
+    [Fact]
+    public void DirectoryCannotBeRead_Message_HoldsTheDirectoryAndTheReason() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DirectoryCannotBeRead.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/srv/locked",
+                "Access is denied."
+            )
+            .ShouldBe("'/srv/locked' cannot be read: Access is denied.");
 }

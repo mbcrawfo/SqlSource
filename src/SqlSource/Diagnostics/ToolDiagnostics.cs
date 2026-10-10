@@ -56,9 +56,20 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor DirectoryCannotBeRead = new(
+        id: "SQLSRC222",
+        title: "Directory cannot be read",
+        messageFormat: "'{0}' cannot be read: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc222",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
     public static ImmutableArray<DiagnosticDescriptor> All { get; } =
-        ImmutableArray.Create(UnexpectedFailure, NoRunUnit, SeveralRunUnits, NotARunUnit);
+        ImmutableArray.Create(UnexpectedFailure, NoRunUnit, SeveralRunUnits, NotARunUnit, DirectoryCannotBeRead);
 }

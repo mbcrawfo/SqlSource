@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.CommandLine;
 using System.Linq;
+using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool;
 
@@ -38,7 +39,7 @@ internal static class UsageCheck
                 {
                     // The token after a misspelt option may be its value, so nothing after it is read, and nothing
                     // found before it is reported beside it.
-                    return new Usage(command, arguments, [$"sqlsource: unknown option '{name}'"]);
+                    return new Usage(command, arguments, [$"sqlsource: unknown option '{OneLine.Of(name)}'"]);
                 }
 
                 var hasSeparator = token.Length > name.Length;

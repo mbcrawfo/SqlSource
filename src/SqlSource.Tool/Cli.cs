@@ -147,7 +147,7 @@ public static class Cli
         }
     }
 
-    private static Command BuildCommands(ToolHost host, Reporter reporter)
+    internal static Command BuildCommands(ToolHost host, Reporter reporter)
     {
         var version = new Option<bool>("--version")
         {

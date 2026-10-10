@@ -46,13 +46,25 @@ internal static class RunUnitFinder
 
     private static RunUnit? FindIn(string directory, Reporter reporter)
     {
-        // Only files: a folder named App.csproj is not a project.
-        var units = Directory
-            .EnumerateFiles(directory)
-            .Select(static file => (File: file, Kind: KindOf(file)))
-            .Where(static unit => unit.Kind is not null)
-            .Take(2)
-            .ToArray();
+        (string File, RunUnitKind? Kind)[] units;
+        try
+        {
+            // Only files: a folder named App.csproj is not a project.
+            units =
+            [
+                .. Directory
+                    .EnumerateFiles(directory)
+                    .Select(static file => (File: file, Kind: KindOf(file)))
+                    .Where(static unit => unit.Kind is not null)
+                    .Take(2),
+            ];
+        }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
+        {
+            // The user named this directory, so that it cannot be read is theirs to mend, and no bug of the tool.
+            reporter.Report(ToolDiagnostic.Create(ToolDiagnostics.DirectoryCannotBeRead, directory, exception.Message));
+            return null;
+        }
 
         switch (units)
         {

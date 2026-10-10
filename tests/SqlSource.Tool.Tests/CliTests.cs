@@ -1,9 +1,12 @@
 using System;
+using System.Collections.Generic;
+using System.CommandLine;
 using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Reporting;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -112,6 +115,46 @@ public class CliTests
         var result = await run.RunAsync("--help=" + Secret);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: option '--help' takes no value\n"));
+    }
+
+    [Fact]
+    public async Task Run_ValueForVersion_NamesTheOptionAlone()
+    {
+        using var run = new CliRun();
+
+        var result = await run.RunAsync("--version=" + Secret);
+
+        result.ShouldBe(new CliResult(1, "", "sqlsource: option '--version' takes no value\n"));
+    }
+
+    [Fact]
+    public void Parser_Settings_ReadEveryTokenAsItStands()
+    {
+        // UsageCheck reads "@file" as an argument and "-ab" as one option, and System.CommandLine must too.
+        Cli.Parser.ResponseFileTokenReplacer.ShouldBeNull();
+        Cli.Parser.EnablePosixBundling.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void BuildCommands_EveryOption_TakesNoValueOrNeedsOne()
+    {
+        // System.CommandLine's default for a flag takes an optional value, which UsageCheck cannot tell from the
+        // argument after the flag.
+        var host = new ToolHost(TextWriter.Null, TextWriter.Null, "/", static _ => null);
+        var commands = new List<Command> { Cli.BuildCommands(host, new Reporter(TextWriter.Null)) };
+
+        for (var index = 0; index < commands.Count; index++)
+        {
+            commands.AddRange(commands[index].Subcommands);
+            foreach (var option in commands[index].Options)
+            {
+                (option.Arity.MaximumNumberOfValues == 0 || option.Arity.MinimumNumberOfValues > 0).ShouldBeTrue(
+                    option.Name
+                );
+            }
+        }
+
+        commands.Count.ShouldBeGreaterThan(1);
     }
 
     [Fact]

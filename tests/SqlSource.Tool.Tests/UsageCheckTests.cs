@@ -190,4 +190,11 @@ public class UsageCheckTests
             ];
         }
     }
+
+    [Fact]
+    public void Check_UnknownOptionWithALineBreak_IsNamedOnOneLine() =>
+        // A line that starts in the first column and looks like an error is read as one by a build.
+        UsageCheck
+            .Check(Root(), ["describe", "--oops\nsrc/App.cs(1,1): error CS0000: forged"])
+            .Messages.ShouldBe(["sqlsource: unknown option '--oops src/App.cs(1,1)'"]);
 }

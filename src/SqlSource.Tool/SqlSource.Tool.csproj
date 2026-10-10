@@ -9,6 +9,13 @@
             System.CommandLine in thirteen languages, and the help is in two languages at once.
         -->
         <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+        <!--
+            The documentation files exist because the repository builds them for every project.  They describe
+            internals, and nothing reads them where a tool is run, so the package leaves out the tool's own and the
+            generator's.  The symbol files stay: they give a stack trace its file names and line numbers.
+        -->
+        <PublishDocumentationFile>false</PublishDocumentationFile>
+        <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
     </PropertyGroup>
     <PropertyGroup>
         <PackAsTool>true</PackAsTool>

@@ -40,6 +40,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC201](#sqlsrc201) | No project or solution found |
 | [SQLSRC202](#sqlsrc202) | More than one project or solution found |
 | [SQLSRC203](#sqlsrc203) | Path is not a project or a solution |
+| [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1.
 
@@ -536,11 +537,11 @@ Remove the marker.
 `sqlsource` stopped on an exception that it has no error of its own for.  The message holds the type of the exception and its message.
 
 ```console
-$ dotnet sqlsource describe /srv/locked
-sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.UnauthorizedAccessException: Access to the path '/srv/locked' is denied.
+$ dotnet sqlsource describe
+sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.IO.FileNotFoundException: Unable to find the specified file.
 ```
 
-When the message names something of your machine, as this one does, fix that.  Otherwise it is a bug in the tool: set the environment variable `SQLSOURCE_DEBUG` to any value, run the command again, and [report it](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
+Here the working directory was deleted while a terminal was still in it.  When the message names such a condition of your machine, mend that.  Otherwise it is a bug in the tool: set the environment variable `SQLSOURCE_DEBUG` to any value, run the command again, and [report it](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
 
 ## SQLSRC201
 
@@ -573,3 +574,16 @@ $ dotnet sqlsource describe App.slnx
 The path given to `sqlsource describe` does not exist, or is a file that is not a `.sln`, `.slnx` or `.csproj` file.  A solution filter, `.slnf`, and a project of another language are not read.  The message holds the full path the tool looked at: a relative path is resolved against the current directory.  An empty path is this error too, which is what a variable that is not set gives in a shell.
 
 Give the path of a solution, of a C# project, or of a directory that holds exactly one of them.
+
+## SQLSRC222
+
+**Directory cannot be read**
+
+`sqlsource describe` was given a directory, or none and so the current one, and the operating system would not list its files.  The message ends with the reason the system gave.
+
+```console
+$ dotnet sqlsource describe /srv/locked
+sqlsource : error SQLSRC222: '/srv/locked' cannot be read: Access to the path '/srv/locked' is denied.
+```
+
+Give yourself the right to read the directory.

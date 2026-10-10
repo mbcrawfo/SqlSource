@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Checks the contents of the two packages.  SqlSource: the generator, the two MSBuild files that hand .sql files and
 # the settings to the compiler, the readme, and nothing under lib/.  SqlSource.Tool: the tool with the generator's
-# assembly and Roslyn beside it, the settings that name its command, and the readme.  Both have one version.
+# assembly and Roslyn beside it, the settings that name its command, the readme, and no documentation files.  Both
+# have one version.
 # Usage: check-package.sh [directory]   The directory holds one SqlSource.<version>.nupkg and one
 # SqlSource.Tool.<version>.nupkg.  Without it, both are packed into a temporary directory first.
 set -euo pipefail
@@ -85,6 +86,14 @@ check_entries "$tool" "${TOOL_REQUIRED[@]}"
 generator_entries="$(unzip -Z1 "$generator")"
 if grep --quiet '^lib/' <<<"$generator_entries"; then
     echo "check-package: $generator holds files under lib/" >&2
+    status=1
+fi
+
+# The documentation files of the tool's assemblies describe internals, and nothing reads them where a tool is run.
+# No pipe here either, for the reason given above: the settings file is taken out of the listing first.
+tool_entries="$(unzip -Z1 "$tool")"
+if grep --quiet '^tools/.*\.xml$' <<<"${tool_entries//DotnetToolSettings.xml/}"; then
+    echo "check-package: $tool holds documentation files under tools/" >&2
     status=1
 fi
 
