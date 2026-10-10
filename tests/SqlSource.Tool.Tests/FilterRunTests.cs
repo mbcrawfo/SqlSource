@@ -113,6 +113,8 @@ public sealed class FilterRunTests : IDisposable
 
         var result = await _scene.DescribeAsync(args);
 
+        // The run reached its end, where the summary is written.
+        result.Out.ShouldContain("postgres (postgres): 1 described, 0 skipped, 0 failed\n");
         result.Error.ShouldNotContain("SQLSRC218");
         (await File.ReadAllTextAsync(_plain + ".json", TestContext.Current.CancellationToken)).ShouldBe(
             "of a query that needed an entry once"
@@ -132,6 +134,28 @@ public sealed class FilterRunTests : IDisposable
 
         result.ExitCode.ShouldBe(0);
         File.Exists(_plain + ".json").ShouldBeFalse();
+    }
+
+    // The planner drops a setting it cannot read and falls back to the next level, so a file can look as if it needs no
+    // entry only because of the error: a run that reported anything deletes nothing.
+    [Fact]
+    public async Task Run_SettingThatIsNotValid_KeepsTheSidecarOfTheFileItHides()
+    {
+        _scene.Project.Properties["SqlSourceOutput"] = "sql";
+        var broken = _scene.Project.AddSql("Broken.sql", "-- name: Broken\nSELECT 5;\n", ("SqlSourceOutput", "modles"));
+        await File.WriteAllTextAsync(
+            broken + ".json",
+            "of a query that needed an entry",
+            TestContext.Current.CancellationToken
+        );
+        var before = await File.ReadAllBytesAsync(broken + ".json", TestContext.Current.CancellationToken);
+
+        var result = await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("error SQLSRC014: ");
+        File.Exists(broken + ".json").ShouldBeTrue();
+        (await File.ReadAllBytesAsync(broken + ".json", TestContext.Current.CancellationToken)).ShouldBe(before);
     }
 
     [Fact]

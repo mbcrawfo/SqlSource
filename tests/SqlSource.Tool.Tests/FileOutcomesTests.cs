@@ -50,8 +50,11 @@ public sealed class FileOutcomesTests : IDisposable
         return files;
     }
 
-    private static FileOutcome Outcome(ImmutableArray<FileWork> files, bool runHasFilter = false) =>
-        FileOutcomes.Decide(files, runHasFilter, File.Exists)[0];
+    private static FileOutcome Outcome(
+        ImmutableArray<FileWork> files,
+        bool runHasFilter = false,
+        bool anythingWasReported = false
+    ) => FileOutcomes.Decide(files, runHasFilter, anythingWasReported, File.Exists)[0];
 
     [Fact]
     public void Decide_EveryQueryDescribed_WritesATargetOfTheToolsVersionsInTheFilesOrder()
@@ -183,12 +186,17 @@ public sealed class FileOutcomesTests : IDisposable
         outcome.Target.ShouldBeNull();
     }
 
+    // A setting that was dropped as not valid, or a claim that could not be read, can make a file look as if it needs
+    // no entry.  A run that reported anything deletes nothing.
     [Theory]
-    [InlineData(false, true, nameof(FileAction.Delete))]
-    [InlineData(true, true, nameof(FileAction.None))]
-    [InlineData(false, false, nameof(FileAction.None))]
-    public void Decide_FileThatNeedsNoEntry_LosesItsSidecarOnlyInARunWithNoFilter(
+    [InlineData(false, false, true, nameof(FileAction.Delete))]
+    [InlineData(true, false, true, nameof(FileAction.None))]
+    [InlineData(false, true, true, nameof(FileAction.None))]
+    [InlineData(true, true, true, nameof(FileAction.None))]
+    [InlineData(false, false, false, nameof(FileAction.None))]
+    public void Decide_FileThatNeedsNoEntry_LosesItsSidecarOnlyInARunWithNoFilterAndNothingReported(
         bool runHasFilter,
+        bool anythingWasReported,
         bool sidecarExists,
         string action
     )
@@ -200,7 +208,8 @@ public sealed class FileOutcomesTests : IDisposable
             File.WriteAllText(sql + ".json", "anything");
         }
 
-        Outcome(Described(Plans.Of(project)), runHasFilter).Action.ShouldBe(Enum.Parse<FileAction>(action));
+        Outcome(Described(Plans.Of(project)), runHasFilter, anythingWasReported)
+            .Action.ShouldBe(Enum.Parse<FileAction>(action));
     }
 
     [Fact]

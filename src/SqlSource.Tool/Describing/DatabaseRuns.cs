@@ -94,37 +94,52 @@ internal static class DatabaseRuns
 
         try
         {
-            var server = guard.Call(() => session.Server);
-            foreach (var query in queries)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var planned = query.Planned;
-                var describe = new DescribeRequest(
-                    planned.Query.Name,
-                    SampleSql.Build(planned.Query),
-                    planned.Query.Parameters
-                );
-                var result = await guard.CallAsync(() => session.DescribeAsync(describe, cancellationToken));
-                if (result.Description is { } description)
-                {
-                    query.Entry = guard.Call(() =>
-                        EntryBuilder.Build(planned, database.Dialect, database.Name, server, description)
-                    );
-                    query.State = QueryState.Described;
-                }
-                else
-                {
-                    var failure = guard.Call(() =>
-                        result.Failure ?? throw new InvalidOperationException(Guard.Nothing)
-                    );
-                    reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), value));
-                    query.State = QueryState.Failed;
-                }
-            }
+            await DescribeAllAsync(database, queries, session, guard, reporter, cancellationToken);
         }
-        finally
+        catch
         {
-            await guard.CallAsync(session.DisposeAsync);
+            // The first exception is the run's end: a session that fails to close after it adds nothing.
+            await Guard.CloseQuietlyAsync(session);
+            throw;
+        }
+
+        await guard.CallAsync(session.DisposeAsync);
+    }
+
+    private static async Task DescribeAllAsync(
+        PlannedDatabase database,
+        List<QueryWork> queries,
+        IDescribeSession session,
+        Guard guard,
+        Reporter reporter,
+        CancellationToken cancellationToken
+    )
+    {
+        var value = guard.Secret;
+        var server = guard.Call(() => session.Server);
+        foreach (var query in queries)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var planned = query.Planned;
+            var describe = new DescribeRequest(
+                planned.Query.Name,
+                SampleSql.Build(planned.Query),
+                planned.Query.Parameters
+            );
+            var result = await guard.CallAsync(() => session.DescribeAsync(describe, cancellationToken));
+            if (result.Description is { } description)
+            {
+                query.Entry = guard.Call(() =>
+                    EntryBuilder.Build(planned, database.Dialect, database.Name, server, description)
+                );
+                query.State = QueryState.Described;
+            }
+            else
+            {
+                var failure = guard.Call(() => result.Failure ?? throw new InvalidOperationException(Guard.Nothing));
+                reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), value));
+                query.State = QueryState.Failed;
+            }
         }
     }
 
@@ -169,6 +184,8 @@ internal static class DatabaseRuns
     {
         public const string Nothing = "A describer returned nothing.";
 
+        public string Secret => secret;
+
         public async Task<T> CallAsync<T>(Func<Task<T>> call)
             where T : class
         {
@@ -191,6 +208,19 @@ internal static class DatabaseRuns
             catch (Exception exception) when (!IsCancellation(exception))
             {
                 throw Fault(exception);
+            }
+        }
+
+        // Closes a session after the run has failed or was cancelled.  What closing throws is dropped.
+        public static async Task CloseQuietlyAsync(IDescribeSession session)
+        {
+            try
+            {
+                await session.DisposeAsync();
+            }
+            catch (Exception exception) when (exception is not OutOfMemoryException)
+            {
+                // Nothing of it may reach the output: the first exception is the one that is reported.
             }
         }
 

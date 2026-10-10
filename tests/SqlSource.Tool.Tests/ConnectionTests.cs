@@ -51,6 +51,12 @@ public class ConnectionTests
         Parse("billing=" + Secret).ToString().ShouldNotContain(Secret);
 
     [Fact]
+    public void ToString_UsageValueOfAConnection_LeavesTheTextOut() =>
+        new UsageValue(new Option<string>("--connection"), "billing=" + Secret, 3)
+            .ToString()
+            .ShouldBe("UsageValue { Option = --connection, Position = 3 }");
+
+    [Fact]
     public void For_ValueOnTheCommandLine_IsUsedAndSaysWhereItCameFrom() =>
         Resolve(["billing"], ["billing=A"])
             .For("billing")
@@ -91,6 +97,23 @@ public class ConnectionTests
     public void For_VariableThatIsEmpty_IsNotSet()
     {
         var connections = Resolve(["billing"], [], ("SQLSOURCE_CONNECTION_BILLING", ""), ("SQLSOURCE_CONNECTION", ""));
+
+        connections.For("billing").Value.ShouldBeNull();
+        connections.UnnamedIsSetAndNotUsed.ShouldBeFalse();
+    }
+
+    // Redacting a space would turn every space of a describer's text into the mark.
+    [Theory]
+    [InlineData(" ")]
+    [InlineData("\t \r\n")]
+    public void For_VariableThatHoldsOnlyWhiteSpace_IsNotSet(string blank)
+    {
+        var connections = Resolve(
+            ["billing"],
+            [],
+            ("SQLSOURCE_CONNECTION_BILLING", blank),
+            ("SQLSOURCE_CONNECTION", blank)
+        );
 
         connections.For("billing").Value.ShouldBeNull();
         connections.UnnamedIsSetAndNotUsed.ShouldBeFalse();
@@ -173,6 +196,37 @@ public class ConnectionTests
                 $"sqlsource: the value of option '--connection' at position {position} is not "
                     + "<name>=<connection string>",
             ]);
+
+    // A path may hold "=" or ";", as the fixture OddPaths does, until a connection is on the line.
+    [Theory]
+    [InlineData("describe", "dir=a;b")]
+    [InlineData("describe", "dir=a;b", "x=y;z.sql")]
+    [InlineData("describe", "--database", "billing", "x=y.sql")]
+    public void CheckUsage_PathWithEqualsOrSemicolonAndNoConnection_GivesNoLine(params string[] args) =>
+        DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), args)).ShouldBeEmpty();
+
+    [Theory]
+    [InlineData(4, "describe", "--connection", "billing=Host=db;User", "Id=sa;Password=" + Secret)]
+    [InlineData(2, "describe", "Id=sa;Password=" + Secret, "--connection=billing=Host=db")]
+    [InlineData(4, "describe", "--connection", "billing=Host=db", "Password=" + Secret)]
+    [InlineData(4, "describe", "--connection", "billing=Host=db", "Id=sa;" + Secret)]
+    public void CheckUsage_PathWithEqualsOrSemicolonBesideAConnection_IsReportedByItsPositionAndNotItsText(
+        int position,
+        params string[] args
+    ) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(ToolRoot(), args))
+            .ShouldBe([
+                $"sqlsource: the argument at position {position} looks like a part of a connection string; put the "
+                    + "value of '--connection' in quotes",
+            ]);
+
+    [Theory]
+    [InlineData("describe", "--connection", "billing=Host=db", "App.csproj")]
+    [InlineData("describe", "--connection", "billing=Host=db", "Users=1;2.sql")]
+    [InlineData("describe", "--connection", "billing=Host=db", "a b")]
+    public void CheckUsage_PathWithNothingOfAConnectionStringBesideAConnection_GivesNoLine(params string[] args) =>
+        DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), args)).ShouldBeEmpty();
 
     [Fact]
     public void CheckUsage_SecondConnectionForOneNameIgnoringCase_IsReportedByItsPosition() =>

@@ -21,18 +21,18 @@ A query belongs to a logical database: the one its `-- database:` marker names, 
 | The variable of the name | `SQLSOURCE_CONNECTION_BILLING`: the name in upper case, with every character that is not a letter or a digit written as `_` |
 | `SQLSOURCE_CONNECTION` | Used when the run has exactly one database |
 
-The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.  The tool never prints a connection string.
+The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.  The tool prints no connection string that it was given as one.  Put the value of `--connection` in quotes: a shell splits it at a space, and the tool rejects a part of it that holds `=` or `;` and is not a path of a `.sql` file.
 
-A query whose entry in the sidecar is current, because neither its SQL nor its database changed since this version of the tool described it, is skipped, and a database whose queries are all current needs no connection.  `--force` describes every query of the run again: it is the command to run after a change to the schema, which the tool cannot see.  `--database`, which may be given several times, restricts the run to the queries of the databases it names, and a path that ends in `.sql` to that file; a restricted run leaves every other sidecar as it was.  A sidecar is written only when every query of its file that needs an entry has one, and a run ends with one line for each database:
+A query whose entry in the sidecar is current, because neither its SQL nor its database changed since this version of the tool described it, is skipped, and a database whose queries are all current needs no connection.  `--force` describes every query of the run again: it is the command to run after a change to the schema, which the tool cannot see.  `--database`, which may be given several times, restricts the run to the queries of the databases it names, and a path that ends in `.sql` to that file; a restricted run leaves every other sidecar as it was.  A sidecar is written only when every query of its file that needs an entry has one.  A run with no filter, in which nothing was reported as an error, deletes the sidecar of a file none of whose queries needs an entry any more: it is the one thing the tool removes from a project.  A run ends with one line for each database it ran on, and one with zeros for each name of `--database` that no query has:
 
 ```console
 billing (postgres): 4 described, 12 skipped, 0 failed
 reports (postgres): no connection, 5 skipped
 ```
 
-The exit code is `0`, or `1` when anything was reported as an error.
+The exit code is `0`, or `1` when anything was reported as an error, when the command line is wrong, or when the run was cancelled.
 
-`describe` takes a `.sln`, `.slnx` or `.csproj` file, or a directory that holds exactly one, and the current directory when none is given.  In a solution it runs on the C# projects that use the SqlSource package; `--project`, which may be given several times, names the ones to run on. 
+`describe` takes a `.sln`, `.slnx` or `.csproj` file, or a directory that holds exactly one, and the current directory when none is given.  In a solution it runs on the C# projects that use the SqlSource package; `--project`, which may be given several times, names the ones to run on.
 
 The tool reads `[SqlSourceGenerate]` from the source without compiling it, so `Path` and `Output` must be written as literals: `Path = "Queries"`, `Output = GeneratorOutput.Models`.
 

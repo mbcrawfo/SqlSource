@@ -142,6 +142,23 @@ public sealed class SecretTests : IDisposable
         _scene.Run.Processes.Requests.ShouldBeEmpty();
     }
 
+    // A connection string that the shell split at a space: the rest stands where the path of the unit stands.
+    [Fact]
+    public async Task Run_ConnectionStringSplitByTheShell_IsAWrongCommandLineThatDoesNotRepeatIt()
+    {
+        var result = await _scene.DescribeAsync("--connection", "postgres=Server=x;User", "Id=sa;Password=" + Marker);
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                "sqlsource: the argument at position 4 looks like a part of a connection string; put the value of "
+                    + "'--connection' in quotes\n"
+            )
+        );
+        _scene.Run.Processes.Requests.ShouldBeEmpty();
+    }
+
     // The rule of sub-phase 2.2 for an unknown option: nothing after it is read.
     [Fact]
     public async Task Run_MisspeltConnectionOptionFollowedByTheValue_NamesTheOptionAlone()

@@ -110,7 +110,9 @@ internal static class DescribeCommand
     /// <remarks>
     /// A path that ends in <c>.sql</c> is a filter and any other is the unit, of which there is one.  A value of
     /// <c>--database</c> is a database name, by the rule of the <c>-- database:</c> marker.  A value of
-    /// <c>--connection</c> is a name, <c>=</c> and a value, and a name is given once.
+    /// <c>--connection</c> is a name, <c>=</c> and a value, and a name is given once.  On a line with a
+    /// <c>--connection</c>, an argument that holds <c>=</c> or <c>;</c> and is no <c>.sql</c> path is taken for the
+    /// rest of a value that the shell split, and is not the unit: it would be printed as a path.
     /// </remarks>
     public static IReadOnlyList<string> CheckUsage(Usage usage)
     {
@@ -122,11 +124,24 @@ internal static class DescribeCommand
         var messages = new List<string>();
         var units = 0;
         var connections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var hasConnection = usage.Values.Any(static value => value.Option?.Name == ConnectionOption);
         foreach (var value in usage.Values)
         {
             if (value.Option is null)
             {
-                if (!SqlPath.IsSqlFile(value.Text) && ++units > 1)
+                if (SqlPath.IsSqlFile(value.Text))
+                {
+                    continue;
+                }
+
+                if (hasConnection && value.Text.AsSpan().IndexOfAny('=', ';') >= 0)
+                {
+                    messages.Add(
+                        $"sqlsource: the argument at position {value.Position} looks like a part of a connection "
+                            + $"string; put the value of '{ConnectionOption}' in quotes"
+                    );
+                }
+                else if (++units > 1)
                 {
                     messages.Add($"sqlsource: unexpected argument at position {value.Position}");
                 }

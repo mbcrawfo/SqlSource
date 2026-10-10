@@ -49,7 +49,8 @@ internal sealed class Connections
     /// <summary>
     /// Finds the connection of each selected database: the command line's value for its name, ignoring case; else
     /// the variable of its name; else <c>SQLSOURCE_CONNECTION</c>, when exactly one database is selected.  A
-    /// variable that is empty is not set.
+    /// variable that is empty, or holds only white space, is not set: redacting a space would turn every space of a
+    /// describer's text into the mark.
     /// </summary>
     /// <param name="selected">The selected databases, in the plan's order, each once ignoring case.</param>
     /// <param name="given">The values of <c>--connection</c>, each name once ignoring case.</param>
@@ -66,7 +67,7 @@ internal sealed class Connections
             onCommandLine[argument.Name] = argument.Value;
         }
 
-        var unnamed = NullIfEmpty(getEnvironmentVariable(ConnectionVariables.Unnamed));
+        var unnamed = NullIfBlank(getEnvironmentVariable(ConnectionVariables.Unnamed));
         var variables = selected.Select(ConnectionVariables.For).ToArray();
         var byDatabase = new Dictionary<string, DatabaseConnection>(StringComparer.OrdinalIgnoreCase);
         for (var index = 0; index < selected.Count; index++)
@@ -81,7 +82,7 @@ internal sealed class Connections
             {
                 byDatabase[name] = new DatabaseConnection(name, variable, value, CommandLineSource, null);
             }
-            else if (NullIfEmpty(getEnvironmentVariable(variable)) is { } ofName)
+            else if (NullIfBlank(getEnvironmentVariable(variable)) is { } ofName)
             {
                 byDatabase[name] = new DatabaseConnection(name, variable, ofName, variable, null);
             }
@@ -126,5 +127,5 @@ internal sealed class Connections
         return null;
     }
 
-    private static string? NullIfEmpty(string? value) => string.IsNullOrEmpty(value) ? null : value;
+    private static string? NullIfBlank(string? value) => string.IsNullOrWhiteSpace(value) ? null : value;
 }

@@ -19,14 +19,25 @@ internal static class FileOutcomes
     /// Whether the run has <c>--project</c>, <c>--database</c> or a <c>.sql</c> path.  A sidecar is deleted only in
     /// a run with none: a run on a part does not know what the rest needs of a file.
     /// </param>
+    /// <param name="anythingWasReported">
+    /// Whether the run has reported an error before this step.  A sidecar is deleted only when it has not: the plan
+    /// drops a setting it cannot read and a claim it cannot read, so a file can look as if it needs no entry only
+    /// because of the error.
+    /// </param>
     /// <param name="exists">Whether a file is on the disk.</param>
     public static ImmutableArray<FileOutcome> Decide(
         ImmutableArray<FileWork> files,
         bool runHasFilter,
+        bool anythingWasReported,
         Func<string, bool> exists
-    ) => [.. files.Select(file => Decide(file, runHasFilter, exists))];
+    ) => [.. files.Select(file => Decide(file, runHasFilter, anythingWasReported, exists))];
 
-    private static FileOutcome Decide(FileWork file, bool runHasFilter, Func<string, bool> exists)
+    private static FileOutcome Decide(
+        FileWork file,
+        bool runHasFilter,
+        bool anythingWasReported,
+        Func<string, bool> exists
+    )
     {
         var path = SidecarFormat.PathFor(file.File.Path);
         if (file.File.State != PlannedFileState.Ready)
@@ -37,8 +48,9 @@ internal static class FileOutcomes
         var needing = file.Queries.Where(static query => query.Planned.NeedsEntry).ToList();
         if (needing.Count == 0)
         {
-            // A sidecar that would be empty.
-            return Of(file, path, !runHasFilter && exists(path) ? FileAction.Delete : FileAction.None);
+            // A sidecar that would be empty.  Not in a run that failed: it may need no entry only by an error.
+            var deletes = !runHasFilter && !anythingWasReported && exists(path);
+            return Of(file, path, deletes ? FileAction.Delete : FileAction.None);
         }
 
         if (!needing.Exists(static query => query.Planned.IsSelected))

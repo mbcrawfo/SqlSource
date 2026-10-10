@@ -728,7 +728,7 @@ Check the spelling of the path.  If the file exists, it is either not a file of 
 
 **Database has no connection**
 
-A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.  A variable that is empty is not set.
+A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.  A variable that is empty or holds only white space is not set.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC213: No connection is given for the database 'postgres'
@@ -798,7 +798,7 @@ The tool could not write a sidecar, or could not delete one that its `.sql` file
 /work/App/Queries/Users.sql.json : error SQLSRC218: '/work/App/Queries/Users.sql.json' could not be written: Access to the path '/work/App/Queries/Users.sql.json' is denied.
 ```
 
-Give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  A sidecar is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one and never a part of either.  The rest of the run goes on.
+Give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  A sidecar is deleted only in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided: a setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.  A sidecar is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one and never a part of either.  The rest of the run goes on.
 
 ## SQLSRC220
 

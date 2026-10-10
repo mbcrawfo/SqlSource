@@ -436,6 +436,32 @@ public sealed class DatabaseRunsTests : IDisposable
         _error.ToString().ShouldBeEmpty();
     }
 
+    // The first exception is the one the run ends with: a close that fails after it is dropped.
+    [Fact]
+    public async Task Run_CancelledAndTheSessionThrowsWhenItIsClosed_EndsAsCancelled()
+    {
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        _describer.BeforeDescribe = _ => cancel.CancelAsync();
+        _describer.CloseException = new IOException($"lost {Secret}");
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(() => RunAsync(cancellationToken: cancel.Token));
+
+        _describer.Closed.ShouldBe(1);
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatThrowsAndTheSessionThrowsWhenItIsClosed_IsAFaultOfTheFirstException()
+    {
+        _describer.Exceptions["GetUser"] = new ArgumentException($"broken {Secret}");
+        _describer.CloseException = new IOException($"lost {Secret}");
+
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.ArgumentException", "broken ***"]);
+        _describer.Closed.ShouldBe(1);
+    }
+
     [Fact]
     public void Of_TextThatHoldsTheSecretTwice_HasTheMarkInBothPlaces() =>
         Redaction.Of("a s3cret and a s3cret", "s3cret").ShouldBe("a *** and a ***");

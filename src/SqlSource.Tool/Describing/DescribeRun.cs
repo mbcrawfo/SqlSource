@@ -44,7 +44,9 @@ internal static class DescribeRun
 
         // 4: a run that was cancelled changes no file.
         cancellationToken.ThrowIfCancellationRequested();
-        var outcomes = FileOutcomes.Decide(files, options.HasFilter, File.Exists);
+        // Nothing is deleted after an error: the plan drops a setting or a claim it could not read, and the file
+        // then looks as if it needs no entry.
+        var outcomes = FileOutcomes.Decide(files, options.HasFilter, reporter.Count > 0, File.Exists);
         SidecarStore.Apply(outcomes, reporter, cancellationToken);
 
         // 5.  The exit code is the reporter's: 1 when anything was reported.
