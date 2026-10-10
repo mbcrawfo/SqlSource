@@ -229,6 +229,32 @@ public sealed class DatabaseRunsTests : IDisposable
             );
     }
 
+    // A driver that rejects a wrong connection string can quote it, and does so when the session is opened.
+    [Fact]
+    public async Task Run_SessionThatCannotBeOpenedAndHoldsTheConnection_IsPrintedWithoutIt()
+    {
+        _describer.OpenFailure = new DescribeFailure(
+            FakeDescriber.Rejected,
+            new EquatableArray<string>([$"open on {Secret}"]),
+            Step: null,
+            new EquatableArray<string>([$"invalid connection string: {Secret}"]),
+            $"check {Secret}"
+        );
+
+        _ = await RunAsync(given: ["postgres=" + Secret]);
+
+        _error.ToString().ShouldNotContain("s3cret");
+        _error
+            .ToString()
+            .ShouldStartWith(
+                $"{_users}(1,10): error SQLSRC999: The server rejected the query 'open on ***'\n"
+                    + "    query: GetUser, database postgres, postgres\n"
+                    + "    server: invalid connection string: ***\n"
+                    + "    help: check ***\n"
+                    + "    see: https://example.test/sqlsrc999\n"
+            );
+    }
+
     [Fact]
     public async Task Run_QueryThatFails_IsReportedInTheFormatOfADescribersErrorAndTheSessionGoesOn()
     {
