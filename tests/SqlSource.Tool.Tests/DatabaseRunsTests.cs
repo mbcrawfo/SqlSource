@@ -7,6 +7,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
@@ -31,6 +32,7 @@ public sealed class DatabaseRunsTests : IDisposable
     private readonly StringWriter _error = new(CultureInfo.InvariantCulture) { NewLine = "\n" };
     private readonly TestProject _project;
     private readonly string _users;
+    private ImmutableArray<FileWork> _files;
 
     public DatabaseRunsTests()
     {
@@ -59,7 +61,7 @@ public sealed class DatabaseRunsTests : IDisposable
     )
     {
         plan ??= Plans.Of(_project);
-        var files = RunDecisions.Decide(plan, force: false, []);
+        var files = _files = RunDecisions.Decide(plan, force: false, []);
         var selected = RunDecisions.SelectedDatabases(plan);
         var connections = Connections.Resolve(
             [.. selected.Select(database => database.Name)],
@@ -301,6 +303,9 @@ public sealed class DatabaseRunsTests : IDisposable
             new EquatableArray<string>([$"could not connect to {Secret}"]),
             $"check {Secret}"
         );
+        // A query that is described would put the server's version, which holds the value, into its entry, and that
+        // ends the run.
+        _describer.Failures["GetInvoice"] = FakeDescriber.Failure("GetInvoice");
 
         _ = await RunAsync();
 
@@ -313,6 +318,11 @@ public sealed class DatabaseRunsTests : IDisposable
                     + "    step: catalog\n"
                     + "    server: could not connect to ***\n"
                     + "    help: check ***\n"
+                    + "    see: https://example.test/sqlsrc999\n"
+                    + $"{_users}(4,10): error SQLSRC999: The server rejected the query 'GetInvoice'\n"
+                    + "    query: GetInvoice, database billing, postgres 16.4 at ***, *** ***\n"
+                    + "    step: describe columns\n"
+                    + "    help: check the SQL\n"
                     + "    see: https://example.test/sqlsrc999\n"
             );
     }
@@ -406,6 +416,84 @@ public sealed class DatabaseRunsTests : IDisposable
         fault
             .Diagnostic.Arguments[1]
             .ShouldBe("The describer gave the parameter 'nope', which the query 'GetUser' does not have.");
+    }
+
+    // A description that holds the value would be written into a file that is committed.
+    private async Task<DescriberFaultException> RunExpectingTheValueInTheDescriptionAsync(string secret)
+    {
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() =>
+            RunAsync(given: ["postgres=" + secret, "billing=" + secret])
+        );
+
+        fault.InnerException.ShouldBeNull();
+        fault.Message.ShouldNotContain("s3cret");
+        fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
+        fault
+            .Diagnostic.Arguments.ToArray()
+            .ShouldBe([
+                "System.InvalidOperationException",
+                "The describer put the connection's value in its description of the query 'GetUser'.",
+            ]);
+        fault.Diagnostic.Arguments.ShouldAllBe(argument => !argument.Contains("s3cret"));
+        _files[0].Queries[0].State.ShouldNotBe(QueryState.Described);
+        _files[0].Queries[0].Entry.ShouldBeNull();
+        _describer.Closed.ShouldBe(1);
+        return fault;
+    }
+
+    [Fact]
+    public async Task Run_DescriptionWithTheValueInTheServersVersion_IsAFault()
+    {
+        _describer.Server = new ServerInfo(
+            $"16.4 at {Secret}",
+            "FakeDriver",
+            null,
+            EquatableArray<ServerSetting>.Empty
+        );
+
+        _ = await RunExpectingTheValueInTheDescriptionAsync(Secret);
+    }
+
+    [Fact]
+    public async Task Run_DescriptionWithTheValueInAColumnsName_IsAFault()
+    {
+        _describer.Descriptions["GetUser"] = FakeDescriber.NoRows with
+        {
+            ResultKind = SidecarResultKind.Rows,
+            Columns = new EquatableArray<SidecarColumn>([
+                new SidecarColumn(0, $"id of {Secret}", new OtherEngineType("int4"), null, null, null, null, null),
+            ]),
+        };
+
+        _ = await RunExpectingTheValueInTheDescriptionAsync(Secret);
+    }
+
+    // The writer escapes a quote and a backslash, so the value is in the file as it escapes it.
+    [Fact]
+    public async Task Run_DescriptionWithAValueOfAQuoteAndABackslashInTheServersVersion_IsAFault()
+    {
+        const string Awkward = "Pwd=\"s3cret\\\"\r\n";
+        _describer.Server = new ServerInfo($"16.4 {Awkward}", "FakeDriver", null, EquatableArray<ServerSetting>.Empty);
+
+        _ = await RunExpectingTheValueInTheDescriptionAsync(Awkward);
+    }
+
+    [Fact]
+    public async Task Run_DescriptionWithoutTheValue_IsDescribedAsBefore()
+    {
+        _describer.Server = new ServerInfo("16.4", "FakeDriver", null, EquatableArray<ServerSetting>.Empty);
+        _describer.Descriptions["GetUser"] = FakeDescriber.NoRows with
+        {
+            ResultKind = SidecarResultKind.Rows,
+            Columns = new EquatableArray<SidecarColumn>([
+                new SidecarColumn(0, "id", new OtherEngineType("int4"), null, null, null, null, null),
+            ]),
+        };
+
+        var files = await RunAsync();
+
+        States(files).ShouldBe([QueryState.Described, QueryState.Described]);
+        _error.ToString().ShouldBeEmpty();
     }
 
     // Review focus 5: a database is opened, and needs a connection, only for a query to describe.

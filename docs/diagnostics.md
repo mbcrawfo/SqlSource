@@ -825,7 +825,7 @@ A sidecar, the `.sql.json` file beside a `.sql` file, says which version of the 
     help: update the SqlSource.Tool package
 ```
 
-Update the tool, with `dotnet tool update SqlSource.Tool`, to the version of the SqlSource package the project uses.  The file is left as it is, and every query of its `.sql` file that the run was asked to describe counts as failed.  A sidecar of a lower format version, of another version of the tool, or one that cannot be read, a merge conflict for one, is no error: the tool describes its queries and writes it again.
+Update the tool, with `dotnet tool update SqlSource.Tool`, to the version of the SqlSource package the project uses.  The file is left as it is, and every query of its `.sql` file that the run was asked to describe counts as failed.  A sidecar of a lower format version, of another version of the tool, or one that cannot be read, a merge conflict for one, is no error: the tool describes its queries and writes it again.  A run that may delete a sidecar, because a file needs no entry any more, does not delete one of a higher format version either.
 
 ## SQLSRC222
 

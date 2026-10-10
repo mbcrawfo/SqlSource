@@ -24,19 +24,22 @@ internal static class FileOutcomes
     /// drops a setting it cannot read and a claim it cannot read, so a file can look as if it needs no entry only
     /// because of the error.
     /// </param>
-    /// <param name="exists">Whether a file is on the disk.</param>
+    /// <param name="read">
+    /// Reads the sidecar beside a <c>.sql</c> file, given the file's path.  A sidecar is deleted only when there is
+    /// one and it is not of a higher format version: that is a newer tool's file, which is left as it is.
+    /// </param>
     public static ImmutableArray<FileOutcome> Decide(
         ImmutableArray<FileWork> files,
         bool runHasFilter,
         bool anythingWasReported,
-        Func<string, bool> exists
-    ) => [.. files.Select(file => Decide(file, runHasFilter, anythingWasReported, exists))];
+        Func<string, SidecarOnDisk> read
+    ) => [.. files.Select(file => Decide(file, runHasFilter, anythingWasReported, read))];
 
     private static FileOutcome Decide(
         FileWork file,
         bool runHasFilter,
         bool anythingWasReported,
-        Func<string, bool> exists
+        Func<string, SidecarOnDisk> read
     )
     {
         var path = SidecarFormat.PathFor(file.File.Path);
@@ -49,7 +52,8 @@ internal static class FileOutcomes
         if (needing.Count == 0)
         {
             // A sidecar that would be empty.  Not in a run that failed: it may need no entry only by an error.
-            var deletes = !runHasFilter && !anythingWasReported && exists(path);
+            var deletes =
+                !runHasFilter && !anythingWasReported && read(file.File.Path) is { Text: not null, NewerFormat: null };
             return Of(file, path, deletes ? FileAction.Delete : FileAction.None);
         }
 

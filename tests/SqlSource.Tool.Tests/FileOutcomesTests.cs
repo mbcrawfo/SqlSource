@@ -54,7 +54,7 @@ public sealed class FileOutcomesTests : IDisposable
         ImmutableArray<FileWork> files,
         bool runHasFilter = false,
         bool anythingWasReported = false
-    ) => FileOutcomes.Decide(files, runHasFilter, anythingWasReported, File.Exists)[0];
+    ) => FileOutcomes.Decide(files, runHasFilter, anythingWasReported, SidecarOnDisk.Read)[0];
 
     [Fact]
     public void Decide_EveryQueryDescribed_WritesATargetOfTheToolsVersionsInTheFilesOrder()
@@ -210,6 +210,23 @@ public sealed class FileOutcomesTests : IDisposable
 
         Outcome(Described(Plans.Of(project)), runHasFilter, anythingWasReported)
             .Action.ShouldBe(Enum.Parse<FileAction>(action));
+    }
+
+    // A sidecar of a higher format version is a newer tool's file, which SQLSRC221 says is left alone.
+    [Fact]
+    public void Decide_FileThatNeedsNoEntryWithASidecarOfAHigherFormat_IsNotDeleted()
+    {
+        var project = Plans.Postgres(_folder, "Other");
+        var sql = project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 3;\n");
+        File.WriteAllText(
+            sql + ".json",
+            SidecarWriter.Write(new Sidecar(2, "9.9.9", EquatableArray<SidecarEntry>.Empty))
+        );
+
+        var outcome = Outcome(Described(Plans.Of(project)));
+
+        outcome.Action.ShouldBe(FileAction.None);
+        outcome.Target.ShouldBeNull();
     }
 
     [Fact]

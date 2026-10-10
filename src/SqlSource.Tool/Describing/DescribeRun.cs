@@ -1,5 +1,4 @@
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -46,7 +45,7 @@ internal static class DescribeRun
         cancellationToken.ThrowIfCancellationRequested();
         // Nothing is deleted after an error: the plan drops a setting or a claim it could not read, and the file
         // then looks as if it needs no entry.
-        var outcomes = FileOutcomes.Decide(files, options.HasFilter, reporter.Count > 0, File.Exists);
+        var outcomes = FileOutcomes.Decide(files, options.HasFilter, reporter.Count > 0, SidecarOnDisk.Read);
         SidecarStore.Apply(outcomes, reporter, cancellationToken);
 
         // 5.  The exit code is the reporter's: 1 when anything was reported.

@@ -13,7 +13,8 @@ internal sealed record ConnectionArgument(string Name, string Value)
 {
     /// <summary>
     /// Reads <c>name=value</c>.  The name is the text before the first <c>=</c> and must be a database name by the
-    /// rule of the <c>-- database:</c> marker; the value is the rest and must not be empty.
+    /// rule of the <c>-- database:</c> marker; the value is the rest and must hold something other than white
+    /// space, since removing white space from a text would turn every space of it into the mark.
     /// </summary>
     /// <remarks>
     /// The option always has a name: a connection string holds <c>=</c> itself and a shell removes quotes, so the
@@ -23,12 +24,18 @@ internal sealed record ConnectionArgument(string Name, string Value)
     {
         argument = null;
         var separator = text.IndexOf('=', StringComparison.Ordinal);
-        if (separator <= 0 || separator == text.Length - 1 || !SettingValue.IsDatabaseName(text.AsSpan(0, separator)))
+        if (separator <= 0 || !SettingValue.IsDatabaseName(text.AsSpan(0, separator)))
         {
             return false;
         }
 
-        argument = new ConnectionArgument(text[..separator], text[(separator + 1)..]);
+        var value = text[(separator + 1)..];
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        argument = new ConnectionArgument(text[..separator], value);
         return true;
     }
 

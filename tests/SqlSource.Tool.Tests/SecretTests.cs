@@ -159,6 +159,29 @@ public sealed class SecretTests : IDisposable
         _scene.Run.Processes.Requests.ShouldBeEmpty();
     }
 
+    // The part that is left ends in ".sql", which would make it a file filter that SQLSRC212 prints in full.
+    [Fact]
+    public async Task Run_ConnectionStringSplitByTheShellWithAPartThatEndsInSql_IsAWrongCommandLineThatDoesNotRepeatIt()
+    {
+        var result = await _scene.DescribeAsync(
+            "--connection",
+            "postgres=Server=x;User",
+            "Id=sa;Password=" + Marker + ".sql"
+        );
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                "sqlsource: the argument at position 4 looks like a part of a connection string; put the value of "
+                    + "'--connection' in quotes\n"
+            )
+        );
+        result.Out.ShouldNotContain(Marker);
+        result.Error.ShouldNotContain(Marker);
+        _scene.Run.Processes.Requests.ShouldBeEmpty();
+    }
+
     // The rule of sub-phase 2.2 for an unknown option: nothing after it is read.
     [Fact]
     public async Task Run_MisspeltConnectionOptionFollowedByTheValue_NamesTheOptionAlone()
@@ -217,6 +240,9 @@ public sealed class SecretTests : IDisposable
             new EquatableArray<string>([$"connection to {Value} was lost"]),
             $"check {Value}"
         );
+        // A query that is described would put the server's version, which holds the value, into its entry, and that
+        // ends the run.
+        _scene.Describer.Failures["Good"] = FakeDescriber.Failure("Good");
 
         var result = await _scene.DescribeAsync();
 
@@ -229,6 +255,39 @@ public sealed class SecretTests : IDisposable
                 + "    server: connection to *** was lost\n"
                 + "    help: check ***\n"
         );
+    }
+
+    // A description that holds the value is a bug of the describer: the run ends, and nothing is written, since a
+    // sidecar is a file that is committed.
+    [Theory]
+    [InlineData(null)]
+    [InlineData("1")]
+    public async Task Run_DescriberThatPutsTheValueInItsDescription_EndsTheRunAndWritesNoSidecar(string? debug)
+    {
+        if (debug is not null)
+        {
+            _scene.Run.Environment[Cli.DebugVariable] = debug;
+        }
+
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Value;
+        _scene.Describer.Server = new ServerInfo(
+            $"16.4 ({Value})",
+            "FakeDriver",
+            null,
+            EquatableArray<ServerSetting>.Empty
+        );
+
+        var result = await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Out.ShouldNotContain(Marker);
+        result.Error.ShouldNotContain(Marker);
+        result.Error.ShouldStartWith(
+            "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: The "
+                + "describer put the connection's value in its description of the query 'Bad'.\n"
+        );
+        File.Exists(_users + ".json").ShouldBeFalse();
     }
 
     // What is written to a sidecar is not printed, and is the server's own word.

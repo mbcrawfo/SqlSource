@@ -46,6 +46,22 @@ public class ConnectionTests
     public void TryParse_ValueThatHoldsEqualsSigns_IsCutAtTheFirst() =>
         Parse("billing=Host=db;Port=5432").ShouldBe(new ConnectionArgument("billing", "Host=db;Port=5432"));
 
+    // Removing a value of white space from a describer's text would turn every space of it into the mark.
+    [Theory]
+    [InlineData("billing=")]
+    [InlineData("billing= ")]
+    [InlineData("billing=\t \r\n")]
+    [InlineData("billing=\u00a0")]
+    public void TryParse_ValueThatIsEmptyOrHoldsOnlyWhiteSpace_IsNoValue(string text)
+    {
+        ConnectionArgument.TryParse(text, out var argument).ShouldBeFalse();
+        argument.ShouldBeNull();
+    }
+
+    [Fact]
+    public void TryParse_ValueWithWhiteSpaceAroundSomethingElse_IsKeptWhole() =>
+        Parse("billing= a ").ShouldBe(new ConnectionArgument("billing", " a "));
+
     [Fact]
     public void ToString_ConnectionArgument_LeavesTheValueOut() =>
         Parse("billing=" + Secret).ToString().ShouldNotContain(Secret);
@@ -184,6 +200,8 @@ public class ConnectionTests
     [InlineData(3, "describe", "--connection", "=" + Secret)]
     [InlineData(3, "describe", "--connection", "not a name=" + Secret)]
     [InlineData(3, "describe", "--connection", "billing=")]
+    [InlineData(3, "describe", "--connection", "billing= ")]
+    [InlineData(3, "describe", "--connection", "billing=\t")]
     [InlineData(2, "describe", "--connection=" + Secret)]
     [InlineData(2, "describe", "--connection:" + Secret)]
     public void CheckUsage_ConnectionThatIsNoNameAndValue_IsReportedByItsPositionAndNotItsText(
@@ -197,7 +215,8 @@ public class ConnectionTests
                     + "<name>=<connection string>",
             ]);
 
-    // A path may hold "=" or ";", as the fixture OddPaths does, until a connection is on the line.
+    // A path may hold "=" or ";", as the fixture OddPaths does, until a connection is on the line.  Then a .sql path
+    // too is refused, since it may be the end of a value that the shell split.
     [Theory]
     [InlineData("describe", "dir=a;b")]
     [InlineData("describe", "dir=a;b", "x=y;z.sql")]
@@ -210,6 +229,8 @@ public class ConnectionTests
     [InlineData(2, "describe", "Id=sa;Password=" + Secret, "--connection=billing=Host=db")]
     [InlineData(4, "describe", "--connection", "billing=Host=db", "Password=" + Secret)]
     [InlineData(4, "describe", "--connection", "billing=Host=db", "Id=sa;" + Secret)]
+    [InlineData(4, "describe", "--connection", "billing=Host=db", "Users=1;2.sql")]
+    [InlineData(2, "describe", "Id=sa;Password=" + Secret + ".sql", "--connection=billing=Host=db")]
     public void CheckUsage_PathWithEqualsOrSemicolonBesideAConnection_IsReportedByItsPositionAndNotItsText(
         int position,
         params string[] args
@@ -223,7 +244,6 @@ public class ConnectionTests
 
     [Theory]
     [InlineData("describe", "--connection", "billing=Host=db", "App.csproj")]
-    [InlineData("describe", "--connection", "billing=Host=db", "Users=1;2.sql")]
     [InlineData("describe", "--connection", "billing=Host=db", "a b")]
     public void CheckUsage_PathWithNothingOfAConnectionStringBesideAConnection_GivesNoLine(params string[] args) =>
         DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), args)).ShouldBeEmpty();

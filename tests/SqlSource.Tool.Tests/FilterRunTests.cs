@@ -136,12 +136,29 @@ public sealed class FilterRunTests : IDisposable
         File.Exists(_plain + ".json").ShouldBeFalse();
     }
 
+    // A sidecar of a newer tool is left alone by a run that is allowed to delete, as it is by one that reads it.
+    [Fact]
+    public async Task Run_FileThatNeedsNoEntryWithASidecarOfAHigherFormat_KeepsItAndReportsNothing()
+    {
+        var newer = SidecarWriter.Write(new Sidecar(2, "9.9.9", EquatableArray<SidecarEntry>.Empty));
+        await File.WriteAllTextAsync(_plain + ".json", newer, TestContext.Current.CancellationToken);
+        var before = await File.ReadAllBytesAsync(_plain + ".json", TestContext.Current.CancellationToken);
+
+        var result = await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(0);
+        result.Error.ShouldBeEmpty();
+        (await File.ReadAllBytesAsync(_plain + ".json", TestContext.Current.CancellationToken)).ShouldBe(before);
+    }
+
     // The planner drops a setting it cannot read and falls back to the next level, so a file can look as if it needs no
     // entry only because of the error: a run that reported anything deletes nothing.
     [Fact]
     public async Task Run_SettingThatIsNotValid_KeepsTheSidecarOfTheFileItHides()
     {
         _scene.Project.Properties["SqlSourceOutput"] = "sql";
+        // A query that needs an entry, so that the summary shows the run went on to describe and to decide the files.
+        var wanted = _scene.Project.AddSql("Wanted.sql", "-- name: Wanted\n-- output: models\nSELECT 6;\n");
         var broken = _scene.Project.AddSql("Broken.sql", "-- name: Broken\nSELECT 5;\n", ("SqlSourceOutput", "modles"));
         await File.WriteAllTextAsync(
             broken + ".json",
@@ -154,6 +171,8 @@ public sealed class FilterRunTests : IDisposable
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain("error SQLSRC014: ");
+        result.Out.ShouldBe("postgres (postgres): 1 described, 0 skipped, 0 failed\n");
+        File.Exists(wanted + ".json").ShouldBeTrue();
         File.Exists(broken + ".json").ShouldBeTrue();
         (await File.ReadAllBytesAsync(broken + ".json", TestContext.Current.CancellationToken)).ShouldBe(before);
     }

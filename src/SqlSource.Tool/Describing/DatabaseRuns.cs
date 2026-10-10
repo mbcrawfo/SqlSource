@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 
@@ -21,7 +22,8 @@ namespace SqlSource.Tool.Describing;
 /// <para>
 /// This is the one place outside <c>Cli</c> that catches every exception: a describer's, which is a bug of the
 /// describer and may hold the connection's value.  It is thrown again as a <see cref="DescriberFaultException" />
-/// without the value, and the run ends.  A run that was cancelled ends as one.
+/// without the value, and the run ends.  A description that holds the value, which would be written into a sidecar,
+/// is such a bug too (<see cref="EntrySecretCheck" />).  A run that was cancelled ends as one.
 /// </para>
 /// </remarks>
 internal static class DatabaseRuns
@@ -130,7 +132,7 @@ internal static class DatabaseRuns
             if (result.Description is { } description)
             {
                 query.Entry = guard.Call(() =>
-                    EntryBuilder.Build(planned, database.Dialect, database.Name, server, description)
+                    NoSecretIn(EntryBuilder.Build(planned, database.Dialect, database.Name, server, description), value)
                 );
                 query.State = QueryState.Described;
             }
@@ -142,6 +144,14 @@ internal static class DatabaseRuns
             }
         }
     }
+
+    // What a describer gave goes into a sidecar, which is committed: a value in it is a bug of the describer.
+    private static SidecarEntry NoSecretIn(SidecarEntry entry, string secret) =>
+        EntrySecretCheck.Holds(entry, secret)
+            ? throw new InvalidOperationException(
+                $"The describer put the connection's value in its description of the query '{entry.Name}'."
+            )
+            : entry;
 
     private static ToolDiagnostic NoConnection(PlannedQuery first, DatabaseConnection connection, Connections all)
     {

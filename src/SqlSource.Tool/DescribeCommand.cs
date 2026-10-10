@@ -111,8 +111,8 @@ internal static class DescribeCommand
     /// A path that ends in <c>.sql</c> is a filter and any other is the unit, of which there is one.  A value of
     /// <c>--database</c> is a database name, by the rule of the <c>-- database:</c> marker.  A value of
     /// <c>--connection</c> is a name, <c>=</c> and a value, and a name is given once.  On a line with a
-    /// <c>--connection</c>, an argument that holds <c>=</c> or <c>;</c> and is no <c>.sql</c> path is taken for the
-    /// rest of a value that the shell split, and is not the unit: it would be printed as a path.
+    /// <c>--connection</c>, an argument that holds <c>=</c> or <c>;</c>, a <c>.sql</c> path too, is taken for the rest
+    /// of a value that the shell split: it would be printed as a path.
     /// </remarks>
     public static IReadOnlyList<string> CheckUsage(Usage usage)
     {
@@ -129,11 +129,6 @@ internal static class DescribeCommand
         {
             if (value.Option is null)
             {
-                if (SqlPath.IsSqlFile(value.Text))
-                {
-                    continue;
-                }
-
                 if (hasConnection && value.Text.AsSpan().IndexOfAny('=', ';') >= 0)
                 {
                     messages.Add(
@@ -141,7 +136,7 @@ internal static class DescribeCommand
                             + $"string; put the value of '{ConnectionOption}' in quotes"
                     );
                 }
-                else if (++units > 1)
+                else if (!SqlPath.IsSqlFile(value.Text) && ++units > 1)
                 {
                     messages.Add($"sqlsource: unexpected argument at position {value.Position}");
                 }
