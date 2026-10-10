@@ -13,6 +13,27 @@
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
+        <!--
+            Fixtures/Projects holds projects that the tests run "dotnet msbuild" on.  They are no code of this
+            project.  Fixtures/FixtureProjects.cs copies one out of the repository before it is used, with the
+            package's MSBuild files and the repository's global.json beside it, so all of them go to the output.
+        -->
+        <Compile Remove="Fixtures/Projects/**" />
+        <None Remove="Fixtures/Projects/**" />
+        <None Include="Fixtures/Projects/**" CopyToOutputDirectory="PreserveNewest" />
+        <None
+            Include="../../src/SqlSource/build/SqlSource.props"
+            Link="Fixtures/build/SqlSource.props"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None
+            Include="../../src/SqlSource/build/SqlSource.targets"
+            Link="Fixtures/build/SqlSource.targets"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None Include="../../global.json" Link="Fixtures/global.json" CopyToOutputDirectory="PreserveNewest" />
+    </ItemGroup>
+    <ItemGroup>
         <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
     </ItemGroup>

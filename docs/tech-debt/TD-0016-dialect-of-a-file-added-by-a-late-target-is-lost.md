@@ -14,7 +14,7 @@ Listing the metadata for `AdditionalFiles` itself gave every `.sql` file of a pr
 
 ## Impact
 
-Low.  It takes a target that adds `.sql` files during the build, gives them a dialect as metadata, hooks that one target of the SDK, and is declared after the package's.  A target that hooks anything earlier, `BeforeBuild` for example, is not affected.
+Low.  It takes a target that adds `.sql` files during the build, gives them a dialect as metadata, hooks that one target of the SDK, and is declared after the package's.  A target that hooks anything earlier, `BeforeBuild` for example, is not affected in a build.  The `sqlsource` tool does not see the file such a target adds at all: [TD-0025](TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md).
 
 ## Proposed fix
 

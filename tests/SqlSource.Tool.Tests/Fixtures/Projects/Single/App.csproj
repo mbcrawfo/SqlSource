@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        One target framework.  The dialect and the database are each on a line of their own, which the manifest must
+        hold trimmed.  The package's files are imported by path, as tests/SqlSource.Tests imports them: a test copies
+        them beside this folder.
+    -->
+    <Import Project="../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <SqlSourceDialect>
+            postgres
+        </SqlSourceDialect>
+    </PropertyGroup>
+    <ItemGroup>
+        <AdditionalFiles Update="Queries/Users.sql">
+            <SqlSourceDatabase>
+                billing
+            </SqlSourceDatabase>
+        </AdditionalFiles>
+    </ItemGroup>
+    <Import Project="../build/SqlSource.targets" />
+</Project>

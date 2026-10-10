@@ -44,6 +44,8 @@ A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both, so i
 
 `tests/SqlSource.Tests` also uses the generator the way a consumer does: the types in `EndToEnd/` are compiled with the generator loaded, and the project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  It gets them by path and the generator through a project reference; `tools/check-package-install.sh`, under Package below, is what installs the packed package.
 
+`tests/SqlSource.Tool.Tests/Fixtures/Projects/` holds small projects that are no part of the solution.  `ManifestTargetTests` copies one to a temporary folder outside the repository, with the package's two MSBuild files and `global.json` beside it, and runs `dotnet msbuild` on it for real, so these tests need the SDK that `global.json` pins and take a second or two each.  A fixture is never built or restored, and a test leaves nothing in the repository.  A file under that folder is copied to the test project's output as it is; add a project there as a folder with an `App.csproj` that imports `../build/SqlSource.props` and `../build/SqlSource.targets`.
+
 To run the tool from its source:
 
 ```bash
