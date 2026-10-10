@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Text;
 
 namespace SqlSource.Generation;
@@ -23,6 +24,14 @@ internal static class SqlPath
     public static StringComparer Comparer => StringComparer.OrdinalIgnoreCase;
 
     public static bool IsSqlFile(string path) => path.EndsWith(SqlExtension, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The paths, each once ignoring case and in the order of <see cref="Comparer" />, which is also the order of a
+    /// type's members.  Of two paths that differ only by case, the first is kept.  The generator and the
+    /// <c>sqlsource</c> tool both make a project's list of <c>.sql</c> files with this.
+    /// </summary>
+    public static EquatableArray<string> ToSortedSet(IEnumerable<string> paths) =>
+        new(paths.Distinct(Comparer).OrderBy(static path => path, Comparer).ToImmutableArray());
 
     /// <summary>
     /// Returns <paramref name="path" /> with <c>/</c> as its only separator, without empty and <c>.</c> segments,
