@@ -26,6 +26,12 @@ public static class Cli
     internal const string DebugVariable = "SQLSOURCE_DEBUG";
 
     /// <summary>
+    /// What ends a <c>describe</c> that reported an error and wrote no log: there is no hint under each error, and
+    /// this one line says how to get a record of the run.
+    /// </summary>
+    internal const string RunAgainLine = "sqlsource: run again with --log <file> for a record of what the run did";
+
+    /// <summary>
     /// How System.CommandLine reads a command line for the tool.
     /// </summary>
     internal static readonly ParserConfiguration Parser = new()
@@ -116,6 +122,10 @@ public static class Cli
         var started = host.Time.GetTimestamp();
         RunLogFile? log = null;
         var exitCode = 0;
+
+        // Whether the line that ends a failed run has a reader: "describe" ran, and no log was asked for.
+        var mayPoint = false;
+        var cancelled = false;
         try
         {
             try
@@ -152,6 +162,11 @@ public static class Cli
                     await host.Error.WriteLineAsync("sqlsource: the command line is not valid");
                     return 1;
                 }
+
+                // Before the log is opened, so that a log that could not be opened counts as asked for.
+                mayPoint =
+                    DescribeCommand.Runs(parsed)
+                    && DescribeCommand.LogPathOf(parsed, host.GetEnvironmentVariable) is null;
 
                 // What the run says of itself: to the log, when it has one, and to the person watching under
                 // --verbose.
@@ -200,6 +215,7 @@ public static class Cli
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
                 exitCode = 1;
+                cancelled = true;
             }
             catch (DescriberFaultException fault)
             {
@@ -212,6 +228,11 @@ public static class Cli
             }
 
             exitCode = ExitCodeOf(reporter, exitCode);
+            if (mayPoint && !cancelled && reporter.Count > reporter.DifferenceCount)
+            {
+                await host.Error.WriteLineAsync(RunAgainLine);
+            }
+
             return log is null ? exitCode : End(log, exitCode, started, host, reporter);
         }
         finally

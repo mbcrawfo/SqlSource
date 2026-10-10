@@ -121,7 +121,9 @@ public sealed class FilterTests : IDisposable
             new CliResult(
                 1,
                 "",
-                $"sqlsource : error SQLSRC212: '{full}' is not a .sql file that a type of the run claims\n" + See
+                $"sqlsource : error SQLSRC212: '{full}' is not a .sql file that a type of the run claims\n"
+                    + See
+                    + DescribeScene.RunAgain
             )
         );
     }

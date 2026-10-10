@@ -77,6 +77,7 @@ public sealed class FilterRunTests : IDisposable
                     + "    query: GetUser: not in this run\n"
                     + "    help: describe the whole file, or fix the queries that failed\n"
                     + $"{DescribeScene.See}217\n"
+                    + DescribeScene.RunAgain
             )
         );
         (await File.ReadAllBytesAsync(_users + ".json", TestContext.Current.CancellationToken)).ShouldBe(before);

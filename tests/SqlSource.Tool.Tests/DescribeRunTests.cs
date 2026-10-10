@@ -141,6 +141,7 @@ public sealed class DescribeRunTests : IDisposable
                 $"{Sidecar} : error SQLSRC221: '{Sidecar}' has format 2, and this tool writes format 1\n"
                     + "    help: update the SqlSource.Tool package\n"
                     + $"{See}221\n"
+                    + DescribeScene.RunAgain
             )
         );
         (await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken)).ShouldBe(newer);
@@ -181,6 +182,7 @@ public sealed class DescribeRunTests : IDisposable
                     + "    query: ListUsers: failed\n"
                     + "    help: describe the whole file, or fix the queries that failed\n"
                     + $"{See}217\n"
+                    + DescribeScene.RunAgain
             )
         );
         File.Exists(Sidecar).ShouldBeFalse();
@@ -232,6 +234,7 @@ public sealed class DescribeRunTests : IDisposable
                 $"{_users}(4,10): error SQLSRC213: No connection is given for the database 'postgres'\n"
                     + "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES\n"
                     + $"{See}213\n"
+                    + DescribeScene.RunAgain
             )
         );
     }
@@ -289,6 +292,7 @@ public sealed class DescribeRunTests : IDisposable
                 $"{_users}(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n{See}216\n"
                     + $"{_users}(4,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n"
                     + $"{See}216\n"
+                    + DescribeScene.RunAgain
             )
         );
         File.Exists(Sidecar).ShouldBeFalse();
@@ -338,6 +342,7 @@ public sealed class DescribeRunTests : IDisposable
                 "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: "
                     + "bad ***\n"
                     + $"{See}200\n"
+                    + DescribeScene.RunAgain
             )
         );
         File.Exists(Sidecar).ShouldBeFalse();

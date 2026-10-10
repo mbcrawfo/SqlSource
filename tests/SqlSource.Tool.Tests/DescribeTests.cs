@@ -168,6 +168,7 @@ public class DescribeTests
         result.Error.ShouldBe(
             $"sqlsource : error SQLSRC207: '{run.Folder.PathOf("Other.csproj")}' is not a project of '{solution}'\n"
                 + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc207\n"
+                + DescribeScene.RunAgain
         );
     }
 
@@ -255,6 +256,7 @@ public class DescribeTests
         result.Error.ShouldBe(
             $"sqlsource : error SQLSRC201: '{run.Folder.Path}' holds no .sln, .slnx or .csproj file\n"
                 + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc201\n"
+                + DescribeScene.RunAgain
         );
     }
 
@@ -293,6 +295,7 @@ public class DescribeTests
                 "postgres (postgres): 0 described, 0 skipped, 1 failed\n",
                 $"{sql}(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n"
                     + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc216\n"
+                    + DescribeScene.RunAgain
             )
         );
     }
@@ -326,7 +329,7 @@ public class DescribeTests
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
         result.Error.ShouldStartWith($"{sql}(2,8): error SQLSRC101: ");
-        result.Error.ShouldEndWith("/docs/diagnostics.md#sqlsrc101\n");
+        result.Error.ShouldEndWith("/docs/diagnostics.md#sqlsrc101\n" + DescribeScene.RunAgain);
     }
 
     [Fact]
