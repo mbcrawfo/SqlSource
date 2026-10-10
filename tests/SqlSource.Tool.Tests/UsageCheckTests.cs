@@ -262,6 +262,7 @@ public class UsageCheckTests
             "N=V",
             "--force",
             "--force=V",
+            "--check",
             "--help",
             "--",
             "V",

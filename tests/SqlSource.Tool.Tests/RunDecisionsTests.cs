@@ -184,6 +184,21 @@ public sealed class RunDecisionsTests : IDisposable
             );
     }
 
+    // "--check" writes nothing, so a sidecar of a newer tool is no error for it: it is a difference, and the queries
+    // of its file are described as any other.
+    [Fact]
+    public void Decide_SidecarOfAHigherFormatVersionUnderCheck_IsNoErrorAndItsQueriesAreDescribed()
+    {
+        var plan = Plans.Of(_project);
+        _ = TestSidecar.Write(plan.Files[0], [], formatVersion: SidecarFormat.Version + 1);
+
+        var file = RunDecisions.Decide(plan, force: true, _errors, check: true)[0];
+
+        _errors.ShouldBeEmpty();
+        file.Queries.Where(query => query.Planned.NeedsEntry)
+            .ShouldAllBe(query => query.State == QueryState.ToDescribe);
+    }
+
     [Fact]
     public void Decide_QueryWithAProblemOfThePlan_FailsEvenUnderForce()
     {

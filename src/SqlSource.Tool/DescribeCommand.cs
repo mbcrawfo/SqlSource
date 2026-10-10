@@ -32,6 +32,8 @@ internal static class DescribeCommand
 
     private const string ForceOption = "--force";
 
+    private const string CheckOption = "--check";
+
     public static Command Create(ToolHost host, Reporter reporter)
     {
         // Several, so that System.CommandLine takes a .sql path beside the unit.  CheckUsage holds them to one unit.
@@ -80,6 +82,16 @@ internal static class DescribeCommand
             Arity = ArgumentArity.Zero,
         };
 
+        // Hidden until it compares: an option is in the help once it does what it says.
+        var check = new Option<bool>(CheckOption)
+        {
+            Description =
+                "Describe every query of the run and compare with the sidecars that are there.  Writes nothing, "
+                + "and exits with 2 when a sidecar is out of date.  The command for a build server.",
+            Arity = ArgumentArity.Zero,
+            Hidden = true,
+        };
+
         var describe = new Command(Name, "Asks the databases of the projects to describe their queries")
         {
             path,
@@ -87,6 +99,7 @@ internal static class DescribeCommand
             database,
             connection,
             force,
+            check,
         };
         describe.SetAction(
             async (parsed, cancellationToken) =>
@@ -188,6 +201,7 @@ internal static class DescribeCommand
 
         return new DescribeOptions(
             parsed.GetValue<bool>(ForceOption),
+            parsed.GetValue<bool>(CheckOption),
             projects.Length > 0 || databases.Length > 0 || paths.Any(SqlPath.IsSqlFile),
             connections.ToImmutable(),
             [.. databases.Distinct(StringComparer.OrdinalIgnoreCase)]

@@ -12,7 +12,7 @@ namespace SqlSource.Tool.Describing;
 /// </summary>
 /// <remarks>
 /// The step that gives each file's outcome, <see cref="FileOutcomes" />, and the one that applies the outcomes to
-/// the disk, <see cref="SidecarStore" />, stay apart: sub-phase 2.6 compares where this one writes.
+/// the disk, <see cref="SidecarStore" />, stay apart: <c>--check</c> applies nothing.
 /// </remarks>
 internal static class DescribeRun
 {
@@ -26,7 +26,8 @@ internal static class DescribeRun
     {
         // 1 and 2: what is there, and what each query needs.
         var errors = new List<ToolDiagnostic>();
-        var files = RunDecisions.Decide(plan, options.Force, errors);
+        // --check describes every selected query, as --force does.
+        var files = RunDecisions.Decide(plan, options.Force || options.Check, errors, options.Check);
         foreach (var error in errors)
         {
             reporter.Report(error);
@@ -46,7 +47,10 @@ internal static class DescribeRun
         // Nothing is deleted after an error: the plan drops a setting or a claim it could not read, and the file
         // then looks as if it needs no entry.
         var outcomes = FileOutcomes.Decide(files, options.HasFilter, reporter.Count > 0, SidecarOnDisk.Read);
-        SidecarStore.Apply(outcomes, reporter, cancellationToken);
+        if (!options.Check)
+        {
+            SidecarStore.Apply(outcomes, reporter, cancellationToken);
+        }
 
         // 5.  The exit code is the reporter's: 1 when anything was reported.
         var lines = RunSummary.Lines([.. plan.Databases], selected, files, connections, options.Databases);

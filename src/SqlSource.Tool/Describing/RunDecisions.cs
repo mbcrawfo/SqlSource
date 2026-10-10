@@ -22,7 +22,16 @@ internal static class RunDecisions
     /// <param name="plan">The plan of the run.</param>
     /// <param name="force">Whether a selected query is described though its entry is current.</param>
     /// <param name="errors">Gains <c>SQLSRC221</c> for each sidecar of a newer tool.</param>
-    public static ImmutableArray<FileWork> Decide(RunPlan plan, bool force, ICollection<ToolDiagnostic> errors)
+    /// <param name="check">
+    /// Whether the run is <c>--check</c>, which writes nothing: a sidecar of a newer tool is then no error, and
+    /// the queries of its file are described as any other.  The comparison reports the file as a difference.
+    /// </param>
+    public static ImmutableArray<FileWork> Decide(
+        RunPlan plan,
+        bool force,
+        ICollection<ToolDiagnostic> errors,
+        bool check = false
+    )
     {
         var files = ImmutableArray.CreateBuilder<FileWork>(plan.Files.Count);
         foreach (var file in plan.Files)
@@ -32,7 +41,7 @@ internal static class RunDecisions
                 ready && file.Queries.Any(static query => query.NeedsEntry && query.IsSelected)
                     ? SidecarOnDisk.Read(file.Path)
                     : null;
-            if (onDisk?.NewerFormat is { } newer)
+            if (!check && onDisk?.NewerFormat is { } newer)
             {
                 errors.Add(
                     ToolDiagnostic
@@ -47,8 +56,14 @@ internal static class RunDecisions
                 );
             }
 
+            // Only a run that writes must leave a newer tool's file alone.
+            var newerFails = !check && onDisk?.NewerFormat is not null;
             files.Add(
-                new FileWork(file, onDisk, [.. file.Queries.Select(query => Decide(query, ready, onDisk, force))])
+                new FileWork(
+                    file,
+                    onDisk,
+                    [.. file.Queries.Select(query => Decide(query, ready, onDisk, force, newerFails))]
+                )
             );
         }
 
@@ -77,7 +92,7 @@ internal static class RunDecisions
     }
 
     // The rows of the spec's table, in its order.
-    private static QueryWork Decide(PlannedQuery query, bool ready, SidecarOnDisk? onDisk, bool force)
+    private static QueryWork Decide(PlannedQuery query, bool ready, SidecarOnDisk? onDisk, bool force, bool newerFails)
     {
         if (!query.NeedsEntry)
         {
@@ -85,7 +100,7 @@ internal static class RunDecisions
         }
 
         // A file that is not ready has the plan's error, and a sidecar of a newer tool has SQLSRC221.
-        if (!ready || query.Problems != QueryProblems.None || (query.IsSelected && onDisk?.NewerFormat is not null))
+        if (!ready || query.Problems != QueryProblems.None || (query.IsSelected && newerFails))
         {
             return new QueryWork(query, QueryState.Failed);
         }
