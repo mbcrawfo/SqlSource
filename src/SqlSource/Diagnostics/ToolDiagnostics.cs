@@ -224,6 +224,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor SidecarOutOfDate = new(
+        id: "SQLSRC219",
+        title: "Sidecar is out of date",
+        messageFormat: "The sidecar is out of date for '{0}': {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc219",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ProjectNotRestored = new(
         id: "SQLSRC220",
         title: "Project was not restored",
@@ -292,6 +303,7 @@ internal static class ToolDiagnostics
             NoDescriberForDialect,
             SidecarNotWritten,
             FileCannotBeChanged,
+            SidecarOutOfDate,
             ProjectNotRestored,
             SidecarOfNewerTool,
             DirectoryCannotBeRead,

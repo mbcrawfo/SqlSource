@@ -151,7 +151,8 @@ public class CliTests
             "/",
             ProcessorCount: 1,
             DescriberRegistry.Empty,
-            static _ => LiveExchange.Instance
+            static _ => LiveExchange.Instance,
+            TimeProvider.System
         );
         var commands = new List<Command> { Cli.BuildCommands(host, new Reporter(TextWriter.Null)) };
 

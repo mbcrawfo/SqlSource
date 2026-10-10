@@ -2,6 +2,8 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using SqlSource.Diagnostics;
+using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Reporting;
 
@@ -25,6 +27,7 @@ internal sealed class Reporter(TextWriter error)
     private readonly object _gate = new();
 
     private int _count;
+    private int _differences;
 
     /// <summary>
     /// How many errors were written.
@@ -40,26 +43,72 @@ internal sealed class Reporter(TextWriter error)
         }
     }
 
+    /// <summary>
+    /// How many of the errors written were <c>SQLSRC219</c>, a sidecar that <c>--check</c> found out of date.  A
+    /// run that wrote no other error exits with <c>2</c>.
+    /// </summary>
+    public int DifferenceCount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _differences;
+            }
+        }
+    }
+
+    /// <summary>
+    /// What the run says of itself beside its errors.  <c>Cli</c> sets it once, before any command runs, for every
+    /// <c>describe</c> that runs, with the run's log when it has one; every error is also an event of that log.
+    /// </summary>
+    public RunTrace Trace { get; set; } = new(NullRunLog.Instance);
+
     public void Report(ToolDiagnostic diagnostic)
     {
-        var text = Format(diagnostic, error.NewLine);
+        var message = MessageOf(diagnostic);
+        var text = Format(diagnostic, message, error.NewLine);
         lock (_gate)
         {
             error.Write(text);
             _count++;
+            if (ReferenceEquals(diagnostic.Descriptor, ToolDiagnostics.SidecarOutOfDate))
+            {
+                _differences++;
+            }
+
+            Trace.Log.Write(
+                "diagnostic",
+                new("id", diagnostic.Descriptor.Id),
+                new("path", diagnostic.Path),
+                new("line", LogValue.Of(diagnostic.Position?.Line + 1)),
+                new("column", LogValue.Of(diagnostic.Position?.Character + 1)),
+                new("message", message),
+                new(
+                    "lines",
+                    LogValue.ListOf(
+                        diagnostic.Lines.Select(static line =>
+                            LogValue.MapOf(new("label", OneLine.Of(line.Label)), new("text", OneLine.Of(line.Text)))
+                        )
+                    )
+                )
+            );
         }
     }
 
-    private static string Format(ToolDiagnostic diagnostic, string newLine)
+    private static string MessageOf(ToolDiagnostic diagnostic)
     {
-        var descriptor = diagnostic.Descriptor;
         object?[] arguments = [.. diagnostic.Arguments.Select(OneLine.Of)];
-        var message = string.Format(
+        return string.Format(
             CultureInfo.InvariantCulture,
-            descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
+            diagnostic.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
             arguments
         );
+    }
 
+    private static string Format(ToolDiagnostic diagnostic, string message, string newLine)
+    {
+        var descriptor = diagnostic.Descriptor;
         var text = new StringBuilder();
         _ = text.Append(Origin(diagnostic)).Append(": error ").Append(descriptor.Id).Append(": ").Append(message);
         _ = text.Append(newLine);

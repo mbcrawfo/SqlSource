@@ -11,6 +11,8 @@ $ dotnet sqlsource describe --connection billing="Host=localhost;Database=billin
 $ dotnet sqlsource describe App.slnx --project src/App/App.csproj
 $ dotnet sqlsource describe src/App/Queries/Users.sql
 $ dotnet sqlsource describe --database billing --force
+$ dotnet sqlsource describe --check
+$ dotnet sqlsource describe --log sqlsource.log
 ```
 
 A query belongs to a logical database: the one its `-- database:` marker names, or the `SqlSourceDatabase` metadata of its file, or the property of that name, or else the name of its dialect.  A connection is given for that name, on the command line or in the environment, and never in the project file, since it holds credentials:
@@ -30,7 +32,17 @@ billing (postgres): 4 described, 12 skipped, 0 failed
 reports (postgres): no connection, 5 skipped
 ```
 
-The exit code is `0`, or `1` when anything was reported as an error, when the command line is wrong, or when the run was cancelled.
+`--check` is the command for a build server.  It describes every query of the run, as `--force` does, compares what the database says with the sidecars that are there, and changes no file.  A sidecar that is out of date is [`SQLSRC219`](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc219), which says what differs and where.  The `help:` line under it names the command that mends it: `describe --force` for a difference that the database reports, since plain `describe` skips a query whose SQL is as it was; an update of the `SqlSource.Tool` package for a sidecar of a higher format version; `describe` for every other.  It compares what changes generated code and not the versions of the tool or of the server, so a sidecar that a developer wrote passes on a server of another patch.  Every database of the run needs a connection.  With `--database`, `--project` or a `.sql` path it compares what `describe` with the same filters would change, and nothing else, with one exception: an entry for a query that is gone, in a sidecar of a database that `--database` does not name, is not reported, though `describe --database` would drop it when it rewrites the file.  Its summary counts each query as the same, as one that differs, or as one that could not be described:
+
+```console
+billing (postgres): 15 same, 1 differ, 0 failed
+```
+
+The exit code is `0`; `1` when an error other than a sidecar out of date was reported, when the command line is wrong, or when the run was cancelled; and `2` when `--check` found a sidecar out of date and nothing else failed.
+
+`--verbose` says what the run decides as it goes, a line for each project, file, database, query and sidecar, each starting with `sqlsource:`.  Without it the tool prints its errors and the lines of its summary, and two other lines: the one that says no project of the unit uses SqlSource, and the one that ends a failed run, below.
+
+`--log <path>` writes what the run did to a file, one JSON object on a line: what ran and on what, each project, file, database and query with what the run decided for it, each error, and how the run ended.  `SQLSOURCE_LOG` gives the path when the option does not.  The file is overwritten by each run, and the tool refuses a name that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip never empties a file of your project.  The console stays as it is without the option.  A log holds no connection string: the value of each `--connection` is written as `***` with its name, and so is a value that a database's driver repeats in a message.  It does hold the paths of your files, the names of your queries and databases, and the rest of your command line as you typed it, so read it before you attach it to an issue.  A run that reported an error other than a sidecar out of date and wrote no log ends with one line that says so: `sqlsource: run again with --log <file> for a record of what the run did`.
 
 `describe` takes a `.sln`, `.slnx` or `.csproj` file, or a directory that holds exactly one, and the current directory when none is given.  In a solution it runs on the C# projects that use the SqlSource package; `--project`, which may be given several times, names the ones to run on.
 

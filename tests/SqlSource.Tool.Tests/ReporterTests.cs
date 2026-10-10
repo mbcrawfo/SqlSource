@@ -164,6 +164,19 @@ public sealed class ReporterTests : IDisposable
         _error.ToString().ShouldBe("/work/odd name/App.csproj : " + Message + "    ser ver: text\n" + See);
     }
 
+    // The exit code 2 is for a run that reported nothing but SQLSRC219.
+    [Fact]
+    public void Report_Sqlsrc219_IsCountedAsAnErrorAndAsADifference()
+    {
+        var reporter = new Reporter(_error);
+
+        reporter.Report(Failure);
+        reporter.Report(ToolDiagnostic.Create(ToolDiagnostics.SidecarOutOfDate, "GetUser", "the sidecar has no entry"));
+
+        reporter.Count.ShouldBe(2);
+        reporter.DifferenceCount.ShouldBe(1);
+    }
+
     // Keeps each call of Write apart.  It is not safe for several threads, as a console's writer need not be.
     private sealed class RecordingWriter : TextWriter
     {

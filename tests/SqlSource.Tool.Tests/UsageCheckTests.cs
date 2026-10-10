@@ -114,6 +114,15 @@ public class UsageCheckTests
                 "sqlsource: option '--force' takes no value",
             ]);
 
+    // System.CommandLine rejects a second value for an option that takes one, with a message that repeats it.
+    [Theory]
+    [InlineData("--connection", "describe", "--connection", "a=b", "--connection=" + Secret)]
+    [InlineData("-c", "describe", "-c", "a=b", "App.csproj", "-c:" + Secret)]
+    public void Check_OptionThatTakesOneValueGivenTwice_IsNamedAsItWasTypedAndItsValueIsNot(
+        string name,
+        params string[] args
+    ) => UsageCheck.Check(Root(), args).Messages.ShouldBe([$"sqlsource: option '{name}' is given more than once"]);
+
     // An option that may be given several times takes one value each time, and the token after that is the path.
     [Fact]
     public void Check_OptionThatMayBeRepeated_TakesOneValueEachTime()
@@ -150,6 +159,35 @@ public class UsageCheckTests
         usage.IsReadTheSameBy(root.Parse(["describe", Secret], Cli.Parser)).ShouldBeFalse();
         usage.IsReadTheSameBy(root.Parse(["describe"], Cli.Parser)).ShouldBeFalse();
         usage.IsReadTheSameBy(root.Parse([], Cli.Parser)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ReadsConnectionsAs_ParseThatBindsOtherValues_IsFalse()
+    {
+        var root = ToolRoot();
+        var usage = UsageCheck.Check(root, ["describe", "--connection", "a=" + Secret, "--connection", "b=2"]);
+
+        DescribeCommand
+            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=" + Secret, "--connection", "b=2"]))
+            .ShouldBeTrue();
+        DescribeCommand
+            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=x", "--connection", "b=2"]))
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "b=2", "--connection", "a=" + Secret]))
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=" + Secret]))
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsConnectionsAs(
+                usage,
+                root.Parse(["describe", "--connection", "a=" + Secret, "--connection", "b=2", "--connection", "c=3"])
+            )
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsConnectionsAs(UsageCheck.Check(root, ["--version"]), root.Parse(["--version"]))
+            .ShouldBeTrue();
     }
 
     // The two readers of a command line must agree, or a token that this one took for a value is the path of the
@@ -262,6 +300,10 @@ public class UsageCheckTests
             "N=V",
             "--force",
             "--force=V",
+            "--check",
+            "--verbose",
+            "--log",
+            "--log=L",
             "--help",
             "--",
             "V",

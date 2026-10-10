@@ -8,14 +8,26 @@ namespace SqlSource.Tool.Describing;
 /// The sidecar beside a <c>.sql</c> file as a run found it.
 /// </summary>
 /// <param name="Path">The full path of the sidecar.</param>
-/// <param name="Text">The text of the file, or null when there is none that can be opened.</param>
-/// <param name="Usable">
-/// The sidecar, when it was read and this version of the tool wrote it in this version of the format.  Only such a
-/// one has entries a run keeps: an entry from an older tool never stands beside a new one.
+/// <param name="Exists">
+/// Whether something is at the path: a file, one the system will not open included, or a directory.
 /// </param>
-/// <param name="NewerFormat">The format version of the file, when it is higher than the tool's.</param>
-internal sealed record SidecarOnDisk(string Path, string? Text, Sidecar? Usable, int? NewerFormat)
+/// <param name="Text">The text of the file, or null when there is none that can be opened.</param>
+/// <param name="Sidecar">
+/// The sidecar, when it was read in this version of the format, whichever version of the tool wrote it.
+/// <c>--check</c> compares it; a run that writes keeps entries of <see cref="Usable" /> alone.
+/// </param>
+/// <param name="FormatVersion">The format version of the file, or null when it is absent or malformed.</param>
+internal sealed record SidecarOnDisk(string Path, bool Exists, string? Text, Sidecar? Sidecar, int? FormatVersion)
 {
+    /// <summary>
+    /// The sidecar, when this version of the tool wrote it in this version of the format.  Only such a one has
+    /// entries a run keeps: an entry from an older tool never stands beside a new one.
+    /// </summary>
+    public Sidecar? Usable => Sidecar is { } sidecar && sidecar.IsWrittenBy(PackageVersion.Prefix) ? sidecar : null;
+
+    /// <summary>The format version of the file, when it is higher than the tool's.</summary>
+    public int? NewerFormat => FormatVersion is { } version && version > SidecarFormat.Version ? version : null;
+
     /// <summary>
     /// Reads the sidecar of a <c>.sql</c> file.  One that is absent, that the system will not open, that is
     /// malformed, or that has a lower format version or another tool version is not usable, and is written again.
@@ -32,20 +44,10 @@ internal sealed record SidecarOnDisk(string Path, string? Text, Sidecar? Usable,
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             // No file, a directory, or a file that is locked: writing it will say so if it cannot be mended.
-            return new SidecarOnDisk(path, null, null, null);
+            return new SidecarOnDisk(path, File.Exists(path) || Directory.Exists(path), null, null, null);
         }
 
         var read = SidecarReader.Read(text);
-        if (read.Sidecar is { } sidecar)
-        {
-            return new SidecarOnDisk(path, text, sidecar.IsWrittenBy(PackageVersion.Prefix) ? sidecar : null, null);
-        }
-
-        return new SidecarOnDisk(
-            path,
-            text,
-            null,
-            read.FormatVersion is { } version && version > SidecarFormat.Version ? version : null
-        );
+        return new SidecarOnDisk(path, Exists: true, text, read.Sidecar, read.FormatVersion);
     }
 }

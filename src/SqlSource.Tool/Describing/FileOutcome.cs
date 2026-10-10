@@ -5,7 +5,7 @@ namespace SqlSource.Tool.Describing;
 
 /// <summary>
 /// What a run does with the sidecar of one file, as data.  <see cref="SidecarStore" /> applies it to the disk, and
-/// sub-phase 2.6 compares in its place.
+/// <see cref="SidecarCheck" /> compares in its place.
 /// </summary>
 /// <param name="File">The file of the plan.</param>
 /// <param name="SidecarPath">The full path of its sidecar.</param>

@@ -15,4 +15,10 @@ internal sealed class QueryWork(PlannedQuery planned, QueryState state, SidecarE
 
     /// <summary>The entry the file's target holds for the query: the kept one, or the new one.</summary>
     public SidecarEntry? Entry { get; set; } = entry;
+
+    /// <summary>
+    /// Whether <c>--check</c> reported a difference at the query, or at the whole of its sidecar.  The summary of
+    /// a check counts it.
+    /// </summary>
+    public bool Differs { get; set; }
 }

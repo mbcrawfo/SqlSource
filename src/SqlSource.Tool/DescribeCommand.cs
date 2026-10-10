@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using SqlSource.Generation;
 using SqlSource.Settings;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
@@ -31,6 +32,15 @@ internal static class DescribeCommand
     internal const string ConnectionOption = "--connection";
 
     private const string ForceOption = "--force";
+
+    private const string CheckOption = "--check";
+
+    private const string VerboseOption = "--verbose";
+
+    internal const string LogOption = "--log";
+
+    /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
+    internal const string LogVariable = "SQLSOURCE_LOG";
 
     public static Command Create(ToolHost host, Reporter reporter)
     {
@@ -80,6 +90,29 @@ internal static class DescribeCommand
             Arity = ArgumentArity.Zero,
         };
 
+        var check = new Option<bool>(CheckOption)
+        {
+            Description =
+                "Describe every query of the run and compare with the sidecars that are there.  Writes nothing, "
+                + "and exits with 2 when a sidecar is out of date.  The command for a build server.",
+            Arity = ArgumentArity.Zero,
+        };
+
+        var verbose = new Option<bool>(VerboseOption)
+        {
+            Description = "Say what the run decides for each project, file, database and query, as it goes.",
+            Arity = ArgumentArity.Zero,
+        };
+
+        var log = new Option<string>(LogOption)
+        {
+            Description =
+                "Write what the run did to this file, one JSON object on a line.  The file is overwritten.  "
+                + $"{LogVariable} gives the path when the option does not.",
+            HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
         var describe = new Command(Name, "Asks the databases of the projects to describe their queries")
         {
             path,
@@ -87,6 +120,9 @@ internal static class DescribeCommand
             database,
             connection,
             force,
+            check,
+            verbose,
+            log,
         };
         describe.SetAction(
             async (parsed, cancellationToken) =>
@@ -148,6 +184,13 @@ internal static class DescribeCommand
                         + "database name"
                 );
             }
+            else if (value.Option.Name == LogOption && string.IsNullOrWhiteSpace(value.Text))
+            {
+                // What --log "$UNSET" gives.
+                messages.Add(
+                    $"sqlsource: the value of option '{LogOption}' at position {value.Position} is not a path"
+                );
+            }
             else if (value.Option.Name == ConnectionOption)
             {
                 if (!ConnectionArgument.TryParse(value.Text, out var connection))
@@ -170,6 +213,54 @@ internal static class DescribeCommand
         return messages;
     }
 
+    /// <summary>
+    /// Whether the command line runs <c>describe</c>: the command is named, and it is its own action that runs
+    /// and not the help's.
+    /// </summary>
+    public static bool Runs(ParseResult parsed) =>
+        parsed.CommandResult.Command.Name == Name
+        && ReferenceEquals(parsed.Action, parsed.CommandResult.Command.Action);
+
+    /// <summary>Whether a <c>describe</c> that runs was given <c>--verbose</c>.</summary>
+    public static bool IsVerbose(ParseResult parsed) => Runs(parsed) && parsed.GetValue<bool>(VerboseOption);
+
+    /// <summary>
+    /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when
+    /// the run has none.  A command line that does not run <c>describe</c> has none: the help must not empty the
+    /// log of the last run.  A variable that is empty or white space is not set.
+    /// </summary>
+    public static string? LogPathOf(ParseResult parsed, Func<string, string?> getEnvironmentVariable)
+    {
+        if (!Runs(parsed))
+        {
+            return null;
+        }
+
+        if (parsed.GetValue<string>(LogOption) is { } option)
+        {
+            return option;
+        }
+
+        var variable = getEnvironmentVariable(LogVariable);
+        return string.IsNullOrWhiteSpace(variable) ? null : variable;
+    }
+
+    /// <summary>
+    /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--connection</c> the same values, in the
+    /// same order.  True for a command other than <c>describe</c>.
+    /// </summary>
+    /// <remarks>
+    /// The log's <c>arguments</c> is redacted from what <see cref="UsageCheck" /> read, and the describer is handed
+    /// what System.CommandLine bound.  If the two disagree on which token is a connection's value, a value could
+    /// reach the log, so <c>Cli</c> runs nothing then.
+    /// </remarks>
+    public static bool ReadsConnectionsAs(Usage usage, ParseResult parsed) =>
+        usage.Command.Name != Name
+        || usage
+            .Values.Where(static value => value.Option?.Name == ConnectionOption)
+            .Select(static value => value.Text)
+            .SequenceEqual(parsed.GetValue<string[]>(ConnectionOption) ?? [], StringComparer.Ordinal);
+
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
     private static DescribeOptions OptionsOf(ParseResult parsed)
     {
@@ -188,6 +279,7 @@ internal static class DescribeCommand
 
         return new DescribeOptions(
             parsed.GetValue<bool>(ForceOption),
+            parsed.GetValue<bool>(CheckOption),
             projects.Length > 0 || databases.Length > 0 || paths.Any(SqlPath.IsSqlFile),
             connections.ToImmutable(),
             [.. databases.Distinct(StringComparer.OrdinalIgnoreCase)]
@@ -217,6 +309,7 @@ internal static class DescribeCommand
             return null;
         }
 
+        RunEvents.Unit(reporter.Trace, unit, wasGiven: unitPath is not null);
         var manifests = await RunProjects.FindAsync(
             unit,
             parsed.GetValue<string[]>(ProjectOption) ?? [],
@@ -241,6 +334,21 @@ internal static class DescribeCommand
             host.WorkingDirectory
         );
         var result = RunPlanner.Plan(manifests, filters, cancellationToken);
+        foreach (var manifest in manifests)
+        {
+            var claimed = result.Plan.Files.Count(file =>
+                file.Claims.Any(claim =>
+                    string.Equals(claim.ProjectPath, manifest.ProjectPath, StringComparison.Ordinal)
+                )
+            );
+            RunEvents.Unclaimed(reporter.Trace, manifest.ProjectPath, ListedFiles.Read(manifest).Paths.Count - claimed);
+        }
+
+        foreach (var file in result.Plan.Files)
+        {
+            RunEvents.File(reporter.Trace, file);
+        }
+
         foreach (var error in result.Errors)
         {
             reporter.Report(error);

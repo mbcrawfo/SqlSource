@@ -24,5 +24,6 @@ public class ToolHostTests
         host.ProcessorCount.ShouldBe(Environment.ProcessorCount);
         host.Describers.ShouldBeSameAs(DescriberRegistry.Empty);
         host.Exchange("billing").ShouldBeSameAs(LiveExchange.Instance);
+        host.Time.ShouldBeSameAs(TimeProvider.System);
     }
 }

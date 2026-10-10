@@ -98,6 +98,7 @@ internal static class RunPlanner
         // What each claim of a file says: its Output, and nothing else.
         var listed = ListedFiles.Read(manifest);
         var claimsOf = new Dictionary<string, List<SettingsLevel>>(SqlPath.Comparer);
+        var typesOf = new Dictionary<string, List<TypeClaim>>(SqlPath.Comparer);
         foreach (var claim in claims.Claims)
         {
             var level = claim.Output is { } output ? new SettingsLevel { Output = output } : SettingsLevel.None;
@@ -110,6 +111,13 @@ internal static class RunPlanner
                 }
 
                 levels.Add(level);
+                if (!typesOf.TryGetValue(path, out var types))
+                {
+                    types = [];
+                    typesOf.Add(path, types);
+                }
+
+                types.Add(claim);
             }
         }
 
@@ -142,7 +150,8 @@ internal static class RunPlanner
                     dialect,
                     settings.Level,
                     ReadDatabase(file.Metadata, invalidSettings) ?? database,
-                    levels
+                    levels,
+                    typesOf[path]
                 )
             );
         }
@@ -228,7 +237,8 @@ internal static class RunPlanner
                 owner.ProjectPath,
                 parsed.Dialect,
                 PlannedFileState.HasParseErrors,
-                EquatableArray<PlannedQuery>.Empty
+                EquatableArray<PlannedQuery>.Empty,
+                ClaimsOf(work)
             );
         }
 
@@ -292,9 +302,18 @@ internal static class RunPlanner
             owner.ProjectPath,
             parsed.Dialect,
             state,
-            new EquatableArray<PlannedQuery>(queries.MoveToImmutable())
+            new EquatableArray<PlannedQuery>(queries.MoveToImmutable()),
+            ClaimsOf(work)
         );
     }
+
+    // Who claims the file, for the log: every claim of every project, in their order.
+    private static EquatableArray<FileClaim> ClaimsOf(FileWork work) =>
+        new([
+            .. work.Claimants.SelectMany(claimant =>
+                claimant.Types.Select(type => new FileClaim(claimant.ProjectPath, type.SourcePath, type.Position))
+            ),
+        ]);
 
     // An output as a marker spells it.  Only the two that need an entry are named in a message.
     private static string NameOf(OutputKind output) => output == OutputKind.CodeGen ? "codegen" : "models";
@@ -466,7 +485,8 @@ internal static class RunPlanner
         DialectSetting ProjectDialect,
         SettingsLevel Property,
         string? Database,
-        List<SettingsLevel> Claims
+        List<SettingsLevel> Claims,
+        List<TypeClaim> Types
     );
 
     // One claimed file of the run, with every project that claims it.  The first is the one it is planned under.

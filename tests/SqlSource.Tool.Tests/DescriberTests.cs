@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Logging;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -60,7 +61,11 @@ public class DescriberTests
         var exchange = new RecordingExchange();
         var token = TestContext.Current.CancellationToken;
 
-        var opened = await describer.OpenAsync(new OpenRequest("billing", "Host=db", exchange), token);
+        var opened = await describer.OpenAsync(
+            new OpenRequest("billing", "Host=db", exchange),
+            NullRunLog.Instance,
+            token
+        );
         await using var session = opened.Session.ShouldNotBeNull();
         var described = await session.DescribeAsync(
             new DescribeRequest("GetUser", "SELECT 1;", EquatableArray<SqlQueryParameter>.Empty),
@@ -80,7 +85,11 @@ public class DescriberTests
         describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser", "42P01: relation \"users\" does not exist");
         var token = TestContext.Current.CancellationToken;
 
-        var opened = await describer.OpenAsync(new OpenRequest("billing", "Host=db", new RecordingExchange()), token);
+        var opened = await describer.OpenAsync(
+            new OpenRequest("billing", "Host=db", new RecordingExchange()),
+            NullRunLog.Instance,
+            token
+        );
         var described = await opened
             .Session.ShouldNotBeNull()
             .DescribeAsync(new DescribeRequest("GetUser", "SELECT 1;", EquatableArray<SqlQueryParameter>.Empty), token);

@@ -28,6 +28,9 @@ internal sealed class CliRun : IDisposable
     // Every database of the run calls through this one.
     public RecordingExchange Exchange { get; } = new();
 
+    // The clock of the run.  The machine's, unless a test brings one it can move.
+    public TimeProvider Time { get; set; } = TimeProvider.System;
+
     // Set to stand in for standard output, for a test of a writer that fails.
     public TextWriter? Out { get; init; }
 
@@ -83,6 +86,7 @@ internal sealed class CliRun : IDisposable
             Folder.CreateFolder("tmp"),
             ProcessorCount: 4,
             new DescriberRegistry(Describers),
-            _ => Exchange
+            _ => Exchange,
+            Time
         );
 }

@@ -1,6 +1,7 @@
 using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Parsing;
+using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing;
 
@@ -14,7 +15,8 @@ namespace SqlSource.Tool.Describing;
 /// </para>
 /// <para>
 /// Every call it makes to an engine goes through <see cref="OpenRequest.Exchange" />, so that a run can be recorded
-/// and replayed.  It puts the connection's value, or a part of it, in nothing it returns.
+/// and replayed.  It puts the connection's value, or a part of it, in nothing it returns and in nothing it logs.
+/// The log it is given removes the whole value all the same, and puts the engine before each event's name.
 /// </para>
 /// </remarks>
 internal interface IQueryDescriber
@@ -23,5 +25,11 @@ internal interface IQueryDescriber
     SqlDialect Dialect { get; }
 
     /// <summary>Opens a session with one database.</summary>
-    Task<OpenResult> OpenAsync(OpenRequest request, CancellationToken cancellationToken);
+    /// <param name="request">The database, its connection and the exchange.</param>
+    /// <param name="log">
+    /// Where the describer's own events go, for the session it opens too.  It is beside the request and not in
+    /// it: the request holds the secret.
+    /// </param>
+    /// <param name="cancellationToken">Ends the run.</param>
+    Task<OpenResult> OpenAsync(OpenRequest request, IRunLog log, CancellationToken cancellationToken);
 }

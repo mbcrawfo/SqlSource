@@ -25,8 +25,21 @@ internal static class UsageCheck
         var messages = new List<string>();
         var arguments = new List<string>();
         var values = new List<UsageValue>();
+        // An option that takes one value takes it once: System.CommandLine rejects a second with the value's text.
+        var givenOnce = new HashSet<Option>();
         var command = root;
         var options = root.Options.ToList();
+
+        void AddValue(Option option, string name, string text, int position)
+        {
+            if (option.Arity.MaximumNumberOfValues == 1 && !givenOnce.Add(option))
+            {
+                messages.Add($"sqlsource: option '{name}' is given more than once");
+                return;
+            }
+
+            values.Add(new UsageValue(option, text, position));
+        }
 
         var index = 0;
         while (index < args.Count)
@@ -62,7 +75,7 @@ internal static class UsageCheck
                     }
                     else
                     {
-                        values.Add(new UsageValue(option, token[(name.Length + 1)..], index));
+                        AddValue(option, name, token[(name.Length + 1)..], index);
                     }
                 }
                 else if (option.Arity.MinimumNumberOfValues > 0)
@@ -75,7 +88,7 @@ internal static class UsageCheck
                     }
                     else
                     {
-                        values.Add(new UsageValue(option, args[index], index + 1));
+                        AddValue(option, name, args[index], index + 1);
                         index++;
                     }
                 }
