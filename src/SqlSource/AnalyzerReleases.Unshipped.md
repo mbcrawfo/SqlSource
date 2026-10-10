@@ -50,6 +50,9 @@ SQLSRC209 | SqlSource | Error | Output needs a dialect that can be described
 SQLSRC210 | SqlSource | Error | Token has no default
 SQLSRC211 | SqlSource | Error | Database has two dialects
 SQLSRC212 | SqlSource | Error | File is not in the run
+SQLSRC213 | SqlSource | Error | Database has no connection
+SQLSRC214 | SqlSource | Error | Two databases share a connection variable
+SQLSRC215 | SqlSource | Error | Connection names no database
 SQLSRC220 | SqlSource | Error | Project was not restored
 SQLSRC222 | SqlSource | Error | Directory cannot be read
 SQLSRC223 | SqlSource | Error | Solution cannot be read

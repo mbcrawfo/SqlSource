@@ -65,7 +65,11 @@ public class ToolDiagnosticsTests
             )
             .ShouldBe("sqlsource failed unexpectedly: System.Exception: boom");
 
-        foreach (var descriptor in ToolDiagnostics.All.Remove(ToolDiagnostics.UnexpectedFailure))
+        foreach (
+            var descriptor in ToolDiagnostics
+                .All.Remove(ToolDiagnostics.UnexpectedFailure)
+                .Remove(ToolDiagnostics.UnnamedConnectionNotUsed)
+        )
         {
             // The later arguments are for the ones that have more than one place: a format ignores an argument it
             // has no place for.
@@ -187,4 +191,36 @@ public class ToolDiagnosticsTests
                 "/work/App/User.sql"
             )
             .ShouldBe("'/work/App/User.sql' is not a .sql file that a type of the run claims");
+
+    [Fact]
+    public void DatabaseHasNoConnection_Message_HoldsTheDatabase() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DatabaseHasNoConnection.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "billing"
+            )
+            .ShouldBe("No connection is given for the database 'billing'");
+
+    [Fact]
+    public void DatabasesShareConnectionVariable_Message_HoldsBothDatabasesAndTheVariable() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DatabasesShareConnectionVariable.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "app-v2",
+                "app_v2",
+                "SQLSOURCE_CONNECTION_APP_V2"
+            )
+            .ShouldBe(
+                "The databases 'app-v2' and 'app_v2' both read their connection from SQLSOURCE_CONNECTION_APP_V2"
+            );
+
+    [Fact]
+    public void UnnamedConnectionNotUsed_Message_HoldsTheCountAndTheNames() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.UnnamedConnectionNotUsed.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "2",
+                "billing, reports"
+            )
+            .ShouldBe("SQLSOURCE_CONNECTION is for a run with one database, and this run has 2: billing, reports");
 }

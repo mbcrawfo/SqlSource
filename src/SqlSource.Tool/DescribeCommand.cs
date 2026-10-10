@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.CommandLine;
 using System.Linq;
@@ -5,6 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Generation;
 using SqlSource.Settings;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
@@ -24,6 +26,8 @@ internal static class DescribeCommand
     private const string ProjectOption = "--project";
 
     private const string DatabaseOption = "--database";
+
+    internal const string ConnectionOption = "--connection";
 
     public static Command Create(ToolHost host, Reporter reporter)
     {
@@ -57,11 +61,22 @@ internal static class DescribeCommand
             Hidden = true,
         };
 
+        // Always a name, "=" and a value.  CheckUsage holds each to that, and a message never repeats one.
+        var connection = new Option<string[]>(ConnectionOption)
+        {
+            Description =
+                "The connection string of a database, as <name>=<connection string>.  May be given several times.",
+            HelpName = "name=value",
+            Arity = ArgumentArity.OneOrMore,
+            AllowMultipleArgumentsPerToken = false,
+        };
+
         var describe = new Command(Name, "Finds the queries of the projects that a database must describe")
         {
             path,
             project,
             database,
+            connection,
         };
         describe.SetAction(
             async (parsed, cancellationToken) =>
@@ -80,7 +95,8 @@ internal static class DescribeCommand
     /// </summary>
     /// <remarks>
     /// A path that ends in <c>.sql</c> is a filter and any other is the unit, of which there is one.  A value of
-    /// <c>--database</c> is a database name, by the rule of the <c>-- database:</c> marker.
+    /// <c>--database</c> is a database name, by the rule of the <c>-- database:</c> marker.  A value of
+    /// <c>--connection</c> is a name, <c>=</c> and a value, and a name is given once.
     /// </remarks>
     public static IReadOnlyList<string> CheckUsage(Usage usage)
     {
@@ -91,6 +107,7 @@ internal static class DescribeCommand
 
         var messages = new List<string>();
         var units = 0;
+        var connections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var value in usage.Values)
         {
             if (value.Option is null)
@@ -106,6 +123,23 @@ internal static class DescribeCommand
                     $"sqlsource: the value of option '{DatabaseOption}' at position {value.Position} is not a "
                         + "database name"
                 );
+            }
+            else if (value.Option.Name == ConnectionOption)
+            {
+                if (!ConnectionArgument.TryParse(value.Text, out var connection))
+                {
+                    messages.Add(
+                        $"sqlsource: the value of option '{ConnectionOption}' at position {value.Position} is not "
+                            + "<name>=<connection string>"
+                    );
+                }
+                else if (!connections.Add(connection.Name))
+                {
+                    messages.Add(
+                        $"sqlsource: option '{ConnectionOption}' at position {value.Position} names a database that "
+                            + "an earlier one names"
+                    );
+                }
             }
         }
 

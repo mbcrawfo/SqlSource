@@ -49,6 +49,9 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC210](#sqlsrc210) | Token has no default |
 | [SQLSRC211](#sqlsrc211) | Database has two dialects |
 | [SQLSRC212](#sqlsrc212) | File is not in the run |
+| [SQLSRC213](#sqlsrc213) | Database has no connection |
+| [SQLSRC214](#sqlsrc214) | Two databases share a connection variable |
+| [SQLSRC215](#sqlsrc215) | Connection names no database |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
@@ -716,6 +719,44 @@ sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file tha
 ```
 
 Check the spelling of the path.  If the file exists, it is either not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it, or no type claims it: a type claims the `.sql` files in the folder of its own source file, or the ones its `Path` names.  With `--project`, the file must be claimed by a type of one of the projects named.  The rest of the run goes on.
+
+## SQLSRC213
+
+**Database has no connection**
+
+A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.  A variable that is empty is not set.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC213: No connection is given for the database 'postgres'
+    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES
+```
+
+Give the connection in one of the two ways the `help:` line names, or leave the database out of the run with `--database`.  When `--connection` was given for a name that no database of the run has, the `help:` line lists those names, so that a misspelt one is seen.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.
+
+## SQLSRC214
+
+**Two databases share a connection variable**
+
+The variable of a database's name is the name in upper case with every character that is not a letter or a digit written as `_`.  Two databases of this run have names that give one variable, as `app-v2` and `app_v2` do, so the variable cannot say which of them it is for.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC214: The databases 'app-v2' and 'app_v2' both read their connection from SQLSOURCE_CONNECTION_APP_V2
+```
+
+Give both databases their connection on the command line, `--connection app-v2=<connection string> --connection app_v2=<connection string>`, or rename one of them.  A connection on the command line for one of the two is not enough: the variable would then be read for the other alone, and a reader of the command could not tell.  The error is reported once for each of the two databases that has a query to describe, at its first such query, and those queries count as failed.
+
+## SQLSRC215
+
+**Connection names no database**
+
+`SQLSOURCE_CONNECTION` is set, and it is the connection of a run with exactly one database.  This run has more, and the database of this query has no connection of its own, so nothing says that the variable is for it.
+
+```console
+/work/App/Queries/Reports.sql(1,10): error SQLSRC215: SQLSOURCE_CONNECTION is for a run with one database, and this run has 2: postgres, reports
+    help: set SQLSOURCE_CONNECTION_POSTGRES for 'postgres' and SQLSOURCE_CONNECTION_REPORTS for 'reports', or pass --connection <name>=<connection string> for each
+```
+
+Set the variable of each database, as the `help:` line names them, or give each with `--connection`, or restrict the run to one database with `--database`.  The error stands in the place of [SQLSRC213](#sqlsrc213) and is reported as that one is: once for a database, at its first query that must be described.
 
 ## SQLSRC220
 

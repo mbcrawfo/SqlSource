@@ -255,6 +255,11 @@ public class UsageCheckTests
             "--database",
             "--database=D",
             "--database=",
+            "--connection",
+            "--connection=N=V",
+            "--connection:N=V",
+            "--connection=",
+            "N=V",
             "--help",
             "--",
             "V",
@@ -280,7 +285,10 @@ public class UsageCheckTests
 
             // The command checks the values that UsageCheck read and runs with the ones System.CommandLine read,
             // so the two must give each option the same values too.
-            if (!usage.IsReadTheSameBy(parsed) || !HasTheSameValues(usage, parsed, "--project", "--database"))
+            if (
+                !usage.IsReadTheSameBy(parsed)
+                || !HasTheSameValues(usage, parsed, "--project", "--database", "--connection")
+            )
             {
                 disagreements.Add(string.Join(' ', args));
             }
