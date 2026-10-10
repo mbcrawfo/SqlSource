@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0036`
+Next id: `TD-0037`
 
 ## Active items
 
@@ -18,8 +18,8 @@ Next id: `TD-0036`
 | [TD-0019](TD-0019-change-to-claimed-files-reads-every-claimed-file-again.md) | Open | 2026-10-08 | Low | A change to the set of claimed files, such as a file added to a type's folder or a changed `Path`, reads every claimed file again |
 | [TD-0021](TD-0021-comments-and-token-defaults.md) | Open | 2026-10-08 | Low | A `--` comment inside an inline default swallows its closing braces, a `-- token:` default is compared as written while an inline one is compared without comments, and a comment can be scanned for tokens where no type keeps comments |
 | [TD-0022](TD-0022-query-that-keeps-its-comments-is-built-and-scanned-twice.md) | Open | 2026-10-08 | Low | A query that keeps its comments has its SQL built and scanned for tokens twice, so its parse allocates and takes about twice as much |
-| [TD-0023](TD-0023-unknown-option-and-path-are-printed-as-given.md) | Open | 2026-10-09 | Low | The `sqlsource` tool prints the name of an unknown option, the path of `describe`, a `.sql` path of it, a path of `--project` and a name of `--database` that no query has as they were typed, so a secret typed as any of them reaches its output, and so does the start of a `--connection` value typed without a name, which `SQLSRC213` prints as a name that no database has |
-| [TD-0024](TD-0024-no-test-reaches-the-line-that-a-command-line-is-not-valid.md) | Open | 2026-10-09 | Low | No test reaches the line `sqlsource: the command line is not valid`, which the `sqlsource` tool writes when System.CommandLine and its own check of the command line disagree; it waits for an option that may be given only once |
+| [TD-0023](TD-0023-unknown-option-and-path-are-printed-as-given.md) | Open | 2026-10-09 | Low | The `sqlsource` tool prints the name of an unknown option, the path of `describe`, a `.sql` path of it, a path of `--project` and a name of `--database` that no query has as they were typed, so a secret typed as any of them reaches its output, and so does the start of a `--connection` value typed without a name, which `SQLSRC213` prints as a name that no database has; the log of `--log` holds every token of a valid command line as typed, but the value of a `--connection` |
+| [TD-0024](TD-0024-no-test-reaches-the-line-that-a-command-line-is-not-valid.md) | Open | 2026-10-09 | Low | No test reaches the line `sqlsource: the command line is not valid`, which the `sqlsource` tool writes when System.CommandLine and its own check of the command line disagree; it waits for a kind of option or argument that the two read differently |
 | [TD-0025](TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md) | Open | 2026-10-09 | Low | The `sqlsource` tool does not see a `.sql` file, or a C# file, that a target adds from a hook of the build: only a target that hooks `SqlSourceTrimMetadataOfFiles` runs before the project manifest is written |
 | [TD-0026](TD-0026-manifest-of-a-multi-targeted-project-is-the-first-frameworks.md) | Open | 2026-10-09 | Low | For a project with several target frameworks the `sqlsource` tool reads the first one alone: a file, an attribute or a reference to SqlSource that only another framework has is not seen |
 | [TD-0027](TD-0027-manifest-target-depends-on-a-target-of-the-sdk.md) | Open | 2026-10-09 | Low | The target that writes the project manifest depends on `AddImplicitDefineConstants`, a target of the SDK whose name is no contract |
@@ -31,6 +31,7 @@ Next id: `TD-0036`
 | [TD-0033](TD-0033-sql-file-that-two-projects-list-has-one-sidecar.md) | Open | 2026-10-10 | Low | A `.sql` file that two projects list is planned under the first that claims it, so the second's dialect and database are not used, and a run on one of the two sees the needs of that one alone |
 | [TD-0034](TD-0034-redaction-of-a-describers-text-has-holes.md) | Open | 2026-10-10 | Low | The `sqlsource` tool replaces the whole connection value in the text a describer gave, in what is printed, said under `--verbose` and logged, and nothing else: not the descriptor of a failure, a value split over lines or changed, or one keyword of it; an entry is searched for the whole value alone before it is written to a sidecar |
 | [TD-0035](TD-0035-three-small-gaps-of-describe.md) | Open | 2026-10-10 | Low | Three small gaps of `describe`: a database that exists only through a file that cannot be described counts as a selected database, the connection variables reach every `dotnet msbuild` the tool starts, and a sidecar that the tool cannot open stays beside a file that needs no entry, with nothing said |
+| [TD-0036](TD-0036-two-small-gaps-of-check-and-the-log.md) | Open | 2026-10-10 | Low | The log's `os` and `runtime` come from `RuntimeInformation` and not from `ToolHost`, and `--check` with `--database` does not report an entry of a query that is gone when the entry's database is not named, though `describe` with the same filter drops it |
 
 ## Columns
 

@@ -11,9 +11,11 @@ The `sqlsource` tool never repeats a token of a wrong command line, because a to
 - **The name of a `--database` that no query has**, on standard output, in the summary line `<name>: 0 described, 0 skipped, 0 failed` from [`RunSummary`](../../src/SqlSource.Tool/Describing/RunSummary.cs).  `CheckUsage` holds a value of `--database` to the rule of a database name, which is letters, digits, `-`, `_` and `.`, and reports one that breaks it by its position, but a value that passes is printed as typed.  A secret that holds only such characters, as a token or a password often does, and is typed after `--database` by mistake, is in the output.  The line is there so that a filter that matched nothing is seen.
 - **The name of a `--connection` that no database has**, in the `help:` line of `SQLSRC213`.  A connection string typed without its name is read as a name and a value: `--connection "Host=db;Password=S3cret"` gives the database `Host`, and `--connection c2VjcmV0cGFzcw==` gives the name `c2VjcmV0cGFzcw`.  The help lists the names that no database of the run has, so the start of a secret is printed.  This is chosen and a test holds it, `Run_ConnectionStringGivenWithoutAName_IsNeverPrinted`: the name is what tells a user that the option was misread, and a line that said only that some connection was unused would not.
 
+Since sub-phase 2.6 the same tokens are also written to a file.  A run with a log, by `--log` or `SQLSOURCE_LOG`, begins it with `run.start`, whose `arguments` holds every token of the command line, built by [`LoggedArguments`](../../src/SqlSource.Tool/Logging/LoggedArguments.cs).  It replaces the value of each `--connection` with `***` and keeps its name, and writes every other token as it was typed: the path of `describe`, a `.sql` path, a path of `--project`, a name of `--database`, a part of a split value, and the name that a `--connection` was read to have.  The name of an unknown option is the one thing not logged, since a wrong command line is never logged.  [The tool's readme](../../src/SqlSource.Tool/README.md) tells a user that the log holds the rest of the command line, and invites them to attach it to an issue.
+
 ## Why it exists
 
-A message that names nothing is of no use: a user who misspells `--force` must be told which word was not known, and a path that was not found must be shown.  Cutting the option at `=` or `:` covers the forms a value is given in beside an option of this tool, and reading nothing after the first unknown option covers the value that follows one.
+A message that names nothing is of no use: a user who misspells `--force` must be told which word was not known, and a path that was not found must be shown.  Cutting the option at `=` or `:` covers the forms a value is given in beside an option of this tool, and reading nothing after the first unknown option covers the value that follows one.  The log records the command line, and only the value of a `--connection` is known to be a secret, so it is the one thing removed.
 
 ## Impact
 
@@ -25,12 +27,12 @@ Low.  The unknown option needs a command line that the tool does not offer: it h
 - on any line, a value typed after `--database` that passes the rule of a database name, which the summary prints whole on standard output;
 - the start of a `--connection` value that is read as a name.
 
-What is printed goes to the terminal of the person who typed it, and to the log of a build that runs the tool.
+What is printed goes to the terminal of the person who typed it, and to the log of a build that runs the tool.  What is written to the log's `arguments` goes to a file that a user is told to read before attaching it to an issue; all of this but the name of an unknown option is in it on every run with a log, whether or not the run fails.
 
 ## Proposed fix
 
-Print an unknown option only when it is close to one the tool has, and by its position otherwise.  For the path, print it only when it has no `=` and no `;` in it, and its position otherwise, whether or not the line has a `--connection`.  For the name of a `--connection` and of a `--database`, print it only when it is close to the name of a database of the plan.
+Print an unknown option only when it is close to one the tool has, and by its position otherwise.  For the path, print it only when it has no `=` and no `;` in it, and its position otherwise, whether or not the line has a `--connection`.  For the name of a `--connection` and of a `--database`, print it only when it is close to the name of a database of the plan.  Give `LoggedArguments` the same rule, so that a token the rule would print only by its position is written to `arguments` by its position too.
 
 ## Trigger
 
-The tool gains a short option that takes a value, or a report of a secret in the log of a build.
+The tool gains a short option that takes a value, or a report of a secret in the log of a build or in a log that was attached to an issue.
