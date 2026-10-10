@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0034`
+Next id: `TD-0035`
 
 ## Active items
 
@@ -19,7 +19,7 @@ Next id: `TD-0034`
 | [TD-0021](TD-0021-comments-and-token-defaults.md) | Open | 2026-10-08 | Low | A `--` comment inside an inline default swallows its closing braces, a `-- token:` default is compared as written while an inline one is compared without comments, and a comment can be scanned for tokens where no type keeps comments |
 | [TD-0022](TD-0022-query-that-keeps-its-comments-is-built-and-scanned-twice.md) | Open | 2026-10-08 | Low | A query that keeps its comments has its SQL built and scanned for tokens twice, so its parse allocates and takes about twice as much |
 | [TD-0023](TD-0023-unknown-option-and-path-are-printed-as-given.md) | Open | 2026-10-09 | Low | The `sqlsource` tool prints the name of an unknown option, the path of `describe`, a `.sql` path of it and a path of `--project` as they were typed, so a secret typed as any of them reaches its output |
-| [TD-0024](TD-0024-gaps-of-the-tools-shell.md) | Open | 2026-10-09 | Low | Three gaps of the `sqlsource` tool's shell that wait for sub-phase 2.5: `SQLSRC200` prints the message of any exception, a driver's included; Ctrl+C is always swallowed; and no test reaches the line the tool writes for a command line that System.CommandLine rejects |
+| [TD-0024](TD-0024-gaps-of-the-tools-shell.md) | Open | 2026-10-09 | Low | No test reaches the line `sqlsource: the command line is not valid`, which the `sqlsource` tool writes when System.CommandLine and its own check of the command line disagree; it waits for an option that may be given only once |
 | [TD-0025](TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md) | Open | 2026-10-09 | Low | The `sqlsource` tool does not see a `.sql` file, or a C# file, that a target adds from a hook of the build: only a target that hooks `SqlSourceTrimMetadataOfFiles` runs before the project manifest is written |
 | [TD-0026](TD-0026-manifest-of-a-multi-targeted-project-is-the-first-frameworks.md) | Open | 2026-10-09 | Low | For a project with several target frameworks the `sqlsource` tool reads the first one alone: a file, an attribute or a reference to SqlSource that only another framework has is not seen |
 | [TD-0027](TD-0027-manifest-target-depends-on-a-target-of-the-sdk.md) | Open | 2026-10-09 | Low | The target that writes the project manifest depends on `AddImplicitDefineConstants`, a target of the SDK whose name is no contract |
@@ -29,6 +29,7 @@ Next id: `TD-0034`
 | [TD-0031](TD-0031-attribute-reader-of-the-tool-is-syntax-only.md) | Open | 2026-10-10 | Low | The `sqlsource` tool reads `[SqlSourceGenerate]` as syntax: an alias for the attribute is not seen, a type of the same name is taken for it, and an attribute inside `#if` is read under the configuration of the manifest alone |
 | [TD-0032](TD-0032-sql-file-that-is-not-utf-8-is-hashed-differently.md) | Open | 2026-10-10 | Low | A `.sql` file that is not UTF-8 is read with replacement characters by the `sqlsource` tool and in a fallback code page by the compiler, so the hash of a query that holds such a character differs between the two |
 | [TD-0033](TD-0033-sql-file-that-two-projects-list-has-one-sidecar.md) | Open | 2026-10-10 | Low | A `.sql` file that two projects list is planned under the first that claims it, so the second's dialect and database are not used, and a run on one of the two sees the needs of that one alone |
+| [TD-0034](TD-0034-redaction-of-a-describers-text-has-holes.md) | Open | 2026-10-10 | Low | The `sqlsource` tool replaces the whole connection value in the text a describer gave, and nothing else: not the descriptor of a failure, a value split over lines or changed, one keyword of it, or what is written to a sidecar |
 
 ## Columns
 

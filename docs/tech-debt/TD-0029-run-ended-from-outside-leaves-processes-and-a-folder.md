@@ -22,4 +22,4 @@ Low.  An evaluation ends by itself within seconds, and the folder holds a few sm
 
 ## Trigger
 
-Sub-phase 2.5, with the second gap of [TD-0024](TD-0024-gaps-of-the-tools-shell.md), which is about the same handler.
+Sub-phase 2.5, which changed the same handler: a second Ctrl+C now ends the process, in [`Cli.Interrupt`](../../src/SqlSource.Tool/Cli.cs), and a run holds database connections.

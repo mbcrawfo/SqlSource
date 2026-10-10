@@ -69,12 +69,7 @@ public static class Cli
         }
 
         using var interrupt = new CancellationTokenSource();
-        void Cancel(object? sender, ConsoleCancelEventArgs e)
-        {
-            // The run ends by its own road, with its exit code, and not by the process being killed.
-            e.Cancel = true;
-            interrupt.Cancel();
-        }
+        void Cancel(object? sender, ConsoleCancelEventArgs e) => e.Cancel = Interrupt(interrupt);
 
         Console.CancelKeyPress += Cancel;
         try
@@ -85,6 +80,23 @@ public static class Cli
         {
             Console.CancelKeyPress -= Cancel;
         }
+    }
+
+    /// <summary>
+    /// What Ctrl+C does.  The first time, the run is cancelled and ends by its own road, with its exit code, and
+    /// the process is kept.  A second time, while the run has not ended, the process is left to be killed: a run
+    /// that waits on a database may not look at its token.
+    /// </summary>
+    /// <returns>Whether the process is kept.</returns>
+    internal static bool Interrupt(CancellationTokenSource interrupt)
+    {
+        if (interrupt.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        interrupt.Cancel();
+        return true;
     }
 
     /// <summary>

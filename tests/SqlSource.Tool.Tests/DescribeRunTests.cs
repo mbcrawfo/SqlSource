@@ -359,6 +359,7 @@ public sealed class DescribeRunTests : IDisposable
     public async Task Run_FileThatNeedsNoEntryAnyMore_LosesItsSidecar()
     {
         _ = await _scene.DescribeAsync();
+        File.Exists(Sidecar).ShouldBeTrue();
         await File.WriteAllTextAsync(_users, "-- output: sql\n" + Users, TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync();

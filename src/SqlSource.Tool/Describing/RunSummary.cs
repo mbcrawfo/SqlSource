@@ -50,7 +50,7 @@ internal static class RunSummary
             );
         }
 
-        foreach (var name in named.Where(name => !selected.Any(database => Same(database.Name, name))))
+        foreach (var name in named.Where(candidate => !selected.Any(database => Same(database.Name, candidate))))
         {
             // With its engine when the plan knows the database, though no query of it is selected.
             lines.Add(

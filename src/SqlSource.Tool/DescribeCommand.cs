@@ -189,8 +189,8 @@ internal static class DescribeCommand
     /// is nothing to plan: no unit, or no project that could be read.
     /// </summary>
     /// <remarks>
-    /// Nothing that a run prints says what it selected, so a test reads the plan from here, and sub-phase 2.5 goes
-    /// on from it.
+    /// The summary of a run prints counts for each selected database and not which queries it selected, so a test
+    /// reads the plan from here, and the run goes on from it.
     /// </remarks>
     internal static async Task<RunPlan?> PlanAsync(
         ParseResult parsed,
