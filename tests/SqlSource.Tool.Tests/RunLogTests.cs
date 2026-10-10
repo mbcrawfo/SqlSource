@@ -260,6 +260,42 @@ public sealed class RunLogTests : IDisposable
         counts.GetProperty("failed").GetInt32().ShouldBe(0);
     }
 
+    // "same" would say that every query of the file was compared, and one could not be: the file has no event.
+    [Fact]
+    public async Task Run_CheckOfAFileOneOfWhoseQueriesFailsToDescribe_HasNoSidecarEventAndSaysNothingOfTheSidecar()
+    {
+        (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
+        _scene.Describer.Failures["ListUsers"] = FakeDescriber.Failure("ListUsers");
+
+        var result = await _scene.DescribeAsync("--check", "--verbose", "--log", "run.log");
+
+        result.ExitCode.ShouldBe(1);
+        LogReader.Read(Log).ShouldNotContain(line => Text(line, "event") == "sidecar");
+        result.Out.ShouldNotContain("sidecar '");
+        LogReader
+            .Read(Log)
+            .Where(line => Text(line, "event") == "query")
+            .Select(line => $"{Text(line, "name")} {Text(line, "decision")}")
+            .ShouldBe(["GetUser described", "ListUsers failed"]);
+    }
+
+    // A difference is a difference whatever else failed in the file.
+    [Fact]
+    public async Task Run_CheckOfAFileWithADifferenceAndAQueryThatFails_HasTheSidecarEventDiffers()
+    {
+        (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
+        await File.WriteAllTextAsync(
+            _users,
+            Users.Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal),
+            TestContext.Current.CancellationToken
+        );
+        _scene.Describer.Failures["ListUsers"] = FakeDescriber.Failure("ListUsers");
+
+        _ = await _scene.DescribeAsync("--check", "--log", "run.log");
+
+        ActionOf(_users + ".json").ShouldBe("differs");
+    }
+
     [Fact]
     public async Task Run_DescriberThatLogs_HasItsEventsUnderItsEngineBetweenTheRunsOwn()
     {
@@ -285,6 +321,20 @@ public sealed class RunLogTests : IDisposable
             ]);
         Text(events[6], "query").ShouldBe("GetUser");
         Text(events[7], "name").ShouldBe("GetUser");
+    }
+
+    // A describer cannot write an event of the run's, nor make a reader take its member for the run's name or time.
+    [Fact]
+    public async Task Run_DescriberThatLogsMembersNamedEventAndTime_HasAnEventOfItsEnginesAndTheRunsOwnTime()
+    {
+        _scene.Describer.OnOpen = (log, _) => log.Write("x", new("event", "run.end"), new("time", "never"));
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        var line = LogReader.Read(Log).Single(e => Text(e, "event") == "postgres.x");
+        Text(line, "_event").ShouldBe("run.end");
+        Text(line, "_time").ShouldBe("never");
+        Text(line, "time").ShouldBe("2026-10-09T14:02:11.412Z");
     }
 
     [Fact]
@@ -422,6 +472,33 @@ public sealed class RunLogTests : IDisposable
         result.Out.ShouldBeEmpty();
         result.Error.ShouldStartWith($"{path} : error SQLSRC218: '{path}' could not be written: ");
         _scene.Describer.Opened.ShouldBeEmpty();
+    }
+
+    // The log's name forgotten before a .sql filter: the file of the run must not be emptied, and nothing runs.
+    [Theory]
+    [InlineData("option")]
+    [InlineData("variable")]
+    public async Task Run_LogThatIsAFileOfTheRun_IsSqlsrc218AndTheFileIsAsItWas(string source)
+    {
+        var before = await File.ReadAllBytesAsync(_users, TestContext.Current.CancellationToken);
+        if (source == "variable")
+        {
+            _scene.Run.Environment["SQLSOURCE_LOG"] = "Users.sql";
+        }
+
+        var result =
+            source == "option" ? await _scene.DescribeAsync("--log", "Users.sql") : await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldStartWith(
+            $"{_users} : error SQLSRC218: '{_users}' could not be written: "
+                + "a log is not written over a .sql file, a sidecar, a project or a solution"
+        );
+        (await File.ReadAllBytesAsync(_users, TestContext.Current.CancellationToken)).ShouldBe(before);
+        _scene.Describer.Described.ShouldBeEmpty();
+        _scene.Describer.Opened.ShouldBeEmpty();
+        File.Exists(_users + ".json").ShouldBeFalse();
     }
 
     [Fact]

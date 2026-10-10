@@ -61,16 +61,18 @@ internal static class DescribeRun
         var outcomes = FileOutcomes.Decide(files, options.HasFilter, reporter.Count > 0, SidecarOnDisk.Read);
         if (options.Check)
         {
-            foreach (var check in SidecarCheck.Compare(files, outcomes, options.Databases))
+            var checks = SidecarCheck.Compare(files, outcomes, options.Databases);
+            for (var index = 0; index < checks.Length; index++)
             {
+                var check = checks[index];
                 foreach (var difference in check.Differences)
                 {
                     reporter.Report(difference);
                 }
 
-                if (check.WasCompared)
+                if (CheckedAs(files[index], check) is { } action)
                 {
-                    RunEvents.Sidecar(trace, check.SidecarPath, check.Differences.Count == 0 ? "same" : "differs");
+                    RunEvents.Sidecar(trace, check.SidecarPath, action);
                 }
             }
         }
@@ -94,5 +96,27 @@ internal static class DescribeRun
         {
             await host.Out.WriteLineAsync(line);
         }
+    }
+
+    // What the log says of a sidecar that was checked: "differs" when a difference was reported for the file; "same"
+    // only when every selected query of the file that needs an entry was described, so that each was compared; and
+    // nothing otherwise, since a query that could not be checked is neither.
+    private static string? CheckedAs(FileWork file, FileCheck check)
+    {
+        if (!check.WasCompared)
+        {
+            return null;
+        }
+
+        if (check.Differences.Count > 0)
+        {
+            return "differs";
+        }
+
+        return file
+            .Queries.Where(static query => query.Planned is { NeedsEntry: true, IsSelected: true })
+            .All(static query => query.State == QueryState.Described)
+            ? "same"
+            : null;
     }
 }

@@ -87,23 +87,22 @@ internal static class RunEvents
     }
 
     /// <summary>A selected database: where its connection came from, never what it is.</summary>
-    public static void Database(
-        RunTrace trace,
-        PlannedDatabase database,
-        DatabaseConnection connection,
-        bool hasDescriber
-    )
+    /// <param name="trace">The run's.</param>
+    /// <param name="database">The database.</param>
+    /// <param name="connectionSource">Where the connection came from, or null when there is none.</param>
+    /// <param name="hasDescriber">Whether a describer is registered for the database's engine.</param>
+    public static void Database(RunTrace trace, PlannedDatabase database, string? connectionSource, bool hasDescriber)
     {
         trace.Log.Write(
             "database",
             new("name", database.Name),
             new("engine", SqlDialectName.Canonical(database.Dialect)),
-            new("connectionSource", connection.Source ?? "none"),
+            new("connectionSource", connectionSource ?? "none"),
             new("describer", hasDescriber)
         );
         trace.Say(
             $"database '{database.Name}' ({SqlDialectName.Canonical(database.Dialect)}): "
-                + (connection.Source is { } source ? $"connection from {source}" : "no connection")
+                + (connectionSource is { } source ? $"connection from {source}" : "no connection")
         );
     }
 
@@ -186,7 +185,8 @@ internal static class RunEvents
     /// <param name="path">The full path of the sidecar.</param>
     /// <param name="action">
     /// <c>written</c>, <c>unchanged</c>, <c>deleted</c>, <c>held-back</c> or <c>failed</c>; <c>same</c> or
-    /// <c>differs</c> under <c>--check</c>.
+    /// <c>differs</c> under <c>--check</c>, which writes no event for a file one of whose queries could not be
+    /// checked.
     /// </param>
     public static void Sidecar(RunTrace trace, string path, string action)
     {
@@ -267,9 +267,10 @@ internal static class RunEvents
             QueryState.Described => "described",
             QueryState.Skipped => "skipped",
             QueryState.LeftOut => "left-out",
-            QueryState.NotNeeded => "failed",
             QueryState.Failed => "failed",
-            QueryState.ToDescribe => "failed",
+            QueryState.NotNeeded or QueryState.ToDescribe => throw new InvalidOperationException(
+                $"A query in the state {state} has no event."
+            ),
             _ => throw new InvalidOperationException($"Unknown state {state}."),
         };
 }

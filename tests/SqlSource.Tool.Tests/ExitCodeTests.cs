@@ -76,10 +76,11 @@ public sealed class ExitCodeTests : IDisposable
     }
 
     [Theory]
-    [InlineData("option")]
-    [InlineData("variable")]
-    [InlineData("a log that cannot be opened")]
-    public async Task Run_ErrorWithALogAskedFor_ExitsOneWithoutTheLine(string kind)
+    [InlineData("option", "SQLSRC999")]
+    [InlineData("variable", "SQLSRC999")]
+    [InlineData("a log that cannot be opened", "SQLSRC218")]
+    [InlineData("a log that is a file of the run", "SQLSRC218")]
+    public async Task Run_ErrorWithALogAskedFor_ExitsOneWithoutTheLine(string kind, string id)
     {
         _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
         if (kind == "variable")
@@ -91,11 +92,12 @@ public sealed class ExitCodeTests : IDisposable
         {
             "option" => await _scene.DescribeAsync("--log", "run.log"),
             "variable" => await _scene.DescribeAsync(),
+            "a log that is a file of the run" => await _scene.DescribeAsync("--log", "Users.sql"),
             _ => await _scene.DescribeAsync("--log", "tmp"),
         };
 
         result.ExitCode.ShouldBe(1);
-        result.Error.ShouldContain("error SQLSRC");
+        result.Error.ShouldContain($"error {id}: ");
         result.Error.ShouldNotContain("run again");
     }
 

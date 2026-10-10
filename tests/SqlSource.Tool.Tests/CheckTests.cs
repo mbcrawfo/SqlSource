@@ -408,6 +408,8 @@ public sealed class CheckTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain("error SQLSRC999: ");
         result.Error.ShouldContain("error SQLSRC219: The sidecar is out of date for 'ListUsers': ");
+        // Exit 1 is the exit of a failure: the line that says how to get a log is written.
+        result.Error.ShouldEndWith(DescribeScene.RunAgain);
     }
 
     // A checkout may give the file other line endings and an editor a byte order mark.  Entries are compared, not

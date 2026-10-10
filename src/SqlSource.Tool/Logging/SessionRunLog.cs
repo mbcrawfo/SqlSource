@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using SqlSource.Tool.Describing;
 
@@ -34,6 +35,8 @@ internal sealed class SessionRunLog(IRunLog inner, string secret, string? prefix
             LogValue.Text text => Redaction.Of(text.Value, secret),
             LogValue.Items items => LogValue.ListOf(items.Values.Select(Clean)),
             LogValue.Members map => LogValue.MapOf([.. map.Values.Select(Clean)]),
-            _ => value,
+            // The kinds that hold no string.  The set is closed: a new kind is decided here, not let through.
+            LogValue.Nothing or LogValue.Flag or LogValue.Number => value,
+            _ => throw new InvalidOperationException($"Unknown kind of log value {value.GetType().Name}."),
         };
 }

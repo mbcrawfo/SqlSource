@@ -173,4 +173,28 @@ public sealed class RedactionTests : IDisposable
             .Select(e => e.GetProperty("id").GetString())
             .ShouldBe(["SQLSRC999", "SQLSRC200"]);
     }
+
+    // The id of a describer's descriptor is a describer's text.  The tests give a database a connection whose value
+    // is the id of the descriptor of FakeDescriber, so that an event written through the plain trace would hold it.
+    [Fact]
+    public async Task Run_SessionThatDoesNotOpenWithAConnectionThatIsTheErrorsId_HasTheMarkAsTheError()
+    {
+        _scene.Describer.OpenFailure = FakeDescriber.Failure("GetUser");
+
+        _ = await LoggedWithAsync(FakeDescriber.Rejected.Id);
+
+        var open = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "database.open");
+        open.GetProperty("error").GetString().ShouldBe("***");
+    }
+
+    [Fact]
+    public async Task Run_QueryThatFailsWithAConnectionThatIsTheErrorsId_HasTheMarkAsTheError()
+    {
+        _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
+
+        _ = await LoggedWithAsync(FakeDescriber.Rejected.Id);
+
+        var query = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "query");
+        query.GetProperty("error").GetString().ShouldBe("***");
+    }
 }

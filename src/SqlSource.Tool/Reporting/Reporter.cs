@@ -59,8 +59,8 @@ internal sealed class Reporter(TextWriter error)
     }
 
     /// <summary>
-    /// What the run says of itself beside its errors.  <c>Cli</c> sets it once, before any command runs, when the
-    /// run has a log; every error is also an event of that log.
+    /// What the run says of itself beside its errors.  <c>Cli</c> sets it once, before any command runs, for every
+    /// <c>describe</c> that runs, with the run's log when it has one; every error is also an event of that log.
     /// </summary>
     public RunTrace Trace { get; set; } = new(NullRunLog.Instance);
 

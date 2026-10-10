@@ -51,6 +51,44 @@ public sealed class RunLogFileTests : IDisposable
             );
     }
 
+    // The writer owns "event", "time" and "truncated" at the top of a line, so a line has each key once and a
+    // reader cannot take a caller's member for the run's.
+    [Fact]
+    public void Write_TopLevelMembersNamedLikeTheWritersOwn_AreWrittenWithAnUnderscoreAndTheWritersStandAlone()
+    {
+        using var log = new RunLogFile("/log", _stream, _clock);
+
+        log.Write("e", new("event", "run.end"), new("time", "never"), new("truncated", false));
+
+        Written().ShouldBe(Head + ",\"_event\":\"run.end\",\"_time\":\"never\",\"_truncated\":false}\n");
+        var line = LogReader.Parse(Written().TrimEnd('\n'));
+        line.GetProperty("event").GetString().ShouldBe("e");
+        line.GetProperty("time").GetString().ShouldBe("2026-10-09T14:02:11.412Z");
+        line.TryGetProperty("truncated", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Write_TopLevelMemberNamedTruncatedAndAStringThatIsCut_HasTheWritersMarkOnceAndTheCallersUnderscored()
+    {
+        using var log = new RunLogFile("/log", _stream, _clock);
+
+        log.Write("e", new LogMember("truncated", "mine"), new("big", new string('a', 2 * RunLogFile.MaxStringBytes)));
+
+        var line = LogReader.Parse(Written().TrimEnd('\n'));
+        line.GetProperty("_truncated").GetString().ShouldBe("mine");
+        line.GetProperty("truncated").GetBoolean().ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Write_MemberOfANestedMapNamedLikeTheWritersOwn_KeepsItsName()
+    {
+        using var log = new RunLogFile("/log", _stream, _clock);
+
+        log.Write("e", new LogMember("map", LogValue.MapOf(new("time", "kept"), new("event", "kept"))));
+
+        Written().ShouldBe(Head + ",\"map\":{\"time\":\"kept\",\"event\":\"kept\"}}\n");
+    }
+
     [Fact]
     public void Write_TwoEvents_AreTwoLinesEachWithTheTimeItWasWrittenAt()
     {
@@ -176,6 +214,45 @@ public sealed class RunLogFileTests : IDisposable
 
         log.ShouldBeNull();
         reason.ShouldNotBeEmpty();
+    }
+
+    // A slip of the command line, "--log Users.sql", must not empty a file of the run: nothing is opened or made.
+    [Theory]
+    [InlineData("Users.sql")]
+    [InlineData("Users.sql.json")]
+    [InlineData("App.csproj")]
+    [InlineData("App.sln")]
+    [InlineData("App.slnx")]
+    [InlineData("USERS.SQL")]
+    [InlineData("sub/App.CsProj")]
+    public void TryOpen_PathOfAFileOfTheRun_GivesNoLogAndTheReasonAndLeavesTheFileAsItWas(string given)
+    {
+        var existing = _folder.WriteFile(given, "of the run\n");
+
+        using var log = RunLogFile.TryOpen(given, _folder.Path, _clock, out var path, out var reason);
+
+        log.ShouldBeNull();
+        path.ShouldBe(existing);
+        reason.ShouldBe("a log is not written over a .sql file, a sidecar, a project or a solution");
+        File.ReadAllText(existing).ShouldBe("of the run\n");
+    }
+
+    [Fact]
+    public void TryOpen_PathOfAFileOfTheRunThatIsNotThere_MakesNothing()
+    {
+        using var log = RunLogFile.TryOpen("New.sql", _folder.Path, _clock, out _, out _);
+
+        log.ShouldBeNull();
+        File.Exists(_folder.PathOf("New.sql")).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void TryOpen_PathThatOnlyEndsLikeAFileOfTheRun_IsALog()
+    {
+        using var log = RunLogFile.TryOpen("run.sql.log", _folder.Path, _clock, out _, out var reason);
+
+        _ = log.ShouldNotBeNull();
+        reason.ShouldBeEmpty();
     }
 
     private sealed class BrokenStream : MemoryStream

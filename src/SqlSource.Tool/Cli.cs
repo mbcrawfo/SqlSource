@@ -123,7 +123,7 @@ public static class Cli
         RunLogFile? log = null;
         var exitCode = 0;
 
-        // Whether the line that ends a failed run has a reader: "describe" ran, and no log was asked for.
+        // Whether the line that ends a failed run has a reader: "describe" runs, and no log was asked for.
         var mayPoint = false;
         var cancelled = false;
         try
@@ -163,17 +163,18 @@ public static class Cli
                     return 1;
                 }
 
-                // Before the log is opened, so that a log that could not be opened counts as asked for.
-                mayPoint =
-                    DescribeCommand.Runs(parsed)
-                    && DescribeCommand.LogPathOf(parsed, host.GetEnvironmentVariable) is null;
+                // Whether the command line runs "describe", and the log it was given, once.  A log that cannot be
+                // opened returns below, before the line that ends a failed run is ever considered.
+                var runs = DescribeCommand.Runs(parsed);
+                var logPath = DescribeCommand.LogPathOf(parsed, host.GetEnvironmentVariable);
+                mayPoint = runs && logPath is null;
 
                 // What the run says of itself: to the log, when it has one, and to the person watching under
                 // --verbose.
                 IRunLog events = NullRunLog.Instance;
 
                 // After the command line was read, so that a wrong one is never logged, and before anything runs.
-                if (DescribeCommand.LogPathOf(parsed, host.GetEnvironmentVariable) is { } given)
+                if (logPath is { } given)
                 {
                     log = RunLogFile.TryOpen(given, host.WorkingDirectory, host.Time, out var path, out var reason);
                     if (log is null)
@@ -196,7 +197,7 @@ public static class Cli
                     );
                 }
 
-                if (DescribeCommand.Runs(parsed))
+                if (runs)
                 {
                     reporter.Trace = new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null);
                 }

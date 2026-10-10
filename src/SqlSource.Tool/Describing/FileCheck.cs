@@ -9,8 +9,10 @@ namespace SqlSource.Tool.Describing;
 /// <param name="File">The file of the plan.</param>
 /// <param name="SidecarPath">The full path of its sidecar.</param>
 /// <param name="WasCompared">
-/// Whether the sidecar was compared with anything.  It was not for a file that is not ready, that has no selected
-/// query that needs an entry, or none of whose selected queries could be described.
+/// Whether the sidecar was compared with anything.  It was when <see cref="FileOutcomes" /> decided to delete it,
+/// which is for a file with no query that needs an entry, and when a selected query of the file was described.  It
+/// was not for a file that is not ready, or none of whose selected queries could be described, or that needs no
+/// entry and whose sidecar is not to be deleted.
 /// </param>
 /// <param name="Differences">An <c>SQLSRC219</c> for each difference, in the order they are to be reported.</param>
 internal sealed record FileCheck(

@@ -45,7 +45,7 @@ internal static class DatabaseRuns
             RunEvents.Database(
                 reporter.Trace,
                 database,
-                connections.For(database.Name),
+                connections.For(database.Name).Source,
                 host.Describers.Find(database.Dialect) is not null
             );
 

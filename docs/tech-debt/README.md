@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0037`
+Next id: `TD-0038`
 
 ## Active items
 
@@ -31,7 +31,8 @@ Next id: `TD-0037`
 | [TD-0033](TD-0033-sql-file-that-two-projects-list-has-one-sidecar.md) | Open | 2026-10-10 | Low | A `.sql` file that two projects list is planned under the first that claims it, so the second's dialect and database are not used, and a run on one of the two sees the needs of that one alone |
 | [TD-0034](TD-0034-redaction-of-a-describers-text-has-holes.md) | Open | 2026-10-10 | Low | The `sqlsource` tool replaces the whole connection value in the text a describer gave, in what is printed, said under `--verbose` and logged, and nothing else: not the descriptor of a failure, a value split over lines or changed, or one keyword of it; an entry is searched for the whole value alone before it is written to a sidecar |
 | [TD-0035](TD-0035-three-small-gaps-of-describe.md) | Open | 2026-10-10 | Low | Three small gaps of `describe`: a database that exists only through a file that cannot be described counts as a selected database, the connection variables reach every `dotnet msbuild` the tool starts, and a sidecar that the tool cannot open stays beside a file that needs no entry, with nothing said |
-| [TD-0036](TD-0036-two-small-gaps-of-check-and-the-log.md) | Open | 2026-10-10 | Low | The log's `os` and `runtime` come from `RuntimeInformation` and not from `ToolHost`, and `--check` with `--database` does not report an entry of a query that is gone when the entry's database is not named, though `describe` with the same filter drops it |
+| [TD-0036](TD-0036-two-small-gaps-of-check-and-the-log.md) | Open | 2026-10-10 | Low | The log's `os` and `runtime` come from `RuntimeInformation` and not from `ToolHost`; `--check --database X` does not report an entry of a query that is gone when the entry's database is not named, though that entry alone makes `describe --database X` rewrite the file; and `run.end` is written before the log's file is closed, so a failed close leaves a log with an exit code the process does not have |
+| [TD-0037](TD-0037-small-gaps-of-the-log-and-of-the-tests-of-sub-phase-2-6.md) | Open | 2026-10-10 | Low | Small gaps of the log and of the tests of sub-phase 2.6: paths of `--check` and of `--verbose` with no test, members of the log with no test of some values, a trap in `RunTrace.Without`, `RunEvents.Opened` outside the guard, a circular reference of `Logging/`, and a test that needs `/dev/full` |
 
 ## Columns
 

@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
@@ -15,18 +16,24 @@ namespace SqlSource.Tool.Logging;
 /// <para>
 /// Every object starts with <c>event</c> and <c>time</c>, the moment in UTC with milliseconds.  A string over
 /// <see cref="MaxStringBytes" />, counted in UTF-8, is cut to that size between two characters, and its object
-/// gains <c>"truncated": true</c>.
+/// gains <c>"truncated": true</c>.  The writer owns these three names: a member of the event itself, not of a map
+/// inside it, that is named <c>event</c>, <c>time</c> or <c>truncated</c> is written with one underscore before
+/// the name, so that no line has a key twice and no reader takes a caller's member for the run's.
 /// </para>
 /// <para>
 /// Several threads may write: an event is one write, under a lock.  A write that the system refuses does not end
 /// the run: the writer keeps the <see cref="Failure" /> and writes nothing more, and <c>Cli</c> reports it when
-/// the run ends.
+/// the run ends.  That is a failure of the system and nothing else: an event nested deeper than the JSON writer
+/// allows throws, which only a describer can cause, and which then ends as that describer's <c>SQLSRC200</c>.
 /// </para>
 /// </remarks>
 internal sealed class RunLogFile : IRunLog, IDisposable
 {
     /// <summary>The longest string an event holds, in bytes of UTF-8: 1 MiB.</summary>
     public const int MaxStringBytes = 1024 * 1024;
+
+    // The files a run reads or writes: a log given one of these names would empty it.
+    private static readonly string[] FilesOfTheRun = [".sql", ".sql.json", ".csproj", ".sln", ".slnx"];
 
     private const string TimeFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
 
@@ -56,7 +63,9 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     public Exception? Failure { get; private set; }
 
     /// <summary>
-    /// Makes the file, or empties the one that is there.  Null, with the system's reason, when it cannot be.
+    /// Makes the file, or empties the one that is there.  Null, with the reason, when it cannot be: the system's, or
+    /// that the name is a file of the run (a <c>.sql</c> file, a sidecar, a project or a solution, whatever the
+    /// case), which is refused before anything is opened, made or emptied.
     /// </summary>
     /// <param name="given">The path as the option or the variable gave it.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
@@ -75,7 +84,14 @@ internal sealed class RunLogFile : IRunLog, IDisposable
         reason = "";
         try
         {
-            path = System.IO.Path.GetFullPath(given, workingDirectory);
+            var full = System.IO.Path.GetFullPath(given, workingDirectory);
+            path = full;
+            if (FilesOfTheRun.Any(ending => full.EndsWith(ending, StringComparison.OrdinalIgnoreCase)))
+            {
+                reason = "a log is not written over a .sql file, a sidecar, a project or a solution";
+                return null;
+            }
+
             return new RunLogFile(path, new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read), time);
         }
         catch (Exception exception)
@@ -110,7 +126,7 @@ internal sealed class RunLogFile : IRunLog, IDisposable
                     );
                     foreach (var member in members)
                     {
-                        json.WritePropertyName(Fit(member.Name, ref cut));
+                        json.WritePropertyName(Fit(Unreserved(member.Name), ref cut));
                         WriteValue(json, member.Value, ref cut);
                     }
 
@@ -156,6 +172,9 @@ internal sealed class RunLogFile : IRunLog, IDisposable
             _line.Dispose();
         }
     }
+
+    // The three names the writer adds to a line are its own: a caller's member of one of them gets an underscore.
+    private static string Unreserved(string name) => name is "event" or "time" or "truncated" ? "_" + name : name;
 
     private static void WriteValue(Utf8JsonWriter json, LogValue value, ref bool cut)
     {

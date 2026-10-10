@@ -73,7 +73,7 @@ internal static class SidecarCheck
         var described = selected.Where(static query => query.State == QueryState.Described).ToList();
 
         // A file none of whose queries could be described is compared with nothing: its errors stand.
-        if (file.OnDisk is not { } onDisk || described.Count == 0)
+        if (described.Count == 0)
         {
             return new FileCheck(
                 file.File,
@@ -82,6 +82,13 @@ internal static class SidecarCheck
                 EquatableArray<ToolDiagnostic>.Empty
             );
         }
+
+        // A check that cannot compare is not a check that passed: a described query means the sidecar was read.
+        var onDisk =
+            file.OnDisk
+            ?? throw new InvalidOperationException(
+                $"The sidecar of '{sql}' was not read, though a query was described."
+            );
 
         if (onDisk.Sidecar is not { } sidecar)
         {
