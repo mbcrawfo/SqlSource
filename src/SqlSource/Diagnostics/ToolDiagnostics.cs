@@ -56,6 +56,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor ProjectCannotBeEvaluated = new(
+        id: "SQLSRC205",
+        title: "Project could not be evaluated",
+        messageFormat: "MSBuild could not evaluate '{0}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc205",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ManifestCannotBeRead = new(
         id: "SQLSRC206",
         title: "Project manifest cannot be read",
@@ -87,6 +98,7 @@ internal static class ToolDiagnostics
             NoRunUnit,
             SeveralRunUnits,
             NotARunUnit,
+            ProjectCannotBeEvaluated,
             ManifestCannotBeRead,
             DirectoryCannotBeRead
         );

@@ -1,0 +1,6 @@
+<Project>
+    <!-- What a solution shares between its projects from its own folder. -->
+    <PropertyGroup>
+        <SqlSourceDialect>mssql</SqlSourceDialect>
+    </PropertyGroup>
+</Project>

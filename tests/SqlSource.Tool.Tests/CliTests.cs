@@ -140,7 +140,15 @@ public class CliTests
     {
         // System.CommandLine's default for a flag takes an optional value, which UsageCheck cannot tell from the
         // argument after the flag.
-        var host = new ToolHost(TextWriter.Null, TextWriter.Null, "/", static _ => null);
+        var host = new ToolHost(
+            TextWriter.Null,
+            TextWriter.Null,
+            "/",
+            static _ => null,
+            new FakeProcessRunner(),
+            "/",
+            ProcessorCount: 1
+        );
         var commands = new List<Command> { Cli.BuildCommands(host, new Reporter(TextWriter.Null)) };
 
         for (var index = 0; index < commands.Count; index++)

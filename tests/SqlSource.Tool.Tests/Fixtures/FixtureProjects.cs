@@ -23,10 +23,11 @@ internal sealed class FixtureProjects : IDisposable
     // The folder that holds the copies.
     public string Root => _folder.Path;
 
-    // Copies a fixture and gives the full path of a file of the copy, its project file when none is named.
-    public string Copy(string fixture, string file = "App.csproj")
+    // Copies a fixture and gives the full path of a file of the copy, its project file when none is named.  The
+    // copy is in a folder of the fixture's name, or of the name given.
+    public string Copy(string fixture, string file = "App.csproj", string? folder = null)
     {
-        var target = _folder.PathOf(fixture);
+        var target = _folder.PathOf(folder ?? fixture);
         if (!Directory.Exists(target))
         {
             CopyFolder(Path.Combine(Source, "Projects", fixture), target);

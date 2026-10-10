@@ -2,7 +2,7 @@
 
 ## Problem
 
-For a project with `TargetFrameworks`, the `sqlsource` tool passes the first of them as `TargetFramework`, to the evaluation that asks whether the project uses SqlSource and to the target that writes the project manifest.  So there is one manifest for the project, and it is that framework's.
+For a project with `TargetFrameworks`, the `sqlsource` tool passes the first of them as `TargetFramework`, to the evaluation that asks whether the project uses SqlSource and to the target that writes the project manifest: [`ProjectEvaluator`](../../src/SqlSource.Tool/Projects/ProjectEvaluator.cs).  So there is one manifest for the project, and it is that framework's.
 
 - A `.sql` file or a `Compile` file that the project lists only under a condition on another framework is not in it.
 - An attribute under `#if` for a constant that only another framework defines is not read.
@@ -10,7 +10,7 @@ For a project with `TargetFrameworks`, the `sqlsource` tool passes the first of 
 
 The queries those bring are never described.  The generator compiles for every framework, so from phase 5 the build of the other framework reports each as having no entry.
 
-`tests/SqlSource.Tool.Tests/ManifestTargetTests.cs` pins the first two with the fixture `Multi`.
+`tests/SqlSource.Tool.Tests/ManifestTargetTests.cs` and `tests/SqlSource.Tool.Tests/FixtureProjectTests.cs` pin the first two with the fixture `Multi`, and the third with `SecondOnly`.
 
 ## Why it exists
 

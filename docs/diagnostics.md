@@ -40,6 +40,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC201](#sqlsrc201) | No project or solution found |
 | [SQLSRC202](#sqlsrc202) | More than one project or solution found |
 | [SQLSRC203](#sqlsrc203) | Path is not a project or a solution |
+| [SQLSRC205](#sqlsrc205) | Project could not be evaluated |
 | [SQLSRC206](#sqlsrc206) | Project manifest cannot be read |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 
@@ -575,6 +576,21 @@ $ dotnet sqlsource describe App.slnx
 The path given to `sqlsource describe` does not exist, or is a file that is not a `.sln`, `.slnx` or `.csproj` file.  A solution filter, `.slnf`, and a project of another language are not read.  The message holds the full path the tool looked at: a relative path is resolved against the current directory.  An empty path is this error too, which is what a variable that is not set gives in a shell.
 
 Give the path of a solution, of a C# project, or of a directory that holds exactly one of them.
+
+## SQLSRC205
+
+**Project could not be evaluated**
+
+`sqlsource` asks MSBuild about each project with `dotnet msbuild`: first what the project is, then for the list of what the compiler is given, which a target of the SqlSource package writes.  One of those runs failed.  The lines under the error give the reason, and then the first twenty lines that MSBuild wrote.
+
+```console
+$ dotnet sqlsource describe
+/work/App/App.csproj : error SQLSRC205: MSBuild could not evaluate '/work/App/App.csproj'
+    reason: dotnet msbuild ended with the exit code 1
+    msbuild: /work/App/App.csproj(4,5): error MSB4019: The imported project "/work/Shared.props" was not found.
+```
+
+Mend what MSBuild reports; `dotnet build` of the project reports the same.  When MSBuild says that the target `SqlSourceWriteManifest` does not exist, the SqlSource package of the project is older than the tool: update the package.  When the reason is that `dotnet` could not be started, the .NET SDK is not installed or not on the path: the tool needs it, and not only the runtime it runs on.
 
 ## SQLSRC206
 

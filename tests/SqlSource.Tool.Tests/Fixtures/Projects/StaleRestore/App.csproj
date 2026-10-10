@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        A reference to the package and nothing of its props: the project as it is between "dotnet add package" and
+        the next restore.  A test puts an assets file under obj, as an earlier restore left one.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="sqlsource" Version="1.0.0" />
+    </ItemGroup>
+</Project>

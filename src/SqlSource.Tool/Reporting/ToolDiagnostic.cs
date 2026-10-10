@@ -33,6 +33,18 @@ internal sealed record ToolDiagnostic(
         );
 
     /// <summary>
+    /// An error about a file, at no position in it.
+    /// </summary>
+    /// <param name="descriptor">What is wrong.</param>
+    /// <param name="path">The full path of the file.</param>
+    /// <param name="arguments">The text the descriptor's message quotes.</param>
+    public static ToolDiagnostic ForFile(DiagnosticDescriptor descriptor, string path, params string[] arguments) =>
+        Create(descriptor, arguments) with
+        {
+            Path = path,
+        };
+
+    /// <summary>
     /// The same error with these lines under its first, in this order.
     /// </summary>
     public ToolDiagnostic WithLines(params ContinuationLine[] lines) =>

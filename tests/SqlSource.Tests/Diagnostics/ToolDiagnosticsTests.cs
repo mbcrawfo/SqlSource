@@ -79,6 +79,15 @@ public class ToolDiagnosticsTests
     }
 
     [Fact]
+    public void ProjectCannotBeEvaluated_Message_HoldsTheProject() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ProjectCannotBeEvaluated.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/App.csproj"
+            )
+            .ShouldBe("MSBuild could not evaluate '/work/App.csproj'");
+
+    [Fact]
     public void ManifestCannotBeRead_Message_HoldsTheProjectAndTheReason() =>
         string.Format(
                 CultureInfo.InvariantCulture,

@@ -41,5 +41,6 @@ SQLSRC200 | SqlSource | Error | The tool failed unexpectedly
 SQLSRC201 | SqlSource | Error | No project or solution found
 SQLSRC202 | SqlSource | Error | More than one project or solution found
 SQLSRC203 | SqlSource | Error | Path is not a project or a solution
+SQLSRC205 | SqlSource | Error | Project could not be evaluated
 SQLSRC206 | SqlSource | Error | Project manifest cannot be read
 SQLSRC222 | SqlSource | Error | Directory cannot be read
