@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Shouldly;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Processes;
 using Xunit;
 
@@ -21,5 +22,7 @@ public class ToolHostTests
         _ = host.Processes.ShouldBeOfType<ProcessRunner>();
         host.TempDirectory.ShouldBe(Path.GetTempPath());
         host.ProcessorCount.ShouldBe(Environment.ProcessorCount);
+        host.Describers.ShouldBeSameAs(DescriberRegistry.Empty);
+        host.Exchange("billing").ShouldBeSameAs(LiveExchange.Instance);
     }
 }

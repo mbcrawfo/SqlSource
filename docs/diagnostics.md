@@ -49,7 +49,14 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC210](#sqlsrc210) | Token has no default |
 | [SQLSRC211](#sqlsrc211) | Database has two dialects |
 | [SQLSRC212](#sqlsrc212) | File is not in the run |
+| [SQLSRC213](#sqlsrc213) | Database has no connection |
+| [SQLSRC214](#sqlsrc214) | Two databases share a connection variable |
+| [SQLSRC215](#sqlsrc215) | Connection names no database |
+| [SQLSRC216](#sqlsrc216) | No describer for the dialect |
+| [SQLSRC217](#sqlsrc217) | Sidecar was not written |
+| [SQLSRC218](#sqlsrc218) | File could not be changed |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
+| [SQLSRC221](#sqlsrc221) | Sidecar was written by a newer tool |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
 
@@ -717,6 +724,82 @@ sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file tha
 
 Check the spelling of the path.  If the file exists, it is either not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it, or no type claims it: a type claims the `.sql` files in the folder of its own source file, or the ones its `Path` names.  With `--project`, the file must be claimed by a type of one of the projects named.  The rest of the run goes on.
 
+## SQLSRC213
+
+**Database has no connection**
+
+A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.  A variable that is empty or holds only white space is not set.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC213: No connection is given for the database 'postgres'
+    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES
+```
+
+Give the connection in one of the two ways the `help:` line names, or leave the database out of the run with `--database`.  When `--connection` was given for a name that no database of the run has, the `help:` line lists those names, so that a misspelt one is seen.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.
+
+## SQLSRC214
+
+**Two databases share a connection variable**
+
+The variable of a database's name is the name in upper case with every character that is not a letter or a digit written as `_`.  Two databases of this run have names that give one variable, as `app-v2` and `app_v2` do, so the variable cannot say which of them it is for.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC214: The databases 'app-v2' and 'app_v2' both read their connection from SQLSOURCE_CONNECTION_APP_V2
+```
+
+Give both databases their connection on the command line, `--connection app-v2=<connection string> --connection app_v2=<connection string>`, or rename one of them.  A connection on the command line for one of the two is not enough: the variable would then be read for the other alone, and a reader of the command could not tell.  The error is reported once for each of the two databases that has a query to describe, at its first such query, and those queries count as failed.
+
+## SQLSRC215
+
+**Connection names no database**
+
+`SQLSOURCE_CONNECTION` is set, and it is the connection of a run with exactly one database.  This run has more, and the database of this query has no connection of its own, so nothing says that the variable is for it.
+
+```console
+/work/App/Queries/Reports.sql(1,10): error SQLSRC215: SQLSOURCE_CONNECTION is for a run with one database, and this run has 2: postgres, reports
+    help: set SQLSOURCE_CONNECTION_POSTGRES for 'postgres' and SQLSOURCE_CONNECTION_REPORTS for 'reports', or pass --connection <name>=<connection string> for each
+```
+
+Set the variable of each database, as the `help:` line names them, or give each with `--connection`, or restrict the run to one database with `--database`.  The error stands in the place of [SQLSRC213](#sqlsrc213) and is reported as that one is: once for a database, at its first query that must be described.
+
+## SQLSRC216
+
+**No describer for the dialect**
+
+The query must be described, its dialect is one whose databases can be asked, and this version of the `sqlsource` tool has nothing that asks them.  It is not [SQLSRC209](#sqlsrc209), which is about a dialect that no version can describe.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'
+```
+
+Update the tool, with `dotnet tool update SqlSource.Tool`, to a version that describes the dialect; this version describes none.  Until then, set the output of the queries to `sql`, with `SqlSourceOutput` or an `-- output: sql` marker, to use their constants and methods without types.  The error is reported at each query that the run would have described, and each counts as failed.
+
+## SQLSRC217
+
+**Sidecar was not written**
+
+A sidecar is written whole or not at all: when every query of its `.sql` file that needs an entry was described in this run or already has a current one.  Here the run described a query of the file and could not write the result, because another query of the file has neither.  The lines under the message name each such query and say why: it `failed`, with an error of its own above, or it is `not in this run`, because `--database` or a `.sql` path left it out and its entry is missing or out of date.
+
+```console
+/work/App/Queries/Users.sql : error SQLSRC217: The sidecar of '/work/App/Queries/Users.sql' was not written, because not every query of the file has an entry
+    query: GetInvoice: not in this run
+    help: describe the whole file, or fix the queries that failed
+```
+
+Mend the queries that failed, or run `describe` without the filter that left a query out, so that every query of the file is described in one run.  The sidecar on the disk is as it was before the run.  The error is there so that a description that was not saved does not look like a success; a file that was held back with none of its queries described has only the errors of those queries.
+
+## SQLSRC218
+
+**File could not be changed**
+
+The tool could not write a sidecar, or could not delete one that its `.sql` file no longer needs.  The message says which, and ends with the reason the operating system gave.
+
+```console
+/work/App/Queries/Users.sql.json : error SQLSRC218: '/work/App/Queries/Users.sql.json' could not be written: Access to the path '/work/App/Queries/Users.sql.json' is denied.
+```
+
+Give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  A sidecar is deleted only in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided: a setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.  A sidecar that the system will not let the tool open, for lack of permission, because it is locked or because it is a directory, is not deleted either when the file beside it needs no entry: it is left as it is and nothing is said.  A sidecar is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one and never a part of either.  The rest of the run goes on.
+
 ## SQLSRC220
 
 **Project was not restored**
@@ -730,6 +813,19 @@ $ dotnet sqlsource describe
 ```
 
 Run `dotnet restore` on the solution or the project, then the command again.  In a solution every C# project is checked, one that has no SQL too: a run on a fresh checkout must not succeed by finding nothing.  A reference that keeps the package's MSBuild files out of the project, `ExcludeAssets="build"` for one, gives this error after a restore as well: remove that from the reference.
+
+## SQLSRC221
+
+**Sidecar was written by a newer tool**
+
+A sidecar, the `.sql.json` file beside a `.sql` file, says which version of the format it has.  This one has a higher version than this tool writes, so a newer `sqlsource` wrote it, and this one must not write it back down: the generator of that newer version would no longer read it.
+
+```console
+/work/App/Queries/Users.sql.json : error SQLSRC221: '/work/App/Queries/Users.sql.json' has format 2, and this tool writes format 1
+    help: update the SqlSource.Tool package
+```
+
+Update the tool, with `dotnet tool update SqlSource.Tool`, to the version of the SqlSource package the project uses.  The file is left as it is, and every query of its `.sql` file that the run was asked to describe counts as failed.  A sidecar of a lower format version, of another version of the tool, or one that cannot be read, a merge conflict for one, is no error: the tool describes its queries and writes it again.  A run that may delete a sidecar, because a file needs no entry any more, does not delete one of a higher format version either.
 
 ## SQLSRC222
 

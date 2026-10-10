@@ -3,11 +3,10 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using System.CommandLine.Invocation;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using SqlSource.Diagnostics;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool;
@@ -65,17 +64,12 @@ public static class Cli
         catch (Exception exception)
         {
             // RunAsync's catch reports to the host, and there is none.
-            new Reporter(error).Report(Failure(exception, Environment.GetEnvironmentVariable));
+            new Reporter(error).Report(UnexpectedFailure.Of(exception, Environment.GetEnvironmentVariable));
             return 1;
         }
 
         using var interrupt = new CancellationTokenSource();
-        void Cancel(object? sender, ConsoleCancelEventArgs e)
-        {
-            // The run ends by its own road, with its exit code, and not by the process being killed.
-            e.Cancel = true;
-            interrupt.Cancel();
-        }
+        void Cancel(object? sender, ConsoleCancelEventArgs e) => e.Cancel = Interrupt(interrupt);
 
         Console.CancelKeyPress += Cancel;
         try
@@ -86,6 +80,23 @@ public static class Cli
         {
             Console.CancelKeyPress -= Cancel;
         }
+    }
+
+    /// <summary>
+    /// What Ctrl+C does.  The first time, the run is cancelled and ends by its own road, with its exit code, and
+    /// the process is kept.  A second time, while the run has not ended, the process is left to be killed: a run
+    /// that waits on a database may not look at its token.
+    /// </summary>
+    /// <returns>Whether the process is kept.</returns>
+    internal static bool Interrupt(CancellationTokenSource interrupt)
+    {
+        if (interrupt.IsCancellationRequested)
+        {
+            return false;
+        }
+
+        interrupt.Cancel();
+        return true;
     }
 
     /// <summary>
@@ -140,9 +151,15 @@ public static class Cli
         {
             return 1;
         }
+        catch (DescriberFaultException fault)
+        {
+            // The error of an exception that a describer threw, already without the connection's value.
+            reporter.Report(fault.Diagnostic);
+            return 1;
+        }
         catch (Exception exception)
         {
-            reporter.Report(Failure(exception, host.GetEnvironmentVariable));
+            reporter.Report(UnexpectedFailure.Of(exception, host.GetEnvironmentVariable));
             return 1;
         }
     }
@@ -168,25 +185,6 @@ public static class Cli
         // System.CommandLine's own answer to no command is an error.
         root.SetAction(static parsed => new HelpAction().Invoke(parsed));
         return root;
-    }
-
-    private static ToolDiagnostic Failure(Exception exception, Func<string, string?> getEnvironmentVariable)
-    {
-        var failure = ToolDiagnostic.Create(
-            ToolDiagnostics.UnexpectedFailure,
-            exception.GetType().FullName ?? exception.GetType().Name,
-            exception.Message
-        );
-        if (string.IsNullOrEmpty(getEnvironmentVariable(DebugVariable)))
-        {
-            return failure;
-        }
-
-        var trace = exception
-            .ToString()
-            .Split('\n')
-            .Select(static line => new ContinuationLine("trace", line.TrimEnd('\r')));
-        return failure.WithLines([.. trace]);
     }
 
     // System.CommandLine's own action for a version reads the assembly the process started with, which under a test

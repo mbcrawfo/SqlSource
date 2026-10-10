@@ -4,8 +4,10 @@ using System.CommandLine;
 using System.Globalization;
 using System.IO;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Reporting;
 using Xunit;
 
@@ -147,7 +149,9 @@ public class CliTests
             static _ => null,
             new FakeProcessRunner(),
             "/",
-            ProcessorCount: 1
+            ProcessorCount: 1,
+            DescriberRegistry.Empty,
+            static _ => LiveExchange.Instance
         );
         var commands = new List<Command> { Cli.BuildCommands(host, new Reporter(TextWriter.Null)) };
 
@@ -291,5 +295,16 @@ public class CliTests
         public override Encoding Encoding => Encoding.UTF8;
 
         public override void Write(char value) => throw new InvalidOperationException(message);
+    }
+
+    // A run that waits on a database and does not look at its token can still be ended from the keyboard.
+    [Fact]
+    public void Interrupt_FirstTime_CancelsTheRunAndKeepsTheProcess_SecondTime_LetsTheProcessEnd()
+    {
+        using var interrupt = new CancellationTokenSource();
+
+        Cli.Interrupt(interrupt).ShouldBeTrue();
+        interrupt.IsCancellationRequested.ShouldBeTrue();
+        Cli.Interrupt(interrupt).ShouldBeFalse();
     }
 }

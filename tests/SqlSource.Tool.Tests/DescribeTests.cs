@@ -272,14 +272,37 @@ public class DescribeTests
 
     private const string Queries = "[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n";
 
+    // The released tool has no describer, so a query that must be described is SQLSRC216.
     [Fact]
-    public async Task Run_ProjectWhosePlanHasNoError_PrintsNothing()
+    public async Task Run_ProjectWithAQueryToDescribe_IsSqlsrc216AndASummaryLine()
     {
         using var run = new CliRun();
         var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
         project.Properties["SqlSourceDialect"] = "postgres";
         _ = project.AddSource("Queries.cs", Queries);
-        _ = project.AddSql("One.sql", "SELECT 1;");
+        var sql = project.AddSql("One.sql", "-- name: One\nSELECT 1;\n");
+
+        var result = await run.RunAsync("describe", project.ProjectPath);
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "postgres (postgres): 0 described, 0 skipped, 1 failed\n",
+                $"{sql}(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n"
+                    + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc216\n"
+            )
+        );
+    }
+
+    [Fact]
+    public async Task Run_ProjectWhoseQueriesNeedNoEntry_PrintsNothing()
+    {
+        using var run = new CliRun();
+        var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
+        project.Properties["SqlSourceDialect"] = "postgres";
+        project.Properties["SqlSourceOutput"] = "sql";
+        _ = project.AddSource("Queries.cs", Queries);
+        _ = project.AddSql("One.sql", "-- name: One\nSELECT 1;\n");
 
         var result = await run.RunAsync("describe", project.ProjectPath);
 

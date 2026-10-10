@@ -65,7 +65,11 @@ public class ToolDiagnosticsTests
             )
             .ShouldBe("sqlsource failed unexpectedly: System.Exception: boom");
 
-        foreach (var descriptor in ToolDiagnostics.All.Remove(ToolDiagnostics.UnexpectedFailure))
+        foreach (
+            var descriptor in ToolDiagnostics
+                .All.Remove(ToolDiagnostics.UnexpectedFailure)
+                .Remove(ToolDiagnostics.UnnamedConnectionNotUsed)
+        )
         {
             // The later arguments are for the ones that have more than one place: a format ignores an argument it
             // has no place for.
@@ -187,4 +191,80 @@ public class ToolDiagnosticsTests
                 "/work/App/User.sql"
             )
             .ShouldBe("'/work/App/User.sql' is not a .sql file that a type of the run claims");
+
+    [Fact]
+    public void DatabaseHasNoConnection_Message_HoldsTheDatabase() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DatabaseHasNoConnection.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "billing"
+            )
+            .ShouldBe("No connection is given for the database 'billing'");
+
+    [Fact]
+    public void DatabasesShareConnectionVariable_Message_HoldsBothDatabasesAndTheVariable() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DatabasesShareConnectionVariable.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "app-v2",
+                "app_v2",
+                "SQLSOURCE_CONNECTION_APP_V2"
+            )
+            .ShouldBe(
+                "The databases 'app-v2' and 'app_v2' both read their connection from SQLSOURCE_CONNECTION_APP_V2"
+            );
+
+    [Fact]
+    public void UnnamedConnectionNotUsed_Message_HoldsTheCountAndTheNames() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.UnnamedConnectionNotUsed.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "2",
+                "billing, reports"
+            )
+            .ShouldBe("SQLSOURCE_CONNECTION is for a run with one database, and this run has 2: billing, reports");
+
+    [Fact]
+    public void NoDescriberForDialect_Message_HoldsTheDialect() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.NoDescriberForDialect.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "postgres"
+            )
+            .ShouldBe("This version of sqlsource cannot describe 'postgres'");
+
+    [Fact]
+    public void SidecarOfNewerTool_Message_HoldsTheSidecarAndBothVersions() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.SidecarOfNewerTool.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/Users.sql.json",
+                "2",
+                "1"
+            )
+            .ShouldBe("'/work/Users.sql.json' has format 2, and this tool writes format 1");
+
+    [Fact]
+    public void SidecarNotWritten_Message_HoldsTheSqlFile() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.SidecarNotWritten.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/Users.sql"
+            )
+            .ShouldBe(
+                "The sidecar of '/work/Users.sql' was not written, because not every query of the file has an entry"
+            );
+
+    [Theory]
+    [InlineData("written")]
+    [InlineData("deleted")]
+    public void FileCannotBeChanged_Message_HoldsTheFileWhatWasTriedAndTheReason(string tried) =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.FileCannotBeChanged.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/Users.sql.json",
+                tried,
+                "Access is denied."
+            )
+            .ShouldBe($"'/work/Users.sql.json' could not be {tried}: Access is denied.");
 }

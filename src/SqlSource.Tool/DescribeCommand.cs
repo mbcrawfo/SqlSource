@@ -1,10 +1,13 @@
+using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.CommandLine;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Generation;
 using SqlSource.Settings;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
@@ -12,8 +15,8 @@ using SqlSource.Tool.Reporting;
 namespace SqlSource.Tool;
 
 /// <summary>
-/// The <c>describe</c> command.  After sub-phase 2.4 it finds the unit and the projects, builds the plan of the run
-/// and reports what is wrong with it.  It describes nothing yet.
+/// The <c>describe</c> command.  It finds the unit and the projects, builds the plan of the run and reports what is
+/// wrong with it, and hands the plan to <see cref="DescribeRun" />, which describes and writes.
 /// </summary>
 internal static class DescribeCommand
 {
@@ -24,6 +27,10 @@ internal static class DescribeCommand
     private const string ProjectOption = "--project";
 
     private const string DatabaseOption = "--database";
+
+    internal const string ConnectionOption = "--connection";
+
+    private const string ForceOption = "--force";
 
     public static Command Create(ToolHost host, Reporter reporter)
     {
@@ -46,28 +53,50 @@ internal static class DescribeCommand
             AllowMultipleArgumentsPerToken = false,
         };
 
-        // Accepted and checked, and not shown: it selects queries, and nothing this version prints depends on which
-        // are selected.  Sub-phase 2.5 gives it an effect and shows it.
+        // It selects queries: what is described, what is written, and what the summary counts.
         var database = new Option<string[]>(DatabaseOption)
         {
             Description = "A database to describe the queries of.  May be given several times.",
             HelpName = "name",
             Arity = ArgumentArity.OneOrMore,
             AllowMultipleArgumentsPerToken = false,
-            Hidden = true,
         };
 
-        var describe = new Command(Name, "Finds the queries of the projects that a database must describe")
+        // Always a name, "=" and a value.  CheckUsage holds each to that, and a message never repeats one.
+        var connection = new Option<string[]>(ConnectionOption)
+        {
+            Description =
+                "The connection string of a database, as <name>=<connection string>.  May be given several times.",
+            HelpName = "name=value",
+            Arity = ArgumentArity.OneOrMore,
+            AllowMultipleArgumentsPerToken = false,
+        };
+
+        var force = new Option<bool>(ForceOption)
+        {
+            Description =
+                "Describe every query of the run again, whether or not its entry is current.  The command to run "
+                + "after a change to the schema.",
+            Arity = ArgumentArity.Zero,
+        };
+
+        var describe = new Command(Name, "Asks the databases of the projects to describe their queries")
         {
             path,
             project,
             database,
+            connection,
+            force,
         };
         describe.SetAction(
             async (parsed, cancellationToken) =>
             {
                 // An error is in the reporter, where the exit code is taken.
-                _ = await PlanAsync(parsed, host, reporter, cancellationToken);
+                if (await PlanAsync(parsed, host, reporter, cancellationToken) is { } plan)
+                {
+                    await DescribeRun.RunAsync(plan, OptionsOf(parsed), host, reporter, cancellationToken);
+                }
+
                 return 0;
             }
         );
@@ -80,7 +109,10 @@ internal static class DescribeCommand
     /// </summary>
     /// <remarks>
     /// A path that ends in <c>.sql</c> is a filter and any other is the unit, of which there is one.  A value of
-    /// <c>--database</c> is a database name, by the rule of the <c>-- database:</c> marker.
+    /// <c>--database</c> is a database name, by the rule of the <c>-- database:</c> marker.  A value of
+    /// <c>--connection</c> is a name, <c>=</c> and a value, and a name is given once.  On a line with a
+    /// <c>--connection</c>, an argument that holds <c>=</c> or <c>;</c>, a <c>.sql</c> path too, is taken for the rest
+    /// of a value that the shell split: it would be printed as a path.
     /// </remarks>
     public static IReadOnlyList<string> CheckUsage(Usage usage)
     {
@@ -91,11 +123,20 @@ internal static class DescribeCommand
 
         var messages = new List<string>();
         var units = 0;
+        var connections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var hasConnection = usage.Values.Any(static value => value.Option?.Name == ConnectionOption);
         foreach (var value in usage.Values)
         {
             if (value.Option is null)
             {
-                if (!SqlPath.IsSqlFile(value.Text) && ++units > 1)
+                if (hasConnection && value.Text.AsSpan().IndexOfAny('=', ';') >= 0)
+                {
+                    messages.Add(
+                        $"sqlsource: the argument at position {value.Position} looks like a part of a connection "
+                            + $"string; put the value of '{ConnectionOption}' in quotes"
+                    );
+                }
+                else if (!SqlPath.IsSqlFile(value.Text) && ++units > 1)
                 {
                     messages.Add($"sqlsource: unexpected argument at position {value.Position}");
                 }
@@ -107,9 +148,50 @@ internal static class DescribeCommand
                         + "database name"
                 );
             }
+            else if (value.Option.Name == ConnectionOption)
+            {
+                if (!ConnectionArgument.TryParse(value.Text, out var connection))
+                {
+                    messages.Add(
+                        $"sqlsource: the value of option '{ConnectionOption}' at position {value.Position} is not "
+                            + "<name>=<connection string>"
+                    );
+                }
+                else if (!connections.Add(connection.Name))
+                {
+                    messages.Add(
+                        $"sqlsource: option '{ConnectionOption}' at position {value.Position} names a database that "
+                            + "an earlier one names"
+                    );
+                }
+            }
         }
 
         return messages;
+    }
+
+    // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
+    private static DescribeOptions OptionsOf(ParseResult parsed)
+    {
+        var paths = parsed.GetValue<string[]>(PathArgument) ?? [];
+        var projects = parsed.GetValue<string[]>(ProjectOption) ?? [];
+        var databases = parsed.GetValue<string[]>(DatabaseOption) ?? [];
+        var connections = ImmutableArray.CreateBuilder<ConnectionArgument>();
+        foreach (var text in parsed.GetValue<string[]>(ConnectionOption) ?? [])
+        {
+            connections.Add(
+                ConnectionArgument.TryParse(text, out var connection)
+                    ? connection
+                    : throw new InvalidOperationException("A --connection that is no name and value was let through.")
+            );
+        }
+
+        return new DescribeOptions(
+            parsed.GetValue<bool>(ForceOption),
+            projects.Length > 0 || databases.Length > 0 || paths.Any(SqlPath.IsSqlFile),
+            connections.ToImmutable(),
+            [.. databases.Distinct(StringComparer.OrdinalIgnoreCase)]
+        );
     }
 
     /// <summary>
@@ -117,8 +199,8 @@ internal static class DescribeCommand
     /// is nothing to plan: no unit, or no project that could be read.
     /// </summary>
     /// <remarks>
-    /// Nothing that a run prints says what it selected, so a test reads the plan from here, and sub-phase 2.5 goes
-    /// on from it.
+    /// The summary of a run prints counts for each selected database and not which queries it selected, so a test
+    /// reads the plan from here, and the run goes on from it.
     /// </remarks>
     internal static async Task<RunPlan?> PlanAsync(
         ParseResult parsed,

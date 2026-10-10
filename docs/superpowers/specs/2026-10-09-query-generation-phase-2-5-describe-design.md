@@ -47,6 +47,7 @@ Settled in this spec:
 | A sidecar on disk that cannot be read, or has a lower format version | Treated as absent, and written again | It is the tool's own file.  The usual cause of one that cannot be read is a merge conflict, and `describe` is the fix. |
 | A sidecar on disk with a higher format version | An error, `SQLSRC221`, and the file is left alone | A newer tool wrote it.  An older one must not write it back down. |
 | How a file is written | To a temporary file in the same folder, then moved over the old one | A run that is stopped leaves the old file or the new one. |
+| What a describer's text may hold | The run writes every occurrence of the database's connection value as `***` in each text of a describer that it prints, an exception's included | A driver's message for a connection string that is wrong can quote the string.  Sub-phase 2.6 does the same for the log. |
 
 ## Out of scope
 
@@ -107,6 +108,7 @@ internal interface IDescribeSession : IAsyncDisposable
 - A describer never throws for what a server or a user can cause: it returns a failure.  An exception from one is a bug, and `SQLSRC200`.
 - A describer gets the SQL as text and lexes it itself, with the generator's lexer, when it needs the lexemes.
 - `OpenRequest` is the one thing that holds a connection's value.  A describer hands it to its driver and puts it, or a part of it, in nothing it returns: not in a failure's arguments, its server lines or its help.  Sub-phase 2.6 gives a describer a log, and that log removes the value from what it is given.
+- The run does not rely on that rule.  Before a text that a describer gave is printed, every occurrence of the database's connection value in it is written as `***`: a failure's arguments, server lines and help, the server's version and the driver of the `query:` line, and the message and the trace of an exception, which is `SQLSRC200` with the type of the exception that was thrown.  The whole value is replaced and nothing less: the tool does not read a connection string, so it knows no part of one.
 - `DescriberRegistry` maps a `SqlDialect` to its describer.  `ToolHost` gains `Describers`; the real host's is empty in this sub-phase.
 
 ### The exchange
@@ -159,7 +161,7 @@ A parameter in the description that the query's list does not hold is a bug in t
 - **The variable of a name** is the name in upper case, in the invariant culture, with every character that is not a letter or a digit replaced by `_`: `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  A variable that is empty is not set.
 - **A database's connection** is the first of: the command line's value for its name, ignoring case; its variable; and `SQLSOURCE_CONNECTION`, when the run has exactly one selected database.
 - **A name on the command line that is no selected database** is not an error: a script may give every connection it has.  The `help:` line of `SQLSRC213` lists such names, so that a misspelt one is seen.
-- **Two selected databases whose names give one variable**, where either has no value on the command line, are `SQLSRC214`.
+- **Two selected databases whose names give one variable**, where at least one of them has no value on the command line, are `SQLSRC214`, and neither has a connection: the one with a value on the command line as well.
 - **`SQLSOURCE_CONNECTION` with more than one selected database** is not used.  A database to describe that has no other connection gets `SQLSRC215` in place of `SQLSRC213`.
 
 The connection of every selected database is looked up, since the summary says which have none.  A missing one is an error only for a database to describe.
@@ -170,7 +172,7 @@ The tool passes a value to the describer and to nothing else.  What it may say a
 
 `describe`, after the plan of sub-phase 2.4:
 
-**1. Read what is there.**  For each `Ready` file with a query that needs an entry, the sidecar beside it, if any, through `SidecarReader`.
+**1. Read what is there.**  For each `Ready` file with a selected query that needs an entry, the sidecar beside it, if any, through `SidecarReader`.  The sidecar of any other file is not read.
 
 | The sidecar | Is |
 |----|----|
@@ -182,16 +184,18 @@ The tool passes a value to the describer and to nothing else.  What it may say a
 
 | The query | Decision |
 |----|----|
-| Has a problem from the plan, or failed in step 1 | Failed |
+| Has a problem from the plan, is in a file that is not `Ready`, or failed in step 1 | Failed |
 | Is selected, and `--force` is given | Describe |
 | Has a current entry: the sidecar is usable and `IsCurrentFor(hash, database)` holds for the entry of its name | Skip, and keep the entry |
 | Is selected | Describe |
 | Otherwise | Left out: it is not selected and has no current entry |
 
+A query of a file that is not `Ready` gets no error here: the plan's stands, as the spec of sub-phase 2.4 says, and the query never reaches `SQLSRC216`.
+
 **3. Describe**, database by database in the plan's order, for each database to describe.  The first of these that holds is reported once, at the database's first query to describe, and its queries to describe fail:
 
 - No describer is registered for its dialect, `SQLSRC216`.  This one is reported at each such query, as the epic says.
-- `SQLSRC214`, for the second of the pair in the plan's order as well as the first.
+- `SQLSRC214`, once at each database of the pair that has a query to describe.
 - No connection: `SQLSRC215` when `SQLSOURCE_CONNECTION` is set and was not used, and `SQLSRC213` otherwise.
 - `OpenAsync` returns a failure.
 
@@ -208,6 +212,8 @@ Otherwise each query is described in the plan's order.  A failure is reported at
 
 A file that is not `Ready` is not touched.  An entry for a query that no longer exists is not in a target, so writing drops it.  A sidecar with no `.sql` file beside it, or beside a file no type claims, is not looked at.
 
+The plan's filters do not hold `--project`, so the command says whether the run has one.
+
 The steps are kept apart in the code: one that gives each file's outcome with its target, and one that applies the outcomes to the disk.  Sub-phase 2.6 compares where this one writes.
 
 **5. Summarise.**  For each selected database, and for each name given with `--database`, one line on standard output:
@@ -217,7 +223,7 @@ The steps are kept apart in the code: one that gives each file's outcome with it
 <name> (<engine>): no connection, <n> skipped
 ```
 
-The counts are of selected queries that need an entry.  The second form is for a database with no connection and nothing to describe.  A database that `--database` names and no query has shows three zeros and no engine.
+The counts are of selected queries that need an entry.  The second form is for a database with no connection, nothing to describe and no query that failed; one with a failed query has the first form.  A name that `--database` gives and no selected query has shows three zeros: with its engine when it is a database of the plan, and with no engine otherwise.
 
 **6. Exit** `1` when anything was reported, and `0` otherwise.
 
@@ -244,9 +250,9 @@ In `ToolDiagnostics`, with the four places each needs.
 | `SQLSRC214` | Two databases share a connection variable | `The databases '{0}' and '{1}' both read their connection from {2}` | The two names; the variable |
 | `SQLSRC215` | Connection names no database | `SQLSOURCE_CONNECTION is for a run with one database, and this run has {0}: {1}` | The count; the names |
 | `SQLSRC216` | No describer for the dialect | `This version of sqlsource cannot describe '{0}'` | The dialect's name |
-| `SQLSRC217` | Sidecar was not written | `The sidecar of '{0}' was not written, because not every query of the file has an entry` | The `.sql` file's name |
-| `SQLSRC218` | File could not be changed | `'{0}' could not be {1}: {2}` | The file; `written` or `deleted`; the system's message |
-| `SQLSRC221` | Sidecar was written by a newer tool | `'{0}' has format {1}, and this tool writes format {2}` | The sidecar; its version; the tool's |
+| `SQLSRC217` | Sidecar was not written | `The sidecar of '{0}' was not written, because not every query of the file has an entry` | The `.sql` file's full path |
+| `SQLSRC218` | File could not be changed | `'{0}' could not be {1}: {2}` | The file's full path; `written` or `deleted`; the system's message |
+| `SQLSRC221` | Sidecar was written by a newer tool | `'{0}' has format {1}, and this tool writes format {2}` | The sidecar's full path; its version; the tool's |
 
 `SQLSRC213` has a `help:` line that names the option and the variable, and the names `--connection` gave that are no selected database.  `SQLSRC215` has one that names the variable of each database.  `SQLSRC217` has one: describe the whole file, or fix the queries that failed.  `SQLSRC221` has one: update the `SqlSource.Tool` package.  `SQLSRC221` is out of the order of the others because it was added after the ids up to `SQLSRC220` were given out.
 
@@ -273,17 +279,20 @@ The describer of the tests, `FakeDescriber`, is given a description or a failure
 | `SampleSqlTests` | No token; a default; an empty default; one token twice; a default from a `-- token:` marker |
 | `EntryBuilderTests` | Each row of the table of an entry.  A parameter the description lacks; one it gives in another case; a declared-only parameter; `nullable` for `null`, `not null` and neither.  A parameter the list lacks throws |
 | `ConnectionTests` | Each of the three sources, and each winning over the ones below it.  The variable of a name with `-`, `.`, `_` and a letter outside ASCII.  A name in another case.  A value that holds `=`.  `--connection` with no `=`, with an empty name, with a name that is no name, with an empty value, and twice for one name: each a wrong command line whose message does not hold what was given.  A name that is no selected database: no error, and it is in the help of `SQLSRC213`.  `SQLSOURCE_CONNECTION` with one selected database, and with two.  Two names with one variable: both from the environment, one on the command line, and both on the command line.  An empty variable |
-| `DescribeRunTests` | Each row of the table of decisions.  A second run describes and writes nothing.  A changed query, a changed `-- param:`, a changed default, a changed database: described again.  A sidecar of another tool version, of a lower format version, and one that cannot be read: every query described.  One of a higher format version: `SQLSRC221`, the file is byte for byte as it was, and its queries are failed.  `--force`.  A failure in one query: the others are described, the file is not written, `SQLSRC217` names it.  A failure to open: once for the database.  No connection with every query current: no error, and the summary says so; with one stale: `SQLSRC213` once |
+| `DescribeRunTests` | Each row of the table of decisions.  A second run describes and writes nothing.  A changed query, a changed `-- param:`, a changed default, a changed database: described again.  A sidecar of another tool version, of a lower format version, and one that cannot be read: every query described.  One of a higher format version: `SQLSRC221`, the file is byte for byte as it was, and its queries are failed.  `--force`.  A failure in one query: the others are described, the file is not written, `SQLSRC217` names it.  A failure to open: once for the database.  No connection with every query current: no error, and the summary says so; with one stale: `SQLSRC213` once.  A query of a file that is not `Ready`: failed, with no error but the plan's, and no `SQLSRC216` |
 | `SidecarStoreTests` | A file is written, unchanged, and deleted.  An entry of a deleted query is dropped.  A file with `\r\n` and the same content is not written again.  A folder that cannot be written gives `SQLSRC218` and leaves no temporary file.  A file that is not `Ready` is not touched |
 | `FilterRunTests` | `--database` with the other database's entries current: a mixed file is written.  With one of them stale: not written, `SQLSRC217` with `not in this run`.  A file whose queries all belong to the other database is not read, written or deleted.  A file that needs no entry keeps its sidecar under each of the three filters, and loses it without one.  A file filter.  `--project` |
-| `SummaryTests` | Each form of the line; the counts; a `--database` name that no query has |
-| `SecretTests` | A run whose connection value holds a marker word, from the command line and from each variable, with errors of every kind of this spec: neither writer holds the word.  The same for `--connection=`, `--connection:`, and a misspelt `--conection` followed by the value, which sub-phase 2.2's rule for an unknown option stops |
+| `SummaryTests` | Each form of the line; the counts; no connection with a failed query; a `--database` name that no query has, and one of the plan that no selected query has |
+| `SecretTests` | A run whose connection value holds a marker word, from the command line and from each variable, with errors of every kind of this spec: neither writer holds the word.  The same for `--connection=`, `--connection:`, and a misspelt `--conection` followed by the value, which sub-phase 2.2's rule for an unknown option stops.  A describer that throws an exception whose message holds the value, and one that returns it in a failure's arguments, server lines and help and in its server's version: `***` stands in each place, with `SQLSOURCE_DEBUG` set as without |
+
+The tests of sub-phase 2.4 that expect a run with a query that needs an entry to print nothing now expect `SQLSRC216` and a summary line.
 
 ## Documentation
 
-- `src/SqlSource.Tool/AGENTS.md`: a describer returns failures and never throws; every call to an engine goes through the exchange; a connection's value goes to the describer and nowhere else, and `SecretTests` holds the tool to that; a sidecar is written whole, through the store; the two steps of the run stay apart; a filter narrows what a run may change.
+- `src/SqlSource.Tool/AGENTS.md`: a describer returns failures and never throws; every call to an engine goes through the exchange; a connection's value goes to the describer and nowhere else, and `SecretTests` holds the tool to that; a sidecar is written whole, through the store; the two steps of the run stay apart; a filter narrows what a run may change; a text of a describer is printed with the connection's value removed.  The rule that the tool writes nothing into a project gains its one exception, the sidecars.
+- `src/SqlSource.Tool/README.md`: what `describe` does now, `--connection` and the two variables, `--force` and `--database`, and that this version has no describer.  `describe --help` shows `--database`, `--connection` and `--force`.
 - `docs/diagnostics.md`: `SQLSRC213` to `SQLSRC218`, and `SQLSRC221`.
-- `README.md`, `CONTRIBUTING.md` and `docs/publishing.md`: nothing in them changes.
+- The repository's `README.md`, `CONTRIBUTING.md` and `docs/publishing.md`: nothing in them changes.
 - `docs/tech-debt` and `docs/deferred`: nothing is expected.
 - The epic outline: in steps 1 and 9.
 

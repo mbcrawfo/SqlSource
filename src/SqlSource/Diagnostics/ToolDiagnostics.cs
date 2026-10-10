@@ -158,6 +158,72 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor DatabaseHasNoConnection = new(
+        id: "SQLSRC213",
+        title: "Database has no connection",
+        messageFormat: "No connection is given for the database '{0}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc213",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor DatabasesShareConnectionVariable = new(
+        id: "SQLSRC214",
+        title: "Two databases share a connection variable",
+        messageFormat: "The databases '{0}' and '{1}' both read their connection from {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc214",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor UnnamedConnectionNotUsed = new(
+        id: "SQLSRC215",
+        title: "Connection names no database",
+        messageFormat: "SQLSOURCE_CONNECTION is for a run with one database, and this run has {0}: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc215",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor NoDescriberForDialect = new(
+        id: "SQLSRC216",
+        title: "No describer for the dialect",
+        messageFormat: "This version of sqlsource cannot describe '{0}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc216",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SidecarNotWritten = new(
+        id: "SQLSRC217",
+        title: "Sidecar was not written",
+        messageFormat: "The sidecar of '{0}' was not written, because not every query of the file has an entry",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc217",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor FileCannotBeChanged = new(
+        id: "SQLSRC218",
+        title: "File could not be changed",
+        messageFormat: "'{0}' could not be {1}: {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc218",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ProjectNotRestored = new(
         id: "SQLSRC220",
         title: "Project was not restored",
@@ -166,6 +232,17 @@ internal static class ToolDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc220",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SidecarOfNewerTool = new(
+        id: "SQLSRC221",
+        title: "Sidecar was written by a newer tool",
+        messageFormat: "'{0}' has format {1}, and this tool writes format {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc221",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -209,7 +286,14 @@ internal static class ToolDiagnostics
             TokenHasNoDefault,
             DatabaseHasTwoDialects,
             FileNotInRun,
+            DatabaseHasNoConnection,
+            DatabasesShareConnectionVariable,
+            UnnamedConnectionNotUsed,
+            NoDescriberForDialect,
+            SidecarNotWritten,
+            FileCannotBeChanged,
             ProjectNotRestored,
+            SidecarOfNewerTool,
             DirectoryCannotBeRead,
             SolutionCannotBeRead
         );
