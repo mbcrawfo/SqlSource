@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 using Xunit;
@@ -20,6 +21,12 @@ internal sealed class CliRun : IDisposable
 
     // Answers every "dotnet msbuild" of the run.  A project it was told nothing about uses SqlSource.
     public FakeProcessRunner Processes { get; } = new();
+
+    // The describers of the run.  None, as in the released tool, unless a test adds one.
+    public List<IQueryDescriber> Describers { get; } = [];
+
+    // Every database of the run calls through this one.
+    public RecordingExchange Exchange { get; } = new();
 
     // Set to stand in for standard output, for a test of a writer that fails.
     public TextWriter? Out { get; init; }
@@ -74,6 +81,8 @@ internal sealed class CliRun : IDisposable
             name => Environment.GetValueOrDefault(name),
             Processes,
             Folder.CreateFolder("tmp"),
-            ProcessorCount: 4
+            ProcessorCount: 4,
+            new DescriberRegistry(Describers),
+            _ => Exchange
         );
 }

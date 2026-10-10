@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Processes;
 
 namespace SqlSource.Tool.Tests;
@@ -22,7 +23,9 @@ internal static class Hosts
             name => environment?.GetValueOrDefault(name),
             processes,
             tempDirectory,
-            processorCount
+            processorCount,
+            DescriberRegistry.Empty,
+            static _ => LiveExchange.Instance
         );
 
     // The environment of the test process, for a run of the real "dotnet".
@@ -34,6 +37,8 @@ internal static class Hosts
             Environment.GetEnvironmentVariable,
             new ProcessRunner(),
             tempDirectory,
-            Environment.ProcessorCount
+            Environment.ProcessorCount,
+            DescriberRegistry.Empty,
+            static _ => LiveExchange.Instance
         );
 }

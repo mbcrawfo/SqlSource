@@ -13,6 +13,11 @@
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
+        <!-- Release tracking for the one descriptor the tests bring themselves: FakeDescriber.Rejected (RS2008). -->
+        <AdditionalFiles Include="AnalyzerReleases.Shipped.md" />
+        <AdditionalFiles Include="AnalyzerReleases.Unshipped.md" />
+    </ItemGroup>
+    <ItemGroup>
         <!--
             Fixtures/Projects holds projects that the tests run "dotnet msbuild" on.  They are no code of this
             project.  Fixtures/FixtureProjects.cs copies one out of the repository before it is used, with the

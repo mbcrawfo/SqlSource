@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Processes;
 
 namespace SqlSource.Tool;
@@ -15,6 +16,8 @@ namespace SqlSource.Tool;
 /// <param name="Processes">Runs every program the tool starts.</param>
 /// <param name="TempDirectory">The full path of the directory the tool makes its temporary folders in.</param>
 /// <param name="ProcessorCount">How many processors the machine has, which bounds what the tool runs at once.</param>
+/// <param name="Describers">The describers of the run, by dialect.</param>
+/// <param name="Exchange">Gives the exchange that the describer of a database, by its name, calls through.</param>
 internal sealed record ToolHost(
     TextWriter Out,
     TextWriter Error,
@@ -22,12 +25,14 @@ internal sealed record ToolHost(
     Func<string, string?> GetEnvironmentVariable,
     IProcessRunner Processes,
     string TempDirectory,
-    int ProcessorCount
+    int ProcessorCount,
+    DescriberRegistry Describers,
+    Func<string, IDescribeExchange> Exchange
 )
 {
     /// <summary>
     /// The host of a real run: the console, the current directory, the environment and the processes of the
-    /// machine.
+    /// machine.  It has no describer yet: phase 3 registers the first.
     /// </summary>
     public static ToolHost Create() =>
         new(
@@ -37,6 +42,8 @@ internal sealed record ToolHost(
             Environment.GetEnvironmentVariable,
             new ProcessRunner(),
             Path.GetTempPath(),
-            Environment.ProcessorCount
+            Environment.ProcessorCount,
+            DescriberRegistry.Empty,
+            static _ => LiveExchange.Instance
         );
 }

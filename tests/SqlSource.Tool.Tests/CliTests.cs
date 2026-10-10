@@ -6,6 +6,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Reporting;
 using Xunit;
 
@@ -147,7 +148,9 @@ public class CliTests
             static _ => null,
             new FakeProcessRunner(),
             "/",
-            ProcessorCount: 1
+            ProcessorCount: 1,
+            DescriberRegistry.Empty,
+            static _ => LiveExchange.Instance
         );
         var commands = new List<Command> { Cli.BuildCommands(host, new Reporter(TextWriter.Null)) };
 
