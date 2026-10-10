@@ -57,8 +57,10 @@ internal static class RunPlanner
             files.Add(PlanFile(work, errors, cancellationToken));
         }
 
+        var databases = AssignDatabases(files, errors);
+
         return new RunPlanResult(
-            new RunPlan(new EquatableArray<PlannedFile>([.. files]), EquatableArray<PlannedDatabase>.Empty),
+            new RunPlan(new EquatableArray<PlannedFile>([.. files]), databases),
             new EquatableArray<ToolDiagnostic>(errors.ToImmutable())
         );
     }
@@ -314,6 +316,99 @@ internal static class RunPlanner
         }
 
         return greatest;
+    }
+
+    // The databases of the run, in the order the plan first holds a query of each.  Names are compared ignoring
+    // case, and every query gets the first spelling.  A database has the dialect of its first query in a file that
+    // can be described: a file that cannot gives it none, since SQLSRC209 is that file's error.  A query of the
+    // database in a file of another dialect has a problem, and its file's first such query is SQLSRC211.
+    private static EquatableArray<PlannedDatabase> AssignDatabases(
+        List<PlannedFile> files,
+        ImmutableArray<ToolDiagnostic>.Builder errors
+    )
+    {
+        var names = new List<string>();
+        var known = new Dictionary<string, DatabaseWork>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in files)
+        {
+            foreach (var query in file.Queries)
+            {
+                if (query.Database is not { } name)
+                {
+                    continue;
+                }
+
+                if (!known.TryGetValue(name, out var database))
+                {
+                    database = new DatabaseWork(name, file.Dialect);
+                    known.Add(name, database);
+                    names.Add(name);
+                }
+
+                if (database.File is null && file.State == PlannedFileState.Ready)
+                {
+                    database.Dialect = file.Dialect;
+                    database.File = file.Path;
+                }
+            }
+        }
+
+        for (var index = 0; index < files.Count; index++)
+        {
+            var file = files[index];
+            HashSet<string>? reported = null;
+            var queries = ImmutableArray.CreateBuilder<PlannedQuery>(file.Queries.Count);
+            foreach (var query in file.Queries)
+            {
+                if (query.Database is not { } name)
+                {
+                    queries.Add(query);
+                    continue;
+                }
+
+                var database = known[name];
+                var problems = query.Problems;
+                if (
+                    file.State == PlannedFileState.Ready
+                    && database.File is { } firstFile
+                    && database.Dialect != file.Dialect
+                )
+                {
+                    problems |= QueryProblems.DatabaseDialectConflict;
+                    if ((reported ??= [with(StringComparer.OrdinalIgnoreCase)]).Add(name))
+                    {
+                        errors.Add(
+                            ToolDiagnostic.At(
+                                ToolDiagnostics.DatabaseHasTwoDialects,
+                                query.Query.NameLocation,
+                                database.Name,
+                                SqlDialectName.Canonical(file.Dialect),
+                                SqlDialectName.Canonical(database.Dialect),
+                                firstFile
+                            )
+                        );
+                    }
+                }
+
+                queries.Add(query with { Database = database.Name, Problems = problems });
+            }
+
+            files[index] = file with { Queries = new EquatableArray<PlannedQuery>(queries.MoveToImmutable()) };
+        }
+
+        return new EquatableArray<PlannedDatabase>([
+            .. names.Select(name => new PlannedDatabase(known[name].Name, known[name].Dialect)),
+        ]);
+    }
+
+    // A database while the plan is made.  File is the first file that can be described and holds a query of it.
+    private sealed class DatabaseWork(string name, SqlDialect dialect)
+    {
+        public string Name => name;
+
+        public SqlDialect Dialect { get; set; } = dialect;
+
+        public string? File { get; set; }
     }
 
     // One claimed file as one project sees it.

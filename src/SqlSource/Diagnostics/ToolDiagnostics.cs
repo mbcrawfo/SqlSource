@@ -136,6 +136,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor DatabaseHasTwoDialects = new(
+        id: "SQLSRC211",
+        title: "Database has two dialects",
+        messageFormat: "The database '{0}' has the dialect '{1}' here and '{2}' in '{3}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc211",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ProjectNotRestored = new(
         id: "SQLSRC220",
         title: "Project was not restored",
@@ -185,6 +196,7 @@ internal static class ToolDiagnostics
             AttributeArgumentNotLiteral,
             OutputNeedsDescribableDialect,
             TokenHasNoDefault,
+            DatabaseHasTwoDialects,
             ProjectNotRestored,
             DirectoryCannotBeRead,
             SolutionCannotBeRead

@@ -67,12 +67,15 @@ public class ToolDiagnosticsTests
 
         foreach (var descriptor in ToolDiagnostics.All.Remove(ToolDiagnostics.UnexpectedFailure))
         {
-            // The second argument is for the one that has two: a format ignores an argument it has no place for.
+            // The later arguments are for the ones that have more than one place: a format ignores an argument it
+            // has no place for.
             string.Format(
                     CultureInfo.InvariantCulture,
                     descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
                     "/work/app",
-                    "the reason"
+                    "the reason",
+                    "a third",
+                    "a fourth"
                 )
                 .ShouldContain("'/work/app'", Case.Sensitive, descriptor.Id);
         }
@@ -163,4 +166,16 @@ public class ToolDiagnosticsTests
                 "The token 'where' has no default.  A query whose output is 'models' is described with a sample in "
                     + "its place."
             );
+
+    [Fact]
+    public void DatabaseHasTwoDialects_Message_HoldsTheDatabaseTheTwoDialectsAndTheOtherFile() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DatabaseHasTwoDialects.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "main",
+                "mssql",
+                "postgres",
+                "/work/App/Users.sql"
+            )
+            .ShouldBe("The database 'main' has the dialect 'mssql' here and 'postgres' in '/work/App/Users.sql'");
 }

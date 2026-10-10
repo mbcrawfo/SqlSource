@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0033`
+Next id: `TD-0034`
 
 ## Active items
 
@@ -28,6 +28,7 @@ Next id: `TD-0033`
 | [TD-0030](TD-0030-project-option-through-a-symbolic-link-is-not-found.md) | Open | 2026-10-10 | Low | A full path given to `--project` through a symbolic link to the working directory is `SQLSRC207`: paths are compared as text |
 | [TD-0031](TD-0031-attribute-reader-of-the-tool-is-syntax-only.md) | Open | 2026-10-10 | Low | The `sqlsource` tool reads `[SqlSourceGenerate]` as syntax: an alias for the attribute is not seen, a type of the same name is taken for it, and an attribute inside `#if` is read under the configuration of the manifest alone |
 | [TD-0032](TD-0032-sql-file-that-is-not-utf-8-is-hashed-differently.md) | Open | 2026-10-10 | Low | A `.sql` file that is not UTF-8 is read with replacement characters by the `sqlsource` tool and in a fallback code page by the compiler, so the hash of a query that holds such a character differs between the two |
+| [TD-0033](TD-0033-sql-file-that-two-projects-list-has-one-sidecar.md) | Open | 2026-10-10 | Low | A `.sql` file that two projects list is planned under the first that claims it, so the second's dialect and database are not used, and a run on one of the two sees the needs of that one alone |
 
 ## Columns
 

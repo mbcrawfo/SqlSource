@@ -279,4 +279,131 @@ public sealed class RunPlannerErrorTests : IDisposable
         errors.Count.ShouldBe(2);
         errors.Select(error => error.Arguments).ShouldAllBe(arguments => arguments.Contains(named));
     }
+
+    private const string InMain = "-- database: main\n";
+
+    [Fact]
+    public void Plan_DatabaseWithTwoDialectsInTwoFiles_IsSqlsrc211AtTheFirstQueryOfTheSecondFile()
+    {
+        var project = Project();
+        var first = project.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n");
+        var second = project.AddSql(
+            "Q/B.sql",
+            InMain
+                + "-- name: Plain\n-- output: sql\nSELECT 0;\n\n-- name: Two\nSELECT 2;\n\n-- name: Three\nSELECT 3;\n",
+            ("SqlSourceDialect", "mssql")
+        );
+
+        var result = Plan(project);
+
+        result.Errors.ShouldBe([
+            ToolDiagnostic.At(
+                ToolDiagnostics.DatabaseHasTwoDialects,
+                second,
+                new LinePosition(5, Name.Length),
+                "main",
+                "mssql",
+                "postgres",
+                first
+            ),
+        ]);
+        result.Plan.Databases.ShouldBe([new PlannedDatabase("main", SqlDialect.PostgreSql)]);
+        result.Plan.Files[0].Queries.Select(query => query.Problems).ShouldBe([QueryProblems.None]);
+        result.Plan.Files[1].State.ShouldBe(PlannedFileState.Ready);
+        result
+            .Plan.Files[1]
+            .Queries.Select(query => query.Problems)
+            .ShouldBe([
+                QueryProblems.None,
+                QueryProblems.DatabaseDialectConflict,
+                QueryProblems.DatabaseDialectConflict,
+            ]);
+    }
+
+    [Fact]
+    public void Plan_DatabaseWithTwoDialectsInTwoProjects_IsSqlsrc211InTheSecond()
+    {
+        var first = Project("A");
+        var firstFile = first.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n");
+        var second = Project("B", dialect: "mssql");
+        var secondFile = second.AddSql("Q/B.sql", InMain + "-- name: Two\nSELECT 2;\n");
+
+        var error = Plan(first, second).Errors.ShouldHaveSingleItem();
+
+        error.Descriptor.ShouldBe(ToolDiagnostics.DatabaseHasTwoDialects);
+        error.Path.ShouldBe(secondFile);
+        error.Arguments.ShouldBe(["main", "mssql", "postgres", firstFile]);
+    }
+
+    [Fact]
+    public void Plan_FileOfAnotherDialectWhoseQueriesAreAllSql_GivesItsDatabaseNoSecondDialect()
+    {
+        var project = Project();
+        _ = project.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n");
+        _ = project.AddSql(
+            "Q/B.sql",
+            InMain + "-- output: sql\n-- name: Two\nSELECT 2;\n",
+            ("SqlSourceDialect", "mssql")
+        );
+
+        Plan(project).Errors.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Plan_FileThatCannotBeDescribed_GivesItsDatabaseNoDialectAndGetsSqlsrc209Alone()
+    {
+        var project = Project();
+        // The first file of the database in the plan's order is the one that cannot be described.
+        _ = project.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n", ("SqlSourceDialect", "ansi"));
+        _ = project.AddSql("Q/B.sql", InMain + "-- name: Two\nSELECT 2;\n");
+
+        var result = Plan(project);
+
+        result.Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC209"]);
+        result.Plan.Databases.ShouldBe([new PlannedDatabase("main", SqlDialect.PostgreSql)]);
+        result.Plan.Files.SelectMany(file => file.Queries).ShouldAllBe(query => query.Problems == QueryProblems.None);
+    }
+
+    [Fact]
+    public void Plan_DatabaseWhoseFilesCanNoneBeDescribed_HasTheDialectOfItsFirstQuery()
+    {
+        var project = Project(dialect: "ansi");
+        _ = project.AddSql("Q/A.sql", "-- name: One\nSELECT 1;\n");
+
+        Plan(project).Plan.Databases.ShouldBe([new PlannedDatabase("ansi", SqlDialect.Ansi)]);
+    }
+
+    [Fact]
+    public void Plan_QueryWithATokenWithoutADefaultInADatabaseOfAnotherDialect_HasBothProblems()
+    {
+        var project = Project();
+        _ = project.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n");
+        _ = project.AddSql("Q/B.sql", InMain + "-- name: Two\nSELECT 2 {{tail}};\n", ("SqlSourceDialect", "mssql"));
+
+        var result = Plan(project);
+
+        result.Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC210", "SQLSRC211"]);
+        result
+            .Plan.Files[1]
+            .Queries.ShouldHaveSingleItem()
+            .Problems.ShouldBe(QueryProblems.TokenWithoutDefault | QueryProblems.DatabaseDialectConflict);
+    }
+
+    [Fact]
+    public void Plan_FileWithQueriesOfTwoDatabasesOfAnotherDialect_IsSqlsrc211ForEachDatabase()
+    {
+        var project = Project();
+        _ = project.AddSql(
+            "Q/A.sql",
+            "-- name: One\n-- database: one\nSELECT 1;\n\n-- name: Two\n-- database: two\nSELECT 2;\n"
+        );
+        _ = project.AddSql(
+            "Q/B.sql",
+            "-- name: Three\n-- database: ONE\nSELECT 3;\n\n-- name: Four\n-- database: two\nSELECT 4;\n\n"
+                + "-- name: Five\n-- database: one\nSELECT 5;\n",
+            ("SqlSourceDialect", "mssql")
+        );
+
+        Plan(project).Errors.Select(error => error.Arguments[0]).ShouldBe(["one", "two"]);
+    }
 }

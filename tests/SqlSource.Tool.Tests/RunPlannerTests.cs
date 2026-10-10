@@ -278,4 +278,92 @@ public sealed class RunPlannerTests : IDisposable
 
         Plan(project).Plan.Files.ShouldHaveSingleItem().Path.ShouldBe(first);
     }
+
+    [Fact]
+    public void Plan_SeveralProjects_HasTheFilesOfEachInTheOrderOfTheProjects()
+    {
+        var first = Postgres("Zeta");
+        _ = first.AddSource("Queries.cs", Type("Queries"));
+        var z = first.AddSql("Z.sql", "SELECT 1;");
+        var second = Postgres("Alpha");
+        _ = second.AddSource("Queries.cs", Type("Queries"));
+        var a = second.AddSql("A.sql", "SELECT 1;");
+
+        var files = Plan(first, second).Plan.Files;
+
+        files.Select(file => (file.Path, file.ProjectPath)).ShouldBe([(z, first.ProjectPath), (a, second.ProjectPath)]);
+    }
+
+    [Fact]
+    public void Plan_FileThatTwoProjectsClaim_IsPlannedOnceUnderTheFirstAndNeedsWhatEitherNeeds()
+    {
+        var shared = _folder.WriteFile("Shared/One.sql", "SELECT 1;");
+        var first = Postgres("A");
+        first.Properties["SqlSourceOutput"] = "sql";
+        _ = first.AddSource("Queries.cs", Type("Queries", "Path = \"../Shared\""));
+        first.ListSql(shared);
+        var second = Postgres("B");
+        _ = second.AddSource("Queries.cs", Type("Queries", "Path = \"../Shared\""));
+        second.ListSql(shared);
+
+        var file = Plan(first, second).Plan.Files.ShouldHaveSingleItem();
+
+        file.ProjectPath.ShouldBe(first.ProjectPath);
+        file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Plan_FileThatTheFirstProjectListsAndTheSecondClaims_IsPlannedUnderTheSecond()
+    {
+        var shared = _folder.WriteFile("Shared/One.sql", "SELECT 1;");
+        var first = Postgres("A");
+        _ = first.AddSource("Queries.cs", Type("Queries"));
+        _ = first.AddSql("Own.sql", "SELECT 1;");
+        first.ListSql(shared);
+        var second = Postgres("B");
+        second.Properties["SqlSourceDialect"] = "mssql";
+        _ = second.AddSource("Queries.cs", Type("Queries", "Path = \"../Shared\""));
+        second.ListSql(shared);
+
+        var file = Plan(first, second).Plan.Files.Single(file => file.Path == shared);
+
+        file.ProjectPath.ShouldBe(second.ProjectPath);
+        file.Dialect.ShouldBe(SqlDialect.SqlServer);
+    }
+
+    [Fact]
+    public void Plan_Databases_AreThoseOfTheQueriesThatNeedAnEntryInTheOrderOfThePlan()
+    {
+        var project = Postgres();
+        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSql("A.sql", "-- name: One\nSELECT 1;\n\n-- name: Plain\n-- output: sql\nSELECT 0;\n");
+        _ = project.AddSql("B.sql", "SELECT 2;", ("SqlSourceDialect", "mssql"));
+        _ = project.AddSql("C.sql", "-- output: sql\n-- database: unused\n-- name: Three\nSELECT 3;\n");
+
+        var result = Plan(project);
+
+        result.Errors.ShouldBeEmpty();
+        result.Plan.Databases.ShouldBe([
+            new PlannedDatabase("postgres", SqlDialect.PostgreSql),
+            new PlannedDatabase("mssql", SqlDialect.SqlServer),
+        ]);
+    }
+
+    [Fact]
+    public void Plan_DatabaseNamesThatDifferInCase_AreOneDatabaseInItsFirstSpelling()
+    {
+        var project = Postgres();
+        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSql("A.sql", "-- database: Billing\n-- name: One\nSELECT 1;\n");
+        _ = project.AddSql("B.sql", "-- database: BILLING\n-- name: Two\nSELECT 2;\n");
+
+        var result = Plan(project);
+
+        result.Errors.ShouldBeEmpty();
+        result.Plan.Databases.ShouldBe([new PlannedDatabase("Billing", SqlDialect.PostgreSql)]);
+        result
+            .Plan.Files.SelectMany(file => file.Queries)
+            .Select(query => query.Database)
+            .ShouldBe(["Billing", "Billing"]);
+    }
 }

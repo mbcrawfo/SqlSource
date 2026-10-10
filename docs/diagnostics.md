@@ -47,6 +47,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC208](#sqlsrc208) | Attribute argument is not a literal |
 | [SQLSRC209](#sqlsrc209) | Output needs a dialect that can be described |
 | [SQLSRC210](#sqlsrc210) | Token has no default |
+| [SQLSRC211](#sqlsrc211) | Database has two dialects |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
@@ -689,6 +690,18 @@ SELECT id, name FROM users {{where}};
 ```
 
 Give the token a default where it stands, `{{where:WHERE deleted_at IS NULL}}`, or once for the query with a marker, `-- token: {{where:WHERE deleted_at IS NULL}}`.  An empty default, `{{where:}}`, describes the query with nothing there.  The default is a sample for describing and nothing else: the generated method still takes the token as an argument.  The error is reported once for each token without a default, at the name of its query.
+
+## SQLSRC211
+
+**Database has two dialects**
+
+Each query that is described belongs to one logical database: the one its `-- database:` marker names, or else the `SqlSourceDatabase` metadata of its file, or else the property of that name, or else the name of its file's dialect.  A name is one database across the whole run, with one connection, and the dialect picks the driver of that connection.  Here two files give one name two dialects.  Names are compared ignoring case.
+
+```console
+/work/App/Queries/Reports.sql(1,10): error SQLSRC211: The database 'main' has the dialect 'mssql' here and 'postgres' in '/work/App/Queries/Users.sql'
+```
+
+Give the queries of one of the two files another database, or the dialect of the other file.  The database keeps the dialect of the first file that names it, in the order of the projects and then of the files' paths.  The error is reported once for each other file, at its first query of that database, and no query of that database in that file is described until it is mended.  A query whose output is `sql` belongs to no database and is not counted, and neither is a file that already has [SQLSRC209](#sqlsrc209).
 
 ## SQLSRC220
 
