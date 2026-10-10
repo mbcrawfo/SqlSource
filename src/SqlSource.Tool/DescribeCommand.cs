@@ -82,14 +82,12 @@ internal static class DescribeCommand
             Arity = ArgumentArity.Zero,
         };
 
-        // Hidden until it compares: an option is in the help once it does what it says.
         var check = new Option<bool>(CheckOption)
         {
             Description =
                 "Describe every query of the run and compare with the sidecars that are there.  Writes nothing, "
                 + "and exits with 2 when a sidecar is out of date.  The command for a build server.",
             Arity = ArgumentArity.Zero,
-            Hidden = true,
         };
 
         var describe = new Command(Name, "Asks the databases of the projects to describe their queries")

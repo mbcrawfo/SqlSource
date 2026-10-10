@@ -47,12 +47,22 @@ internal static class DescribeRun
         // Nothing is deleted after an error: the plan drops a setting or a claim it could not read, and the file
         // then looks as if it needs no entry.
         var outcomes = FileOutcomes.Decide(files, options.HasFilter, reporter.Count > 0, SidecarOnDisk.Read);
-        if (!options.Check)
+        if (options.Check)
+        {
+            foreach (var check in SidecarCheck.Compare(files, outcomes))
+            {
+                foreach (var difference in check.Differences)
+                {
+                    reporter.Report(difference);
+                }
+            }
+        }
+        else
         {
             SidecarStore.Apply(outcomes, reporter, cancellationToken);
         }
 
-        // 5.  The exit code is the reporter's: 1 when anything was reported.
+        // 5.  The exit code is the reporter's: 1 when anything but SQLSRC219 was reported, else 2 when that was.
         var lines = RunSummary.Lines([.. plan.Databases], selected, files, connections, options.Databases);
         foreach (var line in lines)
         {

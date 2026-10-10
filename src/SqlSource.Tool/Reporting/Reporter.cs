@@ -2,6 +2,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
+using SqlSource.Diagnostics;
 
 namespace SqlSource.Tool.Reporting;
 
@@ -25,6 +26,7 @@ internal sealed class Reporter(TextWriter error)
     private readonly object _gate = new();
 
     private int _count;
+    private int _differences;
 
     /// <summary>
     /// How many errors were written.
@@ -40,6 +42,21 @@ internal sealed class Reporter(TextWriter error)
         }
     }
 
+    /// <summary>
+    /// How many of the errors written were <c>SQLSRC219</c>, a sidecar that <c>--check</c> found out of date.  A
+    /// run that wrote no other error exits with <c>2</c>.
+    /// </summary>
+    public int DifferenceCount
+    {
+        get
+        {
+            lock (_gate)
+            {
+                return _differences;
+            }
+        }
+    }
+
     public void Report(ToolDiagnostic diagnostic)
     {
         var text = Format(diagnostic, error.NewLine);
@@ -47,6 +64,10 @@ internal sealed class Reporter(TextWriter error)
         {
             error.Write(text);
             _count++;
+            if (ReferenceEquals(diagnostic.Descriptor, ToolDiagnostics.SidecarOutOfDate))
+            {
+                _differences++;
+            }
         }
     }
 

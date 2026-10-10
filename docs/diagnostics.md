@@ -55,12 +55,13 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC216](#sqlsrc216) | No describer for the dialect |
 | [SQLSRC217](#sqlsrc217) | Sidecar was not written |
 | [SQLSRC218](#sqlsrc218) | File could not be changed |
+| [SQLSRC219](#sqlsrc219) | Sidecar is out of date |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
 | [SQLSRC221](#sqlsrc221) | Sidecar was written by a newer tool |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
@@ -799,6 +800,32 @@ The tool could not write a sidecar, or could not delete one that its `.sql` file
 ```
 
 Give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  A sidecar is deleted only in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided: a setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.  A sidecar that the system will not let the tool open, for lack of permission, because it is locked or because it is a directory, is not deleted either when the file beside it needs no entry: it is left as it is and nothing is said.  A sidecar is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one and never a part of either.  The rest of the run goes on.
+
+## SQLSRC219
+
+**Sidecar is out of date**
+
+`describe --check` asked the database to describe every query of the run and compared what it said with the sidecars that are there.  It changes no file.  The message names a query and says what differs, or names the `.sql` file when the whole sidecar does:
+
+| The message ends with | What it means |
+|----|----|
+| `the sidecar does not exist` | A query of the file needs an entry, and the file has no sidecar |
+| `the sidecar cannot be read`, or `the sidecar has format 2, and this tool writes 1` | The sidecar is no sidecar of this version of the tool.  A merge conflict in it is the usual cause of the first |
+| `the sidecar has no entry` | The query was added, or renamed, since the sidecar was written |
+| `the query has changed since it was described` | The SQL, a `-- param:` marker or the default of a token changed |
+| `columns[2].nullable is true, and the database says false` | The database describes the query another way than the sidecar holds.  A change to the schema is the usual cause |
+| `database is "billing", and the project says "reports"` | The query belongs to another database, or another engine, than the one it was described against |
+| `the query is not in the file`, or `the query needs no entry` | The sidecar holds an entry for a query that was removed, or whose output is now `sql` |
+| `no query of the file needs an entry` | The sidecar belongs to a file that needs none any more |
+
+```console
+/work/App/Queries/Users.sql(3,10): error SQLSRC219: The sidecar is out of date for 'GetUser': columns[2].nullable is true, and the database says false
+    help: run 'dotnet sqlsource describe' and commit the sidecars
+```
+
+Run `dotnet sqlsource describe` with the filters the check had, and commit the sidecars it writes.  After a change to the schema, run it with `--force`: the tool cannot see such a change, and skips a query whose SQL is as it was.  Only the first difference of a query is named.  What is compared is what changes generated code: a query's hash, engine, database and result kind, the table it matches, and the name, the position, the type and the nullability of each parameter and column.  The versions of the tool and of the server, and where a value came from, are not.
+
+The tool exits with the code 2 when it reported this error and no other, so that a build can tell a sidecar that is out of date from a check that could not be made.  A query that could not be described has an error of its own, and the exit code is then 1.
 
 ## SQLSRC220
 

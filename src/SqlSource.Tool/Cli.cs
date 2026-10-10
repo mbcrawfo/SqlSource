@@ -145,7 +145,7 @@ public static class Cli
                 ProcessTerminationTimeout = null,
             };
             var exitCode = await parsed.InvokeAsync(invocation, cancellationToken);
-            return reporter.Count > 0 ? 1 : exitCode;
+            return ExitCodeOf(reporter, exitCode);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -162,6 +162,25 @@ public static class Cli
             reporter.Report(UnexpectedFailure.Of(exception, host.GetEnvironmentVariable));
             return 1;
         }
+    }
+
+    /// <summary>
+    /// The exit code of a run: <c>1</c> when an error other than <c>SQLSRC219</c> was reported, else what the
+    /// command gave when that is not <c>0</c>, else <c>2</c> when <c>SQLSRC219</c> was reported.
+    /// </summary>
+    internal static int ExitCodeOf(Reporter reporter, int exitCode)
+    {
+        if (reporter.Count > reporter.DifferenceCount)
+        {
+            return 1;
+        }
+
+        if (exitCode != 0)
+        {
+            return exitCode;
+        }
+
+        return reporter.DifferenceCount > 0 ? 2 : 0;
     }
 
     internal static Command BuildCommands(ToolHost host, Reporter reporter)

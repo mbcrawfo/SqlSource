@@ -11,6 +11,7 @@ $ dotnet sqlsource describe --connection billing="Host=localhost;Database=billin
 $ dotnet sqlsource describe App.slnx --project src/App/App.csproj
 $ dotnet sqlsource describe src/App/Queries/Users.sql
 $ dotnet sqlsource describe --database billing --force
+$ dotnet sqlsource describe --check
 ```
 
 A query belongs to a logical database: the one its `-- database:` marker names, or the `SqlSourceDatabase` metadata of its file, or the property of that name, or else the name of its dialect.  A connection is given for that name, on the command line or in the environment, and never in the project file, since it holds credentials:
@@ -30,7 +31,9 @@ billing (postgres): 4 described, 12 skipped, 0 failed
 reports (postgres): no connection, 5 skipped
 ```
 
-The exit code is `0`, or `1` when anything was reported as an error, when the command line is wrong, or when the run was cancelled.
+`--check` is the command for a build server.  It describes every query of the run, as `--force` does, compares what the database says with the sidecars that are there, and changes no file.  A sidecar that is out of date is [`SQLSRC219`](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc219), which says what differs and where.  It compares what changes generated code and not the versions of the tool or of the server, so a sidecar that a developer wrote passes on a server of another patch.  Every database of the run needs a connection.
+
+The exit code is `0`; `1` when anything else was reported as an error, when the command line is wrong, or when the run was cancelled; and `2` when `--check` found a sidecar out of date and nothing else failed.
 
 `describe` takes a `.sln`, `.slnx` or `.csproj` file, or a directory that holds exactly one, and the current directory when none is given.  In a solution it runs on the C# projects that use the SqlSource package; `--project`, which may be given several times, names the ones to run on.
 
