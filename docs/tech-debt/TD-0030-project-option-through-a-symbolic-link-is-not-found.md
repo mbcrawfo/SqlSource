@@ -1,4 +1,4 @@
-# TD-0030 - A path of `--project` that goes through a symbolic link is not found
+# TD-0030 - A path of `--project` or a `.sql` path that goes through a symbolic link is not found
 
 ## Problem
 
@@ -12,6 +12,8 @@ sqlsource : error SQLSRC207: '/work/link/App/App.csproj' is not a project of '/w
 
 The review of sub-phase 2.3 ran it.  A relative path is found, and so is a full path when the unit is given by the same spelling.
 
+A `.sql` path of `describe` is compared the same way, by [`RunFilters`](../../src/SqlSource.Tool/Planning/RunFilters.cs), with the paths of the manifest, which MSBuild gives through the real folder.  A full path through the link is `SQLSRC212`.
+
 ## Why it exists
 
 The spec of the sub-phase says that paths are compared as full paths, ignoring case.  No path of the tool is resolved through links, the unit's included.
@@ -22,8 +24,8 @@ Low.  It takes a working directory behind a link and a full path on the command 
 
 ## Proposed fix
 
-Resolve links on both sides before the comparison, with `File.ResolveLinkTarget` for the file and each folder above it, or by comparing the two files' identities.  Do the same in sub-phase 2.4, which compares the path of a `.sql` filter in the same way.
+Resolve links on both sides before the comparison, with `File.ResolveLinkTarget` for the file and each folder above it, or by comparing the two files' identities.  Do the same for the `.sql` path in `RunFilters.Create`.
 
 ## Trigger
 
-A user reports `SQLSRC207` for a project that the solution lists.  Or sub-phase 2.4, when the `.sql` filter meets the same comparison.
+A user reports `SQLSRC207` for a project that the solution lists.  Or `SQLSRC212` for a file that a type claims.

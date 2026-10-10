@@ -24,12 +24,14 @@ internal static class UsageCheck
     {
         var messages = new List<string>();
         var arguments = new List<string>();
+        var values = new List<UsageValue>();
         var command = root;
         var options = root.Options.ToList();
 
         var index = 0;
         while (index < args.Count)
         {
+            // After this, index is the position of the token counted from one.
             var token = args[index++];
             if (token.StartsWith('-'))
             {
@@ -39,7 +41,7 @@ internal static class UsageCheck
                 {
                     // The token after a misspelt option may be its value, so nothing after it is read, and nothing
                     // found before it is reported beside it.
-                    return new Usage(command, arguments, [$"sqlsource: unknown option '{OneLine.Of(name)}'"]);
+                    return new Usage(command, arguments, [], [$"sqlsource: unknown option '{OneLine.Of(name)}'"]);
                 }
 
                 var hasSeparator = token.Length > name.Length;
@@ -58,6 +60,10 @@ internal static class UsageCheck
                     {
                         messages.Add($"sqlsource: option '{name}' needs a value");
                     }
+                    else
+                    {
+                        values.Add(new UsageValue(option, token[(name.Length + 1)..], index));
+                    }
                 }
                 else if (option.Arity.MinimumNumberOfValues > 0)
                 {
@@ -69,6 +75,7 @@ internal static class UsageCheck
                     }
                     else
                     {
+                        values.Add(new UsageValue(option, args[index], index + 1));
                         index++;
                     }
                 }
@@ -81,6 +88,7 @@ internal static class UsageCheck
             else if (arguments.Count < command.Arguments.Sum(static argument => argument.Arity.MaximumNumberOfValues))
             {
                 arguments.Add(token);
+                values.Add(new UsageValue(null, token, index));
             }
             else
             {
@@ -88,7 +96,7 @@ internal static class UsageCheck
             }
         }
 
-        return new Usage(command, arguments, messages);
+        return new Usage(command, arguments, values, messages);
     }
 
     private static Option? Find(List<Option> options, string name) =>

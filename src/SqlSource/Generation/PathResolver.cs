@@ -46,7 +46,7 @@ internal static class PathResolver
             );
         }
 
-        var files = FindFiles(type, sqlPaths);
+        var files = FindFiles(type.FilePath, type.Path, sqlPaths);
         if (files.IsEmpty)
         {
             diagnostics.Add(
@@ -63,28 +63,39 @@ internal static class PathResolver
         );
     }
 
-    private static ImmutableArray<string> FindFiles(TargetType type, EquatableArray<string> sqlPaths)
+    /// <summary>
+    /// The files that a <c>Path</c> names, for an attribute in the file <paramref name="sourceFilePath" />: the
+    /// <c>.sql</c> files of the folder of that file when <paramref name="path" /> is null, of the folder it names, or
+    /// the one file it names.  Empty when it names nothing.  The <c>sqlsource</c> tool resolves a type's files with
+    /// this too, so a change here changes what the tool describes.
+    /// </summary>
+    /// <param name="sourceFilePath">The path of the C# file that carries the attribute.</param>
+    /// <param name="path">The attribute's <c>Path</c>, or null when it is not set.</param>
+    /// <param name="sqlPaths">
+    /// The project's <c>.sql</c> files, as <see cref="SqlPath.ToSortedSet" /> gives them.
+    /// </param>
+    public static ImmutableArray<string> FindFiles(string sourceFilePath, string? path, EquatableArray<string> sqlPaths)
     {
-        if (SqlPath.Normalize(type.FilePath) is not { } sourceFile)
+        if (SqlPath.Normalize(sourceFilePath) is not { } sourceFile)
         {
             return ImmutableArray<string>.Empty;
         }
 
         var folder = SqlPath.GetFolder(sourceFile);
 
-        var target = type.Path is null ? folder : SqlPath.Combine(folder, type.Path);
+        var target = path is null ? folder : SqlPath.Combine(folder, path);
         if (target is null)
         {
             return ImmutableArray<string>.Empty;
         }
 
-        if (type.Path is null || !SqlPath.IsSqlFile(type.Path))
+        if (path is null || !SqlPath.IsSqlFile(path))
         {
             return SqlPath.FindInFolder(sqlPaths, target);
         }
 
         // The path as the project lists it, which may differ from the target in case.
-        var index = SqlPath.IndexOf(sqlPaths, target, static path => path);
+        var index = SqlPath.IndexOf(sqlPaths, target, static listed => listed);
         return index < 0 ? ImmutableArray<string>.Empty : ImmutableArray.Create(sqlPaths[index]);
     }
 }

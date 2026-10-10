@@ -67,12 +67,15 @@ public class ToolDiagnosticsTests
 
         foreach (var descriptor in ToolDiagnostics.All.Remove(ToolDiagnostics.UnexpectedFailure))
         {
-            // The second argument is for the one that has two: a format ignores an argument it has no place for.
+            // The later arguments are for the ones that have more than one place: a format ignores an argument it
+            // has no place for.
             string.Format(
                     CultureInfo.InvariantCulture,
                     descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
                     "/work/app",
-                    "the reason"
+                    "the reason",
+                    "a third",
+                    "a fourth"
                 )
                 .ShouldContain("'/work/app'", Case.Sensitive, descriptor.Id);
         }
@@ -126,4 +129,62 @@ public class ToolDiagnosticsTests
                 "Access is denied."
             )
             .ShouldBe("'/srv/locked' cannot be read: Access is denied.");
+
+    [Fact]
+    public void AttributeArgumentNotLiteral_Message_HoldsTheArgument() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.AttributeArgumentNotLiteral.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "Path"
+            )
+            .ShouldBe(
+                "'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here"
+            );
+
+    [Fact]
+    public void OutputNeedsDescribableDialect_Message_HoldsTheOutputAndTheDialect() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.OutputNeedsDescribableDialect.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "codegen",
+                "ansi"
+            )
+            .ShouldBe(
+                "The output 'codegen' needs a dialect that can be described, and the dialect of this file is 'ansi'.  "
+                    + "Set the dialect to 'postgres' or 'mssql', or the output to 'sql'."
+            );
+
+    [Fact]
+    public void TokenHasNoDefault_Message_HoldsTheTokenAndTheOutput() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.TokenHasNoDefault.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "where",
+                "models"
+            )
+            .ShouldBe(
+                "The token 'where' has no default.  A query whose output is 'models' is described with a sample in "
+                    + "its place."
+            );
+
+    [Fact]
+    public void DatabaseHasTwoDialects_Message_HoldsTheDatabaseTheTwoDialectsAndTheOtherFile() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DatabaseHasTwoDialects.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "main",
+                "mssql",
+                "postgres",
+                "/work/App/Users.sql"
+            )
+            .ShouldBe("The database 'main' has the dialect 'mssql' here and 'postgres' in '/work/App/Users.sql'");
+
+    [Fact]
+    public void FileNotInRun_Message_HoldsThePath() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.FileNotInRun.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/App/User.sql"
+            )
+            .ShouldBe("'/work/App/User.sql' is not a .sql file that a type of the run claims");
 }

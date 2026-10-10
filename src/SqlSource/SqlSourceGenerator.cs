@@ -50,7 +50,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Collect();
 
         var sqlPaths = listedPaths
-            .Select(static (paths, _) => ToSortedSet(paths.Select(static path => path.NormalizedPath)))
+            .Select(static (paths, _) => SqlPath.ToSortedSet(paths.Select(static path => path.NormalizedPath)))
             .WithTrackingName(TrackingNames.SqlPaths);
 
         // Two files whose paths differ only by case.  Almost always none, so this value almost never changes.
@@ -83,7 +83,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var claimedPaths = typeFiles
             .SelectMany(static (type, _) => type.Files)
             .Collect()
-            .Select(static (paths, _) => ToSortedSet(paths))
+            .Select(static (paths, _) => SqlPath.ToSortedSet(paths))
             .WithTrackingName(TrackingNames.ClaimedPaths);
 
         // The files of the types whose attribute asks for comments.  Almost always none, so this value almost never
@@ -93,7 +93,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 static (type, _) => type.Type.Settings.KeepsComments ? type.Files : EquatableArray<string>.Empty
             )
             .Collect()
-            .Select(static (paths, _) => ToSortedSet(paths))
+            .Select(static (paths, _) => SqlPath.ToSortedSet(paths))
             .WithTrackingName(TrackingNames.CommentPaths);
 
         // Reported for a file that a type claims only, as every other problem of a file is.
@@ -246,10 +246,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
     }
-
-    // Distinct ignoring case and in the order of SqlPath.Comparer, which is also the order of a type's members.
-    private static EquatableArray<string> ToSortedSet(IEnumerable<string> paths) =>
-        new(paths.Distinct(SqlPath.Comparer).OrderBy(static path => path, SqlPath.Comparer).ToImmutableArray());
 
     // One file for each path, the first the project lists, in the order of SqlPath.Comparer.
     private static EquatableArray<ParsedSqlFile> ToSortedFiles(ImmutableArray<ParsedSqlFile> files) =>

@@ -100,6 +100,64 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor AttributeArgumentNotLiteral = new(
+        id: "SQLSRC208",
+        title: "Attribute argument is not a literal",
+        messageFormat: "'{0}' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal "
+            + "here",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc208",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor OutputNeedsDescribableDialect = new(
+        id: "SQLSRC209",
+        title: "Output needs a dialect that can be described",
+        messageFormat: "The output '{0}' needs a dialect that can be described, and the dialect of this file is "
+            + "'{1}'.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc209",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor TokenHasNoDefault = new(
+        id: "SQLSRC210",
+        title: "Token has no default",
+        messageFormat: "The token '{0}' has no default.  A query whose output is '{1}' is described with a sample in "
+            + "its place.",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc210",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor DatabaseHasTwoDialects = new(
+        id: "SQLSRC211",
+        title: "Database has two dialects",
+        messageFormat: "The database '{0}' has the dialect '{1}' here and '{2}' in '{3}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc211",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor FileNotInRun = new(
+        id: "SQLSRC212",
+        title: "File is not in the run",
+        messageFormat: "'{0}' is not a .sql file that a type of the run claims",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc212",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ProjectNotRestored = new(
         id: "SQLSRC220",
         title: "Project was not restored",
@@ -146,6 +204,11 @@ internal static class ToolDiagnostics
             ProjectCannotBeEvaluated,
             ManifestCannotBeRead,
             ProjectNotInRun,
+            AttributeArgumentNotLiteral,
+            OutputNeedsDescribableDialect,
+            TokenHasNoDefault,
+            DatabaseHasTwoDialects,
+            FileNotInRun,
             ProjectNotRestored,
             DirectoryCannotBeRead,
             SolutionCannotBeRead

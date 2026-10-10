@@ -38,9 +38,9 @@ The solution has two projects that ship and three test projects:
 |----|----|----|
 | `tests/SqlSource.Tests` | A current version | Every test of the generator |
 | `tests/SqlSource.Tests.RoslynFloor` | 4.8.0, the oldest supported | The generator driver tests: the files of `tests/SqlSource.Tests/Generator/`, compiled a second time |
-| `tests/SqlSource.Tool.Tests` | A current version | The tests of the tool, which run the whole command in process with their own output, working directory and environment |
+| `tests/SqlSource.Tool.Tests` | A current version | The tests of the tool, which run the whole command in process with their own output, working directory and environment.  It also compiles the harness of `tests/SqlSource.Tests/Generator/`, three files, for `GeneratorParityTests`, which runs the generator and the tool over the same sources |
 
-A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both, so it may use only Roslyn API that 4.8.0 has, and the C# it hands to the compiler is C# 12 at most.
+A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both, so it may use only Roslyn API that 4.8.0 has, and the C# it hands to the compiler is C# 12 at most.  `GeneratorHarness.cs`, `InMemoryAdditionalText.cs` and `TestOptionsProvider.cs` of that folder are compiled into `tests/SqlSource.Tool.Tests` as well, so a change to one of them must build there too.
 
 `tests/SqlSource.Tests` also uses the generator the way a consumer does: the types in `EndToEnd/` are compiled with the generator loaded, and the project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  It gets them by path and the generator through a project reference; `tools/check-package-install.sh`, under Package below, is what installs the packed package.
 

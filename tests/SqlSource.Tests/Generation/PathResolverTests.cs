@@ -246,4 +246,17 @@ public class PathResolverTests
                     unsupportedLanguageVersion: null
                 )
             );
+
+    [Theory]
+    [InlineData(null, "app/Repo/Count.sql|app/Repo/Users.sql")]
+    [InlineData("../Queries", "app/Queries/Orders.sql|app/Queries/Users.sql")]
+    [InlineData("users.SQL", "app/Repo/Users.sql")]
+    [InlineData("Missing.sql", "")]
+    [InlineData("../../..", "")]
+    public void FindFiles_PathOfAnAttribute_GivesTheFilesItNames(string? path, string expected) =>
+        string.Join('|', PathResolver.FindFiles("/app/Repo/UserRepository.cs", path, SqlPaths)).ShouldBe(expected);
+
+    [Fact]
+    public void FindFiles_SourceFileWhosePathLeavesTheRoot_GivesNone() =>
+        PathResolver.FindFiles("../UserRepository.cs", null, SqlPaths).ShouldBeEmpty();
 }

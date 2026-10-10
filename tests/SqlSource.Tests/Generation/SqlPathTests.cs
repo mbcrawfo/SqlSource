@@ -203,4 +203,13 @@ public class SqlPathTests
     ]);
 
     private sealed record Item(string Path);
+
+    [Fact]
+    public void ToSortedSet_Paths_AreEachOnceIgnoringCaseAndInOrder() =>
+        SqlPath
+            .ToSortedSet(["b/Users.sql", "a/Z.sql", "B/users.sql", "a/a.sql", "a/Z.sql"])
+            .ShouldBe(["a/a.sql", "a/Z.sql", "b/Users.sql"]);
+
+    [Fact]
+    public void ToSortedSet_NoPaths_IsEmpty() => SqlPath.ToSortedSet([]).Count.ShouldBe(0);
 }

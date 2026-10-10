@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -42,6 +43,9 @@ internal sealed class FakeProject
 
     // The text of the manifest; when null, the version, the project and the framework.
     public string? Manifest { get; set; }
+
+    // Writes the text of the manifest when the target runs, for a project whose files a test adds to as it goes.
+    public Func<string>? ManifestWriter { get; set; }
 
     public ProcessResult Evaluate(ProcessRequest request)
     {
@@ -91,7 +95,9 @@ internal sealed class FakeProject
             var framework = FakeProcessRunner.PropertyOf(request, "TargetFramework") ?? TargetFramework;
             File.WriteAllText(
                 file,
-                Manifest ?? $"SqlSourceManifest=1\nProject={request.Arguments[1]}\nTargetFramework={framework}\n"
+                ManifestWriter?.Invoke()
+                    ?? Manifest
+                    ?? $"SqlSourceManifest=1\nProject={request.Arguments[1]}\nTargetFramework={framework}\n"
             );
         }
 
