@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.CommandLine;
 using System.Linq;
 using System.Threading;
@@ -14,8 +15,8 @@ using SqlSource.Tool.Reporting;
 namespace SqlSource.Tool;
 
 /// <summary>
-/// The <c>describe</c> command.  After sub-phase 2.4 it finds the unit and the projects, builds the plan of the run
-/// and reports what is wrong with it.  It describes nothing yet.
+/// The <c>describe</c> command.  It finds the unit and the projects, builds the plan of the run and reports what is
+/// wrong with it, and hands the plan to <see cref="DescribeRun" />, which describes and writes.
 /// </summary>
 internal static class DescribeCommand
 {
@@ -28,6 +29,8 @@ internal static class DescribeCommand
     private const string DatabaseOption = "--database";
 
     internal const string ConnectionOption = "--connection";
+
+    private const string ForceOption = "--force";
 
     public static Command Create(ToolHost host, Reporter reporter)
     {
@@ -50,15 +53,13 @@ internal static class DescribeCommand
             AllowMultipleArgumentsPerToken = false,
         };
 
-        // Accepted and checked, and not shown: it selects queries, and nothing this version prints depends on which
-        // are selected.  Sub-phase 2.5 gives it an effect and shows it.
+        // It selects queries: what is described, what is written, and what the summary counts.
         var database = new Option<string[]>(DatabaseOption)
         {
             Description = "A database to describe the queries of.  May be given several times.",
             HelpName = "name",
             Arity = ArgumentArity.OneOrMore,
             AllowMultipleArgumentsPerToken = false,
-            Hidden = true,
         };
 
         // Always a name, "=" and a value.  CheckUsage holds each to that, and a message never repeats one.
@@ -71,18 +72,31 @@ internal static class DescribeCommand
             AllowMultipleArgumentsPerToken = false,
         };
 
-        var describe = new Command(Name, "Finds the queries of the projects that a database must describe")
+        var force = new Option<bool>(ForceOption)
+        {
+            Description =
+                "Describe every query of the run again, whether or not its entry is current.  The command to run "
+                + "after a change to the schema.",
+            Arity = ArgumentArity.Zero,
+        };
+
+        var describe = new Command(Name, "Asks the databases of the projects to describe their queries")
         {
             path,
             project,
             database,
             connection,
+            force,
         };
         describe.SetAction(
             async (parsed, cancellationToken) =>
             {
                 // An error is in the reporter, where the exit code is taken.
-                _ = await PlanAsync(parsed, host, reporter, cancellationToken);
+                if (await PlanAsync(parsed, host, reporter, cancellationToken) is { } plan)
+                {
+                    await DescribeRun.RunAsync(plan, OptionsOf(parsed), host, reporter, cancellationToken);
+                }
+
                 return 0;
             }
         );
@@ -144,6 +158,30 @@ internal static class DescribeCommand
         }
 
         return messages;
+    }
+
+    // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
+    private static DescribeOptions OptionsOf(ParseResult parsed)
+    {
+        var paths = parsed.GetValue<string[]>(PathArgument) ?? [];
+        var projects = parsed.GetValue<string[]>(ProjectOption) ?? [];
+        var databases = parsed.GetValue<string[]>(DatabaseOption) ?? [];
+        var connections = ImmutableArray.CreateBuilder<ConnectionArgument>();
+        foreach (var text in parsed.GetValue<string[]>(ConnectionOption) ?? [])
+        {
+            connections.Add(
+                ConnectionArgument.TryParse(text, out var connection)
+                    ? connection
+                    : throw new InvalidOperationException("A --connection that is no name and value was let through.")
+            );
+        }
+
+        return new DescribeOptions(
+            parsed.GetValue<bool>(ForceOption),
+            projects.Length > 0 || databases.Length > 0 || paths.Any(SqlPath.IsSqlFile),
+            connections.ToImmutable(),
+            [.. databases.Distinct(StringComparer.OrdinalIgnoreCase)]
+        );
     }
 
     /// <summary>

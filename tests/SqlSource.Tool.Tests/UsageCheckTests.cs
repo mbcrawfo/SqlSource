@@ -260,6 +260,8 @@ public class UsageCheckTests
             "--connection:N=V",
             "--connection=",
             "N=V",
+            "--force",
+            "--force=V",
             "--help",
             "--",
             "V",
