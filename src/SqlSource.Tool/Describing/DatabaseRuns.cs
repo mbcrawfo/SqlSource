@@ -4,7 +4,10 @@ using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Diagnostics;
+using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 
@@ -39,6 +42,13 @@ internal static class DatabaseRuns
     {
         foreach (var database in selected)
         {
+            RunEvents.Database(
+                reporter.Trace,
+                database,
+                connections.For(database.Name),
+                host.Describers.Find(database.Dialect) is not null
+            );
+
             var queries = ToDescribe(files, database.Name);
             if (queries.Count == 0)
             {
@@ -70,7 +80,7 @@ internal static class DatabaseRuns
                 reporter.Report(DescribeErrors.NoDescriber(query.Planned, database.Dialect));
             }
 
-            Fail(queries);
+            Fail(queries, ToolDiagnostics.NoDescriberForDialect.Id, reporter.Trace);
             return;
         }
 
@@ -78,25 +88,32 @@ internal static class DatabaseRuns
         var connection = connections.For(database.Name);
         if (connection.Value is not { } value)
         {
-            reporter.Report(NoConnection(first, connection, connections));
-            Fail(queries);
+            var error = NoConnection(first, connection, connections);
+            reporter.Report(error);
+            Fail(queries, error.Descriptor.Id, reporter.Trace);
             return;
         }
 
+        // From here on the run holds the connection's value, and what a describer gives may hold it: everything
+        // said of this database goes through a trace that removes it.
+        var trace = reporter.Trace.Without(value);
+        var engine = SqlDialectName.Canonical(database.Dialect);
         var guard = new Guard(value, host.GetEnvironmentVariable, cancellationToken);
         var request = new OpenRequest(database.Name, value, host.Exchange(database.Name));
-        var opened = await guard.CallAsync(() => describer.OpenAsync(request, cancellationToken));
+        var log = new SessionRunLog(reporter.Trace.Log, value, engine + ".");
+        var opened = await guard.CallAsync(() => describer.OpenAsync(request, log, cancellationToken));
         if (opened.Session is not { } session)
         {
             var failure = guard.Call(() => opened.Failure ?? throw new InvalidOperationException(Guard.Nothing));
             reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, first, database, server: null), value));
-            Fail(queries);
+            RunEvents.NotOpened(trace, database, failure.Descriptor.Id);
+            Fail(queries, failure.Descriptor.Id, trace);
             return;
         }
 
         try
         {
-            await DescribeAllAsync(database, queries, session, guard, reporter, cancellationToken);
+            await DescribeAllAsync(database, queries, session, guard, host.Time, reporter, trace, cancellationToken);
         }
         catch
         {
@@ -113,12 +130,15 @@ internal static class DatabaseRuns
         List<QueryWork> queries,
         IDescribeSession session,
         Guard guard,
+        TimeProvider time,
         Reporter reporter,
+        RunTrace trace,
         CancellationToken cancellationToken
     )
     {
         var value = guard.Secret;
         var server = guard.Call(() => session.Server);
+        RunEvents.Opened(trace, database, server);
         foreach (var query in queries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -128,19 +148,23 @@ internal static class DatabaseRuns
                 SampleSql.Build(planned.Query),
                 planned.Query.Parameters
             );
+            var started = time.GetTimestamp();
             var result = await guard.CallAsync(() => session.DescribeAsync(describe, cancellationToken));
+            var duration = (long)time.GetElapsedTime(started).TotalMilliseconds;
             if (result.Description is { } description)
             {
                 query.Entry = guard.Call(() =>
                     NoSecretIn(EntryBuilder.Build(planned, database.Dialect, database.Name, server, description), value)
                 );
                 query.State = QueryState.Described;
+                RunEvents.Query(trace, query, duration);
             }
             else
             {
                 var failure = guard.Call(() => result.Failure ?? throw new InvalidOperationException(Guard.Nothing));
                 reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), value));
                 query.State = QueryState.Failed;
+                RunEvents.Query(trace, query, error: failure.Descriptor.Id);
             }
         }
     }
@@ -176,11 +200,13 @@ internal static class DatabaseRuns
                 ),
         ];
 
-    private static void Fail(List<QueryWork> queries)
+    // The queries fail with one error, which was reported: each has its event.
+    private static void Fail(List<QueryWork> queries, string error, RunTrace trace)
     {
         foreach (var query in queries)
         {
             query.State = QueryState.Failed;
+            RunEvents.Query(trace, query, error: error);
         }
     }
 

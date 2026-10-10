@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 
@@ -33,6 +34,17 @@ internal static class DescribeRun
             reporter.Report(error);
         }
 
+        // What the run decided without asking a database.  A query to describe gets its event when that ends.
+        var trace = reporter.Trace;
+        foreach (
+            var query in files
+                .SelectMany(static file => file.Queries)
+                .Where(static query => query.Planned.NeedsEntry && query.State != QueryState.ToDescribe)
+        )
+        {
+            RunEvents.Query(trace, query);
+        }
+
         // 3: the connection of every selected database is looked up, since the summary says which have none.
         var selected = RunDecisions.SelectedDatabases(plan);
         var connections = Connections.Resolve(
@@ -55,12 +67,19 @@ internal static class DescribeRun
                 {
                     reporter.Report(difference);
                 }
+
+                if (check.WasCompared)
+                {
+                    RunEvents.Sidecar(trace, check.SidecarPath, check.Differences.Count == 0 ? "same" : "differs");
+                }
             }
         }
         else
         {
             SidecarStore.Apply(outcomes, reporter, cancellationToken);
         }
+
+        trace.Databases = RunSummary.Counts(selected, files, options.Check);
 
         // 5.  The exit code is the reporter's: 1 when anything but SQLSRC219 was reported, else 2 when that was.
         var lines = RunSummary.Lines(

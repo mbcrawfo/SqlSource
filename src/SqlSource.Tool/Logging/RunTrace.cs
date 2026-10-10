@@ -14,4 +14,11 @@ internal sealed class RunTrace(IRunLog log)
     /// <c>Cli</c>, which knows the exit code, writes the event.
     /// </summary>
     public LogValue Databases { get; set; } = LogValue.ListOf([]);
+
+    /// <summary>
+    /// The same trace with one connection's value removed from everything said through it.  What the run says of
+    /// a database once it has the connection goes through one: a server's version, a driver's name and a setting
+    /// are a describer's text, as a failure's lines are.
+    /// </summary>
+    public RunTrace Without(string secret) => new(new SessionRunLog(log, secret));
 }

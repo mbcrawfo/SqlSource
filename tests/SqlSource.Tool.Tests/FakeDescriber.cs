@@ -6,6 +6,7 @@ using Microsoft.CodeAnalysis;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Tests;
 
@@ -50,6 +51,11 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     // Runs before each query is described, for a test that cancels the run there.
     public Func<DescribeRequest, Task>? BeforeDescribe { get; set; }
 
+    // Run with the log a describer is given: when a session is asked for, and before each query is described.
+    public Action<IRunLog, OpenRequest>? OnOpen { get; set; }
+
+    public Action<IRunLog, DescribeRequest>? OnDescribe { get; set; }
+
     public List<OpenRequest> Opened { get; } = [];
 
     public List<DescribeRequest> Described { get; } = [];
@@ -65,13 +71,14 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
             "check the SQL"
         );
 
-    public Task<OpenResult> OpenAsync(OpenRequest request, CancellationToken cancellationToken) =>
+    public Task<OpenResult> OpenAsync(OpenRequest request, IRunLog log, CancellationToken cancellationToken) =>
         request.Exchange.AskAsync(
             "open",
             request.Database,
             (_, _) =>
             {
                 Opened.Add(request);
+                OnOpen?.Invoke(log, request);
                 if (OpenException is { } exception)
                 {
                     throw exception;
@@ -85,13 +92,13 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
                 return Task.FromResult(
                     OpenFailure is { } failure
                         ? OpenResult.Failed(failure)
-                        : OpenResult.Opened(new Session(this, request.Exchange))
+                        : OpenResult.Opened(new Session(this, request.Exchange, log))
                 );
             },
             cancellationToken
         );
 
-    private sealed class Session(FakeDescriber owner, IDescribeExchange exchange) : IDescribeSession
+    private sealed class Session(FakeDescriber owner, IDescribeExchange exchange, IRunLog log) : IDescribeSession
     {
         public ServerInfo Server => owner.Server;
 
@@ -102,6 +109,7 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
                 async (asked, token) =>
                 {
                     owner.Described.Add(asked);
+                    owner.OnDescribe?.Invoke(log, asked);
                     if (owner.BeforeDescribe is { } before)
                     {
                         await before(asked);

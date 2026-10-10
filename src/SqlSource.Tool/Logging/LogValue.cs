@@ -5,7 +5,7 @@ namespace SqlSource.Tool.Logging;
 
 /// <summary>
 /// A value of an event of the log: what JSON can hold, and nothing else.  The set is closed, so that the writer
-/// writes every value and <c>SessionRunLog</c> reaches every string.
+/// writes every value and <see cref="SessionRunLog" /> reaches every string.
 /// </summary>
 internal abstract record LogValue
 {

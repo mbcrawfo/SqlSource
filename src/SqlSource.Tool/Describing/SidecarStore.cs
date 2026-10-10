@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using SqlSource.Diagnostics;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Describing;
@@ -39,22 +40,30 @@ internal static class SidecarStore
             switch (outcome.Action)
             {
                 case FileAction.Write:
-                    Write(
+                    var written = Write(
                         outcome.SidecarPath,
                         outcome.Text ?? throw new InvalidOperationException("A file to write has no text."),
                         reporter
                     );
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, written ? "written" : "failed");
                     break;
                 case FileAction.Delete:
-                    Delete(outcome.SidecarPath, reporter);
+                    var deleted = Delete(outcome.SidecarPath, reporter);
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, deleted ? "deleted" : "failed");
                     break;
-                case FileAction.HeldBack when outcome.HasDescribed:
-                    reporter.Report(NotWritten(outcome));
+                case FileAction.HeldBack:
+                    if (outcome.HasDescribed)
+                    {
+                        reporter.Report(NotWritten(outcome));
+                    }
+
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, "held-back");
+                    break;
+                case FileAction.Unchanged:
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, "unchanged");
                     break;
                 case FileAction.None:
-                case FileAction.Unchanged:
-                case FileAction.HeldBack:
-                    // Nothing is changed, and nothing is said.
+                    // The run did not look at this sidecar: nothing is changed, and nothing is said.
                     break;
                 default:
                     throw new InvalidOperationException($"Unknown action {outcome.Action}.");
@@ -62,7 +71,7 @@ internal static class SidecarStore
         }
     }
 
-    private static void Write(string path, string text, Reporter reporter)
+    private static bool Write(string path, string text, Reporter reporter)
     {
         // Beside the file, so that the move is within one volume.  The name ends in neither ".sql" nor ".json":
         // nothing takes a file that a stopped run left for a query file or a sidecar.
@@ -72,24 +81,28 @@ internal static class SidecarStore
             // UTF-8 without a byte order mark, and the line endings of the writer.
             File.WriteAllText(temporary, text);
             File.Move(temporary, path, overwrite: true);
+            return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             // The error of the write is the one to report, so the removal of what it left may fail unseen.
             _ = TryDelete(temporary);
             reporter.Report(Failure(path, Written, exception));
+            return false;
         }
     }
 
-    private static void Delete(string path, Reporter reporter)
+    private static bool Delete(string path, Reporter reporter)
     {
         try
         {
             File.Delete(path);
+            return true;
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
             reporter.Report(Failure(path, Deleted, exception));
+            return false;
         }
     }
 

@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Logging;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -82,6 +83,271 @@ public sealed class RunLogTests : IDisposable
         diagnostics[1].GetProperty("line").ValueKind.ShouldBe(JsonValueKind.Null);
         diagnostics[1].GetProperty("column").ValueKind.ShouldBe(JsonValueKind.Null);
         events[^1].GetProperty("exitCode").GetInt32().ShouldBe(1);
+    }
+
+    private static string? Text(JsonElement line, string name) => line.GetProperty(name).GetString();
+
+    // A run that skips GetUser, describes ListUsers and fails Bad.
+    private async Task<JsonElement[]> RunThatDescribesSkipsAndFailsAsync()
+    {
+        (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
+        await File.WriteAllTextAsync(
+            _users,
+            Users.Replace("SELECT 2;", "SELECT 22;", StringComparison.Ordinal) + "\n-- name: Bad\nSELECT 4;\n",
+            TestContext.Current.CancellationToken
+        );
+        _scene.Describer.Failures["Bad"] = FakeDescriber.Failure("Bad");
+
+        (await _scene.DescribeAsync("--log", "run.log")).ExitCode.ShouldBe(1);
+        return LogReader.Read(Log);
+    }
+
+    [Fact]
+    public async Task Run_ThatDescribesSkipsAndFails_WritesItsEventsInTheOrderThingsHappened()
+    {
+        var events = await RunThatDescribesSkipsAndFailsAsync();
+
+        events
+            .Select(line => Text(line, "event"))
+            .ShouldBe([
+                "run.start",
+                "project",
+                "file",
+                "query",
+                "database",
+                "database.open",
+                "query",
+                "diagnostic",
+                "query",
+                "diagnostic",
+                "sidecar",
+                "run.end",
+            ]);
+        // The second describe took 25 ms more on the clock than the first: every event has the time it was written.
+        Text(events[6], "time").ShouldBe("2026-10-09T14:02:11.487Z");
+    }
+
+    [Fact]
+    public async Task Run_ThatDescribesSkipsAndFails_SaysOfTheProjectAndTheFileWhatItRead()
+    {
+        var events = await RunThatDescribesSkipsAndFailsAsync();
+
+        var project = events[1];
+        Text(project, "path").ShouldBe(_scene.Project.ProjectPath);
+        project.GetProperty("inRun").GetBoolean().ShouldBeTrue();
+        project.GetProperty("usesSqlSource").GetBoolean().ShouldBeTrue();
+        Text(project, "targetFramework").ShouldBe("net10.0");
+        project.GetProperty("sqlFiles").GetInt32().ShouldBe(1);
+        project.GetProperty("compileFiles").GetInt32().ShouldBe(1);
+        var file = events[2];
+        Text(file, "path").ShouldBe(_users);
+        Text(file, "project").ShouldBe(_scene.Project.ProjectPath);
+        Text(file, "dialect").ShouldBe("postgres");
+        Text(file, "state").ShouldBe("ready");
+        file.GetProperty("queries").GetInt32().ShouldBe(3);
+        var claim = file.GetProperty("claims").EnumerateArray().ShouldHaveSingleItem();
+        Text(claim, "project").ShouldBe(_scene.Project.ProjectPath);
+        Text(claim, "source").ShouldBe(_scene.Project.PathOf("Queries.cs"));
+        claim.GetProperty("line").GetInt32().ShouldBe(1);
+    }
+
+    [Fact]
+    public async Task Run_ThatDescribesSkipsAndFails_SaysOfEachQueryWhatItDecided()
+    {
+        var events = await RunThatDescribesSkipsAndFailsAsync();
+
+        var skipped = events[3];
+        Text(skipped, "file").ShouldBe(_users);
+        Text(skipped, "name").ShouldBe("GetUser");
+        Text(skipped, "database").ShouldBe("postgres");
+        Text(skipped, "hash").ShouldNotBeNull().Length.ShouldBe(64);
+        skipped.GetProperty("selected").GetBoolean().ShouldBeTrue();
+        Text(skipped, "decision").ShouldBe("skipped");
+        skipped.TryGetProperty("durationMs", out _).ShouldBeFalse();
+        skipped.TryGetProperty("error", out _).ShouldBeFalse();
+        var described = events[6];
+        Text(described, "name").ShouldBe("ListUsers");
+        Text(described, "decision").ShouldBe("described");
+        described.GetProperty("durationMs").GetInt64().ShouldBe(25);
+        var failed = events[8];
+        Text(failed, "name").ShouldBe("Bad");
+        Text(failed, "decision").ShouldBe("failed");
+        Text(failed, "error").ShouldBe("SQLSRC999");
+        failed.TryGetProperty("durationMs", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Run_ThatDescribesSkipsAndFails_SaysOfTheDatabaseTheSidecarAndTheEnd()
+    {
+        var events = await RunThatDescribesSkipsAndFailsAsync();
+
+        var database = events[4];
+        Text(database, "name").ShouldBe("postgres");
+        Text(database, "engine").ShouldBe("postgres");
+        // Where the connection came from, and never what it is.
+        Text(database, "connectionSource").ShouldBe("SQLSOURCE_CONNECTION_POSTGRES");
+        database.GetProperty("describer").GetBoolean().ShouldBeTrue();
+        var open = events[5];
+        Text(open, "name").ShouldBe("postgres");
+        Text(open, "serverVersion").ShouldBe("16.4");
+        Text(open, "driver").ShouldBe("FakeDriver");
+        Text(open, "driverVersion").ShouldBe("1.2.3");
+        open.GetProperty("settings").ValueKind.ShouldBe(JsonValueKind.Object);
+        var sidecar = events[10];
+        Text(sidecar, "path").ShouldBe(_users + ".json");
+        Text(sidecar, "action").ShouldBe("held-back");
+        var counts = events[11].GetProperty("databases").EnumerateArray().ShouldHaveSingleItem();
+        Text(counts, "name").ShouldBe("postgres");
+        Text(counts, "engine").ShouldBe("postgres");
+        counts.GetProperty("described").GetInt32().ShouldBe(1);
+        counts.GetProperty("skipped").GetInt32().ShouldBe(1);
+        counts.GetProperty("failed").GetInt32().ShouldBe(1);
+    }
+
+    private string? ActionOf(string sidecarPath) =>
+        LogReader
+            .Read(Log)
+            .Where(line => Text(line, "event") == "sidecar" && Text(line, "path") == sidecarPath)
+            .Select(line => Text(line, "action"))
+            .ShouldHaveSingleItem();
+
+    [Fact]
+    public async Task Run_Sidecars_AreWrittenThenUnchangedThenDeleted()
+    {
+        _ = await _scene.DescribeAsync("--log", "run.log");
+        ActionOf(_users + ".json").ShouldBe("written");
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+        ActionOf(_users + ".json").ShouldBe("unchanged");
+
+        await File.WriteAllTextAsync(
+            _users,
+            "-- name: GetUser\n-- output: sql\nSELECT 1;\n",
+            TestContext.Current.CancellationToken
+        );
+        _ = await _scene.DescribeAsync("--log", "run.log");
+        ActionOf(_users + ".json").ShouldBe("deleted");
+        File.Exists(_users + ".json").ShouldBeFalse();
+    }
+
+    // "written" would say what did not happen.
+    [Fact]
+    public async Task Run_SidecarThatCannotBeWritten_HasTheActionFailed()
+    {
+        _ = Directory.CreateDirectory(_users + ".json");
+
+        var result = await _scene.DescribeAsync("--log", "run.log");
+
+        result.Error.ShouldContain("error SQLSRC218: ");
+        ActionOf(_users + ".json").ShouldBe("failed");
+    }
+
+    [Fact]
+    public async Task Run_Check_SaysOfEachSidecarWhetherItIsTheSameAndCountsInItsOwnWords()
+    {
+        (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
+        var other = _scene.Project.AddSql("Zebras.sql", "-- name: GetZebra\nSELECT 5;\n");
+
+        var result = await _scene.DescribeAsync("--check", "--log", "run.log");
+
+        result.ExitCode.ShouldBe(2);
+        ActionOf(_users + ".json").ShouldBe("same");
+        ActionOf(other + ".json").ShouldBe("differs");
+        File.Exists(other + ".json").ShouldBeFalse();
+        var counts = LogReader.Read(Log)[^1].GetProperty("databases").EnumerateArray().ShouldHaveSingleItem();
+        counts.GetProperty("same").GetInt32().ShouldBe(2);
+        counts.GetProperty("differ").GetInt32().ShouldBe(1);
+        counts.GetProperty("failed").GetInt32().ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogs_HasItsEventsUnderItsEngineBetweenTheRunsOwn()
+    {
+        _scene.Describer.OnOpen = (log, request) => log.Write("connect", new LogMember("database", request.Database));
+        _scene.Describer.OnDescribe = (log, request) => log.Write("columns", new LogMember("query", request.Name));
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        var events = LogReader.Read(Log);
+        events
+            .Select(line => Text(line, "event"))
+            .Skip(3)
+            .ShouldBe([
+                "database",
+                "postgres.connect",
+                "database.open",
+                "postgres.columns",
+                "query",
+                "postgres.columns",
+                "query",
+                "sidecar",
+                "run.end",
+            ]);
+        Text(events[6], "query").ShouldBe("GetUser");
+        Text(events[7], "name").ShouldBe("GetUser");
+    }
+
+    [Fact]
+    public async Task Run_DatabaseWithoutADescriber_SaysSoAndFailsItsQueriesWithSqlsrc216()
+    {
+        _scene.Run.Describers.Clear();
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        var events = LogReader.Read(Log);
+        var database = events.Single(line => Text(line, "event") == "database");
+        database.GetProperty("describer").GetBoolean().ShouldBeFalse();
+        events.ShouldNotContain(line => Text(line, "event") == "database.open");
+        events
+            .Where(line => Text(line, "event") == "query")
+            .Select(line => $"{Text(line, "decision")} {Text(line, "error")}")
+            .ShouldBe(["failed SQLSRC216", "failed SQLSRC216"]);
+    }
+
+    [Fact]
+    public async Task Run_DatabaseWithoutAConnection_HasTheSourceNoneAndFailsItsQueriesWithSqlsrc213()
+    {
+        _ = _scene.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        var events = LogReader.Read(Log);
+        Text(events.Single(line => Text(line, "event") == "database"), "connectionSource").ShouldBe("none");
+        events
+            .Where(line => Text(line, "event") == "query")
+            .Select(line => Text(line, "error"))
+            .ShouldBe(["SQLSRC213", "SQLSRC213"]);
+    }
+
+    [Fact]
+    public async Task Run_SessionThatDoesNotOpen_HasTheErrorsIdInDatabaseOpen()
+    {
+        _scene.Describer.OpenFailure = FakeDescriber.Failure("GetUser", "password authentication failed");
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        var open = LogReader.Read(Log).Single(line => Text(line, "event") == "database.open");
+        Text(open, "name").ShouldBe("postgres");
+        Text(open, "error").ShouldBe("SQLSRC999");
+        open.TryGetProperty("serverVersion", out _).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Run_ProjectThatProjectOptionLeavesOut_IsInTheLogAndWasNotAsked()
+    {
+        var lib = Plans.Postgres(_scene.Run.Folder, "Lib", "Lib").AnsweredBy(_scene.Run.Processes);
+        _ = _scene.Run.Folder.WriteFile(
+            "App.slnx",
+            "<Solution><Project Path=\"App.csproj\" /><Project Path=\"Lib/Lib.csproj\" /></Solution>"
+        );
+
+        _ = await _scene.DescribeAsync("App.slnx", "--project", "App.csproj", "--log", "run.log");
+
+        var projects = LogReader.Read(Log).Where(line => Text(line, "event") == "project").ToArray();
+        projects.Select(line => Text(line, "path")).ShouldBe([lib.ProjectPath, _scene.Project.ProjectPath]);
+        projects[0].GetProperty("inRun").GetBoolean().ShouldBeFalse();
+        projects[0].TryGetProperty("usesSqlSource", out _).ShouldBeFalse();
+        projects[1].GetProperty("inRun").GetBoolean().ShouldBeTrue();
     }
 
     [Fact]

@@ -3,6 +3,8 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Describing;
+using SqlSource.Tool.Logging;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -61,5 +63,100 @@ public sealed class RedactionTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldNotContain(Marker);
         File.Exists(Log).ShouldBeFalse();
+    }
+
+    // A value with the two characters that JSON writes another way.
+    private const string Escaped = "Host=db;Password=\"s3cret\\marker\"";
+
+    private async Task<string> LoggedWithAsync(string value)
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = value;
+        _ = await _scene.DescribeAsync("--log", "run.log");
+        return await File.ReadAllTextAsync(Log, TestContext.Current.CancellationToken);
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogsItsConnection_HasTheMarkInEveryPlaceAndTheValueNowhere()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+            log.Write(
+                "connect " + request.Connection,
+                new(request.Connection, request.Connection),
+                new("message", "cannot connect with '" + request.Connection + "'"),
+                new("list", LogValue.ListOf([LogValue.MapOf(new LogMember("deep", request.Connection))]))
+            );
+
+        var text = await LoggedWithAsync(Value);
+
+        text.ShouldNotContain(Marker);
+        var line = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "postgres.connect ***");
+        line.GetProperty("***").GetString().ShouldBe("***");
+        line.GetProperty("message").GetString().ShouldBe("cannot connect with '***'");
+        line.GetProperty("list")[0].GetProperty("deep").GetString().ShouldBe("***");
+    }
+
+    // The value is removed before the line is written, so the file holds it neither as it is nor as JSON escapes it.
+    [Fact]
+    public async Task Run_DescriberThatLogsAConnectionThatJsonEscapes_LeavesTheValueInNeitherForm()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+            log.Write("connect", new LogMember("with", "<" + request.Connection + ">"));
+
+        var text = await LoggedWithAsync(Escaped);
+
+        text.ShouldNotContain("s3cret");
+        LogReader
+            .Read(Log)
+            .Single(e => e.GetProperty("event").GetString() == "postgres.connect")
+            .GetProperty("with")
+            .GetString()
+            .ShouldBe("<***>");
+    }
+
+    // What the run itself writes of a database is a describer's text too.
+    [Fact]
+    public async Task Run_DescriberThatGivesItsConnectionAsItsServer_HasTheMarkInDatabaseOpen()
+    {
+        _scene.Describer.Server = new ServerInfo(
+            Value,
+            Value,
+            Value,
+            new EquatableArray<ServerSetting>([new ServerSetting(Value, Value)])
+        );
+
+        var text = await LoggedWithAsync(Value);
+
+        text.ShouldNotContain(Marker);
+        var open = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "database.open");
+        open.GetProperty("serverVersion").GetString().ShouldBe("***");
+        open.GetProperty("driver").GetString().ShouldBe("***");
+        open.GetProperty("driverVersion").GetString().ShouldBe("***");
+        open.GetProperty("settings").GetProperty("***").GetString().ShouldBe("***");
+    }
+
+    // Every text of a failure and of an exception is in a "diagnostic", and was cleaned before it was reported.
+    [Fact]
+    public async Task Run_DescriberThatReturnsAndThrowsItsConnection_LeavesNoValueInADiagnostic()
+    {
+        // After "Users.sql", so that GetUser fails before Throws ends the run.
+        _ = _scene.Project.AddSql("Zebra.sql", "-- name: Throws\nSELECT 2;\n");
+        _scene.Describer.Failures["GetUser"] = new DescribeFailure(
+            FakeDescriber.Rejected,
+            new EquatableArray<string>([Value]),
+            DescribeStep.Explain,
+            new EquatableArray<string>(["server said " + Value]),
+            "try " + Value
+        );
+        _scene.Describer.Exceptions["Throws"] = new InvalidOperationException("bad " + Value);
+        _scene.Run.Environment["SQLSOURCE_DEBUG"] = "1";
+
+        var text = await LoggedWithAsync(Value);
+
+        text.ShouldNotContain(Marker);
+        LogReader
+            .Read(Log)
+            .Where(e => e.GetProperty("event").GetString() == "diagnostic")
+            .Select(e => e.GetProperty("id").GetString())
+            .ShouldBe(["SQLSRC999", "SQLSRC200"]);
     }
 }

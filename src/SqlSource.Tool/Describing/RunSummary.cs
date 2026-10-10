@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using SqlSource.Parsing;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 
 namespace SqlSource.Tool.Describing;
@@ -78,6 +79,39 @@ internal static class RunSummary
         }
 
         return lines.ToImmutable();
+    }
+
+    /// <summary>
+    /// The counts of each selected database as <c>run.end</c> holds them, in the plan's order: the numbers of the
+    /// summary's lines, under the names of those lines.
+    /// </summary>
+    /// <param name="selected">The selected databases.</param>
+    /// <param name="files">The files, with every query described, kept, failed or left out.</param>
+    /// <param name="check">Whether the run is <c>--check</c>.</param>
+    public static LogValue Counts(
+        ImmutableArray<PlannedDatabase> selected,
+        ImmutableArray<FileWork> files,
+        bool check
+    ) => LogValue.ListOf(selected.Select(database => Counts(database, files, check)));
+
+    private static LogValue Counts(PlannedDatabase database, ImmutableArray<FileWork> files, bool check)
+    {
+        var name = new LogMember("name", database.Name);
+        var engine = new LogMember("engine", SqlDialectName.Canonical(database.Dialect));
+        if (check)
+        {
+            var (same, differ, notDescribed) = CountChecked(files, database.Name);
+            return LogValue.MapOf(name, engine, new("same", same), new("differ", differ), new("failed", notDescribed));
+        }
+
+        var (described, skipped, failed) = Count(files, database.Name);
+        return LogValue.MapOf(
+            name,
+            engine,
+            new("described", described),
+            new("skipped", skipped),
+            new("failed", failed)
+        );
     }
 
     private static string Label(PlannedDatabase database) =>

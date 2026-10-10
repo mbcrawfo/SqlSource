@@ -8,6 +8,8 @@ Before a text that a describer gave is printed, [`Redaction`](../../src/SqlSourc
 - **A value split over several server lines.**  Each line is searched alone, so a value that a describer breaks over two lines is not found.
 - **A value that was changed.**  Only the whole value is replaced.  A driver's message that quotes the value changed, trimmed of a trailing space or line break for one, or quotes one keyword of it, is printed.  The same holds for what is written to a sidecar: [`EntrySecretCheck`](../../src/SqlSource.Tool/Describing/EntrySecretCheck.cs) ends the run when an entry holds the whole value as the writer would write it, and finds nothing of a value that was changed.  It also searches the whole text the writer would write for the entry, its fixed words included, so a connection value that equals one of them, or a short dummy value of a test or a replay such as `server`, `name` or `postgres`, would end the run with `SQLSRC200` for every query.  That fails closed, and no real connection string has that shape, since one holds `=` and no fixed text of the writer does.
 
+Sub-phase 2.6 puts the same removal before two more places, with the same holes: the log of `--log`, through [`SessionRunLog`](../../src/SqlSource.Tool/Logging/SessionRunLog.cs), and the lines of `--verbose`, through [`RunTrace`](../../src/SqlSource.Tool/Logging/RunTrace.cs).  A describer that logs a value it changed, or one keyword of it, writes it to a file that a user may attach to an issue.
+
 ## Why it exists
 
 The spec of sub-phase 2.5 gives the rule for printed text and for the whole value, because the tool does not read a connection string and so knows no part of one.  No describer exists yet whose texts could be studied.
@@ -18,7 +20,7 @@ Low today: the released tool has no describer.  From phase 3 a describer's rule 
 
 ## Proposed fix
 
-With the first real describer: have it hand the tool the parts of the connection that are secret, as its driver's connection-string builder knows them, and redact each.  Search a failure's server lines joined as well as alone.  Give `EntrySecretCheck` the same parts.
+With the first real describer: have it hand the tool the parts of the connection that are secret, as its driver's connection-string builder knows them, and redact each.  Search a failure's server lines joined as well as alone.  Give `EntrySecretCheck` the same parts.  Give `SessionRunLog` and `RunTrace` the same parts.
 
 ## Trigger
 

@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Diagnostics;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Projects;
@@ -54,15 +55,23 @@ internal static class RunProjects
             solution = unit.Path;
         }
 
+        var all = projects;
         var restricted = named.Count > 0;
         if (restricted)
         {
             projects = Restrict(projects, named, unit, host.WorkingDirectory, reporter);
         }
 
+        // A project that --project leaves out is not asked about.
+        foreach (var left in all.Except(projects, StringComparer.OrdinalIgnoreCase))
+        {
+            RunEvents.Project(reporter.Trace, left, evaluation: null);
+        }
+
         var manifests = ImmutableArray.CreateBuilder<ProjectManifest>();
         foreach (var evaluation in await ProjectEvaluator.EvaluateAsync(host, projects, solution, cancellationToken))
         {
+            RunEvents.Project(reporter.Trace, evaluation.ProjectPath, evaluation);
             var project = evaluation.ProjectPath;
             switch (evaluation.State)
             {

@@ -5,7 +5,7 @@ namespace SqlSource.Tool.Logging;
 /// <see cref="NullRunLog" /> is what a run without one has.
 /// </summary>
 /// <remarks>
-/// Nothing hands a log a connection's value.  A describer is given a <c>SessionRunLog</c>, which removes
+/// Nothing hands a log a connection's value.  A describer is given a <see cref="SessionRunLog" />, which removes
 /// the value all the same.
 /// </remarks>
 internal interface IRunLog

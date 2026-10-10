@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using SqlSource.Generation;
 using SqlSource.Settings;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
@@ -320,6 +321,11 @@ internal static class DescribeCommand
             host.WorkingDirectory
         );
         var result = RunPlanner.Plan(manifests, filters, cancellationToken);
+        foreach (var file in result.Plan.Files)
+        {
+            RunEvents.File(reporter.Trace, file);
+        }
+
         foreach (var error in result.Errors)
         {
             reporter.Report(error);

@@ -11,11 +11,13 @@ namespace SqlSource.Tool.Planning;
 /// <param name="Dialect">The dialect it was read by.</param>
 /// <param name="State">Whether its queries can be described.</param>
 /// <param name="Queries">Its queries, in the file's order.  Every one, whatever the filters of the run.</param>
+/// <param name="Claims">Every attribute that claims it, in the order of the projects and then of their claims.</param>
 internal sealed record PlannedFile(
     string Path,
     string NormalizedPath,
     string ProjectPath,
     SqlDialect Dialect,
     PlannedFileState State,
-    EquatableArray<PlannedQuery> Queries
+    EquatableArray<PlannedQuery> Queries,
+    EquatableArray<FileClaim> Claims
 );

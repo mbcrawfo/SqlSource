@@ -79,6 +79,23 @@ public sealed class SecretTests : IDisposable
         _scene.Describer.Opened.ShouldAllBe(request => request.Connection == Value);
     }
 
+    // The same run with a log: the file holds every error of it, and the marker word nowhere.
+    [Fact]
+    public async Task Run_ValueOnTheCommandLineAndEveryErrorWithLog_IsNeverLogged()
+    {
+        AddEveryError();
+
+        var result = await _scene.DescribeAsync("--connection", "postgres=" + Value, "--log", "run.log");
+
+        ShouldHold(result, "213,214,216,217,218,221,999");
+        var log = await File.ReadAllTextAsync(
+            _scene.Run.Folder.PathOf("run.log"),
+            TestContext.Current.CancellationToken
+        );
+        log.ShouldNotContain(Marker);
+        log.ShouldContain("\"id\":\"SQLSRC999\"");
+    }
+
     [Fact]
     public async Task Run_ValueInTheVariableOfTheNameAndEveryError_IsNeverPrinted()
     {
