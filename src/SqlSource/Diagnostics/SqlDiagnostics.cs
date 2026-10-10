@@ -13,9 +13,9 @@ namespace SqlSource.Diagnostics;
 /// </remarks>
 internal static class SqlDiagnostics
 {
-    private const string Category = "SqlSource";
+    internal const string Category = "SqlSource";
 
-    private const string HelpLinkBase = "https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#";
+    internal const string HelpLinkBase = "https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#";
 
     public static readonly DiagnosticDescriptor TypeNotPartial = new(
         id: "SQLSRC001",

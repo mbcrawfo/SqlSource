@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Runs every validation on the whole repository: formatting, linting, build, tests and the two package checks.
+# Runs every validation on the whole repository: formatting, linting, build, tests and the three package checks.
 # Rewrites nothing.  Every step runs even when an earlier one fails, except that the tests and the package checks are
 # skipped when the build fails.
 # Usage: pre-commit-validation.sh
@@ -44,8 +44,9 @@ if run_step 'build' dotnet build "$SOLUTION"; then
     run_step 'test' dotnet test --solution "$SOLUTION" --no-build || true
     run_step 'package' tools/check-package.sh || true
     run_step 'package-install' tools/check-package-install.sh || true
+    run_step 'tool-install' tools/check-tool-install.sh || true
 else
-    results+=('skipped  test' 'skipped  package' 'skipped  package-install')
+    results+=('skipped  test' 'skipped  package' 'skipped  package-install' 'skipped  tool-install')
 fi
 
 printf '\nSummary:\n'

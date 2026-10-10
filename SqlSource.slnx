@@ -1,9 +1,11 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/SqlSource.Tool/SqlSource.Tool.csproj" />
     <Project Path="src/SqlSource/SqlSource.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/SqlSource.Tests.RoslynFloor/SqlSource.Tests.RoslynFloor.csproj" />
     <Project Path="tests/SqlSource.Tests/SqlSource.Tests.csproj" />
+    <Project Path="tests/SqlSource.Tool.Tests/SqlSource.Tool.Tests.csproj" />
   </Folder>
 </Solution>

@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net8.0</TargetFramework>
+        <!-- A machine that has only a later runtime than .NET 8 runs the tool on that one. -->
+        <RollForward>Major</RollForward>
+        <!--
+            The tool writes English.  Without this, the package carries the resources of Roslyn and of
+            System.CommandLine in thirteen languages, and the help is in two languages at once.
+        -->
+        <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+        <!--
+            The documentation files exist because the repository builds them for every project.  They describe
+            internals, and nothing reads them where a tool is run, so the package leaves out the tool's own and the
+            generator's.  The symbol files stay: they give a stack trace its file names and line numbers.
+        -->
+        <PublishDocumentationFile>false</PublishDocumentationFile>
+        <PublishReferencesDocumentationFiles>false</PublishReferencesDocumentationFiles>
+    </PropertyGroup>
+    <PropertyGroup>
+        <PackAsTool>true</PackAsTool>
+        <ToolCommandName>sqlsource</ToolCommandName>
+        <PackageId>SqlSource.Tool</PackageId>
+        <Description>The sqlsource command of the SqlSource C# SQL query source generator.</Description>
+        <Authors>Michael Crawford</Authors>
+        <PackageLicenseExpression>MIT</PackageLicenseExpression>
+        <PackageProjectUrl>https://github.com/mbcrawfo/SqlSource</PackageProjectUrl>
+        <RepositoryUrl>https://github.com/mbcrawfo/SqlSource</RepositoryUrl>
+        <PackageTags>sql;source-generator;roslyn</PackageTags>
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+    </PropertyGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
+    </ItemGroup>
+    <ItemGroup>
+        <!--
+            The generator's reference to Roslyn is private and does not flow.  The tool reads a consumer's C#, so it
+            takes a current compiler and not the generator's pin, as tests/SqlSource.Tests does.
+        -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
+        <PackageReference Include="System.CommandLine" />
+    </ItemGroup>
+    <ItemGroup>
+        <None Include="README.md" Pack="true" PackagePath="/" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../SqlSource/SqlSource.csproj" />
+    </ItemGroup>
+</Project>

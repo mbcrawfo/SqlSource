@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
@@ -15,20 +17,25 @@ public class DiagnosticsDocumentTests
 {
     private const string HeadingPrefix = "## ";
 
+    // The generator's descriptors and then the tool's, which is the order of their ids.
+    private static readonly ImmutableArray<DiagnosticDescriptor> Descriptors = SqlDiagnostics.All.AddRange(
+        ToolDiagnostics.All
+    );
+
     private static readonly string[] Lines = File.ReadAllLines(
         Path.Combine(AppContext.BaseDirectory, "docs", "diagnostics.md")
     );
 
     [Fact]
     public void Document_Sections_AreTheDescriptorsInOrder() =>
-        Sections().Select(section => section.Id).ShouldBe(SqlDiagnostics.All.Select(descriptor => descriptor.Id));
+        Sections().Select(section => section.Id).ShouldBe(Descriptors.Select(descriptor => descriptor.Id));
 
     [Fact]
     public void Document_EachSection_StartsWithItsDescriptorsTitle()
     {
         var sections = Sections().ToDictionary(section => section.Id, section => section.Body);
 
-        foreach (var descriptor in SqlDiagnostics.All)
+        foreach (var descriptor in Descriptors)
         {
             sections[descriptor.Id].FirstOrDefault(line => line.Length > 0).ShouldBe($"**{descriptor.Title}**");
         }
@@ -41,9 +48,7 @@ public class DiagnosticsDocumentTests
 
         rows.ShouldBe(
             // The anchor of a heading is its text in lower case, and an id is "SQLSRC" followed by digits.
-            SqlDiagnostics.All.Select(descriptor =>
-                $"| [{descriptor.Id}](#sqlsrc{descriptor.Id[6..]}) | {descriptor.Title} |"
-            )
+            Descriptors.Select(descriptor => $"| [{descriptor.Id}](#sqlsrc{descriptor.Id[6..]}) | {descriptor.Title} |")
         );
     }
 

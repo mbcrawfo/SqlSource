@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is a build error, and none can be turned off or made a warning.  An error in a `.sql` file is reported at its line and column in that file.  A `.sql` file with an error produces no members until the error is fixed.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning.  The generator reports its errors in the build.  An error in a `.sql` file is reported at its line and column in that file, and a `.sql` file with an error produces no members until the error is fixed.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error.
 
 | Id | Title |
 |----|----|
@@ -36,8 +36,13 @@ Every problem SqlSource finds is a build error, and none can be turned off or ma
 | [SQLSRC117](#sqlsrc117) | Parameter has no type |
 | [SQLSRC118](#sqlsrc118) | Parameter is not declared |
 | [SQLSRC119](#sqlsrc119) | Query has no parameters |
+| [SQLSRC200](#sqlsrc200) | The tool failed unexpectedly |
+| [SQLSRC201](#sqlsrc201) | No project or solution found |
+| [SQLSRC202](#sqlsrc202) | More than one project or solution found |
+| [SQLSRC203](#sqlsrc203) | Path is not a project or a solution |
+| [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
@@ -524,3 +529,61 @@ SELECT COUNT(*) FROM users;
 ```
 
 Remove the marker.
+
+## SQLSRC200
+
+**The tool failed unexpectedly**
+
+`sqlsource` stopped on an exception that it has no error of its own for.  The message holds the type of the exception and its message.
+
+```console
+$ dotnet sqlsource describe
+sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.IO.FileNotFoundException: Unable to find the specified file.
+```
+
+Here the working directory was deleted while a terminal was still in it.  When the message names such a condition of your machine, mend that.  Otherwise it is a bug in the tool: set the environment variable `SQLSOURCE_DEBUG` to any value, run the command again, and [report it](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
+
+## SQLSRC201
+
+**No project or solution found**
+
+`sqlsource describe` was given a directory, or none and so the current one, that holds no `.sln`, `.slnx` or `.csproj` file.  The tool looks in that directory alone, not in the folders below it.
+
+Run the command from the folder of the project or the solution, or name the one to run on:
+
+```console
+$ dotnet sqlsource describe src/App/App.csproj
+```
+
+## SQLSRC202
+
+**More than one project or solution found**
+
+`sqlsource describe` was given a directory, or none and so the current one, that holds more than one `.sln`, `.slnx` or `.csproj` file.  The tool does not choose between them, as `dotnet build` does not.
+
+Name the one to run on:
+
+```console
+$ dotnet sqlsource describe App.slnx
+```
+
+## SQLSRC203
+
+**Path is not a project or a solution**
+
+The path given to `sqlsource describe` does not exist, or is a file that is not a `.sln`, `.slnx` or `.csproj` file.  A solution filter, `.slnf`, and a project of another language are not read.  The message holds the full path the tool looked at: a relative path is resolved against the current directory.  An empty path is this error too, which is what a variable that is not set gives in a shell.
+
+Give the path of a solution, of a C# project, or of a directory that holds exactly one of them.
+
+## SQLSRC222
+
+**Directory cannot be read**
+
+`sqlsource describe` was given a directory, or none and so the current one, and the operating system would not list its files.  The message ends with the reason the system gave.
+
+```console
+$ dotnet sqlsource describe /srv/locked
+sqlsource : error SQLSRC222: '/srv/locked' cannot be read: Access to the path '/srv/locked' is denied.
+```
+
+Give yourself the right to read the directory.

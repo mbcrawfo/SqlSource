@@ -102,7 +102,7 @@ jobs:
               '-reports:artifacts/test-results/*.cobertura.xml' \
               -targetdir:artifacts/coverage \
               '-reporttypes:Html;Cobertura;MarkdownSummaryGithub' \
-              '-assemblyfilters:+SqlSource'
+              '-assemblyfilters:+SqlSource;+SqlSource.Tool'
           cat artifacts/coverage/SummaryGithub.md >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload coverage
@@ -121,6 +121,9 @@ jobs:
 
       - name: Check package install
         run: tools/check-package-install.sh artifacts/packages
+
+      - name: Check tool install
+        run: tools/check-tool-install.sh artifacts/packages
 
       - name: Upload packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
