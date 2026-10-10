@@ -8,7 +8,6 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Diagnostics;
-using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool;
@@ -162,65 +161,12 @@ public static class Cli
         {
             new HelpOption("--help", "-h", "-?"),
             version,
-            Describe(host, reporter),
+            DescribeCommand.Create(host, reporter),
         };
 
         // System.CommandLine's own answer to no command is an error.
         root.SetAction(static parsed => new HelpAction().Invoke(parsed));
         return root;
-    }
-
-    private static Command Describe(ToolHost host, Reporter reporter)
-    {
-        var path = new Argument<string?>("path")
-        {
-            Description =
-                "A .sln, .slnx or .csproj file, or a directory that holds exactly one.  The current directory "
-                + "when left out.",
-            Arity = ArgumentArity.ZeroOrOne,
-        };
-
-        // One value each time it is given, and it may be given several times: UsageCheck reads the token after it as
-        // its value and no further.
-        var project = new Option<string[]>("--project")
-        {
-            Description = "A project to run on, of the solution.  May be given several times.",
-            HelpName = "path",
-            Arity = ArgumentArity.OneOrMore,
-            AllowMultipleArgumentsPerToken = false,
-        };
-
-        var describe = new Command("describe", "Finds the projects to describe and reads what the compiler is given")
-        {
-            path,
-            project,
-        };
-        describe.SetAction(
-            async (parsed, cancellationToken) =>
-            {
-                // An error is in the reporter, where the exit code is taken.
-                if (RunUnitFinder.Find(parsed.GetValue(path), host.WorkingDirectory, reporter) is not { } unit)
-                {
-                    return 0;
-                }
-
-                var manifests = await RunProjects.FindAsync(
-                    unit,
-                    parsed.GetValue(project) ?? [],
-                    host,
-                    reporter,
-                    cancellationToken
-                );
-                if (manifests.IsEmpty && reporter.Count == 0)
-                {
-                    // A run that found nothing to do must not look like one that did it.
-                    await host.Out.WriteLineAsync($"sqlsource: no project of '{OneLine.Of(unit.Path)}' uses SqlSource");
-                }
-
-                return 0;
-            }
-        );
-        return describe;
     }
 
     private static ToolDiagnostic Failure(Exception exception, Func<string, string?> getEnvironmentVariable)

@@ -4,6 +4,8 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Tool.Planning;
+using SqlSource.Tool.Reporting;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -37,11 +39,35 @@ internal sealed class CliRun : IDisposable
 
     public void Dispose() => Folder.Dispose();
 
+    // The plan that "describe" builds for a command line, with what it wrote.  Nothing a run prints says what it
+    // selected, so a test of that reads the plan.
+    public async Task<(RunPlan? Plan, CliResult Result)> PlanAsync(params string[] args)
+    {
+        using var output = NewWriter();
+        using var error = NewWriter();
+        var host = CreateHost(output, error);
+        var reporter = new Reporter(host.Error);
+        var parsed = Cli.BuildCommands(host, reporter).Parse(args, Cli.Parser);
+
+        var plan = await DescribeCommand.PlanAsync(parsed, host, reporter, TestContext.Current.CancellationToken);
+
+        return (plan, new CliResult(reporter.Count > 0 ? 1 : 0, output.ToString(), error.ToString()));
+    }
+
     private async Task<CliResult> InvokeAsync(string[] args, CancellationToken cancellationToken)
     {
-        using var output = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
-        using var error = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
-        var host = new ToolHost(
+        using var output = NewWriter();
+        using var error = NewWriter();
+
+        var exitCode = await Cli.RunAsync(args, CreateHost(output, error), cancellationToken);
+
+        return new CliResult(exitCode, output.ToString(), error.ToString());
+    }
+
+    private static StringWriter NewWriter() => new(CultureInfo.InvariantCulture) { NewLine = "\n" };
+
+    private ToolHost CreateHost(TextWriter output, TextWriter error) =>
+        new(
             Out ?? output,
             error,
             Folder.Path,
@@ -50,9 +76,4 @@ internal sealed class CliRun : IDisposable
             Folder.CreateFolder("tmp"),
             ProcessorCount: 4
         );
-
-        var exitCode = await Cli.RunAsync(args, host, cancellationToken);
-
-        return new CliResult(exitCode, output.ToString(), error.ToString());
-    }
 }

@@ -269,4 +269,52 @@ public class DescribeTests
         result.Out.ShouldBeEmpty();
         result.Error.ShouldStartWith($"sqlsource : error SQLSRC203: '{path}' is not a .sln, .slnx or .csproj file");
     }
+
+    private const string Queries = "[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n";
+
+    [Fact]
+    public async Task Run_ProjectWhosePlanHasNoError_PrintsNothing()
+    {
+        using var run = new CliRun();
+        var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
+        project.Properties["SqlSourceDialect"] = "postgres";
+        _ = project.AddSource("Queries.cs", Queries);
+        _ = project.AddSql("One.sql", "SELECT 1;");
+
+        var result = await run.RunAsync("describe", project.ProjectPath);
+
+        result.ShouldBe(new CliResult(0, "", ""));
+    }
+
+    [Fact]
+    public async Task Run_ProjectWithAFileThatDoesNotParse_ReportsItAsABuildWouldAndExitsOne()
+    {
+        using var run = new CliRun();
+        var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
+        project.Properties["SqlSourceDialect"] = "postgres";
+        _ = project.AddSource("Queries.cs", Queries);
+        var sql = project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
+
+        var result = await run.RunAsync("describe", project.ProjectPath);
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldBeEmpty();
+        result.Error.ShouldStartWith($"{sql}(2,8): error SQLSRC101: ");
+        result.Error.ShouldEndWith("/docs/diagnostics.md#sqlsrc101\n");
+    }
+
+    [Fact]
+    public async Task Plan_Project_GivesThePlanOfTheCommandLine()
+    {
+        using var run = new CliRun();
+        var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
+        project.Properties["SqlSourceDialect"] = "postgres";
+        _ = project.AddSource("Queries.cs", Queries);
+        var sql = project.AddSql("One.sql", "SELECT 1;");
+
+        var (plan, result) = await run.PlanAsync("describe", project.ProjectPath);
+
+        result.ShouldBe(new CliResult(0, "", ""));
+        plan.ShouldNotBeNull().Files.ShouldHaveSingleItem().Path.ShouldBe(sql);
+    }
 }
