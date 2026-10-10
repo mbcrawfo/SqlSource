@@ -232,6 +232,22 @@ internal static class DescribeCommand
         return string.IsNullOrWhiteSpace(variable) ? null : variable;
     }
 
+    /// <summary>
+    /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--connection</c> the same values, in the
+    /// same order.  True for a command other than <c>describe</c>.
+    /// </summary>
+    /// <remarks>
+    /// The log's <c>arguments</c> is redacted from what <see cref="UsageCheck" /> read, and the describer is handed
+    /// what System.CommandLine bound.  If the two disagree on which token is a connection's value, a value could
+    /// reach the log, so <c>Cli</c> runs nothing then.
+    /// </remarks>
+    public static bool ReadsConnectionsAs(Usage usage, ParseResult parsed) =>
+        usage.Command.Name != Name
+        || usage
+            .Values.Where(static value => value.Option?.Name == ConnectionOption)
+            .Select(static value => value.Text)
+            .SequenceEqual(parsed.GetValue<string[]>(ConnectionOption) ?? [], StringComparer.Ordinal);
+
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
     private static DescribeOptions OptionsOf(ParseResult parsed)
     {

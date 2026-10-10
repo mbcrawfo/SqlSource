@@ -139,11 +139,16 @@ public static class Cli
                 }
 
                 var parsed = root.Parse(args, Parser);
-                if (parsed.Errors.Count > 0 || !usage.IsReadTheSameBy(parsed))
+                if (
+                    parsed.Errors.Count > 0
+                    || !usage.IsReadTheSameBy(parsed)
+                    || !DescribeCommand.ReadsConnectionsAs(usage, parsed)
+                )
                 {
                     // UsageCheck lets nothing through that System.CommandLine rejects or reads another way, as far as
                     // the tests know.  If something is, nothing runs, and System.CommandLine's message is not written:
-                    // it may repeat a token.
+                    // it may repeat a token.  The values of --connection are held too: the log's arguments is
+                    // redacted from one reading and the describer is handed the other.
                     await host.Error.WriteLineAsync("sqlsource: the command line is not valid");
                     return 1;
                 }

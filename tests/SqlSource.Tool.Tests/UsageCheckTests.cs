@@ -161,6 +161,35 @@ public class UsageCheckTests
         usage.IsReadTheSameBy(root.Parse([], Cli.Parser)).ShouldBeFalse();
     }
 
+    [Fact]
+    public void ReadsConnectionsAs_ParseThatBindsOtherValues_IsFalse()
+    {
+        var root = ToolRoot();
+        var usage = UsageCheck.Check(root, ["describe", "--connection", "a=" + Secret, "--connection", "b=2"]);
+
+        DescribeCommand
+            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=" + Secret, "--connection", "b=2"]))
+            .ShouldBeTrue();
+        DescribeCommand
+            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=x", "--connection", "b=2"]))
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "b=2", "--connection", "a=" + Secret]))
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=" + Secret]))
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsConnectionsAs(
+                usage,
+                root.Parse(["describe", "--connection", "a=" + Secret, "--connection", "b=2", "--connection", "c=3"])
+            )
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsConnectionsAs(UsageCheck.Check(root, ["--version"]), root.Parse(["--version"]))
+            .ShouldBeTrue();
+    }
+
     // The two readers of a command line must agree, or a token that this one took for a value is the path of the
     // other, and a path is printed.  Every command line of up to four of these tokens that both accept is read by
     // both as one command with the same arguments.
