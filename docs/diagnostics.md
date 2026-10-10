@@ -40,6 +40,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC201](#sqlsrc201) | No project or solution found |
 | [SQLSRC202](#sqlsrc202) | More than one project or solution found |
 | [SQLSRC203](#sqlsrc203) | Path is not a project or a solution |
+| [SQLSRC206](#sqlsrc206) | Project manifest cannot be read |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1.
@@ -574,6 +575,19 @@ $ dotnet sqlsource describe App.slnx
 The path given to `sqlsource describe` does not exist, or is a file that is not a `.sln`, `.slnx` or `.csproj` file.  A solution filter, `.slnf`, and a project of another language are not read.  The message holds the full path the tool looked at: a relative path is resolved against the current directory.  An empty path is this error too, which is what a variable that is not set gives in a shell.
 
 Give the path of a solution, of a C# project, or of a directory that holds exactly one of them.
+
+## SQLSRC206
+
+**Project manifest cannot be read**
+
+For each project, `sqlsource` has MSBuild write a file that lists what the compiler is given: the project manifest, which the target `SqlSourceWriteManifest` of the SqlSource package writes.  The tool could not read what the target wrote.  The message ends with what is wrong.
+
+```console
+$ dotnet sqlsource describe
+/work/App/App.csproj : error SQLSRC206: The project manifest of '/work/App/App.csproj' cannot be read: it has version '2' of the format and this tool reads version 1.  The SqlSource package and the sqlsource tool are out of step: update the older one
+```
+
+The SqlSource package of the project and the `sqlsource` tool are of different versions.  Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool`.  The two are released together under one version number.
 
 ## SQLSRC222
 

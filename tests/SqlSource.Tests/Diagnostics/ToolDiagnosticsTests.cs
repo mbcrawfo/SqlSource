@@ -79,6 +79,16 @@ public class ToolDiagnosticsTests
     }
 
     [Fact]
+    public void ManifestCannotBeRead_Message_HoldsTheProjectAndTheReason() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ManifestCannotBeRead.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/App.csproj",
+                "it names no project"
+            )
+            .ShouldBe("The project manifest of '/work/App.csproj' cannot be read: it names no project");
+
+    [Fact]
     public void DirectoryCannotBeRead_Message_HoldsTheDirectoryAndTheReason() =>
         string.Format(
                 CultureInfo.InvariantCulture,

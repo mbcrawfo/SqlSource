@@ -56,6 +56,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor ManifestCannotBeRead = new(
+        id: "SQLSRC206",
+        title: "Project manifest cannot be read",
+        messageFormat: "The project manifest of '{0}' cannot be read: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc206",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor DirectoryCannotBeRead = new(
         id: "SQLSRC222",
         title: "Directory cannot be read",
@@ -71,5 +82,12 @@ internal static class ToolDiagnostics
     /// Every descriptor, in the order of its id.
     /// </summary>
     public static ImmutableArray<DiagnosticDescriptor> All { get; } =
-        ImmutableArray.Create(UnexpectedFailure, NoRunUnit, SeveralRunUnits, NotARunUnit, DirectoryCannotBeRead);
+        ImmutableArray.Create(
+            UnexpectedFailure,
+            NoRunUnit,
+            SeveralRunUnits,
+            NotARunUnit,
+            ManifestCannotBeRead,
+            DirectoryCannotBeRead
+        );
 }
