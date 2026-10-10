@@ -46,6 +46,18 @@ public partial class BuildFileTests
 
     private static readonly XDocument Targets = Load("SqlSource.targets");
 
+    // The sqlsource tool evaluates a project and asks for this property to find out whether the project uses
+    // SqlSource.  A condition would make a project that uses it look like one that does not.
+    [Fact]
+    public void Props_Marker_SaysThatTheProjectUsesSqlSourceInEveryProject()
+    {
+        var marker = Props.Descendants("SqlSourceImported").ShouldHaveSingleItem();
+
+        marker.Value.ShouldBe("true");
+        marker.Parent.ShouldNotBeNull().Name.LocalName.ShouldBe("PropertyGroup");
+        ConditionsAround(marker).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Props_PropertiesOfThePackage_ReachTheCompilerInEveryProject()
     {

@@ -1,5 +1,14 @@
 <Project>
     <!--
+        Says that the project uses SqlSource.  The sqlsource tool asks a project for this property and for nothing
+        else to find that out, so it is set with no condition, and here: these props reach a project whether the
+        package came from NuGet or its files are imported by path.  A project that was never restored has no props
+        of a package, and so no marker.
+    -->
+    <PropertyGroup>
+        <SqlSourceImported>true</SqlSourceImported>
+    </PropertyGroup>
+    <!--
         Hands every .sql file of the project to the compiler, which is the only way a source generator can see one.
         NuGet imports this file into each project that references the package, before the project's own content, so a
         project can remove files with <AdditionalFiles Remove="..." />.  A project that sets SqlSourceIncludeFiles to
