@@ -342,6 +342,19 @@ public sealed class ProjectEvaluatorTests : IDisposable
         );
     }
 
+    // A solution may list a project that is not on the disk, as after a branch was switched.  Its folder is where
+    // MSBuild would be started, so with the folder gone nothing could be started at all.
+    [Theory]
+    [InlineData("App/Gone.csproj")]
+    [InlineData("Gone/Gone.csproj")]
+    public async Task Evaluate_ProjectFileThatDoesNotExist_IsSqlsrc205AndStartsNothing(string file)
+    {
+        var evaluation = (await EvaluateAsync([_folder.PathOf(file)])).ShouldHaveSingleItem();
+
+        ShouldBeSqlsrc205(evaluation, ("reason", "the project file does not exist"));
+        _runner.Requests.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task Evaluate_ManifestThatCannotBeRead_IsSqlsrc206WithTheReason()
     {

@@ -201,6 +201,25 @@ public sealed class RunProjectsTests : IDisposable
     }
 
     [Fact]
+    public async Task Find_SolutionWithAProjectThatIsNotOnTheDisk_IsSqlsrc205AndReadsTheRest()
+    {
+        Directory.Delete(Path.GetDirectoryName(_b)!, recursive: true);
+
+        var manifests = await FindInSolutionAsync();
+
+        manifests.Select(manifest => manifest.ProjectPath).ShouldBe([_a, _c]);
+        _error
+            .ToString()
+            .ShouldBe(
+                $"{_b} : error SQLSRC205: MSBuild could not evaluate '{_b}'\n"
+                    + "    reason: the project file does not exist\n"
+                    + See
+                    + "205\n"
+            );
+        Asked().ShouldBe([_a, _c], ignoreOrder: true);
+    }
+
+    [Fact]
     public async Task Find_OneProjectNamed_IsTheOnlyOneAskedAbout()
     {
         var manifests = await FindInSolutionAsync(_b);

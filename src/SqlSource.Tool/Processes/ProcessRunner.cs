@@ -12,7 +12,7 @@ namespace SqlSource.Tool.Processes;
 /// </summary>
 internal sealed class ProcessRunner : IProcessRunner
 {
-    // Without a byte order mark: the encoding is also what the process is told its input has.
+    // What both outputs are read as, with no byte order mark expected.
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
     public async Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken)

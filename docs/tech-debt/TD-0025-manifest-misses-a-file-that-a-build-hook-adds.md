@@ -6,7 +6,7 @@ The `sqlsource` tool learns what the compiler is given from the project manifest
 
 A `.sql` file that a target of the project adds as an `AdditionalFiles` item is therefore in the manifest only when that target hooks `SqlSourceTrimMetadataOfFiles`.  One that hooks `BeforeBuild`, or any other target of a build, has not run.  The build compiles the file, and the tool does not know it: it describes none of its queries.  From phase 5 of query generation the generator needs a sidecar entry for each of them, and reports each as missing.
 
-The same holds for a `Compile` item that a target adds: a `[SqlSourceGenerate]` in such a file is not read.
+The same holds for a `Compile` item that a target adds: a `[SqlSourceGenerate]` in such a file is not read.  Every project of the SDK has such items, the files it writes under `obj` for the assembly's attributes and for the global usings.  None holds the attribute, but a global `using` alias that names it is in one of them, and the tool's reader of attributes, in sub-phase 2.4, does not see that alias.
 
 `tests/SqlSource.Tool.Tests/ManifestTargetTests.cs` pins it with the fixture `BuildHookFile`, and `tools/check-package-install.sh` with the file that `tools/package-install/Directory.Build.targets` adds.
 

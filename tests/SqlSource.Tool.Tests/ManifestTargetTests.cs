@@ -80,6 +80,20 @@ public sealed class ManifestTargetTests : IDisposable
         constants.ShouldAllBe(constant => constant.Length > 0);
     }
 
+    // A line break inside a value would end its line of the manifest, and the next line would have no key.  The
+    // trims of the package do not reach a property of the SDK.
+    [Fact]
+    public void WriteManifest_ConstantsWrittenOverSeveralLines_AreOnOneLine()
+    {
+        var lines = _fixtures.WriteManifest(_fixtures.Copy("Constants"));
+
+        lines.ShouldAllBe(line => line.Contains('='));
+        var constants = lines.Single(line => line.StartsWith("DefineConstants=", StringComparison.Ordinal));
+        constants.ShouldContain("FEATURE_A");
+        constants.ShouldContain("FEATURE_B FEATURE_C");
+        constants.ShouldContain("NET10_0");
+    }
+
     [Fact]
     public void WriteManifest_NoFileNamed_WritesOneUnderObj()
     {

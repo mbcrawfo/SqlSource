@@ -163,10 +163,13 @@
         SqlSourceTrimMetadataOfFiles.  TD-0025.
 
         The file is lines of key=value, and its format is a contract with the tool: see src/SqlSource/AGENTS.md.  The
-        tool names the file with SqlSourceManifestFile; without it the file is under obj.
+        tool names the file with SqlSourceManifestFile; without it the file is under obj, and is added to FileWrites.
+        That reaches "dotnet clean" only from inside a build, so it has no effect until a build runs this target.
 
         A property goes through Escape, or MSBuild would make an item of each part of a value that holds a
-        semicolon, as DefineConstants does.  The lines of one .sql file are one item, with %0a between them, so that
+        semicolon, as DefineConstants does.  A property of the SDK is put on one line first, the way a trim does it:
+        the trims do not reach it, a project may write its constants one on each line, and a line break inside a
+        value would end its line of the file.  The lines of one .sql file are one item, with %0a between them, so that
         the metadata of a file stays under its File line whatever the order of the items is; the path and the
         metadata come from the item and are not split.  A setting of the package that is added is a line here, and
         one in each of the two lists of the trims.
@@ -181,9 +184,9 @@
         <ItemGroup>
             <SqlSourceManifestLine Include="SqlSourceManifest=1" />
             <SqlSourceManifestLine Include="Project=$([MSBuild]::Escape($(MSBuildProjectFullPath)))" />
-            <SqlSourceManifestLine Include="TargetFramework=$([MSBuild]::Escape($(TargetFramework)))" />
-            <SqlSourceManifestLine Include="LangVersion=$([MSBuild]::Escape($(LangVersion)))" />
-            <SqlSourceManifestLine Include="DefineConstants=$([MSBuild]::Escape($(DefineConstants)))" />
+            <SqlSourceManifestLine Include="TargetFramework=$([MSBuild]::Escape($([System.Text.RegularExpressions.Regex]::Replace($(TargetFramework), '\s+', ' ').Trim())))" />
+            <SqlSourceManifestLine Include="LangVersion=$([MSBuild]::Escape($([System.Text.RegularExpressions.Regex]::Replace($(LangVersion), '\s+', ' ').Trim())))" />
+            <SqlSourceManifestLine Include="DefineConstants=$([MSBuild]::Escape($([System.Text.RegularExpressions.Regex]::Replace($(DefineConstants), '\s+', ' ').Trim())))" />
             <SqlSourceManifestLine Include="Property.SqlSourceDialect=$([MSBuild]::Escape($(SqlSourceDialect)))" />
             <SqlSourceManifestLine Include="Property.SqlSourceDatabase=$([MSBuild]::Escape($(SqlSourceDatabase)))" />
             <SqlSourceManifestLine Include="Property.SqlSourceOutput=$([MSBuild]::Escape($(SqlSourceOutput)))" />

@@ -23,7 +23,9 @@ internal static class ManifestReader
     private const string PropertyPrefix = "Property.";
     private const string FilePrefix = "File.";
 
-    private static readonly char[] ConstantSeparators = [';', ','];
+    // What the compiler separates constants at.  The target puts the value on one line, so a constant that a
+    // project wrote on a line of its own has a space before it.
+    private static readonly char[] ConstantSeparators = [';', ',', ' ', '\t'];
 
     /// <summary>
     /// The manifest, or null and why the text is not one.

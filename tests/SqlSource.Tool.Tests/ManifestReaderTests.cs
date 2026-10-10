@@ -116,8 +116,10 @@ public class ManifestReaderTests
     [InlineData("TRACE;DEBUG", new[] { "TRACE", "DEBUG" })]
     [InlineData("TRACE,DEBUG", new[] { "TRACE", "DEBUG" })]
     [InlineData(";TRACE;; DEBUG ,;", new[] { "TRACE", "DEBUG" })]
+    // The compiler takes a space for a separator too, and so does a tab.
+    [InlineData("TRACE DEBUG;A\tB ,C", new[] { "TRACE", "DEBUG", "A", "B", "C" })]
     [InlineData("", new string[0])]
-    public void Read_Constants_AreSplitAtSemicolonsAndCommas(string value, string[] expected) =>
+    public void Read_Constants_AreSplitAtSemicolonsCommasAndWhiteSpace(string value, string[] expected) =>
         Read($"SqlSourceManifest=1\nProject=p\nDefineConstants={value}").DefineConstants.ShouldBe(expected);
 
     [Fact]

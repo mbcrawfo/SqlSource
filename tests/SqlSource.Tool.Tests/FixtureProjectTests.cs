@@ -176,6 +176,22 @@ public sealed class FixtureProjectTests : IDisposable
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "a;b=c%41 'é.cs")]);
     }
 
+    // What the build of such a project compiles with: "#if FEATURE_C" holds there.
+    [Fact]
+    public async Task Evaluate_ProjectWhoseConstantsAreWrittenOverSeveralLines_GivesEachConstant()
+    {
+        var evaluation = await EvaluateAsync(_fixtures.Copy("Constants"));
+
+        evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
+        var constants = evaluation.Manifest.ShouldNotBeNull().DefineConstants;
+        constants.ShouldContain("TRACE");
+        constants.ShouldContain("FEATURE_A");
+        constants.ShouldContain("FEATURE_B");
+        constants.ShouldContain("FEATURE_C");
+        constants.ShouldContain("NET10_0");
+        constants.ShouldAllBe(constant => !constant.Any(char.IsWhiteSpace));
+    }
+
     // MSBuild writes a warning of an evaluation to its error output, and the JSON alone to the other.
     [Fact]
     public async Task Evaluate_ProjectWhoseEvaluationWarns_IsReadAllTheSame()
@@ -214,17 +230,20 @@ public sealed class FixtureProjectTests : IDisposable
         evaluation.Manifest.ShouldNotBeNull().Properties["SqlSourceOutput"].ShouldBe("sql");
     }
 
-    // A solution may list a project that is not on the disk, as after a branch was switched.
-    [Fact]
-    public async Task Evaluate_ProjectFileThatDoesNotExist_IsSqlsrc205WithMSBuildsError()
+    // A solution may list a project that is not on the disk, as after a branch was switched: the file alone is
+    // gone, or its folder with it.  The tool says so itself, in the same words for both.
+    [Theory]
+    [InlineData("Single/Gone.csproj")]
+    [InlineData("Gone/Gone.csproj")]
+    public async Task Evaluate_ProjectFileThatDoesNotExist_IsSqlsrc205(string file)
     {
-        var project = Path.Combine(Path.GetDirectoryName(_fixtures.Copy("Single"))!, "Gone.csproj");
+        _ = _fixtures.Copy("Single");
 
-        var evaluation = await EvaluateAsync(project);
+        var evaluation = await EvaluateAsync(_fixtures.PathOf(file));
 
         evaluation.State.ShouldBe(ProjectState.Failed);
         evaluation.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC205");
-        Failure(evaluation).ShouldContain("Gone.csproj");
+        Failure(evaluation).ShouldBe("the project file does not exist");
     }
 
     // The repository's own test project of the generator, where it is: it takes the package's files by path, and

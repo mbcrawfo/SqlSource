@@ -124,6 +124,13 @@ internal static class ProjectEvaluator
         CancellationToken cancellationToken
     )
     {
+        // A solution may list a project that is not on the disk.  MSBuild is started in the project's folder, and
+        // with the folder gone too nothing could be started, which would read as a machine without the SDK.
+        if (!File.Exists(project))
+        {
+            return Failed(project, "the project file does not exist", new ProcessResult(0, "", ""));
+        }
+
         ImmutableArray<string> evaluate =
         [
             "msbuild",

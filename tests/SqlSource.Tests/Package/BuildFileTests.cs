@@ -182,6 +182,19 @@ public partial class BuildFileTests
         parts.Skip(1).ShouldBe(names.Select(name => $"File.{name}=%({name})"), ignoreOrder: true);
     }
 
+    // The trims of the package do not reach a property of the SDK, and a project may write its constants one on
+    // each line.  A line break inside a value would end its line of the manifest, so each of these is put on one
+    // line the way a trim does it.
+    [Theory]
+    [InlineData("TargetFramework")]
+    [InlineData("LangVersion")]
+    [InlineData("DefineConstants")]
+    public void Targets_ManifestTarget_WritesAPropertyOfTheSdkOnOneLine(string name) =>
+        Manifest()
+            .Descendants("SqlSourceManifestLine")
+            .Select(line => line.Attribute("Include").ShouldNotBeNull().Value)
+            .ShouldContain($"{name}=$([MSBuild]::Escape({Trimmed(name)}))");
+
     [Fact]
     public void Targets_ManifestTarget_ListsTheSqlFilesAndTheCompileFiles()
     {
@@ -198,7 +211,8 @@ public partial class BuildFileTests
     }
 
     // The file is the one SqlSourceManifestFile names, which the tool sets to a file of its own.  A file under obj
-    // belongs to the project, so "dotnet clean" is told of it; a file the tool named is the tool's to delete.
+    // belongs to the project, so it is added to FileWrites, which tells "dotnet clean" of it once a build runs the
+    // target; a file the tool named is the tool's to delete.
     [Fact]
     public void Targets_ManifestTarget_WritesTheFileThatIsNamedOrOneUnderObj()
     {

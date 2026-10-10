@@ -100,6 +100,72 @@ public class ProcessRunnerTests
         time.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(15));
     }
 
+    // The wait for a process ends when the token is cancelled, whether the process was killed or not.  So this
+    // looks at the processes: a shell that starts another program, as MSBuild starts its own, and writes the id
+    // of each to a file.  Both must be gone.
+    [Fact]
+    public async Task Run_Cancelled_LeavesNeitherTheProgramNorWhatItStartedRunning()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "The program is a shell script.  docs/tech-debt/TD-0028.");
+        using var folder = new TempFolder();
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var request = Request("sh", "-c", "echo $$ > parent; sleep 30 & echo $! > child; wait") with
+        {
+            WorkingDirectory = folder.Path,
+        };
+
+        var run = Runner.RunAsync(request, cancel.Token);
+        var parent = await ReadIdAsync(folder.PathOf("parent"));
+        var child = await ReadIdAsync(folder.PathOf("child"));
+        IsRunning(parent).ShouldBeTrue();
+        IsRunning(child).ShouldBeTrue();
+        await cancel.CancelAsync();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(run);
+        (await EndsAsync(parent)).ShouldBeTrue("the program is still running");
+        (await EndsAsync(child)).ShouldBeTrue("the program that the program started is still running");
+    }
+
+    // The id that a script wrote to a file, once it has.
+    private static async Task<int> ReadIdAsync(string file)
+    {
+        for (var attempt = 0; attempt < 100; attempt++)
+        {
+            if (File.Exists(file) && int.TryParse(await File.ReadAllTextAsync(file), out var id))
+            {
+                return id;
+            }
+
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+
+        throw new TimeoutException($"Nothing wrote an id to '{file}'.");
+    }
+
+    private static async Task<bool> EndsAsync(int id)
+    {
+        for (var attempt = 0; attempt < 100 && IsRunning(id); attempt++)
+        {
+            await Task.Delay(50, TestContext.Current.CancellationToken);
+        }
+
+        return !IsRunning(id);
+    }
+
+    private static bool IsRunning(int id)
+    {
+        try
+        {
+            using var process = Process.GetProcessById(id);
+            return !process.HasExited;
+        }
+        catch (ArgumentException)
+        {
+            // No process has the id.
+            return false;
+        }
+    }
+
     [Fact]
     public async Task Run_CancelledBeforeItStarts_Throws()
     {

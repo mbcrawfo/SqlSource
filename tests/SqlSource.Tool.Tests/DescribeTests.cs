@@ -119,6 +119,8 @@ public class DescribeTests
     public async Task Run_Solution_ReadsItsProjectsAndPrintsNothing()
     {
         using var run = new CliRun();
+        _ = run.Folder.WriteFile("A/A.csproj");
+        _ = run.Folder.WriteFile("B/B.csproj");
         _ = run.Folder.WriteFile(
             "App.slnx",
             "<Solution><Project Path=\"A/A.csproj\" /><Project Path=\"B/B.csproj\" /></Solution>"
@@ -186,6 +188,7 @@ public class DescribeTests
     public async Task Run_SolutionWhereNoProjectUsesSqlSource_SaysSoAndExitsWithZero()
     {
         using var run = new CliRun();
+        _ = run.Folder.WriteFile("A/A.csproj");
         var solution = run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"A/A.csproj\" /></Solution>");
         run.Processes.Default = new FakeProject { Imported = "", ProjectAssetsFile = solution };
 
