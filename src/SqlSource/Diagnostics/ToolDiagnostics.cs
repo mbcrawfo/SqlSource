@@ -202,6 +202,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor SidecarOfNewerTool = new(
+        id: "SQLSRC221",
+        title: "Sidecar was written by a newer tool",
+        messageFormat: "'{0}' has format {1}, and this tool writes format {2}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc221",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor DirectoryCannotBeRead = new(
         id: "SQLSRC222",
         title: "Directory cannot be read",
@@ -246,6 +257,7 @@ internal static class ToolDiagnostics
             DatabasesShareConnectionVariable,
             UnnamedConnectionNotUsed,
             ProjectNotRestored,
+            SidecarOfNewerTool,
             DirectoryCannotBeRead,
             SolutionCannotBeRead
         );

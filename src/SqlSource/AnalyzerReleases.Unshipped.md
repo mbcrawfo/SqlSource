@@ -54,5 +54,6 @@ SQLSRC213 | SqlSource | Error | Database has no connection
 SQLSRC214 | SqlSource | Error | Two databases share a connection variable
 SQLSRC215 | SqlSource | Error | Connection names no database
 SQLSRC220 | SqlSource | Error | Project was not restored
+SQLSRC221 | SqlSource | Error | Sidecar was written by a newer tool
 SQLSRC222 | SqlSource | Error | Directory cannot be read
 SQLSRC223 | SqlSource | Error | Solution cannot be read

@@ -223,4 +223,15 @@ public class ToolDiagnosticsTests
                 "billing, reports"
             )
             .ShouldBe("SQLSOURCE_CONNECTION is for a run with one database, and this run has 2: billing, reports");
+
+    [Fact]
+    public void SidecarOfNewerTool_Message_HoldsTheSidecarAndBothVersions() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.SidecarOfNewerTool.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "/work/Users.sql.json",
+                "2",
+                "1"
+            )
+            .ShouldBe("'/work/Users.sql.json' has format 2, and this tool writes format 1");
 }

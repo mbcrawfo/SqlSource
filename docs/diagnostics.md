@@ -53,6 +53,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC214](#sqlsrc214) | Two databases share a connection variable |
 | [SQLSRC215](#sqlsrc215) | Connection names no database |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
+| [SQLSRC221](#sqlsrc221) | Sidecar was written by a newer tool |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
 
@@ -771,6 +772,19 @@ $ dotnet sqlsource describe
 ```
 
 Run `dotnet restore` on the solution or the project, then the command again.  In a solution every C# project is checked, one that has no SQL too: a run on a fresh checkout must not succeed by finding nothing.  A reference that keeps the package's MSBuild files out of the project, `ExcludeAssets="build"` for one, gives this error after a restore as well: remove that from the reference.
+
+## SQLSRC221
+
+**Sidecar was written by a newer tool**
+
+A sidecar, the `.sql.json` file beside a `.sql` file, says which version of the format it has.  This one has a higher version than this tool writes, so a newer `sqlsource` wrote it, and this one must not write it back down: the generator of that newer version would no longer read it.
+
+```console
+/work/App/Queries/Users.sql.json : error SQLSRC221: '/work/App/Queries/Users.sql.json' has format 2, and this tool writes format 1
+    help: update the SqlSource.Tool package
+```
+
+Update the tool, with `dotnet tool update SqlSource.Tool`, to the version of the SqlSource package the project uses.  The file is left as it is, and every query of its `.sql` file that the run was asked to describe counts as failed.  A sidecar of a lower format version, of another version of the tool, or one that cannot be read, a merge conflict for one, is no error: the tool describes its queries and writes it again.
 
 ## SQLSRC222
 
