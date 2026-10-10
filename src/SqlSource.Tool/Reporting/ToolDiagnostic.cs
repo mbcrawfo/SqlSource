@@ -1,6 +1,7 @@
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
+using SqlSource.Diagnostics;
 
 namespace SqlSource.Tool.Reporting;
 
@@ -43,6 +44,41 @@ internal sealed record ToolDiagnostic(
         {
             Path = path,
         };
+
+    /// <summary>
+    /// An error at a position in a file.
+    /// </summary>
+    /// <param name="descriptor">What is wrong.</param>
+    /// <param name="path">The full path of the file.</param>
+    /// <param name="position">Where in the file, counted from zero.</param>
+    /// <param name="arguments">The text the descriptor's message quotes.</param>
+    public static ToolDiagnostic At(
+        DiagnosticDescriptor descriptor,
+        string path,
+        LinePosition position,
+        params string[] arguments
+    ) => Create(descriptor, arguments) with { Path = path, Position = position };
+
+    /// <summary>
+    /// An error at a position that the generator's code gave.
+    /// </summary>
+    public static ToolDiagnostic At(
+        DiagnosticDescriptor descriptor,
+        LocationInfo location,
+        params string[] arguments
+    ) => At(descriptor, location.Path, location.LineSpan.Start, arguments);
+
+    /// <summary>
+    /// An error that the generator's code found, in the tool's form: at the start of where the generator has it.
+    /// </summary>
+    public static ToolDiagnostic From(DiagnosticInfo diagnostic) =>
+        new(
+            diagnostic.Descriptor,
+            diagnostic.Location.Path,
+            diagnostic.Location.LineSpan.Start,
+            diagnostic.Arguments,
+            EquatableArray<ContinuationLine>.Empty
+        );
 
     /// <summary>
     /// The same error with these lines under its first, in this order.

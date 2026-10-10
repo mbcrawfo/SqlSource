@@ -126,4 +126,15 @@ public class ToolDiagnosticsTests
                 "Access is denied."
             )
             .ShouldBe("'/srv/locked' cannot be read: Access is denied.");
+
+    [Fact]
+    public void AttributeArgumentNotLiteral_Message_HoldsTheArgument() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.AttributeArgumentNotLiteral.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "Path"
+            )
+            .ShouldBe(
+                "'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here"
+            );
 }

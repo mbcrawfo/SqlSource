@@ -44,6 +44,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC205](#sqlsrc205) | Project could not be evaluated |
 | [SQLSRC206](#sqlsrc206) | Project manifest cannot be read |
 | [SQLSRC207](#sqlsrc207) | Project is not in the run |
+| [SQLSRC208](#sqlsrc208) | Attribute argument is not a literal |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
@@ -637,6 +638,25 @@ sqlsource : error SQLSRC207: '/work/Tools.csproj' is not a project of '/work/App
 ```
 
 Give the path of a `.csproj` file that the solution lists.  `dotnet sln list` shows them.
+
+## SQLSRC208
+
+**Attribute argument is not a literal**
+
+The `sqlsource` tool finds `[SqlSourceGenerate]` by reading the C# files of a project as text.  It does not compile them, so it cannot follow a name to its value.  `Path` and `Output` decide which queries are described, and the tool reads those two alone: `Path` must be a string literal, and `Output` a member of `GeneratorOutput` written out.
+
+```csharp
+private const string Folder = "Queries";
+
+[SqlSourceGenerate(Path = Folder)]
+internal static partial class Queries;
+```
+
+```console
+/work/App/Queries.cs(3,27): error SQLSRC208: 'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here
+```
+
+Write the value where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended; the build is not affected.
 
 ## SQLSRC220
 

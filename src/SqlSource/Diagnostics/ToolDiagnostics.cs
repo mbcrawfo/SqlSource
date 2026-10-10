@@ -100,6 +100,18 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor AttributeArgumentNotLiteral = new(
+        id: "SQLSRC208",
+        title: "Attribute argument is not a literal",
+        messageFormat: "'{0}' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal "
+            + "here",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc208",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ProjectNotRestored = new(
         id: "SQLSRC220",
         title: "Project was not restored",
@@ -146,6 +158,7 @@ internal static class ToolDiagnostics
             ProjectCannotBeEvaluated,
             ManifestCannotBeRead,
             ProjectNotInRun,
+            AttributeArgumentNotLiteral,
             ProjectNotRestored,
             DirectoryCannotBeRead,
             SolutionCannotBeRead
