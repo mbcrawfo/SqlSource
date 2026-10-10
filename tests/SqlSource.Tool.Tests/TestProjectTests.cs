@@ -42,11 +42,14 @@ public class TestProjectTests
     {
         using var run = new CliRun();
         var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
-        // Added after the runner was told of the project.
-        _ = project.AddSql("Queries/Users.sql", "SELECT 1;");
+        // Added after the runner was told of the project: the run sees them only when the manifest is written as
+        // the target runs.
+        _ = project.AddSource("Queries.cs", "[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n");
+        var sql = project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
 
         var result = await run.RunAsync("describe", project.ProjectPath);
 
-        result.ShouldBe(new CliResult(0, "", ""));
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith($"{sql}(2,8): error SQLSRC101: ");
     }
 }

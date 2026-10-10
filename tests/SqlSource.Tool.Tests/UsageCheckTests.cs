@@ -273,12 +273,14 @@ public class UsageCheckTests
         {
             var usage = UsageCheck.Check(root, args);
             var parsed = root.Parse(args, Cli.Parser);
-            if (
-                usage.Messages.Count == 0
-                && DescribeCommand.CheckUsage(usage).Count == 0
-                && parsed.Errors.Count == 0
-                && !usage.IsReadTheSameBy(parsed)
-            )
+            if (usage.Messages.Count > 0 || DescribeCommand.CheckUsage(usage).Count > 0 || parsed.Errors.Count > 0)
+            {
+                continue;
+            }
+
+            // The command checks the values that UsageCheck read and runs with the ones System.CommandLine read,
+            // so the two must give each option the same values too.
+            if (!usage.IsReadTheSameBy(parsed) || !HasTheSameValues(usage, parsed, "--project", "--database"))
             {
                 disagreements.Add(string.Join(' ', args));
             }
@@ -316,6 +318,15 @@ public class UsageCheckTests
     [Fact]
     public void CheckUsage_AnotherCommand_GivesNoLine() =>
         DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), ["--version"])).ShouldBeEmpty();
+
+    private static bool HasTheSameValues(Usage usage, ParseResult parsed, params string[] options) =>
+        usage.Command.Name != DescribeCommand.Name
+        || options.All(name =>
+            usage
+                .Values.Where(value => value.Option?.Name == name)
+                .Select(value => value.Text)
+                .SequenceEqual(parsed.GetValue<string[]>(name) ?? [])
+        );
 
     private static Command ToolRoot() =>
         Cli.BuildCommands(Hosts.Create("/work", new FakeProcessRunner(), "/tmp"), new Reporter(TextWriter.Null));

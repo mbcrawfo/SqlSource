@@ -99,6 +99,7 @@ public sealed class RunPlannerErrorTests : IDisposable
             ToolDiagnostic.ForFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "another"),
             ToolDiagnostic.ForFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "bad-one"),
         ]);
+        result.Plan.Files.Count.ShouldBe(3);
         result.Plan.Files.Select(file => file.Dialect).ShouldAllBe(dialect => dialect == SqlDialect.Ansi);
     }
 

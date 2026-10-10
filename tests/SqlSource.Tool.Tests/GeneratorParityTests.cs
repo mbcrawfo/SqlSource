@@ -212,7 +212,7 @@ public sealed class GeneratorParityTests : IDisposable
     // What the tool's reader and the planner's own list of files give for the same project.
     private static Claimed[] FromTool(ProjectManifest manifest)
     {
-        var claims = AttributeReader.Read(manifest);
+        var claims = AttributeReader.Read(manifest, TestContext.Current.CancellationToken);
         claims.Errors.ShouldBeEmpty();
         var listed = ListedFiles.Read(manifest);
         return Ordered(

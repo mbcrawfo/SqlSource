@@ -36,7 +36,7 @@ public sealed class AttributeReaderTests : IDisposable
     private ProjectClaims Read(string source, string langVersion = "", params string[] constants)
     {
         _ = _folder.WriteFile("App/Repo/Queries.cs", source);
-        return AttributeReader.Read(Manifest(langVersion, constants, Source));
+        return AttributeReader.Read(Manifest(langVersion, constants, Source), TestContext.Current.CancellationToken);
     }
 
     // The attribute lists start on the third line, in its first column.
@@ -229,7 +229,10 @@ public sealed class AttributeReaderTests : IDisposable
     [Fact]
     public void Read_FileThatIsNotOnTheDisk_IsSteppedOver()
     {
-        var claims = AttributeReader.Read(Manifest("", [], _folder.PathOf("App/Gone.cs")));
+        var claims = AttributeReader.Read(
+            Manifest("", [], _folder.PathOf("App/Gone.cs")),
+            TestContext.Current.CancellationToken
+        );
 
         claims.Claims.ShouldBeEmpty();
         claims.Errors.ShouldBeEmpty();

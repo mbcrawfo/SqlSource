@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Planning;
@@ -369,5 +370,43 @@ public sealed class RunPlannerTests : IDisposable
             .Plan.Files.SelectMany(file => file.Queries)
             .Select(query => query.Database)
             .ShouldBe(["Billing", "Billing"]);
+    }
+
+    // The compiler gives a file its metadata by its path, so of two items of one path the last that has any metadata
+    // of the package is the one a build reads.  "Include" where "Update" was meant makes such a second item.
+    [Theory]
+    [InlineData(null, "postgres", "PostgreSql")]
+    [InlineData("postgres", null, "PostgreSql")]
+    [InlineData("mssql", "postgres", "PostgreSql")]
+    public void Plan_FileListedTwiceByOnePath_HasTheMetadataOfTheLastItemThatHasAny(
+        string? first,
+        string? second,
+        string expected
+    )
+    {
+        var project = new TestProject(_folder);
+        project.Properties["SqlSourceOutput"] = "sql";
+        _ = project.AddSource("Queries.cs", Type("Queries"));
+        var sql = project.AddSql("Q.sql", "SELECT 1;", Metadata("SqlSourceDialect", first));
+        project.ListSql(sql, Metadata("SqlSourceDialect", second));
+
+        var file = Plan(project).Plan.Files.ShouldHaveSingleItem();
+
+        file.Path.ShouldBe(sql);
+        file.Dialect.ToString().ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Plan_RunThatWasCancelled_Throws()
+    {
+        var project = Postgres();
+        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSql("Q.sql", "SELECT 1;");
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+
+        _ = Should.Throw<OperationCanceledException>(() =>
+            RunPlanner.Plan([project.Manifest()], RunFilters.None, cancelled.Token)
+        );
     }
 }

@@ -40,7 +40,7 @@ internal static class RunPlanner
         var byPath = new Dictionary<string, FileWork>(SqlPath.Comparer);
         foreach (var manifest in manifests)
         {
-            foreach (var claimed in ReadProject(manifest, errors))
+            foreach (var claimed in ReadProject(manifest, errors, cancellationToken))
             {
                 if (byPath.TryGetValue(claimed.NormalizedPath, out var work))
                 {
@@ -74,10 +74,11 @@ internal static class RunPlanner
     // errors of the project are added: SQLSRC208, then SQLSRC011, then SQLSRC014.
     private static List<ClaimedFile> ReadProject(
         ProjectManifest manifest,
-        ImmutableArray<ToolDiagnostic>.Builder errors
+        ImmutableArray<ToolDiagnostic>.Builder errors,
+        CancellationToken cancellationToken
     )
     {
-        var claims = AttributeReader.Read(manifest);
+        var claims = AttributeReader.Read(manifest, cancellationToken);
         errors.AddRange(claims.Errors);
 
         var options = ManifestOptions.ForProject(manifest);
@@ -199,6 +200,9 @@ internal static class RunPlanner
         CancellationToken cancellationToken
     )
     {
+        // A run that was cancelled reads no further file, and reports nothing of what it read.
+        cancellationToken.ThrowIfCancellationRequested();
+
         var owner = work.Owner;
         var input = FileParseInput.Resolve(
             owner.Metadata,

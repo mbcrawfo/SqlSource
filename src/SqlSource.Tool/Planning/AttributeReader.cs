@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -32,13 +33,15 @@ internal static class AttributeReader
 
     private const string OutputType = "GeneratorOutput";
 
-    public static ProjectClaims Read(ProjectManifest manifest)
+    public static ProjectClaims Read(ProjectManifest manifest, CancellationToken cancellationToken)
     {
         var options = ParseOptionsOf(manifest);
         var claims = ImmutableArray.CreateBuilder<TypeClaim>();
         var errors = ImmutableArray.CreateBuilder<ToolDiagnostic>();
         foreach (var path in manifest.CompileFiles)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+
             // A file that cannot be read is the build's to report.  Most files do not hold the word, and are not
             // parsed.
             if (ReadText(path) is not { } text || !text.ToString().Contains(ShortName, StringComparison.Ordinal))
@@ -46,7 +49,7 @@ internal static class AttributeReader
                 continue;
             }
 
-            var root = CSharpSyntaxTree.ParseText(text, options, path).GetRoot();
+            var root = CSharpSyntaxTree.ParseText(text, options, path, cancellationToken).GetRoot(cancellationToken);
             // Into a namespace and a type, for a nested type, and into nothing else: no body of a member is walked.
             foreach (
                 var node in root.DescendantNodes(static node =>
