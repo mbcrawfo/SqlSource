@@ -3,6 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using SqlSource.Diagnostics;
+using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Reporting;
 
@@ -57,9 +58,16 @@ internal sealed class Reporter(TextWriter error)
         }
     }
 
+    /// <summary>
+    /// What the run says of itself beside its errors.  <c>Cli</c> sets it once, before any command runs, when the
+    /// run has a log; every error is also an event of that log.
+    /// </summary>
+    public RunTrace Trace { get; set; } = new(NullRunLog.Instance);
+
     public void Report(ToolDiagnostic diagnostic)
     {
-        var text = Format(diagnostic, error.NewLine);
+        var message = MessageOf(diagnostic);
+        var text = Format(diagnostic, message, error.NewLine);
         lock (_gate)
         {
             error.Write(text);
@@ -68,19 +76,39 @@ internal sealed class Reporter(TextWriter error)
             {
                 _differences++;
             }
+
+            Trace.Log.Write(
+                "diagnostic",
+                new("id", diagnostic.Descriptor.Id),
+                new("path", diagnostic.Path),
+                new("line", LogValue.Of(diagnostic.Position?.Line + 1)),
+                new("column", LogValue.Of(diagnostic.Position?.Character + 1)),
+                new("message", message),
+                new(
+                    "lines",
+                    LogValue.ListOf(
+                        diagnostic.Lines.Select(static line =>
+                            LogValue.MapOf(new("label", OneLine.Of(line.Label)), new("text", OneLine.Of(line.Text)))
+                        )
+                    )
+                )
+            );
         }
     }
 
-    private static string Format(ToolDiagnostic diagnostic, string newLine)
+    private static string MessageOf(ToolDiagnostic diagnostic)
     {
-        var descriptor = diagnostic.Descriptor;
         object?[] arguments = [.. diagnostic.Arguments.Select(OneLine.Of)];
-        var message = string.Format(
+        return string.Format(
             CultureInfo.InvariantCulture,
-            descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
+            diagnostic.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
             arguments
         );
+    }
 
+    private static string Format(ToolDiagnostic diagnostic, string message, string newLine)
+    {
+        var descriptor = diagnostic.Descriptor;
         var text = new StringBuilder();
         _ = text.Append(Origin(diagnostic)).Append(": error ").Append(descriptor.Id).Append(": ").Append(message);
         _ = text.Append(newLine);

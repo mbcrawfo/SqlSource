@@ -98,6 +98,7 @@ public class DescribeTests
         result.ExitCode.ShouldBe(0);
         result.Out.ShouldContain("--project <path>");
         result.Out.ShouldContain("--check");
+        result.Out.ShouldContain("--log <path>");
         run.Processes.Requests.ShouldBeEmpty();
     }
 

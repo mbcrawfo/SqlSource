@@ -114,6 +114,15 @@ public class UsageCheckTests
                 "sqlsource: option '--force' takes no value",
             ]);
 
+    // System.CommandLine rejects a second value for an option that takes one, with a message that repeats it.
+    [Theory]
+    [InlineData("--connection", "describe", "--connection", "a=b", "--connection=" + Secret)]
+    [InlineData("-c", "describe", "-c", "a=b", "App.csproj", "-c:" + Secret)]
+    public void Check_OptionThatTakesOneValueGivenTwice_IsNamedAsItWasTypedAndItsValueIsNot(
+        string name,
+        params string[] args
+    ) => UsageCheck.Check(Root(), args).Messages.ShouldBe([$"sqlsource: option '{name}' is given more than once"]);
+
     // An option that may be given several times takes one value each time, and the token after that is the path.
     [Fact]
     public void Check_OptionThatMayBeRepeated_TakesOneValueEachTime()
@@ -263,6 +272,8 @@ public class UsageCheckTests
             "--force",
             "--force=V",
             "--check",
+            "--log",
+            "--log=L",
             "--help",
             "--",
             "V",

@@ -25,7 +25,8 @@ internal static class Hosts
             tempDirectory,
             processorCount,
             DescriberRegistry.Empty,
-            static _ => LiveExchange.Instance
+            static _ => LiveExchange.Instance,
+            TimeProvider.System
         );
 
     // The environment of the test process, for a run of the real "dotnet".
@@ -39,6 +40,7 @@ internal static class Hosts
             tempDirectory,
             Environment.ProcessorCount,
             DescriberRegistry.Empty,
-            static _ => LiveExchange.Instance
+            static _ => LiveExchange.Instance,
+            TimeProvider.System
         );
 }

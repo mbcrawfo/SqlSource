@@ -4,9 +4,13 @@ using System.CommandLine.Help;
 using System.CommandLine.Invocation;
 using System.IO;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Diagnostics;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool;
@@ -102,66 +106,127 @@ public static class Cli
     /// <summary>
     /// Runs the command with a host that the caller gives.  The tests call this.
     /// </summary>
+    /// <remarks>
+    /// The log of the run is opened and closed here, though <c>--log</c> is an option of <c>describe</c>: the error
+    /// of an exception is reported here and the exit code is decided here, and both belong in the log.
+    /// </remarks>
     internal static async Task<int> RunAsync(string[] args, ToolHost host, CancellationToken cancellationToken)
     {
         var reporter = new Reporter(host.Error);
+        var started = host.Time.GetTimestamp();
+        RunLogFile? log = null;
+        var exitCode = 0;
         try
         {
-            // A run that was cancelled prints nothing more, whatever it was asked to do.
-            cancellationToken.ThrowIfCancellationRequested();
-
-            var root = BuildCommands(host, reporter);
-
-            var usage = UsageCheck.Check(root, args);
-            var messages = usage.Messages.Count > 0 ? usage.Messages : DescribeCommand.CheckUsage(usage);
-            if (messages.Count > 0)
+            try
             {
-                // These lines have no id and do not go through the reporter.
-                foreach (var line in messages)
+                // A run that was cancelled prints nothing more, whatever it was asked to do.
+                cancellationToken.ThrowIfCancellationRequested();
+
+                var root = BuildCommands(host, reporter);
+
+                var usage = UsageCheck.Check(root, args);
+                var messages = usage.Messages.Count > 0 ? usage.Messages : DescribeCommand.CheckUsage(usage);
+                if (messages.Count > 0)
                 {
-                    await host.Error.WriteLineAsync(line);
+                    // These lines have no id and do not go through the reporter.
+                    foreach (var line in messages)
+                    {
+                        await host.Error.WriteLineAsync(line);
+                    }
+
+                    return 1;
                 }
 
-                return 1;
+                var parsed = root.Parse(args, Parser);
+                if (parsed.Errors.Count > 0 || !usage.IsReadTheSameBy(parsed))
+                {
+                    // UsageCheck lets nothing through that System.CommandLine rejects or reads another way, as far as
+                    // the tests know.  If something is, nothing runs, and System.CommandLine's message is not written:
+                    // it may repeat a token.
+                    await host.Error.WriteLineAsync("sqlsource: the command line is not valid");
+                    return 1;
+                }
+
+                // After the command line was read, so that a wrong one is never logged, and before anything runs.
+                if (DescribeCommand.LogPathOf(parsed, host.GetEnvironmentVariable) is { } given)
+                {
+                    log = RunLogFile.TryOpen(given, host.WorkingDirectory, host.Time, out var path, out var reason);
+                    if (log is null)
+                    {
+                        // The run does not start.
+                        reporter.Report(
+                            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, path, "written", reason)
+                        );
+                        return 1;
+                    }
+
+                    reporter.Trace = new RunTrace(log);
+                    log.Write(
+                        "run.start",
+                        new("toolVersion", PackageVersion.Prefix),
+                        new("formatVersion", SidecarFormat.Version),
+                        new("runtime", RuntimeInformation.FrameworkDescription),
+                        new("os", RuntimeInformation.OSDescription),
+                        new("arguments", LoggedArguments.Of(usage, args))
+                    );
+                }
+
+                var invocation = new InvocationConfiguration
+                {
+                    Output = host.Out,
+                    Error = host.Error,
+                    // An exception comes here, to the catch below.
+                    EnableDefaultExceptionHandler = false,
+                    // Cli.Run listens for Ctrl+C itself.
+                    ProcessTerminationTimeout = null,
+                };
+                exitCode = await parsed.InvokeAsync(invocation, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                exitCode = 1;
+            }
+            catch (DescriberFaultException fault)
+            {
+                // The error of an exception that a describer threw, already without the connection's value.
+                reporter.Report(fault.Diagnostic);
+            }
+            catch (Exception exception)
+            {
+                reporter.Report(UnexpectedFailure.Of(exception, host.GetEnvironmentVariable));
             }
 
-            var parsed = root.Parse(args, Parser);
-            if (parsed.Errors.Count > 0 || !usage.IsReadTheSameBy(parsed))
-            {
-                // UsageCheck lets nothing through that System.CommandLine rejects or reads another way, as far as
-                // the tests know.  If something is, nothing runs, and System.CommandLine's message is not written:
-                // it may repeat a token.
-                await host.Error.WriteLineAsync("sqlsource: the command line is not valid");
-                return 1;
-            }
+            exitCode = ExitCodeOf(reporter, exitCode);
+            return log is null ? exitCode : End(log, exitCode, started, host, reporter);
+        }
+        finally
+        {
+            // A path that leaves the method by an exception of its own still closes the file.
+            log?.Dispose();
+        }
+    }
 
-            var invocation = new InvocationConfiguration
-            {
-                Output = host.Out,
-                Error = host.Error,
-                // An exception comes here, to the catch below.
-                EnableDefaultExceptionHandler = false,
-                // Cli.Run listens for Ctrl+C itself.
-                ProcessTerminationTimeout = null,
-            };
-            var exitCode = await parsed.InvokeAsync(invocation, cancellationToken);
-            return ExitCodeOf(reporter, exitCode);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+    // The last event, with the exit code of the process, and the file is closed.  A log that stopped being
+    // writable while the run went on did not end the run: it is an error now, once, and the exit code is 1.
+    private static int End(RunLogFile log, int exitCode, long started, ToolHost host, Reporter reporter)
+    {
+        log.Write(
+            "run.end",
+            new("exitCode", exitCode),
+            new("durationMs", (long)host.Time.GetElapsedTime(started).TotalMilliseconds),
+            new("databases", reporter.Trace.Databases)
+        );
+        log.Dispose();
+        if (log.Failure is not { } failure)
         {
-            return 1;
+            return exitCode;
         }
-        catch (DescriberFaultException fault)
-        {
-            // The error of an exception that a describer threw, already without the connection's value.
-            reporter.Report(fault.Diagnostic);
-            return 1;
-        }
-        catch (Exception exception)
-        {
-            reporter.Report(UnexpectedFailure.Of(exception, host.GetEnvironmentVariable));
-            return 1;
-        }
+
+        reporter.Report(
+            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, log.Path, log.Path, "written", failure.Message)
+        );
+        return 1;
     }
 
     /// <summary>

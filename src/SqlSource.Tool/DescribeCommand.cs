@@ -34,6 +34,11 @@ internal static class DescribeCommand
 
     private const string CheckOption = "--check";
 
+    internal const string LogOption = "--log";
+
+    /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
+    internal const string LogVariable = "SQLSOURCE_LOG";
+
     public static Command Create(ToolHost host, Reporter reporter)
     {
         // Several, so that System.CommandLine takes a .sql path beside the unit.  CheckUsage holds them to one unit.
@@ -90,6 +95,15 @@ internal static class DescribeCommand
             Arity = ArgumentArity.Zero,
         };
 
+        var log = new Option<string>(LogOption)
+        {
+            Description =
+                "Write what the run did to this file, one JSON object on a line.  The file is overwritten.  "
+                + $"{LogVariable} gives the path when the option does not.",
+            HelpName = "path",
+            Arity = ArgumentArity.ExactlyOne,
+        };
+
         var describe = new Command(Name, "Asks the databases of the projects to describe their queries")
         {
             path,
@@ -98,6 +112,7 @@ internal static class DescribeCommand
             connection,
             force,
             check,
+            log,
         };
         describe.SetAction(
             async (parsed, cancellationToken) =>
@@ -159,6 +174,13 @@ internal static class DescribeCommand
                         + "database name"
                 );
             }
+            else if (value.Option.Name == LogOption && string.IsNullOrWhiteSpace(value.Text))
+            {
+                // What --log "$UNSET" gives.
+                messages.Add(
+                    $"sqlsource: the value of option '{LogOption}' at position {value.Position} is not a path"
+                );
+            }
             else if (value.Option.Name == ConnectionOption)
             {
                 if (!ConnectionArgument.TryParse(value.Text, out var connection))
@@ -179,6 +201,35 @@ internal static class DescribeCommand
         }
 
         return messages;
+    }
+
+    /// <summary>
+    /// Whether the command line runs <c>describe</c>: the command is named, and it is its own action that runs
+    /// and not the help's.
+    /// </summary>
+    public static bool Runs(ParseResult parsed) =>
+        parsed.CommandResult.Command.Name == Name
+        && ReferenceEquals(parsed.Action, parsed.CommandResult.Command.Action);
+
+    /// <summary>
+    /// The path of the run's log as it was given, by <c>--log</c> or else by <c>SQLSOURCE_LOG</c>, or null when
+    /// the run has none.  A command line that does not run <c>describe</c> has none: the help must not empty the
+    /// log of the last run.  A variable that is empty or white space is not set.
+    /// </summary>
+    public static string? LogPathOf(ParseResult parsed, Func<string, string?> getEnvironmentVariable)
+    {
+        if (!Runs(parsed))
+        {
+            return null;
+        }
+
+        if (parsed.GetValue<string>(LogOption) is { } option)
+        {
+            return option;
+        }
+
+        var variable = getEnvironmentVariable(LogVariable);
+        return string.IsNullOrWhiteSpace(variable) ? null : variable;
     }
 
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.

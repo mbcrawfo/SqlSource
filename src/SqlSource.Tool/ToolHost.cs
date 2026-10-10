@@ -18,6 +18,7 @@ namespace SqlSource.Tool;
 /// <param name="ProcessorCount">How many processors the machine has, which bounds what the tool runs at once.</param>
 /// <param name="Describers">The describers of the run, by dialect.</param>
 /// <param name="Exchange">Gives the exchange that the describer of a database, by its name, calls through.</param>
+/// <param name="Time">The clock: the time of a log's events, and how long a step took.</param>
 internal sealed record ToolHost(
     TextWriter Out,
     TextWriter Error,
@@ -27,7 +28,8 @@ internal sealed record ToolHost(
     string TempDirectory,
     int ProcessorCount,
     DescriberRegistry Describers,
-    Func<string, IDescribeExchange> Exchange
+    Func<string, IDescribeExchange> Exchange,
+    TimeProvider Time
 )
 {
     /// <summary>
@@ -44,6 +46,7 @@ internal sealed record ToolHost(
             Path.GetTempPath(),
             Environment.ProcessorCount,
             DescriberRegistry.Empty,
-            static _ => LiveExchange.Instance
+            static _ => LiveExchange.Instance,
+            TimeProvider.System
         );
 }
