@@ -191,6 +191,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor NoDescriberForDialect = new(
+        id: "SQLSRC216",
+        title: "No describer for the dialect",
+        messageFormat: "This version of sqlsource cannot describe '{0}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc216",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ProjectNotRestored = new(
         id: "SQLSRC220",
         title: "Project was not restored",
@@ -256,6 +267,7 @@ internal static class ToolDiagnostics
             DatabaseHasNoConnection,
             DatabasesShareConnectionVariable,
             UnnamedConnectionNotUsed,
+            NoDescriberForDialect,
             ProjectNotRestored,
             SidecarOfNewerTool,
             DirectoryCannotBeRead,

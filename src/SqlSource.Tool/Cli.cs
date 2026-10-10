@@ -3,11 +3,10 @@ using System.CommandLine;
 using System.CommandLine.Help;
 using System.CommandLine.Invocation;
 using System.IO;
-using System.Linq;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
-using SqlSource.Diagnostics;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool;
@@ -65,7 +64,7 @@ public static class Cli
         catch (Exception exception)
         {
             // RunAsync's catch reports to the host, and there is none.
-            new Reporter(error).Report(Failure(exception, Environment.GetEnvironmentVariable));
+            new Reporter(error).Report(UnexpectedFailure.Of(exception, Environment.GetEnvironmentVariable));
             return 1;
         }
 
@@ -140,9 +139,15 @@ public static class Cli
         {
             return 1;
         }
+        catch (DescriberFaultException fault)
+        {
+            // The error of an exception that a describer threw, already without the connection's value.
+            reporter.Report(fault.Diagnostic);
+            return 1;
+        }
         catch (Exception exception)
         {
-            reporter.Report(Failure(exception, host.GetEnvironmentVariable));
+            reporter.Report(UnexpectedFailure.Of(exception, host.GetEnvironmentVariable));
             return 1;
         }
     }
@@ -168,25 +173,6 @@ public static class Cli
         // System.CommandLine's own answer to no command is an error.
         root.SetAction(static parsed => new HelpAction().Invoke(parsed));
         return root;
-    }
-
-    private static ToolDiagnostic Failure(Exception exception, Func<string, string?> getEnvironmentVariable)
-    {
-        var failure = ToolDiagnostic.Create(
-            ToolDiagnostics.UnexpectedFailure,
-            exception.GetType().FullName ?? exception.GetType().Name,
-            exception.Message
-        );
-        if (string.IsNullOrEmpty(getEnvironmentVariable(DebugVariable)))
-        {
-            return failure;
-        }
-
-        var trace = exception
-            .ToString()
-            .Split('\n')
-            .Select(static line => new ContinuationLine("trace", line.TrimEnd('\r')));
-        return failure.WithLines([.. trace]);
     }
 
     // System.CommandLine's own action for a version reads the assembly the process started with, which under a test

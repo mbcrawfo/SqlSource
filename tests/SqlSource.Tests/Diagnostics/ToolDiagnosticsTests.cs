@@ -225,6 +225,15 @@ public class ToolDiagnosticsTests
             .ShouldBe("SQLSOURCE_CONNECTION is for a run with one database, and this run has 2: billing, reports");
 
     [Fact]
+    public void NoDescriberForDialect_Message_HoldsTheDialect() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.NoDescriberForDialect.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "postgres"
+            )
+            .ShouldBe("This version of sqlsource cannot describe 'postgres'");
+
+    [Fact]
     public void SidecarOfNewerTool_Message_HoldsTheSidecarAndBothVersions() =>
         string.Format(
                 CultureInfo.InvariantCulture,

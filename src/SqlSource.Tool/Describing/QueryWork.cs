@@ -5,7 +5,7 @@ namespace SqlSource.Tool.Describing;
 
 /// <summary>
 /// One query of a run, and what the run has done with it so far.  <see cref="RunDecisions" /> makes it and
-/// <c>DatabaseRuns</c> moves it from <see cref="QueryState.ToDescribe" /> to its end.
+/// <see cref="DatabaseRuns" /> moves it from <see cref="QueryState.ToDescribe" /> to its end.
 /// </summary>
 internal sealed class QueryWork(PlannedQuery planned, QueryState state, SidecarEntry? entry = null)
 {

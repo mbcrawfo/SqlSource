@@ -52,6 +52,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC213](#sqlsrc213) | Database has no connection |
 | [SQLSRC214](#sqlsrc214) | Two databases share a connection variable |
 | [SQLSRC215](#sqlsrc215) | Connection names no database |
+| [SQLSRC216](#sqlsrc216) | No describer for the dialect |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
 | [SQLSRC221](#sqlsrc221) | Sidecar was written by a newer tool |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
@@ -758,6 +759,18 @@ Give both databases their connection on the command line, `--connection app-v2=<
 ```
 
 Set the variable of each database, as the `help:` line names them, or give each with `--connection`, or restrict the run to one database with `--database`.  The error stands in the place of [SQLSRC213](#sqlsrc213) and is reported as that one is: once for a database, at its first query that must be described.
+
+## SQLSRC216
+
+**No describer for the dialect**
+
+The query must be described, its dialect is one whose databases can be asked, and this version of the `sqlsource` tool has nothing that asks them.  It is not [SQLSRC209](#sqlsrc209), which is about a dialect that no version can describe.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'
+```
+
+Update the tool, with `dotnet tool update SqlSource.Tool`, to a version that describes the dialect; this version describes none.  Until then, set the output of the queries to `sql`, with `SqlSourceOutput` or an `-- output: sql` marker, to use their constants and methods without types.  The error is reported at each query that the run would have described, and each counts as failed.
 
 ## SQLSRC220
 

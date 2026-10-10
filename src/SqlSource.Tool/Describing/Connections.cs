@@ -7,7 +7,7 @@ namespace SqlSource.Tool.Describing;
 
 /// <summary>
 /// The connections of a run's selected databases.  It reports nothing: a database with no connection is an error
-/// only when a query of it must be described, which <c>DatabaseRuns</c> knows.
+/// only when a query of it must be described, which <see cref="DatabaseRuns" /> knows.
 /// </summary>
 internal sealed class Connections
 {
