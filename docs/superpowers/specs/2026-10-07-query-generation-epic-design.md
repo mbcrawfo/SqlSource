@@ -543,7 +543,7 @@ SidecarType, SQL Server     { Name, MaxLength, Precision, Scale, UserType: { Sch
 - **A sidecar of a higher format version** is an error for `describe`, which leaves it alone; a lower one is written again.
 - **A text of a describer** is printed with the connection's value written as `***`, the message and the trace of an exception it throws included: a driver's message for a connection string that is wrong can quote the string.  The whole value is replaced and nothing less, since the tool does not read a connection string.  A description that holds the value, searched as the sidecar's writer would write it, is a bug of the describer: the run ends and nothing is written.
 - **A sidecar is deleted only in a run with no filter in which nothing was reported.**  The plan drops a setting it cannot read and a claim it cannot read, so a file can look as if it needs no entry only because of the error.
-- **A query that the plan could not describe**, and every query of a file that is not ready, counts as failed in the summary and gets no error of sub-phase 2.5.  A sidecar is read only for a file with a selected query that needs an entry.  The summary's `no connection` form is for a database with no failed query.
+- **A query that the plan could not describe**, and every query of a file that is not ready, counts as failed in the summary and gets no error of sub-phase 2.5.  A sidecar is read only for a file with a selected query that needs an entry, and in a run that may delete one, for a file that needs none, to leave a sidecar of a higher format version alone.  The summary's `no connection` form is for a database with no failed query.
 
 ### Testing
 
