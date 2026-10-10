@@ -137,4 +137,30 @@ public class ToolDiagnosticsTests
             .ShouldBe(
                 "'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here"
             );
+
+    [Fact]
+    public void OutputNeedsDescribableDialect_Message_HoldsTheOutputAndTheDialect() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.OutputNeedsDescribableDialect.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "codegen",
+                "ansi"
+            )
+            .ShouldBe(
+                "The output 'codegen' needs a dialect that can be described, and the dialect of this file is 'ansi'.  "
+                    + "Set the dialect to 'postgres' or 'mssql', or the output to 'sql'."
+            );
+
+    [Fact]
+    public void TokenHasNoDefault_Message_HoldsTheTokenAndTheOutput() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.TokenHasNoDefault.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "where",
+                "models"
+            )
+            .ShouldBe(
+                "The token 'where' has no default.  A query whose output is 'models' is described with a sample in "
+                    + "its place."
+            );
 }

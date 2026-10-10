@@ -112,6 +112,30 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor OutputNeedsDescribableDialect = new(
+        id: "SQLSRC209",
+        title: "Output needs a dialect that can be described",
+        messageFormat: "The output '{0}' needs a dialect that can be described, and the dialect of this file is "
+            + "'{1}'.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc209",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor TokenHasNoDefault = new(
+        id: "SQLSRC210",
+        title: "Token has no default",
+        messageFormat: "The token '{0}' has no default.  A query whose output is '{1}' is described with a sample in "
+            + "its place.",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc210",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor ProjectNotRestored = new(
         id: "SQLSRC220",
         title: "Project was not restored",
@@ -159,6 +183,8 @@ internal static class ToolDiagnostics
             ManifestCannotBeRead,
             ProjectNotInRun,
             AttributeArgumentNotLiteral,
+            OutputNeedsDescribableDialect,
+            TokenHasNoDefault,
             ProjectNotRestored,
             DirectoryCannotBeRead,
             SolutionCannotBeRead

@@ -221,6 +221,7 @@ internal static class RunPlanner
             );
         }
 
+        var state = PlannedFileState.Ready;
         var queries = ImmutableArray.CreateBuilder<PlannedQuery>(parsed.Queries.Count);
         foreach (var query in parsed.Queries)
         {
@@ -232,12 +233,44 @@ internal static class RunPlanner
                 continue;
             }
 
+            // Once for the file, at its first query that needs an entry: one setting mends it.  The parser keeps no
+            // position for the marker that set the output.
+            if (state == PlannedFileState.Ready && !SqlDescribableDialects.Contains(parsed.Dialect))
+            {
+                state = PlannedFileState.NotDescribable;
+                errors.Add(
+                    ToolDiagnostic.At(
+                        ToolDiagnostics.OutputNeedsDescribableDialect,
+                        query.NameLocation,
+                        NameOf(output),
+                        SqlDialectName.Canonical(parsed.Dialect)
+                    )
+                );
+            }
+
+            var problems = QueryProblems.None;
+            // An empty default is one: the query is described with nothing in the token's place.
+            foreach (
+                var token in query
+                    .Tokens.Where(static token => token.Default is null)
+                    .Select(static token => token.Name)
+            )
+            {
+                problems |= QueryProblems.TokenWithoutDefault;
+                errors.Add(
+                    ToolDiagnostic
+                        .At(ToolDiagnostics.TokenHasNoDefault, query.NameLocation, token, NameOf(output))
+                        .WithLines(HelpForToken(token))
+                );
+            }
+
             queries.Add(
                 new PlannedQuery(
                     query,
                     NeedsEntry: true,
                     query.Markers.Database ?? owner.Database ?? SqlDialectName.Canonical(parsed.Dialect),
-                    SqlQueryHash.Compute(parsed.Dialect, query.Segments, query.Tokens, query.Parameters)
+                    SqlQueryHash.Compute(parsed.Dialect, query.Segments, query.Tokens, query.Parameters),
+                    problems
                 )
             );
         }
@@ -247,10 +280,20 @@ internal static class RunPlanner
             owner.NormalizedPath,
             owner.ProjectPath,
             parsed.Dialect,
-            PlannedFileState.Ready,
+            state,
             new EquatableArray<PlannedQuery>(queries.MoveToImmutable())
         );
     }
+
+    // An output as a marker spells it.  Only the two that need an entry are named in a message.
+    private static string NameOf(OutputKind output) => output == OutputKind.CodeGen ? "codegen" : "models";
+
+    private static ContinuationLine HelpForToken(string name) =>
+        new(
+            "help",
+            $"write the token with a default, {{{{{name}:default}}}}, or give one in a marker of the query: "
+                + $"-- token: {{{{{name}:default}}}}"
+        );
 
     // The output resolves for each type and query, and a file needs what any type that claims it needs: the
     // greatest over every claim of every project, each with the metadata and the property of its own project.

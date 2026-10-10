@@ -45,6 +45,8 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC206](#sqlsrc206) | Project manifest cannot be read |
 | [SQLSRC207](#sqlsrc207) | Project is not in the run |
 | [SQLSRC208](#sqlsrc208) | Attribute argument is not a literal |
+| [SQLSRC209](#sqlsrc209) | Output needs a dialect that can be described |
+| [SQLSRC210](#sqlsrc210) | Token has no default |
 | [SQLSRC220](#sqlsrc220) | Project was not restored |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
@@ -657,6 +659,36 @@ internal static partial class Queries;
 ```
 
 Write the value where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended; the build is not affected.
+
+## SQLSRC209
+
+**Output needs a dialect that can be described**
+
+A query whose output is `models` or `codegen` gets its types from a database, and SqlSource can ask two: PostgreSQL, the dialect `postgres`, and SQL Server, the dialect `mssql`.  This file has a query with such an output and another dialect.  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'codegen' needs a dialect that can be described, and the dialect of this file is 'ansi'.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
+```
+
+Set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` at the top of the file.  Or, for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types, and no query of the file is described until it is mended.
+
+## SQLSRC210
+
+**Token has no default**
+
+A query with a `{{token}}` cannot be sent to a database as it is written.  To describe it, the tool puts a sample in the token's place: the token's default.  This query's output is `models` or `codegen`, and the token the message names has none.
+
+```sql
+-- name: FindUsers
+SELECT id, name FROM users {{where}};
+```
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC210: The token 'where' has no default.  A query whose output is 'codegen' is described with a sample in its place.
+    help: write the token with a default, {{where:default}}, or give one in a marker of the query: -- token: {{where:default}}
+```
+
+Give the token a default where it stands, `{{where:WHERE deleted_at IS NULL}}`, or once for the query with a marker, `-- token: {{where:WHERE deleted_at IS NULL}}`.  An empty default, `{{where:}}`, describes the query with nothing there.  The default is a sample for describing and nothing else: the generated method still takes the token as an argument.  The error is reported once for each token without a default, at the name of its query.
 
 ## SQLSRC220
 

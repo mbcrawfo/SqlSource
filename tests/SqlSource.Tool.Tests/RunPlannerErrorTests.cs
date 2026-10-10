@@ -166,4 +166,117 @@ public sealed class RunPlannerErrorTests : IDisposable
         result.Errors.ShouldHaveSingleItem().Descriptor.ShouldBe(ToolDiagnostics.AttributeArgumentNotLiteral);
         result.Plan.Files.Select(file => file.Path).ShouldBe([other]);
     }
+
+    private const string Name = "-- name: ";
+
+    [Theory]
+    [InlineData("ansi", "ansi")]
+    [InlineData("sqlite", "sqlite")]
+    [InlineData("cockroach", "cockroachdb")]
+    public void Plan_QueryThatNeedsAnEntryUnderADialectThatCannotBeDescribed_IsSqlsrc209OnceForItsFile(
+        string dialect,
+        string canonical
+    )
+    {
+        var project = Project(dialect: dialect);
+        var sql = project.AddSql(
+            "Q/Three.sql",
+            "-- name: Plain\n-- output: sql\nSELECT 0;\n\n-- name: One\nSELECT 1;\n\n-- name: Two\nSELECT 2;\n"
+        );
+
+        var result = Plan(project);
+
+        // At the name of the first query that needs an entry, which is the second of the file.
+        result.Errors.ShouldBe([
+            ToolDiagnostic.At(
+                ToolDiagnostics.OutputNeedsDescribableDialect,
+                sql,
+                new LinePosition(4, Name.Length),
+                "codegen",
+                canonical
+            ),
+        ]);
+        var file = result.Plan.Files.ShouldHaveSingleItem();
+        file.State.ShouldBe(PlannedFileState.NotDescribable);
+        file.Queries.Select(query => query.NeedsEntry).ShouldBe([false, true, true]);
+    }
+
+    [Fact]
+    public void Plan_FileUnderADialectThatCannotBeDescribedWhoseQueriesAreAllSql_IsReady()
+    {
+        var project = Project(dialect: "ansi");
+        _ = project.AddSql("Q/One.sql", "-- output: sql\n-- name: One\nSELECT 1;\n");
+
+        var result = Plan(project);
+
+        result.Errors.ShouldBeEmpty();
+        result.Plan.Files.ShouldHaveSingleItem().State.ShouldBe(PlannedFileState.Ready);
+    }
+
+    [Fact]
+    public void Plan_TokensWithoutADefault_AreSqlsrc210ForEachAtTheNameOfTheirQuery()
+    {
+        var project = Project();
+        var sql = project.AddSql(
+            "Q/Find.sql",
+            "-- name: Find\nSELECT id FROM users {{where}} {{order}} {{limit:LIMIT 10}} {{tail:}};\n"
+        );
+
+        var result = Plan(project);
+
+        result
+            .Errors.Select(error => (error.Descriptor.Id, error.Path, error.Position, error.Arguments[0]))
+            .ShouldBe([
+                ("SQLSRC210", sql, new LinePosition(0, Name.Length), "where"),
+                ("SQLSRC210", sql, new LinePosition(0, Name.Length), "order"),
+            ]);
+        result.Errors[0].Arguments[1].ShouldBe("codegen");
+        var help = result.Errors[0].Lines.ShouldHaveSingleItem();
+        help.Label.ShouldBe("help");
+        help.Text.ShouldContain("{{where:default}}");
+        help.Text.ShouldContain("-- token:");
+        var file = result.Plan.Files.ShouldHaveSingleItem();
+        file.State.ShouldBe(PlannedFileState.Ready);
+        file.Queries.ShouldHaveSingleItem().Problems.ShouldBe(QueryProblems.TokenWithoutDefault);
+    }
+
+    [Fact]
+    public void Plan_TokenWithoutADefaultInAQueryWhoseOutputIsSql_IsNoError()
+    {
+        var project = Project();
+        _ = project.AddSql("Q/Find.sql", "-- name: Find\n-- output: sql\nSELECT id FROM users {{where}};\n");
+
+        var result = Plan(project);
+
+        result.Errors.ShouldBeEmpty();
+        result.Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem().Problems.ShouldBe(QueryProblems.None);
+    }
+
+    [Fact]
+    public void Plan_TokenWithoutADefaultInAFileThatCannotBeDescribed_IsReportedBesideSqlsrc209()
+    {
+        var project = Project(dialect: "ansi");
+        _ = project.AddSql("Q/Find.sql", "-- name: Find\nSELECT id FROM users {{where}};\n");
+
+        Plan(project).Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC209", "SQLSRC210"]);
+    }
+
+    // Two types claim the file, one for its models and one for everything: a message names the greater.
+    [Theory]
+    [InlineData("Models", "CodeGen", "codegen")]
+    [InlineData("Models", "Sql", "models")]
+    public void Plan_TwoClaimsWithTwoOutputs_NameTheGreaterInAMessage(string first, string second, string named)
+    {
+        var project = new TestProject(_folder);
+        project.Properties["SqlSourceDialect"] = "ansi";
+        _ = project.AddSource("A.cs", Type("A", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{first}"));
+        _ = project.AddSource("B.cs", Type("B", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{second}"));
+        _ = project.AddSql("Q/Find.sql", "-- name: Find\nSELECT id FROM users {{where}};\n");
+
+        var errors = Plan(project).Errors;
+
+        // SQLSRC209 and SQLSRC210, and each names the output.
+        errors.Count.ShouldBe(2);
+        errors.Select(error => error.Arguments).ShouldAllBe(arguments => arguments.Contains(named));
+    }
 }
