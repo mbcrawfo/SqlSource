@@ -207,10 +207,14 @@ internal static class SidecarComparer
             : new SidecarDifference(path, Json(committed), Json(described));
 
     private static SidecarDifference? Number(string path, int? committed, int? described) =>
-        committed == described ? null : new SidecarDifference(path, Json(committed), Json(described));
+        committed == described
+            ? null
+            : new SidecarDifference(path, SidecarJsonBuilder.Number(committed), SidecarJsonBuilder.Number(described));
 
     private static SidecarDifference? Flag(string path, bool? committed, bool? described) =>
-        committed == described ? null : new SidecarDifference(path, Json(committed), Json(described));
+        committed == described
+            ? null
+            : new SidecarDifference(path, SidecarJsonBuilder.Flag(committed), SidecarJsonBuilder.Flag(described));
 
     // A member that one side has and the other lacks.  Null when both have it or both lack it.
     private static SidecarDifference? Presence(
@@ -230,7 +234,7 @@ internal static class SidecarComparer
     }
 
     private static SidecarDifference Length(string array, int committed, int described) =>
-        new(array + ".length", Json(committed), Json(described));
+        new(array + ".length", SidecarJsonBuilder.Number(committed), SidecarJsonBuilder.Number(described));
 
     private static string Element(string array, int index) =>
         array + "[" + index.ToString(CultureInfo.InvariantCulture) + "]";
@@ -240,15 +244,4 @@ internal static class SidecarComparer
         difference is null ? null : difference with { Path = path + "." + difference.Path };
 
     private static string Json(string? value) => value is null ? Null : SidecarJsonBuilder.Quote(value);
-
-    private static string Json(int? value) =>
-        value is { } number ? number.ToString(CultureInfo.InvariantCulture) : Null;
-
-    private static string Json(bool? value) =>
-        value switch
-        {
-            true => "true",
-            false => "false",
-            null => Null,
-        };
 }

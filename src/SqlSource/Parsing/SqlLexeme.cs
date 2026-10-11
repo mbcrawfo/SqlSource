@@ -25,18 +25,7 @@ internal readonly record struct SqlLexeme(SqlLexemeKind Kind, TextSpan Span)
             return null;
         }
 
-        var start = Span.Start;
-        var end = Span.End;
-        while (start < end && char.IsWhiteSpace(text[start]))
-        {
-            start++;
-        }
-
-        while (end > start && char.IsWhiteSpace(text[end - 1]))
-        {
-            end--;
-        }
-
-        return start == end ? null : TextSpan.FromBounds(start, end);
+        var content = SqlText.Trim(text, Span.Start, Span.End);
+        return content.IsEmpty ? null : content;
     }
 }

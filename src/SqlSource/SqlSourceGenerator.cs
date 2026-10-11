@@ -160,7 +160,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (file, _) => file!)
             .WithTrackingName(TrackingNames.ParsedFile)
             .Collect()
-            .Select(static (files, _) => ToSortedFiles(files))
+            .Select(static (files, _) => ToSorted(files, static file => file.NormalizedPath))
             .WithTrackingName(TrackingNames.ParsedFiles);
 
         // Reported from the collected files, so that a file the project lists twice is reported once.  A dialect that
@@ -190,7 +190,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (settings, _) => settings!)
             .WithTrackingName(TrackingNames.FileSettings)
             .Collect()
-            .Select(static (settings, _) => ToSortedSettings(settings))
+            .Select(static (settings, _) => ToSorted(settings, static file => file.NormalizedPath))
             .WithTrackingName(TrackingNames.FilesSettings);
 
         // Not located, and once for each setting and value.  The metadata of a file that no type claims is not
@@ -250,23 +250,14 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
-    // One file for each path, the first the project lists, in the order of SqlPath.Comparer.
-    private static EquatableArray<ParsedSqlFile> ToSortedFiles(ImmutableArray<ParsedSqlFile> files) =>
+    // One element for each path, the first the project lists, in the order of SqlPath.Comparer.
+    private static EquatableArray<T> ToSorted<T>(ImmutableArray<T> items, Func<T, string> pathOf)
+        where T : IEquatable<T> =>
         new(
-            files
-                .GroupBy(static file => file.NormalizedPath, SqlPath.Comparer)
+            items
+                .GroupBy(pathOf, SqlPath.Comparer)
                 .Select(static group => group.First())
-                .OrderBy(static file => file.NormalizedPath, SqlPath.Comparer)
-                .ToImmutableArray()
-        );
-
-    // One entry for each path, the first the project lists, in the order of SqlPath.Comparer.
-    private static EquatableArray<FileSettings> ToSortedSettings(ImmutableArray<FileSettings> settings) =>
-        new(
-            settings
-                .GroupBy(static file => file.NormalizedPath, SqlPath.Comparer)
-                .Select(static group => group.First())
-                .OrderBy(static file => file.NormalizedPath, SqlPath.Comparer)
+                .OrderBy(pathOf, SqlPath.Comparer)
                 .ToImmutableArray()
         );
 

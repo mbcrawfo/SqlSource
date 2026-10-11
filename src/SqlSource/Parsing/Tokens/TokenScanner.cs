@@ -113,21 +113,21 @@ internal static class TokenScanner
         name = string.Empty;
         defaultSpan = null;
         end = 0;
-        if (CharAt(sql, start) != '{' || CharAt(sql, start + 1) != '{')
+        if (SqlText.CharAt(sql, start) != '{' || SqlText.CharAt(sql, start + 1) != '{')
         {
             return false;
         }
 
         var nameStart = SkipBlanks(sql, start + 2);
         var nameEnd = nameStart;
-        while (SyntaxFacts.IsIdentifierPartCharacter(CharAt(sql, nameEnd)))
+        while (SyntaxFacts.IsIdentifierPartCharacter(SqlText.CharAt(sql, nameEnd)))
         {
             nameEnd++;
         }
 
         var after = SkipBlanks(sql, nameEnd);
-        var hasDefault = CharAt(sql, after) == ':';
-        if (!hasDefault && (CharAt(sql, after) != '}' || CharAt(sql, after + 1) != '}'))
+        var hasDefault = SqlText.CharAt(sql, after) == ':';
+        if (!hasDefault && (SqlText.CharAt(sql, after) != '}' || SqlText.CharAt(sql, after + 1) != '}'))
         {
             return false;
         }
@@ -152,37 +152,20 @@ internal static class TokenScanner
 
         if (close > after)
         {
-            defaultSpan = Trim(sql, after + 1, close);
+            defaultSpan = SqlText.Trim(sql, after + 1, close);
         }
 
         end = close + 2;
         return true;
     }
 
-    private static TextSpan Trim(string sql, int start, int end)
-    {
-        while (start < end && char.IsWhiteSpace(sql[start]))
-        {
-            start++;
-        }
-
-        while (end > start && char.IsWhiteSpace(sql[end - 1]))
-        {
-            end--;
-        }
-
-        return TextSpan.FromBounds(start, end);
-    }
-
     private static int SkipBlanks(string sql, int index)
     {
-        while (CharAt(sql, index) is ' ' or '\t')
+        while (SqlText.CharAt(sql, index) is ' ' or '\t')
         {
             index++;
         }
 
         return index;
     }
-
-    private static char CharAt(string sql, int index) => index < sql.Length ? sql[index] : '\0';
 }

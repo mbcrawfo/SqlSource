@@ -78,10 +78,11 @@ internal static class SettingValue
     }
 
     /// <summary>
-    /// Whether <paramref name="value" /> is a namespace: identifiers that are not reserved keywords, joined by
-    /// periods.
+    /// Whether <paramref name="value" /> is identifiers that are not reserved keywords, joined by periods.  It is
+    /// the rule of a namespace and of the name of a type, which is one identifier or a full name: nothing in the
+    /// text tells the two apart.
     /// </summary>
-    public static bool IsNamespace(ReadOnlySpan<char> value)
+    public static bool IsQualifiedName(ReadOnlySpan<char> value)
     {
         while (true)
         {
@@ -99,12 +100,6 @@ internal static class SettingValue
             value = value.Slice(period + 1);
         }
     }
-
-    /// <summary>
-    /// Whether <paramref name="value" /> names a type: an identifier that is not a reserved keyword, alone or after
-    /// a namespace and a period.  With a period it is a full name.
-    /// </summary>
-    public static bool IsTypeName(ReadOnlySpan<char> value) => IsNamespace(value);
 
     private static bool Matches(ReadOnlySpan<char> value, string name)
     {

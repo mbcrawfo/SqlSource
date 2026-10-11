@@ -13,8 +13,6 @@ namespace SqlSource.Parsing;
 /// </remarks>
 internal static class SqlTextBuilder
 {
-    private static readonly char[] LineTerminators = ['\r', '\n'];
-
     /// <summary>
     /// Builds the SQL of the lexemes from <paramref name="start" /> up to <paramref name="end" />.
     /// </summary>
@@ -118,7 +116,7 @@ internal static class SqlTextBuilder
             var end = lexeme.Span.End;
             while (index < end)
             {
-                var lineEnd = FindLineEnd(index, end);
+                var lineEnd = SqlText.FindLineEnd(source, index, end);
                 Copy(index, lineEnd);
                 ExtendContent(index, lineEnd);
                 if (lineEnd < end)
@@ -141,7 +139,7 @@ internal static class SqlTextBuilder
             var end = lexeme.Span.End;
             while (index < end)
             {
-                var lineEnd = FindLineEnd(index, end);
+                var lineEnd = SqlText.FindLineEnd(source, index, end);
                 Copy(index, lineEnd);
                 if (lineEnd < end)
                 {
@@ -152,12 +150,6 @@ internal static class SqlTextBuilder
             }
 
             _contentEnd = _position;
-        }
-
-        private int FindLineEnd(int start, int end)
-        {
-            var terminator = source.IndexOfAny(LineTerminators, start, end - start);
-            return terminator < 0 ? end : terminator;
         }
 
         private int TerminatorLength(int index, int end)

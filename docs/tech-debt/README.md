@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0042`
+Next id: `TD-0043`
 
 ## Active items
 
@@ -33,9 +33,10 @@ Next id: `TD-0042`
 | [TD-0035](TD-0035-three-small-gaps-of-describe.md) | Open | 2026-10-10 | Low | Three small gaps of `describe`: a database that exists only through a file that cannot be described counts as a selected database, the connection variables reach every `dotnet msbuild` the tool starts, and a sidecar that the tool cannot open stays beside a file that needs no entry, with nothing said |
 | [TD-0036](TD-0036-two-small-gaps-of-check-and-the-log.md) | Open | 2026-10-10 | Low | The log's `os` and `runtime` come from `RuntimeInformation` and not from `ToolHost`; `--check --database X` does not report an entry of a query that is gone when the entry's database is not named, though that entry alone makes `describe --database X` rewrite the file; and `run.end` is written before the log's file is closed, so a failed close leaves a log with an exit code the process does not have |
 | [TD-0037](TD-0037-small-gaps-of-the-log-and-of-the-tests-of-sub-phase-2-6.md) | Open | 2026-10-10 | Low | Small gaps of the log and of the tests of sub-phase 2.6: paths of `--check` and of `--verbose` with no test, members of the log with no test of some values, `RunEvents.Opened` outside the guard, a circular reference of `Logging/`, and a test that needs `/dev/full`; and a member the log's writer renames, which can be written twice |
-| [TD-0038](TD-0038-duplicated-and-uneven-patterns-in-the-generator-and-the-tool.md) | Open | 2026-10-10 | Low | Duplicated and uneven patterns in `src/`: duplicated text helpers in `Parsing/`, methods of a hundred lines, a boolean cascade in `SqlMarkerScope.Read`, and forwarding or duplicated members of the generator |
+| [TD-0038](TD-0038-duplicated-and-uneven-patterns-in-the-generator-and-the-tool.md) | Open | 2026-10-10 | Low | Methods of the tool and of the sidecar reader that do several things: `Cli.RunAsync`, `RunPlanner.ReadProject` and `PlanFile`, `SidecarReader.ReadEntry`, `ProjectEvaluator.EvaluateOneAsync`, and the eight parameters of `DatabaseRuns.DescribeAllAsync` |
 | [TD-0039](TD-0039-duplicated-and-uneven-patterns-in-the-tests.md) | Open | 2026-10-10 | Low | Duplicated and uneven patterns in `tests/`: the help-link prefix in ten places, `Plans` re-implemented twice, fixture texts, sidecars, clock and secret constants copied across classes, `FakeDescriber` lacking what tests build around it, test classes that cover several subjects, theories that dispatch on a string, and two ways to build a `ToolHost` |
 | [TD-0041](TD-0041-ca2000-is-suppressed-on-the-opener-of-the-log.md) | Open | 2026-10-11 | Low | `RunLogFile.Open` suppresses `CA2000`, since the analyzer does not follow a disposable that is returned in an `Outcome`, so a log that a later edit leaks there is not reported |
+| [TD-0042](TD-0042-allocations-of-a-parse-that-no-budget-sees.md) | Open | 2026-10-11 | Low | A query's marker scope is under no allocation budget, a summary of one line makes a list and, on .NET Framework, a copy, and a scope holds the name of its input model twice |
 
 ## Columns
 

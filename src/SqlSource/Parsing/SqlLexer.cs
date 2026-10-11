@@ -15,8 +15,6 @@ namespace SqlSource.Parsing;
 /// </remarks>
 internal sealed class SqlLexer(string text, SqlDialectRules rules)
 {
-    private static readonly char[] LineTerminators = ['\r', '\n'];
-
     private readonly ImmutableArray<SqlLexeme>.Builder _lexemes = ImmutableArray.CreateBuilder<SqlLexeme>();
     private SqlParseError? _error;
     private int _textStart;
@@ -103,15 +101,19 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
         if (current == '-' && IsDashComment(start))
         {
             var isHint = IsLineHint(start);
-            Add(isHint ? SqlLexemeKind.Hint : SqlLexemeKind.LineComment, start, FindLineEnd(start));
+            Add(
+                isHint ? SqlLexemeKind.Hint : SqlLexemeKind.LineComment,
+                start,
+                SqlText.FindLineEnd(text, start, text.Length)
+            );
             PassGap(!isHint && Rules.StringContinuation == SqlStringContinuation.AcrossLineComments);
         }
         else if (current == '#' && Rules.HashComments)
         {
-            Add(SqlLexemeKind.LineComment, start, FindLineEnd(start));
+            Add(SqlLexemeKind.LineComment, start, SqlText.FindLineEnd(text, start, text.Length));
             PassGap(allowed: false);
         }
-        else if (current == '/' && CharAt(start + 1) == '*')
+        else if (current == '/' && SqlText.CharAt(text, start + 1) == '*')
         {
             ReadBlockComment(start);
             PassGap(allowed: false);
@@ -193,22 +195,22 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
         {
             '-' => IsDashComment(index) && !IsLineHint(index),
             '#' => Rules.HashComments,
-            '/' => CharAt(index + 1) == '*' && !IsBlockHint(index),
+            '/' => SqlText.CharAt(text, index + 1) == '*' && !IsBlockHint(index),
             _ => false,
         };
 
     private bool IsDashComment(int index) =>
-        CharAt(index + 1) == '-' && (!Rules.DashNeedsWhitespace || IsDashBoundary(CharAt(index + 2)));
+        SqlText.CharAt(text, index + 1) == '-'
+        && (!Rules.DashNeedsWhitespace || IsDashBoundary(SqlText.CharAt(text, index + 2)));
 
     // What MySQL wants after the two dashes.  The end of the text is '\0' here, which is a control character.
     private static bool IsDashBoundary(char value) => char.IsWhiteSpace(value) || char.IsControl(value);
 
-    private bool IsLineHint(int index) => Rules.LineHints && CharAt(index + 2) == '+';
+    private bool IsLineHint(int index) => Rules.LineHints && SqlText.CharAt(text, index + 2) == '+';
 
     private bool IsBlockHint(int index) =>
-        CharAt(index + 2) is '+' or '!' || (Rules.MariaDbHints && CharAt(index + 2) == 'M' && CharAt(index + 3) == '!');
-
-    private char CharAt(int index) => index < text.Length ? text[index] : '\0';
+        SqlText.CharAt(text, index + 2) is '+' or '!'
+        || (Rules.MariaDbHints && SqlText.CharAt(text, index + 2) == 'M' && SqlText.CharAt(text, index + 3) == '!');
 
     private void Add(SqlLexemeKind kind, int start, int end)
     {
@@ -226,24 +228,18 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
         }
     }
 
-    private int FindLineEnd(int start)
-    {
-        var index = text.IndexOfAny(LineTerminators, start);
-        return index < 0 ? text.Length : index;
-    }
-
     private void ReadBlockComment(int start)
     {
         var depth = 1;
         var index = start + 2;
         while (index < text.Length && depth > 0)
         {
-            if (Rules.NestedComments && text[index] == '/' && CharAt(index + 1) == '*')
+            if (Rules.NestedComments && text[index] == '/' && SqlText.CharAt(text, index + 1) == '*')
             {
                 depth++;
                 index += 2;
             }
-            else if (text[index] == '*' && CharAt(index + 1) == '/')
+            else if (text[index] == '*' && SqlText.CharAt(text, index + 1) == '/')
             {
                 depth--;
                 index += 2;

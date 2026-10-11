@@ -34,6 +34,19 @@ internal sealed class SidecarJsonBuilder
         return text.ToString();
     }
 
+    /// <summary>A number as the writer writes one, or <c>null</c>.</summary>
+    public static string Number(int? value) =>
+        value is { } number ? number.ToString(CultureInfo.InvariantCulture) : Null;
+
+    /// <summary>A boolean as the writer writes one, or <c>null</c>.</summary>
+    public static string Flag(bool? value) =>
+        value switch
+        {
+            true => "true",
+            false => "false",
+            null => Null,
+        };
+
     public void BeginObject(string? key) => Begin(key, '{');
 
     public void EndObject() => End('}');
@@ -58,20 +71,13 @@ internal sealed class SidecarJsonBuilder
     public void WriteNumber(string? key, int? value)
     {
         Item(key);
-        _ = _text.Append(value is { } number ? number.ToString(CultureInfo.InvariantCulture) : Null);
+        _ = _text.Append(Number(value));
     }
 
     public void WriteBoolean(string? key, bool? value)
     {
         Item(key);
-        _ = _text.Append(
-            value switch
-            {
-                true => "true",
-                false => "false",
-                null => Null,
-            }
-        );
+        _ = _text.Append(Flag(value));
     }
 
     public void WriteNull(string? key)
