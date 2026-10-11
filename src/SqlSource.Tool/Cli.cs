@@ -181,7 +181,7 @@ public static class Cli
                     {
                         // The run does not start.
                         reporter.Report(
-                            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, path, "written", reason)
+                            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, "written", reason)
                         );
                         return 1;
                     }
@@ -260,7 +260,7 @@ public static class Cli
         }
 
         reporter.Report(
-            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, log.Path, log.Path, "written", failure.Message)
+            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, log.Path, "written", failure.Message)
         );
         return 1;
     }

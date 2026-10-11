@@ -48,7 +48,6 @@ internal static class RunDecisions
                         .ForFile(
                             ToolDiagnostics.SidecarOfNewerTool,
                             onDisk.Path,
-                            onDisk.Path,
                             newer.ToString(CultureInfo.InvariantCulture),
                             SidecarFormat.Version.ToString(CultureInfo.InvariantCulture)
                         )

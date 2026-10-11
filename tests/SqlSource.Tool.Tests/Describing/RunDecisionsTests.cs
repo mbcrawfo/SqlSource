@@ -178,7 +178,7 @@ public sealed class RunDecisionsTests : IDisposable
             .ShouldHaveSingleItem()
             .ShouldBe(
                 ToolDiagnostic
-                    .ForFile(ToolDiagnostics.SidecarOfNewerTool, path, path, "2", "1")
+                    .ForFile(ToolDiagnostics.SidecarOfNewerTool, path, "2", "1")
                     .WithLines(new ContinuationLine("help", "update the SqlSource.Tool package"))
             );
     }

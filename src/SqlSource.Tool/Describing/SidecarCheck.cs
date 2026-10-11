@@ -231,7 +231,7 @@ internal static class SidecarCheck
     }
 
     private static ToolDiagnostic AtSidecar(string sidecarPath, string sql, string what, ContinuationLine help) =>
-        ToolDiagnostic.ForFile(ToolDiagnostics.SidecarOutOfDate, sidecarPath, sql, what).WithLines(help);
+        ToolDiagnostic.AtFile(ToolDiagnostics.SidecarOutOfDate, sidecarPath, sql, what).WithLines(help);
 
     private static FileCheck Of(FileOutcome outcome, IEnumerable<ToolDiagnostic> differences) =>
         new(outcome.File, outcome.SidecarPath, WasCompared: true, new EquatableArray<ToolDiagnostic>([.. differences]));

@@ -203,7 +203,7 @@ internal static class ProjectEvaluator
             : new ProjectEvaluation(
                 project,
                 ProjectState.Failed,
-                Failure: ToolDiagnostic.ForFile(ToolDiagnostics.ManifestCannotBeRead, project, project, reason)
+                Failure: ToolDiagnostic.ForFile(ToolDiagnostics.ManifestCannotBeRead, project, reason)
             );
     }
 
@@ -362,7 +362,7 @@ internal static class ProjectEvaluator
             project,
             ProjectState.Failed,
             Failure: ToolDiagnostic
-                .ForFile(ToolDiagnostics.ProjectCannotBeEvaluated, project, project)
+                .ForFile(ToolDiagnostics.ProjectCannotBeEvaluated, project)
                 .WithLines([new ContinuationLine("reason", reason), .. lines])
         );
     }
