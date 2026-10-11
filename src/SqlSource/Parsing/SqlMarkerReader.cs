@@ -1,5 +1,4 @@
 using System;
-using Microsoft.CodeAnalysis.Text;
 
 namespace SqlSource.Parsing;
 
@@ -61,7 +60,7 @@ internal static class SqlMarkerReader
                     == 0
             )
             {
-                return new SqlMarker(kind, lexeme.Span, Trim(text, valueStart, end));
+                return new SqlMarker(kind, lexeme.Span, SqlText.Trim(text, valueStart, end));
             }
         }
 
@@ -105,20 +104,5 @@ internal static class SqlMarkerReader
         }
 
         return index < 0 || text[index] is '\n' or '\r';
-    }
-
-    private static TextSpan Trim(string text, int start, int end)
-    {
-        while (start < end && char.IsWhiteSpace(text[start]))
-        {
-            start++;
-        }
-
-        while (end > start && char.IsWhiteSpace(text[end - 1]))
-        {
-            end--;
-        }
-
-        return TextSpan.FromBounds(start, end);
     }
 }
