@@ -1,7 +1,7 @@
 using System;
 using System.Text;
 using SqlSource.Generation;
-using SqlSource.Parsing;
+using SqlSource.Parsing.Tokens;
 
 namespace SqlSource.Tool.Describing;
 
@@ -12,7 +12,8 @@ internal static class SampleSql
 {
     /// <summary>
     /// The query's SQL without comments, with each token's resolved default in the token's place: nothing, for an
-    /// empty one.  This is the text the query's hash is made from, with the defaults written out.
+    /// empty one.  It is the SQL that the hash covers, with each token's default in the place of its
+    /// <c>{{name:default}}</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// A token has no default.  The plan gives such a query a problem, and the run does not describe it.

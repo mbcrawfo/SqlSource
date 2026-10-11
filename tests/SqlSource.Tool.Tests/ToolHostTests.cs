@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 using Shouldly;
-using SqlSource.Tool.Describing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Processes;
 using Xunit;
 

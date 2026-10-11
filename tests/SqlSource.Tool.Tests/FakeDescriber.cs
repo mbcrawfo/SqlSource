@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
-using SqlSource.Tool.Describing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Tests;
@@ -15,7 +15,7 @@ namespace SqlSource.Tool.Tests;
 // a statement without rows and without typed parameters.
 internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) : IQueryDescriber
 {
-    // No describer of this sub-phase has an error of a server, so the tests bring one.
+    // No describer ships yet, so no descriptor of a server's error exists; the tests bring one.
     public static readonly DiagnosticDescriptor Rejected = new(
         id: "SQLSRC999",
         title: "Query was rejected",

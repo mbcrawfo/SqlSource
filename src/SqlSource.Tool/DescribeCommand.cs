@@ -5,7 +5,7 @@ using System.CommandLine;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using SqlSource.Generation;
+using SqlSource.Generation.Paths;
 using SqlSource.Settings;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Logging;

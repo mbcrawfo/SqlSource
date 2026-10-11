@@ -5,6 +5,8 @@ using System.Linq;
 using System.Threading;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.MSBuild;
+using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Tool.Projects;

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Snapshot.Reading;
 using Xunit;
 using static SqlSource.Tests.Snapshot.TestSidecars;
 

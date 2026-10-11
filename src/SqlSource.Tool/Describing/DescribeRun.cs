@@ -83,7 +83,7 @@ internal static class DescribeRun
 
         trace.Databases = RunSummary.Counts(selected, files, options.Check);
 
-        // 5.  The exit code is the reporter's: 1 when anything but SQLSRC219 was reported, else 2 when that was.
+        // 5.  The summary.  The exit code is Cli.ExitCodeOf's, from the reporter's counts.
         var lines = RunSummary.Lines(
             [.. plan.Databases],
             selected,

@@ -132,8 +132,8 @@ internal sealed class SqlDeclaredVariables
             }
             else if (lexeme.Kind is SqlLexemeKind.Quoted or SqlLexemeKind.Parameter)
             {
-                // A comment is no part of the SQL, and a hint no part of a statement.  These two end the wait for
-                // a name.
+                // A quoted region, or a parameter where no name is expected, ends the wait for a name.  A comment
+                // or a hint falls through and is passed over.
                 list.ExpectsName = false;
             }
         }

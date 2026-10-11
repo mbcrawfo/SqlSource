@@ -69,7 +69,7 @@ internal sealed class SqlDialectRules
         }
     }
 
-    /// <summary>Today's rules for every database, unchanged by the dialect setting.</summary>
+    /// <summary>The rules of the default dialect, used when no dialect is set.</summary>
     public static SqlDialectRules Ansi { get; } =
         new(('\'', EscapeString), ('"', Doubled), ('`', Doubled), ('$', Dollar)) { NestedComments = true };
 

@@ -1,6 +1,6 @@
 using System;
 using System.IO;
-using SqlSource.Tool.Describing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Processes;
 
 namespace SqlSource.Tool;

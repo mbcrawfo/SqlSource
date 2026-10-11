@@ -1,3 +1,4 @@
+using SqlSource.Generation.Emitting;
 using SqlSource.Settings;
 
 namespace SqlSource.Generation;

@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 using Xunit;
 

@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Diagnostics;
+using SqlSource.Generation.Emitting;
 using SqlSource.Settings;
 using OutputKind = SqlSource.Settings.OutputKind;
 

@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Text;
+using SqlSource.Parsing.Tokens;
 
 namespace SqlSource.Parsing;
 

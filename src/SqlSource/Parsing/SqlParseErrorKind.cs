@@ -42,15 +42,17 @@ internal enum SqlParseErrorKind
     EmptyGeneratorLine,
 
     /// <summary>
-    /// A generator parameter lacks a value it needs, has one it does not take, or has one that is not valid; or a
-    /// <c>-- dialect:</c> marker does not name a dialect.  Argument: the parameter as written, or the marker as
-    /// <see cref="SqlDialectMarker.Describe" /> gives it.
+    /// A generator parameter has a value, which none takes; or a <c>-- dialect:</c> or <c>-- name:</c> marker, or
+    /// a marker that <see cref="SqlMarkerScope" /> reads, lacks a value it needs or has one that is not valid.
+    /// Argument: the generator parameter as written, or the marker as <see cref="SqlMarkerReader.Describe" /> gives
+    /// it.
     /// </summary>
     InvalidMarkerValue,
 
     /// <summary>
-    /// Two settings contradict each other: both validation parameters in one scope, or two dialects in one file.
-    /// Argument: the second one, as for <see cref="InvalidMarkerValue" />.
+    /// Two settings of one scope contradict each other: <c>default</c> beside another generator parameter, two
+    /// dialects in one file, two values of one setting marker, two declarations of one parameter, or two defaults of
+    /// one token.  Argument: the second one, as for <see cref="InvalidMarkerValue" />, or the token as written.
     /// </summary>
     ConflictingSettings,
 

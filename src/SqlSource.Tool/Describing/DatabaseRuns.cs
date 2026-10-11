@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;

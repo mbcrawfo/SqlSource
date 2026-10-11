@@ -1,4 +1,5 @@
 using SqlSource.Diagnostics;
+using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
 
 namespace SqlSource.Generation;

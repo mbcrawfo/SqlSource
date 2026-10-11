@@ -1,5 +1,6 @@
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
+using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 
 namespace SqlSource.Generation;

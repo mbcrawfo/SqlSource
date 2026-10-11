@@ -1,6 +1,7 @@
 using System.Globalization;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Snapshot.Reading;
 using Xunit;
 using static SqlSource.Tests.Snapshot.TestSidecars;
 

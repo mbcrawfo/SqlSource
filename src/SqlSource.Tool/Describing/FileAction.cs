@@ -7,7 +7,8 @@ internal enum FileAction
 {
     /// <summary>
     /// Nothing, and nothing is said: the file is not ready, has no selected query that needs an entry, or needs no
-    /// sidecar and has none to delete or the run has a filter.
+    /// sidecar and is not deleted, since there is none to delete, it is a newer tool's, the run has a filter, or the
+    /// run has reported an error.
     /// </summary>
     None,
 
