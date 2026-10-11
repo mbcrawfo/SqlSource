@@ -210,6 +210,8 @@ public sealed class RunPlannerTests : IDisposable
     [InlineData(null, null, null, null, "postgres")]
     [InlineData("main", null, null, null, "main")]
     [InlineData("main", "files", null, null, "files")]
+    // Metadata that is white space is not set.
+    [InlineData("main", "  ", null, null, "main")]
     [InlineData("main", "files", "pre", null, "pre")]
     [InlineData("main", "files", "pre", "own", "own")]
     public void Plan_DatabaseFromEachLevel_IsTakenFromTheMostSpecificAndElseIsTheDialectsName(

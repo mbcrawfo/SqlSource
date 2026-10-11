@@ -26,9 +26,6 @@ namespace SqlSource.Tool.Planning;
 /// </remarks>
 internal static class RunPlanner
 {
-    /// <summary>The setting that the tool reads and the generator does not.</summary>
-    public const string DatabaseSetting = "SqlSourceDatabase";
-
     public static RunPlanResult Plan(
         ImmutableArray<ProjectManifest> manifests,
         RunFilters filters,
@@ -85,7 +82,8 @@ internal static class RunPlanner
 
         var options = ManifestOptions.ForProject(manifest);
         var dialect = DialectSetting.ReadProperty(options);
-        var settings = ProjectSettings.Read(options);
+        // The keys of a manifest: they have the database, which the keys of the compiler do not.
+        var settings = ProjectSettings.Read(options, MSBuildSettings.ManifestProperty);
 
         // Each value once, in ordinal order, as the generator reports them.
         var invalidDialects = new SortedSet<string>(StringComparer.Ordinal);
@@ -94,8 +92,6 @@ internal static class RunPlanner
         {
             _ = invalidDialects.Add(invalidProperty);
         }
-
-        var database = ReadDatabase(manifest.Properties, invalidSettings);
 
         // What each claim of a file says: its Output, and nothing else.
         var listed = ListedFiles.Read(manifest);
@@ -133,7 +129,11 @@ internal static class RunPlanner
             }
 
             var file = listed[path];
-            var metadata = FileMetadata.Read(new SqlFileText(file.Path), ManifestOptions.ForFile(file));
+            var metadata = FileMetadata.Read(
+                new SqlFileText(file.Path),
+                ManifestOptions.ForFile(file),
+                MSBuildSettings.ManifestMetadata
+            );
             if (metadata.Dialect.InvalidValue is { } invalidMetadata)
             {
                 _ = invalidDialects.Add(invalidMetadata);
@@ -145,16 +145,7 @@ internal static class RunPlanner
             }
 
             claimed.Add(
-                new ClaimedFile(
-                    manifest.ProjectPath,
-                    path,
-                    metadata,
-                    dialect,
-                    settings.Level,
-                    ReadDatabase(file.Metadata, invalidSettings) ?? database,
-                    levels,
-                    typesOf[path]
-                )
+                new ClaimedFile(manifest.ProjectPath, path, metadata, dialect, settings.Level, levels, typesOf[path])
             );
         }
 
@@ -183,25 +174,9 @@ internal static class RunPlanner
     }
 
     // The generator's reader gives every setting that is not valid.  The tool reports the ones it reads: the build
-    // reports the rest.
-    private static bool IsRead(InvalidSetting setting) => setting.Name == MSBuildSettings.OutputName;
-
-    private static string? ReadDatabase(ImmutableDictionary<string, string> values, HashSet<InvalidSetting> invalid)
-    {
-        if (!values.TryGetValue(DatabaseSetting, out var written) || string.IsNullOrWhiteSpace(written))
-        {
-            return null;
-        }
-
-        var value = written.Trim();
-        if (SettingValue.IsDatabaseName(value.AsSpan()))
-        {
-            return value;
-        }
-
-        _ = invalid.Add(new InvalidSetting(DatabaseSetting, value));
-        return null;
-    }
+    // reports the rest.  The database is the tool's alone: the generator does not read it.
+    private static bool IsRead(InvalidSetting setting) =>
+        setting.Name is MSBuildSettings.OutputName or MSBuildSettings.DatabaseName;
 
     // Parses a claimed file once, with the dialect of the project it is planned under, and gives each query its
     // values.  Comments are never wanted: the hash comes from the SQL without them.
@@ -291,7 +266,10 @@ internal static class RunPlanner
                 new PlannedQuery(
                     query,
                     NeedsEntry: true,
-                    query.Markers.Database ?? owner.Database ?? SqlDialectName.Canonical(parsed.Dialect),
+                    query.Markers.Database
+                        ?? owner.Metadata.Settings?.Level.Database
+                        ?? owner.Property.Database
+                        ?? SqlDialectName.Canonical(parsed.Dialect),
                     SqlQueryHash.Compute(parsed.Dialect, query.Segments, query.Tokens, query.Parameters),
                     problems
                 )
@@ -483,7 +461,6 @@ internal static class RunPlanner
         FileMetadata Metadata,
         DialectSetting ProjectDialect,
         SettingsLevel Property,
-        string? Database,
         List<SettingsLevel> Claims,
         List<TypeClaim> Types
     );
