@@ -200,70 +200,25 @@ internal static class SidecarReader
             return null;
         }
 
-        var seen = 0;
-        string? hash = null;
-        string? engine = null;
-        string? database = null;
-        string? serverVersion = null;
-        SidecarResultKind? resultKind = null;
-        SidecarTable? matchesTable = null;
-        string? plan = null;
-        string? tableMatch = null;
-        var parameters = EquatableArray<SidecarParameter>.Empty;
-        EquatableArray<SidecarColumn>? columns = null;
-        var parametersAt = -1;
-        var columnsAt = -1;
-        var columnsKey = default(TextSpan);
-        for (var key = cursor.NextKey(EntryKeys, ref seen); key is not null; key = cursor.NextKey(EntryKeys, ref seen))
+        var members = new EntryMembers
         {
-            switch (key)
-            {
-                case SidecarKeys.Hash:
-                    hash = cursor.ReadString(key, orNull: false);
-                    break;
-                case SidecarKeys.Engine:
-                    engine = cursor.ReadString(key, orNull: false);
-                    break;
-                case SidecarKeys.Database:
-                    database = cursor.ReadString(key, orNull: true);
-                    break;
-                case SidecarKeys.ServerVersion:
-                    serverVersion = cursor.ReadString(key, orNull: true);
-                    break;
-                case SidecarKeys.ResultKind:
-                    resultKind = ReadResultKind(cursor);
-                    break;
-                case SidecarKeys.MatchesTable:
-                    matchesTable = ReadTable(cursor);
-                    break;
-                case SidecarKeys.Plan:
-                    plan = cursor.ReadString(key, orNull: true);
-                    break;
-                case SidecarKeys.TableMatch:
-                    tableMatch = cursor.ReadString(key, orNull: true);
-                    break;
-                case SidecarKeys.Parameters:
-                    parametersAt = ReadParametersOrDefer(cursor, engine, ref parameters);
-                    break;
-                default:
-                    columnsKey = cursor.KeySpan;
-                    columnsAt = ReadColumnsOrDefer(cursor, engine, ref columns);
-                    break;
-            }
-        }
-
-        RequireEntryKeys(cursor, seen, brace, resultKind);
-        if (resultKind == SidecarResultKind.None && SidecarCursor.Has(EntryKeys, seen, SidecarKeys.Columns))
-        {
-            cursor.Fail(SidecarErrorKind.ColumnsWithoutRows, columnsKey);
-        }
-
-        if (cursor.Error is not null || hash is null || engine is null || resultKind is not { } kind)
+            Parameters = EquatableArray<SidecarParameter>.Empty,
+            ParametersAt = -1,
+            ColumnsAt = -1,
+        };
+        ReadMembers(cursor, ref members);
+        CheckMembers(cursor, ref members, brace);
+        if (
+            cursor.Error is not null
+            || members.Hash is not { } hash
+            || members.Engine is not { } engine
+            || members.ResultKind is not { } kind
+        )
         {
             return null;
         }
 
-        ReadDeferred(cursor, engine, parametersAt, columnsAt, ref parameters, ref columns);
+        ReadDeferred(cursor, engine, ref members);
         if (cursor.Error is not null)
         {
             return null;
@@ -274,85 +229,161 @@ internal static class SidecarReader
             nameSpan,
             hash,
             engine,
-            database,
-            serverVersion,
+            members.Database,
+            members.ServerVersion,
             kind,
-            matchesTable,
-            plan,
-            tableMatch,
-            parameters,
-            columns
+            members.MatchesTable,
+            members.Plan,
+            members.TableMatch,
+            members.Parameters,
+            members.Columns
         );
     }
 
-    // Reads the parameters where they stand when the entry's engine is known.  Otherwise passes over them and
-    // returns the offset to read them from; -1 when there is nothing left to read.
-    private static int ReadParametersOrDefer(
-        SidecarCursor cursor,
-        string? engine,
-        ref EquatableArray<SidecarParameter> parameters
-    )
+    // Reads every member of the entry, to its closing brace.
+    private static void ReadMembers(SidecarCursor cursor, ref EntryMembers members)
     {
-        if (engine is null)
+        var seen = 0;
+        for (var key = cursor.NextKey(EntryKeys, ref seen); key is not null; key = cursor.NextKey(EntryKeys, ref seen))
         {
-            return cursor.DeferArray(SidecarKeys.Parameters);
+            switch (key)
+            {
+                case SidecarKeys.Hash:
+                    members.Hash = cursor.ReadString(key, orNull: false);
+                    break;
+                case SidecarKeys.Engine:
+                    members.Engine = cursor.ReadString(key, orNull: false);
+                    break;
+                case SidecarKeys.Database:
+                    members.Database = cursor.ReadString(key, orNull: true);
+                    break;
+                case SidecarKeys.ServerVersion:
+                    members.ServerVersion = cursor.ReadString(key, orNull: true);
+                    break;
+                case SidecarKeys.ResultKind:
+                    members.ResultKind = ReadResultKind(cursor);
+                    break;
+                case SidecarKeys.MatchesTable:
+                    members.MatchesTable = ReadTable(cursor);
+                    break;
+                case SidecarKeys.Plan:
+                    members.Plan = cursor.ReadString(key, orNull: true);
+                    break;
+                case SidecarKeys.TableMatch:
+                    members.TableMatch = cursor.ReadString(key, orNull: true);
+                    break;
+                case SidecarKeys.Parameters:
+                    ReadParametersOrDefer(cursor, ref members);
+                    break;
+                default:
+                    members.ColumnsKey = cursor.KeySpan;
+                    ReadColumnsOrDefer(cursor, ref members);
+                    break;
+            }
         }
 
-        parameters = ReadParameters(cursor, engine);
-        return -1;
+        members.Seen = seen;
     }
 
-    private static int ReadColumnsOrDefer(
-        SidecarCursor cursor,
-        string? engine,
-        ref EquatableArray<SidecarColumn>? columns
-    )
+    // Reads the parameters where they stand when the entry's engine is known.  Otherwise passes over them and keeps
+    // the offset to read them from, which is -1 when there is nothing left to read.
+    private static void ReadParametersOrDefer(SidecarCursor cursor, ref EntryMembers members)
     {
-        if (engine is null)
+        if (members.Engine is { } engine)
         {
-            return cursor.DeferArray(SidecarKeys.Columns);
+            members.Parameters = ReadParameters(cursor, engine);
+        }
+        else
+        {
+            members.ParametersAt = cursor.DeferArray(SidecarKeys.Parameters);
+        }
+    }
+
+    private static void ReadColumnsOrDefer(SidecarCursor cursor, ref EntryMembers members)
+    {
+        if (members.Engine is { } engine)
+        {
+            members.Columns = ReadColumns(cursor, engine);
+        }
+        else
+        {
+            members.ColumnsAt = cursor.DeferArray(SidecarKeys.Columns);
+        }
+    }
+
+    // What an entry must hold, and what it must not: columns beside a result that has no rows.  The first mistake
+    // found is the entry's error, so the order of the checks is what a user reads.
+    private static void CheckMembers(SidecarCursor cursor, ref EntryMembers members, TextSpan brace)
+    {
+        var seen = members.Seen;
+        cursor.Require(EntryKeys, seen, brace, SidecarKeys.Hash);
+        cursor.Require(EntryKeys, seen, brace, SidecarKeys.Engine);
+        cursor.Require(EntryKeys, seen, brace, SidecarKeys.ResultKind);
+        cursor.Require(EntryKeys, seen, brace, SidecarKeys.Parameters);
+        if (members.ResultKind == SidecarResultKind.Rows)
+        {
+            cursor.Require(EntryKeys, seen, brace, SidecarKeys.Columns);
         }
 
-        columns = ReadColumns(cursor, engine);
-        return -1;
+        if (members.ResultKind == SidecarResultKind.None && SidecarCursor.Has(EntryKeys, seen, SidecarKeys.Columns))
+        {
+            cursor.Fail(SidecarErrorKind.ColumnsWithoutRows, members.ColumnsKey);
+        }
     }
 
     // Reads the arrays that were passed over, and comes back to the end of the entry.
-    private static void ReadDeferred(
-        SidecarCursor cursor,
-        string engine,
-        int parametersAt,
-        int columnsAt,
-        ref EquatableArray<SidecarParameter> parameters,
-        ref EquatableArray<SidecarColumn>? columns
-    )
+    private static void ReadDeferred(SidecarCursor cursor, string engine, ref EntryMembers members)
     {
         var end = cursor.Position;
-        if (parametersAt >= 0)
+        if (members.ParametersAt >= 0)
         {
-            cursor.Position = parametersAt;
-            parameters = ReadParameters(cursor, engine);
+            cursor.Position = members.ParametersAt;
+            members.Parameters = ReadParameters(cursor, engine);
         }
 
-        if (columnsAt >= 0)
+        if (members.ColumnsAt >= 0)
         {
-            cursor.Position = columnsAt;
-            columns = ReadColumns(cursor, engine);
+            cursor.Position = members.ColumnsAt;
+            members.Columns = ReadColumns(cursor, engine);
         }
 
         cursor.Position = end;
     }
 
-    private static void RequireEntryKeys(SidecarCursor cursor, int seen, TextSpan brace, SidecarResultKind? resultKind)
+    // What was read of an entry's members.  A value, handed on by reference: an entry costs no object but itself.
+    private record struct EntryMembers
     {
-        cursor.Require(EntryKeys, seen, brace, SidecarKeys.Hash);
-        cursor.Require(EntryKeys, seen, brace, SidecarKeys.Engine);
-        cursor.Require(EntryKeys, seen, brace, SidecarKeys.ResultKind);
-        cursor.Require(EntryKeys, seen, brace, SidecarKeys.Parameters);
-        if (resultKind == SidecarResultKind.Rows)
-        {
-            cursor.Require(EntryKeys, seen, brace, SidecarKeys.Columns);
-        }
+        /// <summary>The keys that were found, by the bits <see cref="SidecarCursor.NextKey" /> keeps.</summary>
+        public int Seen { get; set; }
+
+        public string? Hash { get; set; }
+
+        public string? Engine { get; set; }
+
+        public string? Database { get; set; }
+
+        public string? ServerVersion { get; set; }
+
+        public SidecarResultKind? ResultKind { get; set; }
+
+        public SidecarTable? MatchesTable { get; set; }
+
+        public string? Plan { get; set; }
+
+        public string? TableMatch { get; set; }
+
+        public EquatableArray<SidecarParameter> Parameters { get; set; }
+
+        public EquatableArray<SidecarColumn>? Columns { get; set; }
+
+        /// <summary>Where the parameters that were passed over start, or -1.</summary>
+        public int ParametersAt { get; set; }
+
+        /// <summary>Where the columns that were passed over start, or -1.</summary>
+        public int ColumnsAt { get; set; }
+
+        /// <summary>The span of the key of the columns, for the error of columns without rows.</summary>
+        public TextSpan ColumnsKey { get; set; }
     }
 
     private static SidecarResultKind? ReadResultKind(SidecarCursor cursor)

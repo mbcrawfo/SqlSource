@@ -84,102 +84,80 @@ internal static class RunPlanner
         var dialect = DialectSetting.ReadProperty(options);
         // The keys of a manifest: they have the database, which the keys of the compiler do not.
         var settings = ProjectSettings.Read(options, MSBuildSettings.ManifestProperty);
+        var invalid = new InvalidValues();
+        invalid.Add(dialect);
+        invalid.Add(settings.Invalid);
 
-        // Each value once, in ordinal order, as the generator reports them.
-        var invalidDialects = new SortedSet<string>(StringComparer.Ordinal);
-        var invalidSettings = new HashSet<InvalidSetting>(settings.Invalid.Where(IsRead));
-        if (dialect.InvalidValue is { } invalidProperty)
-        {
-            _ = invalidDialects.Add(invalidProperty);
-        }
-
-        // What each claim of a file says: its Output, and nothing else.
         var listed = ListedFiles.Read(manifest);
-        var claimsOf = new Dictionary<string, List<SettingsLevel>>(SqlPath.Comparer);
-        var typesOf = new Dictionary<string, List<TypeClaim>>(SqlPath.Comparer);
-        foreach (var claim in claims.Claims)
-        {
-            var level = claim.Output is { } output ? new SettingsLevel { Output = output } : SettingsLevel.None;
-            foreach (var path in listed.ClaimedBy(claim))
-            {
-                if (!claimsOf.TryGetValue(path, out var levels))
-                {
-                    levels = [];
-                    claimsOf.Add(path, levels);
-                }
-
-                levels.Add(level);
-                if (!typesOf.TryGetValue(path, out var types))
-                {
-                    types = [];
-                    typesOf.Add(path, types);
-                }
-
-                types.Add(claim);
-            }
-        }
+        var claimsOf = ClaimsByFile(claims.Claims, listed);
 
         // The metadata of a file that no type claims is not read, as nothing else of such a file is.
         var claimed = new List<ClaimedFile>(claimsOf.Count);
         foreach (var path in listed.Paths)
         {
-            if (!claimsOf.TryGetValue(path, out var levels))
+            if (!claimsOf.TryGetValue(path, out var fileClaims))
             {
                 continue;
             }
 
-            var file = listed[path];
-            var metadata = FileMetadata.Read(
-                new SqlFileText(file.Path),
-                ManifestOptions.ForFile(file),
-                MSBuildSettings.ManifestMetadata
-            );
-            if (metadata.Dialect.InvalidValue is { } invalidMetadata)
-            {
-                _ = invalidDialects.Add(invalidMetadata);
-            }
-
-            if (metadata.Settings is { } fileSettings)
-            {
-                invalidSettings.UnionWith(fileSettings.Invalid.Where(IsRead));
-            }
-
             claimed.Add(
-                new ClaimedFile(manifest.ProjectPath, path, metadata, dialect, settings.Level, levels, typesOf[path])
-            );
-        }
-
-        foreach (var value in invalidDialects)
-        {
-            errors.Add(ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, manifest.ProjectPath, value));
-        }
-
-        foreach (
-            var setting in invalidSettings
-                .OrderBy(static setting => setting.Name, StringComparer.Ordinal)
-                .ThenBy(static setting => setting.Value, StringComparer.Ordinal)
-        )
-        {
-            errors.Add(
-                ToolDiagnostic.AtFile(
-                    SqlDiagnostics.InvalidSettingValue,
+                new ClaimedFile(
                     manifest.ProjectPath,
-                    setting.Value,
-                    setting.Name
+                    path,
+                    ReadMetadata(listed[path], invalid),
+                    dialect,
+                    settings.Level,
+                    fileClaims.Levels,
+                    fileClaims.Types
                 )
             );
         }
 
+        invalid.AddTo(errors, manifest.ProjectPath);
         return claimed;
     }
 
-    // The generator's reader gives every setting that is not valid.  The tool reports the ones it reads: the build
-    // reports the rest.  The database is the tool's alone: the generator does not read it.
-    private static bool IsRead(InvalidSetting setting) =>
-        setting.Name is MSBuildSettings.OutputName or MSBuildSettings.DatabaseName;
+    // The claims of each claimed file, by its path.  What a claim of a file says is its Output, and nothing else.
+    private static Dictionary<string, FileClaims> ClaimsByFile(ImmutableArray<TypeClaim> claims, ListedFiles listed)
+    {
+        var byFile = new Dictionary<string, FileClaims>(SqlPath.Comparer);
+        foreach (var claim in claims)
+        {
+            var level = claim.Output is { } output ? new SettingsLevel { Output = output } : SettingsLevel.None;
+            foreach (var path in listed.ClaimedBy(claim))
+            {
+                if (!byFile.TryGetValue(path, out var fileClaims))
+                {
+                    fileClaims = new FileClaims();
+                    byFile.Add(path, fileClaims);
+                }
 
-    // Parses a claimed file once, with the dialect of the project it is planned under, and gives each query its
-    // values.  Comments are never wanted: the hash comes from the SQL without them.
+                fileClaims.Levels.Add(level);
+                fileClaims.Types.Add(claim);
+            }
+        }
+
+        return byFile;
+    }
+
+    // The metadata of a claimed file's item.  What is not valid in it is kept for the errors of the project.
+    private static FileMetadata ReadMetadata(ManifestFile file, InvalidValues invalid)
+    {
+        var metadata = FileMetadata.Read(
+            new SqlFileText(file.Path),
+            ManifestOptions.ForFile(file),
+            MSBuildSettings.ManifestMetadata
+        );
+        invalid.Add(metadata.Dialect);
+        if (metadata.Settings is { } settings)
+        {
+            invalid.Add(settings.Invalid);
+        }
+
+        return metadata;
+    }
+
+    // Plans a claimed file once, under the first project that claims it.  A file with a parse error has no query.
     private static PlannedFile PlanFile(
         FileWork work,
         ImmutableArray<ToolDiagnostic>.Builder errors,
@@ -189,14 +167,34 @@ internal static class RunPlanner
         // A run that was cancelled reads no further file, and reports nothing of what it read.
         cancellationToken.ThrowIfCancellationRequested();
 
-        var owner = work.Owner;
+        var parsed = Parse(work.Owner, cancellationToken);
+        if (parsed.Errors.Count > 0)
+        {
+            errors.AddRange(parsed.Errors.Select(ToolDiagnostic.From));
+            return FileOf(work, parsed.Dialect, PlannedFileState.HasParseErrors, EquatableArray<PlannedQuery>.Empty);
+        }
+
+        var state = PlannedFileState.Ready;
+        var queries = ImmutableArray.CreateBuilder<PlannedQuery>(parsed.Queries.Count);
+        foreach (var query in parsed.Queries)
+        {
+            queries.Add(PlanQuery(query, work, parsed.Dialect, ref state, errors));
+        }
+
+        return FileOf(work, parsed.Dialect, state, new EquatableArray<PlannedQuery>(queries.MoveToImmutable()));
+    }
+
+    // Parses a claimed file with the dialect of the project it is planned under.  Comments are never wanted: the
+    // hash comes from the SQL without them.
+    private static ParsedSqlFile Parse(ClaimedFile owner, CancellationToken cancellationToken)
+    {
         var input = FileParseInput.Resolve(
             owner.Metadata,
             owner.ProjectDialect,
             projectKeepsComments: false,
             EquatableArray<string>.Empty
         );
-        var parsed = SqlFileReader.Read(
+        return SqlFileReader.Read(
             owner.Metadata.File,
             owner.NormalizedPath,
             input.Dialect,
@@ -204,88 +202,83 @@ internal static class RunPlanner
             commentsWanted: false,
             cancellationToken
         );
+    }
 
-        if (parsed.Errors.Count > 0)
+    // One query with its values, and its errors.  The first query of a file that needs an entry under a dialect
+    // that cannot be described changes the state of the file.
+    private static PlannedQuery PlanQuery(
+        SqlQuery query,
+        FileWork work,
+        SqlDialect dialect,
+        ref PlannedFileState state,
+        ImmutableArray<ToolDiagnostic>.Builder errors
+    )
+    {
+        var output = GreatestOutput(query, work);
+        if (output == OutputKind.Sql)
         {
-            errors.AddRange(parsed.Errors.Select(ToolDiagnostic.From));
-            return new PlannedFile(
-                owner.Metadata.File.Path,
-                owner.NormalizedPath,
-                owner.ProjectPath,
-                parsed.Dialect,
-                PlannedFileState.HasParseErrors,
-                EquatableArray<PlannedQuery>.Empty,
-                ClaimsOf(work)
-            );
+            // It needs no entry, and so belongs to no database and has no hash.
+            return new PlannedQuery(query, NeedsEntry: false, Database: null, Hash: null);
         }
 
-        var state = PlannedFileState.Ready;
-        var queries = ImmutableArray.CreateBuilder<PlannedQuery>(parsed.Queries.Count);
-        foreach (var query in parsed.Queries)
+        // Once for the file, at its first query that needs an entry: one setting mends it.  The parser keeps no
+        // position for the marker that set the output.
+        if (state == PlannedFileState.Ready && !SqlDescribableDialects.Contains(dialect))
         {
-            var output = GreatestOutput(query, work);
-            if (output == OutputKind.Sql)
-            {
-                // It needs no entry, and so belongs to no database and has no hash.
-                queries.Add(new PlannedQuery(query, NeedsEntry: false, Database: null, Hash: null));
-                continue;
-            }
-
-            // Once for the file, at its first query that needs an entry: one setting mends it.  The parser keeps no
-            // position for the marker that set the output.
-            if (state == PlannedFileState.Ready && !SqlDescribableDialects.Contains(parsed.Dialect))
-            {
-                state = PlannedFileState.NotDescribable;
-                errors.Add(
-                    ToolDiagnostic.At(
-                        ToolDiagnostics.OutputNeedsDescribableDialect,
-                        query.NameLocation,
-                        SettingValue.NameOf(output),
-                        SqlDialectName.Canonical(parsed.Dialect)
-                    )
-                );
-            }
-
-            var problems = QueryProblems.None;
-            // An empty default is one: the query is described with nothing in the token's place.
-            foreach (
-                var token in query
-                    .Tokens.Where(static token => token.Default is null)
-                    .Select(static token => token.Name)
-            )
-            {
-                problems |= QueryProblems.TokenWithoutDefault;
-                errors.Add(
-                    ToolDiagnostic
-                        .At(ToolDiagnostics.TokenHasNoDefault, query.NameLocation, token, SettingValue.NameOf(output))
-                        .WithLines(HelpForToken(token))
-                );
-            }
-
-            queries.Add(
-                new PlannedQuery(
-                    query,
-                    NeedsEntry: true,
-                    query.Markers.Database
-                        ?? owner.Metadata.Settings?.Level.Database
-                        ?? owner.Property.Database
-                        ?? SqlDialectName.Canonical(parsed.Dialect),
-                    SqlQueryHash.Compute(parsed.Dialect, query.Segments, query.Tokens, query.Parameters),
-                    problems
+            state = PlannedFileState.NotDescribable;
+            errors.Add(
+                ToolDiagnostic.At(
+                    ToolDiagnostics.OutputNeedsDescribableDialect,
+                    query.NameLocation,
+                    SettingValue.NameOf(output),
+                    SqlDialectName.Canonical(dialect)
                 )
             );
         }
 
-        return new PlannedFile(
-            owner.Metadata.File.Path,
-            owner.NormalizedPath,
-            owner.ProjectPath,
-            parsed.Dialect,
-            state,
-            new EquatableArray<PlannedQuery>(queries.MoveToImmutable()),
-            ClaimsOf(work)
+        var problems = QueryProblems.None;
+        // An empty default is one: the query is described with nothing in the token's place.
+        foreach (
+            var token in query.Tokens.Where(static token => token.Default is null).Select(static token => token.Name)
+        )
+        {
+            problems |= QueryProblems.TokenWithoutDefault;
+            errors.Add(
+                ToolDiagnostic
+                    .At(ToolDiagnostics.TokenHasNoDefault, query.NameLocation, token, SettingValue.NameOf(output))
+                    .WithLines(HelpForToken(token))
+            );
+        }
+
+        var owner = work.Owner;
+        return new PlannedQuery(
+            query,
+            NeedsEntry: true,
+            query.Markers.Database
+                ?? owner.Metadata.Settings?.Level.Database
+                ?? owner.Property.Database
+                ?? SqlDialectName.Canonical(dialect),
+            SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters),
+            problems
         );
     }
+
+    // The planned file of a work, under its owner.
+    private static PlannedFile FileOf(
+        FileWork work,
+        SqlDialect dialect,
+        PlannedFileState state,
+        EquatableArray<PlannedQuery> queries
+    ) =>
+        new(
+            work.Owner.Metadata.File.Path,
+            work.Owner.NormalizedPath,
+            work.Owner.ProjectPath,
+            dialect,
+            state,
+            queries,
+            ClaimsOf(work)
+        );
 
     // Who claims the file, for the log: every claim of every project, in their order.
     private static EquatableArray<FileClaim> ClaimsOf(FileWork work) =>
@@ -453,6 +446,57 @@ internal static class RunPlanner
     private static bool IsNamed(PlannedQuery query, RunFilters filters) =>
         filters.Databases.IsEmpty
         || (query.Database is { } database && filters.Databases.Contains(database, StringComparer.OrdinalIgnoreCase));
+
+    // The claims of one file in one project: what each says, and the type that says it, in the order they came.
+    private sealed class FileClaims
+    {
+        public List<SettingsLevel> Levels { get; } = [];
+
+        public List<TypeClaim> Types { get; } = [];
+    }
+
+    // What is not valid in one project, each value once, as the generator reports them: the dialects in ordinal
+    // order, then the settings the tool reads, by name and then by value.
+    private sealed class InvalidValues
+    {
+        private readonly SortedSet<string> _dialects = [with(StringComparer.Ordinal)];
+
+        private readonly HashSet<InvalidSetting> _settings = [];
+
+        public void Add(DialectSetting dialect)
+        {
+            if (dialect.InvalidValue is { } value)
+            {
+                _ = _dialects.Add(value);
+            }
+        }
+
+        public void Add(IEnumerable<InvalidSetting> settings) => _settings.UnionWith(settings.Where(IsRead));
+
+        // The generator's reader gives every setting that is not valid.  The tool reports the ones it reads: the
+        // build reports the rest.  The database is the tool's alone: the generator does not read it.
+        private static bool IsRead(InvalidSetting setting) =>
+            setting.Name is MSBuildSettings.OutputName or MSBuildSettings.DatabaseName;
+
+        public void AddTo(ImmutableArray<ToolDiagnostic>.Builder errors, string projectPath)
+        {
+            foreach (var value in _dialects)
+            {
+                errors.Add(ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, projectPath, value));
+            }
+
+            foreach (
+                var setting in _settings
+                    .OrderBy(static setting => setting.Name, StringComparer.Ordinal)
+                    .ThenBy(static setting => setting.Value, StringComparer.Ordinal)
+            )
+            {
+                errors.Add(
+                    ToolDiagnostic.AtFile(SqlDiagnostics.InvalidSettingValue, projectPath, setting.Value, setting.Name)
+                );
+            }
+        }
+    }
 
     // One claimed file as one project sees it.
     private sealed record ClaimedFile(

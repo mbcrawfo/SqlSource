@@ -114,9 +114,10 @@ internal static class DatabaseRuns
             return;
         }
 
+        var run = new SessionRun(session, guard, host.Time, reporter, trace);
         try
         {
-            await DescribeAllAsync(database, queries, session, guard, host.Time, reporter, trace, cancellationToken);
+            await DescribeAllAsync(database, queries, run, cancellationToken);
         }
         catch
         {
@@ -131,17 +132,14 @@ internal static class DatabaseRuns
     private static async Task DescribeAllAsync(
         PlannedDatabase database,
         List<QueryWork> queries,
-        IDescribeSession session,
-        Guard guard,
-        TimeProvider time,
-        Reporter reporter,
-        RunTrace trace,
+        SessionRun run,
         CancellationToken cancellationToken
     )
     {
+        var guard = run.Guard;
         var value = guard.Secret;
-        var server = guard.Call(() => session.Server);
-        RunEvents.Opened(trace, database, server);
+        var server = guard.Call(() => run.Session.Server);
+        RunEvents.Opened(run.Trace, database, server);
         foreach (var query in queries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -151,23 +149,23 @@ internal static class DatabaseRuns
                 SampleSql.Build(planned.Query),
                 planned.Query.Parameters
             );
-            var started = time.GetTimestamp();
-            var result = await guard.CallAsync(() => session.DescribeAsync(describe, cancellationToken));
-            var duration = (long)time.GetElapsedTime(started).TotalMilliseconds;
+            var started = run.Time.GetTimestamp();
+            var result = await guard.CallAsync(() => run.Session.DescribeAsync(describe, cancellationToken));
+            var duration = (long)run.Time.GetElapsedTime(started).TotalMilliseconds;
             if (result.Value is { } description)
             {
                 query.Entry = guard.Call(() =>
                     NoSecretIn(EntryBuilder.Build(planned, database.Dialect, database.Name, server, description), value)
                 );
                 query.State = QueryState.Described;
-                RunEvents.Query(trace, query, duration);
+                RunEvents.Query(run.Trace, query, duration);
             }
             else
             {
                 var failure = guard.Call(() => result.Failure ?? throw new InvalidOperationException(Guard.Nothing));
-                reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), value));
+                run.Reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), value));
                 query.State = QueryState.Failed;
-                RunEvents.Query(trace, query, error: failure.Descriptor.Id);
+                RunEvents.Query(run.Trace, query, error: failure.Descriptor.Id);
             }
         }
     }
@@ -212,6 +210,16 @@ internal static class DatabaseRuns
             RunEvents.Query(trace, query, error: error);
         }
     }
+
+    // What belongs to one open session: everything a query of its database is described with.  It holds the session
+    // and does not own it: RunDatabaseAsync closes it.  The trace is the one without the connection's value.
+    private sealed record SessionRun(
+        IDescribeSession Session,
+        Guard Guard,
+        TimeProvider Time,
+        Reporter Reporter,
+        RunTrace Trace
+    );
 
     // Runs what a describer gives or does.  Whatever it throws is a bug of the describer and is thrown again as
     // the SQLSRC200 to report, without the connection's value.

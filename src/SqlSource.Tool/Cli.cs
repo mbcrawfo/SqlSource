@@ -73,7 +73,7 @@ public static class Cli
         }
         catch (Exception exception)
         {
-            // RunAsync's catch reports to the host, and there is none.
+            // RunCommandAsync's catch reports to the host, and there is none.
             new Reporter(error).Report(UnexpectedFailure.Of(exception, Environment.GetEnvironmentVariable));
             return 1;
         }
@@ -118,155 +118,178 @@ public static class Cli
     /// </remarks>
     internal static async Task<int> RunAsync(string[] args, ToolHost host, CancellationToken cancellationToken)
     {
-        // Until the run has its trace an error has the console alone: a log that cannot be opened, or an
-        // exception.  Neither is followed by an error of the run, so no count is split between two reporters.
-        var reporter = new Reporter(host.Error);
-        var started = host.Time.GetTimestamp();
-        RunLogFile? log = null;
-        var databases = LogValue.ListOf([]);
-        var exitCode = 0;
-
-        // Whether the line that ends a failed run has a reader: "describe" runs, and no log was asked for.
-        var mayPoint = false;
-        var cancelled = false;
+        var state = new RunState(host);
         try
         {
-            try
-            {
-                // A run that was cancelled prints nothing more, whatever it was asked to do.
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var root = BuildCommands();
-
-                var usage = UsageCheck.Check(root, args);
-                var messages = usage.Messages.Count > 0 ? usage.Messages : DescribeCommand.CheckUsage(usage);
-                if (messages.Count > 0)
-                {
-                    // These lines have no id and do not go through the reporter.
-                    foreach (var line in messages)
-                    {
-                        await host.Error.WriteLineAsync(line);
-                    }
-
-                    return 1;
-                }
-
-                var parsed = root.Parse(args, Parser);
-                if (
-                    parsed.Errors.Count > 0
-                    || !usage.IsReadTheSameBy(parsed)
-                    || !DescribeCommand.ReadsConnectionsAs(usage, parsed)
-                )
-                {
-                    // UsageCheck lets nothing through that System.CommandLine rejects or reads another way, as far as
-                    // the tests know.  If something is, nothing runs, and System.CommandLine's message is not written:
-                    // it may repeat a token.  The values of --connection are held too: the log's arguments is
-                    // redacted from one reading and the describer is handed the other.
-                    await host.Error.WriteLineAsync("sqlsource: the command line is not valid");
-                    return 1;
-                }
-
-                // Whether the command line runs "describe", and the log it was given, once.  A log that cannot be
-                // opened returns below, before the line that ends a failed run is ever considered.
-                var runs = DescribeCommand.Runs(parsed);
-                var logPath = DescribeCommand.LogPathOf(parsed, host.GetEnvironmentVariable);
-                mayPoint = runs && logPath is null;
-
-                // What the run says of itself: to the log, when it has one, and to the person watching under
-                // --verbose.
-                IRunLog events = NullRunLog.Instance;
-
-                // After the command line was read, so that a wrong one is never logged, and before anything runs.
-                if (logPath is { } given)
-                {
-                    var opened = RunLogFile.Open(given, host.WorkingDirectory, host.Time);
-                    if (!opened.Succeeded)
-                    {
-                        // The run does not start.
-                        reporter.Report(opened.Failure);
-                        return 1;
-                    }
-
-                    log = opened.Value;
-                    events = log;
-                    log.Write(
-                        "run.start",
-                        new("toolVersion", PackageVersion.Prefix),
-                        new("formatVersion", SidecarFormat.Version),
-                        new("runtime", RuntimeInformation.FrameworkDescription),
-                        new("os", RuntimeInformation.OSDescription),
-                        new("arguments", LoggedArguments.Of(usage, args))
-                    );
-                }
-
-                if (runs)
-                {
-                    // The reporter of the run: from here on every error is also an event of the log.  The command
-                    // gets its action only now, so that it cannot run with another.
-                    reporter = new Reporter(
-                        host.Error,
-                        new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null)
-                    );
-                    DescribeCommand.Bind(parsed, host, reporter, counts => databases = counts);
-                }
-
-                var invocation = new InvocationConfiguration
-                {
-                    Output = host.Out,
-                    Error = host.Error,
-                    // An exception comes here, to the catch below.
-                    EnableDefaultExceptionHandler = false,
-                    // Cli.Run listens for Ctrl+C itself.
-                    ProcessTerminationTimeout = null,
-                };
-                exitCode = await parsed.InvokeAsync(invocation, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                exitCode = 1;
-                cancelled = true;
-            }
-            catch (DescriberFaultException fault)
-            {
-                // The error of an exception that a describer threw, already without the connection's value.
-                reporter.Report(fault.Diagnostic);
-            }
-            catch (Exception exception)
-            {
-                reporter.Report(UnexpectedFailure.Of(exception, host.GetEnvironmentVariable));
-            }
-
-            exitCode = ExitCodeOf(reporter, exitCode);
-            if (mayPoint && !cancelled && reporter.Count > reporter.DifferenceCount)
+            // The command first, and the reporter only after it: the command replaces the reporter.
+            var commandExitCode = await RunCommandAsync(args, state, cancellationToken);
+            var exitCode = ExitCodeOf(state.Reporter, commandExitCode);
+            if (state.MayPoint && !state.Cancelled && state.Reporter.Count > state.Reporter.DifferenceCount)
             {
                 await host.Error.WriteLineAsync(RunAgainLine);
             }
 
-            return log is null ? exitCode : End(log, exitCode, started, databases, host, reporter);
+            return state.Log is null ? exitCode : End(state.Log, exitCode, state);
         }
         finally
         {
             // A path that leaves the method by an exception of its own still closes the file.
-            log?.Dispose();
+            state.Log?.Dispose();
         }
+    }
+
+    // The steps of a run, to the end of its command, and the three things that end one early.  It gives what the
+    // command gave, 1 for a run that did not start or was cancelled, and 0 for one an exception ended: the exit
+    // code of that one comes from the reporter.
+    private static async Task<int> RunCommandAsync(string[] args, RunState state, CancellationToken cancellationToken)
+    {
+        try
+        {
+            // A run that was cancelled prints nothing more, whatever it was asked to do.
+            cancellationToken.ThrowIfCancellationRequested();
+
+            if (
+                await ReadCommandLineAsync(args, state.Host) is not { } commandLine
+                || !OpenLog(commandLine, args, state)
+            )
+            {
+                return 1;
+            }
+
+            return await InvokeAsync(commandLine, state, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            state.Cancelled = true;
+            return 1;
+        }
+        catch (DescriberFaultException fault)
+        {
+            // The error of an exception that a describer threw, already without the connection's value.
+            state.Reporter.Report(fault.Diagnostic);
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            state.Reporter.Report(UnexpectedFailure.Of(exception, state.Host.GetEnvironmentVariable));
+            return 0;
+        }
+    }
+
+    // Reads the command line with both readers.  Null when it is wrong, with its lines written: they have no id
+    // and do not go through the reporter.
+    private static async Task<ParsedCommandLine?> ReadCommandLineAsync(string[] args, ToolHost host)
+    {
+        var root = BuildCommands();
+
+        var usage = UsageCheck.Check(root, args);
+        var messages = usage.Messages.Count > 0 ? usage.Messages : DescribeCommand.CheckUsage(usage);
+        if (messages.Count > 0)
+        {
+            foreach (var line in messages)
+            {
+                await host.Error.WriteLineAsync(line);
+            }
+
+            return null;
+        }
+
+        var parsed = root.Parse(args, Parser);
+        if (
+            parsed.Errors.Count > 0
+            || !usage.IsReadTheSameBy(parsed)
+            || !DescribeCommand.ReadsConnectionsAs(usage, parsed)
+        )
+        {
+            // UsageCheck lets nothing through that System.CommandLine rejects or reads another way, as far as
+            // the tests know.  If something is, nothing runs, and System.CommandLine's message is not written:
+            // it may repeat a token.  The values of --connection are held too: the log's arguments is
+            // redacted from one reading and the describer is handed the other.
+            await host.Error.WriteLineAsync("sqlsource: the command line is not valid");
+            return null;
+        }
+
+        // Whether the command line runs "describe", once.
+        return new ParsedCommandLine(usage, parsed, DescribeCommand.Runs(parsed));
+    }
+
+    // Opens the log the run was given, and writes run.start: after the command line was read, so that a wrong one
+    // is never logged, and before anything runs.  False when the log cannot be opened, which is reported: the run
+    // does not start.
+    private static bool OpenLog(ParsedCommandLine commandLine, string[] args, RunState state)
+    {
+        var host = state.Host;
+        var logPath = DescribeCommand.LogPathOf(commandLine.Parsed, host.GetEnvironmentVariable);
+        state.MayPoint = commandLine.RunsDescribe && logPath is null;
+        if (logPath is null)
+        {
+            return true;
+        }
+
+        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.Time);
+        if (!opened.Succeeded)
+        {
+            state.Reporter.Report(opened.Failure);
+            return false;
+        }
+
+        state.Log = opened.Value;
+        state.Log.Write(
+            "run.start",
+            new("toolVersion", PackageVersion.Prefix),
+            new("formatVersion", SidecarFormat.Version),
+            new("runtime", RuntimeInformation.FrameworkDescription),
+            new("os", RuntimeInformation.OSDescription),
+            new("arguments", LoggedArguments.Of(commandLine.Usage, args))
+        );
+        return true;
+    }
+
+    // Gives "describe" its action with the reporter of the run, and invokes the command.
+    private static async Task<int> InvokeAsync(
+        ParsedCommandLine commandLine,
+        RunState state,
+        CancellationToken cancellationToken
+    )
+    {
+        var host = state.Host;
+        var parsed = commandLine.Parsed;
+        if (commandLine.RunsDescribe)
+        {
+            // What the run says of itself: to the log, when it has one, and to the person watching under
+            // --verbose.
+            IRunLog events = state.Log is { } log ? log : NullRunLog.Instance;
+
+            // The reporter of the run: from here on every error is also an event of the log.  The command
+            // gets its action only now, so that it cannot run with another.
+            state.Reporter = new Reporter(
+                host.Error,
+                new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null)
+            );
+            DescribeCommand.Bind(parsed, host, state.Reporter, counts => state.Databases = counts);
+        }
+
+        var invocation = new InvocationConfiguration
+        {
+            Output = host.Out,
+            Error = host.Error,
+            // An exception comes to the catch of RunCommandAsync.
+            EnableDefaultExceptionHandler = false,
+            // Cli.Run listens for Ctrl+C itself.
+            ProcessTerminationTimeout = null,
+        };
+        return await parsed.InvokeAsync(invocation, cancellationToken);
     }
 
     // The last event, with the exit code of the process, and the file is closed.  A log that stopped being
     // writable while the run went on did not end the run: it is an error now, once, and the exit code is 1.
-    private static int End(
-        RunLogFile log,
-        int exitCode,
-        long started,
-        LogValue databases,
-        ToolHost host,
-        Reporter reporter
-    )
+    private static int End(RunLogFile log, int exitCode, RunState state)
     {
         log.Write(
             "run.end",
             new("exitCode", exitCode),
-            new("durationMs", (long)host.Time.GetElapsedTime(started).TotalMilliseconds),
-            new("databases", databases)
+            new("durationMs", (long)state.Host.Time.GetElapsedTime(state.Started).TotalMilliseconds),
+            new("databases", state.Databases)
         );
         log.Dispose();
         if (log.Failure is not { } failure)
@@ -274,7 +297,7 @@ public static class Cli
             return exitCode;
         }
 
-        reporter.Report(
+        state.Reporter.Report(
             ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, log.Path, "written", failure.Message)
         );
         return 1;
@@ -331,5 +354,32 @@ public static class Cli
             parseResult.InvocationConfiguration.Output.WriteLine(Version);
             return 0;
         }
+    }
+
+    // A command line that both readers accept, as each read it.
+    private sealed record ParsedCommandLine(Usage Usage, ParseResult Parsed, bool RunsDescribe);
+
+    // What the steps of one run share.
+    private sealed class RunState(ToolHost host)
+    {
+        public ToolHost Host => host;
+
+        public long Started { get; } = host.Time.GetTimestamp();
+
+        // Until the run has its trace an error has the console alone: a log that cannot be opened, or an
+        // exception.  Neither is followed by an error of the run, so no count is split between two reporters.
+        // InvokeAsync replaces it, so a step reads it here when it reports, and keeps it in no local.
+        public Reporter Reporter { get; set; } = new(host.Error);
+
+        // The log of the run, once it is open.  RunAsync closes it.
+        public RunLogFile? Log { get; set; }
+
+        // The counts of each selected database, as run.end holds them.
+        public LogValue Databases { get; set; } = LogValue.ListOf([]);
+
+        // Whether the line that ends a failed run has a reader: "describe" runs, and no log was asked for.
+        public bool MayPoint { get; set; }
+
+        public bool Cancelled { get; set; }
     }
 }

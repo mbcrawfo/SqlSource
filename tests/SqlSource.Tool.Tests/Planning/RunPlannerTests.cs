@@ -133,6 +133,20 @@ public sealed class RunPlannerTests : IDisposable
         file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBe(needsEntry);
     }
 
+    // The order the project compiles its files in, which is not the order of their paths here.
+    [Fact]
+    public void Plan_TwoTypesThatClaimOneFile_HasBothClaimsInTheOrderOfTheirSourceFiles()
+    {
+        var project = Postgres();
+        var first = project.AddSource("B.cs", Type("B", "Path = \"Q\""));
+        var second = project.AddSource("A.cs", Type("A", "Path = \"Q/One.sql\""));
+        _ = project.AddSql("Q/One.sql", "SELECT 1;");
+
+        var file = Plan(project).Plan.Files.ShouldHaveSingleItem();
+
+        file.Claims.Select(claim => claim.SourcePath).ShouldBe([first, second]);
+    }
+
     [Fact]
     public void Plan_FileThatNoTypeClaims_IsNotReadThoughItDoesNotParse()
     {

@@ -131,6 +131,38 @@ internal static class ProjectEvaluator
             return Failed(project, "the project file does not exist", new ProcessResult(0, "", ""));
         }
 
+        var asked = await AskAsync(host, project, solutionSwitches, cancellationToken);
+        if (!asked.Succeeded)
+        {
+            return asked.Failure;
+        }
+
+        var state = StateOf(asked.Value.Answer, project);
+        if (state != ProjectState.UsesSqlSource)
+        {
+            return new ProjectEvaluation(project, state);
+        }
+
+        var target = await RunManifestTargetAsync(
+            host,
+            project,
+            manifestFile,
+            [.. asked.Value.FrameworkSwitch, .. solutionSwitches],
+            cancellationToken
+        );
+        return target.Succeeded
+            ? await ReadManifestAsync(project, manifestFile, target.Value, cancellationToken)
+            : target.Failure;
+    }
+
+    // Evaluates the project and runs no target; a project of several frameworks is evaluated again under its first.
+    private static async Task<Outcome<Evaluated, ProjectEvaluation>> AskAsync(
+        ToolHost host,
+        string project,
+        ImmutableArray<string> solutionSwitches,
+        CancellationToken cancellationToken
+    )
+    {
         ImmutableArray<string> evaluate =
         [
             "msbuild",
@@ -147,29 +179,33 @@ internal static class ProjectEvaluator
         var result = await RunAsync(host, project, evaluate, cancellationToken);
         if (!TryReadAnswer(result, out var answer, out var reason))
         {
-            return Failed(project, reason, result);
+            return Outcome<Evaluated, ProjectEvaluation>.Failed(Failed(project, reason, result));
         }
 
         // NuGet imports a package's props into a project with several frameworks only under a condition on
         // TargetFramework, so this answer says nothing but which framework is the first.  TD-0026.
-        ImmutableArray<string> frameworkSwitch = [];
-        if (answer.TargetFramework.Length == 0 && FirstFramework(answer.TargetFrameworks) is { } first)
+        if (answer.TargetFramework.Length != 0 || FirstFramework(answer.TargetFrameworks) is not { } first)
         {
-            frameworkSwitch = [MSBuildProperty.Switch("TargetFramework", first)];
-            result = await RunAsync(host, project, [.. evaluate, .. frameworkSwitch], cancellationToken);
-            if (!TryReadAnswer(result, out answer, out reason))
-            {
-                return Failed(project, reason, result);
-            }
+            return Outcome<Evaluated, ProjectEvaluation>.Of(new Evaluated(answer, []));
         }
 
-        var state = StateOf(answer, project);
-        if (state != ProjectState.UsesSqlSource)
-        {
-            return new ProjectEvaluation(project, state);
-        }
+        ImmutableArray<string> frameworkSwitch = [MSBuildProperty.Switch("TargetFramework", first)];
+        result = await RunAsync(host, project, [.. evaluate, .. frameworkSwitch], cancellationToken);
+        return TryReadAnswer(result, out answer, out reason)
+            ? Outcome<Evaluated, ProjectEvaluation>.Of(new Evaluated(answer, frameworkSwitch))
+            : Outcome<Evaluated, ProjectEvaluation>.Failed(Failed(project, reason, result));
+    }
 
-        result = await RunAsync(
+    // Runs the target of the package that writes the manifest, to the file the tool named.
+    private static async Task<Outcome<ProcessResult, ProjectEvaluation>> RunManifestTargetAsync(
+        ToolHost host,
+        string project,
+        string manifestFile,
+        ImmutableArray<string> switches,
+        CancellationToken cancellationToken
+    )
+    {
+        var result = await RunAsync(
             host,
             project,
             [
@@ -178,16 +214,23 @@ internal static class ProjectEvaluator
                 "-nologo",
                 "-t:" + ManifestTarget,
                 MSBuildProperty.Switch("SqlSourceManifestFile", manifestFile),
-                .. frameworkSwitch,
-                .. solutionSwitches,
+                .. switches,
             ],
             cancellationToken
         );
-        if (result.ExitCode != 0)
-        {
-            return Failed(project, ExitCodeReason(result), result);
-        }
+        return result.ExitCode == 0
+            ? Outcome<ProcessResult, ProjectEvaluation>.Of(result)
+            : Outcome<ProcessResult, ProjectEvaluation>.Failed(Failed(project, ExitCodeReason(result), result));
+    }
 
+    // Reads the manifest the target wrote.  A file that is not there shows what the target printed.
+    private static async Task<ProjectEvaluation> ReadManifestAsync(
+        string project,
+        string manifestFile,
+        ProcessResult target,
+        CancellationToken cancellationToken
+    )
+    {
         string text;
         try
         {
@@ -195,7 +238,7 @@ internal static class ProjectEvaluator
         }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
-            return Failed(project, $"the target {ManifestTarget} left no file that can be read", result);
+            return Failed(project, $"the target {ManifestTarget} left no file that can be read", target);
         }
 
         var read = ManifestReader.Read(text);
@@ -387,4 +430,7 @@ internal static class ProjectEvaluator
         string ProjectAssetsFile,
         ImmutableArray<string> PackageReferences
     );
+
+    // What the evaluation of a project gave, and the switch of the framework it was evaluated under, if any.
+    private readonly record struct Evaluated(Answer Answer, ImmutableArray<string> FrameworkSwitch);
 }
