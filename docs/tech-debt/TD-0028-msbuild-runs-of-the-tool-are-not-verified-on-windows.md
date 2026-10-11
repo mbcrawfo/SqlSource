@@ -8,7 +8,7 @@ The `sqlsource` tool starts `dotnet msbuild` for each project, from [`ProjectEva
 2. **A path that MSBuild reads.**  The fixture `OddPaths` and the tests of [`MSBuildProperty`](../../src/SqlSource.Tool/Projects/MSBuildProperty.cs) show that a name with `;`, `=`, `%`, `'`, a space and a letter outside ASCII arrives whole in the manifest and in a `-p:` switch.  They ran on macOS and Linux.
 3. **`SolutionDir`, which ends with `\`.**  The runner gives each argument through `ProcessStartInfo.ArgumentList`, which quotes as Windows needs, and what `dotnet` then hands MSBuild was not looked at.
 4. **The exit code `-1`.**  [`ProcessResult.NotStarted`](../../src/SqlSource.Tool/Processes/ProcessResult.cs) is `-1`, which no program gives on Unix.  On Windows a program can end with it, and `SQLSRC205` would then say that `dotnet` could not be started.
-5. **The kill of a process with what it started.**  `Run_Cancelled_LeavesNeitherTheProgramNorWhatItStartedRunning` in `tests/SqlSource.Tool.Tests/ProcessRunnerTests.cs` is a shell script and is skipped on Windows.
+5. **The kill of a process with what it started.**  `Run_Cancelled_LeavesNeitherTheProgramNorWhatItStartedRunning` in `tests/SqlSource.Tool.Tests/Processes/ProcessRunnerTests.cs` is a shell script and is skipped on Windows.
 
 ## Why it exists
 

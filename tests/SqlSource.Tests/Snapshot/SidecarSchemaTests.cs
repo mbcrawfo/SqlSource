@@ -6,6 +6,7 @@ using System.Text.Json;
 using Json.Schema;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Snapshot.Reading;
 using Xunit;
 
 namespace SqlSource.Tests.Snapshot;

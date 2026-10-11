@@ -9,7 +9,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
-using SqlSource.Tool.Describing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
 

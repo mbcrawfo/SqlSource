@@ -45,11 +45,11 @@ internal static class SidecarStore
                         outcome.Text ?? throw new InvalidOperationException("A file to write has no text."),
                         reporter
                     );
-                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, written ? "written" : "failed");
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, written ? Written : "failed");
                     break;
                 case FileAction.Delete:
                     var deleted = Delete(outcome.SidecarPath, reporter);
-                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, deleted ? "deleted" : "failed");
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, deleted ? Deleted : "failed");
                     break;
                 case FileAction.HeldBack:
                     if (outcome.HasDescribed)

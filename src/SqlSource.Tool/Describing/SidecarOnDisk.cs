@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using SqlSource.Snapshot;
+using SqlSource.Snapshot.Reading;
 
 namespace SqlSource.Tool.Describing;
 

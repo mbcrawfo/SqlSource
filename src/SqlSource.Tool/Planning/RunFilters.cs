@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
-using SqlSource.Generation;
+using SqlSource.Generation.Paths;
 
 namespace SqlSource.Tool.Planning;
 

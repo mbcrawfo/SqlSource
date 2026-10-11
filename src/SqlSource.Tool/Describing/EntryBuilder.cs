@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
 
 namespace SqlSource.Tool.Describing;

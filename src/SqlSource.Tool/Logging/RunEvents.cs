@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 

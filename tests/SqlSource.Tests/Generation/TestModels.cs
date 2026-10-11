@@ -3,6 +3,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Emitting;
 using SqlSource.Settings;
 
 namespace SqlSource.Tests.Generation;

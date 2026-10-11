@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-// The hash ties a query to the description a later phase keeps of it.  Its input is fixed: the engine's name, a line
+// The hash ties a query to its entry in a sidecar.  Its input is fixed: the engine's name, a line
 // feed, the SQL without comments and with each token as {{name:default}}, a line feed, and a line for each parameter
 // that a marker declares.
 public class SqlQueryHashTests

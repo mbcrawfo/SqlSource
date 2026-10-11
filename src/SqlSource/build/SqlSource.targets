@@ -159,7 +159,8 @@
     <!--
         Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
         name.  It hooks nothing on purpose, so no build runs it, and nothing of a build runs before it but the two
-        trims: a .sql file that a target adds is in the manifest only when that target hooks
+        trims and, for a project of the SDK, AddImplicitDefineConstants: a .sql file that a target adds is in the
+        manifest only when that target hooks
         SqlSourceTrimMetadataOfFiles.  TD-0025.
 
         The file is lines of key=value, and its format is a contract with the tool: see src/SqlSource/AGENTS.md.  The

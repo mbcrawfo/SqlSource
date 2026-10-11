@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 
 namespace SqlSource.Parsing;
@@ -97,7 +98,6 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
             return;
         }
 
-        // -- name:, -- summary: and -- dialect: are read by the parser, which never hands them over.
         if (marker.Kind == SqlMarkerKind.GeneratorParameters)
         {
             Generator.Read(text, marker, errors);

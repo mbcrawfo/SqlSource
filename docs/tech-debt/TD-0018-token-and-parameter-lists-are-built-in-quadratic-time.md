@@ -2,7 +2,7 @@
 
 ## Problem
 
-[`SqlTokenList.Create`](../../src/SqlSource/Parsing/SqlTokenList.cs) counts a query's distinct tokens by comparing each occurrence with every one before it (`AppearedBefore`), and finds a token by name with a linear search of the tokens built so far (`IndexOf`, and `FirstWithDefault` for the occurrences).  Both are quadratic in the number of occurrences of tokens in one query.  [`SqlParameterList`](../../src/SqlSource/Parsing/SqlParameterList.cs) looks a parameter up by name in the same way, with a linear search of the parameters found so far, so it is quadratic in the number of parameters of one query.
+[`SqlTokenList.Create`](../../src/SqlSource/Parsing/Tokens/SqlTokenList.cs) counts a query's distinct tokens by comparing each occurrence with every one before it (`AppearedBefore`), and finds a token by name with a linear search of the tokens built so far (`IndexOf`, and `FirstWithDefault` for the occurrences).  Both are quadratic in the number of occurrences of tokens in one query.  [`SqlParameterList`](../../src/SqlSource/Parsing/SqlParameterList.cs) looks a parameter up by name in the same way, with a linear search of the parameters found so far, so it is quadratic in the number of parameters of one query.
 
 A probe with 6,000 distinct tokens in one query took about 0.45 s to parse.  A query with a few tokens, which is every query that people write, is not measurably slower.
 

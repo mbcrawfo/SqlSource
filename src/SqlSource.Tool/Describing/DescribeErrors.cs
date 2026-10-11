@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 

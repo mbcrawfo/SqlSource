@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using SqlSource.Generation;
+using SqlSource.Generation.Paths;
 using SqlSource.Tool.Projects;
 
 namespace SqlSource.Tool.Planning;

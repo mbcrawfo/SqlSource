@@ -20,4 +20,4 @@ The tool works the constants out itself from the manifest's `TargetFramework`, a
 
 ## Trigger
 
-An SDK in which `dotnet msbuild -t:SqlSourceWriteManifest` fails with `MSB4057` for `AddImplicitDefineConstants`.  `tests/SqlSource.Tool.Tests/ManifestTargetTests.cs` fails on that SDK.
+An SDK in which `dotnet msbuild -t:SqlSourceWriteManifest` fails with `MSB4057` for `AddImplicitDefineConstants`.  `tests/SqlSource.Tool.Tests/Projects/ManifestTargetTests.cs` fails on that SDK.

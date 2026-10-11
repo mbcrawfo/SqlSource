@@ -10,7 +10,7 @@ For a project with `TargetFrameworks`, the `sqlsource` tool passes the first of 
 
 The queries those bring are never described.  The generator compiles for every framework, so from phase 5 the build of the other framework reports each as having no entry.
 
-`tests/SqlSource.Tool.Tests/ManifestTargetTests.cs` and `tests/SqlSource.Tool.Tests/FixtureProjectTests.cs` pin the first two with the fixture `Multi`, and the third with `SecondOnly`.
+`tests/SqlSource.Tool.Tests/Projects/ManifestTargetTests.cs` and `tests/SqlSource.Tool.Tests/Projects/FixtureProjectTests.cs` pin the first two with the fixture `Multi`, and the third with `SecondOnly`.
 
 ## Why it exists
 

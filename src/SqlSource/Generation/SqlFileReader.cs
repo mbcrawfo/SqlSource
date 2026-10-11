@@ -3,6 +3,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
+using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
 
 namespace SqlSource.Generation;

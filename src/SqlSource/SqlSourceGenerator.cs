@@ -7,6 +7,9 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Generation.Emitting;
+using SqlSource.Generation.MSBuild;
+using SqlSource.Generation.Paths;
 using SqlSource.Settings;
 
 namespace SqlSource;
