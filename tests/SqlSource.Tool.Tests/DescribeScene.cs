@@ -10,8 +10,6 @@ internal sealed class DescribeScene : IDisposable
 {
     public const string Connection = "Host=db;Password=hunter2";
 
-    public const string See = "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc";
-
     // What ends a "describe" that reported an error and wrote no log.
     public const string RunAgain = "sqlsource: run again with --log <file> for a record of what the run did\n";
 

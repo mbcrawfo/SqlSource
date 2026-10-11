@@ -201,7 +201,7 @@ public class CliTests
         result.Error.ShouldBe(
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: "
                 + "System.InvalidOperationException: the pipe is closed\n"
-                + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc200\n"
+                + Expected.See("SQLSRC200")
         );
     }
 

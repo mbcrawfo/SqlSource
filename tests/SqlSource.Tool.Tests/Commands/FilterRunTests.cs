@@ -76,7 +76,7 @@ public sealed class FilterRunTests : IDisposable
                     + "the file has an entry\n"
                     + "    query: GetUser: not in this run\n"
                     + "    help: describe the whole file, or fix the queries that failed\n"
-                    + $"{DescribeScene.See}217\n"
+                    + Expected.See("SQLSRC217")
                     + DescribeScene.RunAgain
             )
         );

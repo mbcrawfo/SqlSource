@@ -21,8 +21,6 @@ public sealed class DatabaseRunsTests : IDisposable
 {
     private const string Secret = "Host=db;Password=s3cret";
 
-    private const string See = "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc";
-
     private const string Users =
         "-- name: GetUser\nSELECT 1 WHERE @id = 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
 
@@ -98,9 +96,10 @@ public sealed class DatabaseRunsTests : IDisposable
         _error
             .ToString()
             .ShouldBe(
-                $"{_users}(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n{See}216\n"
+                $"{_users}(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n"
+                    + Expected.See("SQLSRC216")
                     + $"{_users}(4,10): error SQLSRC216: This version of sqlsource cannot describe "
-                    + $"'postgres'\n{See}216\n"
+                    + $"'postgres'\n{Expected.See("SQLSRC216")}"
             );
     }
 
@@ -144,7 +143,7 @@ public sealed class DatabaseRunsTests : IDisposable
             .ShouldBe(
                 $"{more}(1,10): error SQLSRC213: No connection is given for the database 'postgres'\n"
                     + "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES\n"
-                    + $"{See}213\n"
+                    + Expected.See("SQLSRC213")
             );
     }
 
@@ -179,9 +178,9 @@ public sealed class DatabaseRunsTests : IDisposable
             .ToString()
             .ShouldBe(
                 $"{sql}(1,10): error SQLSRC214: The databases 'app-v2' and 'app_v2' both read their connection from "
-                    + $"SQLSOURCE_CONNECTION_APP_V2\n{See}214\n"
+                    + $"SQLSOURCE_CONNECTION_APP_V2\n{Expected.See("SQLSRC214")}"
                     + $"{sql}(5,10): error SQLSRC214: The databases 'app_v2' and 'app-v2' both read their connection "
-                    + $"from SQLSOURCE_CONNECTION_APP_V2\n{See}214\n"
+                    + $"from SQLSOURCE_CONNECTION_APP_V2\n{Expected.See("SQLSRC214")}"
             );
     }
 
@@ -200,7 +199,7 @@ public sealed class DatabaseRunsTests : IDisposable
                     + "run has 2: postgres, billing\n"
                     + "    help: set SQLSOURCE_CONNECTION_POSTGRES for 'postgres' and SQLSOURCE_CONNECTION_BILLING for "
                     + "'billing', or pass --connection <name>=<connection string> for each\n"
-                    + $"{See}215\n"
+                    + Expected.See("SQLSRC215")
             );
     }
 

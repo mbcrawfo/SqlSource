@@ -50,7 +50,7 @@ public sealed class ExitCodeTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(1);
-        result.Error.ShouldEndWith($"{DescribeScene.See}200\n{DescribeScene.RunAgain}");
+        result.Error.ShouldEndWith(Expected.See("SQLSRC200") + DescribeScene.RunAgain);
     }
 
     // The line is for a difference that could not be checked, not for one that was found.

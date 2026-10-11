@@ -12,9 +12,6 @@ public sealed class FilterTests : IDisposable
 {
     private const string Secret = "s3cret";
 
-    private const string See =
-        "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc212\n";
-
     private readonly CliRun _run = new();
     private readonly string _users;
 
@@ -121,7 +118,7 @@ public sealed class FilterTests : IDisposable
                 1,
                 "",
                 $"sqlsource : error SQLSRC212: '{full}' is not a .sql file that a type of the run claims\n"
-                    + See
+                    + Expected.See("SQLSRC212")
                     + DescribeScene.RunAgain
             )
         );

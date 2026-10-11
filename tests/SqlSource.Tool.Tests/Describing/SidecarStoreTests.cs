@@ -14,8 +14,6 @@ namespace SqlSource.Tool.Tests.Describing;
 // The one place that changes a sidecar on the disk: a file is written whole or not at all.
 public sealed class SidecarStoreTests : IDisposable
 {
-    private const string See = "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc";
-
     private static readonly DateTime Old = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
 
     private readonly TempFolder _folder = new();
@@ -132,7 +130,7 @@ public sealed class SidecarStoreTests : IDisposable
                     + "    query: GetUser: failed\n"
                     + "    query: GetInvoice: not in this run\n"
                     + "    help: describe the whole file, or fix the queries that failed\n"
-                    + $"{See}217\n"
+                    + Expected.See("SQLSRC217")
             );
         File.Exists(_sidecar).ShouldBeFalse();
     }
@@ -146,7 +144,7 @@ public sealed class SidecarStoreTests : IDisposable
         Apply(Outcome(FileAction.Write, "{}"));
 
         _error.ToString().ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be written: ");
-        _error.ToString().ShouldEndWith($"{See}218\n");
+        _error.ToString().ShouldEndWith(Expected.See("SQLSRC218"));
         Directory.Exists(_sidecar).ShouldBeTrue();
         Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json"]);
     }

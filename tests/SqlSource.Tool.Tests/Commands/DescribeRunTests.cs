@@ -14,8 +14,6 @@ public sealed class DescribeRunTests : IDisposable
 {
     private const string Users = "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n";
 
-    private const string See = DescribeScene.See;
-
     private static readonly DateTime Old = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
 
     private readonly DescribeScene _scene = new();
@@ -140,7 +138,7 @@ public sealed class DescribeRunTests : IDisposable
                 "postgres (postgres): 0 described, 0 skipped, 2 failed\n",
                 $"{Sidecar} : error SQLSRC221: '{Sidecar}' has format 2, and this tool writes format 1\n"
                     + "    help: update the SqlSource.Tool package\n"
-                    + $"{See}221\n"
+                    + Expected.See("SQLSRC221")
                     + DescribeScene.RunAgain
             )
         );
@@ -181,7 +179,7 @@ public sealed class DescribeRunTests : IDisposable
                     + "query of the file has an entry\n"
                     + "    query: ListUsers: failed\n"
                     + "    help: describe the whole file, or fix the queries that failed\n"
-                    + $"{See}217\n"
+                    + Expected.See("SQLSRC217")
                     + DescribeScene.RunAgain
             )
         );
@@ -233,7 +231,7 @@ public sealed class DescribeRunTests : IDisposable
                 "postgres (postgres): 0 described, 1 skipped, 1 failed\n",
                 $"{_users}(4,10): error SQLSRC213: No connection is given for the database 'postgres'\n"
                     + "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES\n"
-                    + $"{See}213\n"
+                    + Expected.See("SQLSRC213")
                     + DescribeScene.RunAgain
             )
         );
@@ -289,9 +287,10 @@ public sealed class DescribeRunTests : IDisposable
             new CliResult(
                 1,
                 "postgres (postgres): 0 described, 0 skipped, 2 failed\n",
-                $"{_users}(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n{See}216\n"
+                $"{_users}(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n"
+                    + Expected.See("SQLSRC216")
                     + $"{_users}(4,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n"
-                    + $"{See}216\n"
+                    + Expected.See("SQLSRC216")
                     + DescribeScene.RunAgain
             )
         );
@@ -339,7 +338,7 @@ public sealed class DescribeRunTests : IDisposable
                 "",
                 "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: "
                     + "bad ***\n"
-                    + $"{See}200\n"
+                    + Expected.See("SQLSRC200")
                     + DescribeScene.RunAgain
             )
         );

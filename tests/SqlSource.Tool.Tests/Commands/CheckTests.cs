@@ -121,7 +121,7 @@ public sealed class CheckTests : IDisposable
     // One SQLSRC219 as the reporter writes it.  The origin is a path with a position, or a path and a space.
     private static string Difference(string origin, string subject, string what, string help = Help) =>
         $"{origin}: error SQLSRC219: The sidecar is out of date for '{subject}': {what}\n"
-        + $"{help}{DescribeScene.See}219\n";
+        + $"{help}{Expected.See("SQLSRC219")}";
 
     // Where a key stands in a text, as the reporter writes a position: "(line,column)", each counted from one.
     private static string PositionOf(string text, string key)

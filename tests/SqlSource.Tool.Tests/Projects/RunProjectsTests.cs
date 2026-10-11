@@ -17,8 +17,6 @@ namespace SqlSource.Tool.Tests.Projects;
 // place.
 public sealed class RunProjectsTests : IDisposable
 {
-    private const string See = "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc";
-
     private readonly TempFolder _folder = new();
     private readonly FakeProcessRunner _runner = new();
     private readonly StringWriter _error = new(CultureInfo.InvariantCulture) { NewLine = "\n" };
@@ -88,18 +86,17 @@ public sealed class RunProjectsTests : IDisposable
     private static string Sqlsrc204(string project) =>
         $"{project} : error SQLSRC204: '{project}' does not use SqlSource\n"
         + "    help: add the SqlSource package to the project\n"
-        + See
-        + "204\n";
+        + Expected.See("SQLSRC204");
 
     private static string Sqlsrc220(string project) =>
         $"{project} : error SQLSRC220: '{project}' has not been restored, or not since the SqlSource package was "
         + "added to it\n"
         + "    help: run 'dotnet restore'\n"
-        + See
-        + "220\n";
+        + Expected.See("SQLSRC220");
 
     private string Sqlsrc207(string path, string? unit = null) =>
-        $"sqlsource : error SQLSRC207: '{path}' is not a project of '{unit ?? _solution}'\n" + See + "207\n";
+        $"sqlsource : error SQLSRC207: '{path}' is not a project of '{unit ?? _solution}'\n"
+        + Expected.See("SQLSRC207");
 
     [Fact]
     public async Task Find_ProjectThatUsesSqlSource_GivesItsManifest()
@@ -210,11 +207,10 @@ public sealed class RunProjectsTests : IDisposable
             $"{_a} : error SQLSRC205: MSBuild could not evaluate '{_a}'\n"
                 + "    reason: dotnet msbuild ended with the exit code 1\n"
                 + "    msbuild: error of A\n"
-                + See
-                + "205\n"
+                + Expected.See("SQLSRC205")
                 + $"{_c} : error SQLSRC206: The project manifest of '{_c}' cannot be read: it has version '7'"
         );
-        errors.ShouldEndWith(See + "206\n");
+        errors.ShouldEndWith(Expected.See("SQLSRC206"));
     }
 
     [Fact]
@@ -230,8 +226,7 @@ public sealed class RunProjectsTests : IDisposable
             .ShouldBe(
                 $"{_b} : error SQLSRC205: MSBuild could not evaluate '{_b}'\n"
                     + "    reason: the project file does not exist\n"
-                    + See
-                    + "205\n"
+                    + Expected.See("SQLSRC205")
             );
         Asked().ShouldBe([_a, _c], ignoreOrder: true);
     }
@@ -356,7 +351,7 @@ public sealed class RunProjectsTests : IDisposable
         // The reason is the library's own text.
         lines[0].ShouldStartWith($"{solution} : error SQLSRC223: '{solution}' cannot be read: ");
         lines[0].Length.ShouldBeGreaterThan($"{solution} : error SQLSRC223: '{solution}' cannot be read: ".Length);
-        lines[1].ShouldBe(See + "223");
+        (lines[1] + "\n").ShouldBe(Expected.See("SQLSRC223"));
     }
 
     [Fact]
