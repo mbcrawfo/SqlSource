@@ -265,6 +265,26 @@ public class CliTests
         database.GetProperty("described").GetInt32().ShouldBe(1);
     }
 
+    // The error of an exception belongs in the log: the run's reporter, which has the trace, reports it, and not
+    // the one the run started with.
+    [Fact]
+    public async Task Run_SummaryThatCannotBeWrittenWithALog_HasTheErrorAsAnEventBeforeRunEnd()
+    {
+        using var run = new CliRun { Out = new FailingWriter("the pipe is closed") };
+        run.Describers.Add(new FakeDescriber());
+        var project = Plans.Postgres(run.Folder, directory: "").AnsweredBy(run.Processes);
+        run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = DescribeScene.Connection;
+        _ = project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+
+        var result = await run.RunAsync("describe", "--log", "run.log");
+
+        result.ExitCode.ShouldBe(1);
+        var events = LogReader.Read(run.Folder.PathOf("run.log"));
+        events[^2].GetProperty("event").GetString().ShouldBe("diagnostic");
+        events[^2].GetProperty("id").GetString().ShouldBe("SQLSRC200");
+        events[^1].GetProperty("event").GetString().ShouldBe("run.end");
+    }
+
     [Fact]
     public async Task Run_CancelledBeforeItStarts_PrintsNothingAndExitsWithOne()
     {
