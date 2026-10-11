@@ -172,6 +172,23 @@ public sealed class RunPlannerErrorTests : IDisposable
         result.Plan.Files.Select(file => file.Path).ShouldBe([other]);
     }
 
+    // The errors of a project come in one order, each value once though the property and a file's metadata both
+    // give it, and before the errors of its files: the file is read as ansi, which cannot be described.
+    [Fact]
+    public void Plan_ProjectWithEveryKindOfError_ReportsThemInOrderAndEachValueOnce()
+    {
+        var project = Project(dialect: "nosuch");
+        project.Properties["SqlSourceOutput"] = "everything";
+        _ = project.AddSource("Other.cs", Type("Other", "Path = Folder"));
+        _ = project.AddSql("Q/One.sql", "SELECT 1;", ("SqlSourceDialect", "nosuch"), ("SqlSourceOutput", "everything"));
+
+        var result = Plan(project);
+
+        result
+            .Errors.Select(error => error.Descriptor.Id)
+            .ShouldBe(["SQLSRC208", "SQLSRC011", "SQLSRC014", "SQLSRC209"]);
+    }
+
     private const string Name = "-- name: ";
 
     [Theory]
