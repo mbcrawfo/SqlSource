@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Immutable;
-using System.IO;
 using System.Linq;
 using System.Threading;
 using Microsoft.CodeAnalysis;
@@ -44,7 +43,7 @@ internal static class AttributeReader
 
             // A file that cannot be read is the build's to report.  Most files do not hold the word, and are not
             // parsed.
-            if (ReadText(path) is not { } text || !text.ToString().Contains(ShortName, StringComparison.Ordinal))
+            if (FileText.Read(path) is not { } text || !text.ToString().Contains(ShortName, StringComparison.Ordinal))
             {
                 continue;
             }
@@ -78,19 +77,6 @@ internal static class AttributeReader
             SourceCodeKind.Regular,
             manifest.DefineConstants
         );
-
-    private static SourceText? ReadText(string path)
-    {
-        try
-        {
-            using var stream = File.OpenRead(path);
-            return SourceText.From(stream);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
 
     // The first attribute of the name in a list with no target or the target "type".
     private static AttributeSyntax? FindAttribute(TypeDeclarationSyntax declaration) =>
