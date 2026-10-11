@@ -117,7 +117,6 @@ public class SqlGeneratorParameterScopeTests
         scope.Parameters.ShouldBe(GeneratorParameters.KeepComments);
     }
 
-    // Each line is lexed alone, so every generator parameter is at the offset it has in its own line.
     [Fact]
     public void Read_WordsSeparatedByTabsAndRunsOfSpaces_AreEachReportedAtTheirOwnPlace()
     {
@@ -132,6 +131,7 @@ public class SqlGeneratorParameterScopeTests
         ]);
     }
 
+    // Each line is lexed alone, so every generator parameter is at the offset it has in its own line.
     private static (SqlGeneratorParameterScope Scope, List<SqlParseError> Errors) Read(params string[] lines)
     {
         var scope = new SqlGeneratorParameterScope();

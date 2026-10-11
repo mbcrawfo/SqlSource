@@ -393,7 +393,11 @@ public class TypeDiagnosticsTests
             namespace App;
             [SqlSourceGenerate(
                 CollectionType = (GeneratorCollectionType)91,
+                OutputModelType = (GeneratorModelType)96,
+                InputModelType = (GeneratorModelType)95,
                 ModelNamespace = "App..Models",
+                OutputModelSuffix = "a b",
+                InputModelSuffix = "a-b",
                 Output = (GeneratorOutput)92,
                 Parameters = "nope",
                 MethodLocation = (MethodLocation)93,
@@ -411,7 +415,11 @@ public class TypeDiagnosticsTests
                 "'93' is not a valid value of MethodLocation",
                 "'nope' is not a valid value of Parameters",
                 "'92' is not a valid value of Output",
+                "'a-b' is not a valid value of InputModelSuffix",
+                "'a b' is not a valid value of OutputModelSuffix",
                 "'App..Models' is not a valid value of ModelNamespace",
+                "'95' is not a valid value of InputModelType",
+                "'96' is not a valid value of OutputModelType",
                 "'91' is not a valid value of CollectionType",
             ]);
     }

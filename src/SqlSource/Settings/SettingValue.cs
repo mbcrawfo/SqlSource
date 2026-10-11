@@ -133,6 +133,7 @@ internal static class SettingValue
     {
         public static readonly string[] Names = Enum.GetNames(typeof(T));
 
+        // From the enum and not from Names: S2743 wants a static field of a generic type to name its parameter.
         public static readonly string[] LowerNames = Array.ConvertAll(Enum.GetNames(typeof(T)), Lower);
 
         public static readonly T[] Values = (T[])Enum.GetValues(typeof(T));

@@ -15,7 +15,7 @@ internal sealed record FileMetadata(AdditionalText File, DialectSetting Dialect,
 {
     /// <summary>Reads the metadata the compiler is shown.</summary>
     public static FileMetadata Read(AdditionalText file, AnalyzerConfigOptions fileOptions) =>
-        Read(file, fileOptions, MSBuildSettings.Metadata);
+        new(file, DialectSetting.ReadMetadata(fileOptions), FileSettings.Read(file.Path, fileOptions));
 
     /// <summary>Reads the metadata, with the settings under <paramref name="keys" />.</summary>
     public static FileMetadata Read(

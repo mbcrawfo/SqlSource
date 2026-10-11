@@ -5,7 +5,8 @@ namespace SqlSource.Settings;
 
 /// <summary>
 /// Reads a <see cref="SettingsLevel" /> from a source that is not a marker.  This is the one place that says which
-/// members such a level has, what makes each valid, and that a text which is empty or white space is not set.
+/// members such a level has, what makes a text and a list of generator parameters valid, and that a text which is
+/// empty or white space is not set.  A choice is decoded by its source, which alone knows how one is written.
 /// </summary>
 internal static class SettingsLevelReader
 {
