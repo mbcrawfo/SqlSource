@@ -10,6 +10,10 @@ internal static class Plans
     // A type that claims every .sql file in the folder of its own source file.
     public const string Type = "[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n";
 
+    // A type with the attribute and these arguments, in a file of its own.
+    public static string TypeNamed(string name, string arguments = "") =>
+        $"[SqlSource.SqlSourceGenerate({arguments})]\ninternal static partial class {name};\n";
+
     // A project whose dialect is postgres, with that type at its root: a .sql file added at the root is claimed.
     public static TestProject Postgres(TempFolder folder, string name = "App", string? directory = null)
     {
@@ -22,10 +26,17 @@ internal static class Plans
     public static RunPlan Of(params TestProject[] projects) => Of(RunFilters.None, projects);
 
     // The plan, whatever is wrong with it: a test of a query with a problem wants the plan all the same.
-    public static RunPlan Of(RunFilters filters, params TestProject[] projects) =>
-        RunPlanner
-            .Plan([.. projects.Select(project => project.Manifest())], filters, TestContext.Current.CancellationToken)
-            .Plan;
+    public static RunPlan Of(RunFilters filters, params TestProject[] projects) => Result(filters, projects).Plan;
+
+    public static RunPlanResult Result(params TestProject[] projects) => Result(RunFilters.None, projects);
+
+    // The plan with what is wrong with it, for a test of the planner itself.
+    public static RunPlanResult Result(RunFilters filters, params TestProject[] projects) =>
+        RunPlanner.Plan(
+            [.. projects.Select(project => project.Manifest())],
+            filters,
+            TestContext.Current.CancellationToken
+        );
 
     // The first query of a file that holds this SQL, in a postgres project of its own.
     public static PlannedQuery Query(TempFolder folder, string sql)

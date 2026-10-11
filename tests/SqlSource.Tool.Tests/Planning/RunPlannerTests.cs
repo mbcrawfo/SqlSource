@@ -16,17 +16,6 @@ public sealed class RunPlannerTests : IDisposable
 
     public void Dispose() => _folder.Dispose();
 
-    private static RunPlanResult Plan(params TestProject[] projects) =>
-        RunPlanner.Plan(
-            [.. projects.Select(project => project.Manifest())],
-            RunFilters.None,
-            TestContext.Current.CancellationToken
-        );
-
-    // A type with the attribute, in a file of its own.
-    private static string Type(string name, string arguments = "") =>
-        $"[SqlSource.SqlSourceGenerate({arguments})]\ninternal static partial class {name};\n";
-
     private static (string Name, string Value)[] Metadata(string name, string? value) =>
         value is null ? [] : [(name, value)];
 
@@ -43,7 +32,7 @@ public sealed class RunPlannerTests : IDisposable
         var project = Postgres();
         _ = project.AddSource(
             "Queries.cs",
-            Type("Queries", "Path = \"Queries\", Output = SqlSource.GeneratorOutput.Models")
+            Plans.TypeNamed("Queries", "Path = \"Queries\", Output = SqlSource.GeneratorOutput.Models")
         );
         var sql = project.AddSql(
             "Queries/Users.sql",
@@ -61,7 +50,7 @@ public sealed class RunPlannerTests : IDisposable
             """
         );
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBeEmpty();
         var file = result.Plan.Files.ShouldHaveSingleItem();
@@ -89,33 +78,33 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_NoPath_ClaimsTheFilesBesideTheSourceFileAndNotThoseBelow()
     {
         var project = Postgres();
-        _ = project.AddSource("Repo/Repository.cs", Type("Repository"));
+        _ = project.AddSource("Repo/Repository.cs", Plans.TypeNamed("Repository"));
         var beside = project.AddSql("Repo/A.sql", "SELECT 1;");
         _ = project.AddSql("Repo/Sub/B.sql", "SELECT 1;");
 
-        Plan(project).Plan.Files.Select(file => file.Path).ShouldBe([beside]);
+        Plans.Result(project).Plan.Files.Select(file => file.Path).ShouldBe([beside]);
     }
 
     [Fact]
     public void Plan_PathOfAFile_ClaimsThatFile()
     {
         var project = Postgres();
-        _ = project.AddSource("Repository.cs", Type("Repository", "Path = \"Queries/b.SQL\""));
+        _ = project.AddSource("Repository.cs", Plans.TypeNamed("Repository", "Path = \"Queries/b.SQL\""));
         _ = project.AddSql("Queries/A.sql", "SELECT 1;");
         var named = project.AddSql("Queries/B.sql", "SELECT 1;");
 
-        Plan(project).Plan.Files.Select(file => file.Path).ShouldBe([named]);
+        Plans.Result(project).Plan.Files.Select(file => file.Path).ShouldBe([named]);
     }
 
     [Fact]
     public void Plan_Files_AreInTheOrderOfTheirPaths()
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         var b = project.AddSql("b.sql", "SELECT 1;");
         var a = project.AddSql("A.sql", "SELECT 1;");
 
-        Plan(project).Plan.Files.Select(file => file.Path).ShouldBe([a, b]);
+        Plans.Result(project).Plan.Files.Select(file => file.Path).ShouldBe([a, b]);
     }
 
     [Theory]
@@ -124,11 +113,17 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_TwoTypesThatClaimOneFile_NeedWhatEitherNeeds(string first, string second, bool needsEntry)
     {
         var project = Postgres();
-        _ = project.AddSource("A.cs", Type("A", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{first}"));
-        _ = project.AddSource("B.cs", Type("B", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{second}"));
+        _ = project.AddSource(
+            "A.cs",
+            Plans.TypeNamed("A", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{first}")
+        );
+        _ = project.AddSource(
+            "B.cs",
+            Plans.TypeNamed("B", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{second}")
+        );
         _ = project.AddSql("Q/One.sql", "SELECT 1;");
 
-        var file = Plan(project).Plan.Files.ShouldHaveSingleItem();
+        var file = Plans.Result(project).Plan.Files.ShouldHaveSingleItem();
 
         file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBe(needsEntry);
     }
@@ -138,11 +133,11 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_TwoTypesThatClaimOneFile_HasBothClaimsInTheOrderOfTheirSourceFiles()
     {
         var project = Postgres();
-        var first = project.AddSource("B.cs", Type("B", "Path = \"Q\""));
-        var second = project.AddSource("A.cs", Type("A", "Path = \"Q/One.sql\""));
+        var first = project.AddSource("B.cs", Plans.TypeNamed("B", "Path = \"Q\""));
+        var second = project.AddSource("A.cs", Plans.TypeNamed("A", "Path = \"Q/One.sql\""));
         _ = project.AddSql("Q/One.sql", "SELECT 1;");
 
-        var file = Plan(project).Plan.Files.ShouldHaveSingleItem();
+        var file = Plans.Result(project).Plan.Files.ShouldHaveSingleItem();
 
         file.Claims.Select(claim => claim.SourcePath).ShouldBe([first, second]);
     }
@@ -151,11 +146,11 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_FileThatNoTypeClaims_IsNotReadThoughItDoesNotParse()
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Type("Queries", "Path = \"Queries\""));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"Queries\""));
         _ = project.AddSql("Queries/One.sql", "SELECT 1;");
         _ = project.AddSql("Migrations/Broken.sql", "-- name: Broken\nSELECT 'open\n");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBeEmpty();
         result.Plan.Files.Count.ShouldBe(1);
@@ -169,10 +164,10 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_PathThatNamesNothing_PlansNothingAndReportsNothing(string path)
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Type("Queries", $"Path = \"{path}\""));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", $"Path = \"{path}\""));
         _ = project.AddSql("Q.sql", "SELECT 1;");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBeEmpty();
         result.Plan.Files.Count.ShouldBe(0);
@@ -202,7 +197,7 @@ public sealed class RunPlannerTests : IDisposable
 
         _ = project.AddSource(
             "Queries.cs",
-            Type("Queries", attribute is null ? "" : $"Output = SqlSource.GeneratorOutput.{attribute}")
+            Plans.TypeNamed("Queries", attribute is null ? "" : $"Output = SqlSource.GeneratorOutput.{attribute}")
         );
         _ = project.AddSql(
             "Q.sql",
@@ -213,7 +208,7 @@ public sealed class RunPlannerTests : IDisposable
             Metadata("SqlSourceOutput", metadata)
         );
 
-        var planned = Plan(project).Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem();
+        var planned = Plans.Result(project).Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem();
 
         planned.NeedsEntry.ShouldBe(needsEntry);
         (planned.Hash is not null).ShouldBe(needsEntry);
@@ -244,7 +239,7 @@ public sealed class RunPlannerTests : IDisposable
             project.Properties["SqlSourceDatabase"] = property;
         }
 
-        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = project.AddSql(
             "Q.sql",
             (preamble is null ? "" : $"-- database: {preamble}\n")
@@ -254,19 +249,24 @@ public sealed class RunPlannerTests : IDisposable
             Metadata("SqlSourceDatabase", metadata)
         );
 
-        Plan(project).Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem().Database.ShouldBe(expected);
+        Plans
+            .Result(project)
+            .Plan.Files.ShouldHaveSingleItem()
+            .Queries.ShouldHaveSingleItem()
+            .Database.ShouldBe(expected);
     }
 
     [Fact]
     public void Plan_DialectOfAFile_IsItsMarkerThenItsMetadataThenTheProperty()
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = project.AddSql("A.sql", "SELECT 1;");
         _ = project.AddSql("B.sql", "SELECT 1;", ("SqlSourceDialect", "mssql"));
         _ = project.AddSql("C.sql", "-- dialect: postgres\nSELECT 1;", ("SqlSourceDialect", "mssql"));
 
-        Plan(project)
+        Plans
+            .Result(project)
             .Plan.Files.Select(file => file.Dialect)
             .ShouldBe([SqlDialect.PostgreSql, SqlDialect.SqlServer, SqlDialect.PostgreSql]);
     }
@@ -276,12 +276,12 @@ public sealed class RunPlannerTests : IDisposable
     {
         const string Sql = "-- name: One\nSELECT id\nFROM users\nWHERE id = @id;\n";
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = project.AddSql("A.sql", Sql);
         _ = project.AddSqlBytes("B.sql", [0xEF, 0xBB, 0xBF, .. Encoding.UTF8.GetBytes(Sql)]);
         _ = project.AddSql("C.sql", Sql.Replace("\n", "\r\n", StringComparison.Ordinal));
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBeEmpty();
         var hashes = result.Plan.Files.Select(file => file.Queries.ShouldHaveSingleItem().Hash).ToArray();
@@ -293,24 +293,24 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_TwoListedPathsThatDifferOnlyByCase_PlanTheFirst()
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         var first = project.AddSql("Users.sql", "SELECT 1;");
         project.ListSql(project.PathOf("USERS.SQL"));
 
-        Plan(project).Plan.Files.ShouldHaveSingleItem().Path.ShouldBe(first);
+        Plans.Result(project).Plan.Files.ShouldHaveSingleItem().Path.ShouldBe(first);
     }
 
     [Fact]
     public void Plan_SeveralProjects_HasTheFilesOfEachInTheOrderOfTheProjects()
     {
         var first = Postgres("Zeta");
-        _ = first.AddSource("Queries.cs", Type("Queries"));
+        _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         var z = first.AddSql("Z.sql", "SELECT 1;");
         var second = Postgres("Alpha");
-        _ = second.AddSource("Queries.cs", Type("Queries"));
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         var a = second.AddSql("A.sql", "SELECT 1;");
 
-        var files = Plan(first, second).Plan.Files;
+        var files = Plans.Result(first, second).Plan.Files;
 
         files.Select(file => (file.Path, file.ProjectPath)).ShouldBe([(z, first.ProjectPath), (a, second.ProjectPath)]);
     }
@@ -321,13 +321,13 @@ public sealed class RunPlannerTests : IDisposable
         var shared = _folder.WriteFile("Shared/One.sql", "SELECT 1;");
         var first = Postgres("A");
         first.Properties["SqlSourceOutput"] = "sql";
-        _ = first.AddSource("Queries.cs", Type("Queries", "Path = \"../Shared\""));
+        _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
         first.ListSql(shared);
         var second = Postgres("B");
-        _ = second.AddSource("Queries.cs", Type("Queries", "Path = \"../Shared\""));
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
         second.ListSql(shared);
 
-        var file = Plan(first, second).Plan.Files.ShouldHaveSingleItem();
+        var file = Plans.Result(first, second).Plan.Files.ShouldHaveSingleItem();
 
         file.ProjectPath.ShouldBe(first.ProjectPath);
         file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
@@ -338,15 +338,15 @@ public sealed class RunPlannerTests : IDisposable
     {
         var shared = _folder.WriteFile("Shared/One.sql", "SELECT 1;");
         var first = Postgres("A");
-        _ = first.AddSource("Queries.cs", Type("Queries"));
+        _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = first.AddSql("Own.sql", "SELECT 1;");
         first.ListSql(shared);
         var second = Postgres("B");
         second.Properties["SqlSourceDialect"] = "mssql";
-        _ = second.AddSource("Queries.cs", Type("Queries", "Path = \"../Shared\""));
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../Shared\""));
         second.ListSql(shared);
 
-        var file = Plan(first, second).Plan.Files.Single(file => file.Path == shared);
+        var file = Plans.Result(first, second).Plan.Files.Single(file => file.Path == shared);
 
         file.ProjectPath.ShouldBe(second.ProjectPath);
         file.Dialect.ShouldBe(SqlDialect.SqlServer);
@@ -356,12 +356,12 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_Databases_AreThoseOfTheQueriesThatNeedAnEntryInTheOrderOfThePlan()
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = project.AddSql("A.sql", "-- name: One\nSELECT 1;\n\n-- name: Plain\n-- output: sql\nSELECT 0;\n");
         _ = project.AddSql("B.sql", "SELECT 2;", ("SqlSourceDialect", "mssql"));
         _ = project.AddSql("C.sql", "-- output: sql\n-- database: unused\n-- name: Three\nSELECT 3;\n");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBeEmpty();
         result.Plan.Databases.ShouldBe([
@@ -374,11 +374,11 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_DatabaseNamesThatDifferInCase_AreOneDatabaseInItsFirstSpelling()
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = project.AddSql("A.sql", "-- database: Billing\n-- name: One\nSELECT 1;\n");
         _ = project.AddSql("B.sql", "-- database: BILLING\n-- name: Two\nSELECT 2;\n");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBeEmpty();
         result.Plan.Databases.ShouldBe([new PlannedDatabase("Billing", SqlDialect.PostgreSql)]);
@@ -402,11 +402,11 @@ public sealed class RunPlannerTests : IDisposable
     {
         var project = new TestProject(_folder);
         project.Properties["SqlSourceOutput"] = "sql";
-        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         var sql = project.AddSql("Q.sql", "SELECT 1;", Metadata("SqlSourceDialect", first));
         project.ListSql(sql, Metadata("SqlSourceDialect", second));
 
-        var file = Plan(project).Plan.Files.ShouldHaveSingleItem();
+        var file = Plans.Result(project).Plan.Files.ShouldHaveSingleItem();
 
         file.Path.ShouldBe(sql);
         file.Dialect.ToString().ShouldBe(expected);
@@ -416,7 +416,7 @@ public sealed class RunPlannerTests : IDisposable
     public void Plan_RunThatWasCancelled_Throws()
     {
         var project = Postgres();
-        _ = project.AddSource("Queries.cs", Type("Queries"));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
         _ = project.AddSql("Q.sql", "SELECT 1;");
         using var cancelled = new CancellationTokenSource();
         cancelled.Cancel();

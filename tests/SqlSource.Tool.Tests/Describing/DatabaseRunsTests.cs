@@ -45,12 +45,6 @@ public sealed class DatabaseRunsTests : IDisposable
         _folder.Dispose();
     }
 
-    private static ConnectionArgument Parse(string text)
-    {
-        ConnectionArgument.TryParse(text, out var argument).ShouldBeTrue();
-        return argument.ShouldNotBeNull();
-    }
-
     // Decides for the plan and runs its databases.  Both databases have a connection unless "given" says otherwise.
     private async Task<ImmutableArray<FileWork>> RunAsync(
         RunPlan? plan = null,
@@ -64,7 +58,7 @@ public sealed class DatabaseRunsTests : IDisposable
         var selected = RunDecisions.SelectedDatabases(plan);
         var connections = Connections.Resolve(
             [.. selected.Select(database => database.Name)],
-            [.. (given ?? ["postgres=" + Secret, "billing=" + Secret]).Select(Parse)],
+            [.. (given ?? ["postgres=" + Secret, "billing=" + Secret]).Select(ConnectionArguments.Parse)],
             name => _environment.GetValueOrDefault(name)
         );
         var host = Hosts.Create(_folder.Path, new FakeProcessRunner(), _folder.Path, environment: _environment) with

@@ -162,7 +162,7 @@ public class UsageCheckTests
     [Fact]
     public void ReadsConnectionsAs_ParseThatBindsOtherValues_IsFalse()
     {
-        var root = ToolRoot();
+        var root = Cli.BuildCommands();
         var usage = UsageCheck.Check(root, ["describe", "--connection", "a=" + Secret, "--connection", "b=2"]);
 
         DescribeCommand
@@ -341,12 +341,14 @@ public class UsageCheckTests
     [InlineData("describe", "Q.sql")]
     [InlineData("describe", "--database", "billing", "--database=app-v2.main")]
     public void CheckUsage_PathsAndDatabasesOfDescribe_GiveNoLine(params string[] args) =>
-        DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), args)).ShouldBeEmpty();
+        DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args)).ShouldBeEmpty();
 
     [Fact]
     public void CheckUsage_SecondPathThatIsNoSqlFile_IsReportedByItsPosition() =>
         DescribeCommand
-            .CheckUsage(UsageCheck.Check(ToolRoot(), ["describe", "App.csproj", "Q.sql", Secret, "--project", "P"]))
+            .CheckUsage(
+                UsageCheck.Check(Cli.BuildCommands(), ["describe", "App.csproj", "Q.sql", Secret, "--project", "P"])
+            )
             .ShouldBe(["sqlsource: unexpected argument at position 4"]);
 
     [Theory]
@@ -358,12 +360,12 @@ public class UsageCheckTests
         params string[] args
     ) =>
         DescribeCommand
-            .CheckUsage(UsageCheck.Check(ToolRoot(), args))
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
             .ShouldBe([$"sqlsource: the value of option '--database' at position {position} is not a database name"]);
 
     [Fact]
     public void CheckUsage_AnotherCommand_GivesNoLine() =>
-        DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), ["--version"])).ShouldBeEmpty();
+        DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), ["--version"])).ShouldBeEmpty();
 
     private static bool HasTheSameValues(Usage usage, ParseResult parsed, params string[] options) =>
         usage.Command.Name != DescribeCommand.Name
@@ -373,6 +375,4 @@ public class UsageCheckTests
                 .Select(value => value.Text)
                 .SequenceEqual(parsed.GetValue<string[]>(name) ?? [])
         );
-
-    private static Command ToolRoot() => Cli.BuildCommands();
 }

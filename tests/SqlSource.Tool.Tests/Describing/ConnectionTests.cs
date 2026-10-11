@@ -12,12 +12,6 @@ public class ConnectionTests
 {
     private const string Secret = "s3cret";
 
-    private static ConnectionArgument Parse(string text)
-    {
-        ConnectionArgument.TryParse(text, out var argument).ShouldBeTrue();
-        return argument.ShouldNotBeNull();
-    }
-
     private static Connections Resolve(
         string[] selected,
         string[] given,
@@ -25,10 +19,12 @@ public class ConnectionTests
     )
     {
         var variables = environment.ToDictionary(variable => variable.Name, variable => variable.Value);
-        return Connections.Resolve(selected, [.. given.Select(Parse)], name => variables.GetValueOrDefault(name));
+        return Connections.Resolve(
+            selected,
+            [.. given.Select(ConnectionArguments.Parse)],
+            name => variables.GetValueOrDefault(name)
+        );
     }
-
-    private static Command ToolRoot() => Cli.BuildCommands();
 
     [Theory]
     [InlineData("billing", "SQLSOURCE_CONNECTION_BILLING")]
@@ -41,7 +37,9 @@ public class ConnectionTests
 
     [Fact]
     public void TryParse_ValueThatHoldsEqualsSigns_IsCutAtTheFirst() =>
-        Parse("billing=Host=db;Port=5432").ShouldBe(new ConnectionArgument("billing", "Host=db;Port=5432"));
+        ConnectionArguments
+            .Parse("billing=Host=db;Port=5432")
+            .ShouldBe(new ConnectionArgument("billing", "Host=db;Port=5432"));
 
     // Removing a value of white space from a describer's text would turn every space of it into the mark.
     [Theory]
@@ -57,11 +55,11 @@ public class ConnectionTests
 
     [Fact]
     public void TryParse_ValueWithWhiteSpaceAroundSomethingElse_IsKeptWhole() =>
-        Parse("billing= a ").ShouldBe(new ConnectionArgument("billing", " a "));
+        ConnectionArguments.Parse("billing= a ").ShouldBe(new ConnectionArgument("billing", " a "));
 
     [Fact]
     public void ToString_ConnectionArgument_LeavesTheValueOut() =>
-        Parse("billing=" + Secret).ToString().ShouldNotContain(Secret);
+        ConnectionArguments.Parse("billing=" + Secret).ToString().ShouldNotContain(Secret);
 
     [Fact]
     public void ToString_UsageValueOfAConnection_LeavesTheTextOut() =>
@@ -190,7 +188,7 @@ public class ConnectionTests
     [InlineData("describe", "--connection", "billing=Host=db")]
     [InlineData("describe", "--connection=billing=Host=db", "--connection:reports=Host=db:5432")]
     public void CheckUsage_ConnectionsWithANameAndAValue_GiveNoLine(params string[] args) =>
-        DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), args)).ShouldBeEmpty();
+        DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args)).ShouldBeEmpty();
 
     [Theory]
     [InlineData(3, "describe", "--connection", Secret)]
@@ -206,7 +204,7 @@ public class ConnectionTests
         params string[] args
     ) =>
         DescribeCommand
-            .CheckUsage(UsageCheck.Check(ToolRoot(), args))
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
             .ShouldBe([
                 $"sqlsource: the value of option '--connection' at position {position} is not "
                     + "<name>=<connection string>",
@@ -219,7 +217,7 @@ public class ConnectionTests
     [InlineData("describe", "dir=a;b", "x=y;z.sql")]
     [InlineData("describe", "--database", "billing", "x=y.sql")]
     public void CheckUsage_PathWithEqualsOrSemicolonAndNoConnection_GivesNoLine(params string[] args) =>
-        DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), args)).ShouldBeEmpty();
+        DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args)).ShouldBeEmpty();
 
     [Theory]
     [InlineData(4, "describe", "--connection", "billing=Host=db;User", "Id=sa;Password=" + Secret)]
@@ -233,7 +231,7 @@ public class ConnectionTests
         params string[] args
     ) =>
         DescribeCommand
-            .CheckUsage(UsageCheck.Check(ToolRoot(), args))
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
             .ShouldBe([
                 $"sqlsource: the argument at position {position} looks like a part of a connection string; put the "
                     + "value of '--connection' in quotes",
@@ -243,14 +241,14 @@ public class ConnectionTests
     [InlineData("describe", "--connection", "billing=Host=db", "App.csproj")]
     [InlineData("describe", "--connection", "billing=Host=db", "a b")]
     public void CheckUsage_PathWithNothingOfAConnectionStringBesideAConnection_GivesNoLine(params string[] args) =>
-        DescribeCommand.CheckUsage(UsageCheck.Check(ToolRoot(), args)).ShouldBeEmpty();
+        DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args)).ShouldBeEmpty();
 
     [Fact]
     public void CheckUsage_SecondConnectionForOneNameIgnoringCase_IsReportedByItsPosition() =>
         DescribeCommand
             .CheckUsage(
                 UsageCheck.Check(
-                    ToolRoot(),
+                    Cli.BuildCommands(),
                     ["describe", "--connection", "billing=A", "--connection=BILLING=" + Secret]
                 )
             )
