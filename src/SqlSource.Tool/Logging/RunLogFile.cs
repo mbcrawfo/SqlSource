@@ -77,8 +77,8 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     [SuppressMessage(
         "Reliability",
         "CA2000:Dispose objects before losing scope",
-        Justification = "The log is its caller's to close, as Cli.RunAsync does.  The analyzer follows a disposable "
-            + "that is returned itself and not one that is returned in an Outcome."
+        Justification = "The log is its caller's to close: Cli.OpenLog keeps it and Cli.RunAsync closes it.  The "
+            + "analyzer follows a disposable that is returned itself and not one that is returned in an Outcome."
     )]
     public static Outcome<RunLogFile, ToolDiagnostic> Open(string given, string workingDirectory, TimeProvider time)
     {

@@ -73,7 +73,7 @@ public static class Cli
         }
         catch (Exception exception)
         {
-            // RunAsync's catch reports to the host, and there is none.
+            // RunCommandAsync's catch reports to the host, and there is none.
             new Reporter(error).Report(UnexpectedFailure.Of(exception, Environment.GetEnvironmentVariable));
             return 1;
         }
