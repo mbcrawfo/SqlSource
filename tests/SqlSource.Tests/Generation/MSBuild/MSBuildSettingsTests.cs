@@ -11,6 +11,16 @@ public class MSBuildSettingsTests
 {
     private const string Path = "/app/Repo/Users.sql";
 
+    // The compiler's contract, spelled out: a change to a constant must fail here, not pass by agreeing with itself.
+    [Fact]
+    public void Prefixes_AreWhereTheCompilerPutsAPropertyAndTheMetadataOfTheSettingsItem()
+    {
+        MSBuildSettings.PropertyPrefix.ShouldBe("build_property.");
+        MSBuildSettings.MetadataPrefix.ShouldBe("build_metadata.SqlSourceSettingsFile.");
+        DialectSetting.PropertyName.ShouldBe("build_property.SqlSourceDialect");
+        DialectSetting.MetadataName.ShouldBe("build_metadata.SqlSourceSettingsFile.SqlSourceDialect");
+    }
+
     [Fact]
     public void ReadProject_NothingSet_IsTheSharedEmptyLevel()
     {

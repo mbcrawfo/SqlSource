@@ -2,6 +2,7 @@ using System;
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using SqlSource.Generation.MSBuild;
 using SqlSource.Tool.Projects;
 
 namespace SqlSource.Tool.Planning;
@@ -13,10 +14,6 @@ namespace SqlSource.Tool.Planning;
 /// </summary>
 internal sealed class ManifestOptions : AnalyzerConfigOptions
 {
-    private const string PropertyPrefix = "build_property.";
-
-    private const string MetadataPrefix = "build_metadata.SqlSourceSettingsFile.";
-
     private readonly ImmutableDictionary<string, string> _values;
 
     private readonly string _prefix;
@@ -27,9 +24,10 @@ internal sealed class ManifestOptions : AnalyzerConfigOptions
         _prefix = prefix;
     }
 
-    public static ManifestOptions ForProject(ProjectManifest manifest) => new(manifest.Properties, PropertyPrefix);
+    public static ManifestOptions ForProject(ProjectManifest manifest) =>
+        new(manifest.Properties, MSBuildSettings.PropertyPrefix);
 
-    public static ManifestOptions ForFile(ManifestFile file) => new(file.Metadata, MetadataPrefix);
+    public static ManifestOptions ForFile(ManifestFile file) => new(file.Metadata, MSBuildSettings.MetadataPrefix);
 
     public override bool TryGetValue(string key, [NotNullWhen(true)] out string? value)
     {

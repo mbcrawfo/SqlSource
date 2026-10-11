@@ -15,6 +15,15 @@ namespace SqlSource.Generation.MSBuild;
 /// </remarks>
 internal static class MSBuildSettings
 {
+    /// <summary>Where the compiler puts the properties of the project.</summary>
+    public const string PropertyPrefix = "build_property.";
+
+    /// <summary>
+    /// Where the compiler puts the metadata of an item of <c>SqlSourceSettingsFile</c>, the item type that
+    /// <c>build/SqlSource.targets</c> fills with the <c>AdditionalFiles</c> items that have any.
+    /// </summary>
+    public const string MetadataPrefix = "build_metadata.SqlSourceSettingsFile.";
+
     public const string GeneratorParametersName = "SqlSourceGeneratorParameters";
 
     public const string OutputName = "SqlSourceOutput";
@@ -31,14 +40,11 @@ internal static class MSBuildSettings
 
     public const string CollectionTypeName = "SqlSourceCollectionType";
 
-    /// <summary>Where the compiler puts the properties of the project.</summary>
-    public static SettingKeys Property { get; } = new("build_property.");
+    /// <summary>The keys of the project's properties.</summary>
+    public static SettingKeys Property { get; } = new(PropertyPrefix);
 
-    /// <summary>
-    /// Where the compiler puts the metadata of an item of <c>SqlSourceSettingsFile</c>, the item type that
-    /// <c>build/SqlSource.targets</c> fills with the <c>AdditionalFiles</c> items that have any.
-    /// </summary>
-    public static SettingKeys Metadata { get; } = new("build_metadata.SqlSourceSettingsFile.");
+    /// <summary>The keys of the metadata of a file's item.</summary>
+    public static SettingKeys Metadata { get; } = new(MetadataPrefix);
 
     /// <summary>
     /// Reads one level.  A value that is not valid is added to <paramref name="invalid" /> and is not set.  The
