@@ -14,7 +14,12 @@ namespace SqlSource.Parsing;
 /// This is the one place that knows which marker is allowed where, and what a valid value of each is.  A marker that
 /// is not allowed, not valid or in conflict with an earlier one of the scope is reported and not applied.
 /// </remarks>
-internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<SqlParseError> errors)
+internal sealed class SqlMarkerScope(
+    string text,
+    SqlDialectRules rules,
+    SqlScopeKind scopeKind,
+    List<SqlParseError> errors
+)
 {
     private const string InsideAQuery = "inside a query";
 
@@ -79,13 +84,12 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
         _declarations ?? (IReadOnlyList<SqlParameterDeclaration>)[];
 
     /// <summary>
-    /// Reads one marker.  <paramref name="inQuery" /> and <paramref name="inPreamble" /> say what the scope is; both
-    /// are true for a file with no <c>-- name:</c> marker, which is one query and its own preamble.
+    /// Reads one marker.  The scope takes it or reports it by what it is the scope of.
     /// </summary>
-    public void Read(SqlMarker marker, bool inQuery, bool inPreamble)
+    public void Read(SqlMarker marker)
     {
         Level = null!; // Built again at the next read of Level.
-        if (!((inQuery && IsAllowedInQuery(marker.Kind)) || (inPreamble && IsAllowedInPreamble(marker.Kind))))
+        if (!IsAllowed(marker.Kind))
         {
             errors.Add(
                 SqlParseError.Create(
@@ -167,6 +171,15 @@ internal sealed class SqlMarkerScope(string text, SqlDialectRules rules, List<Sq
             SetText(ref _outputModel, marker, SettingValue.IsTypeName(Value(marker)));
         }
     }
+
+    private bool IsAllowed(SqlMarkerKind kind) =>
+        scopeKind switch
+        {
+            SqlScopeKind.Preamble => IsAllowedInPreamble(kind),
+            SqlScopeKind.Query => IsAllowedInQuery(kind),
+            SqlScopeKind.WholeFile => IsAllowedInQuery(kind) || IsAllowedInPreamble(kind),
+            _ => false,
+        };
 
     private static bool IsAllowedInQuery(SqlMarkerKind kind) =>
         kind

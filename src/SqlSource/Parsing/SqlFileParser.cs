@@ -175,7 +175,7 @@ internal static class SqlFileParser
 
         private SqlMarkerScope ReadPreamble(int end)
         {
-            var scope = new SqlMarkerScope(text, rules, _errors);
+            var scope = new SqlMarkerScope(text, rules, SqlScopeKind.Preamble, _errors);
             var sqlReported = false;
             for (var index = 0; index < end; index++)
             {
@@ -192,7 +192,7 @@ internal static class SqlFileParser
                     }
                     else
                     {
-                        scope.Read(marker, inQuery: false, inPreamble: true);
+                        scope.Read(marker);
                     }
                 }
                 else if (!sqlReported && lexeme.GetContentSpan(text) is { } content)
@@ -251,11 +251,14 @@ internal static class SqlFileParser
                 }
                 else if (marker.Kind != SqlMarkerKind.Name)
                 {
-                    (scope ??= new SqlMarkerScope(text, rules, _errors)).Read(
-                        marker,
-                        inQuery: true,
-                        inPreamble: preamble is null
-                    );
+                    (
+                        scope ??= new SqlMarkerScope(
+                            text,
+                            rules,
+                            preamble is null ? SqlScopeKind.WholeFile : SqlScopeKind.Query,
+                            _errors
+                        )
+                    ).Read(marker);
                 }
             }
 
