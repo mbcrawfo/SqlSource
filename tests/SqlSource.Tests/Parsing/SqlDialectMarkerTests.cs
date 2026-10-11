@@ -155,16 +155,4 @@ public class SqlDialectMarkerTests
         result.Lexemes.Count(lexeme => lexeme.Kind == SqlLexemeKind.LineComment).ShouldBe(3);
         result.Lexemes.Count(lexeme => lexeme.Kind == SqlLexemeKind.Quoted).ShouldBe(1);
     }
-
-    [Theory]
-    [InlineData("-- dialect: mysql", "dialect: mysql")]
-    [InlineData("-- DIALECT:   MySql, ansi-quotes  ", "dialect: MySql, ansi-quotes")]
-    [InlineData("-- dialect:", "dialect:")]
-    [InlineData("-- dialect:   ", "dialect:")]
-    public void Describe_Marker_GivesTheWordAndTheTrimmedValue(string line, string expected)
-    {
-        var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0]).ShouldNotBeNull();
-
-        SqlDialectMarker.Describe(line, marker).ShouldBe(expected);
-    }
 }

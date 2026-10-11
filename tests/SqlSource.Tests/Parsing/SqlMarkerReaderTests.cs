@@ -154,6 +154,10 @@ public class SqlMarkerReaderTests
     [InlineData("-- token: {{a:b}}", "token: {{a:b}}")]
     [InlineData("--  token:  x  ", "token: x")]
     [InlineData("-- token:", "token:")]
+    [InlineData("-- dialect: mysql", "dialect: mysql")]
+    [InlineData("-- DIALECT:   MySql, ansi-quotes  ", "dialect: MySql, ansi-quotes")]
+    [InlineData("-- dialect:", "dialect:")]
+    [InlineData("-- dialect:   ", "dialect:")]
     public void Describe_Marker_IsItsWordAndItsValue(string text, string expected)
     {
         var marker = SqlMarkerReader.Read(text, SqlLexer.Lex(text, SqlDialectRules.Ansi).Lexemes[0]);

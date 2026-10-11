@@ -100,27 +100,24 @@ public class SettingValueTests
     public void IsSuffix_CharactersThatCanFollowTheFirstOfAnIdentifier_IsASuffix(string value, bool expected) =>
         SettingValue.IsSuffix(value.AsSpan()).ShouldBe(expected);
 
+    // The rule of a namespace and of a type's name, which is one identifier or a full name.
     [Theory]
     [InlineData("App", true)]
     [InlineData("App.Data.Models", true)]
+    [InlineData("UserRow", true)]
+    [InlineData("App.Models.UserRow", true)]
     [InlineData("", false)]
     [InlineData("App.", false)]
     [InlineData(".App", false)]
     [InlineData("App..Data", false)]
     [InlineData("App.class", false)]
+    [InlineData("class", false)]
     [InlineData("App.1st", false)]
     [InlineData("global::App", false)]
-    public void IsNamespace_IdentifiersJoinedByPeriods_IsANamespace(string value, bool expected) =>
-        SettingValue.IsNamespace(value.AsSpan()).ShouldBe(expected);
-
-    [Theory]
-    [InlineData("UserRow", true)]
-    [InlineData("App.Models.UserRow", true)]
-    [InlineData("class", false)]
     [InlineData("User Row", false)]
     [InlineData("UserRow<T>", false)]
-    public void IsTypeName_AnIdentifierOrAFullName_IsATypeName(string value, bool expected) =>
-        SettingValue.IsTypeName(value.AsSpan()).ShouldBe(expected);
+    public void IsQualifiedName_IdentifiersJoinedByPeriods_IsAName(string value, bool expected) =>
+        SettingValue.IsQualifiedName(value.AsSpan()).ShouldBe(expected);
 
     [Theory]
     // An internal enum cannot be the parameter of a public test method, so a row gives the member's name.

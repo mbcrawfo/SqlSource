@@ -367,11 +367,11 @@ internal static class SqlFileParser
             var place = marker.ValueSpan.IsEmpty ? marker.Span : marker.ValueSpan;
             if (!SqlDialectMarker.TryRead(text, marker, out var dialect))
             {
-                AddError(SqlParseErrorKind.InvalidMarkerValue, place, SqlDialectMarker.Describe(text, marker));
+                AddError(SqlParseErrorKind.InvalidMarkerValue, place, SqlMarkerReader.Describe(text, marker));
             }
             else if (_dialect is { } existing && existing != dialect)
             {
-                AddError(SqlParseErrorKind.ConflictingSettings, place, SqlDialectMarker.Describe(text, marker));
+                AddError(SqlParseErrorKind.ConflictingSettings, place, SqlMarkerReader.Describe(text, marker));
             }
             else
             {

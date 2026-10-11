@@ -51,9 +51,4 @@ internal static class SqlDialectMarker
     /// </summary>
     public static bool TryRead(string text, SqlMarker marker, out SqlDialectChoice dialect) =>
         SqlDialectName.TryParse(text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length), out dialect);
-
-    /// <summary>
-    /// The marker as a message names it: <c>dialect: mysql</c>, or <c>dialect:</c> for one without a value.
-    /// </summary>
-    public static string Describe(string text, SqlMarker marker) => SqlMarkerReader.Describe(text, marker);
 }

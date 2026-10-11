@@ -28,7 +28,7 @@ internal static class SettingsLevelReader
             Database = ReadText(ref source, SettingId.Database, SettingValue.IsDatabaseName),
             InputModelSuffix = ReadText(ref source, SettingId.InputModelSuffix, SettingValue.IsSuffix),
             OutputModelSuffix = ReadText(ref source, SettingId.OutputModelSuffix, SettingValue.IsSuffix),
-            ModelNamespace = ReadText(ref source, SettingId.ModelNamespace, SettingValue.IsNamespace),
+            ModelNamespace = ReadText(ref source, SettingId.ModelNamespace, SettingValue.IsQualifiedName),
             InputModelType = source.Choice<ModelKind>(SettingId.InputModelType),
             OutputModelType = source.Choice<ModelKind>(SettingId.OutputModelType),
             CollectionType = source.Choice<CollectionKind>(SettingId.CollectionType),

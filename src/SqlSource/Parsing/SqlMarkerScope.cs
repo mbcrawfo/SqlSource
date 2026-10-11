@@ -144,7 +144,7 @@ internal sealed class SqlMarkerScope(
         }
         else if (marker.Kind == SqlMarkerKind.ModelNamespace)
         {
-            SetText(ref _modelNamespace, marker, SettingValue.IsNamespace(Value(marker)));
+            SetText(ref _modelNamespace, marker, SettingValue.IsQualifiedName(Value(marker)));
         }
         else if (marker.Kind == SqlMarkerKind.InputModelType)
         {
@@ -160,7 +160,7 @@ internal sealed class SqlMarkerScope(
         }
         else if (marker.Kind == SqlMarkerKind.InputModel)
         {
-            SetText(ref _inputModel, marker, SettingValue.IsTypeName(Value(marker)));
+            SetText(ref _inputModel, marker, SettingValue.IsQualifiedName(Value(marker)));
             if (_inputModel is { } inputModel && InputModel is null)
             {
                 InputModel = (inputModel, marker);
@@ -168,7 +168,7 @@ internal sealed class SqlMarkerScope(
         }
         else if (marker.Kind == SqlMarkerKind.OutputModel)
         {
-            SetText(ref _outputModel, marker, SettingValue.IsTypeName(Value(marker)));
+            SetText(ref _outputModel, marker, SettingValue.IsQualifiedName(Value(marker)));
         }
     }
 
