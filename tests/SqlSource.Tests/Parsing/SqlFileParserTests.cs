@@ -244,6 +244,9 @@ public class SqlFileParserTests
     [InlineData("-- name: A\n-- generator: keep-comments\n-- c\n-- name: B\nSELECT 1")]
     [InlineData("-- name: B\nSELECT 1\n-- name: A")]
     [InlineData("-- name: B\nSELECT 1\n-- name: A\n-- summary: s\n")]
+    // A marker whose error comes from the query's parameters: no query is built for a block without SQL.
+    [InlineData("-- name: A\n-- param: @a\n-- name: B\nSELECT 1")]
+    [InlineData("-- name: A\n-- input-model: FindArgs\n-- name: B\nSELECT 1")]
     public void Parse_BlockWithoutSql_IsAnErrorAtItsName(string text)
     {
         var errors = Errors(text);
@@ -374,6 +377,19 @@ public class SqlFileParserTests
 
         Errors(Text)
             .ShouldBe([SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, Token), "class")]);
+    }
+
+    // The first token is in both forms of the SQL and the second in the kept form alone.
+    [Fact]
+    public void Parse_ReservedKeywordTokensUnderKeepComments_AreEachReportedOnce()
+    {
+        const string Text = "-- name: A\n-- generator: keep-comments\nSELECT {{class}} -- {{ class }}\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{class}}"), "class"),
+                SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{ class }}"), "class"),
+            ]);
     }
 
     [Fact]

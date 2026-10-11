@@ -205,7 +205,9 @@ internal static class SqlFileParser
             return scope;
         }
 
-        // preamble is null for a file with no name marker: the file is one query and its own preamble.
+        // preamble is null for a file with no name marker: the file is one query and its own preamble.  The three
+        // steps and the two checks between them stay in this order: an error is added where it is found, and two
+        // errors at one place are reported in the order they were added.
         private void ReadBlock(
             string name,
             TextSpan nameSpan,
@@ -215,10 +217,54 @@ internal static class SqlFileParser
             int end
         )
         {
-            // Created at the first marker the scope takes: most queries have none.
+            var lastContent = FindLastContent(start, end);
+            var (scope, summary) = ReadBlockMarkers(
+                preamble is null ? SqlScopeKind.WholeFile : SqlScopeKind.Query,
+                start,
+                end,
+                lastContent
+            );
+            if (lastContent < 0)
+            {
+                AddError(SqlParseErrorKind.EmptyBlock, nameSpan);
+                return;
+            }
+
+            var query = BuildQuery(scope, start, end);
+            if (scope?.InputModel is { } inputModel && query.Parameters.Count == 0)
+            {
+                AddError(SqlParseErrorKind.InputModelWithoutParameters, inputModel.Marker.Span);
+            }
+
+            var (markers, kept) = ResolveSettings(scope, preamble, query, start, end);
+            _blocks.Add(
+                new SqlBlock(
+                    name,
+                    nameSpan,
+                    summary,
+                    shape,
+                    query.Segments,
+                    kept,
+                    query.Tokens,
+                    query.Parameters,
+                    markers,
+                    scope?.InputModel?.Name,
+                    scope?.OutputModel
+                )
+            );
+        }
+
+        // Step one: the block's markers.  The scope is the query's, or null when no marker was handed to one, as
+        // for most queries; the summary is its lines joined, or null.
+        private (SqlMarkerScope? Scope, string? Summary) ReadBlockMarkers(
+            SqlScopeKind kind,
+            int start,
+            int end,
+            int lastContent
+        )
+        {
             SqlMarkerScope? scope = null;
             var summary = new List<string>();
-            var lastContent = FindLastContent(start, end);
             for (var index = start; index < end; index++)
             {
                 if (SqlMarkerReader.Read(text, lexemes[index]) is not { } marker)
@@ -251,27 +297,19 @@ internal static class SqlFileParser
                 }
                 else if (marker.Kind != SqlMarkerKind.Name)
                 {
-                    (
-                        scope ??= new SqlMarkerScope(
-                            text,
-                            rules,
-                            preamble is null ? SqlScopeKind.WholeFile : SqlScopeKind.Query,
-                            _errors
-                        )
-                    ).Read(marker);
+                    (scope ??= new SqlMarkerScope(text, rules, kind, _errors)).Read(marker);
                 }
             }
 
-            if (lastContent < 0)
-            {
-                AddError(SqlParseErrorKind.EmptyBlock, nameSpan);
-                return;
-            }
+            return (scope, summary.Count == 0 ? null : string.Join(" ", summary));
+        }
 
-            // The stripped SQL is what the query is: its tokens, its parameters and its hash come from it.
+        // Step two: the query.  The stripped SQL is what the query is: its tokens, its parameters and its hash come
+        // from it.
+        private BuiltQuery BuildQuery(SqlMarkerScope? scope, int start, int end)
+        {
             var sql = SqlTextBuilder.Build(text, lexemes, start, end, keepComments: false);
-            var ignoredTokens = scope?.IgnoredTokens ?? SqlMarkerScope.NoNames;
-            var scanned = TokenScanner.Scan(sql.Text, ignoredTokens);
+            var scanned = TokenScanner.Scan(sql.Text, scope?.IgnoredTokens ?? SqlMarkerScope.NoNames);
             var firstScanError = _errors.Count;
             foreach (var error in scanned.Errors)
             {
@@ -287,41 +325,42 @@ internal static class SqlFileParser
                 sql.Parameters.Length == 0 ? null : SqlDeclaredVariables.Find(text, lexemes, start, end, rules);
             var parameters = SqlParameterList.Create(
                 rules,
-                sql,
-                variables,
-                scanned.Occurrences,
-                tokens,
+                new SqlScannedQuery(sql, scanned.Occurrences, tokens, variables),
                 tokenDefaults,
                 scope?.Declarations ?? [],
                 _errors
             );
 
-            if (scope?.InputModel is { } inputModel && parameters.Count == 0)
-            {
-                AddError(SqlParseErrorKind.InputModelWithoutParameters, inputModel.Marker.Span);
-            }
+            return new BuiltQuery(sql, scanned.Segments, tokens, parameters, firstScanError);
+        }
 
-            // A query that has a list uses it whole, so it alone says whether the comments can be wanted.  A query
-            // without one may get the parameter from a level the parser does not see.
+        // Step three: what the parser can resolve of the settings.  A query that has a list uses it whole, so it
+        // alone says whether the comments can be wanted.  A query without one may get the parameter from a level the
+        // parser does not see.
+        private (SettingsLevel Markers, EquatableArray<SqlSegment>? Kept) ResolveSettings(
+            SqlMarkerScope? scope,
+            SqlMarkerScope? preamble,
+            BuiltQuery query,
+            int start,
+            int end
+        )
+        {
             var markers = (scope?.Level ?? SettingsLevel.None).Over(preamble?.Level ?? SettingsLevel.None);
             var keepsComments = markers.Parameters is { } list
                 ? (list & GeneratorParameters.KeepComments) != 0
                 : commentsWanted;
 
-            _blocks.Add(
-                new SqlBlock(
-                    name,
-                    nameSpan,
-                    summary.Count == 0 ? null : string.Join(" ", summary),
-                    shape,
-                    scanned.Segments,
-                    keepsComments ? BuildKept(start, end, sql, ignoredTokens, firstScanError) : null,
-                    tokens,
-                    parameters,
-                    markers,
-                    scope?.InputModel?.Name,
-                    scope?.OutputModel
-                )
+            return (
+                markers,
+                keepsComments
+                    ? BuildKept(
+                        start,
+                        end,
+                        query.Sql,
+                        scope?.IgnoredTokens ?? SqlMarkerScope.NoNames,
+                        query.FirstScanError
+                    )
+                    : null
             );
         }
 
@@ -395,5 +434,15 @@ internal static class SqlFileParser
 
         private void AddError(SqlParseErrorKind kind, TextSpan span, params string[] arguments) =>
             _errors.Add(SqlParseError.Create(kind, span, arguments));
+
+        // What step two gives.  FirstScanError is where the errors of the SQL's scan start in _errors: the kept form
+        // is scanned too, and looks from there for an error it shares.
+        private readonly record struct BuiltQuery(
+            SqlBlockText Sql,
+            EquatableArray<SqlSegment> Segments,
+            EquatableArray<SqlToken> Tokens,
+            EquatableArray<SqlQueryParameter> Parameters,
+            int FirstScanError
+        );
     }
 }

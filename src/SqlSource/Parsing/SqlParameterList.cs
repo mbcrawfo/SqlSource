@@ -23,15 +23,13 @@ internal static class SqlParameterList
     /// </summary>
     public static EquatableArray<SqlQueryParameter> Create(
         SqlDialectRules rules,
-        SqlBlockText sql,
-        SqlDeclaredVariables? variables,
-        EquatableArray<SqlTokenOccurrence> occurrences,
-        EquatableArray<SqlToken> tokens,
+        SqlScannedQuery query,
         IReadOnlyList<SqlTokenDefault> markerDefaults,
         IReadOnlyList<SqlParameterDeclaration> declarations,
         List<SqlParseError> errors
     )
     {
+        var (sql, occurrences, tokens, variables) = query;
         if (sql.Parameters.Length == 0 && declarations.Count == 0 && markerDefaults.Count == 0)
         {
             return EquatableArray<SqlQueryParameter>.Empty;
