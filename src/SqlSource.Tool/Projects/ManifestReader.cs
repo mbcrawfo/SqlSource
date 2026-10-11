@@ -28,11 +28,10 @@ internal static class ManifestReader
     private static readonly char[] ConstantSeparators = [';', ',', ' ', '\t'];
 
     /// <summary>
-    /// The manifest, or null and why the text is not one.
+    /// The manifest, or why the text is not one, as the end of a sentence.
     /// </summary>
     /// <param name="text">The text of the file.</param>
-    /// <param name="reason">What is wrong, as the end of a sentence; empty when nothing is.</param>
-    public static ProjectManifest? Read(string text, out string reason)
+    public static Outcome<ProjectManifest, string> Read(string text)
     {
         // WriteLinesToFile writes none, but an editor or a copy may add one.
         var rest = text.AsSpan().TrimStart('﻿');
@@ -51,9 +50,9 @@ internal static class ManifestReader
             number++;
             if (number == 1)
             {
-                if (!IsVersionLine(line, out reason))
+                if (!IsVersionLine(line, out var reason))
                 {
-                    return null;
+                    return No(reason);
                 }
 
                 continue;
@@ -67,8 +66,7 @@ internal static class ManifestReader
             var separator = line.IndexOf('=');
             if (separator < 0)
             {
-                reason = string.Create(CultureInfo.InvariantCulture, $"line {number} has no '='");
-                return null;
+                return No(string.Create(CultureInfo.InvariantCulture, $"line {number} has no '='"));
             }
 
             var key = line[..separator];
@@ -77,11 +75,12 @@ internal static class ManifestReader
             {
                 if (files.Count == 0)
                 {
-                    reason = string.Create(
-                        CultureInfo.InvariantCulture,
-                        $"line {number} gives metadata of a file before any file"
+                    return No(
+                        string.Create(
+                            CultureInfo.InvariantCulture,
+                            $"line {number} gives metadata of a file before any file"
+                        )
                     );
-                    return null;
                 }
 
                 Set(files[^1].Metadata, key[FilePrefix.Length..], value);
@@ -121,34 +120,36 @@ internal static class ManifestReader
 
         if (number == 0)
         {
-            reason = "it is empty";
-            return null;
+            return No("it is empty");
         }
 
         if (string.IsNullOrEmpty(project))
         {
-            reason = "it names no project";
-            return null;
+            return No("it names no project");
         }
 
-        reason = "";
-        return new ProjectManifest
-        {
-            ProjectPath = project,
-            TargetFramework = targetFramework,
-            LangVersion = langVersion,
-            DefineConstants =
-            [
-                .. constants.Split(
-                    ConstantSeparators,
-                    StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
-                ),
-            ],
-            Properties = properties.ToImmutable(),
-            Files = [.. files.ConvertAll(static file => new ManifestFile(file.Path, file.Metadata.ToImmutable()))],
-            CompileFiles = compileFiles.ToImmutable(),
-        };
+        return Outcome<ProjectManifest, string>.Of(
+            new ProjectManifest
+            {
+                ProjectPath = project,
+                TargetFramework = targetFramework,
+                LangVersion = langVersion,
+                DefineConstants =
+                [
+                    .. constants.Split(
+                        ConstantSeparators,
+                        StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries
+                    ),
+                ],
+                Properties = properties.ToImmutable(),
+                Files = [.. files.ConvertAll(static file => new ManifestFile(file.Path, file.Metadata.ToImmutable()))],
+                CompileFiles = compileFiles.ToImmutable(),
+            }
+        );
     }
+
+    private static Outcome<ProjectManifest, string> No(string reason) =>
+        Outcome<ProjectManifest, string>.Failed(reason);
 
     private static bool IsVersionLine(ReadOnlySpan<char> line, out string reason)
     {

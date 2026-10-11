@@ -79,7 +79,7 @@ public sealed class RunPlannerErrorTests : IDisposable
 
         var result = Plan(project);
 
-        result.Errors.ShouldBe([ToolDiagnostic.ForFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "nosuch")]);
+        result.Errors.ShouldBe([ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "nosuch")]);
         result.Plan.Files.ShouldHaveSingleItem().Dialect.ShouldBe(SqlDialect.Ansi);
     }
 
@@ -96,8 +96,8 @@ public sealed class RunPlannerErrorTests : IDisposable
         var result = Plan(project);
 
         result.Errors.ShouldBe([
-            ToolDiagnostic.ForFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "another"),
-            ToolDiagnostic.ForFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "bad-one"),
+            ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "another"),
+            ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "bad-one"),
         ]);
         result.Plan.Files.Count.ShouldBe(3);
         result.Plan.Files.Select(file => file.Dialect).ShouldAllBe(dialect => dialect == SqlDialect.Ansi);
@@ -114,13 +114,13 @@ public sealed class RunPlannerErrorTests : IDisposable
         var result = Plan(project);
 
         result.Errors.ShouldBe([
-            ToolDiagnostic.ForFile(
+            ToolDiagnostic.AtFile(
                 SqlDiagnostics.InvalidSettingValue,
                 project.ProjectPath,
                 "not a name",
                 "SqlSourceDatabase"
             ),
-            ToolDiagnostic.ForFile(
+            ToolDiagnostic.AtFile(
                 SqlDiagnostics.InvalidSettingValue,
                 project.ProjectPath,
                 "everything",

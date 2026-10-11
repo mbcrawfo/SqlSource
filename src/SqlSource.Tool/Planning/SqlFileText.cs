@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
@@ -17,16 +15,5 @@ internal sealed class SqlFileText(string path) : AdditionalText
 {
     public override string Path => path;
 
-    public override SourceText? GetText(CancellationToken cancellationToken = default)
-    {
-        try
-        {
-            using var stream = File.OpenRead(path);
-            return SourceText.From(stream);
-        }
-        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
-        {
-            return null;
-        }
-    }
+    public override SourceText? GetText(CancellationToken cancellationToken = default) => FileText.Read(path);
 }

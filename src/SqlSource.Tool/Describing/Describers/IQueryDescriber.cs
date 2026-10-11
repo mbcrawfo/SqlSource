@@ -31,5 +31,9 @@ internal interface IQueryDescriber
     /// it: the request holds the secret.
     /// </param>
     /// <param name="cancellationToken">Ends the run.</param>
-    Task<OpenResult> OpenAsync(OpenRequest request, IRunLog log, CancellationToken cancellationToken);
+    Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
+        OpenRequest request,
+        IRunLog log,
+        CancellationToken cancellationToken
+    );
 }

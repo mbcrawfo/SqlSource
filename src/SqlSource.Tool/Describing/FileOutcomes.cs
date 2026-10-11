@@ -15,14 +15,12 @@ internal static class FileOutcomes
     /// Decides for each file, in the files' order.
     /// </summary>
     /// <param name="files">The files, with every query described, kept, failed or left out.</param>
-    /// <param name="runHasFilter">
-    /// Whether the run has <c>--project</c>, <c>--database</c> or a <c>.sql</c> path.  A sidecar is deleted only in
-    /// a run with none: a run on a part does not know what the rest needs of a file.
-    /// </param>
-    /// <param name="anythingWasReported">
-    /// Whether the run has reported an error before this step.  A sidecar is deleted only when it has not: the plan
-    /// drops a setting it cannot read and a claim it cannot read, so a file can look as if it needs no entry only
-    /// because of the error.
+    /// <param name="mayDelete">
+    /// Whether the run may delete a sidecar, which <see cref="DescribeRun" /> decides.  A run with
+    /// <c>--project</c>, <c>--database</c> or a <c>.sql</c> path may not: a run on a part does not know what the
+    /// rest needs of a file.  Nor may a run that has reported an error before this step: the plan drops a setting
+    /// it cannot read and a claim it cannot read, so a file can look as if it needs no entry only because of the
+    /// error.
     /// </param>
     /// <param name="read">
     /// Reads the sidecar beside a <c>.sql</c> file, given the file's path.  A sidecar is deleted only when there is
@@ -30,17 +28,11 @@ internal static class FileOutcomes
     /// </param>
     public static ImmutableArray<FileOutcome> Decide(
         ImmutableArray<FileWork> files,
-        bool runHasFilter,
-        bool anythingWasReported,
+        bool mayDelete,
         Func<string, SidecarOnDisk> read
-    ) => [.. files.Select(file => Decide(file, runHasFilter, anythingWasReported, read))];
+    ) => [.. files.Select(file => Decide(file, mayDelete, read))];
 
-    private static FileOutcome Decide(
-        FileWork file,
-        bool runHasFilter,
-        bool anythingWasReported,
-        Func<string, SidecarOnDisk> read
-    )
+    private static FileOutcome Decide(FileWork file, bool mayDelete, Func<string, SidecarOnDisk> read)
     {
         var path = SidecarFormat.PathFor(file.File.Path);
         if (file.File.State != PlannedFileState.Ready)
@@ -51,9 +43,8 @@ internal static class FileOutcomes
         var needing = file.Queries.Where(static query => query.Planned.NeedsEntry).ToList();
         if (needing.Count == 0)
         {
-            // A sidecar that would be empty.  Not in a run that failed: it may need no entry only by an error.
-            var deletes =
-                !runHasFilter && !anythingWasReported && read(file.File.Path) is { Text: not null, NewerFormat: null };
+            // A sidecar that would be empty.
+            var deletes = mayDelete && read(file.File.Path) is { Text: not null, NewerFormat: null };
             return Of(file, path, deletes ? FileAction.Delete : FileAction.None);
         }
 

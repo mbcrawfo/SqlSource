@@ -2,11 +2,11 @@
 
 ## Problem
 
-[`SqlFileText`](../../src/SqlSource.Tool/Planning/SqlFileText.cs) reads a `.sql` file with `SourceText.From` over its bytes: a byte order mark decides the encoding, and without one the bytes are read as UTF-8, with a replacement character for a sequence that is not UTF-8.  The compiler reads an additional file another way: UTF-8 first, and when the bytes are not valid UTF-8 it reads the whole file again in a fallback encoding, the code page 1252 where the runtime has it, and in the one the project's `CodePage` names when it names one.
+[`SqlFileText`](../../src/SqlSource.Tool/Planning/SqlFileText.cs) reads a `.sql` file through [`FileText`](../../src/SqlSource.Tool/Planning/FileText.cs), with `SourceText.From` over its bytes: a byte order mark decides the encoding, and without one the bytes are read as UTF-8, with a replacement character for a sequence that is not UTF-8.  The compiler reads an additional file another way: UTF-8 first, and when the bytes are not valid UTF-8 it reads the whole file again in a fallback encoding, the code page 1252 where the runtime has it, and in the one the project's `CodePage` names when it names one.
 
 So a query that holds a character outside ASCII, in a file saved as Windows-1252, has one text in the tool and another in the generator.  The hash of `SqlQueryHash` is of that text.  From phase 5 the generator will call such a query's entry stale, whatever the tool writes.
 
-[`AttributeReader`](../../src/SqlSource.Tool/Planning/AttributeReader.cs) reads a C# file the same way.  There it matters only for a `Path` that is written with a character outside ASCII, in a C# file that is not UTF-8: the tool then looks for another folder than the build does.
+[`AttributeReader`](../../src/SqlSource.Tool/Planning/AttributeReader.cs) reads a C# file through the same method.  There it matters only for a `Path` that is written with a character outside ASCII, in a C# file that is not UTF-8: the tool then looks for another folder than the build does.
 
 ## Why it exists
 

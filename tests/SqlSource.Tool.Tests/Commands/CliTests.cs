@@ -7,8 +7,6 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Reporting;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -142,19 +140,7 @@ public class CliTests
     {
         // System.CommandLine's default for a flag takes an optional value, which UsageCheck cannot tell from the
         // argument after the flag.
-        var host = new ToolHost(
-            TextWriter.Null,
-            TextWriter.Null,
-            "/",
-            static _ => null,
-            new FakeProcessRunner(),
-            "/",
-            ProcessorCount: 1,
-            DescriberRegistry.Empty,
-            static _ => LiveExchange.Instance,
-            TimeProvider.System
-        );
-        var commands = new List<Command> { Cli.BuildCommands(host, new Reporter(TextWriter.Null)) };
+        var commands = new List<Command> { Cli.BuildCommands() };
 
         for (var index = 0; index < commands.Count; index++)
         {
@@ -257,6 +243,26 @@ public class CliTests
 
         result.Error.Split('\n')[0].ShouldEndWith("System.InvalidOperationException: first second third");
         result.Error.Split('\n').Length.ShouldBe(3);
+    }
+
+    // The counts are the run's, and the files were written: a summary that cannot be printed does not lose them.
+    [Fact]
+    public async Task Run_SummaryThatCannotBeWritten_StillEndsTheLogWithTheCounts()
+    {
+        using var run = new CliRun { Out = new FailingWriter("the pipe is closed") };
+        run.Describers.Add(new FakeDescriber());
+        var project = Plans.Postgres(run.Folder, directory: "").AnsweredBy(run.Processes);
+        run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = DescribeScene.Connection;
+        _ = project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+
+        var result = await run.RunAsync("describe", "--log", "run.log");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith("sqlsource : error SQLSRC200: ");
+        var end = LogReader.Read(run.Folder.PathOf("run.log"))[^1];
+        end.GetProperty("event").GetString().ShouldBe("run.end");
+        var database = end.GetProperty("databases").EnumerateArray().ShouldHaveSingleItem();
+        database.GetProperty("described").GetInt32().ShouldBe(1);
     }
 
     [Fact]

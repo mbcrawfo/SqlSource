@@ -151,7 +151,7 @@ internal static class RunPlanner
 
         foreach (var value in invalidDialects)
         {
-            errors.Add(ToolDiagnostic.ForFile(SqlDiagnostics.InvalidDialect, manifest.ProjectPath, value));
+            errors.Add(ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, manifest.ProjectPath, value));
         }
 
         foreach (
@@ -161,7 +161,7 @@ internal static class RunPlanner
         )
         {
             errors.Add(
-                ToolDiagnostic.ForFile(
+                ToolDiagnostic.AtFile(
                     SqlDiagnostics.InvalidSettingValue,
                     manifest.ProjectPath,
                     setting.Value,

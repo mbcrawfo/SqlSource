@@ -34,7 +34,7 @@ public sealed class FileOutcomesTests : IDisposable
     // Decides for the plan, and describes what the run would: each such query gets an entry of a newer server.
     private static ImmutableArray<FileWork> Described(RunPlan plan, bool force = false, params string[] failing)
     {
-        var files = RunDecisions.Decide(plan, force, []);
+        var files = RunDecisions.Decide(plan, force ? RunMode.Force : RunMode.Describe, []);
         foreach (var query in files.SelectMany(file => file.Queries).Where(q => q.State == QueryState.ToDescribe))
         {
             if (failing.Contains(query.Planned.Query.Name))
@@ -50,11 +50,8 @@ public sealed class FileOutcomesTests : IDisposable
         return files;
     }
 
-    private static FileOutcome Outcome(
-        ImmutableArray<FileWork> files,
-        bool runHasFilter = false,
-        bool anythingWasReported = false
-    ) => FileOutcomes.Decide(files, runHasFilter, anythingWasReported, SidecarOnDisk.Read)[0];
+    private static FileOutcome Outcome(ImmutableArray<FileWork> files, bool mayDelete = true) =>
+        FileOutcomes.Decide(files, mayDelete, SidecarOnDisk.Read)[0];
 
     [Fact]
     public void Decide_EveryQueryDescribed_WritesATargetOfTheToolsVersionsInTheFilesOrder()
@@ -150,7 +147,7 @@ public sealed class FileOutcomesTests : IDisposable
     [Fact]
     public void Decide_QueryThatIsNotInTheRunAndHasNoCurrentEntry_HoldsTheFileBack()
     {
-        var outcome = Outcome(Described(Plans.Of(OnlyBilling, _project)), runHasFilter: true);
+        var outcome = Outcome(Described(Plans.Of(OnlyBilling, _project)), mayDelete: false);
 
         outcome.Action.ShouldBe(FileAction.HeldBack);
         outcome.HeldBackBy.ToArray().ShouldBe([new HeldBackQuery("GetUser", Failed: false)]);
@@ -163,7 +160,7 @@ public sealed class FileOutcomesTests : IDisposable
         var all = Plans.Of(_project);
         _ = TestSidecar.Write(all.Files[0], [TestSidecar.EntryFor(all.Files[0].Queries[0])]);
 
-        var outcome = Outcome(Described(Plans.Of(OnlyBilling, _project)), runHasFilter: true);
+        var outcome = Outcome(Described(Plans.Of(OnlyBilling, _project)), mayDelete: false);
 
         outcome.Action.ShouldBe(FileAction.Write);
         outcome
@@ -180,23 +177,20 @@ public sealed class FileOutcomesTests : IDisposable
         var plan = Plans.Of(OnlyBilling, project);
         File.WriteAllText(plan.Files[0].Path + ".json", "anything");
 
-        var outcome = Outcome(Described(plan), runHasFilter: true);
+        var outcome = Outcome(Described(plan), mayDelete: false);
 
         outcome.Action.ShouldBe(FileAction.None);
         outcome.Target.ShouldBeNull();
     }
 
-    // A setting that was dropped as not valid, or a claim that could not be read, can make a file look as if it needs
-    // no entry.  A run that reported anything deletes nothing.
+    // Which run may delete is DescribeRun's to say: one with no filter that reported nothing.  FilterRunTests holds
+    // that.
     [Theory]
-    [InlineData(false, false, true, nameof(FileAction.Delete))]
-    [InlineData(true, false, true, nameof(FileAction.None))]
-    [InlineData(false, true, true, nameof(FileAction.None))]
-    [InlineData(true, true, true, nameof(FileAction.None))]
-    [InlineData(false, false, false, nameof(FileAction.None))]
-    public void Decide_FileThatNeedsNoEntry_LosesItsSidecarOnlyInARunWithNoFilterAndNothingReported(
-        bool runHasFilter,
-        bool anythingWasReported,
+    [InlineData(true, true, nameof(FileAction.Delete))]
+    [InlineData(false, true, nameof(FileAction.None))]
+    [InlineData(true, false, nameof(FileAction.None))]
+    public void Decide_FileThatNeedsNoEntry_LosesItsSidecarOnlyInARunThatMayDeleteAndWhenThereIsOne(
+        bool mayDelete,
         bool sidecarExists,
         string action
     )
@@ -208,8 +202,7 @@ public sealed class FileOutcomesTests : IDisposable
             File.WriteAllText(sql + ".json", "anything");
         }
 
-        Outcome(Described(Plans.Of(project)), runHasFilter, anythingWasReported)
-            .Action.ShouldBe(Enum.Parse<FileAction>(action));
+        Outcome(Described(Plans.Of(project)), mayDelete).Action.ShouldBe(Enum.Parse<FileAction>(action));
     }
 
     // A sidecar of a higher format version is a newer tool's file, which SQLSRC221 says is left alone.

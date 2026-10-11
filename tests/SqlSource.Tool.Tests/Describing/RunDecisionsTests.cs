@@ -34,8 +34,8 @@ public sealed class RunDecisionsTests : IDisposable
     public void Dispose() => _folder.Dispose();
 
     // The states of the file's queries, in the file's order.
-    private QueryState[] States(RunPlan plan, bool force = false) =>
-        [.. RunDecisions.Decide(plan, force, _errors)[0].Queries.Select(query => query.State)];
+    private QueryState[] States(RunPlan plan, RunMode mode = RunMode.Describe) =>
+        [.. RunDecisions.Decide(plan, mode, _errors)[0].Queries.Select(query => query.State)];
 
     [Fact]
     public void Decide_NoSidecar_DescribesWhatNeedsAnEntry()
@@ -51,7 +51,7 @@ public sealed class RunDecisionsTests : IDisposable
         var plan = Plans.Of(_project);
         _ = TestSidecar.WriteCurrent(plan.Files[0]);
 
-        var file = RunDecisions.Decide(plan, force: false, _errors)[0];
+        var file = RunDecisions.Decide(plan, RunMode.Describe, _errors)[0];
 
         file.Queries.Select(query => query.State)
             .ShouldBe([QueryState.Skipped, QueryState.Skipped, QueryState.NotNeeded]);
@@ -66,7 +66,7 @@ public sealed class RunDecisionsTests : IDisposable
         var plan = Plans.Of(_project);
         _ = TestSidecar.WriteCurrent(plan.Files[0]);
 
-        States(plan, force: true).ShouldBe([QueryState.ToDescribe, QueryState.ToDescribe, QueryState.NotNeeded]);
+        States(plan, RunMode.Force).ShouldBe([QueryState.ToDescribe, QueryState.ToDescribe, QueryState.NotNeeded]);
     }
 
     [Fact]
@@ -144,7 +144,7 @@ public sealed class RunDecisionsTests : IDisposable
         var plan = Plans.Of(_project);
         File.WriteAllText(SidecarFormat.PathFor(plan.Files[0].Path), "<<<<<<< HEAD\n{");
 
-        var file = RunDecisions.Decide(plan, force: false, _errors)[0];
+        var file = RunDecisions.Decide(plan, RunMode.Describe, _errors)[0];
 
         file.Queries.Select(query => query.State)
             .ShouldBe([QueryState.ToDescribe, QueryState.ToDescribe, QueryState.NotNeeded]);
@@ -158,7 +158,7 @@ public sealed class RunDecisionsTests : IDisposable
         var plan = Plans.Of(_project);
         _ = Directory.CreateDirectory(SidecarFormat.PathFor(plan.Files[0].Path));
 
-        var file = RunDecisions.Decide(plan, force: false, _errors)[0];
+        var file = RunDecisions.Decide(plan, RunMode.Describe, _errors)[0];
 
         file.Queries[0].State.ShouldBe(QueryState.ToDescribe);
         file.OnDisk.ShouldNotBeNull().Text.ShouldBeNull();
@@ -172,13 +172,13 @@ public sealed class RunDecisionsTests : IDisposable
         var file = plan.Files[0];
         var path = TestSidecar.Write(file, file.Queries.Take(2).Select(TestSidecar.EntryFor), formatVersion: 2);
 
-        States(plan, force: true).ShouldBe([QueryState.Failed, QueryState.Failed, QueryState.NotNeeded]);
+        States(plan, RunMode.Force).ShouldBe([QueryState.Failed, QueryState.Failed, QueryState.NotNeeded]);
 
         _errors
             .ShouldHaveSingleItem()
             .ShouldBe(
                 ToolDiagnostic
-                    .ForFile(ToolDiagnostics.SidecarOfNewerTool, path, path, "2", "1")
+                    .ForFile(ToolDiagnostics.SidecarOfNewerTool, path, "2", "1")
                     .WithLines(new ContinuationLine("help", "update the SqlSource.Tool package"))
             );
     }
@@ -191,7 +191,7 @@ public sealed class RunDecisionsTests : IDisposable
         var plan = Plans.Of(_project);
         _ = TestSidecar.Write(plan.Files[0], [], formatVersion: SidecarFormat.Version + 1);
 
-        var file = RunDecisions.Decide(plan, force: true, _errors, check: true)[0];
+        var file = RunDecisions.Decide(plan, RunMode.Check, _errors)[0];
 
         _errors.ShouldBeEmpty();
         file.Queries.Where(query => query.Planned.NeedsEntry)
@@ -205,7 +205,7 @@ public sealed class RunDecisionsTests : IDisposable
         var plan = Plans.Of(_project);
 
         var tokens = RunDecisions
-            .Decide(plan, force: true, _errors)
+            .Decide(plan, RunMode.Force, _errors)
             .Single(file => file.File.Path.EndsWith("Tokens.sql", StringComparison.Ordinal));
 
         tokens.Queries.ShouldHaveSingleItem().State.ShouldBe(QueryState.Failed);
@@ -220,7 +220,7 @@ public sealed class RunDecisionsTests : IDisposable
         plan.Files[0].State.ShouldBe(PlannedFileState.NotDescribable);
         _ = TestSidecar.Write(plan.Files[0], [], formatVersion: 2);
 
-        var file = RunDecisions.Decide(plan, force: false, _errors)[0];
+        var file = RunDecisions.Decide(plan, RunMode.Describe, _errors)[0];
 
         file.Queries.Select(query => query.State)
             .ShouldBe([QueryState.Failed, QueryState.Failed, QueryState.NotNeeded]);
@@ -249,7 +249,7 @@ public sealed class RunDecisionsTests : IDisposable
         var all = Plans.Of(_project);
         _ = TestSidecar.WriteCurrent(all.Files[0]);
 
-        States(Plans.Of(OnlyBilling, _project), force: true)
+        States(Plans.Of(OnlyBilling, _project), RunMode.Force)
             .ShouldBe([QueryState.Skipped, QueryState.ToDescribe, QueryState.NotNeeded]);
     }
 
@@ -263,7 +263,7 @@ public sealed class RunDecisionsTests : IDisposable
         _ = TestSidecar.Write(other, [], formatVersion: 2);
 
         var file = RunDecisions
-            .Decide(Plans.Of(OnlyBilling, _project), force: false, _errors)
+            .Decide(Plans.Of(OnlyBilling, _project), RunMode.Describe, _errors)
             .Single(work => work.File.Path == other.Path);
 
         file.OnDisk.ShouldBeNull();

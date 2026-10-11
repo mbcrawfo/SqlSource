@@ -34,12 +34,22 @@ internal sealed record ToolDiagnostic(
         );
 
     /// <summary>
-    /// An error about a file, at no position in it.
+    /// An error about a file, at no position in it, whose message quotes the file first, as <c>{0}</c>.
+    /// </summary>
+    /// <param name="descriptor">What is wrong.</param>
+    /// <param name="path">The full path of the file: where the error is, and the first text the message quotes.</param>
+    /// <param name="rest">The text the message quotes after the path.</param>
+    public static ToolDiagnostic ForFile(DiagnosticDescriptor descriptor, string path, params string[] rest) =>
+        AtFile(descriptor, path, [path, .. rest]);
+
+    /// <summary>
+    /// An error at a file, at no position in it, whose message does not quote that file first: a descriptor of the
+    /// generator for a setting, which quotes no path, or an error at a sidecar that quotes its <c>.sql</c> file.
     /// </summary>
     /// <param name="descriptor">What is wrong.</param>
     /// <param name="path">The full path of the file.</param>
     /// <param name="arguments">The text the descriptor's message quotes.</param>
-    public static ToolDiagnostic ForFile(DiagnosticDescriptor descriptor, string path, params string[] arguments) =>
+    public static ToolDiagnostic AtFile(DiagnosticDescriptor descriptor, string path, params string[] arguments) =>
         Create(descriptor, arguments) with
         {
             Path = path,

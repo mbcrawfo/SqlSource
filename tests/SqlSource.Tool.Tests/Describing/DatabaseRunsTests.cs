@@ -62,7 +62,7 @@ public sealed class DatabaseRunsTests : IDisposable
     )
     {
         plan ??= Plans.Of(_project);
-        var files = _files = RunDecisions.Decide(plan, force: false, []);
+        var files = _files = RunDecisions.Decide(plan, RunMode.Describe, []);
         var selected = RunDecisions.SelectedDatabases(plan);
         var connections = Connections.Resolve(
             [.. selected.Select(database => database.Name)],
@@ -390,6 +390,56 @@ public sealed class DatabaseRunsTests : IDisposable
         fault
             .Diagnostic.Arguments.ToArray()
             .ShouldBe(["System.InvalidOperationException", "A describer returned nothing."]);
+    }
+
+    private async Task ShouldBeTheFaultOfNothingAsync()
+    {
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault
+            .Diagnostic.Arguments.ToArray()
+            .ShouldBe(["System.InvalidOperationException", "A describer returned nothing."]);
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatFailsWithNoFailure_IsAFault()
+    {
+        _describer.OpenFailsWithNothing = true;
+
+        await ShouldBeTheFaultOfNothingAsync();
+    }
+
+    // An outcome that says it succeeded and holds no value is nothing too: the run reads the value, not the claim.
+    [Fact]
+    public async Task Run_DescriberThatOpensWithNoSession_IsAFault()
+    {
+        _describer.OpensWithNoSession = true;
+
+        await ShouldBeTheFaultOfNothingAsync();
+    }
+
+    [Fact]
+    public async Task Run_SessionThatReturnsNothingForAQuery_IsAFault()
+    {
+        _describer.DescribeResult = static () => null;
+
+        await ShouldBeTheFaultOfNothingAsync();
+    }
+
+    [Fact]
+    public async Task Run_SessionThatDescribesWithNoDescription_IsAFault()
+    {
+        _describer.DescribeResult = static () => Outcome<QueryDescription, DescribeFailure>.Of(null!);
+
+        await ShouldBeTheFaultOfNothingAsync();
+    }
+
+    [Fact]
+    public async Task Run_SessionThatFailsAQueryWithNoFailure_IsAFault()
+    {
+        _describer.DescribeResult = static () => Outcome<QueryDescription, DescribeFailure>.Failed(null!);
+
+        await ShouldBeTheFaultOfNothingAsync();
     }
 
     [Fact]

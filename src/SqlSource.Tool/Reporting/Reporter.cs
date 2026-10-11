@@ -20,7 +20,11 @@ namespace SqlSource.Tool.Reporting;
 /// the writer is.
 /// </para>
 /// </remarks>
-internal sealed class Reporter(TextWriter error)
+/// <param name="error">Where the errors are written.</param>
+/// <param name="trace">
+/// What the run says of itself beside its errors, when it has one: every error is then also an event of its log.
+/// </param>
+internal sealed class Reporter(TextWriter error, RunTrace? trace = null)
 {
     private const string Indent = "    ";
 
@@ -59,10 +63,10 @@ internal sealed class Reporter(TextWriter error)
     }
 
     /// <summary>
-    /// What the run says of itself beside its errors.  <c>Cli</c> sets it once, before any command runs, for every
-    /// <c>describe</c> that runs, with the run's log when it has one; every error is also an event of that log.
+    /// What the run says of itself beside its errors.  <c>Cli</c> makes the reporter of a <c>describe</c> that runs
+    /// with the run's, which has its log when there is one.  A reporter that was given none says nothing.
     /// </summary>
-    public RunTrace Trace { get; set; } = new(NullRunLog.Instance);
+    public RunTrace Trace { get; } = trace ?? new RunTrace(NullRunLog.Instance);
 
     public void Report(ToolDiagnostic diagnostic)
     {

@@ -43,15 +43,13 @@ internal static class RunProjects
         if (unit.Kind == RunUnitKind.Solution)
         {
             var read = await SolutionReader.ReadAsync(unit.Path, cancellationToken);
-            if (read.Failure is { } reason)
+            if (!read.Succeeded)
             {
-                reporter.Report(
-                    ToolDiagnostic.ForFile(ToolDiagnostics.SolutionCannotBeRead, unit.Path, unit.Path, reason)
-                );
+                reporter.Report(ToolDiagnostic.ForFile(ToolDiagnostics.SolutionCannotBeRead, unit.Path, read.Failure));
                 return [];
             }
 
-            projects = read.Projects;
+            projects = read.Value;
             solution = unit.Path;
         }
 
@@ -90,7 +88,7 @@ internal static class RunProjects
                     {
                         reporter.Report(
                             ToolDiagnostic
-                                .ForFile(ToolDiagnostics.ProjectDoesNotUseSqlSource, project, project)
+                                .ForFile(ToolDiagnostics.ProjectDoesNotUseSqlSource, project)
                                 .WithLines(AddThePackage)
                         );
                     }
@@ -100,7 +98,7 @@ internal static class RunProjects
                 case ProjectState.NotRestored:
                     // In a solution too: a run on a fresh checkout must not pass by finding nothing.
                     reporter.Report(
-                        ToolDiagnostic.ForFile(ToolDiagnostics.ProjectNotRestored, project, project).WithLines(Restore)
+                        ToolDiagnostic.ForFile(ToolDiagnostics.ProjectNotRestored, project).WithLines(Restore)
                     );
                     break;
 

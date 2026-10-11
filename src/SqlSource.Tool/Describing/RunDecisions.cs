@@ -20,19 +20,17 @@ internal static class RunDecisions
     /// query that needs an entry: a filter narrows what a run reads as well as what it changes.
     /// </summary>
     /// <param name="plan">The plan of the run.</param>
-    /// <param name="force">Whether a selected query is described though its entry is current.</param>
-    /// <param name="errors">Gains <c>SQLSRC221</c> for each sidecar of a newer tool.</param>
-    /// <param name="check">
-    /// Whether the run is <c>--check</c>, which writes nothing: a sidecar of a newer tool is then no error, and
-    /// the queries of its file are described as any other.  The comparison reports the file as a difference.
+    /// <param name="mode">
+    /// Under <see cref="RunMode.Force" /> and <see cref="RunMode.Check" /> a selected query is described though its
+    /// entry is current.  Under <see cref="RunMode.Check" />, which writes nothing, a sidecar of a newer tool is no
+    /// error, and the queries of its file are described as any other: the comparison reports the file as a
+    /// difference.
     /// </param>
-    public static ImmutableArray<FileWork> Decide(
-        RunPlan plan,
-        bool force,
-        ICollection<ToolDiagnostic> errors,
-        bool check = false
-    )
+    /// <param name="errors">Gains <c>SQLSRC221</c> for each sidecar of a newer tool, in a run that writes.</param>
+    public static ImmutableArray<FileWork> Decide(RunPlan plan, RunMode mode, ICollection<ToolDiagnostic> errors)
     {
+        var force = mode != RunMode.Describe;
+        var check = mode == RunMode.Check;
         var files = ImmutableArray.CreateBuilder<FileWork>(plan.Files.Count);
         foreach (var file in plan.Files)
         {
@@ -47,7 +45,6 @@ internal static class RunDecisions
                     ToolDiagnostic
                         .ForFile(
                             ToolDiagnostics.SidecarOfNewerTool,
-                            onDisk.Path,
                             onDisk.Path,
                             newer.ToString(CultureInfo.InvariantCulture),
                             SidecarFormat.Version.ToString(CultureInfo.InvariantCulture)

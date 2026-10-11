@@ -103,7 +103,7 @@ internal sealed record Outcome<TValue, TFailure>
 }
 ```
 
-It replaces `DescribeResult` and `OpenResult`.  The describer contract keeps its two names as aliases, `global using DescribeResult = Outcome<QueryDescription, DescribeFailure>` and the same for `OpenResult`, so that a describer still writes `OpenResult.Failed(failure)`; `Described` and `Opened` become `Of`.
+It replaces `DescribeResult` and `OpenResult`, and the describer contract names it in full: `Outcome<QueryDescription, DescribeFailure>` and `Outcome<IDescribeSession, DescribeFailure>`.  The two names are not kept as aliases: a `global using` does not cross a project, so each project that holds a describer, the tests' among them, would repeat the two lines.  `Described` and `Opened` become `Of`, and `Description` and `Session` become `Value`.
 
 It is also what these return, each reporting nothing itself:
 
@@ -111,12 +111,12 @@ It is also what these return, each reporting nothing itself:
 |----|----|----|
 | `ManifestReader.Read` | `ProjectManifest?` and `out string reason` | `Outcome<ProjectManifest, string>` |
 | `SolutionReader.ReadAsync` | `SolutionProjects(Projects, Failure?)` | `Outcome<ImmutableArray<string>, string>`; `SolutionProjects` goes |
-| `RunLogFile.TryOpen` | `RunLogFile?` with `out path` and `out reason` | `Outcome<RunLogFile, ToolDiagnostic>`, the failure being the `SQLSRC218` that `Cli` reports |
+| `RunLogFile.TryOpen` | `RunLogFile?` with `out path` and `out reason` | `RunLogFile.Open`, which returns `Outcome<RunLogFile, ToolDiagnostic>`, the failure being the `SQLSRC218` that `Cli` reports |
 | `RunUnitFinder.Find` | reports, and returns `RunUnit?` | `Outcome<RunUnit, ToolDiagnostic>`, with no reporter; `DescribeCommand.PlanAsync` reports |
 
 `DescribeCommand.PlanAsync` still returns `RunPlan?`.  It is the command's own sequence: it reports several errors as it goes, and null means there is nothing to plan, which has no one reason.
 
-The rule goes into `src/SqlSource.Tool/AGENTS.md`: a method that another file calls and that gives one value or one reason returns an `Outcome`, and does not report; a private helper may be a `TryX`; a result with more than two states is a record with a state.
+The rule goes into `src/SqlSource.Tool/AGENTS.md`: a method that another file calls and that gives one value or one reason returns an `Outcome`, and does not report; a private helper may be a `TryX`, and so may a method that gives a value or nothing and no reason, as `ConnectionArgument.TryParse`; a result with more than two states is a record with a state.
 
 `FileCheck` holds its `FileOutcome` in place of the `File` and `SidecarPath` it repeats.
 
@@ -132,7 +132,7 @@ The rule goes into `src/SqlSource.Tool/AGENTS.md`: a method that another file ca
 
 ### No order to remember (11)
 
-`Reporter` takes its `RunTrace` in its constructor, and `Trace` has no setter.  `DescribeRun.RunAsync` returns the counts that `run.end` ends with, and `RunTrace.Databases` goes.  System.CommandLine gives a command's action nothing but an exit code to return, so `Cli.RunAsync` changes its order: it builds the commands without a reporter, reads the command line, opens the log, makes the reporter with its trace, binds the action of `describe` to a function that keeps the returned counts in a local, and invokes.  An error before the trace exists, the log that cannot be opened, is reported by a reporter with no trace, as today.
+`Reporter` takes its `RunTrace` in its constructor, and `Trace` has no setter.  `DescribeRun.RunAsync` hands the counts that `run.end` ends with to a function it is given, where it set `RunTrace.Databases`, and that property goes.  It does not return them: the counts are handed over before the summary is written, so that a summary that cannot be written does not lose them, as it does not today.  System.CommandLine gives a command's action nothing but an exit code to return, so `Cli.RunAsync` changes its order: it builds the commands without a reporter, reads the command line, opens the log, makes the reporter with its trace, binds the action of `describe` with a function that keeps the counts in a local, and invokes.  An error before the trace exists, the log that cannot be opened or an exception, is reported by a reporter with no trace, as today: `Cli.RunAsync` starts with one and replaces it with the run's when the log is open.  The first reports nothing that the run goes on from, so the counts the exit code is taken from are never split between the two.
 
 `AttributeReader.ReadText` and `SqlFileText.GetText` read through one helper of `Planning/`.
 

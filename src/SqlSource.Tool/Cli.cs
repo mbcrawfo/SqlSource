@@ -118,9 +118,12 @@ public static class Cli
     /// </remarks>
     internal static async Task<int> RunAsync(string[] args, ToolHost host, CancellationToken cancellationToken)
     {
+        // Until the run has its trace an error has the console alone: a log that cannot be opened, or an
+        // exception.  Neither is followed by an error of the run, so no count is split between two reporters.
         var reporter = new Reporter(host.Error);
         var started = host.Time.GetTimestamp();
         RunLogFile? log = null;
+        var databases = LogValue.ListOf([]);
         var exitCode = 0;
 
         // Whether the line that ends a failed run has a reader: "describe" runs, and no log was asked for.
@@ -133,7 +136,7 @@ public static class Cli
                 // A run that was cancelled prints nothing more, whatever it was asked to do.
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var root = BuildCommands(host, reporter);
+                var root = BuildCommands();
 
                 var usage = UsageCheck.Check(root, args);
                 var messages = usage.Messages.Count > 0 ? usage.Messages : DescribeCommand.CheckUsage(usage);
@@ -176,16 +179,15 @@ public static class Cli
                 // After the command line was read, so that a wrong one is never logged, and before anything runs.
                 if (logPath is { } given)
                 {
-                    log = RunLogFile.TryOpen(given, host.WorkingDirectory, host.Time, out var path, out var reason);
-                    if (log is null)
+                    var opened = RunLogFile.Open(given, host.WorkingDirectory, host.Time);
+                    if (!opened.Succeeded)
                     {
                         // The run does not start.
-                        reporter.Report(
-                            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, path, "written", reason)
-                        );
+                        reporter.Report(opened.Failure);
                         return 1;
                     }
 
+                    log = opened.Value;
                     events = log;
                     log.Write(
                         "run.start",
@@ -199,7 +201,13 @@ public static class Cli
 
                 if (runs)
                 {
-                    reporter.Trace = new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null);
+                    // The reporter of the run: from here on every error is also an event of the log.  The command
+                    // gets its action only now, so that it cannot run with another.
+                    reporter = new Reporter(
+                        host.Error,
+                        new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null)
+                    );
+                    DescribeCommand.Bind(parsed, host, reporter, counts => databases = counts);
                 }
 
                 var invocation = new InvocationConfiguration
@@ -234,7 +242,7 @@ public static class Cli
                 await host.Error.WriteLineAsync(RunAgainLine);
             }
 
-            return log is null ? exitCode : End(log, exitCode, started, host, reporter);
+            return log is null ? exitCode : End(log, exitCode, started, databases, host, reporter);
         }
         finally
         {
@@ -245,13 +253,20 @@ public static class Cli
 
     // The last event, with the exit code of the process, and the file is closed.  A log that stopped being
     // writable while the run went on did not end the run: it is an error now, once, and the exit code is 1.
-    private static int End(RunLogFile log, int exitCode, long started, ToolHost host, Reporter reporter)
+    private static int End(
+        RunLogFile log,
+        int exitCode,
+        long started,
+        LogValue databases,
+        ToolHost host,
+        Reporter reporter
+    )
     {
         log.Write(
             "run.end",
             new("exitCode", exitCode),
             new("durationMs", (long)host.Time.GetElapsedTime(started).TotalMilliseconds),
-            new("databases", reporter.Trace.Databases)
+            new("databases", databases)
         );
         log.Dispose();
         if (log.Failure is not { } failure)
@@ -260,7 +275,7 @@ public static class Cli
         }
 
         reporter.Report(
-            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, log.Path, log.Path, "written", failure.Message)
+            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, log.Path, "written", failure.Message)
         );
         return 1;
     }
@@ -284,7 +299,7 @@ public static class Cli
         return reporter.DifferenceCount > 0 ? 2 : 0;
     }
 
-    internal static Command BuildCommands(ToolHost host, Reporter reporter)
+    internal static Command BuildCommands()
     {
         var version = new Option<bool>("--version")
         {
@@ -299,7 +314,7 @@ public static class Cli
         {
             new HelpOption("--help", "-h", "-?"),
             version,
-            DescribeCommand.Create(host, reporter),
+            DescribeCommand.Create(),
         };
 
         // System.CommandLine's own answer to no command is an error.

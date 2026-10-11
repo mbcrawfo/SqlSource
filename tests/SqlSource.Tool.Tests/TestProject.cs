@@ -94,8 +94,11 @@ internal sealed class TestProject
         return text.ToString();
     }
 
-    public ProjectManifest Manifest() =>
-        ManifestReader.Read(ManifestText(), out var reason) ?? throw new InvalidOperationException(reason);
+    public ProjectManifest Manifest()
+    {
+        var read = ManifestReader.Read(ManifestText());
+        return read.Succeeded ? read.Value : throw new InvalidOperationException(read.Failure);
+    }
 
     // Has the runner answer for this project with its manifest as it is when the target runs.
     public TestProject AnsweredBy(FakeProcessRunner runner)

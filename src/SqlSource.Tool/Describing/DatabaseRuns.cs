@@ -103,7 +103,9 @@ internal static class DatabaseRuns
         var request = new OpenRequest(database.Name, value, host.Exchange(database.Name));
         var log = new SessionRunLog(reporter.Trace.Log, value, engine + ".");
         var opened = await guard.CallAsync(() => describer.OpenAsync(request, log, cancellationToken));
-        if (opened.Session is not { } session)
+        // The value and not Succeeded, here and where a query is described: a describer may have given null for
+        // either, and an outcome that holds neither is a fault.
+        if (opened.Value is not { } session)
         {
             var failure = guard.Call(() => opened.Failure ?? throw new InvalidOperationException(Guard.Nothing));
             reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, first, database, server: null), value));
@@ -152,7 +154,7 @@ internal static class DatabaseRuns
             var started = time.GetTimestamp();
             var result = await guard.CallAsync(() => session.DescribeAsync(describe, cancellationToken));
             var duration = (long)time.GetElapsedTime(started).TotalMilliseconds;
-            if (result.Description is { } description)
+            if (result.Value is { } description)
             {
                 query.Entry = guard.Call(() =>
                     NoSecretIn(EntryBuilder.Build(planned, database.Dialect, database.Name, server, description), value)

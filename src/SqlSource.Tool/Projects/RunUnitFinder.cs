@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
 using SqlSource.Tool.Reporting;
 
@@ -12,18 +13,16 @@ namespace SqlSource.Tool.Projects;
 internal static class RunUnitFinder
 {
     /// <summary>
-    /// The unit, or null after reporting why there is none.
+    /// The unit, or the error that says why there is none.
     /// </summary>
     /// <param name="argument">The path as given, or null when none was.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
-    /// <param name="reporter">Where the error goes.</param>
-    public static RunUnit? Find(string? argument, string workingDirectory, Reporter reporter)
+    public static Outcome<RunUnit, ToolDiagnostic> Find(string? argument, string workingDirectory)
     {
         // Path.GetFullPath throws for an empty path, which is what an unset variable of a shell gives.
         if (argument is { Length: 0 })
         {
-            reporter.Report(ToolDiagnostic.Create(ToolDiagnostics.NotARunUnit, argument));
-            return null;
+            return No(ToolDiagnostics.NotARunUnit, argument);
         }
 
         var path = Path.TrimEndingDirectorySeparator(
@@ -32,19 +31,18 @@ internal static class RunUnitFinder
 
         if (Directory.Exists(path))
         {
-            return FindIn(path, reporter);
+            return FindIn(path);
         }
 
         if (File.Exists(path) && KindOf(path) is { } kind)
         {
-            return new RunUnit(kind, path);
+            return Outcome<RunUnit, ToolDiagnostic>.Of(new RunUnit(kind, path));
         }
 
-        reporter.Report(ToolDiagnostic.Create(ToolDiagnostics.NotARunUnit, path));
-        return null;
+        return No(ToolDiagnostics.NotARunUnit, path);
     }
 
-    private static RunUnit? FindIn(string directory, Reporter reporter)
+    private static Outcome<RunUnit, ToolDiagnostic> FindIn(string directory)
     {
         (string File, RunUnitKind? Kind)[] units;
         try
@@ -62,22 +60,19 @@ internal static class RunUnitFinder
         catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
         {
             // The user named this directory, so that it cannot be read is theirs to mend, and no bug of the tool.
-            reporter.Report(ToolDiagnostic.Create(ToolDiagnostics.DirectoryCannotBeRead, directory, exception.Message));
-            return null;
+            return No(ToolDiagnostics.DirectoryCannotBeRead, directory, exception.Message);
         }
 
-        switch (units)
+        return units switch
         {
-            case [{ Kind: { } kind } unit]:
-                return new RunUnit(kind, unit.File);
-            case []:
-                reporter.Report(ToolDiagnostic.Create(ToolDiagnostics.NoRunUnit, directory));
-                return null;
-            default:
-                reporter.Report(ToolDiagnostic.Create(ToolDiagnostics.SeveralRunUnits, directory));
-                return null;
-        }
+            [{ Kind: { } kind } unit] => Outcome<RunUnit, ToolDiagnostic>.Of(new RunUnit(kind, unit.File)),
+            [] => No(ToolDiagnostics.NoRunUnit, directory),
+            _ => No(ToolDiagnostics.SeveralRunUnits, directory),
+        };
     }
+
+    private static Outcome<RunUnit, ToolDiagnostic> No(DiagnosticDescriptor descriptor, params string[] arguments) =>
+        Outcome<RunUnit, ToolDiagnostic>.Failed(ToolDiagnostic.Create(descriptor, arguments));
 
     private static RunUnitKind? KindOf(string path)
     {
