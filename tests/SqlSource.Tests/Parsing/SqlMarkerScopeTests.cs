@@ -32,6 +32,11 @@ public class SqlMarkerScopeTests
         IsTaken(line, SqlScopeKind.WholeFile).ShouldBeTrue();
     }
 
+    // A kind that is none of the three takes nothing: the scope does not guess what it is.
+    [Fact]
+    public void Read_ScopeOfAnUnknownKind_TakesNoMarker() =>
+        IsTaken("-- generator: keep-comments", (SqlScopeKind)99).ShouldBeFalse();
+
     // A value that is not valid is another error, and is not what is asked here.
     private static bool IsTaken(string line, SqlScopeKind kind)
     {
