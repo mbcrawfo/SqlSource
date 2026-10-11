@@ -15,8 +15,6 @@ public sealed class CheckTests : IDisposable
 {
     private const string Users = "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n";
 
-    private static readonly DateTime Old = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
-
     private readonly DescribeScene _scene = new();
     private readonly string _users;
 
@@ -25,7 +23,7 @@ public sealed class CheckTests : IDisposable
         _users = _scene.Project.AddSql("Users.sql", Users);
     }
 
-    private string Sidecar => _users + ".json";
+    private string Sidecar => SidecarFormat.PathFor(_users);
 
     public void Dispose() => _scene.Dispose();
 
@@ -33,14 +31,14 @@ public sealed class CheckTests : IDisposable
     private async Task<byte[]> DescribeFirstAsync()
     {
         (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
-        File.SetLastWriteTimeUtc(Sidecar, Old);
+        File.SetLastWriteTimeUtc(Sidecar, SidecarFiles.Old);
         return await File.ReadAllBytesAsync(Sidecar, TestContext.Current.CancellationToken);
     }
 
     private async Task ShouldBeUntouchedAsync(byte[] before)
     {
         (await File.ReadAllBytesAsync(Sidecar, TestContext.Current.CancellationToken)).ShouldBe(before);
-        File.GetLastWriteTimeUtc(Sidecar).ShouldBe(Old);
+        File.GetLastWriteTimeUtc(Sidecar).ShouldBe(SidecarFiles.Old);
     }
 
     [Theory]
@@ -92,7 +90,7 @@ public sealed class CheckTests : IDisposable
     public async Task Check_SidecarOfAHigherFormatVersion_IsNotSqlsrc221AndItsQueriesAreDescribed()
     {
         _ = await DescribeFirstAsync();
-        var newer = SidecarWriter.Write(TestSidecar.Read(_users) with { FormatVersion = 2 });
+        var newer = SidecarWriter.Write(SidecarFiles.Read(_users) with { FormatVersion = 2 });
         await File.WriteAllTextAsync(Sidecar, newer, TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync("--check");
@@ -134,9 +132,9 @@ public sealed class CheckTests : IDisposable
     // Writes the sidecar again with a change, and makes it look old.
     private async Task<string> RewriteAsync(Func<Sidecar, Sidecar> change)
     {
-        var text = SidecarWriter.Write(change(TestSidecar.Read(_users)));
+        var text = SidecarWriter.Write(change(SidecarFiles.Read(_users)));
         await File.WriteAllTextAsync(Sidecar, text, TestContext.Current.CancellationToken);
-        File.SetLastWriteTimeUtc(Sidecar, Old);
+        File.SetLastWriteTimeUtc(Sidecar, SidecarFiles.Old);
         return text;
     }
 
@@ -220,7 +218,7 @@ public sealed class CheckTests : IDisposable
     public async Task Check_QueryThatChanged_SaysSoWithoutTheHashes()
     {
         _ = await DescribeFirstAsync();
-        var hash = TestSidecar.Read(_users).Find("GetUser").ShouldNotBeNull().Hash;
+        var hash = SidecarFiles.Read(_users).Find("GetUser").ShouldNotBeNull().Hash;
         await File.WriteAllTextAsync(
             _users,
             Users.Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal),
@@ -316,10 +314,7 @@ public sealed class CheckTests : IDisposable
     private string AddPlainWithASidecar(int formatVersion = SidecarFormat.Version)
     {
         var plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
-        File.WriteAllText(
-            plain + ".json",
-            SidecarWriter.Write(new Sidecar(formatVersion, PackageVersion.Prefix, EquatableArray<SidecarEntry>.Empty))
-        );
+        File.WriteAllText(SidecarFormat.PathFor(plain), SidecarFiles.Empty(formatVersion));
         return plain;
     }
 
@@ -333,7 +328,7 @@ public sealed class CheckTests : IDisposable
 
         result.ExitCode.ShouldBe(2);
         result.Error.ShouldBe(Difference($"{plain}.json ", plain, "no query of the file needs an entry"));
-        File.Exists(plain + ".json").ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(plain)).ShouldBeTrue();
     }
 
     // "describe" deletes nothing after an error, and leaves a newer tool's file alone: so the check says nothing.
@@ -418,7 +413,7 @@ public sealed class CheckTests : IDisposable
     public async Task Check_SidecarWithAByteOrderMarkAndCarriageReturns_IsReadAsAnyOther()
     {
         _ = await DescribeFirstAsync();
-        var text = SidecarWriter.Write(TestSidecar.Read(_users));
+        var text = SidecarWriter.Write(SidecarFiles.Read(_users));
         await File.WriteAllTextAsync(
             Sidecar,
             text.Replace("\n", "\r\n", StringComparison.Ordinal),

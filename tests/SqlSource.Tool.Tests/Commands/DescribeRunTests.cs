@@ -14,8 +14,6 @@ public sealed class DescribeRunTests : IDisposable
 {
     private const string Users = "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n";
 
-    private static readonly DateTime Old = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
-
     private readonly DescribeScene _scene = new();
     private readonly string _users;
 
@@ -24,7 +22,7 @@ public sealed class DescribeRunTests : IDisposable
         _users = _scene.Project.AddSql("Users.sql", Users);
     }
 
-    private string Sidecar => _users + ".json";
+    private string Sidecar => SidecarFormat.PathFor(_users);
 
     public void Dispose() => _scene.Dispose();
 
@@ -34,7 +32,7 @@ public sealed class DescribeRunTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
-        var sidecar = TestSidecar.Read(_users);
+        var sidecar = SidecarFiles.Read(_users);
         sidecar.FormatVersion.ShouldBe(SidecarFormat.Version);
         sidecar.ToolVersion.ShouldBe(PackageVersion.Prefix);
         sidecar
@@ -49,14 +47,14 @@ public sealed class DescribeRunTests : IDisposable
     public async Task Run_SecondRunWithNothingChanged_DescribesNothingAndWritesNothing()
     {
         _ = await _scene.DescribeAsync();
-        File.SetLastWriteTimeUtc(Sidecar, Old);
+        File.SetLastWriteTimeUtc(Sidecar, SidecarFiles.Old);
 
         var result = await _scene.DescribeAsync();
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 0 described, 2 skipped, 0 failed\n", ""));
         _scene.Describer.Described.Count.ShouldBe(2);
         _scene.Describer.Opened.Count.ShouldBe(1);
-        File.GetLastWriteTimeUtc(Sidecar).ShouldBe(Old);
+        File.GetLastWriteTimeUtc(Sidecar).ShouldBe(SidecarFiles.Old);
     }
 
     // The SQL, a declaration, a default and the database are each part of what was described.
@@ -105,7 +103,7 @@ public sealed class DescribeRunTests : IDisposable
     {
         _ = await _scene.DescribeAsync();
         var written = await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken);
-        var sidecar = TestSidecar.Read(_users);
+        var sidecar = SidecarFiles.Read(_users);
         await File.WriteAllTextAsync(
             Sidecar,
             kind switch
@@ -127,7 +125,7 @@ public sealed class DescribeRunTests : IDisposable
     public async Task Run_SidecarOfAHigherFormatVersion_IsSqlsrc221AndTheFileIsLeftAlone()
     {
         _ = await _scene.DescribeAsync();
-        var newer = SidecarWriter.Write(TestSidecar.Read(_users) with { FormatVersion = 2 });
+        var newer = SidecarWriter.Write(SidecarFiles.Read(_users) with { FormatVersion = 2 });
         await File.WriteAllTextAsync(Sidecar, newer, TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync("--force");
@@ -155,7 +153,7 @@ public sealed class DescribeRunTests : IDisposable
         var result = await _scene.DescribeAsync("--force");
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
-        TestSidecar.Read(_users).Queries.ShouldAllBe(entry => entry.ServerVersion == "17.0");
+        SidecarFiles.Read(_users).Queries.ShouldAllBe(entry => entry.ServerVersion == "17.0");
     }
 
     [Fact]
@@ -354,7 +352,7 @@ public sealed class DescribeRunTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 0 described, 1 skipped, 0 failed\n", ""));
-        TestSidecar.Read(_users).Queries.ShouldHaveSingleItem().Name.ShouldBe("GetUser");
+        SidecarFiles.Read(_users).Queries.ShouldHaveSingleItem().Name.ShouldBe("GetUser");
     }
 
     [Fact]

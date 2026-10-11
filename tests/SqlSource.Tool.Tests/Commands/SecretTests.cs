@@ -47,12 +47,9 @@ public sealed class SecretTests : IDisposable
         );
         _ = _scene.Project.AddSql("Other.sql", "-- dialect: mssql\n-- name: Other\nSELECT 6;\n");
         var locked = _scene.Project.AddSql("Locked.sql", "-- name: Locked\nSELECT 7;\n");
-        _ = Directory.CreateDirectory(locked + ".json");
+        _ = Directory.CreateDirectory(SidecarFormat.PathFor(locked));
         var newer = _scene.Project.AddSql("Newer.sql", "-- name: Newer\nSELECT 8;\n");
-        File.WriteAllText(
-            newer + ".json",
-            SidecarWriter.Write(new Sidecar(2, "9.9.9", EquatableArray<SidecarEntry>.Empty))
-        );
+        File.WriteAllText(SidecarFormat.PathFor(newer), SidecarFiles.Newer);
     }
 
     private static void ShouldHold(CliResult result, string ids)
@@ -316,7 +313,7 @@ public sealed class SecretTests : IDisposable
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: The "
                 + "describer put the connection's value in its description of the query 'Bad'.\n"
         );
-        File.Exists(_users + ".json").ShouldBeFalse();
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
     }
 
     // --check prints what differs, and a text of the describer is among it.  The guard on a description comes first,
@@ -358,6 +355,8 @@ public sealed class SecretTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
-        (await File.ReadAllTextAsync(_users + ".json", TestContext.Current.CancellationToken)).ShouldNotContain(Marker);
+        (
+            await File.ReadAllTextAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken)
+        ).ShouldNotContain(Marker);
     }
 }

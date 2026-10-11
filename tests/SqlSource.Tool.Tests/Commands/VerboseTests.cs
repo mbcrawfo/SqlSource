@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -126,7 +127,7 @@ public sealed class VerboseTests : IDisposable
     public async Task Run_VerboseCheck_SaysOfEachSidecarWhetherItIsTheSame()
     {
         _ = await _scene.DescribeAsync("All.slnx");
-        File.Delete(_items + ".json");
+        File.Delete(SidecarFormat.PathFor(_items));
 
         var result = await _scene.DescribeAsync("All.slnx", "--verbose", "--check");
 

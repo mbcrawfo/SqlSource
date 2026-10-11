@@ -41,13 +41,7 @@ public sealed class CheckFilterTests : IDisposable
 
     private Task<CliResult> DescribeAsync(params string[] args) => _scene.DescribeAsync(["App.csproj", .. args]);
 
-    private void AddASidecarToPlain() =>
-        File.WriteAllText(
-            _plain + ".json",
-            SidecarWriter.Write(
-                new Sidecar(SidecarFormat.Version, PackageVersion.Prefix, EquatableArray<SidecarEntry>.Empty)
-            )
-        );
+    private void AddASidecarToPlain() => File.WriteAllText(SidecarFormat.PathFor(_plain), SidecarFiles.Empty());
 
     [Fact]
     public async Task Check_NoFilter_CountsEachQueryAsSameDifferOrFailed()
@@ -108,10 +102,10 @@ public sealed class CheckFilterTests : IDisposable
     )
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
-        var sidecar = TestSidecar.Read(_users);
+        var sidecar = SidecarFiles.Read(_users);
         var gone = sidecar.Find("GetInvoice").ShouldNotBeNull() with { Name = "Gone" };
         await File.WriteAllTextAsync(
-            _users + ".json",
+            SidecarFormat.PathFor(_users),
             SidecarWriter.Write(
                 sidecar with
                 {
@@ -144,7 +138,7 @@ public sealed class CheckFilterTests : IDisposable
         var result = await _scene.DescribeAsync(["--check", .. args]);
 
         result.ExitCode.ShouldBe(exitCode);
-        File.Exists(_plain + ".json").ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(_plain)).ShouldBeTrue();
     }
 
     // What "describe" with a filter wrote, "--check" with the same filter finds the same.

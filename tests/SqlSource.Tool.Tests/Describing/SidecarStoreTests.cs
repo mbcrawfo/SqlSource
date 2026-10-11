@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
@@ -14,8 +15,6 @@ namespace SqlSource.Tool.Tests.Describing;
 // The one place that changes a sidecar on the disk: a file is written whole or not at all.
 public sealed class SidecarStoreTests : IDisposable
 {
-    private static readonly DateTime Old = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
-
     private readonly TempFolder _folder = new();
     private readonly StringWriter _error = new(CultureInfo.InvariantCulture) { NewLine = "\n" };
     private readonly PlannedFile _file;
@@ -26,7 +25,7 @@ public sealed class SidecarStoreTests : IDisposable
         var project = Plans.Postgres(_folder);
         _ = project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
         _file = Plans.Of(project).Files[0];
-        _sidecar = _file.Path + ".json";
+        _sidecar = SidecarFormat.PathFor(_file.Path);
     }
 
     public void Dispose()
@@ -87,12 +86,12 @@ public sealed class SidecarStoreTests : IDisposable
     {
         var action = Enum.Parse<FileAction>(actionName);
         File.WriteAllText(_sidecar, "as it was");
-        File.SetLastWriteTimeUtc(_sidecar, Old);
+        File.SetLastWriteTimeUtc(_sidecar, SidecarFiles.Old);
 
         Apply(Outcome(action, action == FileAction.Unchanged ? "as it was" : null));
 
         File.ReadAllText(_sidecar).ShouldBe("as it was");
-        File.GetLastWriteTimeUtc(_sidecar).ShouldBe(Old);
+        File.GetLastWriteTimeUtc(_sidecar).ShouldBe(SidecarFiles.Old);
         _error.ToString().ShouldBeEmpty();
     }
 

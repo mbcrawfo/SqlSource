@@ -1,31 +1,38 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
+using SqlSource.Tests.Snapshot;
 using SqlSource.Tool.Planning;
 
 namespace SqlSource.Tool.Tests;
 
-// A sidecar that a test puts beside a .sql file, or reads from there.
-internal static class TestSidecar
+// A sidecar as a file: one that a test puts beside a .sql file, or reads from there.  TestSidecars, of the
+// generator's tests, builds the records.
+internal static class SidecarFiles
 {
+    // A time long before any run, which a test gives a sidecar so that a write to it would show.
+    public static DateTime Old { get; } = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
+
+    // The text of a sidecar that a newer tool wrote: a format above the one this tool writes.
+    public static string Newer { get; } = Empty(2, "9.9.9");
+
     // An entry that is current for the query: its hash and its database, and a statement without rows.
     public static SidecarEntry EntryFor(PlannedQuery query) =>
-        new(
+        TestSidecars.Entry(
             query.Query.Name,
-            default,
             query.Hash.ShouldNotBeNull(),
-            "postgres",
-            query.Database,
-            "16.4",
-            SidecarResultKind.None,
-            null,
-            null,
-            null,
-            EquatableArray<SidecarParameter>.Empty,
-            null
+            database: query.Database,
+            resultKind: SidecarResultKind.None
+        );
+
+    // The text of a sidecar with no entry.  The versions are the tool's unless given.
+    public static string Empty(int formatVersion = SidecarFormat.Version, string? toolVersion = null) =>
+        SidecarWriter.Write(
+            new Sidecar(formatVersion, toolVersion ?? PackageVersion.Prefix, EquatableArray<SidecarEntry>.Empty)
         );
 
     // Writes a sidecar beside the file and gives its path.  The versions are the tool's unless given.

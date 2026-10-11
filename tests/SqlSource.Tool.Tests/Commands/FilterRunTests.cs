@@ -15,8 +15,6 @@ public sealed class FilterRunTests : IDisposable
     private const string Users =
         "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
 
-    private static readonly DateTime Old = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
-
     private readonly DescribeScene _scene = new();
     private readonly string _invoices;
     private readonly string _plain;
@@ -32,7 +30,7 @@ public sealed class FilterRunTests : IDisposable
     public void Dispose() => _scene.Dispose();
 
     private static string HashOf(string sqlPath, string query) =>
-        TestSidecar.Read(sqlPath).Find(query).ShouldNotBeNull().Hash;
+        SidecarFiles.Read(sqlPath).Find(query).ShouldNotBeNull().Hash;
 
     [Fact]
     public async Task Run_DatabaseWithTheOthersEntriesCurrent_WritesTheMixedFile()
@@ -57,7 +55,7 @@ public sealed class FilterRunTests : IDisposable
     public async Task Run_DatabaseWithOneOfTheOthersEntriesStale_DoesNotWriteAndSaysWhichQueryIsNotInTheRun()
     {
         _ = await _scene.DescribeAsync();
-        var before = await File.ReadAllBytesAsync(_users + ".json", TestContext.Current.CancellationToken);
+        var before = await File.ReadAllBytesAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken);
         await File.WriteAllTextAsync(
             _users,
             Users
@@ -80,22 +78,29 @@ public sealed class FilterRunTests : IDisposable
                     + DescribeScene.RunAgain
             )
         );
-        (await File.ReadAllBytesAsync(_users + ".json", TestContext.Current.CancellationToken)).ShouldBe(before);
+        (await File.ReadAllBytesAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken)).ShouldBe(
+            before
+        );
     }
 
     // A sidecar of a newer tool is an error where it is read.  This one is not read.
     [Fact]
     public async Task Run_FileWhoseQueriesAllBelongToAnotherDatabase_IsNotReadWrittenOrDeleted()
     {
-        var newer = SidecarWriter.Write(new Sidecar(2, "9.9.9", EquatableArray<SidecarEntry>.Empty));
-        await File.WriteAllTextAsync(_invoices + ".json", newer, TestContext.Current.CancellationToken);
-        File.SetLastWriteTimeUtc(_invoices + ".json", Old);
+        await File.WriteAllTextAsync(
+            SidecarFormat.PathFor(_invoices),
+            SidecarFiles.Newer,
+            TestContext.Current.CancellationToken
+        );
+        File.SetLastWriteTimeUtc(SidecarFormat.PathFor(_invoices), SidecarFiles.Old);
 
         var result = await _scene.DescribeAsync("--database", "postgres", "--force");
 
         result.Error.ShouldNotContain("SQLSRC221");
-        (await File.ReadAllTextAsync(_invoices + ".json", TestContext.Current.CancellationToken)).ShouldBe(newer);
-        File.GetLastWriteTimeUtc(_invoices + ".json").ShouldBe(Old);
+        (await File.ReadAllTextAsync(SidecarFormat.PathFor(_invoices), TestContext.Current.CancellationToken)).ShouldBe(
+            SidecarFiles.Newer
+        );
+        File.GetLastWriteTimeUtc(SidecarFormat.PathFor(_invoices)).ShouldBe(SidecarFiles.Old);
     }
 
     [Theory]
@@ -107,7 +112,7 @@ public sealed class FilterRunTests : IDisposable
         // Two units stand in the working directory, so each run names its own.
         _ = _scene.Run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"App.csproj\" /></Solution>");
         await File.WriteAllTextAsync(
-            _plain + ".json",
+            SidecarFormat.PathFor(_plain),
             "of a query that needed an entry once",
             TestContext.Current.CancellationToken
         );
@@ -117,7 +122,7 @@ public sealed class FilterRunTests : IDisposable
         // The run reached its end, where the summary is written.
         result.Out.ShouldContain("postgres (postgres): 1 described, 0 skipped, 0 failed\n");
         result.Error.ShouldNotContain("SQLSRC218");
-        (await File.ReadAllTextAsync(_plain + ".json", TestContext.Current.CancellationToken)).ShouldBe(
+        (await File.ReadAllTextAsync(SidecarFormat.PathFor(_plain), TestContext.Current.CancellationToken)).ShouldBe(
             "of a query that needed an entry once"
         );
     }
@@ -126,7 +131,7 @@ public sealed class FilterRunTests : IDisposable
     public async Task Run_FileThatNeedsNoEntry_LosesItsSidecarInARunWithNoFilter()
     {
         await File.WriteAllTextAsync(
-            _plain + ".json",
+            SidecarFormat.PathFor(_plain),
             "of a query that needed an entry once",
             TestContext.Current.CancellationToken
         );
@@ -134,7 +139,7 @@ public sealed class FilterRunTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(0);
-        File.Exists(_plain + ".json").ShouldBeFalse();
+        File.Exists(SidecarFormat.PathFor(_plain)).ShouldBeFalse();
     }
 
     // The plan drops a setting or a claim it could not read, so after an error a file can look as if it needs no
@@ -144,7 +149,7 @@ public sealed class FilterRunTests : IDisposable
     {
         _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser", "relation \"users\" does not exist");
         await File.WriteAllTextAsync(
-            _plain + ".json",
+            SidecarFormat.PathFor(_plain),
             "of a query that needed an entry once",
             TestContext.Current.CancellationToken
         );
@@ -153,7 +158,7 @@ public sealed class FilterRunTests : IDisposable
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain("SQLSRC999");
-        (await File.ReadAllTextAsync(_plain + ".json", TestContext.Current.CancellationToken)).ShouldBe(
+        (await File.ReadAllTextAsync(SidecarFormat.PathFor(_plain), TestContext.Current.CancellationToken)).ShouldBe(
             "of a query that needed an entry once"
         );
     }
@@ -162,15 +167,20 @@ public sealed class FilterRunTests : IDisposable
     [Fact]
     public async Task Run_FileThatNeedsNoEntryWithASidecarOfAHigherFormat_KeepsItAndReportsNothing()
     {
-        var newer = SidecarWriter.Write(new Sidecar(2, "9.9.9", EquatableArray<SidecarEntry>.Empty));
-        await File.WriteAllTextAsync(_plain + ".json", newer, TestContext.Current.CancellationToken);
-        var before = await File.ReadAllBytesAsync(_plain + ".json", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            SidecarFormat.PathFor(_plain),
+            SidecarFiles.Newer,
+            TestContext.Current.CancellationToken
+        );
+        var before = await File.ReadAllBytesAsync(SidecarFormat.PathFor(_plain), TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(0);
         result.Error.ShouldBeEmpty();
-        (await File.ReadAllBytesAsync(_plain + ".json", TestContext.Current.CancellationToken)).ShouldBe(before);
+        (await File.ReadAllBytesAsync(SidecarFormat.PathFor(_plain), TestContext.Current.CancellationToken)).ShouldBe(
+            before
+        );
     }
 
     // The planner drops a setting it cannot read and falls back to the next level, so a file can look as if it needs no
@@ -183,20 +193,22 @@ public sealed class FilterRunTests : IDisposable
         var wanted = _scene.Project.AddSql("Wanted.sql", "-- name: Wanted\n-- output: models\nSELECT 6;\n");
         var broken = _scene.Project.AddSql("Broken.sql", "-- name: Broken\nSELECT 5;\n", ("SqlSourceOutput", "modles"));
         await File.WriteAllTextAsync(
-            broken + ".json",
+            SidecarFormat.PathFor(broken),
             "of a query that needed an entry",
             TestContext.Current.CancellationToken
         );
-        var before = await File.ReadAllBytesAsync(broken + ".json", TestContext.Current.CancellationToken);
+        var before = await File.ReadAllBytesAsync(SidecarFormat.PathFor(broken), TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain("error SQLSRC014: ");
         result.Out.ShouldBe("postgres (postgres): 1 described, 0 skipped, 0 failed\n");
-        File.Exists(wanted + ".json").ShouldBeTrue();
-        File.Exists(broken + ".json").ShouldBeTrue();
-        (await File.ReadAllBytesAsync(broken + ".json", TestContext.Current.CancellationToken)).ShouldBe(before);
+        File.Exists(SidecarFormat.PathFor(wanted)).ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(broken)).ShouldBeTrue();
+        (await File.ReadAllBytesAsync(SidecarFormat.PathFor(broken), TestContext.Current.CancellationToken)).ShouldBe(
+            before
+        );
     }
 
     [Fact]
@@ -213,8 +225,8 @@ public sealed class FilterRunTests : IDisposable
             )
         );
         _scene.Describer.Described.Select(request => request.Name).ShouldBe(["GetInvoice", "GetUser"]);
-        File.Exists(_users + ".json").ShouldBeTrue();
-        File.Exists(_invoices + ".json").ShouldBeFalse();
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(_invoices)).ShouldBeFalse();
     }
 
     [Fact]
@@ -229,7 +241,7 @@ public sealed class FilterRunTests : IDisposable
         var inA = a.AddSql("A.sql", "-- name: InA\nSELECT 1;\n");
         var inB = b.AddSql("B.sql", "-- name: InB\nSELECT 2;\n");
         var plainOfA = a.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 3;\n");
-        await File.WriteAllTextAsync(plainOfA + ".json", "kept", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(SidecarFormat.PathFor(plainOfA), "kept", TestContext.Current.CancellationToken);
         _ = run.Folder.WriteFile(
             "App.slnx",
             "<Solution><Project Path=\"A/A.csproj\" /><Project Path=\"B/B.csproj\" /></Solution>"
@@ -239,8 +251,10 @@ public sealed class FilterRunTests : IDisposable
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 1 described, 0 skipped, 0 failed\n", ""));
         describer.Described.ShouldHaveSingleItem().Name.ShouldBe("InA");
-        File.Exists(inA + ".json").ShouldBeTrue();
-        File.Exists(inB + ".json").ShouldBeFalse();
-        (await File.ReadAllTextAsync(plainOfA + ".json", TestContext.Current.CancellationToken)).ShouldBe("kept");
+        File.Exists(SidecarFormat.PathFor(inA)).ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(inB)).ShouldBeFalse();
+        (await File.ReadAllTextAsync(SidecarFormat.PathFor(plainOfA), TestContext.Current.CancellationToken)).ShouldBe(
+            "kept"
+        );
     }
 }

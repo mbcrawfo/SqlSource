@@ -194,7 +194,7 @@ public sealed class RunLogTests : IDisposable
         Text(open, "driverVersion").ShouldBe("1.2.3");
         open.GetProperty("settings").ValueKind.ShouldBe(JsonValueKind.Object);
         var sidecar = events[10];
-        Text(sidecar, "path").ShouldBe(_users + ".json");
+        Text(sidecar, "path").ShouldBe(SidecarFormat.PathFor(_users));
         Text(sidecar, "action").ShouldBe("held-back");
         var counts = events[11].GetProperty("databases").EnumerateArray().ShouldHaveSingleItem();
         Text(counts, "name").ShouldBe("postgres");
@@ -215,10 +215,10 @@ public sealed class RunLogTests : IDisposable
     public async Task Run_Sidecars_AreWrittenThenUnchangedThenDeleted()
     {
         _ = await _scene.DescribeAsync("--log", "run.log");
-        ActionOf(_users + ".json").ShouldBe("written");
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("written");
 
         _ = await _scene.DescribeAsync("--log", "run.log");
-        ActionOf(_users + ".json").ShouldBe("unchanged");
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("unchanged");
 
         await File.WriteAllTextAsync(
             _users,
@@ -226,20 +226,20 @@ public sealed class RunLogTests : IDisposable
             TestContext.Current.CancellationToken
         );
         _ = await _scene.DescribeAsync("--log", "run.log");
-        ActionOf(_users + ".json").ShouldBe("deleted");
-        File.Exists(_users + ".json").ShouldBeFalse();
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("deleted");
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
     }
 
     // "written" would say what did not happen.
     [Fact]
     public async Task Run_SidecarThatCannotBeWritten_HasTheActionFailed()
     {
-        _ = Directory.CreateDirectory(_users + ".json");
+        _ = Directory.CreateDirectory(SidecarFormat.PathFor(_users));
 
         var result = await _scene.DescribeAsync("--log", "run.log");
 
         result.Error.ShouldContain("error SQLSRC218: ");
-        ActionOf(_users + ".json").ShouldBe("failed");
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("failed");
     }
 
     [Fact]
@@ -251,9 +251,9 @@ public sealed class RunLogTests : IDisposable
         var result = await _scene.DescribeAsync("--check", "--log", "run.log");
 
         result.ExitCode.ShouldBe(2);
-        ActionOf(_users + ".json").ShouldBe("same");
-        ActionOf(other + ".json").ShouldBe("differs");
-        File.Exists(other + ".json").ShouldBeFalse();
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("same");
+        ActionOf(SidecarFormat.PathFor(other)).ShouldBe("differs");
+        File.Exists(SidecarFormat.PathFor(other)).ShouldBeFalse();
         var counts = LogReader.Read(Log)[^1].GetProperty("databases").EnumerateArray().ShouldHaveSingleItem();
         counts.GetProperty("same").GetInt32().ShouldBe(2);
         counts.GetProperty("differ").GetInt32().ShouldBe(1);
@@ -293,7 +293,7 @@ public sealed class RunLogTests : IDisposable
 
         _ = await _scene.DescribeAsync("--check", "--log", "run.log");
 
-        ActionOf(_users + ".json").ShouldBe("differs");
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("differs");
     }
 
     [Fact]
@@ -498,7 +498,7 @@ public sealed class RunLogTests : IDisposable
         (await File.ReadAllBytesAsync(_users, TestContext.Current.CancellationToken)).ShouldBe(before);
         _scene.Describer.Described.ShouldBeEmpty();
         _scene.Describer.Opened.ShouldBeEmpty();
-        File.Exists(_users + ".json").ShouldBeFalse();
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
     }
 
     [Fact]
@@ -586,6 +586,6 @@ public sealed class RunLogTests : IDisposable
         result.Out.ShouldBe("postgres (postgres): 2 described, 0 skipped, 0 failed\n");
         result.Error.ShouldStartWith("/dev/full : error SQLSRC218: '/dev/full' could not be written: ");
         result.Error.Split("error SQLSRC").Length.ShouldBe(2);
-        File.Exists(_users + ".json").ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
     }
 }

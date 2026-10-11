@@ -50,6 +50,11 @@
             Include="../SqlSource.Tests/Generator/TestOptionsProvider.cs"
             Link="Generator/TestOptionsProvider.cs"
         />
+        <!--
+            The builder of a sidecar's records, with the values a test does not care about filled in, for
+            SidecarFiles.  tests/SqlSource.Tests compiles the same file.
+        -->
+        <Compile Include="../SqlSource.Tests/Snapshot/TestSidecars.cs" Link="Snapshot/TestSidecars.cs" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />

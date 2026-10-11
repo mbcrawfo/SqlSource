@@ -44,7 +44,7 @@ public sealed class FileOutcomesTests : IDisposable
             }
 
             query.State = QueryState.Described;
-            query.Entry = TestSidecar.EntryFor(query.Planned) with { ServerVersion = "17.0" };
+            query.Entry = SidecarFiles.EntryFor(query.Planned) with { ServerVersion = "17.0" };
         }
 
         return files;
@@ -62,7 +62,7 @@ public sealed class FileOutcomesTests : IDisposable
 
         outcome.Action.ShouldBe(FileAction.Write);
         outcome.File.ShouldBe(plan.Files[0]);
-        outcome.SidecarPath.ShouldBe(plan.Files[0].Path + ".json");
+        outcome.SidecarPath.ShouldBe(SidecarFormat.PathFor(plan.Files[0].Path));
         var target = outcome.Target.ShouldNotBeNull();
         target.FormatVersion.ShouldBe(SidecarFormat.Version);
         target.ToolVersion.ShouldBe(PackageVersion.Prefix);
@@ -76,7 +76,7 @@ public sealed class FileOutcomesTests : IDisposable
     public void Decide_EveryEntryCurrent_IsUnchanged()
     {
         var plan = Plans.Of(_project);
-        _ = TestSidecar.WriteCurrent(plan.Files[0]);
+        _ = SidecarFiles.WriteCurrent(plan.Files[0]);
 
         Outcome(Described(plan)).Action.ShouldBe(FileAction.Unchanged);
     }
@@ -86,7 +86,7 @@ public sealed class FileOutcomesTests : IDisposable
     public void Decide_SameContentWithAByteOrderMarkAndOtherLineEndings_IsUnchanged()
     {
         var plan = Plans.Of(_project);
-        var path = TestSidecar.WriteCurrent(plan.Files[0]);
+        var path = SidecarFiles.WriteCurrent(plan.Files[0]);
         var text = File.ReadAllText(path).Replace("\n", "\r\n", StringComparison.Ordinal);
         File.WriteAllText(path, text, new UTF8Encoding(encoderShouldEmitUTF8Identifier: true));
 
@@ -97,7 +97,7 @@ public sealed class FileOutcomesTests : IDisposable
     public void Decide_OneQueryDescribedAndOneKept_WritesBoth()
     {
         var plan = Plans.Of(_project);
-        _ = TestSidecar.Write(plan.Files[0], [TestSidecar.EntryFor(plan.Files[0].Queries[1])]);
+        _ = SidecarFiles.Write(plan.Files[0], [SidecarFiles.EntryFor(plan.Files[0].Queries[1])]);
 
         var outcome = Outcome(Described(plan));
 
@@ -113,8 +113,8 @@ public sealed class FileOutcomesTests : IDisposable
     {
         var plan = Plans.Of(_project);
         var file = plan.Files[0];
-        var gone = TestSidecar.EntryFor(file.Queries[0]) with { Name = "Gone" };
-        _ = TestSidecar.Write(file, [.. file.Queries.Take(2).Select(TestSidecar.EntryFor), gone]);
+        var gone = SidecarFiles.EntryFor(file.Queries[0]) with { Name = "Gone" };
+        _ = SidecarFiles.Write(file, [.. file.Queries.Take(2).Select(SidecarFiles.EntryFor), gone]);
 
         var outcome = Outcome(Described(plan));
 
@@ -158,7 +158,7 @@ public sealed class FileOutcomesTests : IDisposable
     public void Decide_QueryThatIsNotInTheRunAndHasACurrentEntry_IsWrittenBesideTheNewOne()
     {
         var all = Plans.Of(_project);
-        _ = TestSidecar.Write(all.Files[0], [TestSidecar.EntryFor(all.Files[0].Queries[0])]);
+        _ = SidecarFiles.Write(all.Files[0], [SidecarFiles.EntryFor(all.Files[0].Queries[0])]);
 
         var outcome = Outcome(Described(Plans.Of(OnlyBilling, _project)), mayDelete: false);
 
@@ -175,7 +175,7 @@ public sealed class FileOutcomesTests : IDisposable
         var project = Plans.Postgres(_folder, "Other");
         _ = project.AddSql("Q.sql", "-- name: A\nSELECT 1;\n");
         var plan = Plans.Of(OnlyBilling, project);
-        File.WriteAllText(plan.Files[0].Path + ".json", "anything");
+        File.WriteAllText(SidecarFormat.PathFor(plan.Files[0].Path), "anything");
 
         var outcome = Outcome(Described(plan), mayDelete: false);
 
@@ -199,7 +199,7 @@ public sealed class FileOutcomesTests : IDisposable
         var sql = project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 3;\n");
         if (sidecarExists)
         {
-            File.WriteAllText(sql + ".json", "anything");
+            File.WriteAllText(SidecarFormat.PathFor(sql), "anything");
         }
 
         Outcome(Described(Plans.Of(project)), mayDelete).Action.ShouldBe(Enum.Parse<FileAction>(action));
@@ -211,10 +211,7 @@ public sealed class FileOutcomesTests : IDisposable
     {
         var project = Plans.Postgres(_folder, "Other");
         var sql = project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 3;\n");
-        File.WriteAllText(
-            sql + ".json",
-            SidecarWriter.Write(new Sidecar(2, "9.9.9", EquatableArray<SidecarEntry>.Empty))
-        );
+        File.WriteAllText(SidecarFormat.PathFor(sql), SidecarFiles.Newer);
 
         var outcome = Outcome(Described(Plans.Of(project)));
 
@@ -227,7 +224,7 @@ public sealed class FileOutcomesTests : IDisposable
     {
         _project.Properties["SqlSourceDialect"] = "ansi";
         var plan = Plans.Of(_project);
-        File.WriteAllText(plan.Files[0].Path + ".json", "anything");
+        File.WriteAllText(SidecarFormat.PathFor(plan.Files[0].Path), "anything");
 
         Outcome(Described(plan)).Action.ShouldBe(FileAction.None);
     }

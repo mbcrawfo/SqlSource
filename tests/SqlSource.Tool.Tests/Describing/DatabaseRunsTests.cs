@@ -544,7 +544,7 @@ public sealed class DatabaseRunsTests : IDisposable
     {
         _ = _project.AddSql("Tokens.sql", "-- name: Find\n-- database: billing\nSELECT 1 {{where}};\n");
         var plan = Plans.Of(_project);
-        _ = TestSidecar.WriteCurrent(plan.Files.Single(file => file.Path == _users));
+        _ = SidecarFiles.WriteCurrent(plan.Files.Single(file => file.Path == _users));
 
         var files = await RunAsync(plan, given: []);
 
