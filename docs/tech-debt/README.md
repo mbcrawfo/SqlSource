@@ -36,7 +36,7 @@ Next id: `TD-0043`
 | [TD-0038](TD-0038-duplicated-and-uneven-patterns-in-the-generator-and-the-tool.md) | Open | 2026-10-10 | Low | Methods of the tool and of the sidecar reader that do several things: `Cli.RunAsync`, `RunPlanner.ReadProject` and `PlanFile`, `SidecarReader.ReadEntry`, `ProjectEvaluator.EvaluateOneAsync`, and the eight parameters of `DatabaseRuns.DescribeAllAsync` |
 | [TD-0039](TD-0039-duplicated-and-uneven-patterns-in-the-tests.md) | Open | 2026-10-10 | Low | Duplicated and uneven patterns in `tests/`: the help-link prefix in ten places, `Plans` re-implemented twice, fixture texts, sidecars, clock and secret constants copied across classes, `FakeDescriber` lacking what tests build around it, test classes that cover several subjects, theories that dispatch on a string, and two ways to build a `ToolHost` |
 | [TD-0041](TD-0041-ca2000-is-suppressed-on-the-opener-of-the-log.md) | Open | 2026-10-11 | Low | `RunLogFile.Open` suppresses `CA2000`, since the analyzer does not follow a disposable that is returned in an `Outcome`, so a log that a later edit leaks there is not reported |
-| [TD-0042](TD-0042-allocations-of-a-parse-that-no-budget-sees.md) | Open | 2026-10-11 | Low | A query's marker scope is under no allocation budget, a summary of one line is copied twice, and a scope holds the name of its input model twice |
+| [TD-0042](TD-0042-allocations-of-a-parse-that-no-budget-sees.md) | Open | 2026-10-11 | Low | A query's marker scope is under no allocation budget, a summary of one line makes a list and, on .NET Framework, a copy, and a scope holds the name of its input model twice |
 
 ## Columns
 

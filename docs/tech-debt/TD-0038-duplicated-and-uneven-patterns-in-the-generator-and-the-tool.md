@@ -14,7 +14,7 @@ The code was written in sub-phases, each adding the next reader, record or helpe
 
 ## Impact
 
-Low.  Nothing here is wrong today.  Each method makes a change to one of its responsibilities read, and risk, the others.
+Low.  Nothing here is wrong today.  To change one responsibility of such a method, a developer must read the others, and may break them.
 
 ## Proposed fix
 
