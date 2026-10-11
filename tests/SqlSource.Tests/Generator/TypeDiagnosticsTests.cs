@@ -1,3 +1,5 @@
+using System;
+using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using Xunit;
@@ -378,6 +380,48 @@ public class TypeDiagnosticsTests
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources.Keys.ShouldContain("App.Sample.g.cs");
+    }
+
+    // Each is reported where the attribute reader reads it: the location, the method location, then the settings in
+    // the order of SettingId.
+    [Fact]
+    public void Run_AttributeWithSeveralValuesThatAreNotValid_ReportsThemInTheOrderTheyAreRead()
+    {
+        var run = GeneratorHarness.Run(
+            """
+            using SqlSource;
+            namespace App;
+            [SqlSourceGenerate(
+                CollectionType = (GeneratorCollectionType)91,
+                OutputModelType = (GeneratorModelType)96,
+                InputModelType = (GeneratorModelType)95,
+                ModelNamespace = "App..Models",
+                OutputModelSuffix = "a b",
+                InputModelSuffix = "a-b",
+                Output = (GeneratorOutput)92,
+                Parameters = "nope",
+                MethodLocation = (MethodLocation)93,
+                SqlLocation = (SqlLocation)94)]
+            public partial class Sample;
+            """,
+            Users
+        );
+
+        run.Diagnostics.Select(static diagnostic =>
+                diagnostic[(diagnostic.IndexOf("): ", StringComparison.Ordinal) + 3)..]
+            )
+            .ShouldBe([
+                "'94' is not a valid value of SqlLocation",
+                "'93' is not a valid value of MethodLocation",
+                "'nope' is not a valid value of Parameters",
+                "'92' is not a valid value of Output",
+                "'a-b' is not a valid value of InputModelSuffix",
+                "'a b' is not a valid value of OutputModelSuffix",
+                "'App..Models' is not a valid value of ModelNamespace",
+                "'95' is not a valid value of InputModelType",
+                "'96' is not a valid value of OutputModelType",
+                "'91' is not a valid value of CollectionType",
+            ]);
     }
 
     [Fact]

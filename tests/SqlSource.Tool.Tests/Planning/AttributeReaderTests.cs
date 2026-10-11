@@ -142,6 +142,9 @@ public sealed class AttributeReaderTests : IDisposable
     [InlineData("global::SqlSource.GeneratorOutput.CodeGen", "CodeGen")]
     // The compiler rejects a member that does not exist.
     [InlineData("GeneratorOutput.Other", null)]
+    // The compiler compares the case, so the reader does.
+    [InlineData("GeneratorOutput.models", null)]
+    [InlineData("GeneratorOutput.CODEGEN", null)]
     public void Read_OutputAsAMember_IsThatMember(string expression, string? expected)
     {
         var claims = Read(OnAClass(OutputPrefix + expression + ")]"));

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation.MSBuild;
@@ -10,6 +11,84 @@ namespace SqlSource.Tests.Generation.MSBuild;
 public class MSBuildSettingsTests
 {
     private const string Path = "/app/Repo/Users.sql";
+
+    // The compiler's contract, spelled out: a change to a constant must fail here, not pass by agreeing with itself.
+    [Fact]
+    public void Prefixes_AreWhereTheCompilerPutsAPropertyAndTheMetadataOfTheSettingsItem()
+    {
+        MSBuildSettings.PropertyPrefix.ShouldBe("build_property.");
+        MSBuildSettings.MetadataPrefix.ShouldBe("build_metadata.SqlSourceSettingsFile.");
+        DialectSetting.PropertyName.ShouldBe("build_property.SqlSourceDialect");
+        DialectSetting.MetadataName.ShouldBe("build_metadata.SqlSourceSettingsFile.SqlSourceDialect");
+    }
+
+    // The names line up with SettingId: the keys are found by its number.
+    [Fact]
+    public void NameOf_EverySetting_IsItsMSBuildName()
+    {
+        foreach (var setting in Enum.GetValues<SettingId>())
+        {
+            MSBuildSettings
+                .NameOf(setting)
+                .ShouldBe(setting == SettingId.Parameters ? "SqlSourceGeneratorParameters" : "SqlSource" + setting);
+        }
+    }
+
+    // The compiler is not shown SqlSourceDatabase, and the generator does not judge it when a project shows it
+    // itself: the keys of the compiler have no database.
+    [Theory]
+    [InlineData("main")]
+    [InlineData("not a name")]
+    public void ReadProject_DatabaseUnderTheKeysOfTheCompiler_IsNotRead(string written)
+    {
+        var settings = ProjectSettings.Read(Provider("SqlSourceDatabase", written).GlobalOptions);
+
+        settings.Level.ShouldBeSameAs(SettingsLevel.None);
+        settings.Invalid.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadFile_DatabaseUnderTheKeysOfTheCompiler_IsNotRead() =>
+        ReadFileMetadata(new Dictionary<string, string> { ["SqlSourceDatabase"] = "not a name" }).ShouldBeNull();
+
+    // The tool reads a manifest, which holds the database, under the keys that have it.
+    [Theory]
+    [InlineData(" main ", "main", null)]
+    [InlineData("not a name", null, "not a name")]
+    [InlineData("   ", null, null)]
+    public void ReadProject_DatabaseUnderTheKeysOfAManifest_IsReadAsAName(
+        string written,
+        string? expected,
+        string? invalid
+    )
+    {
+        var settings = ProjectSettings.Read(
+            Provider("SqlSourceDatabase", written).GlobalOptions,
+            MSBuildSettings.ManifestProperty
+        );
+
+        settings.Level.Database.ShouldBe(expected);
+        settings.Invalid.ShouldBe(invalid is null ? [] : [new InvalidSetting("SqlSourceDatabase", invalid)]);
+    }
+
+    [Fact]
+    public void ReadFile_DatabaseUnderTheKeysOfAManifest_IsReadAsAName()
+    {
+        var settings = FileSettings.Read(
+            Path,
+            new TestOptionsProvider(
+                null,
+                fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
+                {
+                    [Path] = new Dictionary<string, string> { ["SqlSourceDatabase"] = "files" },
+                }
+            ).GetOptions(new InMemoryAdditionalText(Path, "")),
+            MSBuildSettings.ManifestMetadata
+        );
+
+        settings.ShouldNotBeNull().Level.ShouldBe(new SettingsLevel { Database = "files" });
+        settings.Invalid.ShouldBeEmpty();
+    }
 
     [Fact]
     public void ReadProject_NothingSet_IsTheSharedEmptyLevel()

@@ -13,6 +13,14 @@ namespace SqlSource.Generation.MSBuild;
 /// <param name="Settings">The settings the metadata gives, or null when it gives none.</param>
 internal sealed record FileMetadata(AdditionalText File, DialectSetting Dialect, FileSettings? Settings)
 {
+    /// <summary>Reads the metadata the compiler is shown.</summary>
     public static FileMetadata Read(AdditionalText file, AnalyzerConfigOptions fileOptions) =>
         new(file, DialectSetting.ReadMetadata(fileOptions), FileSettings.Read(file.Path, fileOptions));
+
+    /// <summary>Reads the metadata, with the settings under <paramref name="keys" />.</summary>
+    public static FileMetadata Read(
+        AdditionalText file,
+        AnalyzerConfigOptions fileOptions,
+        MSBuildSettings.SettingKeys keys
+    ) => new(file, DialectSetting.ReadMetadata(fileOptions), FileSettings.Read(file.Path, fileOptions, keys));
 }

@@ -117,6 +117,20 @@ public class SqlGeneratorParameterScopeTests
         scope.Parameters.ShouldBe(GeneratorParameters.KeepComments);
     }
 
+    [Fact]
+    public void Read_WordsSeparatedByTabsAndRunsOfSpaces_AreEachReportedAtTheirOwnPlace()
+    {
+        const string Line = "-- generator: keep-comments \t nope   foo=bar";
+
+        var (scope, errors) = Read(Line);
+
+        scope.Parameters.ShouldBe(GeneratorParameters.KeepComments);
+        errors.ShouldBe([
+            SqlParseError.Create(SqlParseErrorKind.UnknownGeneratorParameter, SpanOf(Line, "nope"), "nope"),
+            SqlParseError.Create(SqlParseErrorKind.UnknownGeneratorParameter, SpanOf(Line, "foo=bar"), "foo=bar"),
+        ]);
+    }
+
     // Each line is lexed alone, so every generator parameter is at the offset it has in its own line.
     private static (SqlGeneratorParameterScope Scope, List<SqlParseError> Errors) Read(params string[] lines)
     {

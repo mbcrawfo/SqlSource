@@ -21,10 +21,14 @@ internal sealed record FileSettings(string NormalizedPath, SettingsLevel Level, 
     /// </summary>
     /// <param name="path">The file's path as the compiler gives it.</param>
     /// <param name="fileOptions">The options of the file's item.</param>
-    public static FileSettings? Read(string path, AnalyzerConfigOptions fileOptions)
+    public static FileSettings? Read(string path, AnalyzerConfigOptions fileOptions) =>
+        Read(path, fileOptions, MSBuildSettings.Metadata);
+
+    /// <summary>Reads a file's metadata under <paramref name="keys" />, as the overload without them does.</summary>
+    public static FileSettings? Read(string path, AnalyzerConfigOptions fileOptions, MSBuildSettings.SettingKeys keys)
     {
         List<InvalidSetting>? invalid = null;
-        var level = MSBuildSettings.Read(fileOptions, MSBuildSettings.Metadata, ref invalid);
+        var level = MSBuildSettings.Read(fileOptions, keys, ref invalid);
         if (ReferenceEquals(level, SettingsLevel.None) && invalid is null)
         {
             return null;

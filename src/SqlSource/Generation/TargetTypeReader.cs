@@ -10,7 +10,6 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Settings;
-using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Generation;
 
@@ -47,8 +46,9 @@ internal static class TargetTypeReader
 
         var attributeLocation = LocationInfo.From(reference.GetSyntax(cancellationToken).GetLocation());
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
+        var source = new AttributeSettings(attribute, attributeLocation, diagnostics);
         var types = ReadDeclarations(declaration, diagnostics);
-        var placement = ReadPlacement(attribute, attributeLocation, diagnostics);
+        var placement = source.Choice<MemberPlacement>(AttributeSource.LocationProperty) ?? MemberPlacement.Nested;
         if (placement == MemberPlacement.Nested && IsNestedClassNameTaken(symbol))
         {
             diagnostics.Add(DiagnosticInfo.Create(SqlDiagnostics.SqlMemberExists, attributeLocation, symbol.Name));
@@ -60,13 +60,8 @@ internal static class TargetTypeReader
                 : symbol.ContainingNamespace.ToDisplayString(NamespaceFormat),
             new EquatableArray<TypeDeclaration>(types),
             placement,
-            ReadChoice<MethodPlacement>(
-                attribute,
-                AttributeSource.MethodLocationProperty,
-                attributeLocation,
-                diagnostics
-            ) ?? MethodPlacement.ExtensionClass,
-            ReadSettings(attribute, attributeLocation, diagnostics),
+            source.Choice<MethodPlacement>(AttributeSource.MethodLocationProperty) ?? MethodPlacement.ExtensionClass,
+            SettingsLevelReader.Read(ref source),
             ReadPath(attribute),
             reference.SyntaxTree.FilePath,
             attributeLocation,
@@ -157,182 +152,72 @@ internal static class TargetTypeReader
             ? path
             : null;
 
-    private static MemberPlacement ReadPlacement(
+    // The attribute as a source of settings.  A word that is no generator parameter is reported, and a type with a
+    // diagnostic gets no members, so nothing of this level applies then; every property is still read, so that all
+    // the problems of the attribute are reported together.
+    private readonly struct AttributeSettings(
         AttributeData attribute,
         LocationInfo attributeLocation,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics
-    )
+    ) : ISettingSource
     {
-        // An argument that is not a constant has no value here.  The compiler reports it.
-        if (GetNamedArgument(attribute, AttributeSource.LocationProperty) is not { Value: int value })
-        {
-            return MemberPlacement.Nested;
-        }
+        // A string that is empty or white space is not set, as Path is: the reader of the level says so.
+        public string? Text(SettingId setting) =>
+            PropertyOf(setting) is { } property && GetNamedArgument(attribute, property) is { Value: string written }
+                ? written
+                : null;
 
-        switch (value)
-        {
-            case 0:
-                return MemberPlacement.Nested;
-            case 1:
-                return MemberPlacement.Direct;
-            default:
-                diagnostics.Add(
-                    DiagnosticInfo.Create(
-                        SqlDiagnostics.InvalidAttributeValue,
-                        attributeLocation,
-                        value.ToString(CultureInfo.InvariantCulture),
-                        AttributeSource.LocationProperty
-                    )
-                );
-                return MemberPlacement.Nested;
-        }
-    }
+        public T? Choice<T>(SettingId setting)
+            where T : struct, Enum => PropertyOf(setting) is { } property ? Choice<T>(property) : null;
 
-    // A word that is no generator parameter is reported, and a type with a diagnostic gets no members, so nothing of
-    // this level applies then; every property is still read, so that all the problems of the attribute are reported
-    // together.  A value without text is a property that is not set.
-    private static SettingsLevel ReadSettings(
-        AttributeData attribute,
-        LocationInfo attributeLocation,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
-    )
-    {
-        var level = new SettingsLevel
+        // An enum argument arrives as its number.  A number that is no member of the generator's own form of the
+        // enum was written with a cast, and is reported.  An argument that is not a constant has no value here; the
+        // compiler reports it.
+        public T? Choice<T>(string property)
+            where T : struct, Enum
         {
-            Parameters = ReadParameters(attribute, attributeLocation, diagnostics),
-            Output = ReadChoice<OutputKind>(attribute, AttributeSource.OutputProperty, attributeLocation, diagnostics),
-            InputModelSuffix = ReadText(
-                attribute,
-                AttributeSource.InputModelSuffixProperty,
-                static value => SettingValue.IsSuffix(value.AsSpan()),
-                attributeLocation,
-                diagnostics
-            ),
-            OutputModelSuffix = ReadText(
-                attribute,
-                AttributeSource.OutputModelSuffixProperty,
-                static value => SettingValue.IsSuffix(value.AsSpan()),
-                attributeLocation,
-                diagnostics
-            ),
-            ModelNamespace = ReadText(
-                attribute,
-                AttributeSource.ModelNamespaceProperty,
-                static value => SettingValue.IsNamespace(value.AsSpan()),
-                attributeLocation,
-                diagnostics
-            ),
-            InputModelType = ReadChoice<ModelKind>(
-                attribute,
-                AttributeSource.InputModelTypeProperty,
-                attributeLocation,
-                diagnostics
-            ),
-            OutputModelType = ReadChoice<ModelKind>(
-                attribute,
-                AttributeSource.OutputModelTypeProperty,
-                attributeLocation,
-                diagnostics
-            ),
-            CollectionType = ReadChoice<CollectionKind>(
-                attribute,
-                AttributeSource.CollectionTypeProperty,
-                attributeLocation,
-                diagnostics
-            ),
-        };
+            if (GetNamedArgument(attribute, property) is not { Value: int value })
+            {
+                return null;
+            }
 
-        // A type that sets nothing shares the empty level.
-        return level.Equals(SettingsLevel.None) ? SettingsLevel.None : level;
-    }
+            if (Enum.IsDefined(typeof(T), value))
+            {
+                return (T)Enum.ToObject(typeof(T), value);
+            }
 
-    private static GeneratorParameters? ReadParameters(
-        AttributeData attribute,
-        LocationInfo attributeLocation,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
-    )
-    {
-        if (GetNamedArgument(attribute, AttributeSource.ParametersProperty) is not { Value: string list })
-        {
+            Report(property, value.ToString(CultureInfo.InvariantCulture));
             return null;
         }
 
-        var words = new List<string>();
-        var parameters = GeneratorParameterList.Parse(list, words);
-        foreach (var word in words)
+        public void Invalid(SettingId setting, string value)
         {
+            if (PropertyOf(setting) is { } property)
+            {
+                Report(property, value);
+            }
+        }
+
+        private void Report(string property, string value) =>
             diagnostics.Add(
-                DiagnosticInfo.Create(
-                    SqlDiagnostics.InvalidAttributeValue,
-                    attributeLocation,
-                    word,
-                    AttributeSource.ParametersProperty
-                )
+                DiagnosticInfo.Create(SqlDiagnostics.InvalidAttributeValue, attributeLocation, value, property)
             );
-        }
 
-        return parameters;
-    }
-
-    // A string that is empty or white space is not set, as Path is.
-    private static string? ReadText(
-        AttributeData attribute,
-        string property,
-        Func<string, bool> isValid,
-        LocationInfo attributeLocation,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
-    )
-    {
-        if (
-            GetNamedArgument(attribute, property) is not { Value: string written }
-            || string.IsNullOrWhiteSpace(written)
-        )
-        {
-            return null;
-        }
-
-        var value = written.Trim();
-        if (isValid(value))
-        {
-            return value;
-        }
-
-        diagnostics.Add(
-            DiagnosticInfo.Create(SqlDiagnostics.InvalidAttributeValue, attributeLocation, value, property)
-        );
-        return null;
-    }
-
-    // An enum argument arrives as its number.  A number that is no member of the generator's own form of the enum
-    // was written with a cast, and is reported.  An argument that is not a constant has no value here; the compiler
-    // reports it.
-    private static T? ReadChoice<T>(
-        AttributeData attribute,
-        string property,
-        LocationInfo attributeLocation,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
-    )
-        where T : struct, Enum
-    {
-        if (GetNamedArgument(attribute, property) is not { Value: int value })
-        {
-            return null;
-        }
-
-        if (Enum.IsDefined(typeof(T), value))
-        {
-            return (T)Enum.ToObject(typeof(T), value);
-        }
-
-        diagnostics.Add(
-            DiagnosticInfo.Create(
-                SqlDiagnostics.InvalidAttributeValue,
-                attributeLocation,
-                value.ToString(CultureInfo.InvariantCulture),
-                property
-            )
-        );
-        return null;
+        private static string? PropertyOf(SettingId setting) =>
+            setting switch
+            {
+                SettingId.Parameters => AttributeSource.ParametersProperty,
+                SettingId.Output => AttributeSource.OutputProperty,
+                // The attribute has no property for the database.
+                SettingId.Database => null,
+                SettingId.InputModelSuffix => AttributeSource.InputModelSuffixProperty,
+                SettingId.OutputModelSuffix => AttributeSource.OutputModelSuffixProperty,
+                SettingId.ModelNamespace => AttributeSource.ModelNamespaceProperty,
+                SettingId.InputModelType => AttributeSource.InputModelTypeProperty,
+                SettingId.OutputModelType => AttributeSource.OutputModelTypeProperty,
+                SettingId.CollectionType => AttributeSource.CollectionTypeProperty,
+                _ => null,
+            };
     }
 
     private static TypedConstant? GetNamedArgument(AttributeData attribute, string name)

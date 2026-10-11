@@ -14,11 +14,14 @@ namespace SqlSource.Generation.MSBuild;
 /// <param name="InvalidValue">The value as written when it is not valid, and null otherwise.</param>
 internal sealed record DialectSetting(SqlDialectChoice? Dialect, string? InvalidValue)
 {
+    /// <summary>The name MSBuild knows the setting by.</summary>
+    public const string Name = "SqlSourceDialect";
+
     /// <summary>
     /// Where the compiler puts the <c>SqlSourceDialect</c> property of the project.  It is there only because
     /// <c>build/SqlSource.props</c> lists the property as a <c>CompilerVisibleProperty</c>.
     /// </summary>
-    public const string PropertyName = "build_property.SqlSourceDialect";
+    public const string PropertyName = MSBuildSettings.PropertyPrefix + Name;
 
     /// <summary>
     /// Where the compiler puts the <c>SqlSourceDialect</c> metadata of one <c>AdditionalFiles</c> item.  It is there
@@ -26,7 +29,7 @@ internal sealed record DialectSetting(SqlDialectChoice? Dialect, string? Invalid
     /// <c>SqlSourceSettingsFile</c>, and <c>build/SqlSource.targets</c> puts the items that have any metadata the
     /// package reads there.
     /// </summary>
-    public const string MetadataName = "build_metadata.SqlSourceSettingsFile.SqlSourceDialect";
+    public const string MetadataName = MSBuildSettings.MetadataPrefix + Name;
 
     private static readonly DialectSetting NotSet = new(null, null);
 

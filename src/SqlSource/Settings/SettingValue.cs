@@ -32,6 +32,18 @@ internal static class SettingValue
     }
 
     /// <summary>
+    /// The name of a member of <typeparamref name="T" /> in lower case, as a message names a choice.
+    /// <see cref="TryReadChoice{T}" /> reads it back.
+    /// </summary>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="choice" /> is no member.</exception>
+    public static string NameOf<T>(T choice)
+        where T : struct, Enum
+    {
+        var index = Array.IndexOf(Choices<T>.Values, choice);
+        return index < 0 ? throw new ArgumentOutOfRangeException(nameof(choice)) : Choices<T>.LowerNames[index];
+    }
+
+    /// <summary>
     /// Whether <paramref name="value" /> names a database: one word of letters, digits, <c>-</c>, <c>_</c> and
     /// <c>.</c>.  The tool makes the name of an environment variable from it, so the rule is narrow on purpose.
     /// </summary>
@@ -121,6 +133,21 @@ internal static class SettingValue
     {
         public static readonly string[] Names = Enum.GetNames(typeof(T));
 
+        // From the enum and not from Names: S2743 wants a static field of a generic type to name its parameter.
+        public static readonly string[] LowerNames = Array.ConvertAll(Enum.GetNames(typeof(T)), Lower);
+
         public static readonly T[] Values = (T[])Enum.GetValues(typeof(T));
+
+        // Character by character: the build runs every analyzer rule, and CA1308 rejects string.ToLowerInvariant.
+        private static string Lower(string name)
+        {
+            var characters = name.ToCharArray();
+            for (var index = 0; index < characters.Length; index++)
+            {
+                characters[index] = char.ToLowerInvariant(characters[index]);
+            }
+
+            return new string(characters);
+        }
     }
 }

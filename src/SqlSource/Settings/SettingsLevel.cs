@@ -22,8 +22,8 @@ internal sealed record SettingsLevel
     public OutputKind? Output { get; init; }
 
     /// <summary>
-    /// The name of the database a query belongs to.  The generator carries it from a marker and never reads it; the
-    /// tool does.
+    /// The name of the database a query belongs to.  The generator carries it from a marker and never uses it; the
+    /// tool does.  The generator does not read the property or the metadata, so only the tool has those two levels.
     /// </summary>
     public string? Database { get; init; }
 
