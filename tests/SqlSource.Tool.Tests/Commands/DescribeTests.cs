@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Threading;
@@ -8,14 +9,16 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Commands;
 
 // The describe command from the command line to the exit code.  RunUnitTests holds every case of finding the unit.
-public class DescribeTests
+public sealed class DescribeTests : IDisposable
 {
+    private readonly CliRun _run = new();
+
+    public void Dispose() => _run.Dispose();
+
     [Fact]
     public async Task Run_HelpOfTheTool_ListsTheCommand()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("--help");
+        var result = await _run.RunAsync("--help");
 
         result.ExitCode.ShouldBe(0);
         result.Out.ShouldContain("describe");
@@ -24,9 +27,7 @@ public class DescribeTests
     [Fact]
     public async Task Run_Help_ShowsThePath()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("describe", "--help");
+        var result = await _run.RunAsync("describe", "--help");
 
         result.ExitCode.ShouldBe(0);
         result.Out.ShouldContain("sqlsource describe [<path>...]");
@@ -36,9 +37,7 @@ public class DescribeTests
     [Fact]
     public async Task Run_VersionBeforeACommand_PrintsTheVersionAndRunsNothing()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("--version", "describe");
+        var result = await _run.RunAsync("--version", "describe");
 
         result.ShouldBe(new CliResult(0, Cli.Version + "\n", ""));
     }
@@ -46,10 +45,9 @@ public class DescribeTests
     [Fact]
     public async Task Run_UnknownOptionWhereThePathCouldStand_IsNotTakenForAPath()
     {
-        using var run = new CliRun();
-        _ = run.Folder.WriteFile("-x/App.csproj");
+        _ = _run.Folder.WriteFile("-x/App.csproj");
 
-        var result = await run.RunAsync("describe", "-x");
+        var result = await _run.RunAsync("describe", "-x");
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '-x'\n"));
     }
@@ -57,10 +55,9 @@ public class DescribeTests
     [Fact]
     public async Task Run_PathThatStartsWithAHyphen_IsGivenWithAFolderBeforeIt()
     {
-        using var run = new CliRun();
-        _ = run.Folder.WriteFile("-x/App.csproj");
+        _ = _run.Folder.WriteFile("-x/App.csproj");
 
-        var result = await run.RunAsync("describe", "./-x");
+        var result = await _run.RunAsync("describe", "./-x");
 
         result.ShouldBe(new CliResult(0, "", ""));
     }
@@ -68,9 +65,7 @@ public class DescribeTests
     [Fact]
     public async Task Run_SecondPath_IsReportedByItsPositionAndNotItsText()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("describe", "App.csproj", Secrets.Word);
+        var result = await _run.RunAsync("describe", "App.csproj", Secrets.Word);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unexpected argument at position 3\n"));
     }
@@ -78,10 +73,9 @@ public class DescribeTests
     [Fact]
     public async Task Run_UnitFound_PrintsNothing()
     {
-        using var run = new CliRun();
-        _ = run.Folder.WriteFile("App.csproj");
+        _ = _run.Folder.WriteFile("App.csproj");
 
-        var result = await run.RunAsync("describe");
+        var result = await _run.RunAsync("describe");
 
         result.ShouldBe(new CliResult(0, "", ""));
     }
@@ -89,16 +83,14 @@ public class DescribeTests
     [Fact]
     public async Task Run_Help_ShowsTheProjectOption()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("describe", "--help");
+        var result = await _run.RunAsync("describe", "--help");
 
         result.ExitCode.ShouldBe(0);
         result.Out.ShouldContain("--project <path>");
         result.Out.ShouldContain("--check");
         result.Out.ShouldContain("--log <path>");
         result.Out.ShouldContain("--verbose");
-        run.Processes.Requests.ShouldBeEmpty();
+        _run.Processes.Requests.ShouldBeEmpty();
     }
 
     [Theory]
@@ -107,64 +99,60 @@ public class DescribeTests
     [InlineData("describe", "App.slnx", "--project", Secrets.Word, "--project")]
     public async Task Run_ProjectOptionWithoutAValue_NamesTheOptionAndRunsNothing(params string[] args)
     {
-        using var run = new CliRun();
-        _ = run.Folder.WriteFile("App.slnx", "<Solution />");
+        _ = _run.Folder.WriteFile("App.slnx", "<Solution />");
 
-        var result = await run.RunAsync(args);
+        var result = await _run.RunAsync(args);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: option '--project' needs a value\n"));
-        run.Processes.Requests.ShouldBeEmpty();
+        _run.Processes.Requests.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task Run_Solution_ReadsItsProjectsAndPrintsNothing()
     {
-        using var run = new CliRun();
-        _ = run.Folder.WriteFile("A/A.csproj");
-        _ = run.Folder.WriteFile("B/B.csproj");
-        _ = run.Folder.WriteFile(
+        _ = _run.Folder.WriteFile("A/A.csproj");
+        _ = _run.Folder.WriteFile("B/B.csproj");
+        _ = _run.Folder.WriteFile(
             "App.slnx",
             "<Solution><Project Path=\"A/A.csproj\" /><Project Path=\"B/B.csproj\" /></Solution>"
         );
 
-        var result = await run.RunAsync("describe");
+        var result = await _run.RunAsync("describe");
 
         result.ShouldBe(new CliResult(0, "", ""));
         // Two runs of MSBuild for each of the two projects.
-        run.Processes.Requests.Count.ShouldBe(4);
-        Directory.EnumerateFileSystemEntries(run.Folder.PathOf("tmp")).ShouldBeEmpty();
+        _run.Processes.Requests.Count.ShouldBe(4);
+        Directory.EnumerateFileSystemEntries(_run.Folder.PathOf("tmp")).ShouldBeEmpty();
     }
 
     [Fact]
     public async Task Run_ProjectOptionGivenTwice_RestrictsTheRunToBoth()
     {
-        using var run = new CliRun();
-        var a = run.Folder.WriteFile("A/A.csproj");
-        var c = run.Folder.WriteFile("C/C.csproj");
-        _ = run.Folder.WriteFile(
+        var a = _run.Folder.WriteFile("A/A.csproj");
+        var c = _run.Folder.WriteFile("C/C.csproj");
+        _ = _run.Folder.WriteFile(
             "App.slnx",
             "<Solution><Project Path=\"A/A.csproj\" /><Project Path=\"B/B.csproj\" />"
                 + "<Project Path=\"C/C.csproj\" /></Solution>"
         );
 
-        var result = await run.RunAsync("describe", "--project", "A/A.csproj", "App.slnx", "--project=" + c);
+        var result = await _run.RunAsync("describe", "--project", "A/A.csproj", "App.slnx", "--project=" + c);
 
         result.ShouldBe(new CliResult(0, "", ""));
-        run.Processes.Requests.Select(request => request.Arguments[1]).Distinct().ShouldBe([a, c], ignoreOrder: true);
+        _run.Processes.Requests.Select(request => request.Arguments[1]).Distinct().ShouldBe([a, c], ignoreOrder: true);
     }
 
     [Fact]
     public async Task Run_ProjectOptionOutsideTheSolution_IsSqlsrc207AndExitsWithOne()
     {
-        using var run = new CliRun();
-        var solution = run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"A/A.csproj\" /></Solution>");
+        var solution = _run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"A/A.csproj\" /></Solution>");
 
-        var result = await run.RunAsync("describe", "--project", "Other.csproj");
+        var result = await _run.RunAsync("describe", "--project", "Other.csproj");
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
         result.Error.ShouldBe(
-            $"sqlsource : error SQLSRC207: '{run.Folder.PathOf("Other.csproj")}' is not a project of '{solution}'\n"
+            $"sqlsource : error SQLSRC207: '{_run.Folder.PathOf("Other.csproj")}' is not a project of '{solution}'\n"
                 + Expected.See("SQLSRC207")
                 + DescribeScene.RunAgain
         );
@@ -173,12 +161,11 @@ public class DescribeTests
     [Fact]
     public async Task Run_ProjectThatDoesNotUseSqlSource_IsSqlsrc204AndExitsWithOne()
     {
-        using var run = new CliRun();
-        var project = run.Folder.WriteFile("App.csproj");
+        var project = _run.Folder.WriteFile("App.csproj");
         // Restored, and nothing of the package.
-        run.Processes.Default = new FakeProject { Imported = "", ProjectAssetsFile = project };
+        _run.Processes.Default = new FakeProject { Imported = "", ProjectAssetsFile = project };
 
-        var result = await run.RunAsync("describe");
+        var result = await _run.RunAsync("describe");
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
@@ -189,12 +176,11 @@ public class DescribeTests
     [Fact]
     public async Task Run_SolutionWhereNoProjectUsesSqlSource_SaysSoAndExitsWithZero()
     {
-        using var run = new CliRun();
-        _ = run.Folder.WriteFile("A/A.csproj");
-        var solution = run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"A/A.csproj\" /></Solution>");
-        run.Processes.Default = new FakeProject { Imported = "", ProjectAssetsFile = solution };
+        _ = _run.Folder.WriteFile("A/A.csproj");
+        var solution = _run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"A/A.csproj\" /></Solution>");
+        _run.Processes.Default = new FakeProject { Imported = "", ProjectAssetsFile = solution };
 
-        var result = await run.RunAsync("describe");
+        var result = await _run.RunAsync("describe");
 
         result.ShouldBe(new CliResult(0, $"sqlsource: no project of '{solution}' uses SqlSource\n", ""));
     }
@@ -202,22 +188,20 @@ public class DescribeTests
     [Fact]
     public async Task Run_SolutionWithNoProject_SaysThatNoProjectUsesSqlSource()
     {
-        using var run = new CliRun();
-        var solution = run.Folder.WriteFile("App.slnx", "<Solution />");
+        var solution = _run.Folder.WriteFile("App.slnx", "<Solution />");
 
-        var result = await run.RunAsync("describe");
+        var result = await _run.RunAsync("describe");
 
         result.ShouldBe(new CliResult(0, $"sqlsource: no project of '{solution}' uses SqlSource\n", ""));
-        run.Processes.Requests.ShouldBeEmpty();
+        _run.Processes.Requests.ShouldBeEmpty();
     }
 
     [Fact]
     public async Task Run_SolutionThatCannotBeRead_IsSqlsrc223AndSaysNothingElse()
     {
-        using var run = new CliRun();
-        var solution = run.Folder.WriteFile("App.sln", "this is not a solution\n");
+        var solution = _run.Folder.WriteFile("App.sln", "this is not a solution\n");
 
-        var result = await run.RunAsync("describe");
+        var result = await _run.RunAsync("describe");
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
@@ -227,32 +211,29 @@ public class DescribeTests
     [Fact]
     public async Task Run_CancelledWhileMSBuildRuns_ExitsWithOneAndPrintsNothing()
     {
-        using var run = new CliRun();
-        _ = run.Folder.WriteFile("App.csproj");
+        _ = _run.Folder.WriteFile("App.csproj");
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        run.Processes.BeforeAnswer = async (_, token) =>
+        _run.Processes.BeforeAnswer = async (_, token) =>
         {
             await cancel.CancelAsync();
             await Task.Delay(Timeout.Infinite, token);
         };
 
-        var result = await run.RunAsync(cancel.Token, "describe");
+        var result = await _run.RunAsync(cancel.Token, "describe");
 
         result.ShouldBe(new CliResult(1, "", ""));
-        Directory.EnumerateFileSystemEntries(run.Folder.PathOf("tmp")).ShouldBeEmpty();
+        Directory.EnumerateFileSystemEntries(_run.Folder.PathOf("tmp")).ShouldBeEmpty();
     }
 
     [Fact]
     public async Task Run_NoUnit_ReportsItAndExitsWithOne()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("describe");
+        var result = await _run.RunAsync("describe");
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
         result.Error.ShouldBe(
-            $"sqlsource : error SQLSRC201: '{run.Folder.Path}' holds no .sln, .slnx or .csproj file\n"
+            $"sqlsource : error SQLSRC201: '{_run.Folder.Path}' holds no .sln, .slnx or .csproj file\n"
                 + Expected.See("SQLSRC201")
                 + DescribeScene.RunAgain
         );
@@ -261,31 +242,25 @@ public class DescribeTests
     [Fact]
     public async Task Run_ResponseFileWhereThePathStands_IsAPathLikeAnyOther()
     {
-        using var run = new CliRun();
-        var path = run.Folder.WriteFile("@args.rsp", "--help");
-        _ = run.Folder.WriteFile("args.rsp", "--help");
+        var path = _run.Folder.WriteFile("@args.rsp", "--help");
+        _ = _run.Folder.WriteFile("args.rsp", "--help");
 
         // System.CommandLine would read the file and run what it holds.
-        var result = await run.RunAsync("describe", "@args.rsp");
+        var result = await _run.RunAsync("describe", "@args.rsp");
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
         result.Error.ShouldStartWith($"sqlsource : error SQLSRC203: '{path}' is not a .sln, .slnx or .csproj file");
     }
 
-    private const string Queries = "[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n";
-
     // The released tool has no describer, so a query that must be described is SQLSRC216.
     [Fact]
     public async Task Run_ProjectWithAQueryToDescribe_IsSqlsrc216AndASummaryLine()
     {
-        using var run = new CliRun();
-        var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
-        project.Properties["SqlSourceDialect"] = "postgres";
-        _ = project.AddSource("Queries.cs", Queries);
+        var project = Plans.Postgres(_run.Folder).AnsweredBy(_run.Processes);
         var sql = project.AddSql("One.sql", "-- name: One\nSELECT 1;\n");
 
-        var result = await run.RunAsync("describe", project.ProjectPath);
+        var result = await _run.RunAsync("describe", project.ProjectPath);
 
         result.ShouldBe(
             new CliResult(
@@ -301,14 +276,11 @@ public class DescribeTests
     [Fact]
     public async Task Run_ProjectWhoseQueriesNeedNoEntry_PrintsNothing()
     {
-        using var run = new CliRun();
-        var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
-        project.Properties["SqlSourceDialect"] = "postgres";
+        var project = Plans.Postgres(_run.Folder).AnsweredBy(_run.Processes);
         project.Properties["SqlSourceOutput"] = "sql";
-        _ = project.AddSource("Queries.cs", Queries);
         _ = project.AddSql("One.sql", "-- name: One\nSELECT 1;\n");
 
-        var result = await run.RunAsync("describe", project.ProjectPath);
+        var result = await _run.RunAsync("describe", project.ProjectPath);
 
         result.ShouldBe(new CliResult(0, "", ""));
     }
@@ -316,13 +288,10 @@ public class DescribeTests
     [Fact]
     public async Task Run_ProjectWithAFileThatDoesNotParse_ReportsItAsABuildWouldAndExitsOne()
     {
-        using var run = new CliRun();
-        var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
-        project.Properties["SqlSourceDialect"] = "postgres";
-        _ = project.AddSource("Queries.cs", Queries);
+        var project = Plans.Postgres(_run.Folder).AnsweredBy(_run.Processes);
         var sql = project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
 
-        var result = await run.RunAsync("describe", project.ProjectPath);
+        var result = await _run.RunAsync("describe", project.ProjectPath);
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
@@ -333,13 +302,10 @@ public class DescribeTests
     [Fact]
     public async Task Plan_Project_GivesThePlanOfTheCommandLine()
     {
-        using var run = new CliRun();
-        var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
-        project.Properties["SqlSourceDialect"] = "postgres";
-        _ = project.AddSource("Queries.cs", Queries);
+        var project = Plans.Postgres(_run.Folder).AnsweredBy(_run.Processes);
         var sql = project.AddSql("One.sql", "SELECT 1;");
 
-        var (plan, result) = await run.PlanAsync("describe", project.ProjectPath);
+        var (plan, result) = await _run.PlanAsync("describe", project.ProjectPath);
 
         result.ShouldBe(new CliResult(0, "", ""));
         plan.ShouldNotBeNull().Files.ShouldHaveSingleItem().Path.ShouldBe(sql);
