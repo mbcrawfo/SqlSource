@@ -19,12 +19,6 @@ internal sealed class RunTrace(IRunLog log, TextWriter? verbose = null, string? 
     public IRunLog Log => log;
 
     /// <summary>
-    /// The counts of each database, as <c>run.end</c> holds them.  <c>describe</c> sets it when it has them, and
-    /// <c>Cli</c>, which knows the exit code, writes the event.
-    /// </summary>
-    public LogValue Databases { get; set; } = LogValue.ListOf([]);
-
-    /// <summary>
     /// Says one line under <c>--verbose</c>, and nothing without it.  The text is kept on one line: it holds
     /// paths and names that the tool did not write.
     /// </summary>

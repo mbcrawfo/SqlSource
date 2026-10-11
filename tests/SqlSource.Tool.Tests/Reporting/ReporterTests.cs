@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Diagnostics;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
 using Xunit;
 
@@ -28,6 +29,18 @@ public sealed class ReporterTests : IDisposable
     private readonly StringWriter _error = new(CultureInfo.InvariantCulture) { NewLine = "\n" };
 
     public void Dispose() => _error.Dispose();
+
+    [Fact]
+    public void Report_ReporterMadeWithATrace_WritesTheErrorAsAnEventOfItsLog()
+    {
+        var log = new RecordingLog();
+        var reporter = new Reporter(_error, new RunTrace(log));
+
+        reporter.Report(Failure);
+
+        log.Events.ShouldHaveSingleItem().Name.ShouldBe("diagnostic");
+        reporter.Trace.Log.ShouldBeSameAs(log);
+    }
 
     [Fact]
     public void Report_ErrorAboutNoFile_StartsWithTheNameOfTheTool()

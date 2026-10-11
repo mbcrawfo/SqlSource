@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -17,11 +18,24 @@ namespace SqlSource.Tool.Describing;
 /// </remarks>
 internal static class DescribeRun
 {
+    /// <summary>
+    /// Runs the steps in order, reports their errors and writes the summary.
+    /// </summary>
+    /// <param name="plan">The plan of the run.</param>
+    /// <param name="options">What the command line says of the run, beside its plan.</param>
+    /// <param name="host">The describers, the environment and standard output.</param>
+    /// <param name="reporter">Where the errors go, with the run's trace.</param>
+    /// <param name="counted">
+    /// Given the counts of each selected database, as <c>run.end</c> holds them, before the summary is written: a
+    /// summary that cannot be written does not lose them.
+    /// </param>
+    /// <param name="cancellationToken">Ends the run.</param>
     public static async Task RunAsync(
         RunPlan plan,
         DescribeOptions options,
         ToolHost host,
         Reporter reporter,
+        Action<LogValue> counted,
         CancellationToken cancellationToken
     )
     {
@@ -82,7 +96,7 @@ internal static class DescribeRun
             SidecarStore.Apply(outcomes, reporter, cancellationToken);
         }
 
-        trace.Databases = RunSummary.Counts(selected, files, options.Mode);
+        counted(RunSummary.Counts(selected, files, options.Mode));
 
         // 5.  The summary.  The exit code is Cli.ExitCodeOf's, from the reporter's counts.
         var lines = RunSummary.Lines(

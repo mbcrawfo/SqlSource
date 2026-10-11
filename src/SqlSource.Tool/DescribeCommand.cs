@@ -42,7 +42,7 @@ internal static class DescribeCommand
     /// <summary>The environment variable that gives the log's path when <c>--log</c> does not.</summary>
     internal const string LogVariable = "SQLSOURCE_LOG";
 
-    public static Command Create(ToolHost host, Reporter reporter)
+    public static Command Create()
     {
         // Several, so that System.CommandLine takes a .sql path beside the unit.  CheckUsage holds them to one unit.
         var path = new Argument<string[]>(PathArgument)
@@ -113,7 +113,7 @@ internal static class DescribeCommand
             Arity = ArgumentArity.ExactlyOne,
         };
 
-        var describe = new Command(Name, "Asks the databases of the projects to describe their queries")
+        return new Command(Name, "Asks the databases of the projects to describe their queries")
         {
             path,
             project,
@@ -124,20 +124,29 @@ internal static class DescribeCommand
             verbose,
             log,
         };
-        describe.SetAction(
-            async (parsed, cancellationToken) =>
+    }
+
+    /// <summary>
+    /// Gives the <c>describe</c> that a command line runs its action, once the run has its reporter.
+    /// System.CommandLine takes a command's action when it invokes, not when it parses.
+    /// </summary>
+    /// <param name="parsed">A command line for which <see cref="Runs" /> is true.</param>
+    /// <param name="host">What the run takes from outside.</param>
+    /// <param name="reporter">Where the errors go, with the run's trace.</param>
+    /// <param name="counted">Given the counts of each selected database, as <c>run.end</c> holds them.</param>
+    public static void Bind(ParseResult parsed, ToolHost host, Reporter reporter, Action<LogValue> counted) =>
+        parsed.CommandResult.Command.SetAction(
+            async (command, cancellationToken) =>
             {
                 // An error is in the reporter, where the exit code is taken.
-                if (await PlanAsync(parsed, host, reporter, cancellationToken) is { } plan)
+                if (await PlanAsync(command, host, reporter, cancellationToken) is { } plan)
                 {
-                    await DescribeRun.RunAsync(plan, OptionsOf(parsed), host, reporter, cancellationToken);
+                    await DescribeRun.RunAsync(plan, OptionsOf(command), host, reporter, counted, cancellationToken);
                 }
 
                 return 0;
             }
         );
-        return describe;
-    }
 
     /// <summary>
     /// What is wrong with a command line of <c>describe</c> by the command's own rules, each a whole line to write.
@@ -215,7 +224,8 @@ internal static class DescribeCommand
 
     /// <summary>
     /// Whether the command line runs <c>describe</c>: the command is named, and it is its own action that runs
-    /// and not the help's.
+    /// and not the help's.  Until <see cref="Bind" /> gives the command its action it has none, and neither has a
+    /// command line that runs it, so the answer is the same before and after.
     /// </summary>
     public static bool Runs(ParseResult parsed) =>
         parsed.CommandResult.Command.Name == Name

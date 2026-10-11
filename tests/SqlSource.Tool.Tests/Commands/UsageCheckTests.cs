@@ -1,9 +1,7 @@
 using System.Collections.Generic;
 using System.CommandLine;
-using System.IO;
 using System.Linq;
 using Shouldly;
-using SqlSource.Tool.Reporting;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -311,11 +309,7 @@ public class UsageCheckTests
             "Q.sql",
             "R.SQL",
         ];
-        using var folder = new TempFolder();
-        var root = Cli.BuildCommands(
-            Hosts.Create(folder.Path, new FakeProcessRunner(), folder.Path),
-            new Reporter(TextWriter.Null)
-        );
+        var root = Cli.BuildCommands();
         var disagreements = new List<string>();
 
         foreach (var args in Sequences(vocabulary, 4))
@@ -380,6 +374,5 @@ public class UsageCheckTests
                 .SequenceEqual(parsed.GetValue<string[]>(name) ?? [])
         );
 
-    private static Command ToolRoot() =>
-        Cli.BuildCommands(Hosts.Create("/work", new FakeProcessRunner(), "/tmp"), new Reporter(TextWriter.Null));
+    private static Command ToolRoot() => Cli.BuildCommands();
 }

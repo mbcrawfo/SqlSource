@@ -57,7 +57,7 @@ internal sealed class CliRun : IDisposable
         using var error = NewWriter();
         var host = CreateHost(output, error);
         var reporter = new Reporter(host.Error);
-        var parsed = Cli.BuildCommands(host, reporter).Parse(args, Cli.Parser);
+        var parsed = Cli.BuildCommands().Parse(args, Cli.Parser);
 
         var plan = await DescribeCommand.PlanAsync(parsed, host, reporter, TestContext.Current.CancellationToken);
 
