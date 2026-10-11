@@ -646,6 +646,19 @@ public class SidecarReaderTests
         ShouldBeMalformed(text, SidecarErrorKind.ColumnsWithoutRows, "'columns'", 9, null);
     }
 
+    // The first mistake found is the one reported: a key that is missing, before columns that have no rows.
+    [Fact]
+    public void Read_EntryWithoutAHashAndWithColumnsWithoutRows_IsMissingKeyOfTheHash()
+    {
+        var text = Q(
+            Valid
+                .Replace("'hash': 'h', ", string.Empty, StringComparison.Ordinal)
+                .Replace("'resultKind': 'rows'", "'resultKind': 'none'", StringComparison.Ordinal)
+        );
+
+        ShouldBeMalformed(text, SidecarErrorKind.MissingKey, "{'engine'", 1, "hash");
+    }
+
     [Theory]
     [InlineData("maybe")]
     [InlineData("Rows")]
