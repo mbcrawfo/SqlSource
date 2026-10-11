@@ -29,12 +29,11 @@ public sealed class SecretTests : IDisposable
     // databases, SQLSRC216 for "mssql", SQLSRC218 for a sidecar that cannot be written, and SQLSRC221.
     private void AddEveryError()
     {
-        _scene.Describer.Failures["Bad"] = new DescribeFailure(
-            FakeDescriber.Rejected,
-            new EquatableArray<string>(["Bad"]),
+        _scene.Describer.Failures["Bad"] = FakeDescriber.Failure(
+            "Bad",
             DescribeStep.Explain,
-            new EquatableArray<string>(["could not explain"]),
-            "check the SQL"
+            "check the SQL",
+            "could not explain"
         );
         _ = _scene.Project.AddSql("Reports.sql", "-- name: Report\n-- database: reports\nSELECT 3;\n");
         _ = _scene.Project.AddSql(
@@ -264,18 +263,12 @@ public sealed class SecretTests : IDisposable
         }
 
         _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
-        _scene.Describer.Server = new ServerInfo(
-            $"16.4 ({Secrets.ConnectionWithMarker})",
-            "FakeDriver",
-            null,
-            EquatableArray<ServerSetting>.Empty
-        );
-        _scene.Describer.Failures["Bad"] = new DescribeFailure(
-            FakeDescriber.Rejected,
-            new EquatableArray<string>([$"Bad at {Secrets.ConnectionWithMarker}"]),
+        _scene.Describer.Server = FakeDescriber.ServerWith($"16.4 ({Secrets.ConnectionWithMarker})");
+        _scene.Describer.Failures["Bad"] = FakeDescriber.Failure(
+            $"Bad at {Secrets.ConnectionWithMarker}",
             DescribeStep.DescribeColumns,
-            new EquatableArray<string>([$"connection to {Secrets.ConnectionWithMarker} was lost"]),
-            $"check {Secrets.ConnectionWithMarker}"
+            $"check {Secrets.ConnectionWithMarker}",
+            $"connection to {Secrets.ConnectionWithMarker} was lost"
         );
         // A query that is described would put the server's version, which holds the value, into its entry, and that
         // ends the run.
@@ -307,12 +300,7 @@ public sealed class SecretTests : IDisposable
         }
 
         _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
-        _scene.Describer.Server = new ServerInfo(
-            $"16.4 ({Secrets.ConnectionWithMarker})",
-            "FakeDriver",
-            null,
-            EquatableArray<ServerSetting>.Empty
-        );
+        _scene.Describer.Server = FakeDescriber.ServerWith($"16.4 ({Secrets.ConnectionWithMarker})");
 
         var result = await _scene.DescribeAsync();
 

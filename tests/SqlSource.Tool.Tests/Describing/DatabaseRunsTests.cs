@@ -212,12 +212,11 @@ public sealed class DatabaseRunsTests : IDisposable
     public async Task Run_SessionThatCannotBeOpened_IsReportedOnceAndTheDatabasesQueriesFail()
     {
         _ = _project.AddSql("More.sql", "-- name: More\nSELECT 3;\n");
-        _describer.OpenFailure = new DescribeFailure(
-            FakeDescriber.Rejected,
-            new EquatableArray<string>(["(open)"]),
-            Step: null,
-            new EquatableArray<string>(["28P01: password authentication failed"]),
-            Help: null
+        _describer.OpenFailure = FakeDescriber.Failure(
+            "(open)",
+            step: null,
+            help: null,
+            "28P01: password authentication failed"
         );
 
         var files = await RunAsync(given: ["postgres=" + Secrets.ConnectionWithWord]);
@@ -240,12 +239,11 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public async Task Run_SessionThatCannotBeOpenedAndHoldsTheConnection_IsPrintedWithoutIt()
     {
-        _describer.OpenFailure = new DescribeFailure(
-            FakeDescriber.Rejected,
-            new EquatableArray<string>([$"open on {Secrets.ConnectionWithWord}"]),
-            Step: null,
-            new EquatableArray<string>([$"invalid connection string: {Secrets.ConnectionWithWord}"]),
-            $"check {Secrets.ConnectionWithWord}"
+        _describer.OpenFailure = FakeDescriber.Failure(
+            $"open on {Secrets.ConnectionWithWord}",
+            step: null,
+            $"check {Secrets.ConnectionWithWord}",
+            $"invalid connection string: {Secrets.ConnectionWithWord}"
         );
 
         _ = await RunAsync(given: ["postgres=" + Secrets.ConnectionWithWord]);
@@ -306,12 +304,11 @@ public sealed class DatabaseRunsTests : IDisposable
             Secrets.ConnectionWithWord,
             EquatableArray<ServerSetting>.Empty
         );
-        _describer.Failures["GetUser"] = new DescribeFailure(
-            FakeDescriber.Rejected,
-            new EquatableArray<string>([$"GetUser on {Secrets.ConnectionWithWord}"]),
+        _describer.Failures["GetUser"] = FakeDescriber.Failure(
+            $"GetUser on {Secrets.ConnectionWithWord}",
             DescribeStep.Catalog,
-            new EquatableArray<string>([$"could not connect to {Secrets.ConnectionWithWord}"]),
-            $"check {Secrets.ConnectionWithWord}"
+            $"check {Secrets.ConnectionWithWord}",
+            $"could not connect to {Secrets.ConnectionWithWord}"
         );
         // A query that is described would put the server's version, which holds the value, into its entry, and that
         // ends the run.
@@ -504,12 +501,7 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public async Task Run_DescriptionWithTheValueInTheServersVersion_IsAFault()
     {
-        _describer.Server = new ServerInfo(
-            $"16.4 at {Secrets.ConnectionWithWord}",
-            "FakeDriver",
-            null,
-            EquatableArray<ServerSetting>.Empty
-        );
+        _describer.Server = FakeDescriber.ServerWith($"16.4 at {Secrets.ConnectionWithWord}");
 
         _ = await RunExpectingTheValueInTheDescriptionAsync(Secrets.ConnectionWithWord);
     }
@@ -542,7 +534,7 @@ public sealed class DatabaseRunsTests : IDisposable
     public async Task Run_DescriptionWithAValueOfAQuoteAndABackslashInTheServersVersion_IsAFault()
     {
         const string Awkward = "Pwd=\"s3cret\\\"\r\n";
-        _describer.Server = new ServerInfo($"16.4 {Awkward}", "FakeDriver", null, EquatableArray<ServerSetting>.Empty);
+        _describer.Server = FakeDescriber.ServerWith($"16.4 {Awkward}");
 
         _ = await RunExpectingTheValueInTheDescriptionAsync(Awkward);
     }
@@ -550,7 +542,7 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public async Task Run_DescriptionWithoutTheValue_IsDescribedAsBefore()
     {
-        _describer.Server = new ServerInfo("16.4", "FakeDriver", null, EquatableArray<ServerSetting>.Empty);
+        _describer.Server = FakeDescriber.ServerWith();
         _describer.Descriptions["GetUser"] = FakeDescriber.NoRows with
         {
             ResultKind = SidecarResultKind.Rows,

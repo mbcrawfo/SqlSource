@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
-using SqlSource.Tool.Describing.Describers;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -11,15 +10,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // "--check" compares within what "describe" with the same filters would change, and counts what it found.
 public sealed class CheckFilterTests : IDisposable
 {
-    private static readonly QueryDescription Rows = new(
-        SidecarResultKind.Rows,
-        EquatableArray<DescribedParameter>.Empty,
-        EquatableArray<SidecarColumn>.Empty,
-        null,
-        "not-needed",
-        "no-origin"
-    );
-
     private readonly DescribeScene _scene = new();
     private readonly string _plain;
     private readonly string _users;
@@ -44,7 +34,7 @@ public sealed class CheckFilterTests : IDisposable
     public async Task Check_NoFilter_CountsEachQueryAsSameDifferOrFailed()
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
-        _scene.Describer.Descriptions["GetInvoice"] = Rows;
+        _scene.Describer.Descriptions["GetInvoice"] = FakeDescriber.Rows;
         _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
 
         var result = await DescribeAsync("--check");
@@ -71,7 +61,7 @@ public sealed class CheckFilterTests : IDisposable
     public async Task Check_DatabaseWithADifferenceInTheOthersEntry_ExitsZero()
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
-        _scene.Describer.Descriptions["GetUser"] = Rows;
+        _scene.Describer.Descriptions["GetUser"] = FakeDescriber.Rows;
 
         var result = await DescribeAsync("--check", "--database", "billing");
 
@@ -82,7 +72,7 @@ public sealed class CheckFilterTests : IDisposable
     public async Task Check_FileFilterWithADifferenceInAnotherFile_ExitsZero()
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
-        _scene.Describer.Descriptions["GetUser"] = Rows;
+        _scene.Describer.Descriptions["GetUser"] = FakeDescriber.Rows;
 
         var result = await DescribeAsync("--check", "Invoices.sql");
 

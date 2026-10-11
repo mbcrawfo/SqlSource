@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
-using SqlSource.Tool.Describing.Describers;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -103,16 +102,6 @@ public sealed class CheckTests : IDisposable
     private const string Help = "    help: run 'dotnet sqlsource describe' and commit the sidecars\n";
     private const string ForceHelp = "    help: run 'dotnet sqlsource describe --force' and commit the sidecars\n";
     private const string UpdateHelp = "    help: update the SqlSource.Tool package\n";
-
-    // A statement that produces rows, where the describer of the tests says none unless told.
-    private static readonly QueryDescription Rows = new(
-        SidecarResultKind.Rows,
-        EquatableArray<DescribedParameter>.Empty,
-        EquatableArray<SidecarColumn>.Empty,
-        null,
-        "not-needed",
-        "no-origin"
-    );
 
     // One SQLSRC219 as the reporter writes it.  The origin is a path with a position, or a path and a space.
     private static string Difference(string origin, string subject, string what, string help = Help) =>
@@ -234,7 +223,7 @@ public sealed class CheckTests : IDisposable
     public async Task Check_DatabaseDescribesTheQueryAnotherWay_NamesThePathAndTheTwoValues()
     {
         var before = await DescribeFirstAsync();
-        _scene.Describer.Descriptions["ListUsers"] = Rows;
+        _scene.Describer.Descriptions["ListUsers"] = FakeDescriber.Rows;
 
         var result = await _scene.DescribeAsync("--check");
 
@@ -394,7 +383,7 @@ public sealed class CheckTests : IDisposable
     {
         _ = await DescribeFirstAsync();
         _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
-        _scene.Describer.Descriptions["ListUsers"] = Rows;
+        _scene.Describer.Descriptions["ListUsers"] = FakeDescriber.Rows;
 
         var result = await _scene.DescribeAsync("--check");
 

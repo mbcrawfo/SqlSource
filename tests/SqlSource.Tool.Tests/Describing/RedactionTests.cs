@@ -152,12 +152,11 @@ public sealed class RedactionTests : IDisposable
     {
         // After "Users.sql", so that GetUser fails before Throws ends the run.
         _ = _scene.Project.AddSql("Zebra.sql", "-- name: Throws\nSELECT 2;\n");
-        _scene.Describer.Failures["GetUser"] = new DescribeFailure(
-            FakeDescriber.Rejected,
-            new EquatableArray<string>([Secrets.ConnectionWithMarker]),
+        _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure(
+            Secrets.ConnectionWithMarker,
             DescribeStep.Explain,
-            new EquatableArray<string>(["server said " + Secrets.ConnectionWithMarker]),
-            "try " + Secrets.ConnectionWithMarker
+            "try " + Secrets.ConnectionWithMarker,
+            "server said " + Secrets.ConnectionWithMarker
         );
         _scene.Describer.Exceptions["Throws"] = new InvalidOperationException("bad " + Secrets.ConnectionWithMarker);
         _scene.Run.Environment["SQLSOURCE_DEBUG"] = "1";
