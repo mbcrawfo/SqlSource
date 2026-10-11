@@ -265,7 +265,7 @@ internal static class RunPlanner
                     ToolDiagnostic.At(
                         ToolDiagnostics.OutputNeedsDescribableDialect,
                         query.NameLocation,
-                        NameOf(output),
+                        SettingValue.NameOf(output),
                         SqlDialectName.Canonical(parsed.Dialect)
                     )
                 );
@@ -282,7 +282,7 @@ internal static class RunPlanner
                 problems |= QueryProblems.TokenWithoutDefault;
                 errors.Add(
                     ToolDiagnostic
-                        .At(ToolDiagnostics.TokenHasNoDefault, query.NameLocation, token, NameOf(output))
+                        .At(ToolDiagnostics.TokenHasNoDefault, query.NameLocation, token, SettingValue.NameOf(output))
                         .WithLines(HelpForToken(token))
                 );
             }
@@ -316,9 +316,6 @@ internal static class RunPlanner
                 claimant.Types.Select(type => new FileClaim(claimant.ProjectPath, type.SourcePath, type.Position))
             ),
         ]);
-
-    // An output as a marker spells it.  Only the two that need an entry are named in a message.
-    private static string NameOf(OutputKind output) => output == OutputKind.CodeGen ? "codegen" : "models";
 
     private static ContinuationLine HelpForToken(string name) =>
         new(

@@ -177,13 +177,10 @@ internal static class AttributeReader
             return false;
         }
 
-        output = access.Name.Identifier.ValueText switch
-        {
-            nameof(OutputKind.Sql) => OutputKind.Sql,
-            nameof(OutputKind.Models) => OutputKind.Models,
-            nameof(OutputKind.CodeGen) => OutputKind.CodeGen,
-            _ => null,
-        };
+        // An identifier is never a number or a list, the two other things Enum.TryParse reads.
+        output = Enum.TryParse<OutputKind>(access.Name.Identifier.ValueText, ignoreCase: false, out var member)
+            ? member
+            : null;
         return true;
     }
 

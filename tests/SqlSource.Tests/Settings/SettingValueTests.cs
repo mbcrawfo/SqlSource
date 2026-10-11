@@ -121,4 +121,22 @@ public class SettingValueTests
     [InlineData("UserRow<T>", false)]
     public void IsTypeName_AnIdentifierOrAFullName_IsATypeName(string value, bool expected) =>
         SettingValue.IsTypeName(value.AsSpan()).ShouldBe(expected);
+
+    [Theory]
+    // An internal enum cannot be the parameter of a public test method, so a row gives the member's name.
+    [InlineData("Sql", "sql")]
+    [InlineData("Models", "models")]
+    [InlineData("CodeGen", "codegen")]
+    public void NameOf_Member_IsItsNameInLowerCaseWhichTryReadChoiceReads(string member, string expected)
+    {
+        var output = Enum.Parse<OutputKind>(member);
+
+        SettingValue.NameOf(output).ShouldBe(expected);
+        SettingValue.TryReadChoice<OutputKind>(expected.AsSpan(), out var read).ShouldBeTrue();
+        read.ShouldBe(output);
+    }
+
+    [Fact]
+    public void NameOf_NumberThatIsNoMember_Throws() =>
+        Should.Throw<ArgumentOutOfRangeException>(() => SettingValue.NameOf((OutputKind)99));
 }
