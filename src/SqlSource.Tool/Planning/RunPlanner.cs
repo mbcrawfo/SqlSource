@@ -178,8 +178,7 @@ internal static class RunPlanner
     private static bool IsRead(InvalidSetting setting) =>
         setting.Name is MSBuildSettings.OutputName or MSBuildSettings.DatabaseName;
 
-    // Parses a claimed file once, with the dialect of the project it is planned under, and gives each query its
-    // values.  Comments are never wanted: the hash comes from the SQL without them.
+    // Plans a claimed file once, under the first project that claims it.  A file with a parse error has no query.
     private static PlannedFile PlanFile(
         FileWork work,
         ImmutableArray<ToolDiagnostic>.Builder errors,
@@ -189,14 +188,34 @@ internal static class RunPlanner
         // A run that was cancelled reads no further file, and reports nothing of what it read.
         cancellationToken.ThrowIfCancellationRequested();
 
-        var owner = work.Owner;
+        var parsed = Parse(work.Owner, cancellationToken);
+        if (parsed.Errors.Count > 0)
+        {
+            errors.AddRange(parsed.Errors.Select(ToolDiagnostic.From));
+            return FileOf(work, parsed.Dialect, PlannedFileState.HasParseErrors, EquatableArray<PlannedQuery>.Empty);
+        }
+
+        var state = PlannedFileState.Ready;
+        var queries = ImmutableArray.CreateBuilder<PlannedQuery>(parsed.Queries.Count);
+        foreach (var query in parsed.Queries)
+        {
+            queries.Add(PlanQuery(query, work, parsed.Dialect, ref state, errors));
+        }
+
+        return FileOf(work, parsed.Dialect, state, new EquatableArray<PlannedQuery>(queries.MoveToImmutable()));
+    }
+
+    // Parses a claimed file with the dialect of the project it is planned under.  Comments are never wanted: the
+    // hash comes from the SQL without them.
+    private static ParsedSqlFile Parse(ClaimedFile owner, CancellationToken cancellationToken)
+    {
         var input = FileParseInput.Resolve(
             owner.Metadata,
             owner.ProjectDialect,
             projectKeepsComments: false,
             EquatableArray<string>.Empty
         );
-        var parsed = SqlFileReader.Read(
+        return SqlFileReader.Read(
             owner.Metadata.File,
             owner.NormalizedPath,
             input.Dialect,
@@ -204,88 +223,83 @@ internal static class RunPlanner
             commentsWanted: false,
             cancellationToken
         );
+    }
 
-        if (parsed.Errors.Count > 0)
+    // One query with its values, and its errors.  The first query of a file that needs an entry under a dialect
+    // that cannot be described changes the state of the file.
+    private static PlannedQuery PlanQuery(
+        SqlQuery query,
+        FileWork work,
+        SqlDialect dialect,
+        ref PlannedFileState state,
+        ImmutableArray<ToolDiagnostic>.Builder errors
+    )
+    {
+        var output = GreatestOutput(query, work);
+        if (output == OutputKind.Sql)
         {
-            errors.AddRange(parsed.Errors.Select(ToolDiagnostic.From));
-            return new PlannedFile(
-                owner.Metadata.File.Path,
-                owner.NormalizedPath,
-                owner.ProjectPath,
-                parsed.Dialect,
-                PlannedFileState.HasParseErrors,
-                EquatableArray<PlannedQuery>.Empty,
-                ClaimsOf(work)
-            );
+            // It needs no entry, and so belongs to no database and has no hash.
+            return new PlannedQuery(query, NeedsEntry: false, Database: null, Hash: null);
         }
 
-        var state = PlannedFileState.Ready;
-        var queries = ImmutableArray.CreateBuilder<PlannedQuery>(parsed.Queries.Count);
-        foreach (var query in parsed.Queries)
+        // Once for the file, at its first query that needs an entry: one setting mends it.  The parser keeps no
+        // position for the marker that set the output.
+        if (state == PlannedFileState.Ready && !SqlDescribableDialects.Contains(dialect))
         {
-            var output = GreatestOutput(query, work);
-            if (output == OutputKind.Sql)
-            {
-                // It needs no entry, and so belongs to no database and has no hash.
-                queries.Add(new PlannedQuery(query, NeedsEntry: false, Database: null, Hash: null));
-                continue;
-            }
-
-            // Once for the file, at its first query that needs an entry: one setting mends it.  The parser keeps no
-            // position for the marker that set the output.
-            if (state == PlannedFileState.Ready && !SqlDescribableDialects.Contains(parsed.Dialect))
-            {
-                state = PlannedFileState.NotDescribable;
-                errors.Add(
-                    ToolDiagnostic.At(
-                        ToolDiagnostics.OutputNeedsDescribableDialect,
-                        query.NameLocation,
-                        SettingValue.NameOf(output),
-                        SqlDialectName.Canonical(parsed.Dialect)
-                    )
-                );
-            }
-
-            var problems = QueryProblems.None;
-            // An empty default is one: the query is described with nothing in the token's place.
-            foreach (
-                var token in query
-                    .Tokens.Where(static token => token.Default is null)
-                    .Select(static token => token.Name)
-            )
-            {
-                problems |= QueryProblems.TokenWithoutDefault;
-                errors.Add(
-                    ToolDiagnostic
-                        .At(ToolDiagnostics.TokenHasNoDefault, query.NameLocation, token, SettingValue.NameOf(output))
-                        .WithLines(HelpForToken(token))
-                );
-            }
-
-            queries.Add(
-                new PlannedQuery(
-                    query,
-                    NeedsEntry: true,
-                    query.Markers.Database
-                        ?? owner.Metadata.Settings?.Level.Database
-                        ?? owner.Property.Database
-                        ?? SqlDialectName.Canonical(parsed.Dialect),
-                    SqlQueryHash.Compute(parsed.Dialect, query.Segments, query.Tokens, query.Parameters),
-                    problems
+            state = PlannedFileState.NotDescribable;
+            errors.Add(
+                ToolDiagnostic.At(
+                    ToolDiagnostics.OutputNeedsDescribableDialect,
+                    query.NameLocation,
+                    SettingValue.NameOf(output),
+                    SqlDialectName.Canonical(dialect)
                 )
             );
         }
 
-        return new PlannedFile(
-            owner.Metadata.File.Path,
-            owner.NormalizedPath,
-            owner.ProjectPath,
-            parsed.Dialect,
-            state,
-            new EquatableArray<PlannedQuery>(queries.MoveToImmutable()),
-            ClaimsOf(work)
+        var problems = QueryProblems.None;
+        // An empty default is one: the query is described with nothing in the token's place.
+        foreach (
+            var token in query.Tokens.Where(static token => token.Default is null).Select(static token => token.Name)
+        )
+        {
+            problems |= QueryProblems.TokenWithoutDefault;
+            errors.Add(
+                ToolDiagnostic
+                    .At(ToolDiagnostics.TokenHasNoDefault, query.NameLocation, token, SettingValue.NameOf(output))
+                    .WithLines(HelpForToken(token))
+            );
+        }
+
+        var owner = work.Owner;
+        return new PlannedQuery(
+            query,
+            NeedsEntry: true,
+            query.Markers.Database
+                ?? owner.Metadata.Settings?.Level.Database
+                ?? owner.Property.Database
+                ?? SqlDialectName.Canonical(dialect),
+            SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters),
+            problems
         );
     }
+
+    // The planned file of a work, under its owner.
+    private static PlannedFile FileOf(
+        FileWork work,
+        SqlDialect dialect,
+        PlannedFileState state,
+        EquatableArray<PlannedQuery> queries
+    ) =>
+        new(
+            work.Owner.Metadata.File.Path,
+            work.Owner.NormalizedPath,
+            work.Owner.ProjectPath,
+            dialect,
+            state,
+            queries,
+            ClaimsOf(work)
+        );
 
     // Who claims the file, for the log: every claim of every project, in their order.
     private static EquatableArray<FileClaim> ClaimsOf(FileWork work) =>
