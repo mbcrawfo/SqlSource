@@ -12,16 +12,12 @@ namespace SqlSource.Tool.Tests.Describing;
 // No value of a connection reaches the log: not from the command line, and not from a describer.
 public sealed class RedactionTests : IDisposable
 {
-    private const string Marker = "s3cret-marker";
-
-    private const string Value = "Host=db;Password=" + Marker;
-
     private readonly DescribeScene _scene = new();
 
     public RedactionTests()
     {
         _scene.Run.Environment.Clear();
-        _ = _scene.Project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        _ = _scene.Project.AddSql("Users.sql", SqlTexts.GetUser);
     }
 
     private string Log => _scene.Run.Folder.PathOf("run.log");
@@ -30,22 +26,22 @@ public sealed class RedactionTests : IDisposable
 
     // Whichever way the option was written, the token keeps the option and the name and loses the value.
     [Theory]
-    [InlineData("--connection|postgres=***", "--connection", "postgres=" + Value)]
-    [InlineData("--connection=postgres=***", "--connection=postgres=" + Value)]
-    [InlineData("--connection:postgres=***", "--connection:postgres=" + Value)]
+    [InlineData("--connection|postgres=***", "--connection", "postgres=" + Secrets.ConnectionWithMarker)]
+    [InlineData("--connection=postgres=***", "--connection=postgres=" + Secrets.ConnectionWithMarker)]
+    [InlineData("--connection:postgres=***", "--connection:postgres=" + Secrets.ConnectionWithMarker)]
     public async Task Run_ConnectionOnTheCommandLine_IsLoggedWithItsNameAndNoValue(string logged, params string[] args)
     {
         var result = await _scene.DescribeAsync(["--log", "run.log", .. args]);
 
         result.ExitCode.ShouldBe(0);
-        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Value);
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Secrets.ConnectionWithMarker);
         LogReader
             .Read(Log)[0]
             .GetProperty("arguments")
             .EnumerateArray()
             .Select(item => item.GetString())
             .ShouldBe(["describe", "--log", "run.log", .. logged.Split('|')]);
-        (await File.ReadAllTextAsync(Log, TestContext.Current.CancellationToken)).ShouldNotContain(Marker);
+        (await File.ReadAllTextAsync(Log, TestContext.Current.CancellationToken)).ShouldNotContain(Secrets.Marker);
     }
 
     // The value was typed where "name=value" stands and the shell split it: the line is wrong, and nothing is logged.
@@ -57,11 +53,11 @@ public sealed class RedactionTests : IDisposable
             "run.log",
             "--connection",
             "postgres=Host=db;",
-            "Password=" + Marker
+            "Password=" + Secrets.Marker
         );
 
         result.ExitCode.ShouldBe(1);
-        result.Error.ShouldNotContain(Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
         File.Exists(Log).ShouldBeFalse();
     }
 
@@ -86,9 +82,9 @@ public sealed class RedactionTests : IDisposable
                 new("list", LogValue.ListOf([LogValue.MapOf(new LogMember("deep", request.Connection))]))
             );
 
-        var text = await LoggedWithAsync(Value);
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
-        text.ShouldNotContain(Marker);
+        text.ShouldNotContain(Secrets.Marker);
         var line = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "postgres.connect ***");
         line.GetProperty("***").GetString().ShouldBe("***");
         line.GetProperty("message").GetString().ShouldBe("cannot connect with '***'");
@@ -104,7 +100,7 @@ public sealed class RedactionTests : IDisposable
 
         var text = await LoggedWithAsync(Escaped);
 
-        text.ShouldNotContain("s3cret");
+        text.ShouldNotContain(Secrets.Word);
         LogReader
             .Read(Log)
             .Single(e => e.GetProperty("event").GetString() == "postgres.connect")
@@ -118,15 +114,17 @@ public sealed class RedactionTests : IDisposable
     public async Task Run_DescriberThatGivesItsConnectionAsItsServer_HasTheMarkInDatabaseOpen()
     {
         _scene.Describer.Server = new ServerInfo(
-            Value,
-            Value,
-            Value,
-            new EquatableArray<ServerSetting>([new ServerSetting(Value, Value)])
+            Secrets.ConnectionWithMarker,
+            Secrets.ConnectionWithMarker,
+            Secrets.ConnectionWithMarker,
+            new EquatableArray<ServerSetting>([
+                new ServerSetting(Secrets.ConnectionWithMarker, Secrets.ConnectionWithMarker),
+            ])
         );
 
-        var text = await LoggedWithAsync(Value);
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
-        text.ShouldNotContain(Marker);
+        text.ShouldNotContain(Secrets.Marker);
         var open = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "database.open");
         open.GetProperty("serverVersion").GetString().ShouldBe("***");
         open.GetProperty("driver").GetString().ShouldBe("***");
@@ -138,13 +136,13 @@ public sealed class RedactionTests : IDisposable
     [Fact]
     public async Task Run_VerboseWithADescriberThatGivesItsConnectionAsItsServersVersion_SaysTheMark()
     {
-        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Value;
-        _scene.Describer.Server = _scene.Describer.Server with { Version = Value };
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.ConnectionWithMarker;
+        _scene.Describer.Server = _scene.Describer.Server with { Version = Secrets.ConnectionWithMarker };
 
         var result = await _scene.DescribeAsync("--verbose");
 
-        result.Out.ShouldNotContain(Marker);
-        result.Error.ShouldNotContain(Marker);
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
         result.Out.ShouldContain("sqlsource: database 'postgres': server ***\n");
     }
 
@@ -156,17 +154,17 @@ public sealed class RedactionTests : IDisposable
         _ = _scene.Project.AddSql("Zebra.sql", "-- name: Throws\nSELECT 2;\n");
         _scene.Describer.Failures["GetUser"] = new DescribeFailure(
             FakeDescriber.Rejected,
-            new EquatableArray<string>([Value]),
+            new EquatableArray<string>([Secrets.ConnectionWithMarker]),
             DescribeStep.Explain,
-            new EquatableArray<string>(["server said " + Value]),
-            "try " + Value
+            new EquatableArray<string>(["server said " + Secrets.ConnectionWithMarker]),
+            "try " + Secrets.ConnectionWithMarker
         );
-        _scene.Describer.Exceptions["Throws"] = new InvalidOperationException("bad " + Value);
+        _scene.Describer.Exceptions["Throws"] = new InvalidOperationException("bad " + Secrets.ConnectionWithMarker);
         _scene.Run.Environment["SQLSOURCE_DEBUG"] = "1";
 
-        var text = await LoggedWithAsync(Value);
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
 
-        text.ShouldNotContain(Marker);
+        text.ShouldNotContain(Secrets.Marker);
         LogReader
             .Read(Log)
             .Where(e => e.GetProperty("event").GetString() == "diagnostic")

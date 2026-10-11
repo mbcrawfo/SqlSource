@@ -19,8 +19,6 @@ namespace SqlSource.Tool.Tests.Describing;
 // Step 3 of the run: one session for each database, its queries one at a time, and what is reported on the way.
 public sealed class DatabaseRunsTests : IDisposable
 {
-    private const string Secret = "Host=db;Password=s3cret";
-
     private const string Users =
         "-- name: GetUser\nSELECT 1 WHERE @id = 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
 
@@ -58,7 +56,11 @@ public sealed class DatabaseRunsTests : IDisposable
         var selected = RunDecisions.SelectedDatabases(plan);
         var connections = Connections.Resolve(
             [.. selected.Select(database => database.Name)],
-            [.. (given ?? ["postgres=" + Secret, "billing=" + Secret]).Select(ConnectionArguments.Parse)],
+            [
+                .. (
+                    given ?? ["postgres=" + Secrets.ConnectionWithWord, "billing=" + Secrets.ConnectionWithWord]
+                ).Select(ConnectionArguments.Parse),
+            ],
             name => _environment.GetValueOrDefault(name)
         );
         var host = Hosts.Create(_folder.Path, new FakeProcessRunner(), _folder.Path, environment: _environment) with
@@ -105,7 +107,9 @@ public sealed class DatabaseRunsTests : IDisposable
         _error.ToString().ShouldBeEmpty();
         States(files).ShouldBe([QueryState.Described, QueryState.Described]);
         _describer.Opened.Select(request => request.Database).ShouldBe(["postgres", "billing"]);
-        _describer.Opened.ShouldAllBe(request => request.Connection == Secret && request.Exchange == _exchange);
+        _describer.Opened.ShouldAllBe(request =>
+            request.Connection == Secrets.ConnectionWithWord && request.Exchange == _exchange
+        );
         _describer.Closed.ShouldBe(2);
         _exchange.Methods.ShouldBe(["open", "describe", "open", "describe"]);
 
@@ -127,7 +131,7 @@ public sealed class DatabaseRunsTests : IDisposable
     {
         _ = _project.AddSql("More.sql", "-- name: More\nSELECT 3;\n");
 
-        var files = await RunAsync(given: ["billing=" + Secret]);
+        var files = await RunAsync(given: ["billing=" + Secrets.ConnectionWithWord]);
 
         States(files).ShouldBe([QueryState.Failed, QueryState.Failed, QueryState.Described]);
         _describer.Opened.ShouldHaveSingleItem().Database.ShouldBe("billing");
@@ -144,7 +148,14 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public async Task Run_ConnectionForANameThatIsNoDatabase_IsListedInTheHelpOfSqlsrc213()
     {
-        _ = await RunAsync(given: ["billing=" + Secret, "postgress=" + Secret, "reports=" + Secret]);
+        _ = await RunAsync(
+            given:
+            [
+                "billing=" + Secrets.ConnectionWithWord,
+                "postgress=" + Secrets.ConnectionWithWord,
+                "reports=" + Secrets.ConnectionWithWord,
+            ]
+        );
 
         _error
             .ToString()
@@ -162,7 +173,7 @@ public sealed class DatabaseRunsTests : IDisposable
             "Q.sql",
             "-- name: A\n-- database: app-v2\nSELECT 1;\n\n-- name: B\n-- database: app_v2\nSELECT 2;\n"
         );
-        _environment["SQLSOURCE_CONNECTION_APP_V2"] = Secret;
+        _environment["SQLSOURCE_CONNECTION_APP_V2"] = Secrets.ConnectionWithWord;
 
         var files = await RunAsync(Plans.Of(project), given: []);
 
@@ -181,9 +192,9 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public async Task Run_VariableWithNoNameAndTwoDatabases_IsSqlsrc215ForTheOneWithoutAConnection()
     {
-        _environment["SQLSOURCE_CONNECTION"] = Secret;
+        _environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithWord;
 
-        var files = await RunAsync(given: ["postgres=" + Secret]);
+        var files = await RunAsync(given: ["postgres=" + Secrets.ConnectionWithWord]);
 
         States(files).ShouldBe([QueryState.Described, QueryState.Failed]);
         _error
@@ -209,7 +220,7 @@ public sealed class DatabaseRunsTests : IDisposable
             Help: null
         );
 
-        var files = await RunAsync(given: ["postgres=" + Secret]);
+        var files = await RunAsync(given: ["postgres=" + Secrets.ConnectionWithWord]);
 
         States(files).ShouldAllBe(state => state == QueryState.Failed);
         _describer.Described.ShouldBeEmpty();
@@ -231,15 +242,15 @@ public sealed class DatabaseRunsTests : IDisposable
     {
         _describer.OpenFailure = new DescribeFailure(
             FakeDescriber.Rejected,
-            new EquatableArray<string>([$"open on {Secret}"]),
+            new EquatableArray<string>([$"open on {Secrets.ConnectionWithWord}"]),
             Step: null,
-            new EquatableArray<string>([$"invalid connection string: {Secret}"]),
-            $"check {Secret}"
+            new EquatableArray<string>([$"invalid connection string: {Secrets.ConnectionWithWord}"]),
+            $"check {Secrets.ConnectionWithWord}"
         );
 
-        _ = await RunAsync(given: ["postgres=" + Secret]);
+        _ = await RunAsync(given: ["postgres=" + Secrets.ConnectionWithWord]);
 
-        _error.ToString().ShouldNotContain("s3cret");
+        _error.ToString().ShouldNotContain(Secrets.Word);
         _error
             .ToString()
             .ShouldStartWith(
@@ -289,13 +300,18 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public async Task Run_FailureThatHoldsTheConnection_IsPrintedWithoutIt()
     {
-        _describer.Server = new ServerInfo($"16.4 at {Secret}", Secret, Secret, EquatableArray<ServerSetting>.Empty);
+        _describer.Server = new ServerInfo(
+            $"16.4 at {Secrets.ConnectionWithWord}",
+            Secrets.ConnectionWithWord,
+            Secrets.ConnectionWithWord,
+            EquatableArray<ServerSetting>.Empty
+        );
         _describer.Failures["GetUser"] = new DescribeFailure(
             FakeDescriber.Rejected,
-            new EquatableArray<string>([$"GetUser on {Secret}"]),
+            new EquatableArray<string>([$"GetUser on {Secrets.ConnectionWithWord}"]),
             DescribeStep.Catalog,
-            new EquatableArray<string>([$"could not connect to {Secret}"]),
-            $"check {Secret}"
+            new EquatableArray<string>([$"could not connect to {Secrets.ConnectionWithWord}"]),
+            $"check {Secrets.ConnectionWithWord}"
         );
         // A query that is described would put the server's version, which holds the value, into its entry, and that
         // ends the run.
@@ -303,7 +319,7 @@ public sealed class DatabaseRunsTests : IDisposable
 
         _ = await RunAsync();
 
-        _error.ToString().ShouldNotContain("s3cret");
+        _error.ToString().ShouldNotContain(Secrets.Word);
         _error
             .ToString()
             .ShouldBe(
@@ -331,16 +347,18 @@ public sealed class DatabaseRunsTests : IDisposable
             _environment[Cli.DebugVariable] = debug;
         }
 
-        _describer.Exceptions["GetUser"] = new ArgumentException($"Keyword not supported in '{Secret}'");
+        _describer.Exceptions["GetUser"] = new ArgumentException(
+            $"Keyword not supported in '{Secrets.ConnectionWithWord}'"
+        );
 
         var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
 
         fault.InnerException.ShouldBeNull();
-        fault.Message.ShouldNotContain("s3cret");
+        fault.Message.ShouldNotContain(Secrets.Word);
         fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
         fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.ArgumentException", "Keyword not supported in '***'"]);
         (fault.Diagnostic.Lines.Count > 0).ShouldBe(debug is not null);
-        fault.Diagnostic.Lines.ShouldAllBe(line => line.Label == "trace" && !line.Text.Contains("s3cret"));
+        fault.Diagnostic.Lines.ShouldAllBe(line => line.Label == "trace" && !line.Text.Contains(Secrets.Word));
         // The session is closed all the same.
         _describer.Closed.ShouldBe(1);
     }
@@ -359,14 +377,14 @@ public sealed class DatabaseRunsTests : IDisposable
 
         fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.ArgumentException", "Bad '***'"]);
         fault.Diagnostic.Lines.Count.ShouldBeGreaterThan(0);
-        fault.Diagnostic.Lines.ShouldAllBe(line => !line.Text.Contains("s3cret") && !line.Text.Contains("Host=db"));
+        fault.Diagnostic.Lines.ShouldAllBe(line => !line.Text.Contains(Secrets.Word) && !line.Text.Contains("Host=db"));
         fault.Diagnostic.Lines.ShouldContain(line => line.Text.Contains("inner ***"));
     }
 
     [Fact]
     public async Task Run_DescriberThatThrowsOnOpen_IsAFaultWithoutTheConnection()
     {
-        _describer.OpenException = new InvalidOperationException($"cannot parse {Secret}");
+        _describer.OpenException = new InvalidOperationException($"cannot parse {Secrets.ConnectionWithWord}");
 
         var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
 
@@ -438,7 +456,7 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public async Task Run_SessionThatThrowsWhenItIsClosed_IsAFaultWithoutTheConnection()
     {
-        _describer.CloseException = new IOException($"lost {Secret}");
+        _describer.CloseException = new IOException($"lost {Secrets.ConnectionWithWord}");
 
         var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
 
@@ -468,7 +486,7 @@ public sealed class DatabaseRunsTests : IDisposable
         );
 
         fault.InnerException.ShouldBeNull();
-        fault.Message.ShouldNotContain("s3cret");
+        fault.Message.ShouldNotContain(Secrets.Word);
         fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
         fault
             .Diagnostic.Arguments.ToArray()
@@ -476,7 +494,7 @@ public sealed class DatabaseRunsTests : IDisposable
                 "System.InvalidOperationException",
                 "The describer put the connection's value in its description of the query 'GetUser'.",
             ]);
-        fault.Diagnostic.Arguments.ShouldAllBe(argument => !argument.Contains("s3cret"));
+        fault.Diagnostic.Arguments.ShouldAllBe(argument => !argument.Contains(Secrets.Word));
         _files[0].Queries[0].State.ShouldNotBe(QueryState.Described);
         _files[0].Queries[0].Entry.ShouldBeNull();
         _describer.Closed.ShouldBe(1);
@@ -487,13 +505,13 @@ public sealed class DatabaseRunsTests : IDisposable
     public async Task Run_DescriptionWithTheValueInTheServersVersion_IsAFault()
     {
         _describer.Server = new ServerInfo(
-            $"16.4 at {Secret}",
+            $"16.4 at {Secrets.ConnectionWithWord}",
             "FakeDriver",
             null,
             EquatableArray<ServerSetting>.Empty
         );
 
-        _ = await RunExpectingTheValueInTheDescriptionAsync(Secret);
+        _ = await RunExpectingTheValueInTheDescriptionAsync(Secrets.ConnectionWithWord);
     }
 
     [Fact]
@@ -503,11 +521,20 @@ public sealed class DatabaseRunsTests : IDisposable
         {
             ResultKind = SidecarResultKind.Rows,
             Columns = new EquatableArray<SidecarColumn>([
-                new SidecarColumn(0, $"id of {Secret}", new OtherEngineType("int4"), null, null, null, null, null),
+                new SidecarColumn(
+                    0,
+                    $"id of {Secrets.ConnectionWithWord}",
+                    new OtherEngineType("int4"),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
             ]),
         };
 
-        _ = await RunExpectingTheValueInTheDescriptionAsync(Secret);
+        _ = await RunExpectingTheValueInTheDescriptionAsync(Secrets.ConnectionWithWord);
     }
 
     // The writer escapes a quote and a backslash, so the value is in the file as it escapes it.
@@ -572,7 +599,7 @@ public sealed class DatabaseRunsTests : IDisposable
     {
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         _describer.BeforeDescribe = _ => cancel.CancelAsync();
-        _describer.CloseException = new IOException($"lost {Secret}");
+        _describer.CloseException = new IOException($"lost {Secrets.ConnectionWithWord}");
 
         _ = await Should.ThrowAsync<OperationCanceledException>(() => RunAsync(cancellationToken: cancel.Token));
 
@@ -583,8 +610,8 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public async Task Run_DescriberThatThrowsAndTheSessionThrowsWhenItIsClosed_IsAFaultOfTheFirstException()
     {
-        _describer.Exceptions["GetUser"] = new ArgumentException($"broken {Secret}");
-        _describer.CloseException = new IOException($"lost {Secret}");
+        _describer.Exceptions["GetUser"] = new ArgumentException($"broken {Secrets.ConnectionWithWord}");
+        _describer.CloseException = new IOException($"lost {Secrets.ConnectionWithWord}");
 
         var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
 

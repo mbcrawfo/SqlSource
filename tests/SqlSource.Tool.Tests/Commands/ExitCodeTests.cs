@@ -15,7 +15,7 @@ public sealed class ExitCodeTests : IDisposable
 
     public ExitCodeTests()
     {
-        _users = _scene.Project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.GetUser);
     }
 
     public void Dispose() => _scene.Dispose();

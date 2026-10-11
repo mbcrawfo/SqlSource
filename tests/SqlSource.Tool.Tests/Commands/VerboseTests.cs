@@ -24,10 +24,7 @@ public sealed class VerboseTests : IDisposable
     public VerboseTests()
     {
         // Two projects that use SqlSource and one that does not, in a solution; two databases.
-        _users = _scene.Project.AddSql(
-            "Users.sql",
-            "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n"
-        );
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.Users);
         _lib = Plans.Postgres(_scene.Run.Folder, "Lib", "Lib").AnsweredBy(_scene.Run.Processes);
         _items = _lib.AddSql("Items.sql", "-- name: GetItem\nSELECT 3;\n");
         // A file that the project lists and that stands outside the folder of its type: no type claims it.

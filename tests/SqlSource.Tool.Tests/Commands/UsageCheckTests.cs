@@ -10,8 +10,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // does not move them; the tests at the end run the same checks over the tool's own commands.
 public class UsageCheckTests
 {
-    private const string Secret = "s3cret";
-
     private static Command Root()
     {
         var connection = new Option<string>("--connection", "-c") { Arity = ArgumentArity.ExactlyOne };
@@ -43,7 +41,7 @@ public class UsageCheckTests
 
     [Fact]
     public void Check_ValueThatStartsWithAHyphen_IsTheValueOfTheOptionBeforeIt() =>
-        UsageCheck.Check(Root(), ["describe", "--connection", "-" + Secret]).Messages.ShouldBeEmpty();
+        UsageCheck.Check(Root(), ["describe", "--connection", "-" + Secrets.Word]).Messages.ShouldBeEmpty();
 
     [Fact]
     public void Check_OptionAtTheEndWithoutItsValue_NamesTheOption() =>
@@ -54,7 +52,7 @@ public class UsageCheckTests
     [Fact]
     public void Check_ValueForAFlag_NamesTheOptionAndNotTheValue() =>
         UsageCheck
-            .Check(Root(), ["describe", "--force=" + Secret])
+            .Check(Root(), ["describe", "--force=" + Secrets.Word])
             .Messages.ShouldBe(["sqlsource: option '--force' takes no value"]);
 
     [Fact]
@@ -72,7 +70,7 @@ public class UsageCheckTests
     [Fact]
     public void Check_SeveralMistakes_GivesALineForEach() =>
         UsageCheck
-            .Check(Root(), ["describe", "--force=" + Secret, "one", Secret, "--connection"])
+            .Check(Root(), ["describe", "--force=" + Secrets.Word, "one", Secrets.Word, "--connection"])
             .Messages.ShouldBe([
                 "sqlsource: option '--force' takes no value",
                 "sqlsource: unexpected argument at position 4",
@@ -88,7 +86,7 @@ public class UsageCheckTests
     [Theory]
     [InlineData("-")]
     [InlineData("--")]
-    [InlineData("-" + Secret)]
+    [InlineData("-" + Secrets.Word)]
     public void Check_AnyTokenThatStartsWithAHyphen_IsAnOption(string token) =>
         UsageCheck.Check(Root(), ["describe", token]).Messages.ShouldBe([$"sqlsource: unknown option '{token}'"]);
 
@@ -99,14 +97,14 @@ public class UsageCheckTests
     public void Check_SeparatorWithNothingAfterIt_NeedsAValue(string token, string name) =>
         // What --connection="$UNSET" gives.  System.CommandLine reads it as no value and takes the next token.
         UsageCheck
-            .Check(Root(), ["describe", token, "--connection", Secret])
+            .Check(Root(), ["describe", token, "--connection", Secrets.Word])
             .Messages.ShouldBe([$"sqlsource: option '{name}' needs a value"]);
 
     [Fact]
     public void Check_OptionOfTheCommandWhereAValueShouldStand_IsNotTakenForTheValue() =>
         // System.CommandLine does not take a token that names an option as a value, and neither may this.
         UsageCheck
-            .Check(Root(), ["describe", "--connection", "--force=" + Secret, "--connection=x"])
+            .Check(Root(), ["describe", "--connection", "--force=" + Secrets.Word, "--connection=x"])
             .Messages.ShouldBe([
                 "sqlsource: option '--connection' needs a value",
                 "sqlsource: option '--force' takes no value",
@@ -114,8 +112,8 @@ public class UsageCheckTests
 
     // System.CommandLine rejects a second value for an option that takes one, with a message that repeats it.
     [Theory]
-    [InlineData("--connection", "describe", "--connection", "a=b", "--connection=" + Secret)]
-    [InlineData("-c", "describe", "-c", "a=b", "App.csproj", "-c:" + Secret)]
+    [InlineData("--connection", "describe", "--connection", "a=b", "--connection=" + Secrets.Word)]
+    [InlineData("-c", "describe", "-c", "a=b", "App.csproj", "-c:" + Secrets.Word)]
     public void Check_OptionThatTakesOneValueGivenTwice_IsNamedAsItWasTypedAndItsValueIsNot(
         string name,
         params string[] args
@@ -125,7 +123,10 @@ public class UsageCheckTests
     [Fact]
     public void Check_OptionThatMayBeRepeated_TakesOneValueEachTime()
     {
-        var usage = UsageCheck.Check(Root(), ["describe", "--project", "A.csproj", "App.slnx", "--project", Secret]);
+        var usage = UsageCheck.Check(
+            Root(),
+            ["describe", "--project", "A.csproj", "App.slnx", "--project", Secrets.Word]
+        );
 
         usage.Messages.ShouldBeEmpty();
         usage.Arguments.ShouldBe(["App.slnx"]);
@@ -141,7 +142,7 @@ public class UsageCheckTests
     [Fact]
     public void Check_CommandLineWithNothingWrong_GivesTheCommandAndItsArguments()
     {
-        var usage = UsageCheck.Check(Root(), ["--verbose", "describe", "-c", Secret, "App.csproj", "--force"]);
+        var usage = UsageCheck.Check(Root(), ["--verbose", "describe", "-c", Secrets.Word, "App.csproj", "--force"]);
 
         usage.Command.Name.ShouldBe("describe");
         usage.Arguments.ShouldBe(["App.csproj"]);
@@ -154,7 +155,7 @@ public class UsageCheckTests
         var usage = UsageCheck.Check(root, ["describe", "App.csproj"]);
 
         usage.IsReadTheSameBy(root.Parse(["describe", "App.csproj"], Cli.Parser)).ShouldBeTrue();
-        usage.IsReadTheSameBy(root.Parse(["describe", Secret], Cli.Parser)).ShouldBeFalse();
+        usage.IsReadTheSameBy(root.Parse(["describe", Secrets.Word], Cli.Parser)).ShouldBeFalse();
         usage.IsReadTheSameBy(root.Parse(["describe"], Cli.Parser)).ShouldBeFalse();
         usage.IsReadTheSameBy(root.Parse([], Cli.Parser)).ShouldBeFalse();
     }
@@ -163,24 +164,38 @@ public class UsageCheckTests
     public void ReadsConnectionsAs_ParseThatBindsOtherValues_IsFalse()
     {
         var root = Cli.BuildCommands();
-        var usage = UsageCheck.Check(root, ["describe", "--connection", "a=" + Secret, "--connection", "b=2"]);
+        var usage = UsageCheck.Check(root, ["describe", "--connection", "a=" + Secrets.Word, "--connection", "b=2"]);
 
         DescribeCommand
-            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=" + Secret, "--connection", "b=2"]))
+            .ReadsConnectionsAs(
+                usage,
+                root.Parse(["describe", "--connection", "a=" + Secrets.Word, "--connection", "b=2"])
+            )
             .ShouldBeTrue();
         DescribeCommand
             .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=x", "--connection", "b=2"]))
             .ShouldBeFalse();
         DescribeCommand
-            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "b=2", "--connection", "a=" + Secret]))
+            .ReadsConnectionsAs(
+                usage,
+                root.Parse(["describe", "--connection", "b=2", "--connection", "a=" + Secrets.Word])
+            )
             .ShouldBeFalse();
         DescribeCommand
-            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=" + Secret]))
+            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=" + Secrets.Word]))
             .ShouldBeFalse();
         DescribeCommand
             .ReadsConnectionsAs(
                 usage,
-                root.Parse(["describe", "--connection", "a=" + Secret, "--connection", "b=2", "--connection", "c=3"])
+                root.Parse([
+                    "describe",
+                    "--connection",
+                    "a=" + Secrets.Word,
+                    "--connection",
+                    "b=2",
+                    "--connection",
+                    "c=3",
+                ])
             )
             .ShouldBeFalse();
         DescribeCommand
@@ -347,13 +362,16 @@ public class UsageCheckTests
     public void CheckUsage_SecondPathThatIsNoSqlFile_IsReportedByItsPosition() =>
         DescribeCommand
             .CheckUsage(
-                UsageCheck.Check(Cli.BuildCommands(), ["describe", "App.csproj", "Q.sql", Secret, "--project", "P"])
+                UsageCheck.Check(
+                    Cli.BuildCommands(),
+                    ["describe", "App.csproj", "Q.sql", Secrets.Word, "--project", "P"]
+                )
             )
             .ShouldBe(["sqlsource: unexpected argument at position 4"]);
 
     [Theory]
     [InlineData(3, "describe", "--database", "not a name")]
-    [InlineData(2, "describe", "--database=" + Secret + "!")]
+    [InlineData(2, "describe", "--database=" + Secrets.Word + "!")]
     [InlineData(3, "describe", "--database", "")]
     public void CheckUsage_DatabaseThatIsNoName_IsReportedByItsPositionAndNotItsText(
         int position,

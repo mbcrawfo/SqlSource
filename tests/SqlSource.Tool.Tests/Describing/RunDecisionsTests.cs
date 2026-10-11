@@ -15,10 +15,6 @@ namespace SqlSource.Tool.Tests.Describing;
 // Steps 1 and 2 of the run: the sidecars that are there, and what each query needs of the run.
 public sealed class RunDecisionsTests : IDisposable
 {
-    private const string Users =
-        "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n\n"
-        + "-- name: Plain\n-- output: sql\nSELECT 3;\n";
-
     private static readonly RunFilters OnlyBilling = new([], ["billing"]);
 
     private readonly TempFolder _folder = new();
@@ -28,7 +24,7 @@ public sealed class RunDecisionsTests : IDisposable
     public RunDecisionsTests()
     {
         _project = Plans.Postgres(_folder);
-        _ = _project.AddSql("Users.sql", Users);
+        _ = _project.AddSql("Users.sql", SqlTexts.UsersAndPlain);
     }
 
     public void Dispose() => _folder.Dispose();

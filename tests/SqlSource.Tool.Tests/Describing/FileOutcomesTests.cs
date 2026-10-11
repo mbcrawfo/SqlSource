@@ -14,10 +14,6 @@ namespace SqlSource.Tool.Tests.Describing;
 // Step 4 of the run: what happens to each file's sidecar, and what the sidecar is to hold.  Nothing is written here.
 public sealed class FileOutcomesTests : IDisposable
 {
-    private const string Users =
-        "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n\n"
-        + "-- name: Plain\n-- output: sql\nSELECT 3;\n";
-
     private static readonly RunFilters OnlyBilling = new([], ["billing"]);
 
     private readonly TempFolder _folder = new();
@@ -26,7 +22,7 @@ public sealed class FileOutcomesTests : IDisposable
     public FileOutcomesTests()
     {
         _project = Plans.Postgres(_folder);
-        _ = _project.AddSql("Users.sql", Users);
+        _ = _project.AddSql("Users.sql", SqlTexts.UsersAndPlain);
     }
 
     public void Dispose() => _folder.Dispose();

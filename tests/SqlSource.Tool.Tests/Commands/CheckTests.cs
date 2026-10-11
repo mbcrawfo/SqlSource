@@ -13,14 +13,12 @@ namespace SqlSource.Tool.Tests.Commands;
 // "describe --check": every query is described, the sidecars on the disk are compared, and no file is changed.
 public sealed class CheckTests : IDisposable
 {
-    private const string Users = "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n";
-
     private readonly DescribeScene _scene = new();
     private readonly string _users;
 
     public CheckTests()
     {
-        _users = _scene.Project.AddSql("Users.sql", Users);
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.TwoUsers);
     }
 
     private string Sidecar => SidecarFormat.PathFor(_users);
@@ -221,7 +219,7 @@ public sealed class CheckTests : IDisposable
         var hash = SidecarFiles.Read(_users).Find("GetUser").ShouldNotBeNull().Hash;
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal),
+            SqlTexts.TwoUsers.Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal),
             TestContext.Current.CancellationToken
         );
 

@@ -7,21 +7,27 @@ namespace SqlSource.Tool.Tests.Logging;
 // The log a describer is given: a connection's value is removed from every string of an event, at any depth.
 public sealed class SessionRunLogTests
 {
-    private const string Secret = "Host=db;Password=hunter2";
-
     private readonly RecordingLog _inner = new();
 
     [Fact]
     public void Write_ValueInEveryPlaceAStringCanStand_IsWrittenAsTheMarkInEach()
     {
-        var log = new SessionRunLog(_inner, Secret);
+        var log = new SessionRunLog(_inner, Secrets.Connection);
 
         log.Write(
-            "open " + Secret,
-            new(Secret, Secret),
-            new("inside", "cannot connect with '" + Secret + "' today"),
-            new("list", LogValue.ListOf([Secret, LogValue.ListOfTexts([Secret])])),
-            new("map", LogValue.MapOf(new LogMember(Secret + " key", LogValue.MapOf(new LogMember("deep", Secret)))))
+            "open " + Secrets.Connection,
+            new(Secrets.Connection, Secrets.Connection),
+            new("inside", "cannot connect with '" + Secrets.Connection + "' today"),
+            new("list", LogValue.ListOf([Secrets.Connection, LogValue.ListOfTexts([Secrets.Connection])])),
+            new(
+                "map",
+                LogValue.MapOf(
+                    new LogMember(
+                        Secrets.Connection + " key",
+                        LogValue.MapOf(new LogMember("deep", Secrets.Connection))
+                    )
+                )
+            )
         );
 
         var (name, members) = _inner.Events.ShouldHaveSingleItem();
@@ -37,7 +43,7 @@ public sealed class SessionRunLogTests
     [Fact]
     public void Write_ValuesThatAreNoStrings_AreAsTheyWere()
     {
-        var log = new SessionRunLog(_inner, Secret);
+        var log = new SessionRunLog(_inner, Secrets.Connection);
 
         log.Write("e", new("number", 5), new("flag", true), new("nothing", LogValue.Null));
 

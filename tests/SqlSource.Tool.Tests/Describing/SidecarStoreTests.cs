@@ -23,7 +23,7 @@ public sealed class SidecarStoreTests : IDisposable
     public SidecarStoreTests()
     {
         var project = Plans.Postgres(_folder);
-        _ = project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        _ = project.AddSql("Users.sql", SqlTexts.GetUser);
         _file = Plans.Of(project).Files[0];
         _sidecar = SidecarFormat.PathFor(_file.Path);
     }

@@ -12,9 +12,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // project leaves every other sidecar as it was.
 public sealed class FilterRunTests : IDisposable
 {
-    private const string Users =
-        "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
-
     private readonly DescribeScene _scene = new();
     private readonly string _invoices;
     private readonly string _plain;
@@ -24,7 +21,7 @@ public sealed class FilterRunTests : IDisposable
     {
         _invoices = _scene.Project.AddSql("Invoices.sql", "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n");
         _plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
-        _users = _scene.Project.AddSql("Users.sql", Users);
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.Users);
     }
 
     public void Dispose() => _scene.Dispose();
@@ -40,7 +37,7 @@ public sealed class FilterRunTests : IDisposable
         var getInvoice = HashOf(_users, "GetInvoice");
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 2;", "SELECT 22;", StringComparison.Ordinal),
+            SqlTexts.WithSecondQueryEdited(SqlTexts.Users),
             TestContext.Current.CancellationToken
         );
 
@@ -58,9 +55,7 @@ public sealed class FilterRunTests : IDisposable
         var before = await File.ReadAllBytesAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken);
         await File.WriteAllTextAsync(
             _users,
-            Users
-                .Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal)
-                .Replace("SELECT 2;", "SELECT 22;", StringComparison.Ordinal),
+            SqlTexts.WithSecondQueryEdited(SqlTexts.Users.Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal)),
             TestContext.Current.CancellationToken
         );
 
@@ -235,7 +230,7 @@ public sealed class FilterRunTests : IDisposable
         using var run = new CliRun();
         var describer = new FakeDescriber();
         run.Describers.Add(describer);
-        run.Environment["SQLSOURCE_CONNECTION"] = DescribeScene.Connection;
+        run.Environment["SQLSOURCE_CONNECTION"] = Secrets.Connection;
         var a = Plans.Postgres(run.Folder, "A").AnsweredBy(run.Processes);
         var b = Plans.Postgres(run.Folder, "B").AnsweredBy(run.Processes);
         var inA = a.AddSql("A.sql", "-- name: InA\nSELECT 1;\n");

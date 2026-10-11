@@ -13,8 +13,6 @@ namespace SqlSource.Tool.Tests.Commands;
 
 public class CliTests
 {
-    private const string Secret = "s3cret";
-
     [Fact]
     public async Task Run_NoArguments_PrintsTheHelp()
     {
@@ -62,11 +60,11 @@ public class CliTests
     }
 
     [Theory]
-    [InlineData("--conection=" + Secret)]
-    [InlineData("--conection:" + Secret)]
-    [InlineData("--conection", Secret)]
-    [InlineData("describe", "--conection", Secret)]
-    [InlineData("describe", "--conection=billing=Host=db;Password=" + Secret)]
+    [InlineData("--conection=" + Secrets.Word)]
+    [InlineData("--conection:" + Secrets.Word)]
+    [InlineData("--conection", Secrets.Word)]
+    [InlineData("describe", "--conection", Secrets.Word)]
+    [InlineData("describe", "--conection=billing=Host=db;Password=" + Secrets.Word)]
     public async Task Run_UnknownOption_IsNamedWithoutItsValue(params string[] args)
     {
         using var run = new CliRun();
@@ -82,7 +80,7 @@ public class CliTests
         using var run = new CliRun();
 
         // The second may be the value of the first.
-        var result = await run.RunAsync("--pasword", "-" + Secret);
+        var result = await run.RunAsync("--pasword", "-" + Secrets.Word);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--pasword'\n"));
     }
@@ -112,7 +110,7 @@ public class CliTests
     {
         using var run = new CliRun();
 
-        var result = await run.RunAsync("--help=" + Secret);
+        var result = await run.RunAsync("--help=" + Secrets.Word);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: option '--help' takes no value\n"));
     }
@@ -122,7 +120,7 @@ public class CliTests
     {
         using var run = new CliRun();
 
-        var result = await run.RunAsync("--version=" + Secret);
+        var result = await run.RunAsync("--version=" + Secrets.Word);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: option '--version' takes no value\n"));
     }
@@ -252,8 +250,8 @@ public class CliTests
         using var run = new CliRun { Out = new FailingWriter("the pipe is closed") };
         run.Describers.Add(new FakeDescriber());
         var project = Plans.Postgres(run.Folder, directory: "").AnsweredBy(run.Processes);
-        run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = DescribeScene.Connection;
-        _ = project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
+        _ = project.AddSql("Users.sql", SqlTexts.GetUser);
 
         var result = await run.RunAsync("describe", "--log", "run.log");
 
@@ -273,8 +271,8 @@ public class CliTests
         using var run = new CliRun { Out = new FailingWriter("the pipe is closed") };
         run.Describers.Add(new FakeDescriber());
         var project = Plans.Postgres(run.Folder, directory: "").AnsweredBy(run.Processes);
-        run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = DescribeScene.Connection;
-        _ = project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
+        _ = project.AddSql("Users.sql", SqlTexts.GetUser);
 
         var result = await run.RunAsync("describe", "--log", "run.log");
 

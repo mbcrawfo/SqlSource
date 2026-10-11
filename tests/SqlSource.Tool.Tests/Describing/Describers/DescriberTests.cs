@@ -102,7 +102,7 @@ public class DescriberTests
     [Fact]
     public void ToString_OpenRequest_LeavesTheConnectionOut()
     {
-        var request = new OpenRequest("billing", "Host=db;Password=s3cret", LiveExchange.Instance);
+        var request = new OpenRequest("billing", Secrets.ConnectionWithWord, LiveExchange.Instance);
 
         request.ToString().ShouldBe("OpenRequest { Database = billing }");
     }

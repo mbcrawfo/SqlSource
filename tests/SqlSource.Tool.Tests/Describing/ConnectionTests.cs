@@ -10,8 +10,6 @@ namespace SqlSource.Tool.Tests.Describing;
 // Where the connection of a database comes from: the command line, its own variable, or the variable with no name.
 public class ConnectionTests
 {
-    private const string Secret = "s3cret";
-
     private static Connections Resolve(
         string[] selected,
         string[] given,
@@ -59,11 +57,11 @@ public class ConnectionTests
 
     [Fact]
     public void ToString_ConnectionArgument_LeavesTheValueOut() =>
-        ConnectionArguments.Parse("billing=" + Secret).ToString().ShouldNotContain(Secret);
+        ConnectionArguments.Parse("billing=" + Secrets.Word).ToString().ShouldNotContain(Secrets.Word);
 
     [Fact]
     public void ToString_UsageValueOfAConnection_LeavesTheTextOut() =>
-        new UsageValue(new Option<string>("--connection"), "billing=" + Secret, 3)
+        new UsageValue(new Option<string>("--connection"), "billing=" + Secrets.Word, 3)
             .ToString()
             .ShouldBe("UsageValue { Option = --connection, Position = 3 }");
 
@@ -191,14 +189,14 @@ public class ConnectionTests
         DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args)).ShouldBeEmpty();
 
     [Theory]
-    [InlineData(3, "describe", "--connection", Secret)]
-    [InlineData(3, "describe", "--connection", "=" + Secret)]
-    [InlineData(3, "describe", "--connection", "not a name=" + Secret)]
+    [InlineData(3, "describe", "--connection", Secrets.Word)]
+    [InlineData(3, "describe", "--connection", "=" + Secrets.Word)]
+    [InlineData(3, "describe", "--connection", "not a name=" + Secrets.Word)]
     [InlineData(3, "describe", "--connection", "billing=")]
     [InlineData(3, "describe", "--connection", "billing= ")]
     [InlineData(3, "describe", "--connection", "billing=\t")]
-    [InlineData(2, "describe", "--connection=" + Secret)]
-    [InlineData(2, "describe", "--connection:" + Secret)]
+    [InlineData(2, "describe", "--connection=" + Secrets.Word)]
+    [InlineData(2, "describe", "--connection:" + Secrets.Word)]
     public void CheckUsage_ConnectionThatIsNoNameAndValue_IsReportedByItsPositionAndNotItsText(
         int position,
         params string[] args
@@ -220,12 +218,12 @@ public class ConnectionTests
         DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args)).ShouldBeEmpty();
 
     [Theory]
-    [InlineData(4, "describe", "--connection", "billing=Host=db;User", "Id=sa;Password=" + Secret)]
-    [InlineData(2, "describe", "Id=sa;Password=" + Secret, "--connection=billing=Host=db")]
-    [InlineData(4, "describe", "--connection", "billing=Host=db", "Password=" + Secret)]
-    [InlineData(4, "describe", "--connection", "billing=Host=db", "Id=sa;" + Secret)]
+    [InlineData(4, "describe", "--connection", "billing=Host=db;User", "Id=sa;Password=" + Secrets.Word)]
+    [InlineData(2, "describe", "Id=sa;Password=" + Secrets.Word, "--connection=billing=Host=db")]
+    [InlineData(4, "describe", "--connection", "billing=Host=db", "Password=" + Secrets.Word)]
+    [InlineData(4, "describe", "--connection", "billing=Host=db", "Id=sa;" + Secrets.Word)]
     [InlineData(4, "describe", "--connection", "billing=Host=db", "Users=1;2.sql")]
-    [InlineData(2, "describe", "Id=sa;Password=" + Secret + ".sql", "--connection=billing=Host=db")]
+    [InlineData(2, "describe", "Id=sa;Password=" + Secrets.Word + ".sql", "--connection=billing=Host=db")]
     public void CheckUsage_PathWithEqualsOrSemicolonBesideAConnection_IsReportedByItsPositionAndNotItsText(
         int position,
         params string[] args
@@ -249,7 +247,7 @@ public class ConnectionTests
             .CheckUsage(
                 UsageCheck.Check(
                     Cli.BuildCommands(),
-                    ["describe", "--connection", "billing=A", "--connection=BILLING=" + Secret]
+                    ["describe", "--connection", "billing=A", "--connection=BILLING=" + Secrets.Word]
                 )
             )
             .ShouldBe(["sqlsource: option '--connection' at position 4 names a database that an earlier one names"]);

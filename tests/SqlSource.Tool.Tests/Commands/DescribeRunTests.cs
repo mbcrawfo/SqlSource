@@ -12,14 +12,12 @@ namespace SqlSource.Tool.Tests.Commands;
 // "describe" from the command line to the sidecars on the disk, with the describer of the tests.
 public sealed class DescribeRunTests : IDisposable
 {
-    private const string Users = "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n";
-
     private readonly DescribeScene _scene = new();
     private readonly string _users;
 
     public DescribeRunTests()
     {
-        _users = _scene.Project.AddSql("Users.sql", Users);
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.TwoUsers);
     }
 
     private string Sidecar => SidecarFormat.PathFor(_users);
@@ -39,7 +37,7 @@ public sealed class DescribeRunTests : IDisposable
             .Queries.Select(entry => $"{entry.Name} {entry.Engine} {entry.Database} {entry.ServerVersion}")
             .ShouldBe(["GetUser postgres postgres 16.4", "ListUsers postgres postgres 16.4"]);
         sidecar.Queries.ShouldAllBe(entry => entry.Hash.Length == 64);
-        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(DescribeScene.Connection);
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Secrets.Connection);
         _scene.Describer.Closed.ShouldBe(1);
     }
 
@@ -59,13 +57,13 @@ public sealed class DescribeRunTests : IDisposable
 
     // The SQL, a declaration, a default and the database are each part of what was described.
     [Theory]
-    [InlineData("-- name: GetUser\nSELECT 1;\n", "-- name: GetUser\nSELECT 11;\n")]
+    [InlineData(SqlTexts.GetUser, "-- name: GetUser\nSELECT 11;\n")]
     [InlineData(
         "-- name: GetUser\n-- param: @id int\nSELECT @id;\n",
         "-- name: GetUser\n-- param: @id bigint\nSELECT @id;\n"
     )]
     [InlineData("-- name: GetUser\nSELECT 1 {{w:WHERE 1 = 1}};\n", "-- name: GetUser\nSELECT 1 {{w:WHERE 2 = 2}};\n")]
-    [InlineData("-- name: GetUser\nSELECT 1;\n", "-- name: GetUser\n-- database: billing\nSELECT 1;\n")]
+    [InlineData(SqlTexts.GetUser, "-- name: GetUser\n-- database: billing\nSELECT 1;\n")]
     public async Task Run_QueryThatChanged_IsDescribedAgain(string before, string after)
     {
         await File.WriteAllTextAsync(_users, before, TestContext.Current.CancellationToken);
@@ -86,7 +84,7 @@ public sealed class DescribeRunTests : IDisposable
         _ = await _scene.DescribeAsync();
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 1;", "/* the first */\nSELECT 1;", StringComparison.Ordinal),
+            SqlTexts.TwoUsers.Replace("SELECT 1;", "/* the first */\nSELECT 1;", StringComparison.Ordinal),
             TestContext.Current.CancellationToken
         );
 
@@ -216,7 +214,7 @@ public sealed class DescribeRunTests : IDisposable
         _ = await _scene.DescribeAsync();
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 2;", "SELECT 22;", StringComparison.Ordinal),
+            SqlTexts.WithSecondQueryEdited(SqlTexts.TwoUsers),
             TestContext.Current.CancellationToken
         );
         _scene.Run.Environment.Clear();
@@ -326,7 +324,7 @@ public sealed class DescribeRunTests : IDisposable
     [Fact]
     public async Task Run_DescriberThatThrows_IsSqlsrc200WithoutTheConnectionAndNothingIsWritten()
     {
-        _scene.Describer.Exceptions["ListUsers"] = new InvalidOperationException($"bad {DescribeScene.Connection}");
+        _scene.Describer.Exceptions["ListUsers"] = new InvalidOperationException($"bad {Secrets.Connection}");
 
         var result = await _scene.DescribeAsync();
 
@@ -347,7 +345,7 @@ public sealed class DescribeRunTests : IDisposable
     public async Task Run_QueryThatWasDeleted_LosesItsEntry()
     {
         _ = await _scene.DescribeAsync();
-        await File.WriteAllTextAsync(_users, "-- name: GetUser\nSELECT 1;\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(_users, SqlTexts.GetUser, TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync();
 
@@ -360,7 +358,11 @@ public sealed class DescribeRunTests : IDisposable
     {
         _ = await _scene.DescribeAsync();
         File.Exists(Sidecar).ShouldBeTrue();
-        await File.WriteAllTextAsync(_users, "-- output: sql\n" + Users, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            _users,
+            "-- output: sql\n" + SqlTexts.TwoUsers,
+            TestContext.Current.CancellationToken
+        );
 
         var result = await _scene.DescribeAsync();
 

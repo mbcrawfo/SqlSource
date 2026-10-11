@@ -10,8 +10,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // The describe command from the command line to the exit code.  RunUnitTests holds every case of finding the unit.
 public class DescribeTests
 {
-    private const string Secret = "s3cret";
-
     [Fact]
     public async Task Run_HelpOfTheTool_ListsTheCommand()
     {
@@ -72,7 +70,7 @@ public class DescribeTests
     {
         using var run = new CliRun();
 
-        var result = await run.RunAsync("describe", "App.csproj", Secret);
+        var result = await run.RunAsync("describe", "App.csproj", Secrets.Word);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unexpected argument at position 3\n"));
     }
@@ -106,7 +104,7 @@ public class DescribeTests
     [Theory]
     [InlineData("describe", "--project")]
     [InlineData("describe", "--project=")]
-    [InlineData("describe", "App.slnx", "--project", Secret, "--project")]
+    [InlineData("describe", "App.slnx", "--project", Secrets.Word, "--project")]
     public async Task Run_ProjectOptionWithoutAValue_NamesTheOptionAndRunsNothing(params string[] args)
     {
         using var run = new CliRun();

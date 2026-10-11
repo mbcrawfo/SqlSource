@@ -11,9 +11,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // "--check" compares within what "describe" with the same filters would change, and counts what it found.
 public sealed class CheckFilterTests : IDisposable
 {
-    private const string Users =
-        "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
-
     private static readonly QueryDescription Rows = new(
         SidecarResultKind.Rows,
         EquatableArray<DescribedParameter>.Empty,
@@ -32,7 +29,7 @@ public sealed class CheckFilterTests : IDisposable
         // "Invoices.sql" comes before "Users.sql", so the plan holds "billing" first.
         _ = _scene.Project.AddSql("Invoices.sql", "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n");
         _plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
-        _users = _scene.Project.AddSql("Users.sql", Users);
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.Users);
         // Two units stand in the working directory for the test of "--project", so each run names its own.
         _ = _scene.Run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"App.csproj\" /></Solution>");
     }

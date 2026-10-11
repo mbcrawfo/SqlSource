@@ -9,9 +9,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // The lines that end a run: one for each selected database, and one for each name of "--database".
 public sealed class SummaryTests : IDisposable
 {
-    private const string Users =
-        "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
-
     private readonly DescribeScene _scene = new();
     private readonly string _users;
 
@@ -19,7 +16,7 @@ public sealed class SummaryTests : IDisposable
     {
         // "Invoices.sql" comes before "Users.sql", so the plan holds "billing" first.
         _ = _scene.Project.AddSql("Invoices.sql", "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n");
-        _users = _scene.Project.AddSql("Users.sql", Users);
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.Users);
     }
 
     public void Dispose() => _scene.Dispose();
@@ -45,7 +42,7 @@ public sealed class SummaryTests : IDisposable
         _ = await _scene.DescribeAsync();
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 2;", "SELECT 22;", StringComparison.Ordinal) + "\n-- name: Bad\nSELECT 4;\n",
+            SqlTexts.WithSecondQueryEdited(SqlTexts.Users) + "\n-- name: Bad\nSELECT 4;\n",
             TestContext.Current.CancellationToken
         );
         _scene.Describer.Failures["Bad"] = FakeDescriber.Failure("Bad");
