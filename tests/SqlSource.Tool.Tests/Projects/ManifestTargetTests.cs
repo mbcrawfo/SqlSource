@@ -67,9 +67,9 @@ public sealed class ManifestTargetTests : IDisposable
         lines[4].ShouldStartWith("DefineConstants=");
     }
 
-    // Run by name, a project has only the constants it sets itself, TRACE among them: the SDK adds the constants of
-    // the framework on the way to a compile, which the manifest target depends on.  Without them the tool would not
-    // find an attribute under "#if NET8_0_OR_GREATER".
+    // The SDK adds the constants of the framework only on the way to a compile, so the manifest target depends on
+    // that step, AddImplicitDefineConstants.  Without them the tool would not find an attribute under
+    // "#if NET8_0_OR_GREATER".
     [Fact]
     public void WriteManifest_ProjectWithOneFramework_HasTheConstantsOfItsFramework()
     {

@@ -33,7 +33,7 @@ Dispatch these at once, each as a read-only subagent with the brief in [sweeps.m
 A move changes a namespace: `dotnet_style_namespace_match_folder` is on, and the build treats IDE0130 as an error everywhere but `Polyfills/`.  A child namespace sees its parent without a `using`; the parent, and every other consumer, needs one.  So the cost of a move is the number of files outside the new folder that reference its types, the files that stay in the parent folder included.  Count it with a whole-word grep over `src` and `tests` before deciding, and:
 
 - Move when the group is a concept with a name, references little of what stays, and costs under about twenty `using` lines.
-- Leave a group that a dozen folders reference (`SqlDialect`), a group that cuts across a sequence an AGENTS.md narrates as one (the steps of `Describing/`), and the three harness files of `tests/SqlSource.Tests/Generator/` that two other projects compile by exact path.
+- Leave a group that a dozen folders reference (`SqlDialect`), a group that cuts across a sequence an AGENTS.md narrates as one (the steps of `Describing/`), and `tests/SqlSource.Tests/Generator/`, which `tests/SqlSource.Tests.RoslynFloor` compiles whole and three of whose files `tests/SqlSource.Tool.Tests` links by exact path.
 - `tests/SqlSource.Tests/Snapshot/Examples/`, `tests/SqlSource.Tool.Tests/Fixtures/Projects/` and `AnalyzerReleases.*.md` stay where their `.csproj` names them.
 - A test moves with its type, into the mirrored folder.
 

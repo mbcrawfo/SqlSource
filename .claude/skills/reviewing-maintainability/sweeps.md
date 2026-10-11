@@ -8,7 +8,7 @@ Give the folder sizes (files and lines, from `find` and `wc`).  For each folder 
 
 ## AGENTS.md accuracy
 
-For each AGENTS.md: extract every file path, folder, type, member, test name, MSBuild target or property, diagnostic id, script, workflow and job name, and verify each exists.  Then check the verifiable claims: "only X does Y" by grepping for other sites, "A uses nothing of B" by reading the `using` directives, "each Collect is wrapped", "every step has a name", which test holds which rule, the pins in `Directory.Packages.props` and `global.json`, what `pre-commit-validation.sh` and the workflows run.  Flag guidance about future work and say whether the code shows it still true.  Name folders with non-obvious constraints that no AGENTS.md covers.  Report only what is wrong; give counts of what was checked.
+For each AGENTS.md: extract every file path, folder, type, member, test name, MSBuild target or property, diagnostic id, script, workflow and job name, and verify each exists.  Then check the verifiable claims: "only X does Y" by grepping for other sites, "A uses nothing of B" by reading the `using` directives, "each Collect is wrapped", "every step has a name", which test holds which rule, the pins in `Directory.Packages.props` and `global.json`, what `pre-commit-validation.sh` and the workflows run.  Flag guidance about future work and say whether the code shows it still true.  A rule of the form "`X/` holds Y" is checked by listing `X/` and reading what each file does.  Name folders with non-obvious constraints that no AGENTS.md covers.  Report only what is wrong; give counts of what was checked.
 
 ## Comments, one sweep per project
 

@@ -5,7 +5,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Processes;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Commands;
+namespace SqlSource.Tool.Tests;
 
 public class ToolHostTests
 {
