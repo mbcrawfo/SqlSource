@@ -49,6 +49,13 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     // Returned in place of a failure, for a describer that says it failed and gives no reason.
     public bool OpenFailsWithNothing { get; set; }
 
+    // Returned in place of a session, for a describer that says it opened one and gives none.
+    public bool OpensWithNoSession { get; set; }
+
+    // When set, what it gives is returned for every query in place of the query's result: nothing at all, or an
+    // outcome that holds nothing.
+    public Func<Outcome<QueryDescription, DescribeFailure>?>? DescribeResult { get; set; }
+
     public Exception? CloseException { get; set; }
 
     // Runs before each query is described, for a test that cancels the run there.
@@ -101,6 +108,11 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
                     return Task.FromResult(Outcome<IDescribeSession, DescribeFailure>.Failed(null!));
                 }
 
+                if (OpensWithNoSession)
+                {
+                    return Task.FromResult(Outcome<IDescribeSession, DescribeFailure>.Of(null!));
+                }
+
                 return Task.FromResult(
                     OpenFailure is { } failure
                         ? Outcome<IDescribeSession, DescribeFailure>.Failed(failure)
@@ -134,6 +146,11 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
                     if (owner.Exceptions.TryGetValue(asked.Name, out var exception))
                     {
                         throw exception;
+                    }
+
+                    if (owner.DescribeResult is { } result)
+                    {
+                        return result()!;
                     }
 
                     return owner.Failures.TryGetValue(asked.Name, out var failure)

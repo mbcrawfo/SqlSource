@@ -392,16 +392,54 @@ public sealed class DatabaseRunsTests : IDisposable
             .ShouldBe(["System.InvalidOperationException", "A describer returned nothing."]);
     }
 
-    [Fact]
-    public async Task Run_DescriberThatFailsWithNoFailure_IsAFault()
+    private async Task ShouldBeTheFaultOfNothingAsync()
     {
-        _describer.OpenFailsWithNothing = true;
-
         var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
 
         fault
             .Diagnostic.Arguments.ToArray()
             .ShouldBe(["System.InvalidOperationException", "A describer returned nothing."]);
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatFailsWithNoFailure_IsAFault()
+    {
+        _describer.OpenFailsWithNothing = true;
+
+        await ShouldBeTheFaultOfNothingAsync();
+    }
+
+    // An outcome that says it succeeded and holds no value is nothing too: the run reads the value, not the claim.
+    [Fact]
+    public async Task Run_DescriberThatOpensWithNoSession_IsAFault()
+    {
+        _describer.OpensWithNoSession = true;
+
+        await ShouldBeTheFaultOfNothingAsync();
+    }
+
+    [Fact]
+    public async Task Run_SessionThatReturnsNothingForAQuery_IsAFault()
+    {
+        _describer.DescribeResult = static () => null;
+
+        await ShouldBeTheFaultOfNothingAsync();
+    }
+
+    [Fact]
+    public async Task Run_SessionThatDescribesWithNoDescription_IsAFault()
+    {
+        _describer.DescribeResult = static () => Outcome<QueryDescription, DescribeFailure>.Of(null!);
+
+        await ShouldBeTheFaultOfNothingAsync();
+    }
+
+    [Fact]
+    public async Task Run_SessionThatFailsAQueryWithNoFailure_IsAFault()
+    {
+        _describer.DescribeResult = static () => Outcome<QueryDescription, DescribeFailure>.Failed(null!);
+
+        await ShouldBeTheFaultOfNothingAsync();
     }
 
     [Fact]
