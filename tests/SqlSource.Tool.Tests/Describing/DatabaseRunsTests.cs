@@ -393,6 +393,18 @@ public sealed class DatabaseRunsTests : IDisposable
     }
 
     [Fact]
+    public async Task Run_DescriberThatFailsWithNoFailure_IsAFault()
+    {
+        _describer.OpenFailsWithNothing = true;
+
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault
+            .Diagnostic.Arguments.ToArray()
+            .ShouldBe(["System.InvalidOperationException", "A describer returned nothing."]);
+    }
+
+    [Fact]
     public async Task Run_SessionThatThrowsWhenItIsClosed_IsAFaultWithoutTheConnection()
     {
         _describer.CloseException = new IOException($"lost {Secret}");

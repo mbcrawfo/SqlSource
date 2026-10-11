@@ -14,5 +14,8 @@ internal interface IDescribeSession : IAsyncDisposable
     ServerInfo Server { get; }
 
     /// <summary>Describes one query.  The SQL is text: a describer that needs its lexemes lexes it itself.</summary>
-    Task<DescribeResult> DescribeAsync(DescribeRequest request, CancellationToken cancellationToken);
+    Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
+        DescribeRequest request,
+        CancellationToken cancellationToken
+    );
 }

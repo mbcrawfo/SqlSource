@@ -46,6 +46,9 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     // Returned in place of a result, for a describer that returns nothing.
     public bool OpensNothing { get; set; }
 
+    // Returned in place of a failure, for a describer that says it failed and gives no reason.
+    public bool OpenFailsWithNothing { get; set; }
+
     public Exception? CloseException { get; set; }
 
     // Runs before each query is described, for a test that cancels the run there.
@@ -71,7 +74,11 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
             "check the SQL"
         );
 
-    public Task<OpenResult> OpenAsync(OpenRequest request, IRunLog log, CancellationToken cancellationToken) =>
+    public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
+        OpenRequest request,
+        IRunLog log,
+        CancellationToken cancellationToken
+    ) =>
         request.Exchange.AskAsync(
             "open",
             request.Database,
@@ -86,13 +93,18 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
 
                 if (OpensNothing)
                 {
-                    return Task.FromResult<OpenResult>(null!);
+                    return Task.FromResult<Outcome<IDescribeSession, DescribeFailure>>(null!);
+                }
+
+                if (OpenFailsWithNothing)
+                {
+                    return Task.FromResult(Outcome<IDescribeSession, DescribeFailure>.Failed(null!));
                 }
 
                 return Task.FromResult(
                     OpenFailure is { } failure
-                        ? OpenResult.Failed(failure)
-                        : OpenResult.Opened(new Session(this, request.Exchange, log))
+                        ? Outcome<IDescribeSession, DescribeFailure>.Failed(failure)
+                        : Outcome<IDescribeSession, DescribeFailure>.Of(new Session(this, request.Exchange, log))
                 );
             },
             cancellationToken
@@ -102,7 +114,10 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     {
         public ServerInfo Server => owner.Server;
 
-        public Task<DescribeResult> DescribeAsync(DescribeRequest request, CancellationToken cancellationToken) =>
+        public Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
+            DescribeRequest request,
+            CancellationToken cancellationToken
+        ) =>
             exchange.AskAsync(
                 "describe",
                 request,
@@ -122,8 +137,10 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
                     }
 
                     return owner.Failures.TryGetValue(asked.Name, out var failure)
-                        ? DescribeResult.Failed(failure)
-                        : DescribeResult.Described(owner.Descriptions.GetValueOrDefault(asked.Name, NoRows));
+                        ? Outcome<QueryDescription, DescribeFailure>.Failed(failure)
+                        : Outcome<QueryDescription, DescribeFailure>.Of(
+                            owner.Descriptions.GetValueOrDefault(asked.Name, NoRows)
+                        );
                 },
                 cancellationToken
             );

@@ -66,14 +66,14 @@ public class DescriberTests
             NullRunLog.Instance,
             token
         );
-        await using var session = opened.Session.ShouldNotBeNull();
+        await using var session = opened.Value.ShouldNotBeNull();
         var described = await session.DescribeAsync(
             new DescribeRequest("GetUser", "SELECT 1;", EquatableArray<SqlQueryParameter>.Empty),
             token
         );
 
         exchange.Methods.ShouldBe(["open", "describe"]);
-        described.Description.ShouldBe(FakeDescriber.NoRows);
+        described.Value.ShouldBe(FakeDescriber.NoRows);
         describer.Opened.ShouldHaveSingleItem().Database.ShouldBe("billing");
         describer.Described.ShouldHaveSingleItem().Name.ShouldBe("GetUser");
     }
@@ -91,10 +91,10 @@ public class DescriberTests
             token
         );
         var described = await opened
-            .Session.ShouldNotBeNull()
+            .Value.ShouldNotBeNull()
             .DescribeAsync(new DescribeRequest("GetUser", "SELECT 1;", EquatableArray<SqlQueryParameter>.Empty), token);
 
-        described.Description.ShouldBeNull();
+        described.Value.ShouldBeNull();
         described.Failure.ShouldNotBeNull().Step.ShouldBe(DescribeStep.DescribeColumns);
     }
 
