@@ -246,6 +246,36 @@ public sealed class ProjectEvaluatorTests : IDisposable
         _runner.Requests.Count.ShouldBe(1);
     }
 
+    // The second evaluation of a project with several frameworks fails as the first does, and no target is run.
+    [Fact]
+    public async Task Evaluate_ProjectWithSeveralFrameworksWhoseSecondEvaluationFails_IsSqlsrc205AndRunsNoTarget()
+    {
+        var project = new FakeProject
+        {
+            TargetFrameworks = "net8.0;net10.0",
+            Error = "App.csproj(3,5): error MSB4019: no such import",
+        };
+        _runner.Default = project;
+        _runner.BeforeAnswer = (request, _) =>
+        {
+            if (FakeProcessRunner.PropertyOf(request, "TargetFramework") is not null)
+            {
+                project.EvaluationExitCode = 1;
+            }
+
+            return Task.CompletedTask;
+        };
+
+        var evaluation = await EvaluateAsync();
+
+        ShouldBeSqlsrc205(
+            evaluation,
+            ("reason", "dotnet msbuild ended with the exit code 1"),
+            ("msbuild", "App.csproj(3,5): error MSB4019: no such import")
+        );
+        _runner.Requests.Count.ShouldBe(2);
+    }
+
     [Fact]
     public async Task Evaluate_RunThatPrintsManyLines_ShowsTheFirstTwenty()
     {
