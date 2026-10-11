@@ -278,13 +278,21 @@ internal static class DescribeCommand
         }
 
         return new DescribeOptions(
-            parsed.GetValue<bool>(ForceOption),
-            parsed.GetValue<bool>(CheckOption),
+            ModeOf(parsed),
             projects.Length > 0 || databases.Length > 0 || paths.Any(SqlPath.IsSqlFile),
             connections.ToImmutable(),
             [.. databases.Distinct(StringComparer.OrdinalIgnoreCase)]
         );
     }
+
+    // --check beside --force is --check: it describes every query, as --force does, and writes nothing.
+    private static RunMode ModeOf(ParseResult parsed) =>
+        (parsed.GetValue<bool>(CheckOption), parsed.GetValue<bool>(ForceOption)) switch
+        {
+            (true, _) => RunMode.Check,
+            (false, true) => RunMode.Force,
+            _ => RunMode.Describe,
+        };
 
     /// <summary>
     /// Builds the plan of the run that a command line asks for, and reports what is wrong with it.  Null when there

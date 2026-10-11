@@ -27,8 +27,7 @@ internal static class DescribeRun
     {
         // 1 and 2: what is there, and what each query needs.
         var errors = new List<ToolDiagnostic>();
-        // --check describes every selected query, as --force does.
-        var files = RunDecisions.Decide(plan, options.Force || options.Check, errors, options.Check);
+        var files = RunDecisions.Decide(plan, options.Mode, errors);
         foreach (var error in errors)
         {
             reporter.Report(error);
@@ -56,10 +55,12 @@ internal static class DescribeRun
 
         // 4: a run that was cancelled changes no file.
         cancellationToken.ThrowIfCancellationRequested();
-        // Nothing is deleted after an error: the plan drops a setting or a claim it could not read, and the file
-        // then looks as if it needs no entry.
-        var outcomes = FileOutcomes.Decide(files, options.HasFilter, reporter.Count > 0, SidecarOnDisk.Read);
-        if (options.Check)
+        // A sidecar is deleted only by a run on the whole, which knows what every file needs, and never after an
+        // error: the plan drops a setting or a claim it could not read, and the file then looks as if it needs no
+        // entry.
+        var mayDelete = !options.HasFilter && reporter.Count == 0;
+        var outcomes = FileOutcomes.Decide(files, mayDelete, SidecarOnDisk.Read);
+        if (options.Mode == RunMode.Check)
         {
             var checks = SidecarCheck.Compare(files, outcomes, options.Databases);
             for (var index = 0; index < checks.Length; index++)
@@ -72,7 +73,7 @@ internal static class DescribeRun
 
                 if (CheckedAs(files[index], check) is { } action)
                 {
-                    RunEvents.Sidecar(trace, check.SidecarPath, action);
+                    RunEvents.Sidecar(trace, check.Outcome.SidecarPath, action);
                 }
             }
         }
@@ -81,7 +82,7 @@ internal static class DescribeRun
             SidecarStore.Apply(outcomes, reporter, cancellationToken);
         }
 
-        trace.Databases = RunSummary.Counts(selected, files, options.Check);
+        trace.Databases = RunSummary.Counts(selected, files, options.Mode);
 
         // 5.  The summary.  The exit code is Cli.ExitCodeOf's, from the reporter's counts.
         var lines = RunSummary.Lines(
@@ -90,7 +91,7 @@ internal static class DescribeRun
             files,
             connections,
             options.Databases,
-            options.Check
+            options.Mode
         );
         foreach (var line in lines)
         {

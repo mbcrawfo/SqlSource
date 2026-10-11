@@ -75,12 +75,7 @@ internal static class SidecarCheck
         // A file none of whose queries could be described is compared with nothing: its errors stand.
         if (described.Count == 0)
         {
-            return new FileCheck(
-                file.File,
-                outcome.SidecarPath,
-                WasCompared: false,
-                EquatableArray<ToolDiagnostic>.Empty
-            );
+            return new FileCheck(outcome, WasCompared: false, EquatableArray<ToolDiagnostic>.Empty);
         }
 
         // A check that cannot compare is not a check that passed: a described query means the sidecar was read.
@@ -234,5 +229,5 @@ internal static class SidecarCheck
         ToolDiagnostic.AtFile(ToolDiagnostics.SidecarOutOfDate, sidecarPath, sql, what).WithLines(help);
 
     private static FileCheck Of(FileOutcome outcome, IEnumerable<ToolDiagnostic> differences) =>
-        new(outcome.File, outcome.SidecarPath, WasCompared: true, new EquatableArray<ToolDiagnostic>([.. differences]));
+        new(outcome, WasCompared: true, new EquatableArray<ToolDiagnostic>([.. differences]));
 }

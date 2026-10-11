@@ -62,7 +62,7 @@ public sealed class DatabaseRunsTests : IDisposable
     )
     {
         plan ??= Plans.Of(_project);
-        var files = _files = RunDecisions.Decide(plan, force: false, []);
+        var files = _files = RunDecisions.Decide(plan, RunMode.Describe, []);
         var selected = RunDecisions.SelectedDatabases(plan);
         var connections = Connections.Resolve(
             [.. selected.Select(database => database.Name)],

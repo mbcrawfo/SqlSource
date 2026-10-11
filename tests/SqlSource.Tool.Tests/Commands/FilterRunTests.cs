@@ -137,6 +137,27 @@ public sealed class FilterRunTests : IDisposable
         File.Exists(_plain + ".json").ShouldBeFalse();
     }
 
+    // The plan drops a setting or a claim it could not read, so after an error a file can look as if it needs no
+    // entry.  A run that reported anything deletes nothing.
+    [Fact]
+    public async Task Run_FileThatNeedsNoEntry_KeepsItsSidecarInARunThatReportedAnError()
+    {
+        _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser", "relation \"users\" does not exist");
+        await File.WriteAllTextAsync(
+            _plain + ".json",
+            "of a query that needed an entry once",
+            TestContext.Current.CancellationToken
+        );
+
+        var result = await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("SQLSRC999");
+        (await File.ReadAllTextAsync(_plain + ".json", TestContext.Current.CancellationToken)).ShouldBe(
+            "of a query that needed an entry once"
+        );
+    }
+
     // A sidecar of a newer tool is left alone by a run that is allowed to delete, as it is by one that reads it.
     [Fact]
     public async Task Run_FileThatNeedsNoEntryWithASidecarOfAHigherFormat_KeepsItAndReportsNothing()

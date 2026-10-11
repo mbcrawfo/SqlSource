@@ -23,8 +23,8 @@ internal static class RunSummary
     /// <param name="files">The files, with every query described, kept, failed or left out.</param>
     /// <param name="connections">The connections of the selected databases.</param>
     /// <param name="named">The names of <c>--database</c>.</param>
-    /// <param name="check">
-    /// Whether the run is <c>--check</c>, whose counts are <c>same</c>, <c>differ</c> and <c>failed</c>.
+    /// <param name="mode">
+    /// The run's mode: the counts of <c>--check</c> are <c>same</c>, <c>differ</c> and <c>failed</c>.
     /// </param>
     public static ImmutableArray<string> Lines(
         ImmutableArray<PlannedDatabase> planned,
@@ -32,9 +32,10 @@ internal static class RunSummary
         ImmutableArray<FileWork> files,
         Connections connections,
         ImmutableArray<string> named,
-        bool check
+        RunMode mode
     )
     {
+        var check = mode == RunMode.Check;
         var zeros = check ? "0 same, 0 differ, 0 failed" : "0 described, 0 skipped, 0 failed";
         var lines = ImmutableArray.CreateBuilder<string>();
         foreach (var database in selected)
@@ -87,12 +88,16 @@ internal static class RunSummary
     /// </summary>
     /// <param name="selected">The selected databases.</param>
     /// <param name="files">The files, with every query described, kept, failed or left out.</param>
-    /// <param name="check">Whether the run is <c>--check</c>.</param>
+    /// <param name="mode">The run's mode: <c>--check</c> counts in its own words.</param>
     public static LogValue Counts(
         ImmutableArray<PlannedDatabase> selected,
         ImmutableArray<FileWork> files,
-        bool check
-    ) => LogValue.ListOf(selected.Select(database => Counts(database, files, check)));
+        RunMode mode
+    )
+    {
+        var check = mode == RunMode.Check;
+        return LogValue.ListOf(selected.Select(database => Counts(database, files, check)));
+    }
 
     private static LogValue Counts(PlannedDatabase database, ImmutableArray<FileWork> files, bool check)
     {
