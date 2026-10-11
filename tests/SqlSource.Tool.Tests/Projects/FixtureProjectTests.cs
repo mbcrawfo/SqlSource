@@ -246,45 +246,30 @@ public sealed class FixtureProjectTests : IDisposable
         Failure(evaluation).ShouldBe("the project file does not exist");
     }
 
-    // The repository's own test project of the generator, where it is: it takes the package's files by path, and
-    // its end-to-end files have a dialect each way a file can be given one.
+    // Each value written over several lines, as the test project of the generator writes its own: the package's
+    // targets put a value on one line, and the manifest holds what they made of it.
     [Fact]
-    public async Task Evaluate_TestProjectOfTheGenerator_FindsItsFilesWithTheirDialects()
+    public async Task Evaluate_ProjectWhoseValuesAreWrittenOverSeveralLines_GivesEachOnOneLine()
     {
-        var folder = Path.Combine(RepositoryRoot(), "tests", "SqlSource.Tests");
-        var project = Path.Combine(folder, "SqlSource.Tests.csproj");
+        var project = _fixtures.Copy("SeveralLines");
+        var folder = Path.GetDirectoryName(project)!;
 
         var evaluation = await EvaluateAsync(project);
 
         evaluation.State.ShouldBe(ProjectState.UsesSqlSource, Failure(evaluation));
         var manifest = evaluation.Manifest.ShouldNotBeNull();
-        manifest.ProjectPath.ShouldBe(project);
-        manifest.TargetFramework.ShouldBe("net10.0");
-        manifest.DefineConstants.ShouldContain("NET10_0");
         manifest.Properties["SqlSourceDialect"].ShouldBe("postgres");
         manifest.Properties["SqlSourceGeneratorParameters"].ShouldBe("sort-input no-token-validation");
 
-        string EndToEnd(params string[] parts) => Path.Combine([folder, "EndToEnd", .. parts]);
+        string Query(params string[] parts) => Path.Combine([folder, "Queries", .. parts]);
         var files = manifest.Files.ToDictionary(file => file.Path, file => file.Metadata);
-        files[EndToEnd("Users.sql")].ShouldBeEmpty();
-        files[EndToEnd("Dialects", "ByMetadata.sql")]["SqlSourceDialect"].ShouldBe("mysql");
-        files[EndToEnd("Dialects", "ByOption.sql")]["SqlSourceDialect"].ShouldBe("mysql, no-backslash-escapes");
-        files[EndToEnd("Parameters", "Kept.sql")]
+        files.Count.ShouldBe(4);
+        files[Query("Users.sql")].ShouldBeEmpty();
+        files[Query("Dialects", "ByMetadata.sql")]["SqlSourceDialect"].ShouldBe("mysql");
+        files[Query("Dialects", "ByOption.sql")]["SqlSourceDialect"].ShouldBe("mysql, no-backslash-escapes");
+        files[Query("Parameters", "Kept.sql")]
             ["SqlSourceGeneratorParameters"]
             .ShouldBe("no-token-validation keep-comments");
-        manifest.CompileFiles.ShouldContain(EndToEnd("UserQueries.cs"));
-    }
-
-    private static string RepositoryRoot()
-    {
-        for (var folder = new DirectoryInfo(AppContext.BaseDirectory); folder is not null; folder = folder.Parent)
-        {
-            if (File.Exists(Path.Combine(folder.FullName, "SqlSource.slnx")))
-            {
-                return folder.FullName;
-            }
-        }
-
-        throw new InvalidOperationException("The tests do not run from a folder of the repository.");
+        manifest.CompileFiles.ShouldBe([Path.Combine(folder, "UserQueries.cs")]);
     }
 }

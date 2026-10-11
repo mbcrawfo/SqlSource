@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Processes;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Reporting;
 using Xunit;
@@ -182,10 +183,26 @@ public sealed class RunProjectsTests : IDisposable
     {
         _runner.Projects[_a] = new FakeProject { EvaluationExitCode = 1, Error = "error of A" };
         _runner.Projects[_c] = new FakeProject { Manifest = "SqlSourceManifest=7\n" };
-        // A answers last.
-        _runner.BeforeAnswer = (request, token) => Task.Delay(request.Arguments[1] == _a ? 80 : 0, token);
+        var gate = _runner.Gate = new ProcessGate();
 
-        var manifests = await FindInSolutionAsync();
+        var find = FindInSolutionAsync();
+        // A is answered last: its one request waits while B and C are asked about twice each.
+        ProcessRequest? ofA = null;
+        for (var arrived = 0; arrived < 5; arrived++)
+        {
+            var request = await gate.ArrivalAsync();
+            if (request.Arguments[1] == _a)
+            {
+                ofA = request;
+            }
+            else
+            {
+                gate.Release(request);
+            }
+        }
+
+        gate.Release(ofA.ShouldNotBeNull());
+        var manifests = await find;
 
         manifests.ShouldHaveSingleItem().ProjectPath.ShouldBe(_b);
         var errors = _error.ToString();

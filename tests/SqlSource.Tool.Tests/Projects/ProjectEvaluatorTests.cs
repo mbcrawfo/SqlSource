@@ -422,11 +422,20 @@ public sealed class ProjectEvaluatorTests : IDisposable
     public async Task Evaluate_SeveralProjects_GivesThemInTheirOrderWhateverEndsFirst()
     {
         var projects = Projects(6);
-        // The first project is the last to answer.
-        _runner.BeforeAnswer = (request, token) =>
-            Task.Delay(60 - (10 * Array.IndexOf(projects, request.Arguments[1])), token);
+        _processors = projects.Length;
+        var gate = _runner.Gate = new ProcessGate();
 
-        var evaluations = await EvaluateAsync(projects);
+        var run = EvaluateAsync(projects);
+        // Each project is asked about twice.  The last project gets both its answers first, and the first project
+        // gets its own last.
+        var evaluated = await gate.ArrivalsAsync(projects.Length);
+        foreach (var project in Enumerable.Reverse(projects))
+        {
+            gate.Release(evaluated.Single(request => request.Arguments[1] == project));
+            gate.Release(await gate.ArrivalAsync());
+        }
+
+        var evaluations = await run;
 
         evaluations.Select(evaluation => evaluation.ProjectPath).ShouldBe(projects);
         evaluations.Select(evaluation => evaluation.Manifest.ShouldNotBeNull().ProjectPath).ShouldBe(projects);
@@ -442,9 +451,26 @@ public sealed class ProjectEvaluatorTests : IDisposable
     )
     {
         _processors = processors;
-        _runner.BeforeAnswer = (_, token) => Task.Delay(30, token);
+        var gate = _runner.Gate = new ProcessGate();
+        var projects = Projects(20);
 
-        var evaluations = await EvaluateAsync(Projects(20));
+        var run = EvaluateAsync(projects);
+        // Each project is asked about twice.  As many requests are held as may run at once, and then one is let go
+        // for each that comes, so that number waits to the end.  With a lower limit that many never come, and with
+        // a higher one a further request comes while they wait.
+        var held = (await gate.ArrivalsAsync(expected)).ToList();
+        for (var arrived = expected; arrived < 2 * projects.Length; arrived++)
+        {
+            // An evaluation before a manifest run: the manifest run of the same project follows it, and what
+            // follows a manifest run is the next project, which there may not be.
+            var next = held.Find(request => !FakeProcessRunner.IsManifestRun(request)) ?? held[0];
+            _ = held.Remove(next);
+            gate.Release(next);
+            held.Add(await gate.ArrivalAsync());
+        }
+
+        gate.Open();
+        var evaluations = await run;
 
         evaluations.ShouldAllBe(evaluation => evaluation.State == ProjectState.UsesSqlSource);
         _runner.MostAtOnce.ShouldBe(expected);
@@ -454,9 +480,13 @@ public sealed class ProjectEvaluatorTests : IDisposable
     [Fact]
     public async Task Evaluate_TwoRunsAtOnceOnOneProject_DoNotShareAManifestFile()
     {
-        _runner.BeforeAnswer = (_, token) => Task.Delay(20, token);
+        var gate = _runner.Gate = new ProcessGate();
 
-        var both = await Task.WhenAll(EvaluateAsync([_project]), EvaluateAsync([_project]));
+        var runs = Task.WhenAll(EvaluateAsync([_project]), EvaluateAsync([_project]));
+        // Each run has asked and neither has an answer, so both have their folders.
+        _ = await gate.ArrivalsAsync(2);
+        gate.Open();
+        var both = await runs;
 
         both.ShouldAllBe(evaluations => evaluations[0].State == ProjectState.UsesSqlSource);
         _runner
