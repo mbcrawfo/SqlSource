@@ -1,0 +1,23 @@
+# Briefs for the review sweeps
+
+Each sweep is a read-only subagent.  Every brief starts with: the repository root, that nothing may be modified, and that `.claude/worktrees/`, `bin/` and `obj/` are ignored.  Each report gives `path:line`, the evidence, and the proposed text or action, and ends with the list of files read that had no findings, so coverage is known.
+
+## Folder structure
+
+Give the folder sizes (files and lines, from `find` and `wc`).  For each folder over about twenty files: `ls` it, read the first thirty lines of each file for the type and its dependencies, group by cohesion, and propose a sub-folder only for a group of four or more files with a crisp name and few references to the rest of the folder.  For each proposal: the files, the count of `using` lines the move implies (a whole-word grep over `src` and `tests`; a file that stays in the parent folder counts, since a parent namespace does not see a child), the AGENTS.md lines that name the files, and a move-or-leave recommendation, ranked by value for risk.  State the constraints: namespaces follow folders; `tests/SqlSource.Tests/Generator/` is compiled by `tests/SqlSource.Tests.RoslynFloor` and three of its files by `tests/SqlSource.Tool.Tests` by exact path; the examples and fixtures are bound by their `.csproj`.  Ask whether any non-C# file moves with a group.
+
+## AGENTS.md accuracy
+
+For each AGENTS.md: extract every file path, folder, type, member, test name, MSBuild target or property, diagnostic id, script, workflow and job name, and verify each exists.  Then check the verifiable claims: "only X does Y" by grepping for other sites, "A uses nothing of B" by reading the `using` directives, "each Collect is wrapped", "every step has a name", which test holds which rule, the pins in `Directory.Packages.props` and `global.json`, what `pre-commit-validation.sh` and the workflows run.  Flag guidance about future work and say whether the code shows it still true.  Name folders with non-obvious constraints that no AGENTS.md covers.  Report only what is wrong; give counts of what was checked.
+
+## Comments, one sweep per project
+
+Read every `.cs`, `.props` and `.targets` file in full.  Report comments that are incorrect (the code does otherwise; a name that does not exist; a `<param>` that disagrees with the signature), outdated (future work now done or abandoned; a tech-debt id with no file in `docs/tech-debt/`), needlessly verbose (restates the code, repeats a sibling comment on the same member), or mismatched (a summary copied from a sibling type).  Say that invariants and contracts are documented on purpose and stay.  For a test, "incorrect" includes a comment that says the test checks what its assertions do not.  Propose the corrected text, or "delete".  Verify before reporting.
+
+## Patterns in `src/`
+
+Read both AGENTS.md files first and exclude what they call deliberate.  Look for duplicated logic in two places, dead members, types over about four hundred lines or methods over about eighty with several responsibilities, conventions that differ across siblings for one concept, parallel lists maintained by hand with no test pinning them, parameter lists of seven or more, boolean cascades, order dependencies nothing enforces, mutable statics.  For each: `path:line`, the second location or the count, the call sites, a one-line fix.  Eight to twenty real findings, ranked; say which folders came up clean.
+
+## Patterns in `tests/`
+
+Read the root AGENTS.md and the test projects' `.csproj` files first.  Look for the same arrange code in several classes, fakes of one interface written twice, copy-pasted bodies that should be theories or theories whose rows change the arrangement, inconsistent naming or assertion style, classes over about six hundred lines that mix subjects, tests that depend on the working directory, test order, sleeps, the real clock or programs on the path with no skip guard, magic strings repeated across classes, helpers duplicated between the two test projects, and what the compile-three-times arrangement blocks from being shared.  Same output shape as the `src/` sweep.

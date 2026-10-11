@@ -28,6 +28,10 @@ Every commit must pass `./pre-commit-validation.sh`.  In Claude Code this is enf
 1. **Reply to every CodeRabbit finding.**  When you act on a comment, reply in its thread with what you changed.  When you do not act on one, reply in its thread with the reason: the rule or decision it conflicts with, or why the finding does not apply.  Never leave a finding unanswered or skip one silently.
 2. **Check the version before you open a pull request.**  Run `git fetch --tags origin`, then compare `VersionPrefix` in `Directory.Build.props` with the highest release tag, `git tag --list 'v*' --sort=-v:refname | head -n 1`.  If `VersionPrefix` is not greater than that tag, ask the user what the new version should be and set it in the same pull request.  When the repository has no `v*` tags there is nothing to compare.
 
+## Reviewing maintainability
+
+A periodic review of folder growth, AGENTS.md accuracy, comments and duplicated patterns follows the skill in `.claude/skills/reviewing-maintainability/`, which says what is fixed in the review's pull request and what is recorded in `docs/tech-debt`.
+
 ## Adding guidance for AI agents
 
 1. Always use AGENTS.md files for AI guidance.
