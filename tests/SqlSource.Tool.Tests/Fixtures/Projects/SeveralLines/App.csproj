@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Each value of the package that a project or a file can have, with one word on each line, as
+        tests/SqlSource.Tests writes its own.  The manifest must hold each on one line.  Queries/Users.sql has no
+        value of its own.
+    -->
+    <Import Project="../build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <SqlSourceGeneratorParameters>
+            sort-input
+            no-token-validation
+        </SqlSourceGeneratorParameters>
+        <SqlSourceDialect>
+            postgres
+        </SqlSourceDialect>
+    </PropertyGroup>
+    <ItemGroup>
+        <AdditionalFiles Update="Queries/Dialects/ByMetadata.sql">
+            <SqlSourceDialect>
+                mysql
+            </SqlSourceDialect>
+        </AdditionalFiles>
+        <AdditionalFiles Update="Queries/Dialects/ByOption.sql">
+            <SqlSourceDialect>
+                mysql,
+                no-backslash-escapes
+            </SqlSourceDialect>
+        </AdditionalFiles>
+        <AdditionalFiles Update="Queries/Parameters/Kept.sql">
+            <SqlSourceGeneratorParameters>
+                no-token-validation
+                keep-comments
+            </SqlSourceGeneratorParameters>
+        </AdditionalFiles>
+    </ItemGroup>
+    <Import Project="../build/SqlSource.targets" />
+</Project>

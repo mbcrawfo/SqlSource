@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Immutable;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -10,17 +9,15 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Processes;
 
-// The runner of a real run, with real programs: "dotnet", and three that every operating system has.
+// The runner of a real run, with real programs: "dotnet", and ones that every operating system has.  A test of one
+// of those is skipped where the program is not on the path.  ProcessRunnerEnvironmentTests has the test of the
+// variables that a program gets.
 public class ProcessRunnerTests
 {
     private static readonly ProcessRunner Runner = new();
 
     private static ProcessRequest Request(string program, params string[] arguments) =>
-        new(program, [.. arguments], Path.GetTempPath(), [], []);
-
-    // Prints the environment, one variable on a line.
-    private static ProcessRequest PrintEnvironment() =>
-        OperatingSystem.IsWindows() ? Request("cmd", "/c", "set") : Request("env");
+        Programs.Request(program, arguments);
 
     // Waits for half a minute.
     private static ProcessRequest Wait() =>
@@ -49,27 +46,10 @@ public class ProcessRunnerTests
     }
 
     [Fact]
-    public async Task Run_VariableSet_ReachesTheProgramAndVariableRemovedDoesNot()
-    {
-        Environment.SetEnvironmentVariable("SQLSOURCE_TEST_REMOVED", "removed");
-        Environment.SetEnvironmentVariable("SQLSOURCE_TEST_KEPT", "kept");
-        var request = PrintEnvironment() with
-        {
-            SetVariables = ImmutableDictionary<string, string>.Empty.Add("SQLSOURCE_TEST_SET", "set"),
-            RemovedVariables = ["SQLSOURCE_TEST_REMOVED", "SQLSOURCE_TEST_NEVER_SET"],
-        };
-
-        var result = await Runner.RunAsync(request, TestContext.Current.CancellationToken);
-
-        result.ExitCode.ShouldBe(0, result.Error);
-        result.Output.ShouldContain("SQLSOURCE_TEST_SET=set");
-        result.Output.ShouldContain("SQLSOURCE_TEST_KEPT=kept");
-        result.Output.ShouldNotContain("SQLSOURCE_TEST_REMOVED");
-    }
-
-    [Fact]
     public async Task Run_ProgramThatReadsItsInput_FindsTheEndOfIt()
     {
+        Programs.SkipUnlessOnPath("sort");
+
         // "sort" with no file reads its input to the end.  With an input left open it would never end.
         var result = await Runner.RunAsync(Request("sort"), TestContext.Current.CancellationToken);
 
@@ -87,17 +67,18 @@ public class ProcessRunnerTests
         result.Error.ShouldNotBeEmpty();
     }
 
+    // The program has started when RunAsync gives its task.  Had the program ended by itself, nothing would throw.
     [Fact]
-    public async Task Run_Cancelled_KillsTheProgramAndThrows()
+    public async Task Run_Cancelled_Throws()
     {
+        var wait = Wait();
+        Programs.SkipUnlessOnPath(wait.Program);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var time = Stopwatch.StartNew();
 
-        var run = Runner.RunAsync(Wait(), cancel.Token);
-        cancel.CancelAfter(TimeSpan.FromMilliseconds(200));
+        var run = Runner.RunAsync(wait, cancel.Token);
+        await cancel.CancelAsync();
 
         _ = await Should.ThrowAsync<OperationCanceledException>(run);
-        time.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(15));
     }
 
     // The wait for a process ends when the token is cancelled, whether the process was killed or not.  So this
@@ -107,6 +88,8 @@ public class ProcessRunnerTests
     public async Task Run_Cancelled_LeavesNeitherTheProgramNorWhatItStartedRunning()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "The program is a shell script.  docs/tech-debt/TD-0028.");
+        Programs.SkipUnlessOnPath("sh");
+        Programs.SkipUnlessOnPath("sleep");
         using var folder = new TempFolder();
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
         var request = Request("sh", "-c", "echo $$ > parent; sleep 30 & echo $! > child; wait") with
