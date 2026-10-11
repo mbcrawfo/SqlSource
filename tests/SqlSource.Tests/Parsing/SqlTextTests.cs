@@ -31,8 +31,9 @@ public class SqlTextTests
     [InlineData("abcd", 0, 4, 4)]
     [InlineData("ab\ncd", 3, 5, 5)]
     [InlineData("ab\ncd\nef", 3, 8, 5)]
-    // A terminator at the end of the range is outside it.
+    // A terminator at the end of the range, or past it, is outside it.
     [InlineData("ab\ncd", 0, 2, 2)]
+    [InlineData("ab\ncd", 0, 1, 1)]
     [InlineData("ab\ncd", 2, 2, 2)]
     [InlineData("ab", 2, 2, 2)]
     // U+2028 ends a line of C#, not a line of SQL.
