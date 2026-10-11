@@ -3,7 +3,9 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using Shouldly;
+using SqlSource.Diagnostics;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Reporting;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Logging;
@@ -188,17 +190,15 @@ public sealed class RunLogFileTests : IDisposable
     }
 
     [Fact]
-    public void TryOpen_RelativePath_MakesTheFileInTheWorkingDirectoryAndEmptiesOneThatIsThere()
+    public void Open_RelativePath_MakesTheFileInTheWorkingDirectoryAndEmptiesOneThatIsThere()
     {
         var expected = _folder.WriteFile("run.log", "of an earlier run\n");
 
-        using var log = RunLogFile.TryOpen("run.log", _folder.Path, _clock, out var path, out _);
+        using var log = RunLogFile.Open("run.log", _folder.Path, _clock).Value.ShouldNotBeNull();
 
-        var opened = log.ShouldNotBeNull();
-        opened.Path.ShouldBe(expected);
-        path.ShouldBe(expected);
-        opened.Write("e");
-        opened.Dispose();
+        log.Path.ShouldBe(expected);
+        log.Write("e");
+        log.Dispose();
         File.ReadAllText(expected).ShouldBe(Head + "}\n");
     }
 
@@ -206,14 +206,20 @@ public sealed class RunLogFileTests : IDisposable
     [InlineData("")]
     [InlineData("no-such-folder/run.log")]
     [InlineData("folder")]
-    public void TryOpen_PathThatCannotBeWritten_GivesNoLogAndTheReason(string given)
+    public void Open_PathThatCannotBeWritten_GivesNoLogAndTheErrorWithTheReason(string given)
     {
         _ = _folder.CreateFolder("folder");
 
-        using var log = RunLogFile.TryOpen(given, _folder.Path, _clock, out _, out var reason);
+        var opened = RunLogFile.Open(given, _folder.Path, _clock);
+        opened.Value?.Dispose();
 
-        log.ShouldBeNull();
-        reason.ShouldNotBeEmpty();
+        opened.Succeeded.ShouldBeFalse();
+        var failure = opened.Failure.ShouldNotBeNull();
+        failure.Descriptor.ShouldBeSameAs(ToolDiagnostics.FileCannotBeChanged);
+        // The error is at the path, the full one when the system could make one, and quotes it first.
+        failure.Arguments[0].ShouldBe(failure.Path);
+        failure.Arguments[1].ShouldBe("written");
+        failure.Arguments[2].ShouldNotBeEmpty();
     }
 
     // A slip of the command line, "--log Users.sql", must not empty a file of the run: nothing is opened or made.
@@ -225,34 +231,41 @@ public sealed class RunLogFileTests : IDisposable
     [InlineData("App.slnx")]
     [InlineData("USERS.SQL")]
     [InlineData("sub/App.CsProj")]
-    public void TryOpen_PathOfAFileOfTheRun_GivesNoLogAndTheReasonAndLeavesTheFileAsItWas(string given)
+    public void Open_PathOfAFileOfTheRun_GivesNoLogAndTheReasonAndLeavesTheFileAsItWas(string given)
     {
         var existing = _folder.WriteFile(given, "of the run\n");
 
-        using var log = RunLogFile.TryOpen(given, _folder.Path, _clock, out var path, out var reason);
+        var opened = RunLogFile.Open(given, _folder.Path, _clock);
+        opened.Value?.Dispose();
 
-        log.ShouldBeNull();
-        path.ShouldBe(existing);
-        reason.ShouldBe("a log is not written over a .sql file, a sidecar, a project or a solution");
+        opened.Failure.ShouldBe(
+            ToolDiagnostic.ForFile(
+                ToolDiagnostics.FileCannotBeChanged,
+                existing,
+                "written",
+                "a log is not written over a .sql file, a sidecar, a project or a solution"
+            )
+        );
         File.ReadAllText(existing).ShouldBe("of the run\n");
     }
 
     [Fact]
-    public void TryOpen_PathOfAFileOfTheRunThatIsNotThere_MakesNothing()
+    public void Open_PathOfAFileOfTheRunThatIsNotThere_MakesNothing()
     {
-        using var log = RunLogFile.TryOpen("New.sql", _folder.Path, _clock, out _, out _);
+        var opened = RunLogFile.Open("New.sql", _folder.Path, _clock);
+        opened.Value?.Dispose();
 
-        log.ShouldBeNull();
+        opened.Succeeded.ShouldBeFalse();
         File.Exists(_folder.PathOf("New.sql")).ShouldBeFalse();
     }
 
     [Fact]
-    public void TryOpen_PathThatOnlyEndsLikeAFileOfTheRun_IsALog()
+    public void Open_PathThatOnlyEndsLikeAFileOfTheRun_IsALog()
     {
-        using var log = RunLogFile.TryOpen("run.sql.log", _folder.Path, _clock, out _, out var reason);
+        var opened = RunLogFile.Open("run.sql.log", _folder.Path, _clock);
+        using var log = opened.Value;
 
-        _ = log.ShouldNotBeNull();
-        reason.ShouldBeEmpty();
+        opened.Succeeded.ShouldBeTrue();
     }
 
     private sealed class BrokenStream : MemoryStream

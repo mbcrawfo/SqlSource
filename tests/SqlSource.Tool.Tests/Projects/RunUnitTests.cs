@@ -19,7 +19,18 @@ public sealed class RunUnitTests : IDisposable
         _error.Dispose();
     }
 
-    private RunUnit? Find(string? argument) => RunUnitFinder.Find(argument, _folder.Path, new Reporter(_error));
+    // The finder reports nothing: its caller does, as DescribeCommand does here.
+    private RunUnit? Find(string? argument)
+    {
+        var found = RunUnitFinder.Find(argument, _folder.Path);
+        if (found.Succeeded)
+        {
+            return found.Value;
+        }
+
+        new Reporter(_error).Report(found.Failure);
+        return null;
+    }
 
     private void ShouldHaveReported(string id, string path)
     {

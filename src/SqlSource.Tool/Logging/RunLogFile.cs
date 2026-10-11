@@ -1,10 +1,13 @@
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using SqlSource.Diagnostics;
+using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Logging;
 
@@ -63,45 +66,48 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     public Exception? Failure { get; private set; }
 
     /// <summary>
-    /// Makes the file, or empties the one that is there.  Null, with the reason, when it cannot be: the system's, or
-    /// that the name is a file of the run (a <c>.sql</c> file, a sidecar, a project or a solution, whatever the
-    /// case), which is refused before anything is opened, made or emptied.
+    /// Makes the file, or empties the one that is there.  When it cannot be, the <c>SQLSRC218</c> that says why:
+    /// the system's reason, or that the name is a file of the run (a <c>.sql</c> file, a sidecar, a project or a
+    /// solution, whatever the case), which is refused before anything is opened, made or emptied.  The error is
+    /// at the full path, or at <paramref name="given" /> when that is no path at all.
     /// </summary>
     /// <param name="given">The path as the option or the variable gave it.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
     /// <param name="time">The clock of the run.</param>
-    /// <param name="path">The full path, or <paramref name="given" /> when it is no path at all.</param>
-    /// <param name="reason">Why the file could not be made.  Empty when it was.</param>
-    public static RunLogFile? TryOpen(
-        string given,
-        string workingDirectory,
-        TimeProvider time,
-        out string path,
-        out string reason
-    )
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The log is its caller's to close, as Cli.RunAsync does.  The analyzer follows a disposable "
+            + "that is returned itself and not one that is returned in an Outcome."
+    )]
+    public static Outcome<RunLogFile, ToolDiagnostic> Open(string given, string workingDirectory, TimeProvider time)
     {
-        path = given;
-        reason = "";
+        var path = given;
         try
         {
             var full = System.IO.Path.GetFullPath(given, workingDirectory);
             path = full;
             if (FilesOfTheRun.Any(ending => full.EndsWith(ending, StringComparison.OrdinalIgnoreCase)))
             {
-                reason = "a log is not written over a .sql file, a sidecar, a project or a solution";
-                return null;
+                return NotOpened(path, "a log is not written over a .sql file, a sidecar, a project or a solution");
             }
 
-            return new RunLogFile(path, new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read), time);
+            return Outcome<RunLogFile, ToolDiagnostic>.Of(
+                new RunLogFile(path, new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read), time)
+            );
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
             // An empty path, a directory, a folder that is not there, or a file the system will not open.
-            reason = exception.Message;
-            return null;
+            return NotOpened(path, exception.Message);
         }
     }
+
+    private static Outcome<RunLogFile, ToolDiagnostic> NotOpened(string path, string reason) =>
+        Outcome<RunLogFile, ToolDiagnostic>.Failed(
+            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, "written", reason)
+        );
 
     public void Write(string name, params LogMember[] members)
     {

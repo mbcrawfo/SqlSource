@@ -198,12 +198,13 @@ internal static class ProjectEvaluator
             return Failed(project, $"the target {ManifestTarget} left no file that can be read", result);
         }
 
-        return ManifestReader.Read(text, out reason) is { } manifest
-            ? new ProjectEvaluation(project, ProjectState.UsesSqlSource, manifest)
+        var read = ManifestReader.Read(text);
+        return read.Succeeded
+            ? new ProjectEvaluation(project, ProjectState.UsesSqlSource, read.Value)
             : new ProjectEvaluation(
                 project,
                 ProjectState.Failed,
-                Failure: ToolDiagnostic.ForFile(ToolDiagnostics.ManifestCannotBeRead, project, reason)
+                Failure: ToolDiagnostic.ForFile(ToolDiagnostics.ManifestCannotBeRead, project, read.Failure)
             );
     }
 

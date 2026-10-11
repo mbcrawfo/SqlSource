@@ -176,16 +176,15 @@ public static class Cli
                 // After the command line was read, so that a wrong one is never logged, and before anything runs.
                 if (logPath is { } given)
                 {
-                    log = RunLogFile.TryOpen(given, host.WorkingDirectory, host.Time, out var path, out var reason);
-                    if (log is null)
+                    var opened = RunLogFile.Open(given, host.WorkingDirectory, host.Time);
+                    if (!opened.Succeeded)
                     {
                         // The run does not start.
-                        reporter.Report(
-                            ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, "written", reason)
-                        );
+                        reporter.Report(opened.Failure);
                         return 1;
                     }
 
+                    log = opened.Value;
                     events = log;
                     log.Write(
                         "run.start",

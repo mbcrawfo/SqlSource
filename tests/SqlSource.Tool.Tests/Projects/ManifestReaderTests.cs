@@ -46,15 +46,16 @@ public class ManifestReaderTests
 
     private static ProjectManifest Read(string text)
     {
-        var manifest = ManifestReader.Read(text, out var reason).ShouldNotBeNull(reason);
-        reason.ShouldBeEmpty();
-        return manifest;
+        var read = ManifestReader.Read(text);
+        read.Succeeded.ShouldBeTrue(read.Failure);
+        return read.Value.ShouldNotBeNull();
     }
 
     private static string ReasonOf(string text)
     {
-        ManifestReader.Read(text, out var reason).ShouldBeNull();
-        return reason;
+        var read = ManifestReader.Read(text);
+        read.Succeeded.ShouldBeFalse();
+        return read.Failure.ShouldNotBeNull();
     }
 
     [Fact]

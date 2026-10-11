@@ -43,13 +43,13 @@ internal static class RunProjects
         if (unit.Kind == RunUnitKind.Solution)
         {
             var read = await SolutionReader.ReadAsync(unit.Path, cancellationToken);
-            if (read.Failure is { } reason)
+            if (!read.Succeeded)
             {
-                reporter.Report(ToolDiagnostic.ForFile(ToolDiagnostics.SolutionCannotBeRead, unit.Path, reason));
+                reporter.Report(ToolDiagnostic.ForFile(ToolDiagnostics.SolutionCannotBeRead, unit.Path, read.Failure));
                 return [];
             }
 
-            projects = read.Projects;
+            projects = read.Value;
             solution = unit.Path;
         }
 

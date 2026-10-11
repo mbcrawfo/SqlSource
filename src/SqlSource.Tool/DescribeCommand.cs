@@ -304,11 +304,14 @@ internal static class DescribeCommand
         // With file filters and no unit, the unit is found from the working directory, not from the files.
         var paths = parsed.GetValue<string[]>(PathArgument) ?? [];
         var unitPath = paths.FirstOrDefault(static path => !SqlPath.IsSqlFile(path));
-        if (RunUnitFinder.Find(unitPath, host.WorkingDirectory, reporter) is not { } unit)
+        var found = RunUnitFinder.Find(unitPath, host.WorkingDirectory);
+        if (!found.Succeeded)
         {
+            reporter.Report(found.Failure);
             return null;
         }
 
+        var unit = found.Value;
         RunEvents.Unit(reporter.Trace, unit, wasGiven: unitPath is not null);
         var manifests = await RunProjects.FindAsync(
             unit,

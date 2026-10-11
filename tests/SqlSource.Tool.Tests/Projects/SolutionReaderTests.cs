@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Projects;
@@ -46,7 +47,7 @@ public sealed class SolutionReaderTests : IDisposable
 
     public void Dispose() => _folder.Dispose();
 
-    private static Task<SolutionProjects> ReadAsync(string path) =>
+    private static Task<Outcome<ImmutableArray<string>, string>> ReadAsync(string path) =>
         SolutionReader.ReadAsync(path, TestContext.Current.CancellationToken);
 
     private string[] Expected() =>
@@ -65,8 +66,8 @@ public sealed class SolutionReaderTests : IDisposable
     {
         var read = await ReadAsync(_folder.WriteFile(file, content));
 
-        read.Failure.ShouldBeNull();
-        read.Projects.ShouldBe(Expected());
+        read.Succeeded.ShouldBeTrue(read.Failure);
+        read.Value.ShouldBe(Expected());
     }
 
     [Fact]
@@ -74,8 +75,8 @@ public sealed class SolutionReaderTests : IDisposable
     {
         var read = await ReadAsync(_folder.WriteFile("App.slnx", "<Solution />"));
 
-        read.Failure.ShouldBeNull();
-        read.Projects.ShouldBeEmpty();
+        read.Succeeded.ShouldBeTrue(read.Failure);
+        read.Value.ShouldBeEmpty();
     }
 
     // The library refuses a solution that lists one project twice, whatever the two spellings, so the list that
@@ -93,8 +94,8 @@ public sealed class SolutionReaderTests : IDisposable
             )
         );
 
+        read.Succeeded.ShouldBeFalse();
         read.Failure.ShouldNotBeNullOrWhiteSpace();
-        read.Projects.ShouldBeEmpty();
     }
 
     // The reason is the library's own text, in the language of the machine, so it is not compared.
@@ -108,8 +109,8 @@ public sealed class SolutionReaderTests : IDisposable
     {
         var read = await ReadAsync(_folder.WriteFile(file, content));
 
+        read.Succeeded.ShouldBeFalse();
         read.Failure.ShouldNotBeNullOrWhiteSpace();
-        read.Projects.ShouldBeEmpty();
     }
 
     [Fact]
@@ -117,8 +118,8 @@ public sealed class SolutionReaderTests : IDisposable
     {
         var read = await ReadAsync(_folder.PathOf("Gone.slnx"));
 
+        read.Succeeded.ShouldBeFalse();
         read.Failure.ShouldNotBeNullOrWhiteSpace();
-        read.Projects.ShouldBeEmpty();
     }
 
     [Fact]
@@ -126,6 +127,7 @@ public sealed class SolutionReaderTests : IDisposable
     {
         var read = await ReadAsync(_folder.WriteFile("App.slnf", "{}"));
 
+        read.Succeeded.ShouldBeFalse();
         read.Failure.ShouldBe("it is neither a .sln nor a .slnx file");
     }
 }
