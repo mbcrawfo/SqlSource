@@ -28,6 +28,13 @@ internal static class MSBuildSettings
 
     public const string OutputName = "SqlSourceOutput";
 
+    /// <summary>
+    /// The setting that the tool reads and the generator does not: <c>build/SqlSource.props</c> does not show it to
+    /// the compiler, and the keys of the compiler, <see cref="Property" /> and <see cref="Metadata" />, have none
+    /// for it.
+    /// </summary>
+    public const string DatabaseName = "SqlSourceDatabase";
+
     public const string InputModelSuffixName = "SqlSourceInputModelSuffix";
 
     public const string OutputModelSuffixName = "SqlSourceOutputModelSuffix";
@@ -40,11 +47,37 @@ internal static class MSBuildSettings
 
     public const string CollectionTypeName = "SqlSourceCollectionType";
 
-    /// <summary>The keys of the project's properties.</summary>
-    public static SettingKeys Property { get; } = new(PropertyPrefix);
+    // The names, in the order of SettingId.  Above Property and Metadata, which read it when they are made.
+    private static readonly string[] Names =
+    [
+        GeneratorParametersName,
+        OutputName,
+        DatabaseName,
+        InputModelSuffixName,
+        OutputModelSuffixName,
+        ModelNamespaceName,
+        InputModelTypeName,
+        OutputModelTypeName,
+        CollectionTypeName,
+    ];
 
-    /// <summary>The keys of the metadata of a file's item.</summary>
-    public static SettingKeys Metadata { get; } = new(MetadataPrefix);
+    /// <summary>
+    /// The keys of the project's properties that the compiler is shown.  The database is not among them, so the
+    /// generator does not read it, and does not judge it for a project that shows it to the compiler itself.
+    /// </summary>
+    public static SettingKeys Property { get; } = new(PropertyPrefix, hasDatabase: false);
+
+    /// <summary>The keys of the metadata of a file's item that the compiler is shown, without the database.</summary>
+    public static SettingKeys Metadata { get; } = new(MetadataPrefix, hasDatabase: false);
+
+    /// <summary>The keys of the properties in a project manifest, which the tool reads: with the database.</summary>
+    public static SettingKeys ManifestProperty { get; } = new(PropertyPrefix, hasDatabase: true);
+
+    /// <summary>The keys of a file's metadata in a project manifest: with the database.</summary>
+    public static SettingKeys ManifestMetadata { get; } = new(MetadataPrefix, hasDatabase: true);
+
+    /// <summary>The name MSBuild knows a setting by, without a prefix.</summary>
+    public static string NameOf(SettingId setting) => Names[(int)setting];
 
     /// <summary>
     /// Reads one level.  A value that is not valid is added to <paramref name="invalid" /> and is not set.  The
@@ -52,124 +85,49 @@ internal static class MSBuildSettings
     /// </summary>
     public static SettingsLevel Read(AnalyzerConfigOptions options, SettingKeys keys, ref List<InvalidSetting>? invalid)
     {
-        var level = new SettingsLevel
-        {
-            Parameters = ReadParameters(options, keys.GeneratorParameters, ref invalid),
-            Output = ReadChoice<OutputKind>(options, keys.Output, OutputName, ref invalid),
-            InputModelSuffix = ReadText(
-                options,
-                keys.InputModelSuffix,
-                InputModelSuffixName,
-                SettingValue.IsSuffix,
-                ref invalid
-            ),
-            OutputModelSuffix = ReadText(
-                options,
-                keys.OutputModelSuffix,
-                OutputModelSuffixName,
-                SettingValue.IsSuffix,
-                ref invalid
-            ),
-            ModelNamespace = ReadText(
-                options,
-                keys.ModelNamespace,
-                ModelNamespaceName,
-                SettingValue.IsNamespace,
-                ref invalid
-            ),
-            InputModelType = ReadChoice<ModelKind>(options, keys.InputModelType, InputModelTypeName, ref invalid),
-            OutputModelType = ReadChoice<ModelKind>(options, keys.OutputModelType, OutputModelTypeName, ref invalid),
-            CollectionType = ReadChoice<CollectionKind>(options, keys.CollectionType, CollectionTypeName, ref invalid),
-        };
-
-        return level.Equals(SettingsLevel.None) ? SettingsLevel.None : level;
+        var source = new Source(options, keys, invalid);
+        var level = SettingsLevelReader.Read(ref source);
+        invalid = source.InvalidSettings;
+        return level;
     }
 
-    private static GeneratorParameters? ReadParameters(
-        AnalyzerConfigOptions options,
-        string key,
-        ref List<InvalidSetting>? invalid
-    )
+    // The options the compiler gives for the project or for one file, under the keys of one prefix.
+    private struct Source(AnalyzerConfigOptions options, SettingKeys keys, List<InvalidSetting>? invalid)
+        : ISettingSource
     {
-        if (!options.TryGetValue(key, out var list) || string.IsNullOrWhiteSpace(list))
+        public List<InvalidSetting>? InvalidSettings { get; private set; } = invalid;
+
+        public readonly string? Text(SettingId setting) =>
+            keys[setting] is { } key && options.TryGetValue(key, out var value) ? value : null;
+
+        public T? Choice<T>(SettingId setting)
+            where T : struct, Enum
         {
+            if (Text(setting) is not { } written || string.IsNullOrWhiteSpace(written))
+            {
+                return null;
+            }
+
+            if (SettingValue.TryReadChoice<T>(written.AsSpan().Trim(), out var choice))
+            {
+                return choice;
+            }
+
+            Invalid(setting, written.Trim());
             return null;
         }
 
-        var words = new List<string>();
-        var parameters = GeneratorParameterList.Parse(list, words);
-        foreach (var word in words)
-        {
-            (invalid ??= []).Add(new InvalidSetting(GeneratorParametersName, word));
-        }
-
-        return parameters;
-    }
-
-    private delegate bool Validator(ReadOnlySpan<char> value);
-
-    private static string? ReadText(
-        AnalyzerConfigOptions options,
-        string key,
-        string name,
-        Validator isValid,
-        ref List<InvalidSetting>? invalid
-    )
-    {
-        if (!options.TryGetValue(key, out var written) || string.IsNullOrWhiteSpace(written))
-        {
-            return null;
-        }
-
-        var value = written.Trim();
-        if (isValid(value.AsSpan()))
-        {
-            return value;
-        }
-
-        (invalid ??= []).Add(new InvalidSetting(name, value));
-        return null;
-    }
-
-    private static T? ReadChoice<T>(
-        AnalyzerConfigOptions options,
-        string key,
-        string name,
-        ref List<InvalidSetting>? invalid
-    )
-        where T : struct, Enum
-    {
-        if (!options.TryGetValue(key, out var value) || string.IsNullOrWhiteSpace(value))
-        {
-            return null;
-        }
-
-        if (SettingValue.TryReadChoice<T>(value.AsSpan().Trim(), out var choice))
-        {
-            return choice;
-        }
-
-        (invalid ??= []).Add(new InvalidSetting(name, value.Trim()));
-        return null;
+        public void Invalid(SettingId setting, string value) =>
+            (InvalidSettings ??= []).Add(new InvalidSetting(NameOf(setting), value));
     }
 
     /// <summary>The keys of the settings under one prefix, built once.</summary>
-    internal sealed class SettingKeys(string prefix)
+    internal sealed class SettingKeys(string prefix, bool hasDatabase)
     {
-        public string GeneratorParameters { get; } = prefix + GeneratorParametersName;
+        private readonly string[] _keys = Array.ConvertAll(Names, name => prefix + name);
 
-        public string Output { get; } = prefix + OutputName;
-
-        public string InputModelSuffix { get; } = prefix + InputModelSuffixName;
-
-        public string OutputModelSuffix { get; } = prefix + OutputModelSuffixName;
-
-        public string ModelNamespace { get; } = prefix + ModelNamespaceName;
-
-        public string InputModelType { get; } = prefix + InputModelTypeName;
-
-        public string OutputModelType { get; } = prefix + OutputModelTypeName;
-
-        public string CollectionType { get; } = prefix + CollectionTypeName;
+        /// <summary>The key of a setting, or null for the database where these keys have none.</summary>
+        public string? this[SettingId setting] =>
+            setting == SettingId.Database && !hasDatabase ? null : _keys[(int)setting];
     }
 }

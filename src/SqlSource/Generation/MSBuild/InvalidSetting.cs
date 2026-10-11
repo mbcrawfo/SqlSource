@@ -6,7 +6,7 @@ namespace SqlSource.Generation.MSBuild;
 /// </summary>
 /// <param name="Name">
 /// The name MSBuild knows the setting by, as <c>SqlSourceGeneratorParameters</c>: one of the names of
-/// <see cref="MSBuildSettings" />, or the one the tool adds for <c>SqlSourceDatabase</c>.
+/// <see cref="MSBuildSettings" />.
 /// </param>
 /// <param name="Value">The value, or the part of it that is not valid, as written.</param>
 internal sealed record InvalidSetting(string Name, string Value);
