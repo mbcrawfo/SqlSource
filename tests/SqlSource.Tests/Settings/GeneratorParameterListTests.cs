@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Settings;
@@ -72,5 +73,36 @@ public class GeneratorParameterListTests
 
         GeneratorParameterList.Parse(value, invalid).ShouldBeNull();
         invalid.ShouldBe([expected]);
+    }
+
+    [Theory]
+    [InlineData("", "")]
+    [InlineData(" \t ", "")]
+    [InlineData("one", "0:one")]
+    [InlineData("  one\ttwo   three ", "2:one 6:two 12:three")]
+    [InlineData("a=b  c", "0:a=b 5:c")]
+    public void Words_AnyText_GivesEachWordWithWhereItStarts(string text, string expected)
+    {
+        var found = new List<string>();
+        var words = GeneratorParameterList.Words(text.AsSpan());
+        while (words.MoveNext())
+        {
+            words.Length.ShouldBe(words.Current.Length);
+            found.Add($"{words.Start}:{words.Current}");
+        }
+
+        string.Join(" ", found).ShouldBe(expected);
+    }
+
+    [Fact]
+    public void Words_InAForeach_GivesTheWords()
+    {
+        var found = new List<string>();
+        foreach (var word in GeneratorParameterList.Words(" keep-comments  default ".AsSpan()))
+        {
+            found.Add(word.ToString());
+        }
+
+        found.ShouldBe(["keep-comments", "default"]);
     }
 }

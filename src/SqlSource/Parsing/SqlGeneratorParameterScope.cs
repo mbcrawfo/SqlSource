@@ -32,44 +32,21 @@ internal sealed class SqlGeneratorParameterScope
             return;
         }
 
-        var start = marker.ValueSpan.Start;
-        var end = marker.ValueSpan.End;
-        while (start < end)
+        // A marker's value has no white space around it, so the first word starts where the value does.
+        var words = GeneratorParameterList.Words(text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length));
+        while (words.MoveNext())
         {
-            var wordEnd = FindWordEnd(text, start, end);
-            if (Apply(text.AsSpan(start, wordEnd - start)) is { } problem)
+            if (Apply(words.Current) is { } problem)
             {
                 errors.Add(
                     SqlParseError.Create(
                         problem,
-                        TextSpan.FromBounds(start, wordEnd),
-                        text.Substring(start, wordEnd - start)
+                        new TextSpan(marker.ValueSpan.Start + words.Start, words.Length),
+                        words.Current.ToString()
                     )
                 );
             }
-
-            start = SkipWhiteSpace(text, wordEnd, end);
         }
-    }
-
-    private static int FindWordEnd(string text, int start, int end)
-    {
-        while (start < end && !char.IsWhiteSpace(text[start]))
-        {
-            start++;
-        }
-
-        return start;
-    }
-
-    private static int SkipWhiteSpace(string text, int start, int end)
-    {
-        while (start < end && char.IsWhiteSpace(text[start]))
-        {
-            start++;
-        }
-
-        return start;
     }
 
     private SqlParseErrorKind? Apply(ReadOnlySpan<char> word)
