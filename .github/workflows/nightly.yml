@@ -1,0 +1,70 @@
+# Builds and tests on Windows and macOS every night.  ci.yml covers Linux on every pull request, and this covers what
+# differs elsewhere: paths, quoting, exit codes, and how a process and what it started are killed.
+# No check that needs Docker, and no pack: the lint images are Linux images, and build.yml has both.
+# It is no required check.  A pull request that changes this file runs it, so that a change to it is tried.
+name: Nightly
+
+on:
+  schedule:
+    # 07:17 UTC.  Off the hour, when the scheduler is least loaded.
+    - cron: '17 7 * * *'
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - .github/workflows/nightly.yml
+
+permissions:
+  contents: read
+
+# A newer run for the same pull request cancels the older one.  A scheduled or manual run is never cancelled.
+concurrency:
+  group: nightly-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+env:
+  SOLUTION: SqlSource.slnx
+  CONFIGURATION: Release
+  DOTNET_NOLOGO: 'true'
+
+jobs:
+  test:
+    name: Build and test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      # One system's failure says nothing of the other.
+      fail-fast: false
+      matrix:
+        os:
+          - windows-latest
+          - macos-latest
+    defaults:
+      run:
+        # The same shell on both, so that a step is written once.  On Windows it is the bash of Git.
+        shell: bash
+    steps:
+      - name: Check out
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+          cache: true
+          cache-dependency-path: '**/packages.lock.json'
+
+      - name: Restore packages
+        run: dotnet restore "$SOLUTION"
+
+      - name: Build
+        run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION" --no-restore
+
+      - name: Test
+        run: >-
+          dotnet test --solution "$SOLUTION" --configuration "$CONFIGURATION" --no-build
+          --results-directory artifacts/test-results
+          --report-github
