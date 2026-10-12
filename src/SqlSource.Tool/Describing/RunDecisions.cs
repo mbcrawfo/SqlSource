@@ -71,14 +71,31 @@ internal static class RunDecisions
     /// The selected databases: those of the plan that have a selected query that needs an entry, in the plan's
     /// order.  A query that the plan could not describe counts, as it does in the summary.
     /// </summary>
-    public static ImmutableArray<PlannedDatabase> SelectedDatabases(RunPlan plan)
+    public static ImmutableArray<PlannedDatabase> SelectedDatabases(RunPlan plan) =>
+        DatabasesOf(plan, static (_, _) => true);
+
+    /// <summary>
+    /// The selected databases that can be described: those with a selected query that needs an entry and that the
+    /// plan did not fail, in the plan's order.  <c>SQLSOURCE_CONNECTION</c> is for a run with one of these: a
+    /// database that only a file with an error of the plan gives the run is none the variable could be meant for.
+    /// </summary>
+    public static ImmutableArray<PlannedDatabase> DescribableDatabases(RunPlan plan) =>
+        DatabasesOf(
+            plan,
+            static (file, query) => file.State == PlannedFileState.Ready && query.Problems == QueryProblems.None
+        );
+
+    private static ImmutableArray<PlannedDatabase> DatabasesOf(
+        RunPlan plan,
+        Func<PlannedFile, PlannedQuery, bool> counts
+    )
     {
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in plan.Files)
         {
             foreach (var query in file.Queries)
             {
-                if (query is { NeedsEntry: true, IsSelected: true, Database: { } database })
+                if (query is { NeedsEntry: true, IsSelected: true, Database: { } database } && counts(file, query))
                 {
                     _ = names.Add(database);
                 }

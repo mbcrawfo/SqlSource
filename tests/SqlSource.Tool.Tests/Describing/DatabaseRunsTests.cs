@@ -56,6 +56,7 @@ public sealed class DatabaseRunsTests : IDisposable
         var selected = RunDecisions.SelectedDatabases(plan);
         var connections = Connections.Resolve(
             [.. selected.Select(database => database.Name)],
+            [.. RunDecisions.DescribableDatabases(plan).Select(database => database.Name)],
             [
                 .. (
                     given ?? ["postgres=" + Secrets.ConnectionWithWord, "billing=" + Secrets.ConnectionWithWord]
@@ -197,6 +198,26 @@ public sealed class DatabaseRunsTests : IDisposable
         var files = await RunAsync(given: ["postgres=" + Secrets.ConnectionWithWord]);
 
         States(files).ShouldBe([QueryState.Described, QueryState.Failed]);
+        _error
+            .ToString()
+            .ShouldBe(
+                $"{_users}(4,10): error SQLSRC215: SQLSOURCE_CONNECTION is for a run with one database, and this "
+                    + "run has 2: postgres, billing\n"
+                    + "    help: set SQLSOURCE_CONNECTION_POSTGRES for 'postgres' and SQLSOURCE_CONNECTION_BILLING for "
+                    + "'billing', or pass --connection <name>=<connection string> for each\n"
+                    + Expected.See("SQLSRC215")
+            );
+    }
+
+    // The database "ansi" is in the run through a file that cannot be described, so the variable is not for it.
+    [Fact]
+    public async Task Run_VariableWithNoNameAndADatabaseThatCannotBeDescribed_IsSqlsrc215ThatLeavesItOut()
+    {
+        _ = _project.AddSql("Old.sql", "-- dialect: ansi\n-- name: Old\nSELECT 1;\n");
+        _environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithWord;
+
+        _ = await RunAsync(given: ["postgres=" + Secrets.ConnectionWithWord]);
+
         _error
             .ToString()
             .ShouldBe(

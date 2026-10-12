@@ -318,6 +318,23 @@ public sealed class CheckTests : IDisposable
         File.Exists(SidecarFormat.PathFor(plain)).ShouldBeTrue();
     }
 
+    // "describe" reports the sidecar and leaves it, so the check could not check: an error, and no difference.
+    [Fact]
+    public async Task Check_SidecarOfAFileThatNeedsNoneAndCannotBeOpened_IsSqlsrc218AndNoDifference()
+    {
+        _ = await DescribeFirstAsync();
+        var plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
+        var sidecar = SidecarFormat.PathFor(plain);
+        _ = Directory.CreateDirectory(sidecar);
+
+        var result = await _scene.DescribeAsync("--check");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith($"{sidecar} : error SQLSRC218: '{sidecar}' could not be read: ");
+        result.Error.Split("error SQLSRC").Length.ShouldBe(2);
+        Directory.Exists(sidecar).ShouldBeTrue();
+    }
+
     // "describe" deletes nothing after an error, and leaves a newer tool's file alone: so the check says nothing.
     [Fact]
     public async Task Check_SidecarOfAFileThatNeedsNoneAfterAnError_IsNotReported()

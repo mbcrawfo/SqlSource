@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Shouldly;
+using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Planning;
@@ -175,6 +176,22 @@ public sealed class SidecarStoreTests : IDisposable
         Apply(Outcome(FileAction.Delete));
 
         _error.ToString().ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be deleted: ");
+    }
+
+    [Fact]
+    public void Apply_SidecarThatCouldNotBeOpened_ReportsTheErrorOfItsOutcomeAndLeavesIt()
+    {
+        _ = Directory.CreateDirectory(_sidecar);
+        var failure = ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, _sidecar, "read", "refused");
+
+        Apply(Outcome(FileAction.Unreadable) with { Failure = failure });
+
+        _error
+            .ToString()
+            .ShouldBe(
+                $"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be read: refused\n" + Expected.See("SQLSRC218")
+            );
+        Directory.Exists(_sidecar).ShouldBeTrue();
     }
 
     [Fact]

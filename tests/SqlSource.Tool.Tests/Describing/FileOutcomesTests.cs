@@ -215,6 +215,38 @@ public sealed class FileOutcomesTests : IDisposable
         outcome.Target.ShouldBeNull();
     }
 
+    // What cannot be opened cannot be told from a newer tool's file: it is left, and the outcome holds the error.
+    [Fact]
+    public void Decide_FileThatNeedsNoEntryWithASidecarThatCannotBeOpened_IsUnreadableWithTheSystemsReason()
+    {
+        var project = Plans.Postgres(_folder, "Other");
+        var sidecar = SidecarFormat.PathFor(project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 3;\n"));
+        _ = Directory.CreateDirectory(sidecar);
+        var reason = SidecarOnDisk.Read(project.PathOf("Plain.sql")).OpenFailure.ShouldNotBeNull();
+
+        var outcome = Outcome(Described(Plans.Of(project)));
+
+        outcome.Action.ShouldBe(FileAction.Unreadable);
+        var failure = outcome.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC218");
+        failure.Path.ShouldBe(sidecar);
+        failure.Arguments.AsEnumerable().ShouldBe([sidecar, "read", reason]);
+    }
+
+    [Fact]
+    public void Decide_FileThatNeedsNoEntryWithASidecarThatCannotBeOpened_IsNotLookedAtInARunThatMayNotDelete()
+    {
+        var project = Plans.Postgres(_folder, "Other");
+        _ = Directory.CreateDirectory(
+            SidecarFormat.PathFor(project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 3;\n"))
+        );
+
+        var outcome = Outcome(Described(Plans.Of(project)), mayDelete: false);
+
+        outcome.Action.ShouldBe(FileAction.None);
+        outcome.Failure.ShouldBeNull();
+    }
+
     [Fact]
     public void Decide_FileThatIsNotReady_IsNotTouched()
     {

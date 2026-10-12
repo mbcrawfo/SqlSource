@@ -729,7 +729,7 @@ Check the spelling of the path.  If the file exists, it is either not a file of 
 
 **Database has no connection**
 
-A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.  A variable that is empty or holds only white space is not set.
+A query that must be described belongs to a database that the run has no connection for.  A connection is given for the name of a database, and never in the project, since it holds credentials.  On the command line it is `--connection billing=<connection string>`.  In the environment it is the variable of the name: `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`, so `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  `SQLSOURCE_CONNECTION`, with no name, serves a run that has exactly one database that can be described: a database that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), does not count.  The command line wins over the variable of the name, and that over `SQLSOURCE_CONNECTION`.  A variable that is empty or holds only white space is not set.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC213: No connection is given for the database 'postgres'
@@ -754,7 +754,7 @@ Give both databases their connection on the command line, `--connection app-v2=<
 
 **Connection names no database**
 
-`SQLSOURCE_CONNECTION` is set, and it is the connection of a run with exactly one database.  This run has more, and the database of this query has no connection of its own, so nothing says that the variable is for it.
+`SQLSOURCE_CONNECTION` is set, and it is the connection of a run with exactly one database.  This run has more, and the database of this query has no connection of its own, so nothing says that the variable is for it.  The message counts and names the databases that can be described: one that is in the run only through queries with an error of their own, such as [SQLSRC209](#sqlsrc209), needs no connection and is left out.
 
 ```console
 /work/App/Queries/Reports.sql(1,10): error SQLSRC215: SQLSOURCE_CONNECTION is for a run with one database, and this run has 2: postgres, reports
@@ -793,13 +793,13 @@ Mend the queries that failed, or run `describe` without the filter that left a q
 
 **File could not be changed**
 
-The tool could not write a sidecar, or could not delete one that its `.sql` file no longer needs, or could not write the log of `--log` or `SQLSOURCE_LOG`.  The message says which, and ends with the reason the operating system gave.
+The tool could not write a sidecar, or could not delete one that its `.sql` file no longer needs, or could not read such a one to see that it may be deleted, or could not write the log of `--log` or `SQLSOURCE_LOG`.  The message says which, and ends with the reason the operating system gave.
 
 ```console
 /work/App/Queries/Users.sql.json : error SQLSRC218: '/work/App/Queries/Users.sql.json' could not be written: Access to the path '/work/App/Queries/Users.sql.json' is denied.
 ```
 
-Give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  A sidecar is deleted only in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided: a setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.  A sidecar that the system will not let the tool open, for lack of permission, because it is locked or because it is a directory, is not deleted either when the file beside it needs no entry: it is left as it is and nothing is said.  A sidecar is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one and never a part of either.  The rest of the run goes on after an error about a sidecar.
+Give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  A sidecar is deleted only in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided: a setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.  A sidecar that the system will not let the tool open, for lack of permission, because it is locked or because it is a directory, is not deleted when the file beside it needs no entry: nothing says that it is not the file of a newer tool, so it is left as it is and reported as one that `could not be read`.  Delete it yourself, or give yourself the right to read it.  `describe --check` reports the same, since it could not check the file.  A sidecar is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one and never a part of either.  The rest of the run goes on after an error about a sidecar.
 
 A log has three cases.  When the log cannot be made or emptied as the run starts, because its folder is not there, it is a directory, or the system will not let the tool write it, nothing runs and the exit code is 1: give a path that can be written, or run the command from another folder.  When the path ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, in any case, the tool refuses it with the reason `a log is not written over a .sql file, a sidecar, a project or a solution`, touches nothing and runs nothing, so that a name left out before a `.sql` path does not empty that file: give the log a name of its own.  When the log stops being writable while the run goes on, as when the disk is full, the run finishes and writes its sidecars, the error is reported once at the end, and the exit code is 1; the log holds what was written before it stopped.
 

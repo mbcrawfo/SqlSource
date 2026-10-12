@@ -48,8 +48,9 @@ internal static class SidecarStore
 
     /// <summary>
     /// Writes and deletes what the outcomes say, and reports <c>SQLSRC217</c> for a file that was held back though
-    /// a query of it was described, and <c>SQLSRC218</c> for a file the system would not let it change.  A run
-    /// that was cancelled changes no further file.
+    /// a query of it was described, and <c>SQLSRC218</c> for a file the system would not let it change, or would
+    /// not let <see cref="FileOutcomes" /> open to see that it may be deleted.  A run that was cancelled changes no
+    /// further file.
     /// </summary>
     /// <param name="outcomes">What the run does with the sidecar of each file of its plan.</param>
     /// <param name="reporter">Where the errors go, with the run's trace.</param>
@@ -82,6 +83,12 @@ internal static class SidecarStore
                 case FileAction.Delete:
                     var deleted = Delete(outcome.SidecarPath, reporter);
                     RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, deleted ? Deleted : "failed");
+                    break;
+                case FileAction.Unreadable:
+                    reporter.Report(
+                        outcome.Failure ?? throw new InvalidOperationException("A file left unread has no error.")
+                    );
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, "failed");
                     break;
                 case FileAction.HeldBack:
                     if (outcome.HasDescribed)

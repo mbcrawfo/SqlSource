@@ -56,16 +56,18 @@ internal static class DescribeErrors
             connection.Variable
         );
 
-    /// <summary><c>SQLSRC215</c>, in the place of <c>SQLSRC213</c>, with the variable of each database.</summary>
+    /// <summary>
+    /// <c>SQLSRC215</c>, in the place of <c>SQLSRC213</c>, with the variable of each database that can be described.
+    /// </summary>
     public static ToolDiagnostic UnnamedNotUsed(PlannedQuery query, Connections all)
     {
-        var variables = all.Databases.Select(name => $"{ConnectionVariables.For(name)} for '{name}'");
+        var variables = all.Describable.Select(name => $"{ConnectionVariables.For(name)} for '{name}'");
         return ToolDiagnostic
             .At(
                 ToolDiagnostics.UnnamedConnectionNotUsed,
                 query.Query.NameLocation,
-                all.Databases.Length.ToString(CultureInfo.InvariantCulture),
-                string.Join(", ", all.Databases)
+                all.Describable.Length.ToString(CultureInfo.InvariantCulture),
+                string.Join(", ", all.Describable)
             )
             .WithLines(
                 new ContinuationLine(

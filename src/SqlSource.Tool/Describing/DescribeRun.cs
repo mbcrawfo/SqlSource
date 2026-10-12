@@ -62,6 +62,7 @@ internal static class DescribeRun
         var selected = RunDecisions.SelectedDatabases(plan);
         var connections = Connections.Resolve(
             [.. selected.Select(static database => database.Name)],
+            [.. RunDecisions.DescribableDatabases(plan).Select(static database => database.Name)],
             options.Connections,
             host.GetEnvironmentVariable
         );
@@ -80,6 +81,12 @@ internal static class DescribeRun
             for (var index = 0; index < checks.Length; index++)
             {
                 var check = checks[index];
+                // A sidecar that describe would report and leave could not be checked: an error, and no difference.
+                if (check.Outcome.Failure is { } failure)
+                {
+                    reporter.Report(failure);
+                }
+
                 foreach (var difference in check.Differences)
                 {
                     reporter.Report(difference);
