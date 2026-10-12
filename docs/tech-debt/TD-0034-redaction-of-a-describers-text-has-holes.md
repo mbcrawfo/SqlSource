@@ -2,17 +2,16 @@
 
 ## Problem
 
-Before a text that a describer gave is printed, [`Redaction`](../../src/SqlSource.Tool/Describing/Redaction.cs) writes every occurrence of the database's whole connection value as `***`.  [`DatabaseRuns`](../../src/SqlSource.Tool/Describing/DatabaseRuns.cs) applies it.  Three things are outside it:
+Before a text that a describer gave is printed, [`Redaction`](../../src/SqlSource.Tool/Describing/Redaction.cs) writes every occurrence of the database's whole connection value as `***`.  [`DatabaseRuns`](../../src/SqlSource.Tool/Describing/DatabaseRuns.cs) applies it.  The log of `--log`, through [`SessionRunLog`](../../src/SqlSource.Tool/Logging/SessionRunLog.cs), and the lines of `--verbose`, through [`RunTrace`](../../src/SqlSource.Tool/Logging/RunTrace.cs), have the same removal, and [`EntrySecretCheck`](../../src/SqlSource.Tool/Describing/EntrySecretCheck.cs) ends the run when a describer put the whole value into an entry of a sidecar.  Four things are outside all of them:
 
-- **The descriptor of a failure.**  The id, the message format and the help link of a `DescribeFailure` are printed as given.  A describer that built a descriptor at run time from a server's text would not be covered.
-- **A value split over several server lines.**  Each line is searched alone, so a value that a describer breaks over two lines is not found.
-- **A value that was changed.**  Only the whole value is replaced.  A driver's message that quotes the value changed, trimmed of a trailing space or line break for one, or quotes one keyword of it, is printed.  The same holds for what is written to a sidecar: [`EntrySecretCheck`](../../src/SqlSource.Tool/Describing/EntrySecretCheck.cs) ends the run when an entry holds the whole value as the writer would write it, and finds nothing of a value that was changed.  It also searches the whole text the writer would write for the entry, its fixed words included, so a connection value that equals one of them, or a short dummy value of a test or a replay such as `server`, `name` or `postgres`, would end the run with `SQLSRC200` for every query.  That fails closed, and no real connection string has that shape, since one holds `=` and no fixed text of the writer does.
-
-Sub-phase 2.6 puts the same removal before two more places, with the same holes: the log of `--log`, through [`SessionRunLog`](../../src/SqlSource.Tool/Logging/SessionRunLog.cs), and the lines of `--verbose`, through [`RunTrace`](../../src/SqlSource.Tool/Logging/RunTrace.cs).  A describer that logs a value it changed, or one keyword of it, writes it to a file that a user may attach to an issue.
+- **A value that was changed.**  Only the whole value is found.  A driver's message that quotes the value changed, trimmed of a trailing space or line break for one, or quotes one keyword of it, is printed, said and logged, and an entry that holds it is written.  A log is a file that a user may attach to an issue, and a sidecar is committed.
+- **A value that the parts of a message make together.**  The message format of a failure's descriptor and each of its arguments are searched alone, so a value that stands half in the format and half in an argument, or over two arguments, is in the message that is printed and logged.  The same holds for a value that a describer writes over two members of one event of its log.
+- **A value that the sidecar holds without the describer.**  `EntrySecretCheck` finds a value only when the entry's text holds it and the same text without the describer's part does not.  A value that equals a word of the format, the engine, or the name of the query, of its database or of a parameter is so never found in what a describer gave.  No real connection string has that shape, and the file holds such a value whatever the describer does.
+- **A value that equals a word of the describer's part of an entry.**  The text without the describer's part has no column and no type, so a value that equals a key that only those have, `origin` or `nullableSource` for two, ends the run with `SQLSRC200` when a query has a column.  That fails closed, and it is what is left of a wider case: a dummy value of a test or a replay such as `postgres` no longer ends the run.
 
 ## Why it exists
 
-The spec of sub-phase 2.5 gives the rule for printed text and for the whole value, because the tool does not read a connection string and so knows no part of one.  No describer exists yet whose texts could be studied.
+The tool does not read a connection string and so knows no part of one, and no describer exists yet whose texts could be studied.  What the tool could mend alone is mended: the descriptor of a failure is searched, a failure's server lines are searched joined, and a value that the sidecar holds without the describer is no fault.
 
 ## Impact
 
@@ -20,7 +19,7 @@ Low today: the released tool has no describer.  From phase 3 a describer's rule 
 
 ## Proposed fix
 
-With the first real describer: have it hand the tool the parts of the connection that are secret, as its driver's connection-string builder knows them, and redact each.  Search a failure's server lines joined as well as alone.  Give `EntrySecretCheck` the same parts.  Give `SessionRunLog` and `RunTrace` the same parts.
+With the first real describer: have it hand the tool the parts of the connection that are secret, as its driver's connection-string builder knows them, and redact each in `Redaction`, `SessionRunLog` and `RunTrace`, and search for each in `EntrySecretCheck`.  That does not reach the case that matters most: a driver quotes a connection string mostly when it cannot read it, and then its builder gives no part either.  So study what the driver says of a string it cannot read, and either keep that text from the output whole or search it for the value as the driver changes it.  Search the message of a failure once it is made, and not its format and arguments alone.
 
 ## Trigger
 

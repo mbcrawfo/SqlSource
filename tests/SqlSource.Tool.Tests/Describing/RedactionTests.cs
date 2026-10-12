@@ -171,6 +171,23 @@ public sealed class RedactionTests : IDisposable
             .ShouldBe(["SQLSRC999", "SQLSRC200"]);
     }
 
+    // The id of a "diagnostic" is the descriptor's, which a describer may have built from what a server said.
+    [Fact]
+    public async Task Run_SessionThatDoesNotOpenWithADescriptorThatHoldsTheConnection_HasTheMarkAsTheDiagnosticsId()
+    {
+        _scene.Describer.OpenFailure = FakeDescriber.Failure("GetUser") with
+        {
+            Descriptor = FakeDescriber.RejectedWith(Secrets.ConnectionWithMarker),
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var diagnostic = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "diagnostic");
+        diagnostic.GetProperty("id").GetString().ShouldBe("***");
+        diagnostic.GetProperty("message").GetString().ShouldBe("*** rejected the query 'GetUser'");
+    }
+
     // The id of a describer's descriptor is a describer's text.  The tests give a database a connection whose value
     // is the id of the descriptor of FakeDescriber, so that an event written through the plain trace would hold it.
     [Fact]

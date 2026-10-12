@@ -287,6 +287,59 @@ public sealed class SecretTests : IDisposable
         );
     }
 
+    // The descriptor of a failure is a describer's text too, when the describer built it from what a server said.
+    [Fact]
+    public async Task Run_DescriberWhoseFailureHasADescriptorWithTheValue_PrintsTheMarkInEachPlace()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
+        _scene.Describer.Failures["Bad"] = FakeDescriber.Failure("Bad") with
+        {
+            Descriptor = FakeDescriber.RejectedWith(Secrets.ConnectionWithMarker),
+        };
+
+        var result = await _scene.DescribeAsync();
+
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldStartWith(
+            $"{_users}(1,10): error ***: *** rejected the query 'Bad'\n"
+                + "    query: Bad, database postgres, postgres 16.4, FakeDriver 1.2.3\n"
+                + "    step: describe columns\n"
+                + "    help: check the SQL\n"
+                + "    see: https://example.test/***\n"
+        );
+    }
+
+    // A describer cuts what a server said into lines, and a value that holds a line break is then in two of them.
+    // The cut drops the kind of break, so the value is found whichever kind it has.
+    [Theory]
+    [InlineData("Host=db;\nPassword=s3cret-marker")]
+    [InlineData("Host=db;\r\nPassword=s3cret-marker")]
+    [InlineData("Host=db;\rPassword=s3cret-marker")]
+    public async Task Run_DescriberThatReturnsTheValueOverTwoServerLines_PrintsTheMarkOnOne(string value)
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = value;
+        _scene.Describer.Failures["Bad"] = FakeDescriber.Failure(
+            "Bad",
+            "cannot read 'Host=db;",
+            "Password=s3cret-marker' as a connection",
+            "no session"
+        );
+
+        var result = await _scene.DescribeAsync();
+
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldStartWith(
+            $"{_users}(1,10): error SQLSRC999: The server rejected the query 'Bad'\n"
+                + "    query: Bad, database postgres, postgres 16.4, FakeDriver 1.2.3\n"
+                + "    step: describe columns\n"
+                + "    server: cannot read '***' as a connection\n"
+                + "    server: no session\n"
+                + "    help: check the SQL\n"
+        );
+    }
+
     // A description that holds the value is a bug of the describer: the run ends, and nothing is written, since a
     // sidecar is a file that is committed.
     [Theory]
@@ -313,6 +366,22 @@ public sealed class SecretTests : IDisposable
                 + "describer put the connection's value in its description of the query 'Bad'.\n"
         );
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
+    }
+
+    // A value that the sidecar holds without the describer, as a word of the format, the engine or the name of the
+    // database, is no value the describer put there: such a run describes its queries like any other.
+    [Theory]
+    [InlineData("postgres")]
+    [InlineData("resultKind")]
+    [InlineData("Good")]
+    public async Task Run_ConnectionThatTheSidecarHoldsWithoutTheDescriber_DescribesAndWritesTheSidecar(string value)
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = value;
+
+        var result = await _scene.DescribeAsync();
+
+        result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
     }
 
     // --check prints what differs, and a text of the describer is among it.  The guard on a description comes first,
