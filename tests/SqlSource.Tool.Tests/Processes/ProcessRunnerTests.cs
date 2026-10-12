@@ -23,6 +23,22 @@ public class ProcessRunnerTests
     private static ProcessRequest Wait() =>
         OperatingSystem.IsWindows() ? Request("ping", "-n", "30", "127.0.0.1") : Request("sleep", "30");
 
+    // Writes its id to the file "parent", starts a program that waits, writes that one's id to "child", and waits
+    // for it.  Windows has no shell that knows its own id but PowerShell.
+    private static ProcessRequest WaitWithAChild() =>
+        OperatingSystem.IsWindows()
+            ? Request(
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "[IO.File]::WriteAllText('parent', $PID);"
+                    + " $child = Start-Process ping -ArgumentList '-n', '30', '127.0.0.1' -NoNewWindow -PassThru;"
+                    + " [IO.File]::WriteAllText('child', $child.Id);"
+                    + " $child.WaitForExit()"
+            )
+            : Request("sh", "-c", "echo $$ > parent; sleep 30 & echo $! > child; wait");
+
     [Fact]
     public async Task Run_Dotnet_GivesItsExitCodeAndItsOutput()
     {
@@ -88,15 +104,11 @@ public class ProcessRunnerTests
     [Fact]
     public async Task Run_Cancelled_LeavesNeitherTheProgramNorWhatItStartedRunning()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows(), "The program is a shell script.  docs/tech-debt/TD-0028.");
-        Programs.SkipUnlessOnPath("sh");
-        Programs.SkipUnlessOnPath("sleep");
         using var folder = new TempFolder();
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var request = Request("sh", "-c", "echo $$ > parent; sleep 30 & echo $! > child; wait") with
-        {
-            WorkingDirectory = folder.Path,
-        };
+        var request = WaitWithAChild() with { WorkingDirectory = folder.Path };
+        Programs.SkipUnlessOnPath(request.Program);
+        Programs.SkipUnlessOnPath(Wait().Program);
 
         var run = Runner.RunAsync(request, cancel.Token);
         var parent = await ReadIdAsync(folder.PathOf("parent"));
@@ -110,10 +122,11 @@ public class ProcessRunnerTests
         (await EndsAsync(child)).ShouldBeTrue("the program that the program started is still running");
     }
 
-    // The id that a script wrote to a file, once it has.
+    // The id that a script wrote to a file, once it has.  PowerShell takes seconds to start on a machine that has
+    // not run it.
     private static async Task<int> ReadIdAsync(string file)
     {
-        for (var attempt = 0; attempt < 100; attempt++)
+        for (var attempt = 0; attempt < 600; attempt++)
         {
             if (File.Exists(file) && int.TryParse(await File.ReadAllTextAsync(file), out var id))
             {
