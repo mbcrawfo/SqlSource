@@ -18,8 +18,13 @@ namespace SqlSource.Tool.Describing;
 /// The text holds more than a describer gave: the words of the format, the engine, and the names of the query, of
 /// its database and of its parameters.  A value that the text holds without the describer's part is in the file
 /// whatever the describer did, so it is none the describer put there: a dummy value of a test or of a replay, such
-/// as <c>postgres</c>, is no fault.  A new member of an entry that a describer gives and that is not taken out here
-/// is searched in both texts, which finds too much and never too little.
+/// as <c>postgres</c>, is no fault.
+/// </para>
+/// <para>
+/// A member of an entry that a describer gives must be left out of that second text.  One that is kept there holds
+/// the value in both texts, and the value in it is then never found.  So the second entry is made with the
+/// constructors and not with <c>with</c>: a new member of an entry or of a parameter does not compile here until it
+/// is given to one side, and <c>EntrySecretCheckTests</c> has a fact for each member that a describer gives.
 /// </para>
 /// </remarks>
 internal static class EntrySecretCheck
@@ -46,17 +51,28 @@ internal static class EntrySecretCheck
             new Sidecar(SidecarFormat.Version, PackageVersion.Prefix, new EquatableArray<SidecarEntry>([entry]))
         );
 
-    // What EntryBuilder takes from the plan alone.
+    // What EntryBuilder takes from the plan alone, with the kind of result, which is one of two words of the format.
     private static SidecarEntry WithoutTheDescribersPart(SidecarEntry entry) =>
-        entry with
-        {
-            ServerVersion = null,
-            MatchesTable = null,
-            Plan = null,
-            TableMatch = null,
-            Columns = null,
-            Parameters = new EquatableArray<SidecarParameter>([
-                .. entry.Parameters.Select(static parameter => parameter with { Type = null, TypeSource = null }),
+        new(
+            entry.Name,
+            entry.NameSpan,
+            entry.Hash,
+            entry.Engine,
+            entry.Database,
+            ServerVersion: null,
+            entry.ResultKind,
+            MatchesTable: null,
+            Plan: null,
+            TableMatch: null,
+            new EquatableArray<SidecarParameter>([
+                .. entry.Parameters.Select(static parameter => new SidecarParameter(
+                    parameter.Name,
+                    parameter.Ordinal,
+                    Type: null,
+                    parameter.Nullable,
+                    TypeSource: null
+                )),
             ]),
-        };
+            Columns: null
+        );
 }
