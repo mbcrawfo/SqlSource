@@ -59,7 +59,7 @@ public static class Cli
     public static int Run(string[] args) => Run(args, ToolHost.Create, Console.Error);
 
     /// <summary>
-    /// Runs the command with a host that is made here, and listens for Ctrl+C.
+    /// Runs the command with a host that is made here, and listens for Ctrl+C, <c>SIGTERM</c> and <c>SIGHUP</c>.
     /// </summary>
     /// <param name="args">The command line.</param>
     /// <param name="createHost">Makes the host.  The real one asks for the current directory, which can throw.</param>
@@ -79,15 +79,25 @@ public static class Cli
         }
 
         using var interrupt = new CancellationTokenSource();
-        void Cancel(object? sender, ConsoleCancelEventArgs e) => e.Cancel = Interrupt(interrupt);
+        using var ended = new ManualResetEventSlim();
+        var signals = 0;
+        void Cancel(object? sender, ConsoleCancelEventArgs e) => e.Cancel = Interrupt(interrupt, ref signals);
+        void End(PosixSignalContext context) => context.Cancel = Terminate(interrupt, ref signals, ended.Wait);
 
         Console.CancelKeyPress += Cancel;
+
+        // SIGTERM is what "timeout", a cancelled CI job and an editor send, and SIGHUP what a closed terminal and a
+        // lost session do.  Left alone, either ends the process at once, with the programs the run started still
+        // running and its temporary folder left.  On Windows they are the shutdown and the closed console.
+        using var terminate = PosixSignalRegistration.Create(PosixSignal.SIGTERM, End);
+        using var hangUp = PosixSignalRegistration.Create(PosixSignal.SIGHUP, End);
         try
         {
             return RunAsync(args, host, interrupt.Token).GetAwaiter().GetResult();
         }
         finally
         {
+            ended.Set();
             Console.CancelKeyPress -= Cancel;
         }
     }
@@ -97,15 +107,40 @@ public static class Cli
     /// the process is kept.  A second time, while the run has not ended, the process is left to be killed: a run
     /// that waits on a database may not look at its token.
     /// </summary>
+    /// <param name="interrupt">Cancels the run.</param>
+    /// <param name="signals">
+    /// How many times the run was told to end, by any of the three.  Two that come at once, each on a thread of
+    /// its own, are counted apart, so only one of them is the first.
+    /// </param>
     /// <returns>Whether the process is kept.</returns>
-    internal static bool Interrupt(CancellationTokenSource interrupt)
+    internal static bool Interrupt(CancellationTokenSource interrupt, ref int signals)
     {
-        if (interrupt.IsCancellationRequested)
+        if (Interlocked.Increment(ref signals) > 1)
         {
             return false;
         }
 
         interrupt.Cancel();
+        return true;
+    }
+
+    /// <summary>
+    /// What <c>SIGTERM</c> and <c>SIGHUP</c> do: what Ctrl+C does, and the first time it returns only when the run
+    /// has ended.  Windows ends the process when the handler of a shutdown or of a closed console returns,
+    /// whatever it answers, so a handler that returned at once would leave the run no time to end.
+    /// </summary>
+    /// <param name="interrupt">Cancels the run.</param>
+    /// <param name="signals">How many times the run was told to end, by any of the three.</param>
+    /// <param name="waitForTheEnd">Returns when the run has ended.</param>
+    /// <returns>Whether the process is kept.</returns>
+    internal static bool Terminate(CancellationTokenSource interrupt, ref int signals, Action waitForTheEnd)
+    {
+        if (!Interrupt(interrupt, ref signals))
+        {
+            return false;
+        }
+
+        waitForTheEnd();
         return true;
     }
 
@@ -275,7 +310,7 @@ public static class Cli
             Error = host.Error,
             // An exception comes to the catch of RunCommandAsync.
             EnableDefaultExceptionHandler = false,
-            // Cli.Run listens for Ctrl+C itself.
+            // Cli.Run listens for Ctrl+C, SIGTERM and SIGHUP itself.
             ProcessTerminationTimeout = null,
         };
         return await parsed.InvokeAsync(invocation, cancellationToken);

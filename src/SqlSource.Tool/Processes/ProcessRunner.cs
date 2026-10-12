@@ -15,6 +15,22 @@ internal sealed class ProcessRunner : IProcessRunner
     // What both outputs are read as, with no byte order mark expected.
     private static readonly UTF8Encoding Utf8 = new(encoderShouldEmitUTF8Identifier: false);
 
+    // How long a run that was cancelled waits for its program to end, once it has killed it.
+    private static readonly TimeSpan KillWait = TimeSpan.FromSeconds(5);
+
+    private readonly Action<Process> _kill;
+
+    public ProcessRunner()
+        : this(Kill) { }
+
+    /// <summary>
+    /// A runner that ends a program whose run was cancelled with the function given.  A test gives one that fails.
+    /// </summary>
+    internal ProcessRunner(Action<Process> kill)
+    {
+        _kill = kill;
+    }
+
     public async Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken)
     {
         var start = new ProcessStartInfo(request.Program)
@@ -68,21 +84,31 @@ internal sealed class ProcessRunner : IProcessRunner
         }
         catch (OperationCanceledException)
         {
-            Kill(process);
+            End(process);
             throw;
         }
     }
 
-    private static void Kill(Process process)
+    // Ends a program whose run was cancelled.  Nothing that goes wrong here stands in for the cancellation, which
+    // the caller is told: a run that was cancelled is no unexpected failure.
+    private void End(Process process)
     {
         try
         {
-            // MSBuild starts processes of its own, and they would go on without this one.
-            process.Kill(entireProcessTree: true);
+            _kill(process);
+
+            // A kill only asks, and on Windows the program ends some time after.  What the caller deletes next, a
+            // folder the program wrote to, is then no longer held by it.  A program that does not end is left,
+            // and so is what the program started: nothing waits for that.
+            _ = process.WaitForExit(KillWait);
         }
-        catch (InvalidOperationException)
+        catch (Exception exception)
+            when (exception is InvalidOperationException or Win32Exception or AggregateException)
         {
-            // It ended between the cancellation and here.
+            // It ended between the cancellation and here, or the system would not end it or one that it started.
         }
     }
+
+    // MSBuild starts processes of its own, and they would go on without this one.
+    private static void Kill(Process process) => process.Kill(entireProcessTree: true);
 }

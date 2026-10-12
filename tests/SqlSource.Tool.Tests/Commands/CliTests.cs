@@ -306,9 +306,67 @@ public sealed class CliTests : IDisposable
     public void Interrupt_FirstTime_CancelsTheRunAndKeepsTheProcess_SecondTime_LetsTheProcessEnd()
     {
         using var interrupt = new CancellationTokenSource();
+        var signals = 0;
 
-        Cli.Interrupt(interrupt).ShouldBeTrue();
+        Cli.Interrupt(interrupt, ref signals).ShouldBeTrue();
         interrupt.IsCancellationRequested.ShouldBeTrue();
-        Cli.Interrupt(interrupt).ShouldBeFalse();
+        Cli.Interrupt(interrupt, ref signals).ShouldBeFalse();
+    }
+
+    // SIGTERM and SIGHUP can come at once, each on a thread of its own.  Only one of them is the first: were both,
+    // both would wait for the run, and the one that was to end the process at once would end nothing.
+    [Fact]
+    public void Interrupt_SeveralAtOnce_OnlyOneIsTheFirst()
+    {
+        const int Threads = 8;
+        for (var round = 0; round < 2000; round++)
+        {
+            using var interrupt = new CancellationTokenSource();
+            using var together = new Barrier(Threads);
+            var signals = 0;
+            var firsts = 0;
+            var threads = new Thread[Threads];
+            for (var index = 0; index < Threads; index++)
+            {
+                threads[index] = new Thread(() =>
+                {
+                    together.SignalAndWait();
+                    if (Cli.Interrupt(interrupt, ref signals))
+                    {
+                        _ = Interlocked.Increment(ref firsts);
+                    }
+                });
+                threads[index].Start();
+            }
+
+            foreach (var thread in threads)
+            {
+                thread.Join();
+            }
+
+            firsts.ShouldBe(1);
+        }
+    }
+
+    // Windows ends the process when the handler of a closed console or of a shutdown returns, so the handler
+    // returns only when the run has ended.  A second signal waits for nothing: the process is to end now.
+    [Fact]
+    public void Terminate_FirstTime_CancelsTheRunAndWaitsForItsEnd_SecondTime_LetsTheProcessEndAtOnce()
+    {
+        using var interrupt = new CancellationTokenSource();
+        var signals = 0;
+        var waits = 0;
+        var cancelledBeforeTheWait = false;
+        void WaitForTheEnd()
+        {
+            waits++;
+            cancelledBeforeTheWait = interrupt.IsCancellationRequested;
+        }
+
+        Cli.Terminate(interrupt, ref signals, WaitForTheEnd).ShouldBeTrue();
+        waits.ShouldBe(1);
+        cancelledBeforeTheWait.ShouldBeTrue();
+        Cli.Terminate(interrupt, ref signals, WaitForTheEnd).ShouldBeFalse();
+        waits.ShouldBe(1);
     }
 }

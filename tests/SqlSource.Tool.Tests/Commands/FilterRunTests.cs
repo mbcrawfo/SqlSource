@@ -29,6 +29,59 @@ public sealed class FilterRunTests : IDisposable
     private static string HashOf(string sqlPath, string query) =>
         SidecarFiles.Read(sqlPath).Find(query).ShouldNotBeNull().Hash;
 
+    // A file as a run leaves it when it is killed between the write of a sidecar and the move, long ago.
+    private string Leftover(string sqlName)
+    {
+        var path = _scene.Run.Folder.PathOf($"{sqlName}.json.0123456789abcdef0123456789abcdef.tmp");
+        File.WriteAllText(path, "{");
+        File.SetLastWriteTimeUtc(path, SidecarFiles.Old);
+        return path;
+    }
+
+    // The .sql file of the first is gone since, so no run looks at its sidecar again.
+    [Fact]
+    public async Task Run_OnTheWhole_RemovesTheTemporaryFilesThatAKilledRunLeft()
+    {
+        var ofAFileThatIsGone = Leftover("Gone.sql");
+        var ofAFileOfTheRun = Leftover("Users.sql");
+
+        var result = await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        File.Exists(ofAFileThatIsGone).ShouldBeFalse();
+        File.Exists(ofAFileOfTheRun).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Run_Database_RemovesOnlyTheTemporaryFilesOfTheSidecarsItLooksAt()
+    {
+        _ = await _scene.DescribeAsync();
+        var ofAFileThatIsGone = Leftover("Gone.sql");
+        var ofAFileOfAnotherDatabase = Leftover("Plain.sql");
+        var ofAFileOfTheRun = Leftover("Invoices.sql");
+
+        var result = await _scene.DescribeAsync("--database", "billing");
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        File.Exists(ofAFileThatIsGone).ShouldBeTrue();
+        File.Exists(ofAFileOfAnotherDatabase).ShouldBeTrue();
+        File.Exists(ofAFileOfTheRun).ShouldBeFalse();
+    }
+
+    [Fact]
+    public async Task Run_Check_RemovesNoTemporaryFile()
+    {
+        _ = await _scene.DescribeAsync();
+        var ofAFileThatIsGone = Leftover("Gone.sql");
+        var ofAFileOfTheRun = Leftover("Users.sql");
+
+        var result = await _scene.DescribeAsync("--check");
+
+        result.ExitCode.ShouldBe(0, result.Error);
+        File.Exists(ofAFileThatIsGone).ShouldBeTrue();
+        File.Exists(ofAFileOfTheRun).ShouldBeTrue();
+    }
+
     [Fact]
     public async Task Run_DatabaseWithTheOthersEntriesCurrent_WritesTheMixedFile()
     {

@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Threading;
@@ -175,6 +176,63 @@ public class ProcessRunnerTests
             // No process has the id.
             return false;
         }
+    }
+
+    // A kill only asks, and on Windows the program ends some time after.  The run waits for that: what its caller
+    // deletes next, the folder that MSBuild writes its manifest to, is then no longer held by it.  The kill here
+    // is done only when the test lets it, after the runner asked for it, so it is late on every system.
+    [Fact]
+    public async Task Run_Cancelled_EndsOnlyWhenTheProgramHas()
+    {
+        var wait = Wait();
+        Programs.SkipUnlessOnPath(wait.Program);
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var asked = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var let = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var runner = new ProcessRunner(process =>
+        {
+            var id = process.Id;
+            _ = Task.Run(async () =>
+            {
+                await let.Task;
+                using var late = Process.GetProcessById(id);
+                late.Kill();
+            });
+            asked.SetResult(id);
+        });
+
+        var run = runner.RunAsync(wait, cancel.Token);
+        await cancel.CancelAsync();
+        var program = await asked.Task;
+        IsRunning(program).ShouldBeTrue();
+        let.SetResult();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(run);
+        IsRunning(program).ShouldBeFalse();
+    }
+
+    // A kill of the whole tree can fail, as when a process of it belongs to another user.  The run was cancelled
+    // all the same, and that is what its caller is told: anything else would be reported as SQLSRC200.
+    [Theory]
+    [InlineData(typeof(InvalidOperationException))]
+    [InlineData(typeof(Win32Exception))]
+    [InlineData(typeof(AggregateException))]
+    public async Task Run_CancelledAndTheKillFails_ThrowsTheCancellation(Type failure)
+    {
+        var wait = Wait();
+        Programs.SkipUnlessOnPath(wait.Program);
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var runner = new ProcessRunner(process =>
+        {
+            // The program is ended, so that the test leaves none, and the kill fails as the system's would.
+            process.Kill(entireProcessTree: true);
+            throw (Exception)Activator.CreateInstance(failure)!;
+        });
+
+        var run = runner.RunAsync(wait, cancel.Token);
+        await cancel.CancelAsync();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(run);
     }
 
     [Fact]
