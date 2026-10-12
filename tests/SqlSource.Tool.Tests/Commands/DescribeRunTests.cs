@@ -12,21 +12,15 @@ namespace SqlSource.Tool.Tests.Commands;
 // "describe" from the command line to the sidecars on the disk, with the describer of the tests.
 public sealed class DescribeRunTests : IDisposable
 {
-    private const string Users = "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n";
-
-    private const string See = DescribeScene.See;
-
-    private static readonly DateTime Old = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
-
     private readonly DescribeScene _scene = new();
     private readonly string _users;
 
     public DescribeRunTests()
     {
-        _users = _scene.Project.AddSql("Users.sql", Users);
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.TwoUsers);
     }
 
-    private string Sidecar => _users + ".json";
+    private string Sidecar => SidecarFormat.PathFor(_users);
 
     public void Dispose() => _scene.Dispose();
 
@@ -36,14 +30,14 @@ public sealed class DescribeRunTests : IDisposable
         var result = await _scene.DescribeAsync();
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
-        var sidecar = TestSidecar.Read(_users);
+        var sidecar = SidecarFiles.Read(_users);
         sidecar.FormatVersion.ShouldBe(SidecarFormat.Version);
         sidecar.ToolVersion.ShouldBe(PackageVersion.Prefix);
         sidecar
             .Queries.Select(entry => $"{entry.Name} {entry.Engine} {entry.Database} {entry.ServerVersion}")
             .ShouldBe(["GetUser postgres postgres 16.4", "ListUsers postgres postgres 16.4"]);
         sidecar.Queries.ShouldAllBe(entry => entry.Hash.Length == 64);
-        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(DescribeScene.Connection);
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Secrets.Connection);
         _scene.Describer.Closed.ShouldBe(1);
     }
 
@@ -51,25 +45,25 @@ public sealed class DescribeRunTests : IDisposable
     public async Task Run_SecondRunWithNothingChanged_DescribesNothingAndWritesNothing()
     {
         _ = await _scene.DescribeAsync();
-        File.SetLastWriteTimeUtc(Sidecar, Old);
+        File.SetLastWriteTimeUtc(Sidecar, SidecarFiles.Old);
 
         var result = await _scene.DescribeAsync();
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 0 described, 2 skipped, 0 failed\n", ""));
         _scene.Describer.Described.Count.ShouldBe(2);
         _scene.Describer.Opened.Count.ShouldBe(1);
-        File.GetLastWriteTimeUtc(Sidecar).ShouldBe(Old);
+        File.GetLastWriteTimeUtc(Sidecar).ShouldBe(SidecarFiles.Old);
     }
 
     // The SQL, a declaration, a default and the database are each part of what was described.
     [Theory]
-    [InlineData("-- name: GetUser\nSELECT 1;\n", "-- name: GetUser\nSELECT 11;\n")]
+    [InlineData(SqlTexts.GetUser, "-- name: GetUser\nSELECT 11;\n")]
     [InlineData(
         "-- name: GetUser\n-- param: @id int\nSELECT @id;\n",
         "-- name: GetUser\n-- param: @id bigint\nSELECT @id;\n"
     )]
     [InlineData("-- name: GetUser\nSELECT 1 {{w:WHERE 1 = 1}};\n", "-- name: GetUser\nSELECT 1 {{w:WHERE 2 = 2}};\n")]
-    [InlineData("-- name: GetUser\nSELECT 1;\n", "-- name: GetUser\n-- database: billing\nSELECT 1;\n")]
+    [InlineData(SqlTexts.GetUser, "-- name: GetUser\n-- database: billing\nSELECT 1;\n")]
     public async Task Run_QueryThatChanged_IsDescribedAgain(string before, string after)
     {
         await File.WriteAllTextAsync(_users, before, TestContext.Current.CancellationToken);
@@ -90,7 +84,7 @@ public sealed class DescribeRunTests : IDisposable
         _ = await _scene.DescribeAsync();
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 1;", "/* the first */\nSELECT 1;", StringComparison.Ordinal),
+            SqlTexts.TwoUsers.Replace("SELECT 1;", "/* the first */\nSELECT 1;", StringComparison.Ordinal),
             TestContext.Current.CancellationToken
         );
 
@@ -107,7 +101,7 @@ public sealed class DescribeRunTests : IDisposable
     {
         _ = await _scene.DescribeAsync();
         var written = await File.ReadAllTextAsync(Sidecar, TestContext.Current.CancellationToken);
-        var sidecar = TestSidecar.Read(_users);
+        var sidecar = SidecarFiles.Read(_users);
         await File.WriteAllTextAsync(
             Sidecar,
             kind switch
@@ -129,7 +123,7 @@ public sealed class DescribeRunTests : IDisposable
     public async Task Run_SidecarOfAHigherFormatVersion_IsSqlsrc221AndTheFileIsLeftAlone()
     {
         _ = await _scene.DescribeAsync();
-        var newer = SidecarWriter.Write(TestSidecar.Read(_users) with { FormatVersion = 2 });
+        var newer = SidecarWriter.Write(SidecarFiles.Read(_users) with { FormatVersion = 2 });
         await File.WriteAllTextAsync(Sidecar, newer, TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync("--force");
@@ -140,7 +134,7 @@ public sealed class DescribeRunTests : IDisposable
                 "postgres (postgres): 0 described, 0 skipped, 2 failed\n",
                 $"{Sidecar} : error SQLSRC221: '{Sidecar}' has format 2, and this tool writes format 1\n"
                     + "    help: update the SqlSource.Tool package\n"
-                    + $"{See}221\n"
+                    + Expected.See("SQLSRC221")
                     + DescribeScene.RunAgain
             )
         );
@@ -157,7 +151,7 @@ public sealed class DescribeRunTests : IDisposable
         var result = await _scene.DescribeAsync("--force");
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
-        TestSidecar.Read(_users).Queries.ShouldAllBe(entry => entry.ServerVersion == "17.0");
+        SidecarFiles.Read(_users).Queries.ShouldAllBe(entry => entry.ServerVersion == "17.0");
     }
 
     [Fact]
@@ -181,7 +175,7 @@ public sealed class DescribeRunTests : IDisposable
                     + "query of the file has an entry\n"
                     + "    query: ListUsers: failed\n"
                     + "    help: describe the whole file, or fix the queries that failed\n"
-                    + $"{See}217\n"
+                    + Expected.See("SQLSRC217")
                     + DescribeScene.RunAgain
             )
         );
@@ -220,7 +214,7 @@ public sealed class DescribeRunTests : IDisposable
         _ = await _scene.DescribeAsync();
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 2;", "SELECT 22;", StringComparison.Ordinal),
+            SqlTexts.WithSecondQueryEdited(SqlTexts.TwoUsers),
             TestContext.Current.CancellationToken
         );
         _scene.Run.Environment.Clear();
@@ -233,7 +227,7 @@ public sealed class DescribeRunTests : IDisposable
                 "postgres (postgres): 0 described, 1 skipped, 1 failed\n",
                 $"{_users}(4,10): error SQLSRC213: No connection is given for the database 'postgres'\n"
                     + "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES\n"
-                    + $"{See}213\n"
+                    + Expected.See("SQLSRC213")
                     + DescribeScene.RunAgain
             )
         );
@@ -289,9 +283,10 @@ public sealed class DescribeRunTests : IDisposable
             new CliResult(
                 1,
                 "postgres (postgres): 0 described, 0 skipped, 2 failed\n",
-                $"{_users}(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n{See}216\n"
+                $"{_users}(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n"
+                    + Expected.See("SQLSRC216")
                     + $"{_users}(4,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'\n"
-                    + $"{See}216\n"
+                    + Expected.See("SQLSRC216")
                     + DescribeScene.RunAgain
             )
         );
@@ -329,7 +324,7 @@ public sealed class DescribeRunTests : IDisposable
     [Fact]
     public async Task Run_DescriberThatThrows_IsSqlsrc200WithoutTheConnectionAndNothingIsWritten()
     {
-        _scene.Describer.Exceptions["ListUsers"] = new InvalidOperationException($"bad {DescribeScene.Connection}");
+        _scene.Describer.Exceptions["ListUsers"] = new InvalidOperationException($"bad {Secrets.Connection}");
 
         var result = await _scene.DescribeAsync();
 
@@ -339,7 +334,7 @@ public sealed class DescribeRunTests : IDisposable
                 "",
                 "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: "
                     + "bad ***\n"
-                    + $"{See}200\n"
+                    + Expected.See("SQLSRC200")
                     + DescribeScene.RunAgain
             )
         );
@@ -350,12 +345,12 @@ public sealed class DescribeRunTests : IDisposable
     public async Task Run_QueryThatWasDeleted_LosesItsEntry()
     {
         _ = await _scene.DescribeAsync();
-        await File.WriteAllTextAsync(_users, "-- name: GetUser\nSELECT 1;\n", TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(_users, SqlTexts.GetUser, TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync();
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 0 described, 1 skipped, 0 failed\n", ""));
-        TestSidecar.Read(_users).Queries.ShouldHaveSingleItem().Name.ShouldBe("GetUser");
+        SidecarFiles.Read(_users).Queries.ShouldHaveSingleItem().Name.ShouldBe("GetUser");
     }
 
     [Fact]
@@ -363,7 +358,11 @@ public sealed class DescribeRunTests : IDisposable
     {
         _ = await _scene.DescribeAsync();
         File.Exists(Sidecar).ShouldBeTrue();
-        await File.WriteAllTextAsync(_users, "-- output: sql\n" + Users, TestContext.Current.CancellationToken);
+        await File.WriteAllTextAsync(
+            _users,
+            "-- output: sql\n" + SqlTexts.TwoUsers,
+            TestContext.Current.CancellationToken
+        );
 
         var result = await _scene.DescribeAsync();
 

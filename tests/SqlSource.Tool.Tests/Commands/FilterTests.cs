@@ -10,11 +10,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // every claimed file; a filter says which of them the run was asked to describe.
 public sealed class FilterTests : IDisposable
 {
-    private const string Secret = "s3cret";
-
-    private const string See =
-        "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc212\n";
-
     private readonly CliRun _run = new();
     private readonly string _users;
 
@@ -23,16 +18,9 @@ public sealed class FilterTests : IDisposable
         // The project file is in the working directory, so a run that names no unit finds it.
         var project = new TestProject(_run.Folder, directory: "").AnsweredBy(_run.Processes);
         project.Properties["SqlSourceDialect"] = "postgres";
-        _ = project.AddSource(
-            "Queries.cs",
-            "[SqlSource.SqlSourceGenerate(Path = \"Q\")]\ninternal static partial class Queries;\n"
-        );
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"Q\""));
         _ = project.AddSql("Q/Invoices.sql", "-- database: billing\n-- name: ListInvoices\nSELECT 4;\n");
-        _users = project.AddSql(
-            "Q/Users.sql",
-            "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n\n"
-                + "-- name: Plain\n-- output: sql\nSELECT 3;\n"
-        );
+        _users = project.AddSql("Q/Users.sql", SqlTexts.UsersAndPlain);
         _ = project.AddSql("Unclaimed/Other.sql", "SELECT 5;");
     }
 
@@ -103,7 +91,7 @@ public sealed class FilterTests : IDisposable
     [Fact]
     public async Task Run_TwoUnits_IsAWrongCommandLineThatDoesNotRepeatTheSecond()
     {
-        var result = await _run.RunAsync("describe", "App.csproj", "Q/Users.sql", Secret);
+        var result = await _run.RunAsync("describe", "App.csproj", "Q/Users.sql", Secrets.Word);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unexpected argument at position 4\n"));
     }
@@ -121,7 +109,7 @@ public sealed class FilterTests : IDisposable
                 1,
                 "",
                 $"sqlsource : error SQLSRC212: '{full}' is not a .sql file that a type of the run claims\n"
-                    + See
+                    + Expected.See("SQLSRC212")
                     + DescribeScene.RunAgain
             )
         );
@@ -152,7 +140,7 @@ public sealed class FilterTests : IDisposable
 
     [Theory]
     [InlineData(3, "describe", "--database", "not a name")]
-    [InlineData(2, "describe", "--database=" + Secret + "!")]
+    [InlineData(2, "describe", "--database=" + Secrets.Word + "!")]
     public async Task Run_DatabaseThatIsNoName_IsAWrongCommandLineThatDoesNotRepeatIt(
         int position,
         params string[] args

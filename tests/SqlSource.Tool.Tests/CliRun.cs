@@ -32,7 +32,7 @@ internal sealed class CliRun : IDisposable
     public TimeProvider Time { get; set; } = TimeProvider.System;
 
     // Set to stand in for standard output, for a test of a writer that fails.
-    public TextWriter? Out { get; init; }
+    public TextWriter? Out { get; set; }
 
     public Task<CliResult> RunAsync(params string[] args) => InvokeAsync(args, TestContext.Current.CancellationToken);
 
@@ -77,16 +77,12 @@ internal sealed class CliRun : IDisposable
     private static StringWriter NewWriter() => new(CultureInfo.InvariantCulture) { NewLine = "\n" };
 
     private ToolHost CreateHost(TextWriter output, TextWriter error) =>
-        new(
-            Out ?? output,
-            error,
-            Folder.Path,
-            name => Environment.GetValueOrDefault(name),
-            Processes,
-            Folder.CreateFolder("tmp"),
-            ProcessorCount: 4,
-            new DescriberRegistry(Describers),
-            _ => Exchange,
-            Time
-        );
+        Hosts.Create(Folder.Path, Processes, Folder.CreateFolder("tmp"), environment: Environment) with
+        {
+            Out = Out ?? output,
+            Error = error,
+            Describers = new DescriberRegistry(Describers),
+            Exchange = _ => Exchange,
+            Time = Time,
+        };
 }

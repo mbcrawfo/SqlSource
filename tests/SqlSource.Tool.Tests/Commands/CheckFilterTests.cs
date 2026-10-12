@@ -3,7 +3,6 @@ using System.IO;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
-using SqlSource.Tool.Describing.Describers;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -11,18 +10,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // "--check" compares within what "describe" with the same filters would change, and counts what it found.
 public sealed class CheckFilterTests : IDisposable
 {
-    private const string Users =
-        "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n";
-
-    private static readonly QueryDescription Rows = new(
-        SidecarResultKind.Rows,
-        EquatableArray<DescribedParameter>.Empty,
-        EquatableArray<SidecarColumn>.Empty,
-        null,
-        "not-needed",
-        "no-origin"
-    );
-
     private readonly DescribeScene _scene = new();
     private readonly string _plain;
     private readonly string _users;
@@ -32,7 +19,7 @@ public sealed class CheckFilterTests : IDisposable
         // "Invoices.sql" comes before "Users.sql", so the plan holds "billing" first.
         _ = _scene.Project.AddSql("Invoices.sql", "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n");
         _plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
-        _users = _scene.Project.AddSql("Users.sql", Users);
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.Users);
         // Two units stand in the working directory for the test of "--project", so each run names its own.
         _ = _scene.Run.Folder.WriteFile("App.slnx", "<Solution><Project Path=\"App.csproj\" /></Solution>");
     }
@@ -41,19 +28,13 @@ public sealed class CheckFilterTests : IDisposable
 
     private Task<CliResult> DescribeAsync(params string[] args) => _scene.DescribeAsync(["App.csproj", .. args]);
 
-    private void AddASidecarToPlain() =>
-        File.WriteAllText(
-            _plain + ".json",
-            SidecarWriter.Write(
-                new Sidecar(SidecarFormat.Version, PackageVersion.Prefix, EquatableArray<SidecarEntry>.Empty)
-            )
-        );
+    private void AddASidecarToPlain() => File.WriteAllText(SidecarFormat.PathFor(_plain), SidecarFiles.Empty());
 
     [Fact]
     public async Task Check_NoFilter_CountsEachQueryAsSameDifferOrFailed()
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
-        _scene.Describer.Descriptions["GetInvoice"] = Rows;
+        _scene.Describer.Descriptions["GetInvoice"] = FakeDescriber.Rows;
         _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
 
         var result = await DescribeAsync("--check");
@@ -80,7 +61,7 @@ public sealed class CheckFilterTests : IDisposable
     public async Task Check_DatabaseWithADifferenceInTheOthersEntry_ExitsZero()
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
-        _scene.Describer.Descriptions["GetUser"] = Rows;
+        _scene.Describer.Descriptions["GetUser"] = FakeDescriber.Rows;
 
         var result = await DescribeAsync("--check", "--database", "billing");
 
@@ -91,7 +72,7 @@ public sealed class CheckFilterTests : IDisposable
     public async Task Check_FileFilterWithADifferenceInAnotherFile_ExitsZero()
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
-        _scene.Describer.Descriptions["GetUser"] = Rows;
+        _scene.Describer.Descriptions["GetUser"] = FakeDescriber.Rows;
 
         var result = await DescribeAsync("--check", "Invoices.sql");
 
@@ -108,10 +89,10 @@ public sealed class CheckFilterTests : IDisposable
     )
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
-        var sidecar = TestSidecar.Read(_users);
+        var sidecar = SidecarFiles.Read(_users);
         var gone = sidecar.Find("GetInvoice").ShouldNotBeNull() with { Name = "Gone" };
         await File.WriteAllTextAsync(
-            _users + ".json",
+            SidecarFormat.PathFor(_users),
             SidecarWriter.Write(
                 sidecar with
                 {
@@ -144,7 +125,7 @@ public sealed class CheckFilterTests : IDisposable
         var result = await _scene.DescribeAsync(["--check", .. args]);
 
         result.ExitCode.ShouldBe(exitCode);
-        File.Exists(_plain + ".json").ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(_plain)).ShouldBeTrue();
     }
 
     // What "describe" with a filter wrote, "--check" with the same filter finds the same.

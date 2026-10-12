@@ -15,14 +15,12 @@ namespace SqlSource.Tool.Tests.Logging;
 // The log of a run: "--log" or SQLSOURCE_LOG, one JSON object on a line for each thing the run did.
 public sealed class RunLogTests : IDisposable
 {
-    private const string Users = "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n";
-
     private readonly DescribeScene _scene = new();
     private readonly string _users;
 
     public RunLogTests()
     {
-        _users = _scene.Project.AddSql("Users.sql", Users);
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.TwoUsers);
         // Each describe takes 25 ms on the clock of the test.
         _scene.Describer.BeforeDescribe = _ =>
         {
@@ -47,7 +45,7 @@ public sealed class RunLogTests : IDisposable
         var events = LogReader.Read(Log);
         var start = events[0];
         start.GetProperty("event").GetString().ShouldBe("run.start");
-        start.GetProperty("time").GetString().ShouldBe("2026-10-09T14:02:11.412Z");
+        start.GetProperty("time").GetString().ShouldBe(TestClock.StartIso);
         start.GetProperty("toolVersion").GetString().ShouldBe(PackageVersion.Prefix);
         start.GetProperty("formatVersion").GetInt32().ShouldBe(SidecarFormat.Version);
         start.GetProperty("runtime").GetString().ShouldBe(RuntimeInformation.FrameworkDescription);
@@ -93,7 +91,7 @@ public sealed class RunLogTests : IDisposable
         (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 2;", "SELECT 22;", StringComparison.Ordinal) + "\n-- name: Bad\nSELECT 4;\n",
+            SqlTexts.WithSecondQueryEdited(SqlTexts.TwoUsers) + "\n-- name: Bad\nSELECT 4;\n",
             TestContext.Current.CancellationToken
         );
         _scene.Describer.Failures["Bad"] = FakeDescriber.Failure("Bad");
@@ -194,7 +192,7 @@ public sealed class RunLogTests : IDisposable
         Text(open, "driverVersion").ShouldBe("1.2.3");
         open.GetProperty("settings").ValueKind.ShouldBe(JsonValueKind.Object);
         var sidecar = events[10];
-        Text(sidecar, "path").ShouldBe(_users + ".json");
+        Text(sidecar, "path").ShouldBe(SidecarFormat.PathFor(_users));
         Text(sidecar, "action").ShouldBe("held-back");
         var counts = events[11].GetProperty("databases").EnumerateArray().ShouldHaveSingleItem();
         Text(counts, "name").ShouldBe("postgres");
@@ -215,10 +213,10 @@ public sealed class RunLogTests : IDisposable
     public async Task Run_Sidecars_AreWrittenThenUnchangedThenDeleted()
     {
         _ = await _scene.DescribeAsync("--log", "run.log");
-        ActionOf(_users + ".json").ShouldBe("written");
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("written");
 
         _ = await _scene.DescribeAsync("--log", "run.log");
-        ActionOf(_users + ".json").ShouldBe("unchanged");
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("unchanged");
 
         await File.WriteAllTextAsync(
             _users,
@@ -226,20 +224,20 @@ public sealed class RunLogTests : IDisposable
             TestContext.Current.CancellationToken
         );
         _ = await _scene.DescribeAsync("--log", "run.log");
-        ActionOf(_users + ".json").ShouldBe("deleted");
-        File.Exists(_users + ".json").ShouldBeFalse();
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("deleted");
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
     }
 
     // "written" would say what did not happen.
     [Fact]
     public async Task Run_SidecarThatCannotBeWritten_HasTheActionFailed()
     {
-        _ = Directory.CreateDirectory(_users + ".json");
+        _ = Directory.CreateDirectory(SidecarFormat.PathFor(_users));
 
         var result = await _scene.DescribeAsync("--log", "run.log");
 
         result.Error.ShouldContain("error SQLSRC218: ");
-        ActionOf(_users + ".json").ShouldBe("failed");
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("failed");
     }
 
     [Fact]
@@ -251,9 +249,9 @@ public sealed class RunLogTests : IDisposable
         var result = await _scene.DescribeAsync("--check", "--log", "run.log");
 
         result.ExitCode.ShouldBe(2);
-        ActionOf(_users + ".json").ShouldBe("same");
-        ActionOf(other + ".json").ShouldBe("differs");
-        File.Exists(other + ".json").ShouldBeFalse();
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("same");
+        ActionOf(SidecarFormat.PathFor(other)).ShouldBe("differs");
+        File.Exists(SidecarFormat.PathFor(other)).ShouldBeFalse();
         var counts = LogReader.Read(Log)[^1].GetProperty("databases").EnumerateArray().ShouldHaveSingleItem();
         counts.GetProperty("same").GetInt32().ShouldBe(2);
         counts.GetProperty("differ").GetInt32().ShouldBe(1);
@@ -286,14 +284,14 @@ public sealed class RunLogTests : IDisposable
         (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal),
+            SqlTexts.TwoUsers.Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal),
             TestContext.Current.CancellationToken
         );
         _scene.Describer.Failures["ListUsers"] = FakeDescriber.Failure("ListUsers");
 
         _ = await _scene.DescribeAsync("--check", "--log", "run.log");
 
-        ActionOf(_users + ".json").ShouldBe("differs");
+        ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("differs");
     }
 
     [Fact]
@@ -334,7 +332,7 @@ public sealed class RunLogTests : IDisposable
         var line = LogReader.Read(Log).Single(e => Text(e, "event") == "postgres.x");
         Text(line, "_event").ShouldBe("run.end");
         Text(line, "_time").ShouldBe("never");
-        Text(line, "time").ShouldBe("2026-10-09T14:02:11.412Z");
+        Text(line, "time").ShouldBe(TestClock.StartIso);
     }
 
     [Fact]
@@ -498,7 +496,7 @@ public sealed class RunLogTests : IDisposable
         (await File.ReadAllBytesAsync(_users, TestContext.Current.CancellationToken)).ShouldBe(before);
         _scene.Describer.Described.ShouldBeEmpty();
         _scene.Describer.Opened.ShouldBeEmpty();
-        File.Exists(_users + ".json").ShouldBeFalse();
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
     }
 
     [Fact]
@@ -586,6 +584,6 @@ public sealed class RunLogTests : IDisposable
         result.Out.ShouldBe("postgres (postgres): 2 described, 0 skipped, 0 failed\n");
         result.Error.ShouldStartWith("/dev/full : error SQLSRC218: '/dev/full' could not be written: ");
         result.Error.Split("error SQLSRC").Length.ShouldBe(2);
-        File.Exists(_users + ".json").ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
     }
 }

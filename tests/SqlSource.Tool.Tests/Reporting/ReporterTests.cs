@@ -17,9 +17,6 @@ public sealed class ReporterTests : IDisposable
 {
     private const string Message = "error SQLSRC200: sqlsource failed unexpectedly: System.Exception: boom\n";
 
-    private const string See =
-        "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc200\n";
-
     private static readonly ToolDiagnostic Failure = ToolDiagnostic.Create(
         ToolDiagnostics.UnexpectedFailure,
         "System.Exception",
@@ -49,7 +46,7 @@ public sealed class ReporterTests : IDisposable
 
         reporter.Report(Failure);
 
-        _error.ToString().ShouldBe("sqlsource : " + Message + See);
+        _error.ToString().ShouldBe("sqlsource : " + Message + Expected.See("SQLSRC200"));
     }
 
     [Fact]
@@ -59,7 +56,7 @@ public sealed class ReporterTests : IDisposable
 
         reporter.Report(Failure with { Path = "/work/App/App.csproj" });
 
-        _error.ToString().ShouldBe("/work/App/App.csproj : " + Message + See);
+        _error.ToString().ShouldBe("/work/App/App.csproj : " + Message + Expected.See("SQLSRC200"));
     }
 
     [Fact]
@@ -69,7 +66,7 @@ public sealed class ReporterTests : IDisposable
 
         reporter.Report(Failure with { Path = "/work/App/Users.sql", Position = new LinePosition(2, 9) });
 
-        _error.ToString().ShouldBe("/work/App/Users.sql(3,10): " + Message + See);
+        _error.ToString().ShouldBe("/work/App/Users.sql(3,10): " + Message + Expected.See("SQLSRC200"));
     }
 
     [Fact]
@@ -91,7 +88,7 @@ public sealed class ReporterTests : IDisposable
                     + Message
                     + "    server: ERROR: relation \"users\" does not exist\n"
                     + "    help: create the table\n"
-                    + See
+                    + Expected.See("SQLSRC200")
             );
     }
 
@@ -124,7 +121,7 @@ public sealed class ReporterTests : IDisposable
             .ShouldBe(
                 "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.Exception: one two three four\n"
                     + "    server: first second\n"
-                    + See
+                    + Expected.See("SQLSRC200")
             );
     }
 
@@ -149,7 +146,7 @@ public sealed class ReporterTests : IDisposable
 
         reporter.Report(Failure.WithLines(new ContinuationLine("help", "try again")));
 
-        writer.Writes.ShouldBe(["sqlsource : " + Message + "    help: try again\n" + See]);
+        writer.Writes.ShouldBe(["sqlsource : " + Message + "    help: try again\n" + Expected.See("SQLSRC200")]);
     }
 
     [Fact]
@@ -162,7 +159,7 @@ public sealed class ReporterTests : IDisposable
 
         reporter.Count.ShouldBe(2000);
         writer.Writes.Count.ShouldBe(2000);
-        writer.Writes.ShouldAllBe(write => write == "sqlsource : " + Message + See);
+        writer.Writes.ShouldAllBe(write => write == "sqlsource : " + Message + Expected.See("SQLSRC200"));
     }
 
     [Fact]
@@ -174,7 +171,9 @@ public sealed class ReporterTests : IDisposable
             (Failure with { Path = "/work/odd\nname/App.csproj" }).WithLines(new ContinuationLine("ser\nver", "text"))
         );
 
-        _error.ToString().ShouldBe("/work/odd name/App.csproj : " + Message + "    ser ver: text\n" + See);
+        _error
+            .ToString()
+            .ShouldBe("/work/odd name/App.csproj : " + Message + "    ser ver: text\n" + Expected.See("SQLSRC200"));
     }
 
     // The exit code 2 is for a run that reported nothing but SQLSRC219.

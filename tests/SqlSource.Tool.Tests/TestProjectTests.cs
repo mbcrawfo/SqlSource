@@ -44,7 +44,7 @@ public class TestProjectTests
         var project = new TestProject(run.Folder).AnsweredBy(run.Processes);
         // Added after the runner was told of the project: the run sees them only when the manifest is written as
         // the target runs.
-        _ = project.AddSource("Queries.cs", "[SqlSource.SqlSourceGenerate]\ninternal static partial class Queries;\n");
+        _ = project.AddSource("Queries.cs", Plans.Type);
         var sql = project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
 
         var result = await run.RunAsync("describe", project.ProjectPath);

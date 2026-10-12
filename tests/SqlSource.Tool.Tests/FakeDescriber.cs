@@ -29,9 +29,20 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     public static QueryDescription NoRows { get; } =
         new(SidecarResultKind.None, EquatableArray<DescribedParameter>.Empty, null, null, null, null);
 
+    // A statement that produces rows, where the describer says none unless told.
+    public static QueryDescription Rows { get; } =
+        new(
+            SidecarResultKind.Rows,
+            EquatableArray<DescribedParameter>.Empty,
+            EquatableArray<SidecarColumn>.Empty,
+            null,
+            "not-needed",
+            "no-origin"
+        );
+
     public SqlDialect Dialect => dialect;
 
-    public ServerInfo Server { get; set; } = new("16.4", "FakeDriver", "1.2.3", EquatableArray<ServerSetting>.Empty);
+    public ServerInfo Server { get; set; } = ServerWith(driverVersion: "1.2.3");
 
     public Dictionary<string, QueryDescription> Descriptions { get; } = [with(StringComparer.Ordinal)];
 
@@ -72,14 +83,21 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
 
     public int Closed { get; private set; }
 
+    // The server of the fake driver.  A driver without a version is named alone.
+    public static ServerInfo ServerWith(string version = "16.4", string? driverVersion = null) =>
+        new(version, "FakeDriver", driverVersion, EquatableArray<ServerSetting>.Empty);
+
     public static DescribeFailure Failure(string query, params string[] serverLines) =>
-        new(
-            Rejected,
-            new EquatableArray<string>([query]),
-            DescribeStep.DescribeColumns,
-            new EquatableArray<string>([.. serverLines]),
-            "check the SQL"
-        );
+        Failure(query, DescribeStep.DescribeColumns, "check the SQL", serverLines);
+
+    // A failure at a step, or at none, with the help it gives, or none.  Name "step" or "help" where it is null.
+    public static DescribeFailure Failure(
+        string argument,
+        DescribeStep? step,
+        string? help,
+        params string[] serverLines
+    ) =>
+        new(Rejected, new EquatableArray<string>([argument]), step, new EquatableArray<string>([.. serverLines]), help);
 
     public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,

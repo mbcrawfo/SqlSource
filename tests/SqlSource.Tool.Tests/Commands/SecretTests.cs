@@ -12,10 +12,6 @@ namespace SqlSource.Tool.Tests.Commands;
 // wrong, and not when a describer breaks its own rule.
 public sealed class SecretTests : IDisposable
 {
-    private const string Marker = "s3cret-marker";
-
-    private const string Value = "Host=db;Password=" + Marker;
-
     private readonly DescribeScene _scene = new();
     private readonly string _users;
 
@@ -33,12 +29,11 @@ public sealed class SecretTests : IDisposable
     // databases, SQLSRC216 for "mssql", SQLSRC218 for a sidecar that cannot be written, and SQLSRC221.
     private void AddEveryError()
     {
-        _scene.Describer.Failures["Bad"] = new DescribeFailure(
-            FakeDescriber.Rejected,
-            new EquatableArray<string>(["Bad"]),
+        _scene.Describer.Failures["Bad"] = FakeDescriber.Failure(
+            "Bad",
             DescribeStep.Explain,
-            new EquatableArray<string>(["could not explain"]),
-            "check the SQL"
+            "check the SQL",
+            "could not explain"
         );
         _ = _scene.Project.AddSql("Reports.sql", "-- name: Report\n-- database: reports\nSELECT 3;\n");
         _ = _scene.Project.AddSql(
@@ -47,19 +42,16 @@ public sealed class SecretTests : IDisposable
         );
         _ = _scene.Project.AddSql("Other.sql", "-- dialect: mssql\n-- name: Other\nSELECT 6;\n");
         var locked = _scene.Project.AddSql("Locked.sql", "-- name: Locked\nSELECT 7;\n");
-        _ = Directory.CreateDirectory(locked + ".json");
+        _ = Directory.CreateDirectory(SidecarFormat.PathFor(locked));
         var newer = _scene.Project.AddSql("Newer.sql", "-- name: Newer\nSELECT 8;\n");
-        File.WriteAllText(
-            newer + ".json",
-            SidecarWriter.Write(new Sidecar(2, "9.9.9", EquatableArray<SidecarEntry>.Empty))
-        );
+        File.WriteAllText(SidecarFormat.PathFor(newer), SidecarFiles.Newer);
     }
 
     private static void ShouldHold(CliResult result, string ids)
     {
         result.ExitCode.ShouldBe(1);
-        result.Out.ShouldNotContain(Marker);
-        result.Error.ShouldNotContain(Marker);
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
         foreach (var id in ids.Split(','))
         {
             result.Error.ShouldContain($"error SQLSRC{id}: ");
@@ -67,9 +59,9 @@ public sealed class SecretTests : IDisposable
     }
 
     [Theory]
-    [InlineData("--connection", "postgres=" + Value)]
-    [InlineData("--connection=postgres=" + Value)]
-    [InlineData("--connection:postgres=" + Value)]
+    [InlineData("--connection", "postgres=" + Secrets.ConnectionWithMarker)]
+    [InlineData("--connection=postgres=" + Secrets.ConnectionWithMarker)]
+    [InlineData("--connection:postgres=" + Secrets.ConnectionWithMarker)]
     public async Task Run_ValueOnTheCommandLineAndEveryError_IsNeverPrinted(params string[] args)
     {
         AddEveryError();
@@ -77,7 +69,7 @@ public sealed class SecretTests : IDisposable
         var result = await _scene.DescribeAsync(args);
 
         ShouldHold(result, "213,214,216,217,218,221,999");
-        _scene.Describer.Opened.ShouldAllBe(request => request.Connection == Value);
+        _scene.Describer.Opened.ShouldAllBe(request => request.Connection == Secrets.ConnectionWithMarker);
     }
 
     // The same run with a log: the file holds every error of it, and the marker word nowhere.
@@ -86,14 +78,19 @@ public sealed class SecretTests : IDisposable
     {
         AddEveryError();
 
-        var result = await _scene.DescribeAsync("--connection", "postgres=" + Value, "--log", "run.log");
+        var result = await _scene.DescribeAsync(
+            "--connection",
+            "postgres=" + Secrets.ConnectionWithMarker,
+            "--log",
+            "run.log"
+        );
 
         ShouldHold(result, "213,214,216,217,218,221,999");
         var log = await File.ReadAllTextAsync(
             _scene.Run.Folder.PathOf("run.log"),
             TestContext.Current.CancellationToken
         );
-        log.ShouldNotContain(Marker);
+        log.ShouldNotContain(Secrets.Marker);
         log.ShouldContain("\"id\":\"SQLSRC999\"");
     }
 
@@ -102,7 +99,11 @@ public sealed class SecretTests : IDisposable
     {
         AddEveryError();
 
-        var result = await _scene.DescribeAsync("--connection", "postgres=" + Value, "--verbose");
+        var result = await _scene.DescribeAsync(
+            "--connection",
+            "postgres=" + Secrets.ConnectionWithMarker,
+            "--verbose"
+        );
 
         ShouldHold(result, "213,214,216,217,218,221,999");
         result.Out.ShouldContain("sqlsource: database 'postgres' (postgres): connection from --connection\n");
@@ -112,8 +113,8 @@ public sealed class SecretTests : IDisposable
     public async Task Run_ValueInTheVariableOfTheNameAndEveryError_IsNeverPrinted()
     {
         AddEveryError();
-        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Value;
-        _scene.Run.Environment["SQLSOURCE_CONNECTION_APP_V2"] = Value;
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.ConnectionWithMarker;
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_APP_V2"] = Secrets.ConnectionWithMarker;
 
         var result = await _scene.DescribeAsync();
 
@@ -125,7 +126,7 @@ public sealed class SecretTests : IDisposable
     public async Task Run_ValueInTheVariableWithNoNameAndEveryError_IsNeverPrinted()
     {
         AddEveryError();
-        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Value;
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
 
         var result = await _scene.DescribeAsync();
 
@@ -136,30 +137,30 @@ public sealed class SecretTests : IDisposable
     [Fact]
     public async Task Run_ValueInTheVariableWithNoNameAndOneDatabase_IsUsedAndNeverPrinted()
     {
-        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Value;
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
         _scene.Describer.Failures["Bad"] = FakeDescriber.Failure("Bad");
 
         var result = await _scene.DescribeAsync();
 
         ShouldHold(result, "217,999");
-        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Value);
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Secrets.ConnectionWithMarker);
     }
 
     // The value was typed where "name=value" stands.  Its first keyword is taken for a name, and only that is said.
     [Fact]
     public async Task Run_ConnectionStringGivenWithoutAName_IsNeverPrinted()
     {
-        var result = await _scene.DescribeAsync("--connection", Value);
+        var result = await _scene.DescribeAsync("--connection", Secrets.ConnectionWithMarker);
 
         ShouldHold(result, "213");
         result.Error.ShouldContain("--connection was given for Host, which is no database of this run");
     }
 
     [Theory]
-    [InlineData("--connection", Marker)]
-    [InlineData("--connection=" + Marker)]
-    [InlineData("--connection:" + Marker)]
-    [InlineData("--connection", "postgres=a", "--connection", "POSTGRES=" + Marker)]
+    [InlineData("--connection", Secrets.Marker)]
+    [InlineData("--connection=" + Secrets.Marker)]
+    [InlineData("--connection:" + Secrets.Marker)]
+    [InlineData("--connection", "postgres=a", "--connection", "POSTGRES=" + Secrets.Marker)]
     public async Task Run_ConnectionThatIsWrong_IsAWrongCommandLineThatDoesNotRepeatIt(params string[] args)
     {
         var result = await _scene.DescribeAsync(args);
@@ -167,7 +168,7 @@ public sealed class SecretTests : IDisposable
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
         result.Error.ShouldStartWith("sqlsource: ");
-        result.Error.ShouldNotContain(Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
         _scene.Run.Processes.Requests.ShouldBeEmpty();
     }
 
@@ -175,7 +176,11 @@ public sealed class SecretTests : IDisposable
     [Fact]
     public async Task Run_ConnectionStringSplitByTheShell_IsAWrongCommandLineThatDoesNotRepeatIt()
     {
-        var result = await _scene.DescribeAsync("--connection", "postgres=Server=x;User", "Id=sa;Password=" + Marker);
+        var result = await _scene.DescribeAsync(
+            "--connection",
+            "postgres=Server=x;User",
+            "Id=sa;Password=" + Secrets.Marker
+        );
 
         result.ShouldBe(
             new CliResult(
@@ -195,7 +200,7 @@ public sealed class SecretTests : IDisposable
         var result = await _scene.DescribeAsync(
             "--connection",
             "postgres=Server=x;User",
-            "Id=sa;Password=" + Marker + ".sql"
+            "Id=sa;Password=" + Secrets.Marker + ".sql"
         );
 
         result.ShouldBe(
@@ -206,8 +211,8 @@ public sealed class SecretTests : IDisposable
                     + "'--connection' in quotes\n"
             )
         );
-        result.Out.ShouldNotContain(Marker);
-        result.Error.ShouldNotContain(Marker);
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
         _scene.Run.Processes.Requests.ShouldBeEmpty();
     }
 
@@ -215,7 +220,7 @@ public sealed class SecretTests : IDisposable
     [Fact]
     public async Task Run_MisspeltConnectionOptionFollowedByTheValue_NamesTheOptionAlone()
     {
-        var result = await _scene.DescribeAsync("--conection", "postgres=" + Value);
+        var result = await _scene.DescribeAsync("--conection", "postgres=" + Secrets.ConnectionWithMarker);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--conection'\n"));
     }
@@ -230,14 +235,16 @@ public sealed class SecretTests : IDisposable
             _scene.Run.Environment[Cli.DebugVariable] = debug;
         }
 
-        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Value;
-        _scene.Describer.OpenException = new ArgumentException($"Format of the initialization string: {Value}");
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
+        _scene.Describer.OpenException = new ArgumentException(
+            $"Format of the initialization string: {Secrets.ConnectionWithMarker}"
+        );
 
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
-        result.Error.ShouldNotContain(Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
         result.Error.ShouldStartWith(
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.ArgumentException: Format of the "
                 + "initialization string: ***\n"
@@ -255,19 +262,13 @@ public sealed class SecretTests : IDisposable
             _scene.Run.Environment[Cli.DebugVariable] = debug;
         }
 
-        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Value;
-        _scene.Describer.Server = new ServerInfo(
-            $"16.4 ({Value})",
-            "FakeDriver",
-            null,
-            EquatableArray<ServerSetting>.Empty
-        );
-        _scene.Describer.Failures["Bad"] = new DescribeFailure(
-            FakeDescriber.Rejected,
-            new EquatableArray<string>([$"Bad at {Value}"]),
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
+        _scene.Describer.Server = FakeDescriber.ServerWith($"16.4 ({Secrets.ConnectionWithMarker})");
+        _scene.Describer.Failures["Bad"] = FakeDescriber.Failure(
+            $"Bad at {Secrets.ConnectionWithMarker}",
             DescribeStep.DescribeColumns,
-            new EquatableArray<string>([$"connection to {Value} was lost"]),
-            $"check {Value}"
+            $"check {Secrets.ConnectionWithMarker}",
+            $"connection to {Secrets.ConnectionWithMarker} was lost"
         );
         // A query that is described would put the server's version, which holds the value, into its entry, and that
         // ends the run.
@@ -275,8 +276,8 @@ public sealed class SecretTests : IDisposable
 
         var result = await _scene.DescribeAsync();
 
-        result.Out.ShouldNotContain(Marker);
-        result.Error.ShouldNotContain(Marker);
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
         result.Error.ShouldStartWith(
             $"{_users}(1,10): error SQLSRC999: The server rejected the query 'Bad at ***'\n"
                 + "    query: Bad, database postgres, postgres 16.4 (***), FakeDriver\n"
@@ -298,25 +299,20 @@ public sealed class SecretTests : IDisposable
             _scene.Run.Environment[Cli.DebugVariable] = debug;
         }
 
-        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Value;
-        _scene.Describer.Server = new ServerInfo(
-            $"16.4 ({Value})",
-            "FakeDriver",
-            null,
-            EquatableArray<ServerSetting>.Empty
-        );
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
+        _scene.Describer.Server = FakeDescriber.ServerWith($"16.4 ({Secrets.ConnectionWithMarker})");
 
         var result = await _scene.DescribeAsync();
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBeEmpty();
-        result.Out.ShouldNotContain(Marker);
-        result.Error.ShouldNotContain(Marker);
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
         result.Error.ShouldStartWith(
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: The "
                 + "describer put the connection's value in its description of the query 'Bad'.\n"
         );
-        File.Exists(_users + ".json").ShouldBeFalse();
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
     }
 
     // --check prints what differs, and a text of the describer is among it.  The guard on a description comes first,
@@ -324,13 +320,22 @@ public sealed class SecretTests : IDisposable
     [Fact]
     public async Task Check_DescriberThatPutsTheValueInAColumnOfAQueryThatDiffers_EndsTheRunAndPrintsNothingOfIt()
     {
-        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Value;
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
         (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
         _scene.Describer.Descriptions["Good"] = new QueryDescription(
             SidecarResultKind.Rows,
             EquatableArray<DescribedParameter>.Empty,
             new EquatableArray<SidecarColumn>([
-                new SidecarColumn(0, Value, new OtherEngineType("int4"), null, null, null, null, null),
+                new SidecarColumn(
+                    0,
+                    Secrets.ConnectionWithMarker,
+                    new OtherEngineType("int4"),
+                    null,
+                    null,
+                    null,
+                    null,
+                    null
+                ),
             ]),
             null,
             null,
@@ -340,8 +345,8 @@ public sealed class SecretTests : IDisposable
         var result = await _scene.DescribeAsync("--check");
 
         result.ExitCode.ShouldBe(1);
-        result.Out.ShouldNotContain(Marker);
-        result.Error.ShouldNotContain(Marker);
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
         result.Error.ShouldStartWith(
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: The "
                 + "describer put the connection's value in its description of the query 'Good'.\n"
@@ -353,11 +358,13 @@ public sealed class SecretTests : IDisposable
     [Fact]
     public async Task Run_QueriesDescribed_PrintNothingOfTheConnection()
     {
-        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Value;
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = Secrets.ConnectionWithMarker;
 
         var result = await _scene.DescribeAsync();
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
-        (await File.ReadAllTextAsync(_users + ".json", TestContext.Current.CancellationToken)).ShouldNotContain(Marker);
+        (
+            await File.ReadAllTextAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken)
+        ).ShouldNotContain(Secrets.Marker);
     }
 }

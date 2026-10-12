@@ -5,7 +5,6 @@ using System.Text;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
-using SqlSource.Tool.Describing.Describers;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -13,19 +12,15 @@ namespace SqlSource.Tool.Tests.Commands;
 // "describe --check": every query is described, the sidecars on the disk are compared, and no file is changed.
 public sealed class CheckTests : IDisposable
 {
-    private const string Users = "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n";
-
-    private static readonly DateTime Old = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
-
     private readonly DescribeScene _scene = new();
     private readonly string _users;
 
     public CheckTests()
     {
-        _users = _scene.Project.AddSql("Users.sql", Users);
+        _users = _scene.Project.AddSql("Users.sql", SqlTexts.TwoUsers);
     }
 
-    private string Sidecar => _users + ".json";
+    private string Sidecar => SidecarFormat.PathFor(_users);
 
     public void Dispose() => _scene.Dispose();
 
@@ -33,14 +28,14 @@ public sealed class CheckTests : IDisposable
     private async Task<byte[]> DescribeFirstAsync()
     {
         (await _scene.DescribeAsync()).ExitCode.ShouldBe(0);
-        File.SetLastWriteTimeUtc(Sidecar, Old);
+        File.SetLastWriteTimeUtc(Sidecar, SidecarFiles.Old);
         return await File.ReadAllBytesAsync(Sidecar, TestContext.Current.CancellationToken);
     }
 
     private async Task ShouldBeUntouchedAsync(byte[] before)
     {
         (await File.ReadAllBytesAsync(Sidecar, TestContext.Current.CancellationToken)).ShouldBe(before);
-        File.GetLastWriteTimeUtc(Sidecar).ShouldBe(Old);
+        File.GetLastWriteTimeUtc(Sidecar).ShouldBe(SidecarFiles.Old);
     }
 
     [Theory]
@@ -92,7 +87,7 @@ public sealed class CheckTests : IDisposable
     public async Task Check_SidecarOfAHigherFormatVersion_IsNotSqlsrc221AndItsQueriesAreDescribed()
     {
         _ = await DescribeFirstAsync();
-        var newer = SidecarWriter.Write(TestSidecar.Read(_users) with { FormatVersion = 2 });
+        var newer = SidecarWriter.Write(SidecarFiles.Read(_users) with { FormatVersion = 2 });
         await File.WriteAllTextAsync(Sidecar, newer, TestContext.Current.CancellationToken);
 
         var result = await _scene.DescribeAsync("--check");
@@ -108,20 +103,10 @@ public sealed class CheckTests : IDisposable
     private const string ForceHelp = "    help: run 'dotnet sqlsource describe --force' and commit the sidecars\n";
     private const string UpdateHelp = "    help: update the SqlSource.Tool package\n";
 
-    // A statement that produces rows, where the describer of the tests says none unless told.
-    private static readonly QueryDescription Rows = new(
-        SidecarResultKind.Rows,
-        EquatableArray<DescribedParameter>.Empty,
-        EquatableArray<SidecarColumn>.Empty,
-        null,
-        "not-needed",
-        "no-origin"
-    );
-
     // One SQLSRC219 as the reporter writes it.  The origin is a path with a position, or a path and a space.
     private static string Difference(string origin, string subject, string what, string help = Help) =>
         $"{origin}: error SQLSRC219: The sidecar is out of date for '{subject}': {what}\n"
-        + $"{help}{DescribeScene.See}219\n";
+        + $"{help}{Expected.See("SQLSRC219")}";
 
     // Where a key stands in a text, as the reporter writes a position: "(line,column)", each counted from one.
     private static string PositionOf(string text, string key)
@@ -134,9 +119,9 @@ public sealed class CheckTests : IDisposable
     // Writes the sidecar again with a change, and makes it look old.
     private async Task<string> RewriteAsync(Func<Sidecar, Sidecar> change)
     {
-        var text = SidecarWriter.Write(change(TestSidecar.Read(_users)));
+        var text = SidecarWriter.Write(change(SidecarFiles.Read(_users)));
         await File.WriteAllTextAsync(Sidecar, text, TestContext.Current.CancellationToken);
-        File.SetLastWriteTimeUtc(Sidecar, Old);
+        File.SetLastWriteTimeUtc(Sidecar, SidecarFiles.Old);
         return text;
     }
 
@@ -220,10 +205,10 @@ public sealed class CheckTests : IDisposable
     public async Task Check_QueryThatChanged_SaysSoWithoutTheHashes()
     {
         _ = await DescribeFirstAsync();
-        var hash = TestSidecar.Read(_users).Find("GetUser").ShouldNotBeNull().Hash;
+        var hash = SidecarFiles.Read(_users).Find("GetUser").ShouldNotBeNull().Hash;
         await File.WriteAllTextAsync(
             _users,
-            Users.Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal),
+            SqlTexts.TwoUsers.Replace("SELECT 1;", "SELECT 11;", StringComparison.Ordinal),
             TestContext.Current.CancellationToken
         );
 
@@ -238,7 +223,7 @@ public sealed class CheckTests : IDisposable
     public async Task Check_DatabaseDescribesTheQueryAnotherWay_NamesThePathAndTheTwoValues()
     {
         var before = await DescribeFirstAsync();
-        _scene.Describer.Descriptions["ListUsers"] = Rows;
+        _scene.Describer.Descriptions["ListUsers"] = FakeDescriber.Rows;
 
         var result = await _scene.DescribeAsync("--check");
 
@@ -316,10 +301,7 @@ public sealed class CheckTests : IDisposable
     private string AddPlainWithASidecar(int formatVersion = SidecarFormat.Version)
     {
         var plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
-        File.WriteAllText(
-            plain + ".json",
-            SidecarWriter.Write(new Sidecar(formatVersion, PackageVersion.Prefix, EquatableArray<SidecarEntry>.Empty))
-        );
+        File.WriteAllText(SidecarFormat.PathFor(plain), SidecarFiles.Empty(formatVersion));
         return plain;
     }
 
@@ -333,7 +315,7 @@ public sealed class CheckTests : IDisposable
 
         result.ExitCode.ShouldBe(2);
         result.Error.ShouldBe(Difference($"{plain}.json ", plain, "no query of the file needs an entry"));
-        File.Exists(plain + ".json").ShouldBeTrue();
+        File.Exists(SidecarFormat.PathFor(plain)).ShouldBeTrue();
     }
 
     // "describe" deletes nothing after an error, and leaves a newer tool's file alone: so the check says nothing.
@@ -401,7 +383,7 @@ public sealed class CheckTests : IDisposable
     {
         _ = await DescribeFirstAsync();
         _scene.Describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
-        _scene.Describer.Descriptions["ListUsers"] = Rows;
+        _scene.Describer.Descriptions["ListUsers"] = FakeDescriber.Rows;
 
         var result = await _scene.DescribeAsync("--check");
 
@@ -418,7 +400,7 @@ public sealed class CheckTests : IDisposable
     public async Task Check_SidecarWithAByteOrderMarkAndCarriageReturns_IsReadAsAnyOther()
     {
         _ = await DescribeFirstAsync();
-        var text = SidecarWriter.Write(TestSidecar.Read(_users));
+        var text = SidecarWriter.Write(SidecarFiles.Read(_users));
         await File.WriteAllTextAsync(
             Sidecar,
             text.Replace("\n", "\r\n", StringComparison.Ordinal),

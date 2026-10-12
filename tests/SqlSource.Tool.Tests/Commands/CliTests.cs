@@ -11,16 +11,16 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
 
-public class CliTests
+public sealed class CliTests : IDisposable
 {
-    private const string Secret = "s3cret";
+    private readonly CliRun _run = new();
+
+    public void Dispose() => _run.Dispose();
 
     [Fact]
     public async Task Run_NoArguments_PrintsTheHelp()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync();
+        var result = await _run.RunAsync();
 
         result.ExitCode.ShouldBe(0);
         // Nothing here is a text of System.CommandLine, which it writes in the language of the machine.
@@ -35,9 +35,7 @@ public class CliTests
     [InlineData("-?")]
     public async Task Run_Help_ListsTheOptionsThatDoSomething(string option)
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync(option);
+        var result = await _run.RunAsync(option);
 
         result.ExitCode.ShouldBe(0);
         result.Out.ShouldContain("Describes the SQL queries of a project");
@@ -49,9 +47,7 @@ public class CliTests
     [Fact]
     public async Task Run_Version_PrintsTheInformationalVersionOfTheTool()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("--version");
+        var result = await _run.RunAsync("--version");
 
         result.ExitCode.ShouldBe(0);
         result.Out.ShouldBe(Cli.Version + "\n");
@@ -62,16 +58,14 @@ public class CliTests
     }
 
     [Theory]
-    [InlineData("--conection=" + Secret)]
-    [InlineData("--conection:" + Secret)]
-    [InlineData("--conection", Secret)]
-    [InlineData("describe", "--conection", Secret)]
-    [InlineData("describe", "--conection=billing=Host=db;Password=" + Secret)]
+    [InlineData("--conection=" + Secrets.Word)]
+    [InlineData("--conection:" + Secrets.Word)]
+    [InlineData("--conection", Secrets.Word)]
+    [InlineData("describe", "--conection", Secrets.Word)]
+    [InlineData("describe", "--conection=billing=Host=db;Password=" + Secrets.Word)]
     public async Task Run_UnknownOption_IsNamedWithoutItsValue(params string[] args)
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync(args);
+        var result = await _run.RunAsync(args);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--conection'\n"));
     }
@@ -79,10 +73,8 @@ public class CliTests
     [Fact]
     public async Task Run_TwoUnknownOptions_ReportsTheFirstAlone()
     {
-        using var run = new CliRun();
-
         // The second may be the value of the first.
-        var result = await run.RunAsync("--pasword", "-" + Secret);
+        var result = await _run.RunAsync("--pasword", "-" + Secrets.Word);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--pasword'\n"));
     }
@@ -90,9 +82,7 @@ public class CliTests
     [Fact]
     public async Task Run_UnknownOptionAfterAnotherMistake_ReportsTheOptionAlone()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("describe", "one", "two", "--oops");
+        var result = await _run.RunAsync("describe", "one", "two", "--oops");
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--oops'\n"));
     }
@@ -100,9 +90,7 @@ public class CliTests
     [Fact]
     public async Task Run_UnknownCommand_IsReportedByItsPosition()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("descrbe");
+        var result = await _run.RunAsync("descrbe");
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unexpected argument at position 1\n"));
     }
@@ -110,9 +98,7 @@ public class CliTests
     [Fact]
     public async Task Run_ValueForAnOptionThatTakesNone_NamesTheOptionAlone()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("--help=" + Secret);
+        var result = await _run.RunAsync("--help=" + Secrets.Word);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: option '--help' takes no value\n"));
     }
@@ -120,9 +106,7 @@ public class CliTests
     [Fact]
     public async Task Run_ValueForVersion_NamesTheOptionAlone()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("--version=" + Secret);
+        var result = await _run.RunAsync("--version=" + Secrets.Word);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: option '--version' takes no value\n"));
     }
@@ -159,10 +143,9 @@ public class CliTests
     [Fact]
     public async Task Run_TokenThatStartsWithAnAtSign_IsNotReadAsAFile()
     {
-        using var run = new CliRun();
-        _ = run.Folder.WriteFile("args.rsp", "--version");
+        _ = _run.Folder.WriteFile("args.rsp", "--version");
 
-        var result = await run.RunAsync("@args.rsp");
+        var result = await _run.RunAsync("@args.rsp");
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unexpected argument at position 1\n"));
     }
@@ -170,9 +153,7 @@ public class CliTests
     [Fact]
     public async Task Run_DoubleHyphen_IsAnUnknownOption()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync("--", "--version");
+        var result = await _run.RunAsync("--", "--version");
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--'\n"));
     }
@@ -183,9 +164,7 @@ public class CliTests
     [InlineData("sqlsource")]
     public async Task Run_TokenThatSystemCommandLineGivesAMeaning_IsAnArgumentLikeAnyOther(string token)
     {
-        using var run = new CliRun();
-
-        var result = await run.RunAsync(token);
+        var result = await _run.RunAsync(token);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unexpected argument at position 1\n"));
     }
@@ -193,25 +172,25 @@ public class CliTests
     [Fact]
     public async Task Run_Exception_IsReportedAsSqlsrc200WithoutAStackTrace()
     {
-        using var run = new CliRun { Out = new FailingWriter("the pipe is closed") };
+        _run.Out = new FailingWriter("the pipe is closed");
 
-        var result = await run.RunAsync("--version");
+        var result = await _run.RunAsync("--version");
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldBe(
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: "
                 + "System.InvalidOperationException: the pipe is closed\n"
-                + "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc200\n"
+                + Expected.See("SQLSRC200")
         );
     }
 
     [Fact]
     public async Task Run_ExceptionWithTheDebugVariableSet_AddsTheStackTraceBeforeTheLink()
     {
-        using var run = new CliRun { Out = new FailingWriter("the pipe is closed") };
-        run.Environment["SQLSOURCE_DEBUG"] = "1";
+        _run.Out = new FailingWriter("the pipe is closed");
+        _run.Environment["SQLSOURCE_DEBUG"] = "1";
 
-        var result = await run.RunAsync("--version");
+        var result = await _run.RunAsync("--version");
 
         result.ExitCode.ShouldBe(1);
         var lines = result.Error.TrimEnd('\n').Split('\n');
@@ -226,10 +205,10 @@ public class CliTests
     [Fact]
     public async Task Run_ExceptionWithTheDebugVariableEmpty_HasNoStackTrace()
     {
-        using var run = new CliRun { Out = new FailingWriter("the pipe is closed") };
-        run.Environment["SQLSOURCE_DEBUG"] = "";
+        _run.Out = new FailingWriter("the pipe is closed");
+        _run.Environment["SQLSOURCE_DEBUG"] = "";
 
-        var result = await run.RunAsync("--version");
+        var result = await _run.RunAsync("--version");
 
         result.Error.ShouldNotContain("trace:");
     }
@@ -237,9 +216,9 @@ public class CliTests
     [Fact]
     public async Task Run_ExceptionWhoseMessageHasLineBreaks_KeepsTheErrorOnOneLine()
     {
-        using var run = new CliRun { Out = new FailingWriter("first\r\nsecond\nthird") };
+        _run.Out = new FailingWriter("first\r\nsecond\nthird");
 
-        var result = await run.RunAsync("--version");
+        var result = await _run.RunAsync("--version");
 
         result.Error.Split('\n')[0].ShouldEndWith("System.InvalidOperationException: first second third");
         result.Error.Split('\n').Length.ShouldBe(3);
@@ -249,17 +228,17 @@ public class CliTests
     [Fact]
     public async Task Run_SummaryThatCannotBeWritten_StillEndsTheLogWithTheCounts()
     {
-        using var run = new CliRun { Out = new FailingWriter("the pipe is closed") };
-        run.Describers.Add(new FakeDescriber());
-        var project = Plans.Postgres(run.Folder, directory: "").AnsweredBy(run.Processes);
-        run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = DescribeScene.Connection;
-        _ = project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        _run.Out = new FailingWriter("the pipe is closed");
+        _run.Describers.Add(new FakeDescriber());
+        var project = Plans.Postgres(_run.Folder, directory: "").AnsweredBy(_run.Processes);
+        _run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
+        _ = project.AddSql("Users.sql", SqlTexts.GetUser);
 
-        var result = await run.RunAsync("describe", "--log", "run.log");
+        var result = await _run.RunAsync("describe", "--log", "run.log");
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldStartWith("sqlsource : error SQLSRC200: ");
-        var end = LogReader.Read(run.Folder.PathOf("run.log"))[^1];
+        var end = LogReader.Read(_run.Folder.PathOf("run.log"))[^1];
         end.GetProperty("event").GetString().ShouldBe("run.end");
         var database = end.GetProperty("databases").EnumerateArray().ShouldHaveSingleItem();
         database.GetProperty("described").GetInt32().ShouldBe(1);
@@ -270,16 +249,16 @@ public class CliTests
     [Fact]
     public async Task Run_SummaryThatCannotBeWrittenWithALog_HasTheErrorAsAnEventBeforeRunEnd()
     {
-        using var run = new CliRun { Out = new FailingWriter("the pipe is closed") };
-        run.Describers.Add(new FakeDescriber());
-        var project = Plans.Postgres(run.Folder, directory: "").AnsweredBy(run.Processes);
-        run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = DescribeScene.Connection;
-        _ = project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        _run.Out = new FailingWriter("the pipe is closed");
+        _run.Describers.Add(new FakeDescriber());
+        var project = Plans.Postgres(_run.Folder, directory: "").AnsweredBy(_run.Processes);
+        _run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
+        _ = project.AddSql("Users.sql", SqlTexts.GetUser);
 
-        var result = await run.RunAsync("describe", "--log", "run.log");
+        var result = await _run.RunAsync("describe", "--log", "run.log");
 
         result.ExitCode.ShouldBe(1);
-        var events = LogReader.Read(run.Folder.PathOf("run.log"));
+        var events = LogReader.Read(_run.Folder.PathOf("run.log"));
         events[^2].GetProperty("event").GetString().ShouldBe("diagnostic");
         events[^2].GetProperty("id").GetString().ShouldBe("SQLSRC200");
         events[^1].GetProperty("event").GetString().ShouldBe("run.end");
@@ -288,9 +267,7 @@ public class CliTests
     [Fact]
     public async Task Run_CancelledBeforeItStarts_PrintsNothingAndExitsWithOne()
     {
-        using var run = new CliRun();
-
-        var result = await run.RunCancelledAsync("--version");
+        var result = await _run.RunCancelledAsync("--version");
 
         result.ShouldBe(new CliResult(1, "", ""));
     }

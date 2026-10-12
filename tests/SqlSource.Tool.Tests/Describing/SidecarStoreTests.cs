@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
@@ -14,10 +15,6 @@ namespace SqlSource.Tool.Tests.Describing;
 // The one place that changes a sidecar on the disk: a file is written whole or not at all.
 public sealed class SidecarStoreTests : IDisposable
 {
-    private const string See = "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc";
-
-    private static readonly DateTime Old = new(2001, 2, 3, 4, 5, 6, DateTimeKind.Utc);
-
     private readonly TempFolder _folder = new();
     private readonly StringWriter _error = new(CultureInfo.InvariantCulture) { NewLine = "\n" };
     private readonly PlannedFile _file;
@@ -26,9 +23,9 @@ public sealed class SidecarStoreTests : IDisposable
     public SidecarStoreTests()
     {
         var project = Plans.Postgres(_folder);
-        _ = project.AddSql("Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        _ = project.AddSql("Users.sql", SqlTexts.GetUser);
         _file = Plans.Of(project).Files[0];
-        _sidecar = _file.Path + ".json";
+        _sidecar = SidecarFormat.PathFor(_file.Path);
     }
 
     public void Dispose()
@@ -89,12 +86,12 @@ public sealed class SidecarStoreTests : IDisposable
     {
         var action = Enum.Parse<FileAction>(actionName);
         File.WriteAllText(_sidecar, "as it was");
-        File.SetLastWriteTimeUtc(_sidecar, Old);
+        File.SetLastWriteTimeUtc(_sidecar, SidecarFiles.Old);
 
         Apply(Outcome(action, action == FileAction.Unchanged ? "as it was" : null));
 
         File.ReadAllText(_sidecar).ShouldBe("as it was");
-        File.GetLastWriteTimeUtc(_sidecar).ShouldBe(Old);
+        File.GetLastWriteTimeUtc(_sidecar).ShouldBe(SidecarFiles.Old);
         _error.ToString().ShouldBeEmpty();
     }
 
@@ -132,7 +129,7 @@ public sealed class SidecarStoreTests : IDisposable
                     + "    query: GetUser: failed\n"
                     + "    query: GetInvoice: not in this run\n"
                     + "    help: describe the whole file, or fix the queries that failed\n"
-                    + $"{See}217\n"
+                    + Expected.See("SQLSRC217")
             );
         File.Exists(_sidecar).ShouldBeFalse();
     }
@@ -146,7 +143,7 @@ public sealed class SidecarStoreTests : IDisposable
         Apply(Outcome(FileAction.Write, "{}"));
 
         _error.ToString().ShouldStartWith($"{_sidecar} : error SQLSRC218: '{_sidecar}' could not be written: ");
-        _error.ToString().ShouldEndWith($"{See}218\n");
+        _error.ToString().ShouldEndWith(Expected.See("SQLSRC218"));
         Directory.Exists(_sidecar).ShouldBeTrue();
         Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql", "Users.sql.json"]);
     }

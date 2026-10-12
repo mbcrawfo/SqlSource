@@ -15,10 +15,6 @@ namespace SqlSource.Tool.Tests.Describing;
 // Steps 1 and 2 of the run: the sidecars that are there, and what each query needs of the run.
 public sealed class RunDecisionsTests : IDisposable
 {
-    private const string Users =
-        "-- name: GetUser\nSELECT 1;\n\n-- name: GetInvoice\n-- database: billing\nSELECT 2;\n\n"
-        + "-- name: Plain\n-- output: sql\nSELECT 3;\n";
-
     private static readonly RunFilters OnlyBilling = new([], ["billing"]);
 
     private readonly TempFolder _folder = new();
@@ -28,7 +24,7 @@ public sealed class RunDecisionsTests : IDisposable
     public RunDecisionsTests()
     {
         _project = Plans.Postgres(_folder);
-        _ = _project.AddSql("Users.sql", Users);
+        _ = _project.AddSql("Users.sql", SqlTexts.UsersAndPlain);
     }
 
     public void Dispose() => _folder.Dispose();
@@ -49,7 +45,7 @@ public sealed class RunDecisionsTests : IDisposable
     public void Decide_CurrentEntries_AreSkippedAndKept()
     {
         var plan = Plans.Of(_project);
-        _ = TestSidecar.WriteCurrent(plan.Files[0]);
+        _ = SidecarFiles.WriteCurrent(plan.Files[0]);
 
         var file = RunDecisions.Decide(plan, RunMode.Describe, _errors)[0];
 
@@ -64,7 +60,7 @@ public sealed class RunDecisionsTests : IDisposable
     public void Decide_CurrentEntriesUnderForce_AreDescribedAgain()
     {
         var plan = Plans.Of(_project);
-        _ = TestSidecar.WriteCurrent(plan.Files[0]);
+        _ = SidecarFiles.WriteCurrent(plan.Files[0]);
 
         States(plan, RunMode.Force).ShouldBe([QueryState.ToDescribe, QueryState.ToDescribe, QueryState.NotNeeded]);
     }
@@ -74,9 +70,9 @@ public sealed class RunDecisionsTests : IDisposable
     {
         var plan = Plans.Of(_project);
         var file = plan.Files[0];
-        _ = TestSidecar.Write(
+        _ = SidecarFiles.Write(
             file,
-            [TestSidecar.EntryFor(file.Queries[0]) with { Hash = "0000" }, TestSidecar.EntryFor(file.Queries[1])]
+            [SidecarFiles.EntryFor(file.Queries[0]) with { Hash = "0000" }, SidecarFiles.EntryFor(file.Queries[1])]
         );
 
         States(plan).ShouldBe([QueryState.ToDescribe, QueryState.Skipped, QueryState.NotNeeded]);
@@ -87,14 +83,14 @@ public sealed class RunDecisionsTests : IDisposable
     {
         var plan = Plans.Of(_project);
         var file = plan.Files[0];
-        _ = TestSidecar.Write(
+        _ = SidecarFiles.Write(
             file,
             [
-                TestSidecar.EntryFor(file.Queries[0]) with
+                SidecarFiles.EntryFor(file.Queries[0]) with
                 {
                     Database = "elsewhere",
                 },
-                TestSidecar.EntryFor(file.Queries[1]),
+                SidecarFiles.EntryFor(file.Queries[1]),
             ]
         );
 
@@ -107,9 +103,15 @@ public sealed class RunDecisionsTests : IDisposable
     {
         var plan = Plans.Of(_project);
         var file = plan.Files[0];
-        _ = TestSidecar.Write(
+        _ = SidecarFiles.Write(
             file,
-            [TestSidecar.EntryFor(file.Queries[0]), TestSidecar.EntryFor(file.Queries[1]) with { Database = "BILLING" }]
+            [
+                SidecarFiles.EntryFor(file.Queries[0]),
+                SidecarFiles.EntryFor(file.Queries[1]) with
+                {
+                    Database = "BILLING",
+                },
+            ]
         );
 
         States(plan).ShouldBe([QueryState.Skipped, QueryState.Skipped, QueryState.NotNeeded]);
@@ -120,7 +122,7 @@ public sealed class RunDecisionsTests : IDisposable
     {
         var plan = Plans.Of(_project);
         var file = plan.Files[0];
-        _ = TestSidecar.Write(file, file.Queries.Take(2).Select(TestSidecar.EntryFor), toolVersion: "0.0.1");
+        _ = SidecarFiles.Write(file, file.Queries.Take(2).Select(SidecarFiles.EntryFor), toolVersion: "0.0.1");
 
         States(plan).ShouldBe([QueryState.ToDescribe, QueryState.ToDescribe, QueryState.NotNeeded]);
         _errors.ShouldBeEmpty();
@@ -131,7 +133,7 @@ public sealed class RunDecisionsTests : IDisposable
     {
         var plan = Plans.Of(_project);
         var file = plan.Files[0];
-        _ = TestSidecar.Write(file, file.Queries.Take(2).Select(TestSidecar.EntryFor), formatVersion: 0);
+        _ = SidecarFiles.Write(file, file.Queries.Take(2).Select(SidecarFiles.EntryFor), formatVersion: 0);
 
         States(plan).ShouldBe([QueryState.ToDescribe, QueryState.ToDescribe, QueryState.NotNeeded]);
         _errors.ShouldBeEmpty();
@@ -170,7 +172,7 @@ public sealed class RunDecisionsTests : IDisposable
     {
         var plan = Plans.Of(_project);
         var file = plan.Files[0];
-        var path = TestSidecar.Write(file, file.Queries.Take(2).Select(TestSidecar.EntryFor), formatVersion: 2);
+        var path = SidecarFiles.Write(file, file.Queries.Take(2).Select(SidecarFiles.EntryFor), formatVersion: 2);
 
         States(plan, RunMode.Force).ShouldBe([QueryState.Failed, QueryState.Failed, QueryState.NotNeeded]);
 
@@ -189,7 +191,7 @@ public sealed class RunDecisionsTests : IDisposable
     public void Decide_SidecarOfAHigherFormatVersionUnderCheck_IsNoErrorAndItsQueriesAreDescribed()
     {
         var plan = Plans.Of(_project);
-        _ = TestSidecar.Write(plan.Files[0], [], formatVersion: SidecarFormat.Version + 1);
+        _ = SidecarFiles.Write(plan.Files[0], [], formatVersion: SidecarFormat.Version + 1);
 
         var file = RunDecisions.Decide(plan, RunMode.Check, _errors)[0];
 
@@ -218,7 +220,7 @@ public sealed class RunDecisionsTests : IDisposable
         _project.Properties["SqlSourceDialect"] = "ansi";
         var plan = Plans.Of(_project);
         plan.Files[0].State.ShouldBe(PlannedFileState.NotDescribable);
-        _ = TestSidecar.Write(plan.Files[0], [], formatVersion: 2);
+        _ = SidecarFiles.Write(plan.Files[0], [], formatVersion: 2);
 
         var file = RunDecisions.Decide(plan, RunMode.Describe, _errors)[0];
 
@@ -232,7 +234,7 @@ public sealed class RunDecisionsTests : IDisposable
     public void Decide_QueryThatIsNotSelected_IsKeptWhenCurrentAndLeftOutOtherwise()
     {
         var all = Plans.Of(_project);
-        _ = TestSidecar.Write(all.Files[0], [TestSidecar.EntryFor(all.Files[0].Queries[0])]);
+        _ = SidecarFiles.Write(all.Files[0], [SidecarFiles.EntryFor(all.Files[0].Queries[0])]);
 
         States(Plans.Of(OnlyBilling, _project))
             .ShouldBe([QueryState.Skipped, QueryState.ToDescribe, QueryState.NotNeeded]);
@@ -247,7 +249,7 @@ public sealed class RunDecisionsTests : IDisposable
     public void Decide_QueryThatIsNotSelectedUnderForce_IsStillKept()
     {
         var all = Plans.Of(_project);
-        _ = TestSidecar.WriteCurrent(all.Files[0]);
+        _ = SidecarFiles.WriteCurrent(all.Files[0]);
 
         States(Plans.Of(OnlyBilling, _project), RunMode.Force)
             .ShouldBe([QueryState.Skipped, QueryState.ToDescribe, QueryState.NotNeeded]);
@@ -260,7 +262,7 @@ public sealed class RunDecisionsTests : IDisposable
         _ = _project.AddSql("Other.sql", "-- name: Other\nSELECT 4;\n");
         var all = Plans.Of(_project);
         var other = all.Files.Single(file => file.Path.EndsWith("Other.sql", StringComparison.Ordinal));
-        _ = TestSidecar.Write(other, [], formatVersion: 2);
+        _ = SidecarFiles.Write(other, [], formatVersion: 2);
 
         var file = RunDecisions
             .Decide(Plans.Of(OnlyBilling, _project), RunMode.Describe, _errors)

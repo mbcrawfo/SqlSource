@@ -17,22 +17,12 @@ public sealed class RunPlannerErrorTests : IDisposable
 
     public void Dispose() => _folder.Dispose();
 
-    private static RunPlanResult Plan(params TestProject[] projects) =>
-        RunPlanner.Plan(
-            [.. projects.Select(project => project.Manifest())],
-            RunFilters.None,
-            TestContext.Current.CancellationToken
-        );
-
-    private static string Type(string name, string arguments = "") =>
-        $"[SqlSource.SqlSourceGenerate({arguments})]\ninternal static partial class {name};\n";
-
     // A project whose dialect can be described, with one type that claims the folder "Q".
     private TestProject Project(string name = "App", string dialect = "postgres")
     {
         var project = new TestProject(_folder, name);
         project.Properties["SqlSourceDialect"] = dialect;
-        _ = project.AddSource("Queries.cs", Type("Queries", "Path = \"Q\""));
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"Q\""));
         return project;
     }
 
@@ -42,7 +32,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         var project = Project();
         var sql = project.AddSql("Q/Broken.sql", "-- name: One\nSELECT 'open\n");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         var error = result.Errors.ShouldHaveSingleItem();
         error.Descriptor.Id.ShouldBe("SQLSRC101");
@@ -61,7 +51,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         var gone = project.PathOf("Q/Gone.sql");
         project.ListSql(gone);
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         var error = result.Errors.ShouldHaveSingleItem();
         error.Descriptor.Id.ShouldStartWith("SQLSRC1");
@@ -77,7 +67,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         project.Properties["SqlSourceOutput"] = "sql";
         _ = project.AddSql("Q/One.sql", "SELECT 1;");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBe([ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "nosuch")]);
         result.Plan.Files.ShouldHaveSingleItem().Dialect.ShouldBe(SqlDialect.Ansi);
@@ -93,7 +83,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         _ = project.AddSql("Q/C.sql", "SELECT 1;", ("SqlSourceDialect", "another"));
         _ = project.AddSql("Unclaimed/D.sql", "SELECT 1;", ("SqlSourceDialect", "never-read"));
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBe([
             ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, project.ProjectPath, "another"),
@@ -111,7 +101,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         project.Properties["SqlSourceDatabase"] = "not a name";
         _ = project.AddSql("Q/One.sql", "SELECT 1;");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBe([
             ToolDiagnostic.AtFile(
@@ -139,7 +129,8 @@ public sealed class RunPlannerErrorTests : IDisposable
         _ = project.AddSql("Q/One.sql", "SELECT 1;", ("SqlSourceOutput", "bad"), ("SqlSourceDatabase", "a b"));
         _ = project.AddSql("Unclaimed/Two.sql", "SELECT 1;", ("SqlSourceOutput", "never-read"));
 
-        Plan(project)
+        Plans
+            .Result(project)
             .Errors.Select(error => (error.Descriptor.Id, error.Arguments[0], error.Arguments[1]))
             .ShouldBe([("SQLSRC014", "a b", "SqlSourceDatabase"), ("SQLSRC014", "bad", "SqlSourceOutput")]);
     }
@@ -153,7 +144,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         project.Properties["SqlSourceInputModelSuffix"] = "a b";
         _ = project.AddSql("Q/One.sql", "SELECT 1;", ("SqlSourceCollectionType", "bag"));
 
-        Plan(project).Errors.ShouldBeEmpty();
+        Plans.Result(project).Errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -161,12 +152,12 @@ public sealed class RunPlannerErrorTests : IDisposable
     {
         var project = new TestProject(_folder);
         project.Properties["SqlSourceDialect"] = "postgres";
-        _ = project.AddSource("A.cs", Type("A", "Path = Folder"));
-        _ = project.AddSource("B.cs", Type("B", "Path = \"Other\""));
+        _ = project.AddSource("A.cs", Plans.TypeNamed("A", "Path = Folder"));
+        _ = project.AddSource("B.cs", Plans.TypeNamed("B", "Path = \"Other\""));
         _ = project.AddSql("One.sql", "SELECT 1;");
         var other = project.AddSql("Other/Two.sql", "SELECT 1;");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldHaveSingleItem().Descriptor.ShouldBe(ToolDiagnostics.AttributeArgumentNotLiteral);
         result.Plan.Files.Select(file => file.Path).ShouldBe([other]);
@@ -179,10 +170,10 @@ public sealed class RunPlannerErrorTests : IDisposable
     {
         var project = Project(dialect: "nosuch");
         project.Properties["SqlSourceOutput"] = "everything";
-        _ = project.AddSource("Other.cs", Type("Other", "Path = Folder"));
+        _ = project.AddSource("Other.cs", Plans.TypeNamed("Other", "Path = Folder"));
         _ = project.AddSql("Q/One.sql", "SELECT 1;", ("SqlSourceDialect", "nosuch"), ("SqlSourceOutput", "everything"));
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result
             .Errors.Select(error => error.Descriptor.Id)
@@ -206,7 +197,7 @@ public sealed class RunPlannerErrorTests : IDisposable
             "-- name: Plain\n-- output: sql\nSELECT 0;\n\n-- name: One\nSELECT 1;\n\n-- name: Two\nSELECT 2;\n"
         );
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         // At the name of the first query that needs an entry, which is the second of the file.
         result.Errors.ShouldBe([
@@ -229,7 +220,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         var project = Project(dialect: "ansi");
         _ = project.AddSql("Q/One.sql", "-- output: sql\n-- name: One\nSELECT 1;\n");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBeEmpty();
         result.Plan.Files.ShouldHaveSingleItem().State.ShouldBe(PlannedFileState.Ready);
@@ -244,7 +235,7 @@ public sealed class RunPlannerErrorTests : IDisposable
             "-- name: Find\nSELECT id FROM users {{where}} {{order}} {{limit:LIMIT 10}} {{tail:}};\n"
         );
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result
             .Errors.Select(error => (error.Descriptor.Id, error.Path, error.Position, error.Arguments[0]))
@@ -268,7 +259,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         var project = Project();
         _ = project.AddSql("Q/Find.sql", "-- name: Find\n-- output: sql\nSELECT id FROM users {{where}};\n");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBeEmpty();
         result.Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem().Problems.ShouldBe(QueryProblems.None);
@@ -280,7 +271,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         var project = Project(dialect: "ansi");
         _ = project.AddSql("Q/Find.sql", "-- name: Find\nSELECT id FROM users {{where}};\n");
 
-        Plan(project).Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC209", "SQLSRC210"]);
+        Plans.Result(project).Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC209", "SQLSRC210"]);
     }
 
     // Two types claim the file, one for its models and one for everything: a message names the greater.
@@ -291,11 +282,17 @@ public sealed class RunPlannerErrorTests : IDisposable
     {
         var project = new TestProject(_folder);
         project.Properties["SqlSourceDialect"] = "ansi";
-        _ = project.AddSource("A.cs", Type("A", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{first}"));
-        _ = project.AddSource("B.cs", Type("B", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{second}"));
+        _ = project.AddSource(
+            "A.cs",
+            Plans.TypeNamed("A", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{first}")
+        );
+        _ = project.AddSource(
+            "B.cs",
+            Plans.TypeNamed("B", $"Path = \"Q\", Output = SqlSource.GeneratorOutput.{second}")
+        );
         _ = project.AddSql("Q/Find.sql", "-- name: Find\nSELECT id FROM users {{where}};\n");
 
-        var errors = Plan(project).Errors;
+        var errors = Plans.Result(project).Errors;
 
         // SQLSRC209 and SQLSRC210, and each names the output.
         errors.Count.ShouldBe(2);
@@ -316,7 +313,7 @@ public sealed class RunPlannerErrorTests : IDisposable
             ("SqlSourceDialect", "mssql")
         );
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.ShouldBe([
             ToolDiagnostic.At(
@@ -350,7 +347,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         var second = Project("B", dialect: "mssql");
         var secondFile = second.AddSql("Q/B.sql", InMain + "-- name: Two\nSELECT 2;\n");
 
-        var error = Plan(first, second).Errors.ShouldHaveSingleItem();
+        var error = Plans.Result(first, second).Errors.ShouldHaveSingleItem();
 
         error.Descriptor.ShouldBe(ToolDiagnostics.DatabaseHasTwoDialects);
         error.Path.ShouldBe(secondFile);
@@ -368,7 +365,7 @@ public sealed class RunPlannerErrorTests : IDisposable
             ("SqlSourceDialect", "mssql")
         );
 
-        Plan(project).Errors.ShouldBeEmpty();
+        Plans.Result(project).Errors.ShouldBeEmpty();
     }
 
     [Fact]
@@ -379,7 +376,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         _ = project.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n", ("SqlSourceDialect", "ansi"));
         _ = project.AddSql("Q/B.sql", InMain + "-- name: Two\nSELECT 2;\n");
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC209"]);
         result.Plan.Databases.ShouldBe([new PlannedDatabase("main", SqlDialect.PostgreSql)]);
@@ -392,7 +389,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         var project = Project(dialect: "ansi");
         _ = project.AddSql("Q/A.sql", "-- name: One\nSELECT 1;\n");
 
-        Plan(project).Plan.Databases.ShouldBe([new PlannedDatabase("ansi", SqlDialect.Ansi)]);
+        Plans.Result(project).Plan.Databases.ShouldBe([new PlannedDatabase("ansi", SqlDialect.Ansi)]);
     }
 
     [Fact]
@@ -402,7 +399,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         _ = project.AddSql("Q/A.sql", InMain + "-- name: One\nSELECT 1;\n");
         _ = project.AddSql("Q/B.sql", InMain + "-- name: Two\nSELECT 2 {{tail}};\n", ("SqlSourceDialect", "mssql"));
 
-        var result = Plan(project);
+        var result = Plans.Result(project);
 
         result.Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC210", "SQLSRC211"]);
         result
@@ -426,6 +423,6 @@ public sealed class RunPlannerErrorTests : IDisposable
             ("SqlSourceDialect", "mssql")
         );
 
-        Plan(project).Errors.Select(error => error.Arguments[0]).ShouldBe(["one", "two"]);
+        Plans.Result(project).Errors.Select(error => error.Arguments[0]).ShouldBe(["one", "two"]);
     }
 }

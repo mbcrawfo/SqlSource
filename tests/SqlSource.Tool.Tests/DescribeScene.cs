@@ -8,10 +8,6 @@ namespace SqlSource.Tool.Tests;
 // connection, each in its own variable, until a test takes one away.
 internal sealed class DescribeScene : IDisposable
 {
-    public const string Connection = "Host=db;Password=hunter2";
-
-    public const string See = "    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc";
-
     // What ends a "describe" that reported an error and wrote no log.
     public const string RunAgain = "sqlsource: run again with --log <file> for a record of what the run did\n";
 
@@ -20,8 +16,8 @@ internal sealed class DescribeScene : IDisposable
         Run.Time = Clock;
         Run.Describers.Add(Describer);
         Project = Plans.Postgres(Run.Folder, directory: "").AnsweredBy(Run.Processes);
-        Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Connection;
-        Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Connection;
+        Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = Secrets.Connection;
+        Run.Environment["SQLSOURCE_CONNECTION_BILLING"] = Secrets.Connection;
     }
 
     public TestClock Clock { get; } = new();

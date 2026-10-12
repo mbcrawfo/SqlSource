@@ -13,7 +13,7 @@ namespace SqlSource.Tool.Tests.Logging;
 // The writer of a log's file: one JSON object on a line for each event.
 public sealed class RunLogFileTests : IDisposable
 {
-    private const string Head = "{\"event\":\"e\",\"time\":\"2026-10-09T14:02:11.412Z\"";
+    private const string Head = "{\"event\":\"e\",\"time\":\"" + TestClock.StartIso + "\"";
 
     private readonly TestClock _clock = new();
     private readonly TempFolder _folder = new();
@@ -65,7 +65,7 @@ public sealed class RunLogFileTests : IDisposable
         Written().ShouldBe(Head + ",\"_event\":\"run.end\",\"_time\":\"never\",\"_truncated\":false}\n");
         var line = LogReader.Parse(Written().TrimEnd('\n'));
         line.GetProperty("event").GetString().ShouldBe("e");
-        line.GetProperty("time").GetString().ShouldBe("2026-10-09T14:02:11.412Z");
+        line.GetProperty("time").GetString().ShouldBe(TestClock.StartIso);
         line.TryGetProperty("truncated", out _).ShouldBeFalse();
     }
 
