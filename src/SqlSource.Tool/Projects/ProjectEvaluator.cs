@@ -43,7 +43,7 @@ internal static class ProjectEvaluator
 
     private static readonly ImmutableDictionary<string, string> SetVariables = ImmutableDictionary
         .Create<string, string>(StringComparer.Ordinal)
-        // A path outside ASCII arrives whole on Windows, where the console's code page is not UTF-8.  TD-0028.
+        // A path outside ASCII arrives whole on Windows, where the console's code page is not UTF-8.
         .Add("DOTNET_CLI_FORCE_UTF8_ENCODING", "true")
         // The first "dotnet" command on a machine prints a welcome, which would stand before the JSON.
         .Add("DOTNET_NOLOGO", "true");
@@ -389,9 +389,9 @@ internal static class ProjectEvaluator
     }
 
     private static string ExitCodeReason(ProcessResult result) =>
-        result.ExitCode == ProcessResult.NotStarted
-            ? "dotnet could not be started"
-            : string.Create(CultureInfo.InvariantCulture, $"dotnet msbuild ended with the exit code {result.ExitCode}");
+        result.Started
+            ? string.Create(CultureInfo.InvariantCulture, $"dotnet msbuild ended with the exit code {result.ExitCode}")
+            : "dotnet could not be started";
 
     private static ProjectEvaluation Failed(string project, string reason, ProcessResult result)
     {

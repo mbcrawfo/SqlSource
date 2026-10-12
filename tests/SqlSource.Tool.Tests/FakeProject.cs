@@ -33,6 +33,9 @@ internal sealed class FakeProject
 
     public int TargetExitCode { get; set; }
 
+    // Whether "dotnet" cannot be started at all.  Error is then the reason.
+    public bool CannotBeStarted { get; set; }
+
     // What a run that fails prints.
     public string Output { get; set; } = "";
 
@@ -49,6 +52,11 @@ internal sealed class FakeProject
 
     public ProcessResult Evaluate(ProcessRequest request)
     {
+        if (CannotBeStarted)
+        {
+            return ProcessResult.NotStarted(Error);
+        }
+
         if (EvaluationExitCode != 0)
         {
             return new ProcessResult(EvaluationExitCode, Output, Error);

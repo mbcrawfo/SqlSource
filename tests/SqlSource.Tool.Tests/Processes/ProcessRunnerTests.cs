@@ -62,7 +62,8 @@ public class ProcessRunnerTests
     {
         var result = await Runner.RunAsync(Request("sqlsource-no-such-program"), TestContext.Current.CancellationToken);
 
-        result.ExitCode.ShouldBe(ProcessResult.NotStarted);
+        result.Started.ShouldBeFalse();
+        result.ExitCode.ShouldNotBe(0);
         result.Output.ShouldBeEmpty();
         result.Error.ShouldNotBeEmpty();
     }

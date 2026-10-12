@@ -52,7 +52,7 @@ internal sealed class ProcessRunner : IProcessRunner
         catch (Win32Exception exception)
         {
             // No such program, or no such working directory.
-            return new ProcessResult(ProcessResult.NotStarted, "", exception.Message);
+            return ProcessResult.NotStarted(exception.Message);
         }
 
         try

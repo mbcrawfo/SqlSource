@@ -361,7 +361,7 @@ public sealed class ProjectEvaluatorTests : IDisposable
     [Fact]
     public async Task Evaluate_DotnetThatCannotBeStarted_IsSqlsrc205WithTheReason()
     {
-        _runner.Default = new FakeProject { EvaluationExitCode = -1, Error = "No such file or directory" };
+        _runner.Default = new FakeProject { CannotBeStarted = true, Error = "No such file or directory" };
 
         var evaluation = await EvaluateAsync();
 
@@ -369,6 +369,21 @@ public sealed class ProjectEvaluatorTests : IDisposable
             evaluation,
             ("reason", "dotnet could not be started"),
             ("msbuild", "No such file or directory")
+        );
+    }
+
+    // On Windows a program can end with a negative exit code.  It did start.
+    [Fact]
+    public async Task Evaluate_EvaluationThatEndsWithANegativeExitCode_IsSqlsrc205WithTheExitCode()
+    {
+        _runner.Default = new FakeProject { EvaluationExitCode = -1, Error = "error MSB1025: an internal failure" };
+
+        var evaluation = await EvaluateAsync();
+
+        ShouldBeSqlsrc205(
+            evaluation,
+            ("reason", "dotnet msbuild ended with the exit code -1"),
+            ("msbuild", "error MSB1025: an internal failure")
         );
     }
 

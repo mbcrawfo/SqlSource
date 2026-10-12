@@ -10,8 +10,8 @@ namespace SqlSource.Tool.Processes;
 internal interface IProcessRunner
 {
     /// <summary>
-    /// Runs the program to its end.  A program that cannot be started gives the exit code
-    /// <see cref="ProcessResult.NotStarted" /> and the reason as its error output.
+    /// Runs the program to its end.  A program that cannot be started gives
+    /// <see cref="ProcessResult.NotStarted" />, with the reason as its error output.
     /// </summary>
     /// <exception cref="System.OperationCanceledException">
     /// The token was cancelled.  The process, and every process it started, was killed first.
