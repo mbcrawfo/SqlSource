@@ -10,10 +10,14 @@ namespace SqlSource.Tool.Processes;
 /// <param name="WorkingDirectory">The full path of the directory it runs in.</param>
 /// <param name="SetVariables">Environment variables it gets beside the ones of this process.</param>
 /// <param name="RemovedVariables">Environment variables of this process that it does not get.</param>
+/// <param name="RemovedPrefixes">
+/// It gets no environment variable of this process whose name starts with one of these, in any case.
+/// </param>
 internal sealed record ProcessRequest(
     string Program,
     ImmutableArray<string> Arguments,
     string WorkingDirectory,
     ImmutableDictionary<string, string> SetVariables,
-    ImmutableArray<string> RemovedVariables
+    ImmutableArray<string> RemovedVariables,
+    ImmutableArray<string> RemovedPrefixes
 );

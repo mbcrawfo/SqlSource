@@ -285,4 +285,27 @@ public sealed class RunDecisionsTests : IDisposable
             .Select(database => database.Name)
             .ShouldBe(["billing"]);
     }
+
+    // "ansi" has only the query of a file that cannot be described (SQLSRC209), and "reports" only one with a token
+    // that has no default (SQLSRC210).
+    [Fact]
+    public void DescribableDatabases_DatabaseWhoseEveryQueryThePlanFailed_IsLeftOut()
+    {
+        _ = _project.AddSql("Old.sql", "-- dialect: ansi\n-- name: Old\nSELECT 1;\n");
+        _ = _project.AddSql("Tokens.sql", "-- name: Find\n-- database: reports\nSELECT 1 {{where}};\n");
+        var plan = Plans.Of(_project);
+
+        RunDecisions
+            .SelectedDatabases(plan)
+            .Select(database => database.Name)
+            .ShouldBe(["ansi", "reports", "postgres", "billing"], ignoreOrder: true);
+        RunDecisions.DescribableDatabases(plan).Select(database => database.Name).ShouldBe(["postgres", "billing"]);
+    }
+
+    [Fact]
+    public void DescribableDatabases_Filter_GivesOnlyTheDatabasesOfSelectedQueries() =>
+        RunDecisions
+            .DescribableDatabases(Plans.Of(OnlyBilling, _project))
+            .Select(database => database.Name)
+            .ShouldBe(["billing"]);
 }

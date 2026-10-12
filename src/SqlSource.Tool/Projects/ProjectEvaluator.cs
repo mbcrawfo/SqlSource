@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Diagnostics;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Processes;
 using SqlSource.Tool.Reporting;
 
@@ -48,9 +49,19 @@ internal static class ProjectEvaluator
         // The first "dotnet" command on a machine prints a welcome, which would stand before the JSON.
         .Add("DOTNET_NOLOGO", "true");
 
-    // A tool that a build started has these, and "dotnet" loads the SDK they name in place of the one that the
-    // project's global.json picks.
-    private static readonly ImmutableArray<string> RemovedVariables = ["MSBuildSDKsPath", "MSBuildExtensionsPath"];
+    private static readonly ImmutableArray<string> RemovedVariables =
+    [
+        // A tool that a build started has these, and "dotnet" loads the SDK they name in place of the one that the
+        // project's global.json picks.
+        "MSBuildSDKsPath",
+        "MSBuildExtensionsPath",
+        // A connection is for the describer alone: MSBuild reads the environment for properties, so a project's
+        // targets would have it, and could print it.
+        ConnectionVariables.Unnamed,
+    ];
+
+    // The variable of each database, for the same reason.
+    private static readonly ImmutableArray<string> RemovedPrefixes = [ConnectionVariables.NamedPrefix];
 
     /// <summary>
     /// Asks about each project, several at once.
@@ -264,7 +275,7 @@ internal static class ProjectEvaluator
         // The project's folder, so that the project's own global.json picks the SDK.
         var workingDirectory = Path.GetDirectoryName(project) ?? host.WorkingDirectory;
         return host.Processes.RunAsync(
-            new ProcessRequest(dotnet, arguments, workingDirectory, SetVariables, RemovedVariables),
+            new ProcessRequest(dotnet, arguments, workingDirectory, SetVariables, RemovedVariables, RemovedPrefixes),
             cancellationToken
         );
     }

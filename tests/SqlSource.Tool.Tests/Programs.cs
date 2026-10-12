@@ -11,7 +11,7 @@ internal static class Programs
 {
     // A run of a program in the temporary directory, with the environment of the test process.
     public static ProcessRequest Request(string program, params string[] arguments) =>
-        new(program, [.. arguments], Path.GetTempPath(), [], []);
+        new(program, [.. arguments], Path.GetTempPath(), [], [], []);
 
     // Skips the test when no folder of the path holds a program of the name.
     public static void SkipUnlessOnPath(string program) =>

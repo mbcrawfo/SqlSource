@@ -271,6 +271,31 @@ public sealed class DescribeRunTests : IDisposable
         _scene.Describer.Opened.ShouldBeEmpty();
     }
 
+    // A database that no query of the run can be described for is none that the variable could be meant for.
+    [Fact]
+    public async Task Run_VariableWithNoNameAndASecondDatabaseThatCannotBeDescribed_IsUsedForTheOneThatCan()
+    {
+        _ = _scene.Project.AddSql("Old.sql", "-- dialect: ansi\n-- name: Old\nSELECT 1;\n");
+        _ = _scene.Run.Environment.Remove("SQLSOURCE_CONNECTION_POSTGRES");
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = "Host=one";
+
+        var result = await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.Split("error SQLSRC").Length.ShouldBe(2);
+        result.Error.ShouldContain("error SQLSRC209: ");
+        result
+            .Out.Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            .ShouldBe(
+                [
+                    "ansi (ansi): 0 described, 0 skipped, 1 failed",
+                    "postgres (postgres): 2 described, 0 skipped, 0 failed",
+                ],
+                ignoreOrder: true
+            );
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe("Host=one");
+    }
+
     // The released tool: no describer is registered until phase 3.
     [Fact]
     public async Task Run_NoDescriberRegistered_IsSqlsrc216AtEachQueryAndNothingIsWritten()

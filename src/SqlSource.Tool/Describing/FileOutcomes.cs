@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Immutable;
 using System.Linq;
+using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Planning;
+using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Describing;
 
@@ -24,7 +26,8 @@ internal static class FileOutcomes
     /// </param>
     /// <param name="read">
     /// Reads the sidecar beside a <c>.sql</c> file, given the file's path.  A sidecar is deleted only when there is
-    /// one and it is not of a higher format version: that is a newer tool's file, which is left as it is.
+    /// one and it is not of a higher format version: that is a newer tool's file, which is left as it is.  One that
+    /// the system will not let the tool open is left too, and its outcome holds the <c>SQLSRC218</c> that says so.
     /// </param>
     public static ImmutableArray<FileOutcome> Decide(
         ImmutableArray<FileWork> files,
@@ -44,7 +47,17 @@ internal static class FileOutcomes
         if (needing.Count == 0)
         {
             // A sidecar that would be empty.
-            var deletes = mayDelete && read(file.File.Path) is { Text: not null, NewerFormat: null };
+            var stale = mayDelete ? read(file.File.Path) : null;
+            if (stale?.OpenFailure is { } reason)
+            {
+                // What cannot be opened cannot be told from a newer tool's file, so it stays, and the user is told.
+                return Of(file, path, FileAction.Unreadable) with
+                {
+                    Failure = ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, "read", reason),
+                };
+            }
+
+            var deletes = stale is { Text: not null, NewerFormat: null };
             return Of(file, path, deletes ? FileAction.Delete : FileAction.None);
         }
 

@@ -7,8 +7,13 @@ namespace SqlSource.Tool.Describing;
 /// </summary>
 internal static class ConnectionVariables
 {
-    /// <summary>The variable with no name, for a run that has exactly one selected database.</summary>
+    /// <summary>
+    /// The variable with no name, for a run that has exactly one selected database that can be described.
+    /// </summary>
     public const string Unnamed = "SQLSOURCE_CONNECTION";
+
+    /// <summary>What the variable of every database starts with.</summary>
+    public const string NamedPrefix = Unnamed + "_";
 
     /// <summary>
     /// The variable of a database: its name in upper case, in the invariant culture, with every character that is
@@ -16,7 +21,7 @@ internal static class ConnectionVariables
     /// </summary>
     public static string For(string database)
     {
-        var variable = new StringBuilder(Unnamed).Append('_');
+        var variable = new StringBuilder(NamedPrefix);
         foreach (var character in database.ToUpperInvariant())
         {
             _ = variable.Append(char.IsLetterOrDigit(character) ? character : '_');

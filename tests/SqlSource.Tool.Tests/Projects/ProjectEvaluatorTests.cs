@@ -450,7 +450,10 @@ public sealed class ProjectEvaluatorTests : IDisposable
                 .SetVariables.OrderBy(pair => pair.Key, StringComparer.Ordinal)
                 .Select(pair => pair.Key + "=" + pair.Value)
                 .ShouldBe(["DOTNET_CLI_FORCE_UTF8_ENCODING=true", "DOTNET_NOLOGO=true"]);
-            request.RemovedVariables.ShouldBe(["MSBuildSDKsPath", "MSBuildExtensionsPath"]);
+            request.RemovedVariables.ShouldBe(["MSBuildSDKsPath", "MSBuildExtensionsPath", "SQLSOURCE_CONNECTION"]);
+            // A connection is for the describer: MSBuild reads the environment for properties, and a project's
+            // targets would have it.
+            request.RemovedPrefixes.ShouldBe(["SQLSOURCE_CONNECTION_"]);
         }
     }
 

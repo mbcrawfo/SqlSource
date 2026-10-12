@@ -231,6 +231,37 @@ public sealed class FilterRunTests : IDisposable
         );
     }
 
+    // What cannot be opened cannot be told from a newer tool's file, so it stays, and the run says which file does.  A
+    // directory is what no system lets any user open as a file.
+    [Fact]
+    public async Task Run_FileThatNeedsNoEntryWithASidecarThatCannotBeOpened_KeepsItAndIsSqlsrc218()
+    {
+        var sidecar = SidecarFormat.PathFor(_plain);
+        _ = Directory.CreateDirectory(sidecar);
+
+        var result = await _scene.DescribeAsync();
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldStartWith($"{sidecar} : error SQLSRC218: '{sidecar}' could not be read: ");
+        result.Error.ShouldEndWith(Expected.See("SQLSRC218") + DescribeScene.RunAgain);
+        result.Error.Split("error SQLSRC").Length.ShouldBe(2);
+        Directory.Exists(sidecar).ShouldBeTrue();
+        // The other sidecars of the run are written all the same.
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
+    }
+
+    // A run on a part does not look at the sidecar of a file that needs no entry, and so says nothing of it.
+    [Fact]
+    public async Task Run_FileThatNeedsNoEntryWithASidecarThatCannotBeOpened_IsNotLookedAtUnderAFilter()
+    {
+        _ = Directory.CreateDirectory(SidecarFormat.PathFor(_plain));
+
+        var result = await _scene.DescribeAsync("Users.sql");
+
+        result.ExitCode.ShouldBe(0);
+        result.Error.ShouldBeEmpty();
+    }
+
     // The planner drops a setting it cannot read and falls back to the next level, so a file can look as if it needs no
     // entry only because of the error: a run that reported anything deletes nothing.
     [Fact]

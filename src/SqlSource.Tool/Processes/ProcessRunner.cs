@@ -1,6 +1,7 @@
 using System;
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -51,6 +52,17 @@ internal sealed class ProcessRunner : IProcessRunner
         }
 
         foreach (var name in request.RemovedVariables)
+        {
+            _ = start.Environment.Remove(name);
+        }
+
+        foreach (
+            var name in start
+                .Environment.Keys.Where(name =>
+                    request.RemovedPrefixes.Any(prefix => name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                )
+                .ToList()
+        )
         {
             _ = start.Environment.Remove(name);
         }

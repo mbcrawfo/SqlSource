@@ -1,5 +1,6 @@
 using SqlSource.Snapshot;
 using SqlSource.Tool.Planning;
+using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Describing;
 
@@ -16,6 +17,9 @@ namespace SqlSource.Tool.Describing;
 /// <param name="Text">The target as the writer gives it.  Set with <paramref name="Target" />.</param>
 /// <param name="HeldBackBy">The queries that held the file back, in the file's order.</param>
 /// <param name="HasDescribed">Whether a query of the file was described in this run.</param>
+/// <param name="Failure">
+/// The <c>SQLSRC218</c> of <see cref="FileAction.Unreadable" />, which the step that applies the outcome reports.
+/// </param>
 internal sealed record FileOutcome(
     PlannedFile File,
     string SidecarPath,
@@ -23,5 +27,6 @@ internal sealed record FileOutcome(
     Sidecar? Target,
     string? Text,
     EquatableArray<HeldBackQuery> HeldBackBy,
-    bool HasDescribed
+    bool HasDescribed,
+    ToolDiagnostic? Failure = null
 );

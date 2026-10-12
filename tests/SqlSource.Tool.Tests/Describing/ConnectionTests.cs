@@ -10,8 +10,16 @@ namespace SqlSource.Tool.Tests.Describing;
 // Where the connection of a database comes from: the command line, its own variable, or the variable with no name.
 public class ConnectionTests
 {
+    // Every selected database can be described.
     private static Connections Resolve(
         string[] selected,
+        string[] given,
+        params (string Name, string Value)[] environment
+    ) => Resolve(selected, selected, given, environment);
+
+    private static Connections Resolve(
+        string[] selected,
+        string[] describable,
         string[] given,
         params (string Name, string Value)[] environment
     )
@@ -19,6 +27,7 @@ public class ConnectionTests
         var variables = environment.ToDictionary(variable => variable.Name, variable => variable.Value);
         return Connections.Resolve(
             selected,
+            describable,
             [.. given.Select(ConnectionArguments.Parse)],
             name => variables.GetValueOrDefault(name)
         );
@@ -136,6 +145,35 @@ public class ConnectionTests
         connections.For("billing").Value.ShouldBe("A");
         connections.For("reports").Value.ShouldBeNull();
         connections.UnnamedIsSetAndNotUsed.ShouldBeTrue();
+    }
+
+    // A database that only a file which cannot be described gives the run is none the variable could be meant for.
+    [Fact]
+    public void For_VariableWithNoNameAndOneOfTwoSelectedDatabasesThatCanBeDescribed_IsUsedForThatOne()
+    {
+        var connections = Resolve(["ansi", "Billing"], ["billing"], [], ("SQLSOURCE_CONNECTION", "C"));
+
+        connections.For("billing").Source.ShouldBe("SQLSOURCE_CONNECTION");
+        connections.For("billing").Value.ShouldBe("C");
+        connections.For("ansi").Value.ShouldBeNull();
+        connections.UnnamedIsSetAndNotUsed.ShouldBeFalse();
+        connections.Databases.ShouldBe(["ansi", "Billing"]);
+    }
+
+    [Fact]
+    public void Describable_TwoOfThreeSelectedDatabases_AreTheOnesTheVariableWithNoNameIsNotUsedFor()
+    {
+        var connections = Resolve(
+            ["ansi", "billing", "reports"],
+            ["billing", "reports"],
+            [],
+            ("SQLSOURCE_CONNECTION", "C")
+        );
+
+        connections.For("billing").Value.ShouldBeNull();
+        connections.For("reports").Value.ShouldBeNull();
+        connections.UnnamedIsSetAndNotUsed.ShouldBeTrue();
+        connections.Describable.ShouldBe(["billing", "reports"]);
     }
 
     [Fact]

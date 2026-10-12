@@ -18,12 +18,14 @@ internal sealed class Connections
     private Connections(
         Dictionary<string, DatabaseConnection> byDatabase,
         ImmutableArray<string> databases,
+        ImmutableArray<string> describable,
         ImmutableArray<string> unusedNames,
         bool unnamedIsSetAndNotUsed
     )
     {
         _byDatabase = byDatabase;
         Databases = databases;
+        Describable = describable;
         UnusedNames = unusedNames;
         UnnamedIsSetAndNotUsed = unnamedIsSetAndNotUsed;
     }
@@ -32,14 +34,20 @@ internal sealed class Connections
     public ImmutableArray<string> Databases { get; }
 
     /// <summary>
+    /// The selected databases that can be described, in the plan's order: the ones <c>SQLSOURCE_CONNECTION</c>
+    /// could be meant for.
+    /// </summary>
+    public ImmutableArray<string> Describable { get; }
+
+    /// <summary>
     /// The names <c>--connection</c> gave that are no selected database, in the order given.  Not an error: a
     /// script may give every connection it has.  The help of <c>SQLSRC213</c> lists them.
     /// </summary>
     public ImmutableArray<string> UnusedNames { get; }
 
     /// <summary>
-    /// Whether <c>SQLSOURCE_CONNECTION</c> is set and the run has more than one selected database, so that it is
-    /// used for none (<c>SQLSRC215</c>).
+    /// Whether <c>SQLSOURCE_CONNECTION</c> is set and the run has more than one selected database that can be
+    /// described, so that it is used for none (<c>SQLSRC215</c>).
     /// </summary>
     public bool UnnamedIsSetAndNotUsed { get; }
 
@@ -48,15 +56,19 @@ internal sealed class Connections
 
     /// <summary>
     /// Finds the connection of each selected database: the command line's value for its name, ignoring case; else
-    /// the variable of its name; else <c>SQLSOURCE_CONNECTION</c>, when exactly one database is selected.  A
-    /// variable that is empty, or holds only white space, is not set: redacting a space would turn every space of a
-    /// describer's text into the mark.
+    /// the variable of its name; else <c>SQLSOURCE_CONNECTION</c>, when it is the one selected database that can be
+    /// described.  A variable that is empty, or holds only white space, is not set: redacting a space would turn
+    /// every space of a describer's text into the mark.
     /// </summary>
     /// <param name="selected">The selected databases, in the plan's order, each once ignoring case.</param>
+    /// <param name="describable">
+    /// Those of <paramref name="selected" /> with a query that the plan did not fail, in the plan's order.
+    /// </param>
     /// <param name="given">The values of <c>--connection</c>, each name once ignoring case.</param>
     /// <param name="getEnvironmentVariable">The host's.</param>
     public static Connections Resolve(
         IReadOnlyList<string> selected,
+        IReadOnlyList<string> describable,
         IReadOnlyList<ConnectionArgument> given,
         Func<string, string?> getEnvironmentVariable
     )
@@ -86,7 +98,7 @@ internal sealed class Connections
             {
                 byDatabase[name] = new DatabaseConnection(name, variable, ofName, variable, null);
             }
-            else if (selected.Count == 1 && unnamed is not null)
+            else if (unnamed is not null && IsTheOnly(describable, name))
             {
                 byDatabase[name] = new DatabaseConnection(name, variable, unnamed, ConnectionVariables.Unnamed, null);
             }
@@ -99,10 +111,14 @@ internal sealed class Connections
         return new Connections(
             byDatabase,
             [.. selected],
+            [.. describable],
             [.. given.Select(static argument => argument.Name).Where(name => !byDatabase.ContainsKey(name))],
-            unnamed is not null && selected.Count > 1
+            unnamed is not null && describable.Count > 1
         );
     }
+
+    private static bool IsTheOnly(IReadOnlyList<string> describable, string name) =>
+        describable.Count == 1 && string.Equals(describable[0], name, StringComparison.OrdinalIgnoreCase);
 
     // The first other selected database with the same variable, when the variable would be read for either.
     private static string? SharerOf(
