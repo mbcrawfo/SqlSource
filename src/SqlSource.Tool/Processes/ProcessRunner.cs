@@ -98,7 +98,8 @@ internal sealed class ProcessRunner : IProcessRunner
             _kill(process);
 
             // A kill only asks, and on Windows the program ends some time after.  What the caller deletes next, a
-            // folder the program wrote to, is then held by nothing.  A program that does not end is left.
+            // folder the program wrote to, is then no longer held by it.  A program that does not end is left,
+            // and so is what the program started: nothing waits for that.
             _ = process.WaitForExit(KillWait);
         }
         catch (Exception exception)

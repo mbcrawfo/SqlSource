@@ -80,8 +80,9 @@ public static class Cli
 
         using var interrupt = new CancellationTokenSource();
         using var ended = new ManualResetEventSlim();
-        void Cancel(object? sender, ConsoleCancelEventArgs e) => e.Cancel = Interrupt(interrupt);
-        void End(PosixSignalContext context) => context.Cancel = Terminate(interrupt, ended.Wait);
+        var signals = 0;
+        void Cancel(object? sender, ConsoleCancelEventArgs e) => e.Cancel = Interrupt(interrupt, ref signals);
+        void End(PosixSignalContext context) => context.Cancel = Terminate(interrupt, ref signals, ended.Wait);
 
         Console.CancelKeyPress += Cancel;
 
@@ -106,10 +107,15 @@ public static class Cli
     /// the process is kept.  A second time, while the run has not ended, the process is left to be killed: a run
     /// that waits on a database may not look at its token.
     /// </summary>
+    /// <param name="interrupt">Cancels the run.</param>
+    /// <param name="signals">
+    /// How many times the run was told to end, by any of the three.  Two that come at once, each on a thread of
+    /// its own, are counted apart, so only one of them is the first.
+    /// </param>
     /// <returns>Whether the process is kept.</returns>
-    internal static bool Interrupt(CancellationTokenSource interrupt)
+    internal static bool Interrupt(CancellationTokenSource interrupt, ref int signals)
     {
-        if (interrupt.IsCancellationRequested)
+        if (Interlocked.Increment(ref signals) > 1)
         {
             return false;
         }
@@ -124,11 +130,12 @@ public static class Cli
     /// whatever it answers, so a handler that returned at once would leave the run no time to end.
     /// </summary>
     /// <param name="interrupt">Cancels the run.</param>
+    /// <param name="signals">How many times the run was told to end, by any of the three.</param>
     /// <param name="waitForTheEnd">Returns when the run has ended.</param>
     /// <returns>Whether the process is kept.</returns>
-    internal static bool Terminate(CancellationTokenSource interrupt, Action waitForTheEnd)
+    internal static bool Terminate(CancellationTokenSource interrupt, ref int signals, Action waitForTheEnd)
     {
-        if (!Interrupt(interrupt))
+        if (!Interrupt(interrupt, ref signals))
         {
             return false;
         }

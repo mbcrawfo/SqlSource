@@ -179,31 +179,36 @@ public class ProcessRunnerTests
     }
 
     // A kill only asks, and on Windows the program ends some time after.  The run waits for that: what its caller
-    // deletes next, the folder that MSBuild writes its manifest to, is then held by no program.  The kill here is
-    // late on every system.
+    // deletes next, the folder that MSBuild writes its manifest to, is then no longer held by it.  The kill here
+    // is done only when the test lets it, after the runner asked for it, so it is late on every system.
     [Fact]
     public async Task Run_Cancelled_EndsOnlyWhenTheProgramHas()
     {
         var wait = Wait();
         Programs.SkipUnlessOnPath(wait.Program);
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var id = 0;
+        var asked = new TaskCompletionSource<int>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var let = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var runner = new ProcessRunner(process =>
         {
-            id = process.Id;
+            var id = process.Id;
             _ = Task.Run(async () =>
             {
-                await Task.Delay(300);
+                await let.Task;
                 using var late = Process.GetProcessById(id);
                 late.Kill();
             });
+            asked.SetResult(id);
         });
 
         var run = runner.RunAsync(wait, cancel.Token);
         await cancel.CancelAsync();
+        var program = await asked.Task;
+        IsRunning(program).ShouldBeTrue();
+        let.SetResult();
 
         _ = await Should.ThrowAsync<OperationCanceledException>(run);
-        IsRunning(id).ShouldBeFalse();
+        IsRunning(program).ShouldBeFalse();
     }
 
     // A kill of the whole tree can fail, as when a process of it belongs to another user.  The run was cancelled

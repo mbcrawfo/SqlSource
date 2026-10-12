@@ -228,6 +228,39 @@ public sealed class SidecarStoreTests : IDisposable
         File.Exists(leftover).ShouldBeTrue();
     }
 
+    // The run is cancelled when the store has begun: it reads the clock once, before it removes anything.
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Apply_RunThatIsCancelledAsItBegins_RemovesNothing(bool onTheWhole)
+    {
+        using var cancel = new CancellationTokenSource();
+        var leftover = Leftover(TimeSpan.FromDays(3));
+
+        _ = Should.Throw<OperationCanceledException>(() =>
+            SidecarStore.Apply(
+                [Outcome(FileAction.Write, "{}")],
+                new Reporter(_error),
+                new CancellingClock(cancel, _clock.Now),
+                onTheWhole,
+                cancel.Token
+            )
+        );
+
+        File.Exists(leftover).ShouldBeTrue();
+        File.Exists(_sidecar).ShouldBeFalse();
+    }
+
+    // A clock that cancels a run when it is read.
+    private sealed class CancellingClock(CancellationTokenSource cancel, DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow()
+        {
+            cancel.Cancel();
+            return now;
+        }
+    }
+
     // The .sql file of the temporary file is gone, or no type claims it any more, so no run looks at its sidecar.
     // A run on the whole knows every file of the project and removes what a sidecar of the folder left, whichever
     // file it was of and whatever the run does with the sidecars that are there.

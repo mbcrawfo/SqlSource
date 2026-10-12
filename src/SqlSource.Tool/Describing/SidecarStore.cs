@@ -65,32 +65,10 @@ internal static class SidecarStore
     )
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var before = time.GetUtcNow().UtcDateTime - LeftoverAge;
-        if (onTheWhole)
-        {
-            var folders = outcomes
-                .Select(static outcome => Path.GetDirectoryName(outcome.SidecarPath) ?? "")
-                .Distinct(StringComparer.Ordinal);
-            foreach (var folder in folders)
-            {
-                RemoveLeftovers(folder, IsSidecarName, before);
-            }
-        }
-
+        RemoveLeftovers(outcomes, onTheWhole, time.GetUtcNow().UtcDateTime - LeftoverAge, cancellationToken);
         foreach (var outcome in outcomes)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!onTheWhole && outcome.Action != FileAction.None)
-            {
-                // A filter narrows what the run may change to the sidecars it looks at.
-                var name = Path.GetFileName(outcome.SidecarPath);
-                RemoveLeftovers(
-                    Path.GetDirectoryName(outcome.SidecarPath) ?? "",
-                    sidecar => sidecar.Equals(name, StringComparison.Ordinal),
-                    before
-                );
-            }
-
             switch (outcome.Action)
             {
                 case FileAction.Write:
@@ -125,11 +103,44 @@ internal static class SidecarStore
         }
     }
 
+    // Removes the temporary files that an earlier run left, each folder read once.  A filter narrows what the run
+    // may change to the sidecars it looks at; a run on the whole knows every file of its projects, and takes those
+    // of every sidecar in the folders of its files.
+    private static void RemoveLeftovers(
+        ImmutableArray<FileOutcome> outcomes,
+        bool onTheWhole,
+        DateTime before,
+        CancellationToken cancellationToken
+    )
+    {
+        var folders = outcomes
+            .Where(outcome => onTheWhole || outcome.Action != FileAction.None)
+            .GroupBy(
+                static outcome => Path.GetDirectoryName(outcome.SidecarPath) ?? "",
+                static outcome => Path.GetFileName(outcome.SidecarPath),
+                StringComparer.Ordinal
+            );
+        foreach (var folder in folders)
+        {
+            Func<string, bool> isWanted = onTheWhole
+                ? IsSidecarName
+                : folder.ToHashSet(StringComparer.Ordinal).Contains;
+            RemoveLeftovers(folder.Key, isWanted, before, cancellationToken);
+        }
+    }
+
     // Removes the temporary files that an earlier run left in the folder, of the sidecars whose names are wanted.
     // One that was written after the time given is left: another run may be writing the sidecar now, and its move
-    // would fail.  A file that cannot be removed is no error of this run.
-    private static void RemoveLeftovers(string folder, Func<string, bool> isWanted, DateTime before)
+    // would fail.  A file that cannot be removed is no error of this run, and a run that was cancelled removes no
+    // further file.
+    private static void RemoveLeftovers(
+        string folder,
+        Func<string, bool> isWanted,
+        DateTime before,
+        CancellationToken cancellationToken
+    )
     {
+        cancellationToken.ThrowIfCancellationRequested();
         try
         {
             var leftovers = Directory
@@ -141,6 +152,7 @@ internal static class SidecarStore
                 );
             foreach (var file in leftovers)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 _ = TryDelete(file);
             }
         }
