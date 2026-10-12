@@ -23,6 +23,36 @@ public class ProcessRunnerTests
     private static ProcessRequest Wait() =>
         OperatingSystem.IsWindows() ? Request("ping", "-n", "30", "127.0.0.1") : Request("sleep", "30");
 
+    // Writes its id to one file, starts a program that waits, writes that one's id to the other, and waits for it.
+    // Windows has no shell that knows its own id but PowerShell.  The files reach the script as variables, which
+    // need no quoting, and with their full paths: the programs do not run in the folder of the files, since Windows
+    // does not delete a folder that a process runs in.
+    private static ProcessRequest WaitWithAChild(string parentFile, string childFile)
+    {
+        var request = OperatingSystem.IsWindows()
+            ? Request(
+                "powershell",
+                "-NoProfile",
+                "-NonInteractive",
+                "-Command",
+                "[IO.File]::WriteAllText($env:SQLSOURCE_TEST_PARENT, $PID);"
+                    + " $child = Start-Process ping -ArgumentList '-n', '30', '127.0.0.1' -NoNewWindow -PassThru;"
+                    + " [IO.File]::WriteAllText($env:SQLSOURCE_TEST_CHILD, $child.Id);"
+                    + " $child.WaitForExit()"
+            )
+            : Request(
+                "sh",
+                "-c",
+                "echo $$ > \"$SQLSOURCE_TEST_PARENT\"; sleep 30 & echo $! > \"$SQLSOURCE_TEST_CHILD\"; wait"
+            );
+        return request with
+        {
+            SetVariables = request
+                .SetVariables.Add("SQLSOURCE_TEST_PARENT", parentFile)
+                .Add("SQLSOURCE_TEST_CHILD", childFile),
+        };
+    }
+
     [Fact]
     public async Task Run_Dotnet_GivesItsExitCodeAndItsOutput()
     {
@@ -62,7 +92,8 @@ public class ProcessRunnerTests
     {
         var result = await Runner.RunAsync(Request("sqlsource-no-such-program"), TestContext.Current.CancellationToken);
 
-        result.ExitCode.ShouldBe(ProcessResult.NotStarted);
+        result.Started.ShouldBeFalse();
+        result.ExitCode.ShouldNotBe(0);
         result.Output.ShouldBeEmpty();
         result.Error.ShouldNotBeEmpty();
     }
@@ -87,15 +118,11 @@ public class ProcessRunnerTests
     [Fact]
     public async Task Run_Cancelled_LeavesNeitherTheProgramNorWhatItStartedRunning()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows(), "The program is a shell script.  docs/tech-debt/TD-0028.");
-        Programs.SkipUnlessOnPath("sh");
-        Programs.SkipUnlessOnPath("sleep");
         using var folder = new TempFolder();
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var request = Request("sh", "-c", "echo $$ > parent; sleep 30 & echo $! > child; wait") with
-        {
-            WorkingDirectory = folder.Path,
-        };
+        var request = WaitWithAChild(folder.PathOf("parent"), folder.PathOf("child"));
+        Programs.SkipUnlessOnPath(request.Program);
+        Programs.SkipUnlessOnPath(Wait().Program);
 
         var run = Runner.RunAsync(request, cancel.Token);
         var parent = await ReadIdAsync(folder.PathOf("parent"));
@@ -109,10 +136,11 @@ public class ProcessRunnerTests
         (await EndsAsync(child)).ShouldBeTrue("the program that the program started is still running");
     }
 
-    // The id that a script wrote to a file, once it has.
+    // The id that a script wrote to a file, once it has.  PowerShell takes seconds to start on a machine that has
+    // not run it.
     private static async Task<int> ReadIdAsync(string file)
     {
-        for (var attempt = 0; attempt < 100; attempt++)
+        for (var attempt = 0; attempt < 600; attempt++)
         {
             if (File.Exists(file) && int.TryParse(await File.ReadAllTextAsync(file), out var id))
             {

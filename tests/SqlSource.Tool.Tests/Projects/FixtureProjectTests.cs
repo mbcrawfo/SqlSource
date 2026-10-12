@@ -110,6 +110,19 @@ public sealed class FixtureProjectTests : IDisposable
         evaluation.State.ShouldBe(ProjectState.DoesNotUseSqlSource, Failure(evaluation));
     }
 
+    // The path of the assets file comes in the JSON that MSBuild prints.  On Windows the code page of a console is
+    // not UTF-8, and a path read wrongly there would make the project one that was never restored.
+    [Fact]
+    public async Task Evaluate_RestoredProjectInAFolderWithLettersOutsideAscii_IsSeenAsRestored()
+    {
+        var project = _fixtures.Copy("Plain", folder: "Größe 日本語");
+        Restore(project);
+
+        var evaluation = await EvaluateAsync(project);
+
+        evaluation.State.ShouldBe(ProjectState.DoesNotUseSqlSource, Failure(evaluation));
+    }
+
     [Fact]
     public async Task Evaluate_ProjectWithoutThePackageThatWasNeverRestored_IsNotRestored()
     {
