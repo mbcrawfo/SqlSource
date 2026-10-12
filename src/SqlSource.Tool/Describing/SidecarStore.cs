@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Immutable;
 using System.IO;
 using System.Linq;
@@ -14,8 +15,15 @@ namespace SqlSource.Tool.Describing;
 /// thing the tool writes into a project.
 /// </summary>
 /// <remarks>
+/// <para>
 /// A sidecar is written whole or not at all: to a temporary file in the same folder, which is then moved over the
 /// old one, so that a run that is stopped leaves the old file or the new one.
+/// </para>
+/// <para>
+/// A run that is killed between the write and the move leaves the temporary file.  The next run that looks at the
+/// sidecar removes it, and a run that does not look at the sidecar changes nothing beside it.  A run on the whole
+/// removes those of every sidecar in the folders of its files: the <c>.sql</c> file of one may be gone.
+/// </para>
 /// </remarks>
 internal static class SidecarStore
 {
@@ -23,20 +31,66 @@ internal static class SidecarStore
 
     private const string Deleted = "deleted";
 
+    private const string TemporaryExtension = ".tmp";
+
+    // What the name of every sidecar ends with: SidecarFormat.PathFor adds ".json" to the path of a .sql file.
+    private const string SidecarSuffix = ".sql.json";
+
+    // How many digits a Guid has in the format "N".
+    private const int IdLength = 32;
+
+    private static readonly SearchValues<char> IdDigits = SearchValues.Create("0123456789abcdef");
+
+    /// <summary>
+    /// How long ago a temporary file was last written before it is taken for one that a run left behind.
+    /// </summary>
+    internal static readonly TimeSpan LeftoverAge = TimeSpan.FromMinutes(1);
+
     /// <summary>
     /// Writes and deletes what the outcomes say, and reports <c>SQLSRC217</c> for a file that was held back though
     /// a query of it was described, and <c>SQLSRC218</c> for a file the system would not let it change.  A run
     /// that was cancelled changes no further file.
     /// </summary>
+    /// <param name="outcomes">What the run does with the sidecar of each file of its plan.</param>
+    /// <param name="reporter">Where the errors go, with the run's trace.</param>
+    /// <param name="time">The clock, which says how old a temporary file is.</param>
+    /// <param name="onTheWhole">Whether the run has no filter, and so knows every file of its projects.</param>
+    /// <param name="cancellationToken">Ends the run.</param>
     public static void Apply(
         ImmutableArray<FileOutcome> outcomes,
         Reporter reporter,
+        TimeProvider time,
+        bool onTheWhole,
         CancellationToken cancellationToken
     )
     {
+        cancellationToken.ThrowIfCancellationRequested();
+        var before = time.GetUtcNow().UtcDateTime - LeftoverAge;
+        if (onTheWhole)
+        {
+            var folders = outcomes
+                .Select(static outcome => Path.GetDirectoryName(outcome.SidecarPath) ?? "")
+                .Distinct(StringComparer.Ordinal);
+            foreach (var folder in folders)
+            {
+                RemoveLeftovers(folder, IsSidecarName, before);
+            }
+        }
+
         foreach (var outcome in outcomes)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (!onTheWhole && outcome.Action != FileAction.None)
+            {
+                // A filter narrows what the run may change to the sidecars it looks at.
+                var name = Path.GetFileName(outcome.SidecarPath);
+                RemoveLeftovers(
+                    Path.GetDirectoryName(outcome.SidecarPath) ?? "",
+                    sidecar => sidecar.Equals(name, StringComparison.Ordinal),
+                    before
+                );
+            }
+
             switch (outcome.Action)
             {
                 case FileAction.Write:
@@ -71,11 +125,54 @@ internal static class SidecarStore
         }
     }
 
+    // Removes the temporary files that an earlier run left in the folder, of the sidecars whose names are wanted.
+    // One that was written after the time given is left: another run may be writing the sidecar now, and its move
+    // would fail.  A file that cannot be removed is no error of this run.
+    private static void RemoveLeftovers(string folder, Func<string, bool> isWanted, DateTime before)
+    {
+        try
+        {
+            var leftovers = Directory
+                .EnumerateFiles(folder, "*" + TemporaryExtension)
+                .Where(file =>
+                    SidecarOfTemporary(Path.GetFileName(file)) is { } sidecar
+                    && isWanted(sidecar)
+                    && File.GetLastWriteTimeUtc(file) < before
+                );
+            foreach (var file in leftovers)
+            {
+                _ = TryDelete(file);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // The folder cannot be listed.  What the run does with the sidecar itself says so, if it matters.
+        }
+    }
+
+    // The name of the sidecar that a temporary file of Write is of, or nothing when the name is not one that Write
+    // gives: the sidecar's name, a point, the 32 digits of a Guid, and ".tmp".  What the system matches a pattern
+    // with is wider.
+    private static string? SidecarOfTemporary(string fileName)
+    {
+        var sidecarLength = fileName.Length - 1 - IdLength - TemporaryExtension.Length;
+        return
+            sidecarLength > 0
+            && fileName[sidecarLength] == '.'
+            && fileName.EndsWith(TemporaryExtension, StringComparison.Ordinal)
+            && fileName.AsSpan(sidecarLength + 1, IdLength).IndexOfAnyExcept(IdDigits) < 0
+            ? fileName[..sidecarLength]
+            : null;
+    }
+
+    // Whether the name is a sidecar's: that of a .sql file, which the generator takes in any case, and ".json".
+    private static bool IsSidecarName(string name) => name.EndsWith(SidecarSuffix, StringComparison.OrdinalIgnoreCase);
+
     private static bool Write(string path, string text, Reporter reporter)
     {
         // Beside the file, so that the move is within one volume.  The name ends in neither ".sql" nor ".json":
-        // nothing takes a file that a stopped run left for a query file or a sidecar.
-        var temporary = $"{path}.{Guid.NewGuid():N}.tmp";
+        // nothing takes a file that a stopped run left for a query file or a sidecar.  SidecarOfTemporary knows it.
+        var temporary = $"{path}.{Guid.NewGuid():N}{TemporaryExtension}";
         try
         {
             // UTF-8 without a byte order mark, and the line endings of the writer.

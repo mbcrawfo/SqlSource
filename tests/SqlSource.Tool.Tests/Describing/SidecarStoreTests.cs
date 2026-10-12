@@ -17,6 +17,7 @@ public sealed class SidecarStoreTests : IDisposable
 {
     private readonly TempFolder _folder = new();
     private readonly StringWriter _error = new(CultureInfo.InvariantCulture) { NewLine = "\n" };
+    private readonly TestClock _clock = new();
     private readonly PlannedFile _file;
     private readonly string _sidecar;
 
@@ -45,8 +46,26 @@ public sealed class SidecarStoreTests : IDisposable
             HasDescribed: false
         );
 
-    private void Apply(params FileOutcome[] outcomes) =>
-        SidecarStore.Apply([.. outcomes], new Reporter(_error), TestContext.Current.CancellationToken);
+    // A run on a part of the project, as under a filter.
+    private void Apply(params FileOutcome[] outcomes) => Apply(onTheWhole: false, outcomes);
+
+    private void Apply(bool onTheWhole, params FileOutcome[] outcomes) =>
+        SidecarStore.Apply(
+            [.. outcomes],
+            new Reporter(_error),
+            _clock,
+            onTheWhole,
+            TestContext.Current.CancellationToken
+        );
+
+    // A file as a run leaves it when it is killed between the write and the move, last written so long ago.
+    private string Leftover(TimeSpan age, string? name = null)
+    {
+        var path = Path.Combine(Path.GetDirectoryName(_sidecar)!, name ?? $"Users.sql.json.{Guid.NewGuid():N}.tmp");
+        File.WriteAllText(path, "{");
+        File.SetLastWriteTimeUtc(path, (_clock.Now - age).UtcDateTime);
+        return path;
+    }
 
     // The names of what is in the project's folder, to see that nothing else was left there.
     private string[] Left() =>
@@ -177,9 +196,182 @@ public sealed class SidecarStoreTests : IDisposable
         cancelled.Cancel();
 
         _ = Should.Throw<OperationCanceledException>(() =>
-            SidecarStore.Apply([Outcome(FileAction.Write, "{}")], new Reporter(_error), cancelled.Token)
+            SidecarStore.Apply(
+                [Outcome(FileAction.Write, "{}")],
+                new Reporter(_error),
+                _clock,
+                onTheWhole: false,
+                cancelled.Token
+            )
         );
 
         Left().ShouldBe(["App.csproj", "Queries.cs", "Users.sql"]);
+    }
+
+    [Fact]
+    public void Apply_RunOnTheWholeThatWasCancelled_RemovesNothing()
+    {
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        var leftover = Leftover(TimeSpan.FromDays(3));
+
+        _ = Should.Throw<OperationCanceledException>(() =>
+            SidecarStore.Apply(
+                [Outcome(FileAction.Write, "{}")],
+                new Reporter(_error),
+                _clock,
+                onTheWhole: true,
+                cancelled.Token
+            )
+        );
+
+        File.Exists(leftover).ShouldBeTrue();
+    }
+
+    // The .sql file of the temporary file is gone, or no type claims it any more, so no run looks at its sidecar.
+    // A run on the whole knows every file of the project and removes what a sidecar of the folder left, whichever
+    // file it was of and whatever the run does with the sidecars that are there.
+    [Theory]
+    [InlineData(nameof(FileAction.Write))]
+    [InlineData(nameof(FileAction.None))]
+    public void Apply_RunOnTheWhole_RemovesTheTemporaryFilesOfEverySidecarOfTheFolder(string actionName)
+    {
+        var action = Enum.Parse<FileAction>(actionName);
+        var own = Leftover(TimeSpan.FromDays(3));
+        var ofAFileThatIsGone = Leftover(TimeSpan.FromDays(3), "Gone.sql.json.0123456789abcdef0123456789abcdef.tmp");
+        var ofAnotherCase = Leftover(TimeSpan.FromDays(3), "Loud.SQL.json.0123456789abcdef0123456789abcdef.tmp");
+
+        Apply(onTheWhole: true, Outcome(action, action == FileAction.Write ? "{}" : null));
+
+        File.Exists(own).ShouldBeFalse();
+        File.Exists(ofAFileThatIsGone).ShouldBeFalse();
+        File.Exists(ofAnotherCase).ShouldBeFalse();
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Apply_RunOnTheWhole_LeavesATemporaryFileThatIsNew()
+    {
+        var writing = Leftover(
+            SidecarStore.LeftoverAge - TimeSpan.FromSeconds(1),
+            "Gone.sql.json.0123456789abcdef0123456789abcdef.tmp"
+        );
+
+        Apply(onTheWhole: true, Outcome(FileAction.Write, "{}"));
+
+        File.Exists(writing).ShouldBeTrue();
+    }
+
+    // Only the temporary file of a sidecar: a file of another program that ends the same way is not the tool's.
+    [Theory]
+    [InlineData("Users.sql.json.tmp")]
+    [InlineData("Users.sql.json.backup.tmp")]
+    [InlineData("Users.sql.json.0123456789abcdef0123456789abcde.tmp")]
+    [InlineData("Users.sql.json.0123456789abcdef0123456789abcdeg.tmp")]
+    [InlineData("Users.sql.json.0123456789ABCDEF0123456789abcdef.tmp")]
+    [InlineData("Users.sql.json.0123456789abcdef0123456789abcdef.tmp.txt")]
+    [InlineData("Users.sql.0123456789abcdef0123456789abcdef.tmp")]
+    [InlineData("settings.json.0123456789abcdef0123456789abcdef.tmp")]
+    [InlineData("Users.sqlx.json.0123456789abcdef0123456789abcdef.tmp")]
+    [InlineData("0123456789abcdef0123456789abcdef.tmp")]
+    public void Apply_RunOnTheWhole_LeavesAFileOfAnotherName(string name)
+    {
+        var other = Leftover(TimeSpan.FromDays(3), name);
+
+        Apply(onTheWhole: true, Outcome(FileAction.Write, "{}"));
+
+        File.Exists(other).ShouldBeTrue();
+    }
+
+    // A folder of the project that holds no file of the plan is not looked into.
+    [Fact]
+    public void Apply_RunOnTheWhole_LeavesAFolderThatHoldsNoFileOfTheRun()
+    {
+        var folder = Directory.CreateDirectory(Path.Combine(Path.GetDirectoryName(_sidecar)!, "Other")).FullName;
+        var elsewhere = Leftover(
+            TimeSpan.FromDays(3),
+            Path.Combine(folder, "Gone.sql.json.0123456789abcdef0123456789abcdef.tmp")
+        );
+
+        Apply(onTheWhole: true, Outcome(FileAction.Write, "{}"));
+
+        File.Exists(elsewhere).ShouldBeTrue();
+    }
+
+    // A run that was killed between the write and the move left its temporary file, and nothing else removes it.
+    [Theory]
+    [InlineData(nameof(FileAction.Write))]
+    [InlineData(nameof(FileAction.Delete))]
+    [InlineData(nameof(FileAction.Unchanged))]
+    [InlineData(nameof(FileAction.HeldBack))]
+    public void Apply_FileTheRunLooksAt_RemovesTheTemporaryFilesAnEarlierRunLeft(string actionName)
+    {
+        var action = Enum.Parse<FileAction>(actionName);
+        var first = Leftover(TimeSpan.FromDays(3));
+        var second = Leftover(SidecarStore.LeftoverAge + TimeSpan.FromSeconds(1));
+
+        Apply(Outcome(action, action is FileAction.Write or FileAction.Unchanged ? "{}" : null));
+
+        File.Exists(first).ShouldBeFalse();
+        File.Exists(second).ShouldBeFalse();
+        _error.ToString().ShouldBeEmpty();
+    }
+
+    // The run did not look at the sidecar, as under a filter that leaves the file out: nothing beside it is changed.
+    [Fact]
+    public void Apply_FileTheRunDoesNotLookAt_LeavesTheTemporaryFileOfAnEarlierRun()
+    {
+        var leftover = Leftover(TimeSpan.FromDays(3));
+
+        Apply(Outcome(FileAction.None));
+
+        File.Exists(leftover).ShouldBeTrue();
+    }
+
+    // Another run that writes the same sidecar now has its temporary file there for a moment.
+    [Fact]
+    public void Apply_TemporaryFileThatIsNew_IsLeftForTheRunThatWritesIt()
+    {
+        var writing = Leftover(SidecarStore.LeftoverAge - TimeSpan.FromSeconds(1));
+        var ahead = Leftover(-TimeSpan.FromHours(1));
+
+        Apply(Outcome(FileAction.Write, "{}"));
+
+        File.Exists(writing).ShouldBeTrue();
+        File.Exists(ahead).ShouldBeTrue();
+    }
+
+    // Only a name that this store gives a temporary file of this sidecar: nothing else in a project is the tool's.
+    [Theory]
+    [InlineData("Users.sql.json.tmp")]
+    [InlineData("Users.sql.json.backup.tmp")]
+    [InlineData("Users.sql.json.0123456789abcdef0123456789abcde.tmp")]
+    [InlineData("Users.sql.json.0123456789abcdef0123456789abcdef0.tmp")]
+    [InlineData("Users.sql.json.0123456789abcdef0123456789abcdeg.tmp")]
+    [InlineData("Users.sql.json.0123456789abcdef0123456789abcdef.tmp.txt")]
+    [InlineData("Users.sql.json.x.0123456789abcdef0123456789abcdef.tmp")]
+    [InlineData("Others.sql.json.0123456789abcdef0123456789abcdef.tmp")]
+    [InlineData("Users.sql.0123456789abcdef0123456789abcdef.tmp")]
+    public void Apply_FileOfAnotherName_IsLeft(string name)
+    {
+        var other = Leftover(TimeSpan.FromDays(3), name);
+
+        Apply(Outcome(FileAction.Write, "{}"));
+
+        File.Exists(other).ShouldBeTrue();
+    }
+
+    // What stands where a temporary file would is not removed, and is no error of the run.
+    [Fact]
+    public void Apply_DirectoryWithTheNameOfATemporaryFile_IsLeftAndTheSidecarIsWritten()
+    {
+        var folder = Path.Combine(Path.GetDirectoryName(_sidecar)!, $"Users.sql.json.{Guid.NewGuid():N}.tmp");
+        _ = Directory.CreateDirectory(folder);
+
+        Apply(Outcome(FileAction.Write, "{}"));
+
+        Directory.Exists(folder).ShouldBeTrue();
+        File.ReadAllText(_sidecar).ShouldBe("{}");
+        _error.ToString().ShouldBeEmpty();
     }
 }

@@ -311,4 +311,25 @@ public sealed class CliTests : IDisposable
         interrupt.IsCancellationRequested.ShouldBeTrue();
         Cli.Interrupt(interrupt).ShouldBeFalse();
     }
+
+    // Windows ends the process when the handler of a closed console or of a shutdown returns, so the handler
+    // returns only when the run has ended.  A second signal waits for nothing: the process is to end now.
+    [Fact]
+    public void Terminate_FirstTime_CancelsTheRunAndWaitsForItsEnd_SecondTime_LetsTheProcessEndAtOnce()
+    {
+        using var interrupt = new CancellationTokenSource();
+        var waits = 0;
+        var cancelledBeforeTheWait = false;
+        void WaitForTheEnd()
+        {
+            waits++;
+            cancelledBeforeTheWait = interrupt.IsCancellationRequested;
+        }
+
+        Cli.Terminate(interrupt, WaitForTheEnd).ShouldBeTrue();
+        waits.ShouldBe(1);
+        cancelledBeforeTheWait.ShouldBeTrue();
+        Cli.Terminate(interrupt, WaitForTheEnd).ShouldBeFalse();
+        waits.ShouldBe(1);
+    }
 }

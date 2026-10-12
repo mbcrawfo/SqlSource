@@ -59,7 +59,7 @@ public static class Cli
     public static int Run(string[] args) => Run(args, ToolHost.Create, Console.Error);
 
     /// <summary>
-    /// Runs the command with a host that is made here, and listens for Ctrl+C.
+    /// Runs the command with a host that is made here, and listens for Ctrl+C, <c>SIGTERM</c> and <c>SIGHUP</c>.
     /// </summary>
     /// <param name="args">The command line.</param>
     /// <param name="createHost">Makes the host.  The real one asks for the current directory, which can throw.</param>
@@ -79,15 +79,24 @@ public static class Cli
         }
 
         using var interrupt = new CancellationTokenSource();
+        using var ended = new ManualResetEventSlim();
         void Cancel(object? sender, ConsoleCancelEventArgs e) => e.Cancel = Interrupt(interrupt);
+        void End(PosixSignalContext context) => context.Cancel = Terminate(interrupt, ended.Wait);
 
         Console.CancelKeyPress += Cancel;
+
+        // SIGTERM is what "timeout", a cancelled CI job and an editor send, and SIGHUP what a closed terminal and a
+        // lost session do.  Left alone, either ends the process at once, with the programs the run started still
+        // running and its temporary folder left.  On Windows they are the shutdown and the closed console.
+        using var terminate = PosixSignalRegistration.Create(PosixSignal.SIGTERM, End);
+        using var hangUp = PosixSignalRegistration.Create(PosixSignal.SIGHUP, End);
         try
         {
             return RunAsync(args, host, interrupt.Token).GetAwaiter().GetResult();
         }
         finally
         {
+            ended.Set();
             Console.CancelKeyPress -= Cancel;
         }
     }
@@ -106,6 +115,25 @@ public static class Cli
         }
 
         interrupt.Cancel();
+        return true;
+    }
+
+    /// <summary>
+    /// What <c>SIGTERM</c> and <c>SIGHUP</c> do: what Ctrl+C does, and the first time it returns only when the run
+    /// has ended.  Windows ends the process when the handler of a shutdown or of a closed console returns,
+    /// whatever it answers, so a handler that returned at once would leave the run no time to end.
+    /// </summary>
+    /// <param name="interrupt">Cancels the run.</param>
+    /// <param name="waitForTheEnd">Returns when the run has ended.</param>
+    /// <returns>Whether the process is kept.</returns>
+    internal static bool Terminate(CancellationTokenSource interrupt, Action waitForTheEnd)
+    {
+        if (!Interrupt(interrupt))
+        {
+            return false;
+        }
+
+        waitForTheEnd();
         return true;
     }
 
@@ -275,7 +303,7 @@ public static class Cli
             Error = host.Error,
             // An exception comes to the catch of RunCommandAsync.
             EnableDefaultExceptionHandler = false,
-            // Cli.Run listens for Ctrl+C itself.
+            // Cli.Run listens for Ctrl+C, SIGTERM and SIGHUP itself.
             ProcessTerminationTimeout = null,
         };
         return await parsed.InvokeAsync(invocation, cancellationToken);

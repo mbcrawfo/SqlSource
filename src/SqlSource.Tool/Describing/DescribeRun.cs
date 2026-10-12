@@ -93,7 +93,7 @@ internal static class DescribeRun
         }
         else
         {
-            SidecarStore.Apply(outcomes, reporter, cancellationToken);
+            SidecarStore.Apply(outcomes, reporter, host.Time, onTheWhole: !options.HasFilter, cancellationToken);
         }
 
         counted(RunSummary.Counts(selected, files, options.Mode));
