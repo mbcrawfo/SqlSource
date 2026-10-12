@@ -107,7 +107,10 @@ internal static class DatabaseRuns
         // either, and an outcome that holds neither is a fault.
         if (opened.Value is not { } session)
         {
-            var failure = guard.Call(() => opened.Failure ?? throw new InvalidOperationException(Guard.Nothing));
+            var failure = Redaction.Of(
+                guard.Call(() => opened.Failure ?? throw new InvalidOperationException(Guard.Nothing)),
+                value
+            );
             reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, first, database, server: null), value));
             RunEvents.NotOpened(trace, database, failure.Descriptor.Id);
             Fail(queries, failure.Descriptor.Id, trace);
@@ -162,7 +165,10 @@ internal static class DatabaseRuns
             }
             else
             {
-                var failure = guard.Call(() => result.Failure ?? throw new InvalidOperationException(Guard.Nothing));
+                var failure = Redaction.Of(
+                    guard.Call(() => result.Failure ?? throw new InvalidOperationException(Guard.Nothing)),
+                    value
+                );
                 run.Reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), value));
                 query.State = QueryState.Failed;
                 RunEvents.Query(run.Trace, query, error: failure.Descriptor.Id);

@@ -26,6 +26,20 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
         helpLinkUri: "https://example.test/sqlsrc999"
     );
 
+    // A descriptor that a describer built at run time from a text, a server's for one: the text is in every part
+    // of it.  Its id is no constant, so release tracking has no row for it.
+    public static DiagnosticDescriptor RejectedWith(string text) =>
+        new(
+            id: text,
+            title: "Rejected by " + text,
+            messageFormat: text + " rejected the query '{0}'",
+            category: text,
+            defaultSeverity: DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            description: text,
+            helpLinkUri: "https://example.test/" + text
+        );
+
     public static QueryDescription NoRows { get; } =
         new(SidecarResultKind.None, EquatableArray<DescribedParameter>.Empty, null, null, null, null);
 
