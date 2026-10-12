@@ -23,21 +23,35 @@ public class ProcessRunnerTests
     private static ProcessRequest Wait() =>
         OperatingSystem.IsWindows() ? Request("ping", "-n", "30", "127.0.0.1") : Request("sleep", "30");
 
-    // Writes its id to the file "parent", starts a program that waits, writes that one's id to "child", and waits
-    // for it.  Windows has no shell that knows its own id but PowerShell.
-    private static ProcessRequest WaitWithAChild() =>
-        OperatingSystem.IsWindows()
+    // Writes its id to one file, starts a program that waits, writes that one's id to the other, and waits for it.
+    // Windows has no shell that knows its own id but PowerShell.  The files reach the script as variables, which
+    // need no quoting, and with their full paths: the programs do not run in the folder of the files, since Windows
+    // does not delete a folder that a process runs in.
+    private static ProcessRequest WaitWithAChild(string parentFile, string childFile)
+    {
+        var request = OperatingSystem.IsWindows()
             ? Request(
                 "powershell",
                 "-NoProfile",
                 "-NonInteractive",
                 "-Command",
-                "[IO.File]::WriteAllText('parent', $PID);"
+                "[IO.File]::WriteAllText($env:SQLSOURCE_TEST_PARENT, $PID);"
                     + " $child = Start-Process ping -ArgumentList '-n', '30', '127.0.0.1' -NoNewWindow -PassThru;"
-                    + " [IO.File]::WriteAllText('child', $child.Id);"
+                    + " [IO.File]::WriteAllText($env:SQLSOURCE_TEST_CHILD, $child.Id);"
                     + " $child.WaitForExit()"
             )
-            : Request("sh", "-c", "echo $$ > parent; sleep 30 & echo $! > child; wait");
+            : Request(
+                "sh",
+                "-c",
+                "echo $$ > \"$SQLSOURCE_TEST_PARENT\"; sleep 30 & echo $! > \"$SQLSOURCE_TEST_CHILD\"; wait"
+            );
+        return request with
+        {
+            SetVariables = request
+                .SetVariables.Add("SQLSOURCE_TEST_PARENT", parentFile)
+                .Add("SQLSOURCE_TEST_CHILD", childFile),
+        };
+    }
 
     [Fact]
     public async Task Run_Dotnet_GivesItsExitCodeAndItsOutput()
@@ -106,7 +120,7 @@ public class ProcessRunnerTests
     {
         using var folder = new TempFolder();
         using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-        var request = WaitWithAChild() with { WorkingDirectory = folder.Path };
+        var request = WaitWithAChild(folder.PathOf("parent"), folder.PathOf("child"));
         Programs.SkipUnlessOnPath(request.Program);
         Programs.SkipUnlessOnPath(Wait().Program);
 
