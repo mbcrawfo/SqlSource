@@ -2,7 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
-using System.Linq;
+using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
@@ -33,7 +33,8 @@ public sealed class TerminationTests : IDisposable
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Nothing sends a signal to a process on Windows.");
         Programs.SkipUnlessOnPath("kill");
-        var project = ProjectThatWaits();
+        var waiting = _fixtures.PathOf("waiting");
+        var project = ProjectThatWaits(waiting);
         var temp = Directory.CreateDirectory(_fixtures.PathOf("tmp")).FullName;
 
         using var tool = StartTool(temp, "describe", project);
@@ -42,8 +43,9 @@ public sealed class TerminationTests : IDisposable
             var output = tool.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
             var error = tool.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
 
-            // The run has its folder from just before it starts MSBuild.
-            await AppearsAsync(temp, RunFolders);
+            // The target of the project has begun its wait: the run has its folder, and an MSBuild that has
+            // started a program of its own.
+            await AppearsAsync(() => File.Exists(waiting), $"Nothing wrote '{waiting}'.");
             using (var kill = Process.Start("kill", [signal, tool.Id.ToString(CultureInfo.InvariantCulture)]))
             {
                 await kill.WaitForExitAsync(TestContext.Current.CancellationToken);
@@ -77,7 +79,8 @@ public sealed class TerminationTests : IDisposable
         Assert.SkipUnless(OperatingSystem.IsWindows(), "Only Windows closes the console of a process.");
         Programs.SkipUnlessOnPath("cmd");
         Programs.SkipUnlessOnPath("taskkill");
-        var project = ProjectThatWaits();
+        var waiting = _fixtures.PathOf("waiting");
+        var project = ProjectThatWaits(waiting);
         var temp = Directory.CreateDirectory(_fixtures.PathOf("tmp")).FullName;
         var title = "sqlsource-test-" + Guid.NewGuid().ToString("N");
 
@@ -93,7 +96,14 @@ public sealed class TerminationTests : IDisposable
         using var shell = Process.Start(start)!;
         try
         {
-            await AppearsAsync(temp, RunFolders);
+            // The target of the project has begun its wait.  A wait that failed would end the run by itself, and
+            // the test would take that for the close: so the run is seen to go on for a while first.  Nothing
+            // here says what the tool wrote, which went to its console.
+            await AppearsAsync(() => File.Exists(waiting), $"Nothing wrote '{waiting}'.");
+            await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+            shell.HasExited.ShouldBeFalse("the run ended by itself, before its console was closed");
+            _ = Directory.EnumerateDirectories(temp, RunFolders).ShouldHaveSingleItem();
+
             var closed = await CloseConsoleAsync(title);
 
             // Left alone, the run would wait for its MSBuild for two minutes.
@@ -122,9 +132,9 @@ public sealed class TerminationTests : IDisposable
     // The tool that was built beside the tests.
     private static string ToolPath => Path.Combine(AppContext.BaseDirectory, "SqlSource.Tool.dll");
 
-    // A copy of a fixture whose manifest target waits for two minutes first, so that a run of it ends only when it
-    // is told to: a test that failed to tell it sees a run that goes on.
-    private string ProjectThatWaits()
+    // A copy of a fixture whose manifest target writes the file given and then waits for two minutes, so that a
+    // run of it ends only when it is told to: a test that failed to tell it sees a run that goes on.
+    private string ProjectThatWaits(string waiting)
     {
         var project = _fixtures.Copy("Single");
         var wait = OperatingSystem.IsWindows() ? "ping -n 120 127.0.0.1 &gt; nul" : "sleep 120";
@@ -133,6 +143,7 @@ public sealed class TerminationTests : IDisposable
             $"""
             <Project>
                 <Target Name="Wait" BeforeTargets="SqlSourceWriteManifest">
+                    <WriteLinesToFile File="{SecurityElement.Escape(waiting)}" Lines="waiting" />
                     <Exec Command="{wait}" />
                 </Target>
             </Project>
@@ -191,11 +202,12 @@ public sealed class TerminationTests : IDisposable
         return $"{output.Trim()} {(await error).Trim()} (exit code {taskkill.ExitCode})";
     }
 
-    private static async Task AppearsAsync(string folder, string pattern)
+    // Waits for what a program of the test does, which with a first run of MSBuild on a machine takes a while.
+    private static async Task AppearsAsync(Func<bool> isThere, string otherwise)
     {
-        for (var attempt = 0; attempt < 3000; attempt++)
+        for (var attempt = 0; attempt < 12000; attempt++)
         {
-            if (Directory.EnumerateDirectories(folder, pattern).Any())
+            if (isThere())
             {
                 return;
             }
@@ -203,6 +215,6 @@ public sealed class TerminationTests : IDisposable
             await Task.Delay(10, TestContext.Current.CancellationToken);
         }
 
-        throw new TimeoutException($"Nothing made '{pattern}' in '{folder}'.");
+        throw new TimeoutException(otherwise);
     }
 }
