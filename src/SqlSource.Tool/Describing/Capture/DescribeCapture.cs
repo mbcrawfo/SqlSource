@@ -3,8 +3,9 @@ using System.Collections.Generic;
 namespace SqlSource.Tool.Describing.Capture;
 
 /// <summary>
-/// Every call a describer made while it described, in the order it made them.  <c>CapturingExchange</c> fills one,
-/// <see cref="CaptureJson" /> writes and reads it, and <c>ReplayingExchange</c> answers from it.
+/// Every call a describer made while it described, in the order it made them.
+/// <see cref="CapturingExchange" /> fills one, <see cref="CaptureJson" /> writes and reads it, and
+/// <see cref="ReplayingExchange" /> answers from it.
 /// </summary>
 /// <remarks>
 /// It is for one thread, as a session is: the run describes one query at a time.
