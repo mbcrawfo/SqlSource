@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
+using Npgsql;
+using Shouldly;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
@@ -51,5 +53,22 @@ internal static class Sessions
             token
         );
         return (long)(await command.ExecuteScalarAsync(token) ?? 0L);
+    }
+
+    // Ends the session's backend from a connection of the test's own, as a server that restarts and an
+    // administrator do, and returns when the backend has ended.  The session's connection is not told.
+    public static async Task EndBackendAsync(PostgresSession session, string connection)
+    {
+        var token = TestContext.Current.CancellationToken;
+        int backend;
+        await using (var ask = await session.Connection.CommandAsync("SELECT pg_catalog.pg_backend_pid()", token))
+        {
+            backend = (await ask.ExecuteScalarAsync(token)).ShouldBeOfType<int>();
+        }
+
+        await using var own = NpgsqlDataSource.Create(connection);
+        await using var end = own.CreateCommand("SELECT pg_catalog.pg_terminate_backend(@backend, 10000)");
+        _ = end.Parameters.AddWithValue("backend", backend);
+        (await end.ExecuteScalarAsync(token)).ShouldBe(true, "the backend did not end in ten seconds");
     }
 }

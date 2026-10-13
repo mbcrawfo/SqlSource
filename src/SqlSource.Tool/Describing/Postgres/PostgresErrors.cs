@@ -156,9 +156,12 @@ internal static class PostgresErrors
     public static string Written(SqlQueryParameter parameter) =>
         SqlDialectRules.PostgreSql.ParameterPrefix + parameter.Name;
 
-    /// <summary><c>SQLSRC225</c> at the step <c>resolve type</c>: the catalog could not be read.</summary>
+    /// <summary>
+    /// <c>SQLSRC225</c> at the step <c>resolve type</c>: the catalog could not be read.  There is no position line:
+    /// a position the server gives is in the tool's own query of the catalog, and not in the user's SQL.
+    /// </summary>
     public static DescribeFailure Types(PostgresServerError error, DescribeRequest query) =>
-        Rejected(error, query, DescribeStep.ResolveType, ServerLines(error, 0));
+        Rejected(error, query, DescribeStep.ResolveType, ServerLines(error with { Position = null }, 0));
 
     /// <summary>
     /// A parameter whose type is a pseudo-type.  The server accepts one and says nothing, so there is no server

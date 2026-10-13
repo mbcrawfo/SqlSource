@@ -15,11 +15,15 @@ namespace SqlSource.Tool.Describing.Postgres;
 internal static class PostgresTypes
 {
     /// <summary>
-    /// Whether the type is a pseudo-type, <c>record</c>, <c>cstring</c>, <c>anyelement</c>: one that no value has
-    /// and that cannot be described.  The server accepts one as a parameter's type, declared or inferred.
+    /// Whether the type is a pseudo-type, <c>record</c>, <c>cstring</c>, <c>anyelement</c>, or an array of one,
+    /// <c>cstring[]</c>: one that no value has and that cannot be described.  The server accepts one as a
+    /// parameter's type, declared or inferred.
     /// </summary>
-    public static bool IsPseudo(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>
-        Row(oid, rows).Typtype == "p";
+    public static bool IsPseudo(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows)
+    {
+        var row = Row(oid, rows);
+        return row.Typtype == "p" || (IsArray(row) && IsPseudo(row.Typelem, rows));
+    }
 
     /// <summary>The record of a type.</summary>
     /// <param name="oid">The type.</param>
@@ -36,7 +40,7 @@ internal static class PostgresTypes
         var row = Row(oid, rows);
         return row.Typtype switch
         {
-            "b" when row.Typcategory == "A" => Array(row, rows),
+            "b" when IsArray(row) => Array(row, rows),
             "b" => Plain(row, SidecarValues.Kind.Base, facets),
             "d" => Plain(row, SidecarValues.Kind.Domain, PostgresFacets.None) with
             {
@@ -60,6 +64,9 @@ internal static class PostgresTypes
             ),
         };
     }
+
+    // A domain has the category of its base, so an array is a base type of the category A.
+    private static bool IsArray(PostgresTypeRow row) => row is { Typtype: "b", Typcategory: "A" };
 
     private static PostgresType Array(PostgresTypeRow row, IReadOnlyDictionary<long, PostgresTypeRow> rows)
     {

@@ -268,6 +268,17 @@ public class PostgresErrorsTests
         failure.ServerLines.ShouldBe(["Exception while reading from stream"]);
     }
 
+    // What PostgreSQL 13 says of "types".  The position is in the tool's own query of the catalog, which the user
+    // never wrote, so there is no line for it; the detail and the hint of the server stay.
+    [Fact]
+    public void Types_ErrorWithAPosition_HasNoPositionLine() =>
+        PostgresErrors
+            .Types(
+                new PostgresServerError("42703", "column m.rngmultitypid does not exist", "a detail", "a hint", 392),
+                Query()
+            )
+            .ServerLines.ShouldBe(["42703: column m.rngmultitypid does not exist", "detail: a detail", "hint: a hint"]);
+
     // The server said nothing: it accepted the type.  So there is no server line, and the help says what it gave.
     [Fact]
     public void PseudoType_InferredParameter_IsSqlsrc226ThatNamesThePseudoType()

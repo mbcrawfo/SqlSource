@@ -1,14 +1,19 @@
 using System;
+using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
+using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.Postgres;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
-// "open" against a real server: what a session knows of it, and each way a session is not opened.
+// A session against a real server: what "open" knows of it, each way a session is not opened, and what a describe
+// says once the server has ended the session.
 [Collection(UsesPostgres.Name)]
 public sealed class SessionTests(PostgresContainer postgres)
 {
@@ -76,6 +81,82 @@ public sealed class SessionTests(PostgresContainer postgres)
         var failure = await ShouldNotOpenAsync("Host=127.0.0.1;Port=1;Timeout=5;Username=app;Password=" + Marker);
 
         failure.ServerLines.ShouldBe(["Failed to connect to 127.0.0.1:1"]);
+    }
+
+    private const string Sql = "SELECT 1 FROM users WHERE id = @id";
+
+    // A server ends a backend when it restarts, when an administrator says so and after an idle timeout.  The
+    // describe that finds it out has what the server said last, 57P01, or what the driver says of a socket that
+    // closed before it read that, so its lines are not compared.  Every call after it has the tool's own text: the
+    // driver would throw what is no error of a server.
+    [Fact]
+    public async Task Describe_AfterTheServerEndedTheSession_IsSqlsrc225EachTimeAndNoThrow()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
+        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        _ = (await session.DescribeAsync(Requests.Of(Sql), token)).Value.ShouldNotBeNull();
+
+        await Sessions.EndBackendAsync(session, postgres.ConnectionString);
+        var found = await session.DescribeAsync(Requests.Of(Sql), token);
+        var later = await session.DescribeAsync(Requests.Of(Sql), token);
+
+        _ = ShouldBeRejected(found, DescribeStep.DescribeParameters);
+        ShouldBeRejected(later, DescribeStep.DescribeParameters)
+            .ServerLines.ShouldBe([PostgresConnection.LostConnection]);
+    }
+
+    // The statement is prepared and the session ends before its types are read.  "types" answers the error that is
+    // reported, and "deallocate", which is asked whatever became of the describe, answers one too and replaces
+    // nothing.
+    [Fact]
+    public async Task Describe_ServerEndsTheSessionBetweenPrepareAndTypes_IsSqlsrc225AndNoThrow()
+    {
+        var capture = new DescribeCapture("postgres");
+        var exchange = new EndsTheBackendAfterPrepare(postgres.ConnectionString);
+        var opened = await Sessions.OpenAsync(postgres.ConnectionString, new CapturingExchange(exchange, capture));
+        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        exchange.Session = session;
+
+        var described = await session.DescribeAsync(Requests.Of(Sql), TestContext.Current.CancellationToken);
+
+        _ = ShouldBeRejected(described, DescribeStep.ResolveType);
+        capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "types", "deallocate"]);
+        CaptureJson.TextOf(capture.Calls[3].Answer).ShouldContain(PostgresConnection.LostConnection);
+    }
+
+    private static DescribeFailure ShouldBeRejected(
+        Outcome<QueryDescription, DescribeFailure> described,
+        DescribeStep step
+    )
+    {
+        described.Value.ShouldBeNull();
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(step);
+        return failure;
+    }
+
+    // Asks the server, and ends the session's backend when "prepare" has answered.
+    private sealed class EndsTheBackendAfterPrepare(string connection) : IDescribeExchange
+    {
+        public PostgresSession? Session { get; set; }
+
+        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
+            string method,
+            TRequest request,
+            Func<TRequest, CancellationToken, Task<TAnswer>> live,
+            CancellationToken cancellationToken
+        )
+        {
+            var answer = await LiveExchange.Instance.AskAsync(method, request, live, cancellationToken);
+            if (method == "prepare" && Session is { } session)
+            {
+                await Sessions.EndBackendAsync(session, connection);
+            }
+
+            return answer;
+        }
     }
 
     // No session, SQLSRC224 at no step for the database, and the connection's whole value in no text of it.

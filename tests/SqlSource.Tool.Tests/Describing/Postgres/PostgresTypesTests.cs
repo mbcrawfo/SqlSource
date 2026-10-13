@@ -170,6 +170,22 @@ public class PostgresTypesTests
         PostgresTypes.IsPseudo(23, rows).ShouldBeFalse();
     }
 
+    // "cstring[]" is a base type of the category A, as "text[]" is, and no value has an array of what no value has.
+    [Fact]
+    public void IsPseudo_ArrayOfAPseudoType_IsTrueAndOfAnyOtherTypeFalse()
+    {
+        var cstring = PostgresRows.PseudoOf(2275, "cstring");
+        var rows = PostgresRows.Of(
+            cstring,
+            PostgresRows.ArrayOf(1263, "_cstring", cstring),
+            PostgresRows.Text,
+            PostgresRows.TextArray
+        );
+
+        PostgresTypes.IsPseudo(1263, rows).ShouldBeTrue();
+        PostgresTypes.IsPseudo(1009, rows).ShouldBeFalse();
+    }
+
     // The session asks IsPseudo first, so a pseudo-type here is a bug.
     [Fact]
     public void Build_PseudoType_Throws() =>

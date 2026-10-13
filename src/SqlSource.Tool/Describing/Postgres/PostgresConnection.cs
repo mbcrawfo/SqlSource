@@ -1,4 +1,5 @@
 using System;
+using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
@@ -6,9 +7,9 @@ using Npgsql;
 namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
-/// The one thing of the describer that holds the connection's value, and the one place that makes a connection and
-/// a command.  Nothing here runs until a <c>live</c> function asks for it, so a replayed session touches no
-/// driver.
+/// The one thing of the describer that holds the connection's value, and the one place that makes a connection, a
+/// command and a batch.  Nothing here runs until a <c>live</c> function asks for it, so a replayed session touches
+/// no driver.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -30,6 +31,12 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
     /// </summary>
     public const string UnreadableConnectionString = "Npgsql cannot read the connection string";
 
+    /// <summary>
+    /// What is said of a call on a connection that the server has ended: a restart, an administrator, an idle
+    /// timeout.  The driver's own word for it is an exception that is none of a server.
+    /// </summary>
+    public const string LostConnection = "the connection to the server was lost";
+
     private NpgsqlDataSource? _source;
     private NpgsqlConnection? _connection;
 
@@ -38,13 +45,17 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
 
     /// <summary>The session's connection, opened by the first call.</summary>
     /// <exception cref="NpgsqlException">
-    /// The server could not be reached or refused, or the driver cannot read the connection string.
+    /// The server could not be reached or refused, the driver cannot read the connection string, or the connection
+    /// was open and is so no longer.
     /// </exception>
     public async Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken)
     {
         if (_connection is not null)
         {
-            return _connection;
+            // The driver closes a connection on which a call found that the server had gone, and for a command on
+            // a closed one it throws what is no NpgsqlException.  A server causes it, so it is an answer's error
+            // like any other.  The session is not opened again: what it had prepared is gone with its backend.
+            return _connection.State == ConnectionState.Open ? _connection : throw new NpgsqlException(LostConnection);
         }
 
         try
@@ -61,9 +72,27 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
         }
     }
 
-    /// <summary>A command on the session's connection.  Its caller disposes it.</summary>
+    /// <summary>
+    /// A command on the session's connection.  Its caller disposes it.  The driver splits a command's text at each
+    /// <c>;</c> it finds outside a string and a comment, and runs every part: it is for a text that holds nothing
+    /// of a user's.
+    /// </summary>
     public async Task<NpgsqlCommand> CommandAsync(string sql, CancellationToken cancellationToken) =>
         new(sql, await OpenAsync(cancellationToken));
+
+    /// <summary>
+    /// Runs a text that holds a user's SQL, as a batch of one command.  The driver does not read the command of a
+    /// batch that has no parameters and never splits it: it sends the text as one statement to parse, and the
+    /// server refuses a text that holds a second one, <c>42601</c>, before it runs anything.  So whatever the text
+    /// holds, and however the tool's lexer read it, one statement at most is run.
+    /// </summary>
+    /// <exception cref="NpgsqlException">The server refused the text, or the connection is lost.</exception>
+    public async Task ExecuteAsOneStatementAsync(string sql, CancellationToken cancellationToken)
+    {
+        await using var batch = new NpgsqlBatch(await OpenAsync(cancellationToken));
+        batch.BatchCommands.Add(new NpgsqlBatchCommand(sql));
+        _ = await batch.ExecuteNonQueryAsync(cancellationToken);
+    }
 
     /// <summary>What the driver threw, as the answer of a call holds it.</summary>
     public static PostgresServerError ErrorOf(NpgsqlException exception)
@@ -79,14 +108,20 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
 
     public async ValueTask DisposeAsync()
     {
-        if (_connection is not null)
+        try
         {
-            await _connection.DisposeAsync();
+            if (_connection is not null)
+            {
+                await _connection.DisposeAsync();
+            }
         }
-
-        if (_source is not null)
+        finally
         {
-            await _source.DisposeAsync();
+            // Whatever closing the connection threw, the data source and its pool are not left behind.
+            if (_source is not null)
+            {
+                await _source.DisposeAsync();
+            }
         }
     }
 

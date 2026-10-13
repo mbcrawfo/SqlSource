@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Npgsql;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tests.Snapshot;
@@ -31,6 +32,9 @@ public sealed class ParameterTests(PostgresContainer postgres)
         (await Sessions.PreparedStatementsAsync(session)).ShouldBe(0);
         return described;
     }
+
+    // A table of these tests alone, which a describe must leave as it is.  The fixture schema has none of the name.
+    private const string Canary = "describer_canary";
 
     private static string[] MethodsOf(DescribeCapture capture) => [.. capture.Calls.Select(call => call.Method)];
 
@@ -67,6 +71,40 @@ public sealed class ParameterTests(PostgresContainer postgres)
             PostgresErrors.NotATypeName,
         ]);
         MethodsOf(capture).ShouldBe(["open"]);
+    }
+
+    // The tool's lexer reads "$x$" after a "§" as the start of a dollar-quoted string, since "§" is no letter to it,
+    // and so ParameterPlaceholders.Rewrite finds one statement.  The server reads "§$x$" as one identifier: to it
+    // the text is two statements and a comment.  The PREPARE is sent as one command that the driver does not split,
+    // so the server refuses the whole of it and the table of the second statement is still there.
+    [Theory]
+    [InlineData('§')]
+    [InlineData('£')]
+    public async Task Describe_TextTheLexerAndTheServerSplitDifferently_IsAFailureAndRunsNothing(char symbol)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using (var create = own.CreateCommand($"CREATE TABLE {Canary} (id int)"))
+        {
+            _ = await create.ExecuteNonQueryAsync(token);
+        }
+
+        try
+        {
+            var described = await DescribeAsync(Requests.Of($"SELECT 1 AS {symbol}$x$; DROP TABLE {Canary}; --$x$"));
+
+            await using var find = own.CreateCommand($"SELECT pg_catalog.to_regclass('{Canary}') IS NOT NULL");
+            (await find.ExecuteScalarAsync(token)).ShouldBe(true, "the describe ran the second statement");
+            var failure = described.Failure.ShouldNotBeNull();
+            failure.Descriptor.Id.ShouldBe("SQLSRC225");
+            failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+            failure.ServerLines.ShouldBe(["42601: cannot insert multiple commands into a prepared statement"]);
+        }
+        finally
+        {
+            await using var drop = own.CreateCommand($"DROP TABLE IF EXISTS {Canary}");
+            _ = await drop.ExecuteNonQueryAsync(token);
+        }
     }
 
     private async Task<DescribeFailure> ShouldFailAsync(DescribeRequest request, string id)
@@ -380,12 +418,14 @@ public sealed class ParameterTests(PostgresContainer postgres)
             Inferred("id", TestSidecars.Postgres()),
         ]);
 
-    // The server accepts a pseudo-type, declared or inferred.  A .sql file can cause either, so neither throws.
+    // The server accepts a pseudo-type, declared or inferred, and an array of one.  A .sql file can cause each, so
+    // none throws.
     [Theory]
     [InlineData("SELECT row_to_json(@p)", null, "SQLSRC226")]
     [InlineData("SELECT int4in(@p)", null, "SQLSRC226")]
     [InlineData("SELECT @p", "record", "SQLSRC228")]
     [InlineData("SELECT @p", "anyelement", "SQLSRC228")]
+    [InlineData("SELECT @p", "cstring[]", "SQLSRC228")]
     public async Task Describe_ParameterOfAPseudoType_IsAFailureAndNoThrow(string sql, string? declared, string id)
     {
         var request = declared is null ? Requests.Of(sql) : Requests.Of(sql, ("p", declared));

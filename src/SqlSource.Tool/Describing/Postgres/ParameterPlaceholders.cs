@@ -12,10 +12,20 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// list, and the <c>PREPARE</c> around both.
 /// </summary>
 /// <remarks>
+/// <para>
 /// The lexer of the generator says what is a parameter and what is a string, a comment or a quoted identifier, under
-/// the rules of <c>postgres</c>, so the tool and the generator read a query one way.  Npgsql splits a text at
-/// <c>;</c> and runs each part, and <c>PREPARE</c> would prepare the first and run the second: a text of several
-/// statements is never sent.
+/// the rules of <c>postgres</c>, so the tool and the generator read a query one way.  A text in which the lexer
+/// finds a second statement is refused before anything is sent, <c>SQLSRC230</c>, which tells the user what is
+/// wrong.
+/// </para>
+/// <para>
+/// That refusal is the first one and no guarantee, since the lexer and the server do not always split a text alike:
+/// <c>SELECT 1 AS §$x$; DROP TABLE t; --$x$</c> is one statement to the lexer, which reads <c>$x$</c> after a
+/// <c>§</c> as the start of a dollar-quoted string, and two to the server, which reads <c>§$x$</c> as an
+/// identifier.  What keeps a second statement from being run is how the text is sent:
+/// <see cref="PostgresConnection.ExecuteAsOneStatementAsync" /> gives it to the driver as a batch of one command,
+/// which the driver does not split, and the server refuses a text of two statements whole.
+/// </para>
 /// </remarks>
 internal static class ParameterPlaceholders
 {

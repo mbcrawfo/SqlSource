@@ -919,7 +919,11 @@ The tool asked the server to prepare the query, and the server refused it: a syn
     server: at character 15
 ```
 
-Mend the query, or bring the database to the schema the query was written for.  `at character` counts from the start of the query's SQL as the tool sent it: without its comments, with each token's default in the token's place and `$1` in the place of each parameter, so it is close to the place in the file and not always the same.  Run with `--log` for the SQL as it was sent.  A type that a `-- param:` marker declares is checked against every use of the parameter, so a declared `int` compared with a text column is this error too.  It is also what a connection that dropped while a query was described is reported as, with the driver's message and no SQLSTATE.
+Mend the query, or bring the database to the schema the query was written for.  `at character` counts from the start of the query's SQL as the tool sent it: without its comments, with each token's default in the token's place and `$1` in the place of each parameter, so it is close to the place in the file and not always the same.  Run with `--log` for the SQL as it was sent.  An error at the step `resolve type` has no `at character` line: there the server refused the tool's own question about a type, and not the query.  A type that a `-- param:` marker declares is checked against every use of the parameter, so a declared `int` compared with a text column is this error too.
+
+A statement that the server cannot prepare is reported so as well, though its SQL is valid: `CALL` and data definition such as `CREATE TABLE` are two, and of the first the server says `syntax error at or near "CALL"`.
+
+It is also what a connection that the server ended while the queries were described is reported as.  The query that finds it out has what the server said last, `57P01: terminating connection due to administrator command` for a backend that was ended, or the driver's message with no SQLSTATE when the server said nothing.  Every query of that database after it has the line `the connection to the server was lost`, with no SQLSTATE: start the run again.
 
 ## SQLSRC226
 
@@ -962,7 +966,7 @@ A `-- param:` marker gives a parameter a type, and the tool asks the server to r
 
 - `it is not written as a type name`: the text is not a type as a column definition writes one.  The tool puts a declared type into the statement it sends, so it reads the text first and sends nothing that is not a name, PostgreSQL's own type words such as `varying` or `without time zone`, one modifier in parentheses, and `[]`.  The server can give the same reason: an error other than "no such type" that it positions at a declared type is reported so, `numeric(2,-3)` on PostgreSQL 14 for one, which has no negative scale, and the `server:` line then says what the server made of the type.
 - `the database has no such type`: the server knows no type of that name on the session's search path.
-- `it is a pseudo-type`: the server knows the name, and no value has that type, `record` and `anyelement` for two.
+- `it is a pseudo-type`: the server knows the name, and no value has that type, `record` and `anyelement` for two, or it is an array of such a type, `cstring[]`.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC228: The type 'user_state' declared for the parameter '@status' of the query 'ListUsers' is not valid: the database has no such type
@@ -978,7 +982,7 @@ Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `t
 
 **Query holds more than one statement**
 
-A query is one statement.  The tool prepares it on the server to describe it, and a text with a second statement would have the first prepared and the second run.  Nothing of such a query is sent.
+A query is one statement.  The tool prepares it on the server to describe it, and it found a second statement in the text.  Nothing of such a query is sent.
 
 ```console
 /work/App/Queries/Cleanup.sql(1,10): error SQLSRC230: The query 'Cleanup' holds more than one statement
@@ -988,3 +992,5 @@ A query is one statement.  The tool prepares it on the server to describe it, an
 ```
 
 Give each statement a `-- name:` of its own.  A `;` at the end of the statement is allowed, with white space and comments after it; a `;` inside a string, a dollar-quoted string or a comment does not count.
+
+This check is a help and not what keeps a second statement from being run.  The tool hands the query to the server as one statement that the driver cannot split, and the server refuses a text of several before it runs anything.  So a text that the tool reads as one statement and the server as two, which takes a `$` straight after a character such as `§`, is [SQLSRC225](#sqlsrc225) with the server's `42601: cannot insert multiple commands into a prepared statement`, and nothing of it is run.

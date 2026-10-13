@@ -354,11 +354,9 @@ internal sealed class PostgresSession : IDescribeSession
     {
         try
         {
+            // The one text that holds a user's SQL: the driver is given it as one statement and may not split it.
             var text = ParameterPlaceholders.PrepareText(asked.Statement, asked.Types, asked.Sql);
-            await using (var prepare = await Connection.CommandAsync(text, token))
-            {
-                _ = await prepare.ExecuteNonQueryAsync(token);
-            }
+            await Connection.ExecuteAsOneStatementAsync(text, token);
 
             await using var read = await Connection.CommandAsync(ParameterTypesSql, token);
             _ = read.Parameters.AddWithValue("name", asked.Statement);
