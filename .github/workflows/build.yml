@@ -94,6 +94,16 @@ jobs:
           --coverage --coverage-output-format cobertura
           --report-github
 
+      # The Test step ran the tests of the PostgreSQL describer on the default image.  This runs them again on the
+      # oldest PostgreSQL that is supported.
+      - name: Test on PostgreSQL 14
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          SQLSOURCE_TESTS_POSTGRES_IMAGE: postgres:14
+        run: >-
+          dotnet test --project tests/SqlSource.Tests.Postgres --configuration "$CONFIGURATION" --no-build
+          --report-github
+
       - name: Report coverage
         id: coverage
         if: ${{ !cancelled() && hashFiles('artifacts/test-results/*.cobertura.xml') != '' }}

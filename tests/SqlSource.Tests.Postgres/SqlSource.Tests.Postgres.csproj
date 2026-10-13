@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="GitHubActionsTestLogger" />
+        <!-- The version the tool itself references: central pinning would otherwise hold it at the generator's. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+        <PackageReference Include="Npgsql" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="xunit.v3" />
+    </ItemGroup>
+    <ItemGroup>
+        <!--
+            The harness of a describer's fixtures, which FixtureCasesTests describes live and records with.
+            tests/SqlSource.Tool.Tests owns the three files and replays the same cases with no database.
+        -->
+        <Compile Include="../SqlSource.Tool.Tests/Fixtures/FixtureCase.cs" Link="Fixtures/FixtureCase.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/Fixtures/FixtureCases.cs" Link="Fixtures/FixtureCases.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/Fixtures/FixtureReplay.cs" Link="Fixtures/FixtureReplay.cs" />
+        <!-- The builder of a sidecar's records.  tests/SqlSource.Tests owns the file. -->
+        <Compile Include="../SqlSource.Tests/Snapshot/TestSidecars.cs" Link="Snapshot/TestSidecars.cs" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
+        <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+    </ItemGroup>
+</Project>
