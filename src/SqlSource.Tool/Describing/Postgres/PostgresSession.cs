@@ -167,6 +167,7 @@ internal sealed class PostgresSession : IDescribeSession
         var parameterOids = ParameterOids(request, prepared);
 
         var answer = await ColumnsAsync(
+            request.Name,
             new PostgresColumnsRequest(statement, request.Parameters.Count),
             cancellationToken
         );
@@ -324,7 +325,7 @@ internal sealed class PostgresSession : IDescribeSession
 
     // The columns in order.  The first of a pseudo-type ends the describe: no value has such a type.  A domain is
     // never over one, so the type the protocol reported is the one to ask.
-    private static Outcome<IReadOnlyList<SidecarColumn>, DescribeFailure> BuildColumns(
+    private Outcome<IReadOnlyList<SidecarColumn>, DescribeFailure> BuildColumns(
         DescribeRequest request,
         IReadOnlyList<PostgresColumnRow> columns,
         ColumnOrigin?[] origins,
@@ -343,7 +344,9 @@ internal sealed class PostgresSession : IDescribeSession
                 );
             }
 
-            built.Add(PostgresColumns.Build(column, origins[index], rows, gated));
+            var recorded = PostgresColumns.Build(column, origins[index], rows, gated);
+            PostgresEvents.Column(_log, request.Name, recorded, gated);
+            built.Add(recorded);
         }
 
         return Outcome<IReadOnlyList<SidecarColumn>, DescribeFailure>.Of(built);
@@ -367,8 +370,11 @@ internal sealed class PostgresSession : IDescribeSession
                 ),
             [.. parameters.Select(CheckParameterOf)]
         );
+        var started = _time.GetTimestamp();
         var answer = await _exchange.AskAsync("check", asked, _live.CheckAsync, cancellationToken);
-        return PostgresErrors.Check(request, asked, answer, NpgsqlCheck.Read(answer, columns, rows));
+        var verdict = NpgsqlCheck.Read(answer, columns, rows);
+        PostgresEvents.Check(_log, request.Name, asked, verdict, ElapsedSince(started));
+        return PostgresErrors.Check(request, asked, answer, verdict);
     }
 
     // A parameter as generated code will bind it: by the name of its type, as the sidecar will record it.
@@ -433,15 +439,28 @@ internal sealed class PostgresSession : IDescribeSession
         return answer;
     }
 
-    private Task<PostgresColumnsAnswer> ColumnsAsync(
+    private async Task<PostgresColumnsAnswer> ColumnsAsync(
+        string query,
         PostgresColumnsRequest request,
         CancellationToken cancellationToken
-    ) => _exchange.AskAsync("columns", request, _live.ColumnsAsync, cancellationToken);
+    )
+    {
+        var started = _time.GetTimestamp();
+        var answer = await _exchange.AskAsync("columns", request, _live.ColumnsAsync, cancellationToken);
+        PostgresEvents.Columns(_log, query, request, answer, ElapsedSince(started));
+        return answer;
+    }
 
-    private Task<PostgresTablesAnswer> TablesAsync(
+    private async Task<PostgresTablesAnswer> TablesAsync(
         PostgresTablesRequest request,
         CancellationToken cancellationToken
-    ) => _exchange.AskAsync("tables", request, _live.TablesAsync, cancellationToken);
+    )
+    {
+        var started = _time.GetTimestamp();
+        var answer = await _exchange.AskAsync("tables", request, _live.TablesAsync, cancellationToken);
+        PostgresEvents.Tables(_log, request, answer, ElapsedSince(started));
+        return answer;
+    }
 
     private async Task<PostgresTypesAnswer> TypesAsync(
         PostgresTypesRequest request,

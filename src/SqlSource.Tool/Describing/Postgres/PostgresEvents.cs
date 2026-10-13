@@ -1,4 +1,5 @@
 using System.Linq;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.Postgres;
@@ -10,7 +11,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <remarks>
 /// The names are written without the engine: the log a describer is given puts <c>postgres.</c> before each, and
 /// removes the connection's value from every string.  A member is added and never renamed.  <c>open</c> has no
-/// event of its own: the run's <c>database.open</c> records what the session knows of its server.
+/// event of its own: the run's <c>database.open</c> records what the session knows of its server.  A describe
+/// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, one <c>column</c> for each column,
+/// <c>check</c> and <c>deallocate</c>, in that order, each only when its call was made.
 /// </remarks>
 internal static class PostgresEvents
 {
@@ -53,6 +56,93 @@ internal static class PostgresEvents
             new(Duration, durationMs)
         );
 
+    /// <summary><c>postgres.columns</c>: each column as the answer holds it, or the error.</summary>
+    public static void Columns(
+        IRunLog log,
+        string query,
+        PostgresColumnsRequest request,
+        PostgresColumnsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            "columns",
+            new("query", query),
+            new("statement", request.Statement),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember("columns", LogValue.ListOf((answer.Columns ?? []).Select(ColumnOf))),
+            new(Duration, durationMs)
+        );
+
+    /// <summary><c>postgres.tables</c>: each table with its columns as the answer holds them, or the error.</summary>
+    public static void Tables(
+        IRunLog log,
+        PostgresTablesRequest request,
+        PostgresTablesAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            "tables",
+            new("oids", LogValue.ListOf(request.Oids.Select(static oid => (LogValue)oid))),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember("tables", LogValue.ListOf((answer.Tables ?? []).Select(TableOf))),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
+    /// <c>postgres.check</c>: the name and the type name of each parameter, whether the two describes agree, and
+    /// what differs.  The SQL is in <c>postgres.prepare</c>.
+    /// </summary>
+    public static void Check(
+        IRunLog log,
+        string query,
+        PostgresCheckRequest request,
+        CheckVerdict verdict,
+        long durationMs
+    ) =>
+        log.Write(
+            "check",
+            new("query", query),
+            new(
+                "parameters",
+                LogValue.ListOf(
+                    request.Parameters.Select(static parameter =>
+                        LogValue.MapOf(new("name", parameter.Name), new("dataTypeName", parameter.DataTypeName))
+                    )
+                )
+            ),
+            new("result", verdict.Result),
+            new("differs", verdict.Differs),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
+    /// <c>postgres.column</c>: one column as it will be recorded, and whether its query was gated.  It is the one
+    /// place that says why a column is nullable beside what was asked to find out.
+    /// </summary>
+    public static void Column(IRunLog log, string query, SidecarColumn column, bool gated) =>
+        log.Write(
+            "column",
+            new("query", query),
+            new("ordinal", column.Ordinal),
+            new("name", column.Name),
+            new("type", column.Type.Name),
+            new(
+                "origin",
+                column.Origin is { } origin
+                    ? LogValue.MapOf(
+                        new("schema", origin.Schema),
+                        new("table", origin.Table),
+                        new("column", origin.Column)
+                    )
+                    : LogValue.Null
+            ),
+            new("nullable", column.Nullable is { } nullable ? (LogValue)nullable : LogValue.Null),
+            new("nullableSource", column.NullableSource),
+            new("gated", gated)
+        );
+
     /// <summary><c>postgres.deallocate</c>: the one place that says a statement could not be freed.</summary>
     public static void Deallocate(
         IRunLog log,
@@ -74,6 +164,37 @@ internal static class PostgresEvents
             new("detail", error.Detail),
             new("hint", error.Hint),
             new("position", LogValue.Of(error.Position))
+        );
+
+    private static LogValue ColumnOf(PostgresColumnRow column) =>
+        LogValue.MapOf(
+            new("ordinal", column.Ordinal),
+            new("name", column.Name),
+            new("typeOid", column.TypeOid),
+            new("tableOid", column.TableOid),
+            new("attributeNumber", column.AttributeNumber),
+            new("length", LogValue.Of(column.Length)),
+            new("precision", LogValue.Of(column.Precision)),
+            new("scale", LogValue.Of(column.Scale))
+        );
+
+    private static LogValue TableOf(PostgresTableRow table) =>
+        LogValue.MapOf(
+            new("oid", table.Oid),
+            new("relkind", table.Relkind),
+            new("schema", table.Schema),
+            new("name", table.Name),
+            new("columns", LogValue.ListOf(table.Columns.Select(AttributeOf)))
+        );
+
+    private static LogValue AttributeOf(PostgresAttributeRow attribute) =>
+        LogValue.MapOf(
+            new("attnum", attribute.Attnum),
+            new("name", attribute.Name),
+            new("notNull", attribute.NotNull),
+            new("identity", attribute.Identity),
+            new("generated", attribute.Generated),
+            new("typeOid", attribute.TypeOid)
         );
 
     private static LogValue RowOf(PostgresTypeRow row) =>
