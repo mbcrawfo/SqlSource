@@ -7,9 +7,12 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 using Xunit;
@@ -24,7 +27,8 @@ public sealed class DatabaseRunsTests : IDisposable
 
     private readonly TempFolder _folder = new();
     private readonly FakeDescriber _describer = new();
-    private readonly RecordingExchange _exchange = new();
+    private readonly DescribeCapture _capture = new("postgres");
+    private readonly CapturingExchange _exchange;
     private readonly Dictionary<string, string> _environment = [];
     private readonly StringWriter _error = new(CultureInfo.InvariantCulture) { NewLine = "\n" };
     private readonly TestProject _project;
@@ -33,6 +37,7 @@ public sealed class DatabaseRunsTests : IDisposable
 
     public DatabaseRunsTests()
     {
+        _exchange = new CapturingExchange(LiveExchange.Instance, _capture);
         _project = Plans.Postgres(_folder);
         _users = _project.AddSql("Users.sql", Users);
     }
@@ -48,7 +53,8 @@ public sealed class DatabaseRunsTests : IDisposable
         RunPlan? plan = null,
         bool registered = true,
         string[]? given = null,
-        CancellationToken? cancellationToken = null
+        CancellationToken? cancellationToken = null,
+        IQueryDescriber? describer = null
     )
     {
         plan ??= Plans.Of(_project);
@@ -66,7 +72,7 @@ public sealed class DatabaseRunsTests : IDisposable
         );
         var host = Hosts.Create(_folder.Path, new FakeProcessRunner(), _folder.Path, environment: _environment) with
         {
-            Describers = new DescriberRegistry(registered ? [_describer] : []),
+            Describers = new DescriberRegistry(registered ? [describer ?? _describer] : []),
             Exchange = _ => _exchange,
         };
 
@@ -112,7 +118,7 @@ public sealed class DatabaseRunsTests : IDisposable
             request.Connection == Secrets.ConnectionWithWord && request.Exchange == _exchange
         );
         _describer.Closed.ShouldBe(2);
-        _exchange.Methods.ShouldBe(["open", "describe", "open", "describe"]);
+        _capture.Calls.Select(call => call.Method).ShouldBe(["open", "describe", "open", "describe"]);
 
         var getUser = _describer.Described[0];
         getUser.Name.ShouldBe("GetUser");
@@ -409,6 +415,19 @@ public sealed class DatabaseRunsTests : IDisposable
         fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.InvalidOperationException", "cannot parse ***"]);
     }
 
+    // The describer of the tests throws from a task.  One that throws before it has a task to return, a method that
+    // is not async for one, is the same fault, and its text is held to the same.
+    [Fact]
+    public async Task Run_DescriberThatThrowsOnOpenBeforeItReturnsATask_IsAFaultWithoutTheConnection()
+    {
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() =>
+            RunAsync(describer: new ThrowsBeforeItReturns())
+        );
+
+        fault.InnerException.ShouldBeNull();
+        fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.InvalidOperationException", "cannot parse ***"]);
+    }
+
     [Fact]
     public async Task Run_DescriberThatReturnsNothing_IsAFault()
     {
@@ -635,4 +654,16 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public void Of_TextThatHoldsTheSecretTwice_HasTheMarkInBothPlaces() =>
         Redaction.Of("a s3cret and a s3cret", "s3cret").ShouldBe("a *** and a ***");
+
+    // A describer whose OpenAsync is not async: what it throws leaves the call itself, and no task holds it.
+    private sealed class ThrowsBeforeItReturns : IQueryDescriber
+    {
+        public SqlDialect Dialect => SqlDialect.PostgreSql;
+
+        public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
+            OpenRequest request,
+            IRunLog log,
+            CancellationToken cancellationToken
+        ) => throw new InvalidOperationException($"cannot parse {request.Connection}");
+    }
 }

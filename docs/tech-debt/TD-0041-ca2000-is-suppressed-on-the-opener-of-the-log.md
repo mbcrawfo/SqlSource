@@ -12,7 +12,7 @@ An attribute covers the whole method.  So the `FileStream` that the method makes
 
 ## Impact
 
-Low.  The method is twenty lines and has one caller, and `RunLogFileTests` holds what it opens and what it refuses.  It is the only suppression of an analyzer's finding in `src/SqlSource.Tool`, and a second `Outcome` of a disposable would add another.
+Low.  The method is twenty lines and has one caller, and `RunLogFileTests` holds what it opens and what it refuses.  It is the only suppression of an analyzer's finding in `src/SqlSource.Tool`.  A second `Outcome` of a disposable has appeared in the tests: [`FakeDescriber.OpenAsync`](../../tests/SqlSource.Tool.Tests/FakeDescriber.cs) returns an opened session in one and has the same attribute, since `IQueryDescriber.OpenAsync` gives that shape to every describer.  The first describer in `src/`, sub-phase 3.2's, will add a third.
 
 ## Proposed fix
 
@@ -20,4 +20,4 @@ Remove the attribute when the analyzer follows a disposable into the object it i
 
 ## Trigger
 
-A second method that returns an `Outcome` of a disposable; or an update of the analyzers after which the build passes without the attribute.
+The first describer in `src/SqlSource.Tool`, whose `OpenAsync` returns an `Outcome` of a session: decide then for all three.  Or an update of the analyzers after which the build passes without the attribute.

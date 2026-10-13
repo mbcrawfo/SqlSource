@@ -37,6 +37,11 @@ end_of_line = lf
 max_line_length = off
 end_of_line = lf
 
+# The fixtures of a describer, as the tool writes them: a line of a capture is as long as its SQL.
+[tests/SqlSource.Tool.Tests/Fixtures/Describers/**]
+max_line_length = off
+end_of_line = lf
+
 # Files formatted by CSharpier
 [*.{cs,csproj,props,targets,slnx}]
 end_of_line = lf

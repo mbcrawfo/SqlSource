@@ -38,6 +38,13 @@
         />
         <None Include="../../global.json" Link="Fixtures/global.json" CopyToOutputDirectory="PreserveNewest" />
         <!--
+            Fixtures/Describers holds the cases of the describers, under a folder for each engine: a query, the
+            capture of describing it and the sidecar expected of it.  Fixtures/FixtureCases.cs finds them in the
+            output.  The first case comes with the first describer.
+        -->
+        <None Remove="Fixtures/Describers/**" />
+        <None Include="Fixtures/Describers/**" CopyToOutputDirectory="PreserveNewest" />
+        <!--
             The harness of the generator's driver tests, for GeneratorParityTests, which runs the generator and the
             tool's planner over the same sources.  tests/SqlSource.Tests.RoslynFloor compiles the same files.
         -->

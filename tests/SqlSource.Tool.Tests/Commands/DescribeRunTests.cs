@@ -41,6 +41,15 @@ public sealed class DescribeRunTests : IDisposable
         _scene.Describer.Closed.ShouldBe(1);
     }
 
+    // A describer's events carry durations, and its clock is the run's.
+    [Fact]
+    public async Task Run_Describer_IsGivenTheClockOfTheRun()
+    {
+        _ = await _scene.DescribeAsync();
+
+        _scene.Describer.Opened.ShouldHaveSingleItem().Time.ShouldBeSameAs(_scene.Clock);
+    }
+
     [Fact]
     public async Task Run_SecondRunWithNothingChanged_DescribesNothingAndWritesNothing()
     {

@@ -14,3 +14,6 @@
 # A sidecar is compared byte for byte with what the writer gives, which uses LF
 *.sql.json text eol=lf
 schemas/*.json text eol=lf
+
+# A describer's fixture is compared byte for byte, and its SQL is in a request that keys a recorded answer
+tests/SqlSource.Tool.Tests/Fixtures/Describers/** text eol=lf
