@@ -110,7 +110,8 @@
                 "notNull": false,
                 "identity": "",
                 "generated": "",
-                "typeOid": 23
+                "typeOid": 23,
+                "notNullValidated": null
               },
               {
                 "attnum": 2,
@@ -118,7 +119,8 @@
                 "notNull": false,
                 "identity": "",
                 "generated": "",
-                "typeOid": 1043
+                "typeOid": 1043,
+                "notNullValidated": null
               },
               {
                 "attnum": 3,
@@ -126,7 +128,8 @@
                 "notNull": false,
                 "identity": "",
                 "generated": "",
-                "typeOid": 16387
+                "typeOid": 16387,
+                "notNullValidated": null
               },
               {
                 "attnum": 4,
@@ -134,7 +137,8 @@
                 "notNull": false,
                 "identity": "",
                 "generated": "",
-                "typeOid": 16390
+                "typeOid": 16390,
+                "notNullValidated": null
               }
             ]
           }

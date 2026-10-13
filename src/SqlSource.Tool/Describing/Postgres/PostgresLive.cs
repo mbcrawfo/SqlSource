@@ -42,10 +42,13 @@ internal sealed class PostgresLive(PostgresConnection connection)
             a.attnotnull,
             a.attidentity::text,
             a.attgenerated::text,
-            a.atttypid
+            a.atttypid,
+            k.convalidated
         FROM pg_catalog.pg_class AS c
         JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
         LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+        LEFT JOIN pg_catalog.pg_constraint AS k
+            ON k.conrelid = c.oid AND k.contype = 'n' AND k.conkey = ARRAY[a.attnum]
         WHERE c.oid = ANY (@oids)
         ORDER BY c.oid, a.attnum
         """;
@@ -229,7 +232,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
                             reader.GetBoolean(6),
                             reader.GetString(7),
                             reader.GetString(8),
-                            await reader.GetFieldValueAsync<uint>(9, token)
+                            await reader.GetFieldValueAsync<uint>(9, token),
+                            await reader.IsDBNullAsync(10, token) ? null : reader.GetBoolean(10)
                         )
                     );
                 }

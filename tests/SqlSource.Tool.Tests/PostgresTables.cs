@@ -35,8 +35,9 @@ internal static class PostgresTables
         long typeOid,
         bool notNull = false,
         string identity = "",
-        string generated = ""
-    ) => new(attnum, name, notNull, identity, generated, typeOid);
+        string generated = "",
+        bool? notNullValidated = null
+    ) => new(attnum, name, notNull, identity, generated, typeOid, notNullValidated);
 
     public static IReadOnlyDictionary<long, PostgresTableRow> Of(params PostgresTableRow[] tables) =>
         tables.ToDictionary(static table => table.Oid);

@@ -308,7 +308,8 @@ public class PostgresEventsTests
                     new("notNull", true),
                     new("identity", "a"),
                     new("generated", string.Empty),
-                    new("typeOid", 23L)
+                    new("typeOid", 23L),
+                    new("notNullValidated", LogValue.Null)
                 )
             );
 

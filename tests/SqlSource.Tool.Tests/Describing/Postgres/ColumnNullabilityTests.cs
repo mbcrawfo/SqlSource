@@ -8,13 +8,13 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 // The five rows of the spec's table, in its order: the first that fits a column is its answer.
 public class ColumnNullabilityTests
 {
-    private static ColumnOrigin Origin(string relkind, bool notNull) =>
+    private static ColumnOrigin Origin(string relkind, bool notNull, bool? notNullValidated = null) =>
         new(
             PostgresTables.TableOf(7, "t") with
             {
                 Relkind = relkind,
             },
-            PostgresTables.Attribute(1, "c", PostgresRows.Int4.Oid, notNull)
+            PostgresTables.Attribute(1, "c", PostgresRows.Int4.Oid, notNull, notNullValidated: notNullValidated)
         );
 
     [Theory]
@@ -68,4 +68,42 @@ public class ColumnNullabilityTests
         ColumnNullability
             .Of(Origin("p", notNull: true), gated: false)
             .ShouldBe((false, SidecarValues.NullableSource.Catalog));
+
+    // PostgreSQL 18 sets attnotnull for a NOT NULL constraint that is NOT VALID, and rows that were there before may
+    // hold NULL.  Only a constraint that the server says is not validated changes the answer: null is an older
+    // server, a column without the constraint, or an answer recorded before the member existed.
+    [Fact]
+    public void Of_NotNullColumnWhoseConstraintIsNotValidated_IsNullableByTheCatalog() =>
+        ColumnNullability
+            .Of(Origin("r", notNull: true, notNullValidated: false), gated: false)
+            .ShouldBe((true, SidecarValues.NullableSource.Catalog));
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(null)]
+    public void Of_NotNullColumnWhoseConstraintIsValidatedOrUnsaid_IsNotNullableByTheCatalog(bool? validated) =>
+        ColumnNullability
+            .Of(Origin("r", notNull: true, notNullValidated: validated), gated: false)
+            .ShouldBe((false, SidecarValues.NullableSource.Catalog));
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void Of_NullableColumnWhateverTheConstraintMemberSays_IsNullableByTheCatalog(bool? validated) =>
+        ColumnNullability
+            .Of(Origin("r", notNull: false, notNullValidated: validated), gated: false)
+            .ShouldBe((true, SidecarValues.NullableSource.Catalog));
+
+    [Fact]
+    public void Of_ConstraintNotValidatedInAView_IsStillUnknownAndSaysView() =>
+        ColumnNullability
+            .Of(Origin("v", notNull: true, notNullValidated: false), gated: false)
+            .ShouldBe((null, SidecarValues.NullableSource.View));
+
+    [Fact]
+    public void Of_ConstraintNotValidatedInAGatedQuery_IsStillNullableByTheHeuristic() =>
+        ColumnNullability
+            .Of(Origin("r", notNull: true, notNullValidated: false), gated: true)
+            .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
 }

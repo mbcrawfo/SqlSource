@@ -171,13 +171,19 @@ internal sealed record PostgresTableRow(
 /// <param name="Identity"><c>attidentity</c>: empty, <c>a</c> or <c>d</c>.</param>
 /// <param name="Generated"><c>attgenerated</c>: empty, <c>s</c> or <c>v</c>.</param>
 /// <param name="TypeOid"><c>atttypid</c>: the declared type, a domain where the column is one.</param>
+/// <param name="NotNullValidated">
+/// <c>convalidated</c> of the column's <c>NOT NULL</c> constraint in <c>pg_constraint</c>, which PostgreSQL 18 keeps
+/// and may hold as not validated while <c>attnotnull</c> is set.  Null when the server said nothing: an older server,
+/// a column without the constraint, or an answer recorded before the member existed.
+/// </param>
 internal sealed record PostgresAttributeRow(
     int Attnum,
     string Name,
     bool NotNull,
     string Identity,
     string Generated,
-    long TypeOid
+    long TypeOid,
+    bool? NotNullValidated
 );
 
 /// <summary>Everything that decides the answer of <c>check</c>.</summary>

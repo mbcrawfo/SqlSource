@@ -363,6 +363,41 @@ public sealed class ColumnTests(PostgresContainer postgres)
     private static (bool? Nullable, string? Source)[] NullabilityOf(IEnumerable<SidecarColumn> columns) =>
         [.. columns.Select(static column => (column.Nullable, column.NullableSource))];
 
+    // PostgreSQL 18 holds a NOT NULL constraint that is NOT VALID: it sets attnotnull, and rows that were there
+    // before may hold NULL.  The table is made by SQL that can be run again.
+    private const string NotValidTable = """
+        CREATE TABLE IF NOT EXISTS column_not_valid (id int, name text NOT NULL);
+        DO $$
+        BEGIN
+            ALTER TABLE column_not_valid ADD CONSTRAINT column_not_valid_id NOT NULL id NOT VALID;
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END
+        $$;
+        """;
+
+    [Fact]
+    public async Task Describe_NotNullThatIsNotValid_IsNullable()
+    {
+        Assert.SkipWhen(await ServerMajorAsync() < 18, "Only PostgreSQL 18 has a NOT NULL that is NOT VALID.");
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        {
+            await using var command = source.CreateCommand(NotValidTable);
+            _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        // The premise: the server sets attnotnull for a constraint that is not validated.
+        (
+            await ScalarAsync(
+                "SELECT attnotnull FROM pg_catalog.pg_attribute "
+                    + "WHERE attrelid = 'column_not_valid'::regclass AND attname = 'id'"
+            )
+        ).ShouldBe(true);
+
+        var columns = await ColumnsOfAsync("SELECT id, name FROM column_not_valid");
+
+        NullabilityOf(columns).ShouldBe([(true, "catalog"), (false, "catalog")]);
+    }
+
     // The query of the spec's Goal, without its join.
     [Fact]
     public async Task Describe_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()

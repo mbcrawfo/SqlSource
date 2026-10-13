@@ -9,7 +9,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <remarks>
 /// An answer is never "not nullable" unless the catalog says <c>NOT NULL</c>, the origin is a table, and no outer
 /// join can have touched the column.  Until the walk exists, a gated query makes every column of a table
-/// nullable.
+/// nullable.  A <c>NOT NULL</c> that PostgreSQL 18 holds as not validated (<c>NOT VALID</c>) sets the catalog's flag
+/// while rows that were there before may hold <c>NULL</c>, so it is nullable too.
 /// </remarks>
 internal static class ColumnNullability
 {
@@ -24,6 +25,9 @@ internal static class ColumnNullability
             // PostgreSQL records no NOT NULL for a view's column and does not enforce a foreign table's.
             { Table.Relkind: "v" or "m" or "f" } => (null, SidecarValues.NullableSource.View),
             _ when gated => (true, SidecarValues.NullableSource.Heuristic),
-            { } found => (!found.Attribute.NotNull, SidecarValues.NullableSource.Catalog),
+            { } found => (
+                found.Attribute is not { NotNull: true, NotNullValidated: not false },
+                SidecarValues.NullableSource.Catalog
+            ),
         };
 }

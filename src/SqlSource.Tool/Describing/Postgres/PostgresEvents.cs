@@ -194,7 +194,8 @@ internal static class PostgresEvents
             new("notNull", attribute.NotNull),
             new("identity", attribute.Identity),
             new("generated", attribute.Generated),
-            new("typeOid", attribute.TypeOid)
+            new("typeOid", attribute.TypeOid),
+            new("notNullValidated", attribute.NotNullValidated is { } validated ? (LogValue)validated : LogValue.Null)
         );
 
     private static LogValue RowOf(PostgresTypeRow row) =>
