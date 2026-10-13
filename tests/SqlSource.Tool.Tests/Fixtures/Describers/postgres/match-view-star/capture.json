@@ -1,0 +1,263 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT * FROM active_users",
+        "types": []
+      },
+      "answer": {
+        "parameterTypes": [],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 0
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "id",
+            "typeOid": 23,
+            "tableOid": 16468,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 1,
+            "name": "name",
+            "typeOid": 1043,
+            "tableOid": 16468,
+            "attributeNumber": 2,
+            "length": 100,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 2,
+            "name": "email",
+            "typeOid": 1043,
+            "tableOid": 16468,
+            "attributeNumber": 3,
+            "length": 254,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 3,
+            "name": "status",
+            "typeOid": 16390,
+            "tableOid": 16468,
+            "attributeNumber": 4,
+            "length": null,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16468
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16468,
+            "relkind": "v",
+            "schema": "public",
+            "name": "active_users",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 2,
+                "name": "name",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1043,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 3,
+                "name": "email",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16387,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 4,
+                "name": "status",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16390,
+                "notNullValidated": null
+              }
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          23,
+          1043,
+          16387,
+          16390
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 23,
+            "typname": "int4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "integer",
+            "enumLabels": null
+          },
+          {
+            "oid": 1043,
+            "typname": "varchar",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "character varying",
+            "enumLabels": null
+          },
+          {
+            "oid": 16387,
+            "typname": "email_t",
+            "nspname": "public",
+            "typtype": "d",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 1043,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "email_t",
+            "enumLabels": null
+          },
+          {
+            "oid": 16390,
+            "typname": "user_status",
+            "nspname": "public",
+            "typtype": "e",
+            "typcategory": "E",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "user_status",
+            "enumLabels": [
+              "active",
+              "disabled"
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT * FROM active_users",
+        "parameters": []
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "id",
+            "typeOid": 23,
+            "dataTypeName": "integer"
+          },
+          {
+            "name": "name",
+            "typeOid": 1043,
+            "dataTypeName": "character varying(100)"
+          },
+          {
+            "name": "email",
+            "typeOid": 1043,
+            "dataTypeName": "character varying(254)"
+          },
+          {
+            "name": "status",
+            "typeOid": 16390,
+            "dataTypeName": "public.user_status"
+          }
+        ],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,439 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT id, name, email, status, tags, balance, created_at, deleted_at, name_upper FROM users",
+        "types": []
+      },
+      "answer": {
+        "parameterTypes": [],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 0
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "id",
+            "typeOid": 23,
+            "tableOid": 16396,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 1,
+            "name": "name",
+            "typeOid": 1043,
+            "tableOid": 16396,
+            "attributeNumber": 2,
+            "length": 100,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 2,
+            "name": "email",
+            "typeOid": 1043,
+            "tableOid": 16396,
+            "attributeNumber": 3,
+            "length": 254,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 3,
+            "name": "status",
+            "typeOid": 16390,
+            "tableOid": 16396,
+            "attributeNumber": 4,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 4,
+            "name": "tags",
+            "typeOid": 1009,
+            "tableOid": 16396,
+            "attributeNumber": 5,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 5,
+            "name": "balance",
+            "typeOid": 1700,
+            "tableOid": 16396,
+            "attributeNumber": 6,
+            "length": null,
+            "precision": 18,
+            "scale": 2
+          },
+          {
+            "ordinal": 6,
+            "name": "created_at",
+            "typeOid": 1184,
+            "tableOid": 16396,
+            "attributeNumber": 7,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 7,
+            "name": "deleted_at",
+            "typeOid": 1184,
+            "tableOid": 16396,
+            "attributeNumber": 8,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 8,
+            "name": "name_upper",
+            "typeOid": 25,
+            "tableOid": 16396,
+            "attributeNumber": 9,
+            "length": null,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16396
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16396,
+            "relkind": "r",
+            "schema": "public",
+            "name": "users",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "a",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "name",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1043,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "email",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16387,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 4,
+                "name": "status",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16390,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1009,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 6,
+                "name": "balance",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 7,
+                "name": "created_at",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 8,
+                "name": "deleted_at",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 9,
+                "name": "name_upper",
+                "notNull": false,
+                "identity": "",
+                "generated": "s",
+                "typeOid": 25,
+                "notNullValidated": null
+              }
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          23,
+          25,
+          1009,
+          1043,
+          1184,
+          1700,
+          16387,
+          16390
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 23,
+            "typname": "int4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "integer",
+            "enumLabels": null
+          },
+          {
+            "oid": 25,
+            "typname": "text",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "text",
+            "enumLabels": null
+          },
+          {
+            "oid": 1009,
+            "typname": "_text",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "A",
+            "typelem": 25,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "text[]",
+            "enumLabels": null
+          },
+          {
+            "oid": 1043,
+            "typname": "varchar",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "character varying",
+            "enumLabels": null
+          },
+          {
+            "oid": 1184,
+            "typname": "timestamptz",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "D",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "timestamp with time zone",
+            "enumLabels": null
+          },
+          {
+            "oid": 1700,
+            "typname": "numeric",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "numeric",
+            "enumLabels": null
+          },
+          {
+            "oid": 16387,
+            "typname": "email_t",
+            "nspname": "public",
+            "typtype": "d",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 1043,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "email_t",
+            "enumLabels": null
+          },
+          {
+            "oid": 16390,
+            "typname": "user_status",
+            "nspname": "public",
+            "typtype": "e",
+            "typcategory": "E",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "user_status",
+            "enumLabels": [
+              "active",
+              "disabled"
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT id, name, email, status, tags, balance, created_at, deleted_at, name_upper FROM users",
+        "parameters": []
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "id",
+            "typeOid": 23,
+            "dataTypeName": "integer"
+          },
+          {
+            "name": "name",
+            "typeOid": 1043,
+            "dataTypeName": "character varying(100)"
+          },
+          {
+            "name": "email",
+            "typeOid": 1043,
+            "dataTypeName": "character varying(254)"
+          },
+          {
+            "name": "status",
+            "typeOid": 16390,
+            "dataTypeName": "public.user_status"
+          },
+          {
+            "name": "tags",
+            "typeOid": 1009,
+            "dataTypeName": "text[]"
+          },
+          {
+            "name": "balance",
+            "typeOid": 1700,
+            "dataTypeName": "numeric(18, 2)"
+          },
+          {
+            "name": "created_at",
+            "typeOid": 1184,
+            "dataTypeName": "timestamp with time zone"
+          },
+          {
+            "name": "deleted_at",
+            "typeOid": 1184,
+            "dataTypeName": "timestamp with time zone"
+          },
+          {
+            "name": "name_upper",
+            "typeOid": 25,
+            "dataTypeName": "text"
+          }
+        ],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}
