@@ -13,9 +13,13 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class NpgsqlCheckTests(PostgresContainer postgres)
 {
+    // The longest name a type can have: PostgreSQL keeps 63 bytes of a name.
+    private const string LongTypeName = "check_enum_with_a_name_of_exactly_sixty_three_characters_long00";
+
     // What these tests need and the fixture schema lacks: a type in a schema whose name needs quotes, a domain
-    // over a domain, and a table that a describe must leave as it is.  Each statement can be run again.
-    private const string OwnObjects = """
+    // over a domain, a composite type, an enum whose name is as long as a name can be, and a table that a
+    // describe must leave as it is.  Each statement can be run again.
+    private const string OwnObjects = $$"""
         CREATE SCHEMA IF NOT EXISTS "My Schema";
         DO $do$
         BEGIN
@@ -26,6 +30,18 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         DO $do$
         BEGIN
             CREATE DOMAIN check_d2 AS email_t;
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END
+        $do$;
+        DO $do$
+        BEGIN
+            CREATE TYPE check_pair AS (a int, b int);
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END
+        $do$;
+        DO $do$
+        BEGIN
+            CREATE TYPE {{LongTypeName}} AS ENUM ('a', 'b');
         EXCEPTION WHEN duplicate_object THEN NULL;
         END
         $do$;
@@ -101,6 +117,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData("email_t[]")]
     [InlineData("tstzrange")]
     [InlineData("int4multirange")]
+    [InlineData("varbit(5)")]
     public async Task Describe_ParameterOfEachKindOfType_IsBoundByItsSpelledName(string type) =>
         await ShouldPassAsync("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", ("p", type));
 
@@ -111,7 +128,9 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         await ShouldPassAsync("SELECT 1 FROM users WHERE id = @id AND name = $2");
 
     // Types whose spelled names Npgsql refuses: one in a schema whose name needs quotes, the "char" of the system
-    // catalogs, a domain over a domain, and a bit string type, which the describer spells "bit" for a parameter.
+    // catalogs, a domain over a domain, a bit string type, which the describer spells "bit" for a parameter, a
+    // composite type, and an array of a type whose name is so long that the spelling with its schema is too long
+    // for Npgsql, which refuses it with an ArgumentException.
     [Theory]
     [InlineData(
         "SELECT 1 AS one FROM users WHERE @p IS NOT NULL",
@@ -122,6 +141,13 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData("SELECT relname FROM pg_catalog.pg_class WHERE relkind = @p", null, "\"char\"", true)]
     [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "check_d2", "public.check_d2", false)]
     [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "bit(3)", "\"bit\"", true)]
+    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "check_pair", "public.check_pair", false)]
+    [InlineData(
+        "SELECT 1 AS one FROM users WHERE @p IS NOT NULL",
+        LongTypeName + "[]",
+        "public." + LongTypeName + "[]",
+        false
+    )]
     public async Task Describe_ParameterNpgsqlCannotBind_IsSqlsrc232NamingIt(
         string sql,
         string? declared,

@@ -17,6 +17,9 @@ public class OuterJoinGateTests
     [InlineData("ROLLUP")]
     [InlineData("CUBE")]
     [InlineData("GROUPING")]
+    [InlineData("OLD")]
+    [InlineData("NEW")]
+    [InlineData("MERGE")]
     public void IsGated_EachWordInAnyCase_IsGated(string word)
     {
         // CA1308 asks for upper case in a string, and the lower case here is the point of the test.
@@ -39,6 +42,11 @@ public class OuterJoinGateTests
     [InlineData("SELECT 1 FROM a\nLEFT\nJOIN b ON true")]
     [InlineData("SELECT 1 FROM a NATURAL FULL JOIN b")]
     [InlineData("SELECT 1 FROM \"a\"LEFT JOIN b ON true")]
+    // The old and the new row of a RETURNING list, and a MERGE: NULL with no join in the plan.
+    [InlineData("INSERT INTO t (id) VALUES (1) RETURNING old.id, new.id")]
+    [InlineData("DELETE FROM t WHERE id = 1 RETURNING old.id")]
+    [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS o, NEW AS n) o.v, n.v")]
+    [InlineData("MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN DELETE RETURNING s.id")]
     public void IsGated_QueryThatHoldsAWord_IsGated(string sql) => OuterJoinGate.IsGated(sql).ShouldBeTrue();
 
     [Theory]
@@ -57,6 +65,9 @@ public class OuterJoinGateTests
     [InlineData("SELECT leftover FROM users")]
     [InlineData("SELECT x_left, left_x, left1, a.fullname FROM users")]
     [InlineData("SELECT groupings, cubed, outermost, rights FROM users")]
+    [InlineData("SELECT renewal, older, newest, merged, new_value, old_id FROM t")]
+    [InlineData("SELECT \"new\", \"old\" FROM t")]
+    [InlineData("SELECT 'merge' FROM t")]
     // A parameter is no word of the SQL.
     [InlineData("SELECT id FROM users WHERE id = @left")]
     [InlineData("")]

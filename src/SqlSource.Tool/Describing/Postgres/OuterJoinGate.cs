@@ -8,15 +8,33 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <c>NULL</c>.  For a query that is gated the catalog's <c>NOT NULL</c> is not believed.
 /// </summary>
 /// <remarks>
-/// The words are the four of an outer join and the three of the grouping sets, which put <c>NULL</c> into a
-/// grouping column on a subtotal row with no join in sight; <c>GROUPING</c> covers <c>GROUPING SETS</c> and the
-/// function.  The lexer of the generator says what is a string, a comment or a quoted identifier, and only what
-/// is left is searched.  The gate reads words and no structure: <c>left(name, 3)</c> gates a query that has no
-/// join, which costs one walk that finds nothing and never a wrong answer.
+/// The words are the four of an outer join, the three of the grouping sets and three more.  The grouping sets put
+/// <c>NULL</c> into a grouping column on a subtotal row with no join in sight; <c>GROUPING</c> covers
+/// <c>GROUPING SETS</c> and the function.  <c>OLD</c> and <c>NEW</c> are the old and the new row of a
+/// <c>RETURNING</c> list of PostgreSQL 18, all <c>NULL</c> for the row an <c>INSERT</c> had no old one of and a
+/// <c>DELETE</c> has no new one of; <c>MERGE</c> has a <c>RETURNING</c> list that holds the source's columns as
+/// <c>NULL</c> for a row that <c>WHEN NOT MATCHED BY SOURCE</c> acted on.  Each keeps the table's origin in the
+/// row description, and none has an outer join in its plan.  What the list must keep is the rule that a column is
+/// never <c>false</c> when the server can return <c>NULL</c> for it.  The lexer of the generator says what is a
+/// string, a comment or a quoted identifier, and only what is left is searched.  The gate reads words and no
+/// structure: <c>left(name, 3)</c> gates a query that has no join, which costs one walk that finds nothing and
+/// never a wrong answer.
 /// </remarks>
 internal static class OuterJoinGate
 {
-    private static readonly string[] Words = ["LEFT", "RIGHT", "FULL", "OUTER", "ROLLUP", "CUBE", "GROUPING"];
+    private static readonly string[] Words =
+    [
+        "LEFT",
+        "RIGHT",
+        "FULL",
+        "OUTER",
+        "ROLLUP",
+        "CUBE",
+        "GROUPING",
+        "OLD",
+        "NEW",
+        "MERGE",
+    ];
 
     /// <summary>Whether the SQL holds one of the words, as a whole word and in any case.</summary>
     /// <exception cref="InvalidOperationException">

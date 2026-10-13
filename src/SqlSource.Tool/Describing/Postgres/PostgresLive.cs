@@ -302,9 +302,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// </summary>
     /// <remarks>
     /// The text is a user's, so it goes as a batch of one command.  Npgsql refuses two things before it sends
-    /// anything, with one of the same two exceptions for both: a type name it cannot bind, and a text in which it
-    /// finds a <c>;</c> that something follows.  Which of the two it was is found by asking for each parameter
-    /// alone, with a text of the tool's own.
+    /// anything: a type name it cannot bind, and a text in which it finds a <c>;</c> that something follows.  It
+    /// throws a <see cref="NotSupportedException" />, an <see cref="InvalidCastException" /> or, for a name that is
+    /// too long, an <see cref="ArgumentException" />, and the answer is the same for each.  Which of the two
+    /// refusals it was is found by asking for each parameter alone, with a text of the tool's own.
     /// </remarks>
     public async Task<PostgresCheckAnswer> CheckAsync(PostgresCheckRequest asked, CancellationToken token)
     {
@@ -340,6 +341,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
             return await RefusedAsync(asked, refused.Message, token);
         }
         catch (InvalidCastException refused)
+        {
+            return await RefusedAsync(asked, refused.Message, token);
+        }
+        catch (ArgumentException refused)
         {
             return await RefusedAsync(asked, refused.Message, token);
         }
@@ -386,6 +391,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
             return refused.Message;
         }
         catch (InvalidCastException refused)
+        {
+            return refused.Message;
+        }
+        catch (ArgumentException refused)
         {
             return refused.Message;
         }

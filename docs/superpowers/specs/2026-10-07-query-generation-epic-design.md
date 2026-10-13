@@ -648,6 +648,8 @@ The server's errors and what the tool says, as settled:
 
 `record` and `unknown` as a column type are `SQLSRC229` with the column named.
 
+- **The gate has three words more than sub-phase 3.3's spec lists**, `OLD`, `NEW` and `MERGE`, which the review of 3.3 found on PostgreSQL 18.4.  `OLD` and `NEW` are the old and the new row of a `RETURNING` list of PostgreSQL 18, all `NULL` for the row an `INSERT` had no old one of and a `DELETE` has no new one of; `MERGE` is for PostgreSQL 17's `WHEN NOT MATCHED BY SOURCE ... RETURNING`, which holds the source's columns as `NULL`.  Each keeps the table's origin in the row description, so a `NOT NULL` column would be `false` with `catalog` where the server returns `NULL`.  The rule is that a column is never `false` when the server can return `NULL` for it.  Sub-phase 3.5's walk cannot answer a query gated by one of them, since its plan holds no outer join, so such a query keeps the heuristic.
+
 ### Technical notes
 
 - `Parse` and `Describe` plan and execute nothing; `EXECUTE` under `SchemaOnly` describes the prepared statement's result, and a statement without rows answers no fields.  Table origins survive subqueries in `FROM`, CTEs and joins; they are zero for expressions, function results, aggregates, the merged column of a `USING` join in a `FULL JOIN`, and the whole output of a `UNION`, `INTERSECT` or `EXCEPT`; the `USING` column of an inner join has the left table's origin.  A view reports the view's OID and column, and a view's columns are never `NOT NULL` in `pg_attribute`.

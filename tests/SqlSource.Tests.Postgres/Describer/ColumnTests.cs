@@ -413,6 +413,41 @@ public sealed class ColumnTests(PostgresContainer postgres)
         (status.Nullable, status.NullableSource).ShouldBe((true, "heuristic"));
     }
 
+    // PostgreSQL 18's old and new row of a RETURNING list are NULL for the row an INSERT had no old one of, and
+    // each column keeps its table as its origin, with no outer join in the plan.
+    [Fact]
+    public async Task Describe_ReturningOldAndNew_IsGated()
+    {
+        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+
+        var description = await ShouldDescribeAsync(
+            "INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING old.id, new.id"
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        var columns = description.Columns.ShouldNotBeNull();
+        columns.Select(column => column.Origin).ShouldBe([Origin("orders", "id"), Origin("orders", "id")]);
+        NullabilityOf(columns).ShouldBe([(true, "heuristic"), (true, "heuristic")]);
+    }
+
+    // A MERGE of PostgreSQL 17 that deletes the rows of the target the source lacks returns the source's columns
+    // as NULL, and the column keeps the source's table as its origin.
+    [Fact]
+    public async Task Describe_MergeReturning_IsGated()
+    {
+        Assert.SkipWhen(await ServerMajorAsync() < 17, "PostgreSQL before 17 has no RETURNING for MERGE.");
+
+        var description = await ShouldDescribeAsync(
+            "MERGE INTO orders AS o USING users AS u ON o.user_id = u.id "
+                + "WHEN NOT MATCHED BY SOURCE THEN DELETE RETURNING u.id, o.id"
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        var columns = description.Columns.ShouldNotBeNull();
+        columns[0].Origin.ShouldBe(Origin("users", "id"));
+        (columns[0].Nullable, columns[0].NullableSource).ShouldBe((true, "heuristic"));
+    }
+
     // The gate reads words: a function named as one gates a query that has no join.
     [Fact]
     public async Task Describe_FunctionNamedAsAGateWord_IsGated()
@@ -456,6 +491,18 @@ public sealed class ColumnTests(PostgresContainer postgres)
         NullabilityOf(view).ShouldAllBe(found => found.Nullable == null && found.Source == "view");
         NullabilityOf(materialized).ShouldBe([(null, "view")]);
         NullabilityOf(gated).ShouldBe([(null, "view"), (true, "heuristic")]);
+    }
+
+    // A table's row selected whole is a column of the table's composite type, which is no pseudo-type.
+    [Fact]
+    public async Task Describe_ColumnOfACompositeType_IsTheTablesRowTypeWithNoOrigin()
+    {
+        var column = (await ColumnsOfAsync("SELECT u FROM users u")).ShouldHaveSingleItem();
+
+        column.Name.ShouldBe("u");
+        column.Type.Name.ShouldBe("public.users");
+        column.Type.ShouldBeOfType<PostgresType>().Kind.ShouldBe(SidecarValues.Kind.Composite);
+        column.Origin.ShouldBeNull();
     }
 
     // A row built in the select list, and the alias of a subquery selected whole, are "record".
