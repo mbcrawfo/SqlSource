@@ -86,6 +86,7 @@ public sealed class DescriberFixtureTests : IDisposable
     [InlineData("prepare")]
     [InlineData("columns")]
     [InlineData("types")]
+    [InlineData("check")]
     [InlineData("deallocate")]
     public async Task Replay_CaptureWithACallRemoved_ThrowsACaptureMiss(string method)
     {

@@ -179,3 +179,38 @@ internal sealed record PostgresAttributeRow(
     string Generated,
     long TypeOid
 );
+
+/// <summary>Everything that decides the answer of <c>check</c>.</summary>
+/// <param name="Sql">
+/// The query's one statement as it was written, <c>@name</c> for each parameter, without its trailing <c>;</c>.
+/// </param>
+/// <param name="Parameters">The parameters of the query's list, in order.</param>
+internal sealed record PostgresCheckRequest(string Sql, IReadOnlyList<PostgresCheckParameter> Parameters);
+
+/// <summary>A parameter as generated code will bind it.</summary>
+/// <param name="Name">The name, as the query's list has it.</param>
+/// <param name="DataTypeName">The <c>name</c> of the type the describer gave the parameter.</param>
+internal sealed record PostgresCheckParameter(string Name, string DataTypeName);
+
+/// <summary>What Npgsql's own describe of the SQL gave.  One of the three members is not null.</summary>
+/// <param name="Columns">The columns of the result, in order.</param>
+/// <param name="Error">
+/// What the server said, or what Npgsql said of a text it would not send: it has no SQLSTATE then.
+/// </param>
+/// <param name="DriverError">The parameter whose type Npgsql cannot bind.</param>
+internal sealed record PostgresCheckAnswer(
+    IReadOnlyList<PostgresCheckColumn>? Columns,
+    PostgresServerError? Error,
+    PostgresBindError? DriverError
+);
+
+/// <summary>A column as Npgsql's describe of the original SQL reports it.</summary>
+/// <param name="Name">The name.</param>
+/// <param name="TypeOid">The type.</param>
+/// <param name="DataTypeName">Npgsql's own name for the type.</param>
+internal sealed record PostgresCheckColumn(string Name, long TypeOid, string DataTypeName);
+
+/// <summary>A type name that Npgsql refused before it sent anything.</summary>
+/// <param name="Parameter">The first parameter of the list whose type is refused.</param>
+/// <param name="Message">Npgsql's own message.</param>
+internal sealed record PostgresBindError(string Parameter, string Message);

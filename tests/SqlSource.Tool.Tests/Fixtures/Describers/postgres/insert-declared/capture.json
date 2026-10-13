@@ -114,6 +114,31 @@
       }
     },
     {
+      "method": "check",
+      "request": {
+        "sql": "INSERT INTO users (name, email, status) VALUES (@name, @email, @status)",
+        "parameters": [
+          {
+            "name": "name",
+            "dataTypeName": "character varying"
+          },
+          {
+            "name": "email",
+            "dataTypeName": "public.email_t"
+          },
+          {
+            "name": "status",
+            "dataTypeName": "public.user_status"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"

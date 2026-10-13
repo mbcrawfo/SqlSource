@@ -121,12 +121,33 @@ public class PostgresSessionTests
     private static PostgresScript Frees(PostgresScript script, int number, PostgresDeallocateAnswer? answer = null) =>
         script.Answer("deallocate", new PostgresDeallocateRequest($"sqlsource_{number}"), answer ?? Freed);
 
+    // "check" answering the columns the test gives, each with the type "columns" answered: the two describes agree.
+    private static PostgresScript Checks(
+        PostgresScript script,
+        string sql,
+        (string Name, string Type)[] parameters,
+        params PostgresColumnRow[] columns
+    ) =>
+        script.Answer(
+            "check",
+            new PostgresCheckRequest(
+                sql,
+                [.. parameters.Select(static parameter => new PostgresCheckParameter(parameter.Name, parameter.Type))]
+            ),
+            new PostgresCheckAnswer(
+                [.. columns.Select(static column => new PostgresCheckColumn(column.Name, column.TypeOid, "a type"))],
+                null,
+                null
+            )
+        );
+
     // The trailing ";" is not sent, the parameter is $1, and the statement is freed when the describe is done.
     [Fact]
     public async Task DescribeAsync_Query_AsksPrepareThenDeallocateForTheStatement()
     {
         var script = new PostgresScript().Open();
         _ = Prepares(script, 1, "DELETE FROM samples WHERE flag", [], new PostgresPrepareAnswer([], null));
+        _ = Checks(script, "DELETE FROM samples WHERE flag", []);
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -145,8 +166,10 @@ public class PostgresSessionTests
     {
         var script = new PostgresScript().Open();
         _ = Prepares(script, 1, "DELETE FROM samples", [], new PostgresPrepareAnswer([], null));
+        _ = Checks(script, "DELETE FROM samples", []);
         _ = Frees(script, 1);
         _ = Prepares(script, 2, "DELETE FROM orders", [], new PostgresPrepareAnswer([], null));
+        _ = Checks(script, "DELETE FROM orders", []);
         var exchange = Frees(script, 2).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -167,6 +190,7 @@ public class PostgresSessionTests
         var script = new PostgresScript().Open();
         _ = Prepares(script, 1, "DELETE FROM nope", [], new PostgresPrepareAnswer(null, rejected));
         _ = Prepares(script, 2, "DELETE FROM orders", [], new PostgresPrepareAnswer([], null));
+        _ = Checks(script, "DELETE FROM orders", []);
         var exchange = Frees(script, 2).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -194,6 +218,7 @@ public class PostgresSessionTests
             null,
             null
         );
+        _ = Checks(script, "DELETE FROM samples", []);
         var exchange = Frees(script, 1, new PostgresDeallocateAnswer(gone)).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -256,6 +281,11 @@ public class PostgresSessionTests
             new PostgresPrepareAnswer([23, 1043], null)
         );
         _ = Resolves(script, [23, 1043], PostgresRows.Int4, PostgresRows.Varchar);
+        _ = Checks(
+            script,
+            "SELECT id FROM users WHERE id = @id AND name = @name",
+            [("id", "integer"), ("name", "character varying")]
+        );
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -304,6 +334,11 @@ public class PostgresSessionTests
             new PostgresPrepareAnswer([1043, 23, 23], null)
         );
         _ = Resolves(script, [23, 1043], PostgresRows.Int4, PostgresRows.Varchar);
+        _ = Checks(
+            script,
+            "UPDATE users SET name = @name WHERE id = @id",
+            [("name", "character varying"), ("id", "integer"), ("tenant", "integer")]
+        );
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -338,6 +373,7 @@ public class PostgresSessionTests
             new PostgresPrepareAnswer([23, 25], null)
         );
         _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = Checks(script, "SELECT 1 FROM users WHERE id = @id AND name = $2", [("id", "integer")]);
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -447,6 +483,14 @@ public class PostgresSessionTests
             Expression(2, "numeric", 1700, precision: 18, scale: 2)
         );
         _ = Resolves(script, [23, 1043, 1700], PostgresRows.Int4, PostgresRows.Varchar, PostgresRows.Numeric);
+        _ = Checks(
+            script,
+            "SELECT 1, 'a'::varchar(100), 2::numeric(18,2)",
+            [],
+            Expression(0, "?column?", 23),
+            Expression(1, "varchar", 1043),
+            Expression(2, "numeric", 1700)
+        );
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -478,6 +522,7 @@ public class PostgresSessionTests
         var script = new PostgresScript().Open();
         _ = Prepares(script, 1, "DELETE FROM samples WHERE id = $1", ["unknown"], new([23], null));
         _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = Checks(script, "DELETE FROM samples WHERE id = @id", [("id", "integer")]);
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -502,6 +547,14 @@ public class PostgresSessionTests
         _ = PreparesOnly(script, 1, "SELECT $1::text AS a, 1 AS b, 2 AS c", ["unknown"], new([25], null));
         _ = Columns(script, 1, 1, Expression(0, "a", 25), Expression(1, "b", 23), Expression(2, "c", 23));
         _ = Resolves(script, [23, 25], PostgresRows.Int4, PostgresRows.Text);
+        _ = Checks(
+            script,
+            "SELECT @p::text AS a, 1 AS b, 2 AS c",
+            [("p", "text")],
+            Expression(0, "a", 25),
+            Expression(1, "b", 23),
+            Expression(2, "c", 23)
+        );
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -577,6 +630,14 @@ public class PostgresSessionTests
             PostgresRows.Numeric,
             PostgresRows.EmailT
         );
+        _ = Checks(
+            script,
+            "SELECT o.total, u.email, u.id FROM orders o, users u",
+            [],
+            Expression(0, "total", 1700),
+            Expression(1, "email", 1043),
+            Expression(2, "id", 23)
+        );
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -608,6 +669,7 @@ public class PostgresSessionTests
         _ = Columns(script, 1, 0, new PostgresColumnRow(0, "ctid", 27, users.Oid, -1, null, null, null));
         _ = Tables(script, [users.Oid], users);
         _ = Resolves(script, [27], PostgresRows.Tid);
+        _ = Checks(script, "SELECT ctid FROM users", [], Expression(0, "ctid", 27));
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -655,6 +717,7 @@ public class PostgresSessionTests
         _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
         _ = Tables(script, [users.Oid], users);
         _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        _ = Checks(script, sql, [], Expression(0, "id", 23), Expression(1, "n", 20));
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -699,6 +762,7 @@ public class PostgresSessionTests
     {
         var script = new PostgresScript().Open();
         _ = Prepares(script, 1, "DELETE FROM users WHERE left(name, 1) = 'a'", [], new([], null));
+        _ = Checks(script, "DELETE FROM users WHERE left(name, 1) = 'a'", []);
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -768,6 +832,111 @@ public class PostgresSessionTests
         );
 
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC228");
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The second describe saw another query: a column fewer.  The statement is freed all the same.
+    [Fact]
+    public async Task DescribeAsync_CheckWhoseColumnsDiffer_IsSqlsrc231SayingWhatDiffers()
+    {
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT $1::int AS a, 'x' AS b", ["unknown"], new([23], null));
+        _ = Columns(script, 1, 1, Expression(0, "a", 23), Expression(1, "b", 25));
+        _ = Resolves(script, [23, 25], PostgresRows.Int4, PostgresRows.Text);
+        _ = Checks(script, "SELECT @p::int AS a, 'x' AS b", [("p", "integer")], Expression(0, "a", 23));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT @p::int AS a, 'x' AS b;", Inferred("p")),
+            TestContext.Current.CancellationToken
+        );
+
+        described.Value.ShouldBeNull();
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.Arguments.ShouldBe(["Q", "the result has 1 columns for Npgsql and 2 for SqlSource"]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DescribeAsync_CheckThatIsRefused_IsSqlsrc231WithTheLinesOfTheAnswer()
+    {
+        var refused = new PostgresServerError(
+            null,
+            "Specifying multiple SQL statements in a single NpgsqlBatchCommand isn't supported, "
+                + "please remove all semicolons.",
+            null,
+            null,
+            null
+        );
+        var script = new PostgresScript().Open();
+        _ = Prepares(script, 1, "DELETE FROM samples WHERE id = $1", ["unknown"], new([23], null));
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = script.Answer(
+            "check",
+            new PostgresCheckRequest("DELETE FROM samples WHERE id = @id", [new("id", "integer")]),
+            new PostgresCheckAnswer(null, refused, null)
+        );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("DELETE FROM samples WHERE id = @id", Inferred("id")),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.Arguments.ShouldBe(["Q", refused.Message]);
+        failure.ServerLines.ShouldBe([refused.Message]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The parameter is the second of the list, and the type is the name the describer spelled for it.
+    [Fact]
+    public async Task DescribeAsync_CheckWithAParameterNpgsqlCannotBind_IsSqlsrc232NamingIt()
+    {
+        var script = new PostgresScript().Open();
+        _ = Prepares(
+            script,
+            1,
+            "DELETE FROM t WHERE a = $1 AND b = $2",
+            ["unknown", "d2"],
+            new([23, PostgresRows.D2.Oid], null)
+        );
+
+        // The request names the two types of the parameters; the closure holds the bases of the domain too.
+        _ = Resolves(
+            script,
+            [23, PostgresRows.D2.Oid],
+            PostgresRows.Int4,
+            PostgresRows.Varchar,
+            PostgresRows.EmailT,
+            PostgresRows.D2
+        );
+        _ = script.Answer(
+            "check",
+            new PostgresCheckRequest(
+                "DELETE FROM t WHERE a = @a AND b = @b",
+                [new("a", "integer"), new("b", "public.d2")]
+            ),
+            new PostgresCheckAnswer(null, null, new PostgresBindError("b", "Writing is not supported"))
+        );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("DELETE FROM t WHERE a = @a AND b = @b", Inferred("a"), Declared("b", "d2")),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC232");
+        failure.Arguments.ShouldBe(["public.d2", "@b", "Q"]);
+        failure.ServerLines.ShouldBe(["Writing is not supported"]);
+        failure.Help.ShouldBe(PostgresErrors.BindHelp);
         exchange.Unused.ShouldBeEmpty();
     }
 }

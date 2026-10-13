@@ -39,6 +39,17 @@ internal static class PostgresErrors
     public const string ColumnTypeHelp =
         "cast the column to a concrete type, or give the expression an alias and a cast";
 
+    public const string CheckHelp =
+        "a @ that one of the two reads as a parameter and the other as text; the server's lines say where";
+
+    public const string BindHelp =
+        "declare the parameter as a type Npgsql binds, text for one, with -- param: and cast it where it is used; "
+        + "and report it: the sidecar's spelling of a type is what generated code binds with";
+
+    public const string BindQuotedHelp =
+        "Npgsql takes no type name that is written with quotes; declare the parameter as text with -- param: and "
+        + "cast it to the type where it is used";
+
     private const string UndefinedObject = "42704";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
@@ -228,6 +239,71 @@ internal static class PostgresErrors
             EquatableArray<string>.Empty,
             ColumnTypeHelp
         );
+
+    /// <summary>
+    /// What <c>check</c> is reported as, or null when the two describes agree.  A type Npgsql cannot bind is
+    /// <c>SQLSRC232</c>, with Npgsql's message as its one line; anything else that differs is <c>SQLSRC231</c>,
+    /// with the lines of the error when there is one.  There is no position line: a position the server gives
+    /// is in Npgsql's own rewrite of the SQL.
+    /// </summary>
+    public static DescribeFailure? Check(
+        DescribeRequest query,
+        PostgresCheckRequest asked,
+        PostgresCheckAnswer answer,
+        CheckVerdict verdict
+    )
+    {
+        if (verdict.Result == NpgsqlCheck.Same)
+        {
+            return null;
+        }
+
+        if (answer.DriverError is { } unbound)
+        {
+            return CannotBind(query, asked, unbound);
+        }
+
+        return new DescribeFailure(
+            ToolDiagnostics.ParametersReadDifferently,
+            new EquatableArray<string>([query.Name, verdict.Differs ?? string.Empty]),
+            DescribeStep.CheckParameters,
+            answer.Error is { } error ? ServerLines(error with { Position = null }, 0) : EquatableArray<string>.Empty,
+            CheckHelp
+        );
+    }
+
+    // SQLSRC232.  The type is the name that was asked with, and the parameter is written as the SQL writes one.
+    private static DescribeFailure CannotBind(
+        DescribeRequest query,
+        PostgresCheckRequest asked,
+        PostgresBindError unbound
+    )
+    {
+        var index = 0;
+        while (
+            index < asked.Parameters.Count
+            && !string.Equals(asked.Parameters[index].Name, unbound.Parameter, StringComparison.Ordinal)
+        )
+        {
+            index++;
+        }
+
+        if (index == asked.Parameters.Count)
+        {
+            throw new InvalidOperationException(
+                $"The answer to 'check' names the parameter '{unbound.Parameter}', which was not asked with."
+            );
+        }
+
+        var type = asked.Parameters[index].DataTypeName;
+        return new DescribeFailure(
+            ToolDiagnostics.TypeCannotBeBound,
+            new EquatableArray<string>([type, Written(query.Parameters[index]), query.Name]),
+            DescribeStep.CheckParameters,
+            new EquatableArray<string>([unbound.Message]),
+            type.Contains('"', StringComparison.Ordinal) ? BindQuotedHelp : BindHelp
+        );
+    }
 
     // SQLSRC225.  The server's lines say what is wrong, so there is no help.
     private static DescribeFailure Rejected(

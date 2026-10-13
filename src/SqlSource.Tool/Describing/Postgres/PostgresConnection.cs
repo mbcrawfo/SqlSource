@@ -81,16 +81,40 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
         new(sql, await OpenAsync(cancellationToken));
 
     /// <summary>
-    /// Runs a text that holds a user's SQL, as a batch of one command.  The driver does not read the command of a
-    /// batch that has no parameters and never splits it: it sends the text as one statement to parse, and the
-    /// server refuses a text that holds a second one, <c>42601</c>, before it runs anything.  So whatever the text
-    /// holds, and however the tool's lexer read it, one statement at most is run.
+    /// A batch of one command that holds a user's SQL.  Its caller adds parameters to the command, runs or describes
+    /// it, and disposes the batch.
+    /// </summary>
+    /// <remarks>
+    /// The driver does not read the command of a batch that has no parameters and never splits it: it sends the
+    /// text as one statement to parse, and the server refuses a text that holds a second one, <c>42601</c>, before
+    /// it runs anything.  With a named parameter the driver reads the text to place the parameter, and refuses a
+    /// text in which it finds a <c>;</c> that something follows: it throws a <see cref="NotSupportedException" />
+    /// and sends nothing.  So whatever the text holds, and however the tool's lexer read it, one statement at most
+    /// reaches the server.
+    /// </remarks>
+    public async Task<NpgsqlBatch> BatchOfOneAsync(string sql, CancellationToken cancellationToken)
+    {
+        var batch = new NpgsqlBatch(await OpenAsync(cancellationToken));
+        try
+        {
+            batch.BatchCommands.Add(new NpgsqlBatchCommand(sql));
+            return batch;
+        }
+        catch
+        {
+            await batch.DisposeAsync();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Runs a text that holds a user's SQL, as a batch of one command: see <see cref="BatchOfOneAsync" />.  So
+    /// whatever the text holds, and however the tool's lexer read it, one statement at most is run.
     /// </summary>
     /// <exception cref="NpgsqlException">The server refused the text, or the connection is lost.</exception>
     public async Task ExecuteAsOneStatementAsync(string sql, CancellationToken cancellationToken)
     {
-        await using var batch = new NpgsqlBatch(await OpenAsync(cancellationToken));
-        batch.BatchCommands.Add(new NpgsqlBatchCommand(sql));
+        await using var batch = await BatchOfOneAsync(sql, cancellationToken);
         _ = await batch.ExecuteNonQueryAsync(cancellationToken);
     }
 

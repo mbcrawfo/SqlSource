@@ -156,7 +156,7 @@ internal sealed class PostgresSession : IDescribeSession
     }
 
     // What is asked of a statement that was prepared, in this order: its columns, the tables they name, and every
-    // type that the parameters, the columns and their origins have, once.
+    // type that the parameters, the columns and their origins have, once, and Npgsql's own reading of the SQL.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
         string statement,
@@ -211,7 +211,14 @@ internal sealed class PostgresSession : IDescribeSession
         // A statement without rows has nothing a join could null-extend.
         var gated = columns.Count > 0 && OuterJoinGate.IsGated(request.Sql);
         var built = BuildColumns(request, columns, origins, rows.Value, gated);
-        return built.Succeeded ? Described(parameters.Value, built.Value, gated) : Failed(built.Failure);
+        if (!built.Succeeded)
+        {
+            return Failed(built.Failure);
+        }
+
+        return await CheckAsync(request, parameters.Value, columns, rows.Value, cancellationToken) is { } differs
+            ? Failed(differs)
+            : Described(parameters.Value, built.Value, gated);
     }
 
     // The types the server resolved for the parameters of the query's list.  It lists a type for a "$n" that the SQL
@@ -341,6 +348,36 @@ internal sealed class PostgresSession : IDescribeSession
 
         return Outcome<IReadOnlyList<SidecarColumn>, DescribeFailure>.Of(built);
     }
+
+    // Asks Npgsql to describe the SQL as generated code will send it, and says what it saw otherwise than the
+    // prepared statement's columns, or null.  It is asked for a query without parameters too: one Parse, which
+    // still proves the two describes saw one query.
+    private async Task<DescribeFailure?> CheckAsync(
+        DescribeRequest request,
+        IReadOnlyList<DescribedParameter> parameters,
+        IReadOnlyList<PostgresColumnRow> columns,
+        IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        CancellationToken cancellationToken
+    )
+    {
+        var asked = new PostgresCheckRequest(
+            ParameterPlaceholders.AsWritten(request.Sql)
+                ?? throw new InvalidOperationException(
+                    $"The SQL of '{request.Name}' was prepared and holds more than one statement."
+                ),
+            [.. parameters.Select(CheckParameterOf)]
+        );
+        var answer = await _exchange.AskAsync("check", asked, _live.CheckAsync, cancellationToken);
+        return PostgresErrors.Check(request, asked, answer, NpgsqlCheck.Read(answer, columns, rows));
+    }
+
+    // A parameter as generated code will bind it: by the name of its type, as the sidecar will record it.
+    private static PostgresCheckParameter CheckParameterOf(DescribedParameter parameter) =>
+        new(
+            parameter.Name,
+            parameter.Type?.Name
+                ?? throw new InvalidOperationException($"The parameter '{parameter.Name}' was given no type.")
+        );
 
     // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.  One
     // with rows says whether it needed a plan: "unavailable" for a gated query, until the walk exists.

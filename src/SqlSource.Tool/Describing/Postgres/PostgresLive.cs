@@ -96,6 +96,9 @@ internal sealed class PostgresLive(PostgresConnection connection)
         ORDER BY t.oid
         """;
 
+    // One parameter and nothing of a user's: what Npgsql says of a type's name alone.
+    private const string ProbeSql = "SELECT $1";
+
     /// <summary>Asks <c>open</c>.</summary>
     public async Task<PostgresOpenAnswer> OpenAsync(CancellationToken token)
     {
@@ -292,6 +295,110 @@ internal sealed class PostgresLive(PostgresConnection connection)
             return new PostgresTypesAnswer(null, PostgresConnection.ErrorOf(exception));
         }
     }
+
+    /// <summary>
+    /// Asks <c>check</c>: describes the SQL as generated code will send it, each parameter named as the query's
+    /// list names it and bound by the name of its type, and runs nothing.
+    /// </summary>
+    /// <remarks>
+    /// The text is a user's, so it goes as a batch of one command.  Npgsql refuses two things before it sends
+    /// anything, with one of the same two exceptions for both: a type name it cannot bind, and a text in which it
+    /// finds a <c>;</c> that something follows.  Which of the two it was is found by asking for each parameter
+    /// alone, with a text of the tool's own.
+    /// </remarks>
+    public async Task<PostgresCheckAnswer> CheckAsync(PostgresCheckRequest asked, CancellationToken token)
+    {
+        try
+        {
+            await using var batch = await connection.BatchOfOneAsync(asked.Sql, token);
+            foreach (var parameter in asked.Parameters)
+            {
+                _ = batch.BatchCommands[0].Parameters.Add(Unvalued(parameter.Name, parameter.DataTypeName));
+            }
+
+            await using var reader = await batch.ExecuteReaderAsync(CommandBehavior.SchemaOnly, token);
+            var columns = new List<PostgresCheckColumn>(reader.FieldCount);
+            for (var ordinal = 0; ordinal < reader.FieldCount; ordinal++)
+            {
+                columns.Add(
+                    new PostgresCheckColumn(
+                        reader.GetName(ordinal),
+                        reader.GetDataTypeOID(ordinal),
+                        reader.GetDataTypeName(ordinal)
+                    )
+                );
+            }
+
+            return new PostgresCheckAnswer(columns, null, null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresCheckAnswer(null, PostgresConnection.ErrorOf(exception), null);
+        }
+        catch (NotSupportedException refused)
+        {
+            return await RefusedAsync(asked, refused.Message, token);
+        }
+        catch (InvalidCastException refused)
+        {
+            return await RefusedAsync(asked, refused.Message, token);
+        }
+    }
+
+    // The driver refused and sent nothing.  The first parameter whose type it refuses alone is the one that cannot
+    // be bound; when it refuses none, it refused the text, and its message is the answer's error.
+    private async Task<PostgresCheckAnswer> RefusedAsync(
+        PostgresCheckRequest asked,
+        string message,
+        CancellationToken token
+    )
+    {
+        try
+        {
+            foreach (var parameter in asked.Parameters)
+            {
+                if (await RefusalOfAsync(parameter.DataTypeName, token) is { } refusal)
+                {
+                    return new PostgresCheckAnswer(null, null, new PostgresBindError(parameter.Name, refusal));
+                }
+            }
+
+            return new PostgresCheckAnswer(null, new PostgresServerError(null, message, null, null, null), null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresCheckAnswer(null, PostgresConnection.ErrorOf(exception), null);
+        }
+    }
+
+    // What Npgsql says of a parameter of this type and no other, or null when it binds it.
+    private async Task<string?> RefusalOfAsync(string dataTypeName, CancellationToken token)
+    {
+        try
+        {
+            await using var command = await connection.CommandAsync(ProbeSql, token);
+            _ = command.Parameters.Add(Unvalued(string.Empty, dataTypeName));
+            await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SchemaOnly, token);
+            return null;
+        }
+        catch (NotSupportedException refused)
+        {
+            return refused.Message;
+        }
+        catch (InvalidCastException refused)
+        {
+            return refused.Message;
+        }
+    }
+
+    // A parameter with a type's name and no value, as a describe needs one.
+    private static NpgsqlParameter Unvalued(string name, string dataTypeName) =>
+        new()
+        {
+            ParameterName = name,
+            Value = DBNull.Value,
+            DataTypeName = dataTypeName,
+        };
 
     /// <summary>Asks <c>deallocate</c>.</summary>
     public async Task<PostgresDeallocateAnswer> DeallocateAsync(

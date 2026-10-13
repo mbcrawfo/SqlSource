@@ -98,6 +98,27 @@
       }
     },
     {
+      "method": "check",
+      "request": {
+        "sql": "DELETE FROM users WHERE status = @status AND deleted_at IS NOT NULL",
+        "parameters": [
+          {
+            "name": "status",
+            "dataTypeName": "public.user_status"
+          },
+          {
+            "name": "tenant",
+            "dataTypeName": "integer"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"

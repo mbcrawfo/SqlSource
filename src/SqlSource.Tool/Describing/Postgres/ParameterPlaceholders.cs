@@ -45,7 +45,19 @@ internal static class ParameterPlaceholders
     /// The SQL does not lex, or holds a parameter that the list does not: a bug of the plan, whose parser read the
     /// same text.
     /// </exception>
-    public static string? Rewrite(string sql, EquatableArray<SqlQueryParameter> parameters)
+    public static string? Rewrite(string sql, EquatableArray<SqlQueryParameter> parameters) =>
+        Statement(sql, parameters);
+
+    /// <summary>
+    /// The SQL with each parameter as it was written, and without its trailing <c>;</c> and what follows it: what
+    /// Npgsql is given to read in the check.  Its parser may refuse any text after a <c>;</c>, a comment included.
+    /// Null when the query holds more than one statement, as for <see cref="Rewrite" />.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">The SQL does not lex.</exception>
+    public static string? AsWritten(string sql) => Statement(sql, null);
+
+    // The one statement of the SQL, with "$n" for each parameter when it is given the list.
+    private static string? Statement(string sql, EquatableArray<SqlQueryParameter>? parameters)
     {
         var lexed = SqlLexer.Lex(sql, SqlDialectRules.PostgreSql);
         if (lexed.Error is not null)
@@ -60,9 +72,9 @@ internal static class ParameterPlaceholders
         {
             var lexeme = lexed.Lexemes[index];
             var text = sql.AsSpan(lexeme.Span.Start, lexeme.Span.Length);
-            if (lexeme.Kind == SqlLexemeKind.Parameter)
+            if (lexeme.Kind == SqlLexemeKind.Parameter && parameters is { } list)
             {
-                _ = rewritten.Append('$').Append(OrdinalOf(text[1..], parameters));
+                _ = rewritten.Append('$').Append(OrdinalOf(text[1..], list));
                 continue;
             }
 

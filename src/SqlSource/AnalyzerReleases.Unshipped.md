@@ -68,3 +68,5 @@ SQLSRC227 | SqlSource | Error | Parameter's first use does not fix its type
 SQLSRC228 | SqlSource | Error | Declared type is not valid
 SQLSRC229 | SqlSource | Error | Column type is not supported
 SQLSRC230 | SqlSource | Error | Query holds more than one statement
+SQLSRC231 | SqlSource | Error | Parameters as Npgsql reads them differ
+SQLSRC232 | SqlSource | Error | Type cannot be bound by Npgsql

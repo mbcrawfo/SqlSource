@@ -163,7 +163,9 @@ public sealed class ColumnTests(PostgresContainer postgres)
             new CapturingExchange(LiveExchange.Instance, capture)
         );
 
-        capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "columns", "types", "deallocate"]);
+        capture
+            .Calls.Select(call => call.Method)
+            .ShouldBe(["open", "prepare", "columns", "types", "check", "deallocate"]);
     }
 
     // Two tables of these tests alone: one with the modifiers the fixture schema lacks, and one with no column.
@@ -355,7 +357,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         capture
             .Calls.Select(call => call.Method)
-            .ShouldBe(["open", "prepare", "columns", "tables", "types", "deallocate"]);
+            .ShouldBe(["open", "prepare", "columns", "tables", "types", "check", "deallocate"]);
     }
 
     private static (bool? Nullable, string? Source)[] NullabilityOf(IEnumerable<SidecarColumn> columns) =>

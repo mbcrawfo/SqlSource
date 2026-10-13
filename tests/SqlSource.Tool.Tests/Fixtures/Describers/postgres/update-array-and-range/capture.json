@@ -137,6 +137,31 @@
       }
     },
     {
+      "method": "check",
+      "request": {
+        "sql": "UPDATE bookings SET during = @during, tags = @tags WHERE id = @id",
+        "parameters": [
+          {
+            "name": "during",
+            "dataTypeName": "tstzrange"
+          },
+          {
+            "name": "tags",
+            "dataTypeName": "text[]"
+          },
+          {
+            "name": "id",
+            "dataTypeName": "bigint"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"

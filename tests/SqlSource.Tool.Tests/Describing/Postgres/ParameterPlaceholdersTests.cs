@@ -136,4 +136,22 @@ public class ParameterPlaceholdersTests
     [InlineData(39, 1)]
     public void TypeAt_Position_IsTheItemItFallsInOrFollows(int position, int expected) =>
         ParameterPlaceholders.TypeAt("sqlsource_10", ["unknown", "nope_t"], position).ShouldBe(expected);
+
+    // The SQL of the check: cut where Rewrite cuts it, with each parameter as the user wrote it.
+    [Theory]
+    [InlineData("SELECT @id, @Name", "SELECT @id, @Name")]
+    [InlineData("SELECT @id;", "SELECT @id")]
+    [InlineData("SELECT @id ; -- the end\n/* and more */", "SELECT @id ")]
+    [InlineData("SELECT ';' || @a", "SELECT ';' || @a")]
+    [InlineData("SELECT $$ @x; $$, @a;", "SELECT $$ @x; $$, @a")]
+    [InlineData("DELETE FROM samples", "DELETE FROM samples")]
+    public void AsWritten_OneStatement_IsCutAtItsTrailingSemicolonWithItsParametersAsWritten(
+        string sql,
+        string expected
+    ) => ParameterPlaceholders.AsWritten(sql).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("SELECT 1; SELECT 2")]
+    [InlineData("SELECT @a;;")]
+    public void AsWritten_SecondStatement_IsNull(string sql) => ParameterPlaceholders.AsWritten(sql).ShouldBeNull();
 }

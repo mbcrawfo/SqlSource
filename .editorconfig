@@ -241,7 +241,8 @@ dotnet_diagnostic.CA1515.severity = none
 dotnet_diagnostic.CA1031.severity = none
 
 [src/SqlSource.Tool/Describing/Postgres/PostgresConnection.cs]
-# CA2100 (review SQL for user input): the one place that makes every command of the PostgreSQL describer and its one
-# batch, which carries the PREPARE.  PREPARE and DEALLOCATE take no parameters, and what the describer puts into them
-# is a counter, a type that DeclaredTypeText read, and the user's own SQL, which is what is to be described.
+# CA2100 (review SQL for user input): the one place that makes every command of the PostgreSQL describer and its
+# batches, which carry the PREPARE and the SQL of the check.  PREPARE and DEALLOCATE take no parameters, and what the
+# describer puts into them is a counter, a type that DeclaredTypeText read, and the user's own SQL, which is what is
+# to be described; the check describes the user's own SQL and runs nothing.
 dotnet_diagnostic.CA2100.severity = none

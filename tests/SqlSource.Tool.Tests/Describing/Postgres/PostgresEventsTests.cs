@@ -28,6 +28,13 @@ public class PostgresEventsTests
 
     private static readonly PostgresColumnsRequest Columns = new("sqlsource_1", 1);
 
+    private static readonly PostgresCheckRequest Check = new(
+        "SELECT 1 FROM users WHERE id = @id",
+        [new PostgresCheckParameter("id", "integer")]
+    );
+
+    private static readonly PostgresCheckAnswer Agrees = new([], null, null);
+
     private static LogValue Member(LogMember[] members, string name) =>
         members.Single(member => member.Name == name).Value;
 
@@ -48,6 +55,7 @@ public class PostgresEventsTests
             .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
             .Answer("columns", Columns, PostgresScript.NoColumns)
             .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
+            .Answer("check", Check, Agrees)
             .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
 
         await DescribeAsync(script, log);
@@ -169,6 +177,7 @@ public class PostgresEventsTests
             .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
             .Answer("columns", Columns, PostgresScript.NoColumns)
             .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
+            .Answer("check", Check, Agrees)
             .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(gone));
 
         await DescribeAsync(script, log);
@@ -188,6 +197,7 @@ public class PostgresEventsTests
             .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
             .Answer("columns", Columns, PostgresScript.NoColumns)
             .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
+            .Answer("check", Check, Agrees)
             .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
 
         await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."));
