@@ -3,6 +3,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
+using SqlSource.Tests.Snapshot;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
@@ -199,4 +201,208 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_StatementWithATrailingSemicolonAndNoParameter_IsDescribed() =>
         (await DescribeAsync(Requests.Of("DELETE FROM samples WHERE flag; -- all of them"))).Value.ShouldNotBeNull();
+
+    private static readonly PostgresType CharacterVarying = TestSidecars.Postgres(
+        "character varying",
+        internalName: "varchar"
+    );
+
+    private static readonly PostgresType EmailT = TestSidecars.Postgres(
+        "public.email_t",
+        SidecarValues.Kind.Domain,
+        "public",
+        "email_t",
+        baseType: CharacterVarying
+    );
+
+    private static readonly PostgresType UserStatus = TestSidecars.Postgres(
+        "public.user_status",
+        SidecarValues.Kind.Enum,
+        "public",
+        "user_status",
+        labels: ["active", "disabled"]
+    );
+
+    private static readonly PostgresType TextArray = TestSidecars.Postgres(
+        "text[]",
+        SidecarValues.Kind.Array,
+        internalName: "_text",
+        element: TestSidecars.Postgres("text", internalName: "text")
+    );
+
+    private async Task<EquatableArray<DescribedParameter>> ShouldDescribeAsync(DescribeRequest request)
+    {
+        var described = await DescribeAsync(request);
+
+        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
+        var description = described.Value.ShouldNotBeNull();
+        description.ResultKind.ShouldBe(SidecarResultKind.None);
+        description.Columns.ShouldBeNull();
+        return description.Parameters;
+    }
+
+    private static DescribedParameter Inferred(string name, PostgresType type) =>
+        new(name, type, SidecarValues.TypeSource.Inferred);
+
+    private static DescribedParameter Declared(string name, PostgresType type) =>
+        new(name, type, SidecarValues.TypeSource.Declared);
+
+    // The goal of the sub-phase.
+    [Fact]
+    public async Task Describe_ParametersComparedWithColumns_AreInferredFromThem()
+    {
+        var parameters = await ShouldDescribeAsync(
+            Requests.Of("SELECT id FROM users WHERE id = @id AND status = @status")
+        );
+
+        parameters.ShouldBe([Inferred("id", TestSidecars.Postgres()), Inferred("status", UserStatus)]);
+    }
+
+    // An assignment gives a parameter the column's own type, so every base type of the schema is reached through
+    // one.  A parameter has no facets: numeric(18,2) is numeric and char(2) is bpchar.
+    [Theory]
+    [InlineData("samples", "id", "integer", "int4")]
+    [InlineData("samples", "flag", "boolean", "bool")]
+    [InlineData("samples", "small", "smallint", "int2")]
+    [InlineData("samples", "big", "bigint", "int8")]
+    [InlineData("samples", "ratio", "real", "float4")]
+    [InlineData("samples", "amount", "double precision", "float8")]
+    [InlineData("samples", "code", "bpchar", "bpchar")]
+    [InlineData("samples", "label", "text", "text")]
+    [InlineData("samples", "born", "date", "date")]
+    [InlineData("samples", "at_time", "time without time zone", "time")]
+    [InlineData("samples", "at_local", "timestamp without time zone", "timestamp")]
+    [InlineData("samples", "span", "interval", "interval")]
+    [InlineData("samples", "token", "uuid", "uuid")]
+    [InlineData("samples", "payload", "bytea", "bytea")]
+    [InlineData("samples", "document", "jsonb", "jsonb")]
+    [InlineData("users", "name", "character varying", "varchar")]
+    [InlineData("users", "balance", "numeric", "numeric")]
+    [InlineData("users", "created_at", "timestamp with time zone", "timestamptz")]
+    public async Task Describe_BaseTypeInferredFromAnAssignment_IsSpelledAsTheServerSpellsIt(
+        string table,
+        string column,
+        string name,
+        string internalName
+    )
+    {
+        var parameters = await ShouldDescribeAsync(Requests.Of($"UPDATE {table} SET {column} = @p"));
+
+        parameters.ShouldBe([Inferred("p", TestSidecars.Postgres(name, internalName: internalName))]);
+    }
+
+    // A parameter keeps its domain; a column, in the next sub-phase, is flattened to its base by the protocol.
+    [Fact]
+    public async Task Describe_DomainEnumArrayRangeAndMultirangeInferred_HaveTheirParts()
+    {
+        var users = await ShouldDescribeAsync(
+            Requests.Of("UPDATE users SET email = @email, status = @status, tags = @tags")
+        );
+        var bookings = await ShouldDescribeAsync(Requests.Of("UPDATE bookings SET during = @during, slots = @slots"));
+
+        users.ShouldBe([Inferred("email", EmailT), Inferred("status", UserStatus), Inferred("tags", TextArray)]);
+        bookings.ShouldBe([
+            Inferred(
+                "during",
+                TestSidecars.Postgres(
+                    "tstzrange",
+                    SidecarValues.Kind.Range,
+                    internalName: "tstzrange",
+                    subtype: TestSidecars.Postgres("timestamp with time zone", internalName: "timestamptz")
+                )
+            ),
+            Inferred(
+                "slots",
+                TestSidecars.Postgres(
+                    "int4multirange",
+                    SidecarValues.Kind.Multirange,
+                    internalName: "int4multirange",
+                    subtype: TestSidecars.Postgres()
+                )
+            ),
+        ]);
+    }
+
+    // A comparison with a varchar or a domain column infers text: the operator is text's.  The last is the
+    // optional filter with the use that fixes the type first.
+    [Theory]
+    [InlineData("SELECT 1 FROM users WHERE name = @p")]
+    [InlineData("SELECT 1 FROM users WHERE email = @p")]
+    [InlineData("SELECT 1 FROM users WHERE (name = @p OR @p IS NULL)")]
+    public async Task Describe_ParameterComparedWithATextualColumn_IsText(string sql) =>
+        (await ShouldDescribeAsync(Requests.Of(sql))).ShouldBe([
+            Inferred("p", TestSidecars.Postgres("text", internalName: "text")),
+        ]);
+
+    // The server parses each declared type: int is integer, varchar(50) loses its length, a domain stays a domain.
+    [Fact]
+    public async Task Describe_DeclaredTypes_AreResolvedByTheServer()
+    {
+        var parameters = await ShouldDescribeAsync(
+            Requests.Of(
+                "SELECT @a, @b, @c, @d, @e",
+                ("a", "int"),
+                ("b", "varchar(50)"),
+                ("c", "public.user_status"),
+                ("d", "email_t"),
+                ("e", "text[]")
+            )
+        );
+
+        parameters.ShouldBe([
+            Declared("a", TestSidecars.Postgres()),
+            Declared("b", CharacterVarying),
+            Declared("c", UserStatus),
+            Declared("d", EmailT),
+            Declared("e", TextArray),
+        ]);
+    }
+
+    [Fact]
+    public async Task Describe_OptionalFilterWithADeclaration_IsTypedAsDeclared() =>
+        (
+            await ShouldDescribeAsync(
+                Requests.Of("SELECT 1 FROM users WHERE (@name IS NULL OR name = @name)", ("name", "varchar"))
+            )
+        ).ShouldBe([Declared("name", CharacterVarying)]);
+
+    // The declared parameter is not in the SQL: it stands at the end of the list, and the server accepts a list
+    // longer than the placeholders used.
+    [Fact]
+    public async Task Describe_ParameterThatOnlyAMarkerDeclares_IsTypedAsDeclared() =>
+        (
+            await ShouldDescribeAsync(Requests.Of("DELETE FROM users WHERE status = @status", ("tenant", "int")))
+        ).ShouldBe([Inferred("status", UserStatus), Declared("tenant", TestSidecars.Postgres())]);
+
+    [Fact]
+    public async Task Describe_ParameterUsedTwice_IsOneParameter() =>
+        (await ShouldDescribeAsync(Requests.Of("SELECT 1 FROM users WHERE id = @id OR id = @ID + 1"))).ShouldBe([
+            Inferred("id", TestSidecars.Postgres()),
+        ]);
+
+    // The server accepts a pseudo-type, declared or inferred.  A .sql file can cause either, so neither throws.
+    [Theory]
+    [InlineData("SELECT row_to_json(@p)", null, "SQLSRC226")]
+    [InlineData("SELECT int4in(@p)", null, "SQLSRC226")]
+    [InlineData("SELECT @p", "record", "SQLSRC228")]
+    [InlineData("SELECT @p", "anyelement", "SQLSRC228")]
+    public async Task Describe_ParameterOfAPseudoType_IsAFailureAndNoThrow(string sql, string? declared, string id)
+    {
+        var request = declared is null ? Requests.Of(sql) : Requests.Of(sql, ("p", declared));
+
+        var described = await DescribeAsync(request);
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe(id);
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.ServerLines.ShouldBeEmpty();
+    }
+
+    // "$2" is no parameter of SqlSource.  The server types it after the query's own, and the query's own are what
+    // is described.
+    [Fact]
+    public async Task Describe_SqlWithAPlaceholderOfItsOwn_TypesTheListedParametersAlone() =>
+        (await ShouldDescribeAsync(Requests.Of("SELECT 1 FROM users WHERE id = @id AND name = $2"))).ShouldBe([
+            Inferred("id", TestSidecars.Postgres()),
+        ]);
 }

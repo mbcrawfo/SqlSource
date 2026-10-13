@@ -253,4 +253,50 @@ public class PostgresErrorsTests
 
         failure.ServerLines.ShouldBe(["42601: syntax error", "at character 5"]);
     }
+
+    [Fact]
+    public void Types_Error_IsSqlsrc225AtResolveType()
+    {
+        var failure = PostgresErrors.Types(
+            new PostgresServerError(null, "Exception while reading from stream", null, null, null),
+            Query()
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe(["Q", "Exception while reading from stream"]);
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.ServerLines.ShouldBe(["Exception while reading from stream"]);
+    }
+
+    // The server said nothing: it accepted the type.  So there is no server line, and the help says what it gave.
+    [Fact]
+    public void PseudoType_InferredParameter_IsSqlsrc226ThatNamesThePseudoType()
+    {
+        var parameter = Inferred("p");
+
+        var failure = PostgresErrors.PseudoType(Query(parameter), parameter, "record");
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC226");
+        failure.Arguments.ShouldBe(["@p", "Q"]);
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(
+            "the server gave it the pseudo-type 'record', which no value has: cast the parameter where it is used, "
+                + "or declare its type with -- param: @p <type>"
+        );
+    }
+
+    [Fact]
+    public void PseudoType_DeclaredParameter_IsSqlsrc228ThatSaysItIsAPseudoType()
+    {
+        var parameter = Declared("p", "anyelement");
+
+        var failure = PostgresErrors.PseudoType(Query(parameter), parameter, "anyelement");
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC228");
+        failure.Arguments.ShouldBe(["anyelement", "@p", "Q", "it is a pseudo-type"]);
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.PseudoTypeHelp);
+    }
 }

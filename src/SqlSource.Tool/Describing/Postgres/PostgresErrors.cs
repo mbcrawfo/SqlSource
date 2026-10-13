@@ -31,6 +31,11 @@ internal static class PostgresErrors
         "declare the type with -- param:, or write the use that fixes the type before the one that does not: "
         + "(name = @name OR @name IS NULL)";
 
+    public const string PseudoTypeReason = "it is a pseudo-type";
+
+    public const string PseudoTypeHelp =
+        "declare a type that a value can have: a pseudo-type such as record or anyelement stands for no value";
+
     private const string UndefinedObject = "42704";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
@@ -150,6 +155,43 @@ internal static class PostgresErrors
     /// </summary>
     public static string Written(SqlQueryParameter parameter) =>
         SqlDialectRules.PostgreSql.ParameterPrefix + parameter.Name;
+
+    /// <summary><c>SQLSRC225</c> at the step <c>resolve type</c>: the catalog could not be read.</summary>
+    public static DescribeFailure Types(PostgresServerError error, DescribeRequest query) =>
+        Rejected(error, query, DescribeStep.ResolveType, ServerLines(error, 0));
+
+    /// <summary>
+    /// A parameter whose type is a pseudo-type.  The server accepts one and says nothing, so there is no server
+    /// line.  A declared one is <c>SQLSRC228</c>; an inferred one is <c>SQLSRC226</c>, whose help says what the
+    /// server gave.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="parameter">The parameter.</param>
+    /// <param name="typeName">The pseudo-type, as <c>format_type</c> spells it.</param>
+    public static DescribeFailure PseudoType(DescribeRequest query, SqlQueryParameter parameter, string typeName)
+    {
+        if (parameter.Type is not null)
+        {
+            return DeclaredType(
+                query,
+                parameter,
+                PseudoTypeReason,
+                DescribeStep.ResolveType,
+                EquatableArray<string>.Empty,
+                PseudoTypeHelp
+            );
+        }
+
+        var written = Written(parameter);
+        return new DescribeFailure(
+            ToolDiagnostics.ParameterTypeNotDetermined,
+            new EquatableArray<string>([written, query.Name]),
+            DescribeStep.ResolveType,
+            EquatableArray<string>.Empty,
+            $"the server gave it the pseudo-type '{typeName}', which no value has: cast the parameter where it is "
+                + $"used, or declare its type with -- param: {written} <type>"
+        );
+    }
 
     // SQLSRC225.  The server's lines say what is wrong, so there is no help.
     private static DescribeFailure Rejected(

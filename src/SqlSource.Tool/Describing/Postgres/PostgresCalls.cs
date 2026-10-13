@@ -67,3 +67,41 @@ internal sealed record PostgresDeallocateRequest(string Statement);
 
 /// <summary>Null when the statement was freed.  An error here is logged and never reported.</summary>
 internal sealed record PostgresDeallocateAnswer(PostgresServerError? Error);
+
+/// <summary>The request of <c>types</c>.</summary>
+/// <param name="Oids">The types to resolve, sorted and each once.</param>
+internal sealed record PostgresTypesRequest(IReadOnlyList<long> Oids);
+
+/// <summary>The rows of the closure, or why the catalog could not be read.</summary>
+/// <param name="Rows">
+/// One row for each type asked for and for every type they reach: the element of an array, the base of a domain,
+/// the subtype of a range, the range of a multirange.  In <c>oid</c> order.
+/// </param>
+/// <param name="Error">What the server said, or null.</param>
+internal sealed record PostgresTypesAnswer(IReadOnlyList<PostgresTypeRow>? Rows, PostgresServerError? Error);
+
+/// <summary>What the catalog says of one type.  Each member is named as the catalog names it.</summary>
+/// <param name="Oid">The type.</param>
+/// <param name="Typname">Its name in <c>pg_type</c>: <c>int4</c>, <c>_text</c>.</param>
+/// <param name="Nspname">Its schema.</param>
+/// <param name="Typtype"><c>b</c>, <c>c</c>, <c>d</c>, <c>e</c>, <c>m</c>, <c>p</c> or <c>r</c>.</param>
+/// <param name="Typcategory">The category: <c>A</c> for an array.</param>
+/// <param name="Typelem">The element of an array, or zero.</param>
+/// <param name="Typbasetype">The base of a domain, or zero.</param>
+/// <param name="Rngsubtype">The subtype of a range, or null for a type that is none.</param>
+/// <param name="MultirangeRngsubtype">The subtype of a multirange's range, or null for a type that is none.</param>
+/// <param name="FormatType"><c>format_type(oid, -1)</c>: the SQL spelling without a modifier.</param>
+/// <param name="EnumLabels">The labels of an enum in their sort order, or null for a type that is none.</param>
+internal sealed record PostgresTypeRow(
+    long Oid,
+    string Typname,
+    string Nspname,
+    string Typtype,
+    string Typcategory,
+    long Typelem,
+    long Typbasetype,
+    long? Rngsubtype,
+    long? MultirangeRngsubtype,
+    string FormatType,
+    IReadOnlyList<string>? EnumLabels
+);

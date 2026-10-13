@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
@@ -34,6 +35,52 @@ internal sealed class PostgresSession : IDescribeSession
 
     private const string ParameterTypesSql =
         "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = @name";
+
+    // The closure of the types asked for, in one query: a recursive term that follows the element of an array, the
+    // base of a domain, the subtype of a range and the range of a multirange.  A domain has the category of its
+    // base, so an array is a base type of the category A.
+    private const string TypesSql = """
+        WITH RECURSIVE closure (oid) AS (
+            SELECT t.oid FROM pg_catalog.pg_type AS t WHERE t.oid = ANY (@oids)
+            UNION
+            SELECT link.oid
+            FROM closure AS c
+            JOIN pg_catalog.pg_type AS t ON t.oid = c.oid
+            LEFT JOIN pg_catalog.pg_range AS r ON r.rngtypid = t.oid
+            LEFT JOIN pg_catalog.pg_range AS m ON m.rngmultitypid = t.oid
+            CROSS JOIN LATERAL (
+                VALUES
+                    (CASE WHEN t.typtype = 'b' AND t.typcategory = 'A' THEN t.typelem END),
+                    (CASE WHEN t.typtype = 'd' THEN t.typbasetype END),
+                    (r.rngsubtype),
+                    (m.rngtypid)
+            ) AS link (oid)
+            WHERE link.oid IS NOT NULL AND link.oid <> 0
+        )
+        SELECT
+            t.oid,
+            t.typname::text,
+            n.nspname::text,
+            t.typtype::text,
+            t.typcategory::text,
+            t.typelem,
+            t.typbasetype,
+            r.rngsubtype,
+            mr.rngsubtype,
+            pg_catalog.format_type(t.oid, -1),
+            (
+                SELECT pg_catalog.array_agg(e.enumlabel::text ORDER BY e.enumsortorder)
+                FROM pg_catalog.pg_enum AS e
+                WHERE e.enumtypid = t.oid
+            )
+        FROM closure AS c
+        JOIN pg_catalog.pg_type AS t ON t.oid = c.oid
+        JOIN pg_catalog.pg_namespace AS n ON n.oid = t.typnamespace
+        LEFT JOIN pg_catalog.pg_range AS r ON r.rngtypid = t.oid
+        LEFT JOIN pg_catalog.pg_range AS m ON m.rngmultitypid = t.oid
+        LEFT JOIN pg_catalog.pg_range AS mr ON mr.rngtypid = m.rngtypid
+        ORDER BY t.oid
+        """;
 
     private readonly IDescribeExchange _exchange;
     private int _statements;
@@ -136,16 +183,7 @@ internal sealed class PostgresSession : IDescribeSession
 
         try
         {
-            return Outcome<QueryDescription, DescribeFailure>.Of(
-                new QueryDescription(
-                    SidecarResultKind.None,
-                    EquatableArray<DescribedParameter>.Empty,
-                    null,
-                    null,
-                    null,
-                    null
-                )
-            );
+            return await TypeParametersAsync(request, prepared, cancellationToken);
         }
         finally
         {
@@ -159,6 +197,82 @@ internal sealed class PostgresSession : IDescribeSession
             );
         }
     }
+
+    // Each parameter of the query's list gets the type the server resolved for it.
+    private async Task<Outcome<QueryDescription, DescribeFailure>> TypeParametersAsync(
+        DescribeRequest request,
+        PostgresPrepareAnswer prepared,
+        CancellationToken cancellationToken
+    )
+    {
+        var count = request.Parameters.Count;
+        var resolved =
+            prepared.ParameterTypes
+            ?? throw new InvalidOperationException("The answer to 'prepare' holds no types and no error.");
+        if (resolved.Count < count)
+        {
+            throw new InvalidOperationException(
+                $"The server resolved {resolved.Count} types for the {count} parameters of '{request.Name}'."
+            );
+        }
+
+        if (count == 0)
+        {
+            return Described([]);
+        }
+
+        // The server lists a type for a "$n" that the SQL writes itself, after the query's own.  It is no parameter
+        // of the query: the list's are the first.
+        var oids = resolved.Take(count).ToList();
+        var answer = await _exchange.AskAsync(
+            "types",
+            new PostgresTypesRequest([.. oids.Distinct().Order()]),
+            TypesLiveAsync,
+            cancellationToken
+        );
+        if (answer.Error is { } error)
+        {
+            return Failed(PostgresErrors.Types(error, request));
+        }
+
+        var rows = (
+            answer.Rows ?? throw new InvalidOperationException("The answer to 'types' holds no rows and no error.")
+        ).ToDictionary(static row => row.Oid);
+        var parameters = new List<DescribedParameter>(count);
+        for (var index = 0; index < count; index++)
+        {
+            var parameter = request.Parameters[index];
+            if (PostgresTypes.IsPseudo(oids[index], rows))
+            {
+                // The server accepts a pseudo-type, declared or inferred, and no value has one.
+                return Failed(PostgresErrors.PseudoType(request, parameter, rows[oids[index]].FormatType));
+            }
+
+            // A parameter has no facets: the protocol gives it an OID and no modifier.
+            parameters.Add(
+                new DescribedParameter(
+                    parameter.Name,
+                    PostgresTypes.Build(oids[index], rows, PostgresFacets.None),
+                    parameter.Type is null ? SidecarValues.TypeSource.Inferred : SidecarValues.TypeSource.Declared
+                )
+            );
+        }
+
+        return Described(parameters);
+    }
+
+    // The parameters, no rows and nothing else: the columns come with the next sub-phase.
+    private static Outcome<QueryDescription, DescribeFailure> Described(List<DescribedParameter> parameters) =>
+        Outcome<QueryDescription, DescribeFailure>.Of(
+            new QueryDescription(
+                SidecarResultKind.None,
+                new EquatableArray<DescribedParameter>([.. parameters]),
+                null,
+                null,
+                null,
+                null
+            )
+        );
 
     public ValueTask DisposeAsync() => Connection.DisposeAsync();
 
@@ -222,6 +336,48 @@ internal sealed class PostgresSession : IDescribeSession
         catch (NpgsqlException exception)
         {
             return new PostgresPrepareAnswer(null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
+    private async Task<PostgresTypesAnswer> TypesLiveAsync(PostgresTypesRequest asked, CancellationToken token)
+    {
+        try
+        {
+            await using var command = await Connection.CommandAsync(TypesSql, token);
+            _ = command.Parameters.Add(
+                new NpgsqlParameter("oids", asked.Oids.Select(static oid => (uint)oid).ToArray())
+                {
+                    DataTypeName = "oid[]",
+                }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            var rows = new List<PostgresTypeRow>();
+            while (await reader.ReadAsync(token))
+            {
+                rows.Add(
+                    new PostgresTypeRow(
+                        await reader.GetFieldValueAsync<uint>(0, token),
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        reader.GetString(3),
+                        reader.GetString(4),
+                        await reader.GetFieldValueAsync<uint>(5, token),
+                        await reader.GetFieldValueAsync<uint>(6, token),
+                        await reader.IsDBNullAsync(7, token) ? null : await reader.GetFieldValueAsync<uint>(7, token),
+                        await reader.IsDBNullAsync(8, token) ? null : await reader.GetFieldValueAsync<uint>(8, token),
+                        reader.GetString(9),
+                        await reader.IsDBNullAsync(10, token)
+                            ? null
+                            : await reader.GetFieldValueAsync<string[]>(10, token)
+                    )
+                );
+            }
+
+            return new PostgresTypesAnswer(rows, null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresTypesAnswer(null, PostgresConnection.ErrorOf(exception));
         }
     }
 
