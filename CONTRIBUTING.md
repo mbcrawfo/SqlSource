@@ -55,6 +55,14 @@ SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14 dotnet test --project tests/SqlSource
 
 `dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh`, runs it on the default image.
 
+The describer's fixtures are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/`: a folder for each case with its `query.sql`, the `capture.json` of describing it and the `expected.json` of its sidecar.  `tests/SqlSource.Tool.Tests` replays each from its capture with no database, and `tests/SqlSource.Tests.Postgres` describes each against the container and compares the entry, so a describer that asks something else fails the first and one that answers something else fails the second.  After a change to what the describer asks or answers, or to `schema.sql`, record them again and read the diff before it is committed:
+
+```bash
+tools/record-fixtures.sh
+```
+
+To add a case, add its folder with a `query.sql` and run the script.  A recorded file is never edited by hand.
+
 To run the tool from its source:
 
 ```bash

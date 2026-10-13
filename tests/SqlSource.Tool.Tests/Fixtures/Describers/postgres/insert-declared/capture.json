@@ -1,0 +1,115 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "INSERT INTO users (name, email, status) VALUES ($1, $2, $3)",
+        "types": [
+          "varchar(50)",
+          "email_t",
+          "unknown"
+        ]
+      },
+      "answer": {
+        "parameterTypes": [
+          1043,
+          16387,
+          16390
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          1043,
+          16387,
+          16390
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "typname": "varchar",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "character varying",
+            "enumLabels": null
+          },
+          {
+            "oid": 16387,
+            "typname": "email_t",
+            "nspname": "public",
+            "typtype": "d",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 1043,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "email_t",
+            "enumLabels": null
+          },
+          {
+            "oid": 16390,
+            "typname": "user_status",
+            "nspname": "public",
+            "typtype": "e",
+            "typcategory": "E",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "user_status",
+            "enumLabels": [
+              "active",
+              "disabled"
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}
