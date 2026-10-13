@@ -2,7 +2,7 @@
 
 ## Problem
 
-The PostgreSQL describer prepares a query with `$n` where SqlSource's lexer found a parameter, and then asks Npgsql to describe the SQL as written, to prove that Npgsql finds the same parameters ([`NpgsqlCheck`](../../src/SqlSource.Tool/Describing/Postgres/NpgsqlCheck.cs), [`PostgresLive.CheckAsync`](../../src/SqlSource.Tool/Describing/Postgres/PostgresLive.cs)).  It compares the columns of the two results.  Eight things about it are not whole:
+The PostgreSQL describer prepares a query with `$n` where SqlSource's lexer found a parameter, and then asks Npgsql to describe the SQL as written, to prove that Npgsql finds the same parameters ([`NpgsqlCheck`](../../src/SqlSource.Tool/Describing/Postgres/NpgsqlCheck.cs), [`PostgresLive.CheckAsync`](../../src/SqlSource.Tool/Describing/Postgres/PostgresLive.cs)).  It compares the columns of the two results.  Seven things about it are not whole:
 
 - **A disagreement that leaves the columns alone passes.**  If the two read a `@` differently inside a predicate, and the server accepts both readings, the result has the same columns and the check says `same`.
 - **A `$n` that the SQL writes itself passes.**  `SELECT 1 FROM users WHERE id = @id AND name = $2` is described by both: Npgsql sends `$1` for `@id`, leaves `$2`, and the server types it.  At run time nothing binds it.  This is the first item of [TD-0043](TD-0043-small-gaps-of-the-postgresql-describers-parameters.md).
@@ -14,7 +14,7 @@ The PostgreSQL describer prepares a query with `$n` where SqlSource's lexer foun
 
 ## Why it exists
 
-The check was specified as a comparison of columns because that is what a describe gives: Npgsql does not say which placeholders it found.  The spelled name is the sidecar's, chosen in sub-phase 3.2 to be what PostgreSQL writes, and Npgsql's `DataTypeName` has a syntax of its own, without quotes.  The round trips are on the path of a failure alone.
+The check was specified as a comparison of columns because that is what a describe gives: Npgsql does not say which placeholders it found.  The spelled name is the sidecar's, chosen in sub-phase 3.2 to be what PostgreSQL writes, and Npgsql's `DataTypeName` has a syntax of its own, without quotes.  The round trips are on the path of a failure alone.  The spec of sub-phase 3.3 made every error of `check` `SQLSRC231`, since an error of the server on Npgsql's own rewrite is what a disagreement usually looks like.
 
 ## Impact
 
