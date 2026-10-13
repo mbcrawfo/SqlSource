@@ -1,8 +1,10 @@
 using System;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using Xunit;
 
@@ -144,6 +146,18 @@ public sealed class SecretTests : IDisposable
 
         ShouldHold(result, "217,999");
         _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Secrets.ConnectionWithMarker);
+    }
+
+    // A capture is a file that a user attaches to a report: nothing of a connection is in what a run recorded.
+    [Fact]
+    public async Task Run_ThroughACapturingExchange_LeavesNothingOfTheValueInTheCapture()
+    {
+        var result = await _scene.DescribeAsync("--connection", "postgres=" + Secrets.ConnectionWithMarker);
+
+        result.ExitCode.ShouldBe(0);
+        _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe(Secrets.ConnectionWithMarker);
+        _scene.Run.Capture.Calls.Select(call => call.Method).ShouldBe(["open", "describe", "describe"]);
+        CaptureJson.Write(_scene.Run.Capture).ShouldNotContain(Secrets.Marker);
     }
 
     // The value was typed where "name=value" stands.  Its first keyword is taken for a name, and only that is said.

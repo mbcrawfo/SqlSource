@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
@@ -24,7 +25,8 @@ public sealed class DatabaseRunsTests : IDisposable
 
     private readonly TempFolder _folder = new();
     private readonly FakeDescriber _describer = new();
-    private readonly RecordingExchange _exchange = new();
+    private readonly DescribeCapture _capture = new("postgres");
+    private readonly CapturingExchange _exchange;
     private readonly Dictionary<string, string> _environment = [];
     private readonly StringWriter _error = new(CultureInfo.InvariantCulture) { NewLine = "\n" };
     private readonly TestProject _project;
@@ -33,6 +35,7 @@ public sealed class DatabaseRunsTests : IDisposable
 
     public DatabaseRunsTests()
     {
+        _exchange = new CapturingExchange(LiveExchange.Instance, _capture);
         _project = Plans.Postgres(_folder);
         _users = _project.AddSql("Users.sql", Users);
     }
@@ -112,7 +115,7 @@ public sealed class DatabaseRunsTests : IDisposable
             request.Connection == Secrets.ConnectionWithWord && request.Exchange == _exchange
         );
         _describer.Closed.ShouldBe(2);
-        _exchange.Methods.ShouldBe(["open", "describe", "open", "describe"]);
+        _capture.Calls.Select(call => call.Method).ShouldBe(["open", "describe", "open", "describe"]);
 
         var getUser = _describer.Described[0];
         getUser.Name.ShouldBe("GetUser");

@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
@@ -25,8 +26,16 @@ internal sealed class CliRun : IDisposable
     // The describers of the run.  None, as in the released tool, unless a test adds one.
     public List<IQueryDescriber> Describers { get; } = [];
 
-    // Every database of the run calls through this one.
-    public RecordingExchange Exchange { get; } = new();
+    public CliRun()
+    {
+        Exchange = new CapturingExchange(LiveExchange.Instance, Capture);
+    }
+
+    // What every describer of the run asked and was answered.  The engine is a name only: a run may have several.
+    public DescribeCapture Capture { get; } = new("postgres");
+
+    // Every database of the run calls through this one, which asks the describer and keeps the call.
+    public CapturingExchange Exchange { get; }
 
     // The clock of the run.  The machine's, unless a test brings one it can move.
     public TimeProvider Time { get; set; } = TimeProvider.System;

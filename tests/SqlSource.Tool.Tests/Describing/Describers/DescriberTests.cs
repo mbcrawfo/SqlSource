@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tests.Snapshot;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 using Xunit;
@@ -61,7 +62,8 @@ public class DescriberTests
     public async Task OpenAsync_DescriberOfTheTests_MakesEveryCallThroughTheExchange()
     {
         var describer = new FakeDescriber();
-        var exchange = new RecordingExchange();
+        var capture = new DescribeCapture("postgres");
+        var exchange = new CapturingExchange(LiveExchange.Instance, capture);
         var token = TestContext.Current.CancellationToken;
 
         var opened = await describer.OpenAsync(
@@ -75,7 +77,7 @@ public class DescriberTests
             token
         );
 
-        exchange.Methods.ShouldBe(["open", "describe"]);
+        capture.Calls.Select(call => call.Method).ShouldBe(["open", "describe"]);
         described.Value.ShouldBe(FakeDescriber.NoRows);
         describer.Opened.ShouldHaveSingleItem().Database.ShouldBe("billing");
         describer.Described.ShouldHaveSingleItem().Name.ShouldBe("GetUser");
@@ -89,7 +91,7 @@ public class DescriberTests
         var token = TestContext.Current.CancellationToken;
 
         var opened = await describer.OpenAsync(
-            new OpenRequest("billing", "Host=db", new RecordingExchange(), TimeProvider.System),
+            new OpenRequest("billing", "Host=db", LiveExchange.Instance, TimeProvider.System),
             NullRunLog.Instance,
             token
         );
