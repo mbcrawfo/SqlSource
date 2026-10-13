@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Npgsql;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
@@ -27,72 +26,24 @@ internal sealed class PostgresSession : IDescribeSession
 {
     public const string DriverName = "Npgsql";
 
-    // The settings of a session that change a description, in the order "open" answers them.
-    private static readonly string[] SettingNames = ["search_path", "plan_cache_mode", "standard_conforming_strings"];
-
-    private const string OpenSql =
-        "SELECT pg_catalog.current_setting('server_version'), pg_catalog.current_setting('search_path'), "
-        + "pg_catalog.current_setting('plan_cache_mode'), pg_catalog.current_setting('standard_conforming_strings')";
-
-    private const string ParameterTypesSql =
-        "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = @name";
-
-    // The closure of the types asked for, in one query: a recursive term that follows the element of an array, the
-    // base of a domain, the subtype of a range and the range of a multirange.  A domain has the category of its
-    // base, so an array is a base type of the category A.
-    private const string TypesSql = """
-        WITH RECURSIVE closure (oid) AS (
-            SELECT t.oid FROM pg_catalog.pg_type AS t WHERE t.oid = ANY (@oids)
-            UNION
-            SELECT link.oid
-            FROM closure AS c
-            JOIN pg_catalog.pg_type AS t ON t.oid = c.oid
-            LEFT JOIN pg_catalog.pg_range AS r ON r.rngtypid = t.oid
-            LEFT JOIN pg_catalog.pg_range AS m ON m.rngmultitypid = t.oid
-            CROSS JOIN LATERAL (
-                VALUES
-                    (CASE WHEN t.typtype = 'b' AND t.typcategory = 'A' THEN t.typelem END),
-                    (CASE WHEN t.typtype = 'd' THEN t.typbasetype END),
-                    (r.rngsubtype),
-                    (m.rngtypid)
-            ) AS link (oid)
-            WHERE link.oid IS NOT NULL AND link.oid <> 0
-        )
-        SELECT
-            t.oid,
-            t.typname::text,
-            n.nspname::text,
-            t.typtype::text,
-            t.typcategory::text,
-            t.typelem,
-            t.typbasetype,
-            r.rngsubtype,
-            mr.rngsubtype,
-            pg_catalog.format_type(t.oid, -1),
-            (
-                SELECT pg_catalog.array_agg(e.enumlabel::text ORDER BY e.enumsortorder)
-                FROM pg_catalog.pg_enum AS e
-                WHERE e.enumtypid = t.oid
-            )
-        FROM closure AS c
-        JOIN pg_catalog.pg_type AS t ON t.oid = c.oid
-        JOIN pg_catalog.pg_namespace AS n ON n.oid = t.typnamespace
-        LEFT JOIN pg_catalog.pg_range AS r ON r.rngtypid = t.oid
-        LEFT JOIN pg_catalog.pg_range AS m ON m.rngmultitypid = t.oid
-        LEFT JOIN pg_catalog.pg_range AS mr ON mr.rngtypid = m.rngtypid
-        ORDER BY t.oid
-        """;
-
     private readonly IDescribeExchange _exchange;
     private readonly IRunLog _log;
+    private readonly PostgresLive _live;
     private readonly TimeProvider _time;
     private int _statements;
 
-    private PostgresSession(OpenRequest request, IRunLog log, PostgresConnection connection, ServerInfo server)
+    private PostgresSession(
+        OpenRequest request,
+        IRunLog log,
+        PostgresConnection connection,
+        PostgresLive live,
+        ServerInfo server
+    )
     {
         _exchange = request.Exchange;
         _time = request.Time;
         _log = log;
+        _live = live;
         Connection = connection;
         Server = server;
     }
@@ -123,13 +74,14 @@ internal sealed class PostgresSession : IDescribeSession
     )
     {
         var connection = new PostgresConnection(request.Connection);
+        var live = new PostgresLive(connection);
         var kept = false;
         try
         {
             var answer = await request.Exchange.AskAsync(
                 "open",
                 PostgresOpenRequest.Instance,
-                (_, token) => OpenLiveAsync(connection, token),
+                (_, token) => live.OpenAsync(token),
                 cancellationToken
             );
             if (answer.Error is { } error)
@@ -137,7 +89,7 @@ internal sealed class PostgresSession : IDescribeSession
                 return Outcome<IDescribeSession, DescribeFailure>.Failed(PostgresErrors.Open(error, request.Database));
             }
 
-            var session = new PostgresSession(request, log, connection, ServerOf(answer));
+            var session = new PostgresSession(request, log, connection, live, ServerOf(answer));
             kept = true;
             return Outcome<IDescribeSession, DescribeFailure>.Of(session);
         }
@@ -298,7 +250,7 @@ internal sealed class PostgresSession : IDescribeSession
     )
     {
         var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("prepare", request, PrepareLiveAsync, cancellationToken);
+        var answer = await _exchange.AskAsync("prepare", request, _live.PrepareAsync, cancellationToken);
         PostgresEvents.Prepare(_log, query, request, answer, ElapsedSince(started));
         return answer;
     }
@@ -309,7 +261,7 @@ internal sealed class PostgresSession : IDescribeSession
     )
     {
         var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("types", request, TypesLiveAsync, cancellationToken);
+        var answer = await _exchange.AskAsync("types", request, _live.TypesAsync, cancellationToken);
         PostgresEvents.Types(_log, request, answer, ElapsedSince(started));
         return answer;
     }
@@ -318,115 +270,9 @@ internal sealed class PostgresSession : IDescribeSession
     private async Task DeallocateAsync(PostgresDeallocateRequest request, CancellationToken cancellationToken)
     {
         var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("deallocate", request, DeallocateLiveAsync, cancellationToken);
+        var answer = await _exchange.AskAsync("deallocate", request, _live.DeallocateAsync, cancellationToken);
         PostgresEvents.Deallocate(_log, request, answer, ElapsedSince(started));
     }
 
     private long ElapsedSince(long started) => (long)_time.GetElapsedTime(started).TotalMilliseconds;
-
-    // In each "live" function, what the server can cause is the answer's error.  A cancellation passes through, and
-    // anything else is a bug.
-    private static async Task<PostgresOpenAnswer> OpenLiveAsync(PostgresConnection connection, CancellationToken token)
-    {
-        try
-        {
-            await using var command = await connection.CommandAsync(OpenSql, token);
-            await using var reader = await command.ExecuteReaderAsync(token);
-            if (!await reader.ReadAsync(token))
-            {
-                throw new InvalidOperationException("The server answered 'open' with no row.");
-            }
-
-            return new PostgresOpenAnswer(
-                VersionOf(reader.GetString(0)),
-                PostgresConnection.DriverVersion,
-                [.. SettingNames.Select((name, index) => new PostgresSetting(name, reader.GetString(index + 1)))],
-                null
-            );
-        }
-        catch (NpgsqlException exception)
-        {
-            return new PostgresOpenAnswer(null, null, null, PostgresConnection.ErrorOf(exception));
-        }
-    }
-
-    private async Task<PostgresPrepareAnswer> PrepareLiveAsync(PostgresPrepareRequest asked, CancellationToken token)
-    {
-        try
-        {
-            // The one text that holds a user's SQL: the driver is given it as one statement and may not split it.
-            var text = ParameterPlaceholders.PrepareText(asked.Statement, asked.Types, asked.Sql);
-            await Connection.ExecuteAsOneStatementAsync(text, token);
-
-            await using var read = await Connection.CommandAsync(ParameterTypesSql, token);
-            _ = read.Parameters.AddWithValue("name", asked.Statement);
-            var types =
-                await read.ExecuteScalarAsync(token) as uint[]
-                ?? throw new InvalidOperationException($"The server lists no prepared statement '{asked.Statement}'.");
-            return new PostgresPrepareAnswer([.. types.Select(static oid => (long)oid)], null);
-        }
-        catch (NpgsqlException exception)
-        {
-            return new PostgresPrepareAnswer(null, PostgresConnection.ErrorOf(exception));
-        }
-    }
-
-    private async Task<PostgresTypesAnswer> TypesLiveAsync(PostgresTypesRequest asked, CancellationToken token)
-    {
-        try
-        {
-            await using var command = await Connection.CommandAsync(TypesSql, token);
-            _ = command.Parameters.Add(
-                new NpgsqlParameter("oids", asked.Oids.Select(static oid => (uint)oid).ToArray())
-                {
-                    DataTypeName = "oid[]",
-                }
-            );
-            await using var reader = await command.ExecuteReaderAsync(token);
-            var rows = new List<PostgresTypeRow>();
-            while (await reader.ReadAsync(token))
-            {
-                rows.Add(
-                    new PostgresTypeRow(
-                        await reader.GetFieldValueAsync<uint>(0, token),
-                        reader.GetString(1),
-                        reader.GetString(2),
-                        reader.GetString(3),
-                        reader.GetString(4),
-                        await reader.GetFieldValueAsync<uint>(5, token),
-                        await reader.GetFieldValueAsync<uint>(6, token),
-                        await reader.IsDBNullAsync(7, token) ? null : await reader.GetFieldValueAsync<uint>(7, token),
-                        await reader.IsDBNullAsync(8, token) ? null : await reader.GetFieldValueAsync<uint>(8, token),
-                        reader.GetString(9),
-                        await reader.IsDBNullAsync(10, token)
-                            ? null
-                            : await reader.GetFieldValueAsync<string[]>(10, token)
-                    )
-                );
-            }
-
-            return new PostgresTypesAnswer(rows, null);
-        }
-        catch (NpgsqlException exception)
-        {
-            return new PostgresTypesAnswer(null, PostgresConnection.ErrorOf(exception));
-        }
-    }
-
-    private async Task<PostgresDeallocateAnswer> DeallocateLiveAsync(
-        PostgresDeallocateRequest asked,
-        CancellationToken token
-    )
-    {
-        try
-        {
-            await using var command = await Connection.CommandAsync($"DEALLOCATE {asked.Statement}", token);
-            _ = await command.ExecuteNonQueryAsync(token);
-            return new PostgresDeallocateAnswer(null);
-        }
-        catch (NpgsqlException exception)
-        {
-            return new PostgresDeallocateAnswer(PostgresConnection.ErrorOf(exception));
-        }
-    }
 }
