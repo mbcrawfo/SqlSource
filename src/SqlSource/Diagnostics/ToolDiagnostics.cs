@@ -334,6 +334,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor ColumnTypeNotSupported = new(
+        id: "SQLSRC229",
+        title: "Column type is not supported",
+        messageFormat: "The column '{0}' of the query '{1}' has the type '{2}', which cannot be described",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc229",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor QueryHasSeveralStatements = new(
         id: "SQLSRC230",
         title: "Query holds more than one statement",
@@ -342,6 +353,28 @@ internal static class ToolDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc230",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ParametersReadDifferently = new(
+        id: "SQLSRC231",
+        title: "Parameters as Npgsql reads them differ",
+        messageFormat: "Npgsql reads the parameters of the query '{0}' differently from SqlSource: {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc231",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor TypeCannotBeBound = new(
+        id: "SQLSRC232",
+        title: "Type cannot be bound by Npgsql",
+        messageFormat: "Npgsql cannot bind the type '{0}' of the parameter '{1}' of the query '{2}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc232",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -379,6 +412,9 @@ internal static class ToolDiagnostics
             ParameterTypeNotDetermined,
             ParameterFirstUseDoesNotFixType,
             DeclaredTypeNotValid,
-            QueryHasSeveralStatements
+            ColumnTypeNotSupported,
+            QueryHasSeveralStatements,
+            ParametersReadDifferently,
+            TypeCannotBeBound
         );
 }

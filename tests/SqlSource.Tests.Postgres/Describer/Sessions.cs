@@ -32,6 +32,22 @@ internal static class Sessions
             TestContext.Current.CancellationToken
         );
 
+    // Describes one query in a session of its own, which must end with no prepared statement left in it.
+    public static async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
+        string connection,
+        DescribeRequest request,
+        IDescribeExchange? exchange = null
+    )
+    {
+        var opened = await OpenAsync(connection, exchange);
+        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+
+        var described = await session.DescribeAsync(request, TestContext.Current.CancellationToken);
+
+        (await PreparedStatementsAsync(session)).ShouldBe(0);
+        return described;
+    }
+
     // Every text of a failure that a run prints or logs.
     public static IReadOnlyList<string> TextsOf(DescribeFailure failure) =>
         [

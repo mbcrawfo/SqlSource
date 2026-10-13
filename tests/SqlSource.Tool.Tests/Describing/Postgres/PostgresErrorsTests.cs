@@ -268,6 +268,28 @@ public class PostgresErrorsTests
         failure.ServerLines.ShouldBe(["Exception while reading from stream"]);
     }
 
+    // Nothing the server said: a table, a column or a type went while the query was described.  So there is no
+    // server line, and the help says to run the tool again.
+    [Fact]
+    public void SchemaChanged_TableThatWentAtTheCatalog_IsSqlsrc225WithNoServerLineAndTheHelp()
+    {
+        const string What = "the table of the column 'id' no longer exists";
+
+        var failure = PostgresErrors.SchemaChanged(Query(), DescribeStep.Catalog, What);
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe(["Q", What]);
+        failure.Step.ShouldBe(DescribeStep.Catalog);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
+    }
+
+    [Fact]
+    public void SchemaChanged_TypeThatWentAtResolveType_KeepsTheStepItWasGiven() =>
+        PostgresErrors
+            .SchemaChanged(Query(), DescribeStep.ResolveType, "the type of the column 'n' no longer exists")
+            .Step.ShouldBe(DescribeStep.ResolveType);
+
     // What PostgreSQL 13 says of "types".  The position is in the tool's own query of the catalog, which the user
     // never wrote, so there is no line for it; the detail and the hint of the server stay.
     [Fact]
@@ -309,5 +331,86 @@ public class PostgresErrorsTests
         failure.Step.ShouldBe(DescribeStep.ResolveType);
         failure.ServerLines.ShouldBeEmpty();
         failure.Help.ShouldBe(PostgresErrors.PseudoTypeHelp);
+    }
+
+    private static readonly DescribeRequest Checked = new(
+        "ListUsers",
+        "SELECT id FROM users WHERE status = @status",
+        new EquatableArray<SqlQueryParameter>([new SqlQueryParameter("status", null, null, false)])
+    );
+
+    private static PostgresCheckRequest AskedWith(string type) =>
+        new("SELECT id FROM users WHERE status = @status", [new PostgresCheckParameter("status", type)]);
+
+    [Fact]
+    public void Check_VerdictSame_IsNoFailure() =>
+        PostgresErrors
+            .Check(
+                Checked,
+                AskedWith("text"),
+                new PostgresCheckAnswer([], null, null),
+                new CheckVerdict(NpgsqlCheck.Same, null)
+            )
+            .ShouldBeNull();
+
+    [Fact]
+    public void Check_ColumnsThatDiffer_IsSqlsrc231WithWhatDiffersAndNoServerLine()
+    {
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                AskedWith("text"),
+                new PostgresCheckAnswer([], null, null),
+                new CheckVerdict(NpgsqlCheck.Differ, "the result has 0 columns for Npgsql and 1 for SqlSource")
+            )
+            .ShouldNotBeNull();
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.Arguments.ShouldBe(["ListUsers", "the result has 0 columns for Npgsql and 1 for SqlSource"]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.CheckHelp);
+    }
+
+    // The position is in Npgsql's own rewrite of the SQL, which the user never sees, so it has no line.
+    [Fact]
+    public void Check_ErrorOfTheServer_IsSqlsrc231WithItsLinesAndNoPosition()
+    {
+        var error = new PostgresServerError("42601", "syntax error at or near \"@\"", null, "a hint", 31);
+
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                AskedWith("text"),
+                new PostgresCheckAnswer(null, error, null),
+                new CheckVerdict(NpgsqlCheck.Differ, error.Message)
+            )
+            .ShouldNotBeNull();
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.Arguments.ShouldBe(["ListUsers", "syntax error at or near \"@\""]);
+        failure.ServerLines.ShouldBe(["42601: syntax error at or near \"@\"", "hint: a hint"]);
+    }
+
+    [Theory]
+    [InlineData("public.d2", false)]
+    [InlineData("\"My Schema\".\"Status\"", true)]
+    [InlineData("\"char\"", true)]
+    public void Check_DriverError_IsSqlsrc232NamingTheTypeAndTheParameterAsWritten(string type, bool quoted)
+    {
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                AskedWith(type),
+                new PostgresCheckAnswer(null, null, new PostgresBindError("status", "Npgsql's own words")),
+                new CheckVerdict(NpgsqlCheck.Unbound, "Npgsql's own words")
+            )
+            .ShouldNotBeNull();
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC232");
+        failure.Arguments.ShouldBe([type, "@status", "ListUsers"]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBe(["Npgsql's own words"]);
+        failure.Help.ShouldBe(quoted ? PostgresErrors.BindQuotedHelp : PostgresErrors.BindHelp);
     }
 }

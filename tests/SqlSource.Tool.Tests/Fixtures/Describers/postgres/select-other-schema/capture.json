@@ -1,0 +1,269 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT id, order_id, amount, issued_on FROM billing.invoices WHERE order_id = $1",
+        "types": [
+          "unknown"
+        ]
+      },
+      "answer": {
+        "parameterTypes": [
+          20
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 1
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "id",
+            "typeOid": 23,
+            "tableOid": 16459,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 1,
+            "name": "order_id",
+            "typeOid": 20,
+            "tableOid": 16459,
+            "attributeNumber": 2,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 2,
+            "name": "amount",
+            "typeOid": 1700,
+            "tableOid": 16459,
+            "attributeNumber": 3,
+            "length": null,
+            "precision": 18,
+            "scale": 2
+          },
+          {
+            "ordinal": 3,
+            "name": "issued_on",
+            "typeOid": 1082,
+            "tableOid": 16459,
+            "attributeNumber": 4,
+            "length": null,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16459
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16459,
+            "relkind": "r",
+            "schema": "billing",
+            "name": "invoices",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "order_id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 20,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "amount",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 4,
+                "name": "issued_on",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1082,
+                "notNullValidated": true
+              }
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          20,
+          23,
+          1082,
+          1700
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 20,
+            "typname": "int8",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "bigint",
+            "enumLabels": null
+          },
+          {
+            "oid": 23,
+            "typname": "int4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "integer",
+            "enumLabels": null
+          },
+          {
+            "oid": 1082,
+            "typname": "date",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "D",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "date",
+            "enumLabels": null
+          },
+          {
+            "oid": 1700,
+            "typname": "numeric",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "numeric",
+            "enumLabels": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT id, order_id, amount, issued_on FROM billing.invoices WHERE order_id = @order_id",
+        "parameters": [
+          {
+            "name": "order_id",
+            "dataTypeName": "bigint"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "id",
+            "typeOid": 23,
+            "dataTypeName": "integer"
+          },
+          {
+            "name": "order_id",
+            "typeOid": 20,
+            "dataTypeName": "bigint"
+          },
+          {
+            "name": "amount",
+            "typeOid": 1700,
+            "dataTypeName": "numeric(18, 2)"
+          },
+          {
+            "name": "issued_on",
+            "typeOid": 1082,
+            "dataTypeName": "date"
+          }
+        ],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}

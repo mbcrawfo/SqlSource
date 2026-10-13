@@ -35,6 +35,9 @@ internal sealed class PostgresScript
             null
         );
 
+    // What "columns" answers for a statement without rows.
+    public static PostgresColumnsAnswer NoColumns { get; } = new([], null);
+
     public PostgresScript Answer<TRequest, TAnswer>(string method, TRequest request, TAnswer answer)
     {
         _capture.Add(new CaptureCall(method, CaptureJson.ToElement(request), CaptureJson.ToElement(answer)));

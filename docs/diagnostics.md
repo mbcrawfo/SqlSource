@@ -65,7 +65,10 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC226](#sqlsrc226) | Parameter type could not be determined |
 | [SQLSRC227](#sqlsrc227) | Parameter's first use does not fix its type |
 | [SQLSRC228](#sqlsrc228) | Declared type is not valid |
+| [SQLSRC229](#sqlsrc229) | Column type is not supported |
 | [SQLSRC230](#sqlsrc230) | Query holds more than one statement |
+| [SQLSRC231](#sqlsrc231) | Parameters as Npgsql reads them differ |
+| [SQLSRC232](#sqlsrc232) | Type cannot be bound by Npgsql |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
@@ -923,6 +926,8 @@ Mend the query, or bring the database to the schema the query was written for.  
 
 A statement that the server cannot prepare is reported so as well, though its SQL is valid: `CALL` and data definition such as `CREATE TABLE` are two, and of the first the server says `syntax error at or near "CALL"`.
 
+It is also given when a table, a column or a type that the query uses was dropped while the tool described it, since another session changed the schema between two of the tool's questions.  The message says what went, as in `the table of the column 'id' no longer exists`; there is no `server:` line, since the server said nothing, and the help says to run the tool again.
+
 It is also what a connection that the server ended while the queries were described is reported as.  The query that finds it out has what the server said last, `57P01: terminating connection due to administrator command` for a backend that was ended, or the driver's message with no SQLSTATE when the server said nothing.  Every query of that database after it has the line `the connection to the server was lost`, with no SQLSTATE: start the run again.
 
 ## SQLSRC226
@@ -978,6 +983,21 @@ A `-- param:` marker gives a parameter a type, and the tool asks the server to r
 
 Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `timestamp(3) without time zone`, `public.user_status`, `"My Schema"."Status"[]`.  A type in a schema that is not on the search path of the connection needs its schema.  A marker's type runs to the end of its line, but for a `null` or `not null` that ends it, so nothing else may follow it there.
 
+## SQLSRC229
+
+**Column type is not supported**
+
+A column of the query has a pseudo-type, a type that the server knows by name and that no value read from a column can be given.  `record` is the one a query meets: a row that is built in the select list and not taken apart again, `ROW(a, b)`, or the alias of a subquery selected whole.  An array of one, `record[]`, is another.  The tool cannot say what such a column holds, so the query is not described.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC229: The column 'row' of the query 'ListPairs' has the type 'record', which cannot be described
+    query: ListPairs, database app, postgres 18.4, Npgsql 10.0.3
+    step: resolve type
+    help: cast the column to a concrete type, or give the expression an alias and a cast
+```
+
+Select the fields of the row as columns of their own, or cast the expression to a type the database has: `ROW(a, b)::pair`, with `pair` a composite type, or `to_jsonb(s)` for a whole row.  A parameter of a pseudo-type that the query returns is reported for the parameter, as [SQLSRC226](#sqlsrc226) or [SQLSRC228](#sqlsrc228).
+
 ## SQLSRC230
 
 **Query holds more than one statement**
@@ -994,3 +1014,35 @@ A query is one statement.  The tool prepares it on the server to describe it, an
 Give each statement a `-- name:` of its own.  A `;` at the end of the statement is allowed, with white space and comments after it; a `;` inside a string, a dollar-quoted string or a comment does not count.  A `;` inside parentheses counts as the end of a statement, since the tool does not read the structure of the SQL; no statement that can be prepared holds one.
 
 This check is a help and not what keeps a second statement from being run.  The tool hands the query to the server as one statement that the driver cannot split, and the server refuses a text of several before it runs anything.  So a text that the tool reads as one statement and the server as two, which takes a `$` straight after a character such as `§`, is [SQLSRC225](#sqlsrc225) with the server's `42601: cannot insert multiple commands into a prepared statement`, and nothing of it is run.
+
+## SQLSRC231
+
+**Parameters as Npgsql reads them differ**
+
+SqlSource finds the parameters of a query with its own reading of the SQL, and describes the query with `$1`, `$2` in their places.  The code it generates sends the SQL as you wrote it, and Npgsql finds the `@name` parameters itself.  The tool asks Npgsql to describe the SQL that way too, with each parameter bound by its type's name, and compares the columns of the two results.  They are not the same, so what was described is not what would run.  The message ends with what differs: the number of columns, the name or the type of one, or what the server said of the SQL as Npgsql sent it.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC231: Npgsql reads the parameters of the query 'ListUsers' differently from SqlSource: syntax error at or near "@"
+    query: ListUsers, database app, postgres 18.4, Npgsql 10.0.3
+    step: check parameters
+    server: 42601: syntax error at or near "@"
+    help: a @ that one of the two reads as a parameter and the other as text; the server's lines say where
+```
+
+Look for a `@` that stands where only one of the two would read a parameter: inside an unusual string or an identifier, or directly after another character of a name.  Put a space before the parameter, or write the text so that the `@` is plainly inside a string.  One difference has no `@` in it: a parameter that is an array of a domain, `-- param: @p email_t[]`, and is returned as a column.  Npgsql sends it as an array of the domain's base type, so the column is `character varying[]` for Npgsql and `email_t[]` for SqlSource; cast the column to the type you want, `@p::varchar[]`.  If the SQL is plain and the two still differ, report it.
+
+## SQLSRC232
+
+**Type cannot be bound by Npgsql**
+
+The code SqlSource generates binds a parameter by the name of its type, as the sidecar records it.  Npgsql refused that name before it sent anything, so a query with this parameter could not be run.  The `server:` line is Npgsql's own message.  These kinds of type are known to be refused: a type whose name or whose schema's name needs quotes, `"My Schema"."Status"`; `"char"`, the one-byte type of the system catalogs, which a comparison with a column such as `pg_class.relkind` gives a parameter; a domain over another domain; a composite type, `public.pair`, and an array of one; a table's row type, and an array of one; `regclass`, which `WHERE c.oid = @t::regclass` gives a parameter, and the other types of the system catalogs that Npgsql does not load, such as `aclitem`, `txid_snapshot` and `pg_node_tree`; an array of a type whose name is 63 characters long, which Npgsql cannot spell with its schema without cutting it; and the bit string type without a length, which the server spells `"bit"` and which is how every bit parameter is spelled.  `bit varying` is bound.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC232: Npgsql cannot bind the type '"My Schema"."Status"' of the parameter '@status' of the query 'ListUsers'
+    query: ListUsers, database app, postgres 18.4, Npgsql 10.0.3
+    step: check parameters
+    server: The data type name '"My Schema"."Status"' could not be found in the types that were loaded by Npgsql. Your database details or Npgsql type loading configuration may be incorrect. Alternatively your PostgreSQL installation might need to be upgraded, or an extension adding the missing data type might not have been installed.
+    help: Npgsql takes no type name that is written with quotes; declare the parameter as text with -- param: and cast it to the type where it is used
+```
+
+Declare the parameter as a type Npgsql binds and cast it where it is used: `-- param: @status text` with `@status::"My Schema"."Status"` in the SQL.  The error is also given for a parameter that only a `-- param:` marker declares: Npgsql resolves the type of every parameter it is handed.

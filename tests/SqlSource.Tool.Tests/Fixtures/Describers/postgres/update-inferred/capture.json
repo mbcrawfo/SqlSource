@@ -44,6 +44,17 @@
       }
     },
     {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 2
+      },
+      "answer": {
+        "columns": [],
+        "error": null
+      }
+    },
+    {
       "method": "types",
       "request": {
         "oids": [
@@ -81,6 +92,27 @@
           }
         ],
         "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "UPDATE users SET name = @name WHERE id = @id",
+        "parameters": [
+          {
+            "name": "name",
+            "dataTypeName": "character varying"
+          },
+          {
+            "name": "id",
+            "dataTypeName": "integer"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [],
+        "error": null,
+        "driverError": null
       }
     },
     {

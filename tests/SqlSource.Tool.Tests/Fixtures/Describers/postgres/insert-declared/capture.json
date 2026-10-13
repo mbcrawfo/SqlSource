@@ -46,6 +46,17 @@
       }
     },
     {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 3
+      },
+      "answer": {
+        "columns": [],
+        "error": null
+      }
+    },
+    {
       "method": "types",
       "request": {
         "oids": [
@@ -100,6 +111,31 @@
           }
         ],
         "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "INSERT INTO users (name, email, status) VALUES (@name, @email, @status)",
+        "parameters": [
+          {
+            "name": "name",
+            "dataTypeName": "character varying"
+          },
+          {
+            "name": "email",
+            "dataTypeName": "public.email_t"
+          },
+          {
+            "name": "status",
+            "dataTypeName": "public.user_status"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [],
+        "error": null,
+        "driverError": null
       }
     },
     {

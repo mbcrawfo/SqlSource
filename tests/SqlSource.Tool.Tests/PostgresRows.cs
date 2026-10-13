@@ -10,6 +10,8 @@ internal static class PostgresRows
 {
     public static PostgresTypeRow Int4 { get; } = BaseOf(23, "int4", "integer", "N");
 
+    public static PostgresTypeRow Int8 { get; } = BaseOf(20, "int8", "bigint", "N");
+
     public static PostgresTypeRow Text { get; } = BaseOf(25, "text", "text", "S");
 
     public static PostgresTypeRow Varchar { get; } = BaseOf(1043, "varchar", "character varying", "S");
@@ -20,7 +22,14 @@ internal static class PostgresRows
 
     public static PostgresTypeRow TextArray { get; } = ArrayOf(1009, "_text", Text);
 
+    public static PostgresTypeRow VarcharArray { get; } = ArrayOf(1015, "_varchar", Varchar);
+
     public static PostgresTypeRow EmailT { get; } = DomainOf(16387, "email_t", Varchar);
+
+    // A domain over a domain.
+    public static PostgresTypeRow D2 { get; } = DomainOf(16500, "d2", EmailT);
+
+    public static PostgresTypeRow Tid { get; } = BaseOf(27, "tid", "tid", "U");
 
     public static PostgresTypeRow UserStatus { get; } = EnumOf(16390, "user_status", "active", "disabled");
 
@@ -31,6 +40,8 @@ internal static class PostgresRows
     public static PostgresTypeRow Int4multirange { get; } = MultirangeOf(4451, "int4multirange", Int4range);
 
     public static PostgresTypeRow Record { get; } = PseudoOf(2249, "record");
+
+    public static PostgresTypeRow RecordArray { get; } = ArrayOf(2287, "_record", Record);
 
     public static PostgresTypeRow BaseOf(
         long oid,

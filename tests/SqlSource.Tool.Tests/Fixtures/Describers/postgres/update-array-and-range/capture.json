@@ -46,6 +46,17 @@
       }
     },
     {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 3
+      },
+      "answer": {
+        "columns": [],
+        "error": null
+      }
+    },
+    {
       "method": "types",
       "request": {
         "oids": [
@@ -123,6 +134,31 @@
           }
         ],
         "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "UPDATE bookings SET during = @during, tags = @tags WHERE id = @id",
+        "parameters": [
+          {
+            "name": "during",
+            "dataTypeName": "tstzrange"
+          },
+          {
+            "name": "tags",
+            "dataTypeName": "text[]"
+          },
+          {
+            "name": "id",
+            "dataTypeName": "bigint"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [],
+        "error": null,
+        "driverError": null
       }
     },
     {

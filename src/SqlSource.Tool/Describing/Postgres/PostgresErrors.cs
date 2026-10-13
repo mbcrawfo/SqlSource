@@ -36,6 +36,23 @@ internal static class PostgresErrors
     public const string PseudoTypeHelp =
         "declare a type that a value can have: a pseudo-type such as record or anyelement stands for no value";
 
+    public const string ColumnTypeHelp =
+        "cast the column to a concrete type, or give the expression an alias and a cast";
+
+    public const string CheckHelp =
+        "a @ that one of the two reads as a parameter and the other as text; the server's lines say where";
+
+    public const string BindHelp =
+        "declare the parameter as a type Npgsql binds, text for one, with -- param: and cast it where it is used; "
+        + "and report it: the sidecar's spelling of a type is what generated code binds with";
+
+    public const string BindQuotedHelp =
+        "Npgsql takes no type name that is written with quotes; declare the parameter as text with -- param: and "
+        + "cast it to the type where it is used";
+
+    public const string SchemaChangedHelp =
+        "the database's schema changed while the query was described; run the tool again";
+
     private const string UndefinedObject = "42704";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
@@ -164,6 +181,20 @@ internal static class PostgresErrors
         Rejected(error, query, DescribeStep.ResolveType, ServerLines(error with { Position = null }, 0));
 
     /// <summary>
+    /// <c>SQLSRC225</c> at the step <c>describe columns</c>: the prepared statement could not be described.  There
+    /// is no position line: a position the server gives is in the tool's own <c>EXECUTE</c>.
+    /// </summary>
+    public static DescribeFailure Columns(PostgresServerError error, DescribeRequest query) =>
+        Rejected(error, query, DescribeStep.DescribeColumns, ServerLines(error with { Position = null }, 0));
+
+    /// <summary>
+    /// <c>SQLSRC225</c> at the step <c>catalog</c>: the tables of the columns could not be read.  There is no
+    /// position line: a position the server gives is in the tool's own query of the catalog.
+    /// </summary>
+    public static DescribeFailure Tables(PostgresServerError error, DescribeRequest query) =>
+        Rejected(error, query, DescribeStep.Catalog, ServerLines(error with { Position = null }, 0));
+
+    /// <summary>
     /// A parameter whose type is a pseudo-type.  The server accepts one and says nothing, so there is no server
     /// line.  A declared one is <c>SQLSRC228</c>; an inferred one is <c>SQLSRC226</c>, whose help says what the
     /// server gave.
@@ -195,6 +226,106 @@ internal static class PostgresErrors
                 + $"used, or declare its type with -- param: {written} <type>"
         );
     }
+
+    /// <summary>
+    /// <c>SQLSRC229</c>: a column whose type is a pseudo-type.  The server describes such a column and says nothing,
+    /// so there is no server line.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="column">The column's name, as the server returned it.</param>
+    /// <param name="typeName">The pseudo-type, as <c>format_type</c> spells it.</param>
+    public static DescribeFailure ColumnPseudoType(DescribeRequest query, string column, string typeName) =>
+        new(
+            ToolDiagnostics.ColumnTypeNotSupported,
+            new EquatableArray<string>([column, query.Name, typeName]),
+            DescribeStep.ResolveType,
+            EquatableArray<string>.Empty,
+            ColumnTypeHelp
+        );
+
+    /// <summary>
+    /// What <c>check</c> is reported as, or null when the two describes agree.  A type Npgsql cannot bind is
+    /// <c>SQLSRC232</c>, with Npgsql's message as its one line; anything else that differs is <c>SQLSRC231</c>,
+    /// with the lines of the error when there is one.  There is no position line: a position the server gives
+    /// is in Npgsql's own rewrite of the SQL.
+    /// </summary>
+    public static DescribeFailure? Check(
+        DescribeRequest query,
+        PostgresCheckRequest asked,
+        PostgresCheckAnswer answer,
+        CheckVerdict verdict
+    )
+    {
+        if (verdict.Result == NpgsqlCheck.Same)
+        {
+            return null;
+        }
+
+        if (answer.DriverError is { } unbound)
+        {
+            return CannotBind(query, asked, unbound);
+        }
+
+        return new DescribeFailure(
+            ToolDiagnostics.ParametersReadDifferently,
+            new EquatableArray<string>([query.Name, verdict.Differs ?? string.Empty]),
+            DescribeStep.CheckParameters,
+            answer.Error is { } error ? ServerLines(error with { Position = null }, 0) : EquatableArray<string>.Empty,
+            CheckHelp
+        );
+    }
+
+    // SQLSRC232.  The type is the name that was asked with, and the parameter is written as the SQL writes one.
+    private static DescribeFailure CannotBind(
+        DescribeRequest query,
+        PostgresCheckRequest asked,
+        PostgresBindError unbound
+    )
+    {
+        var index = 0;
+        while (
+            index < asked.Parameters.Count
+            && !string.Equals(asked.Parameters[index].Name, unbound.Parameter, StringComparison.Ordinal)
+        )
+        {
+            index++;
+        }
+
+        if (index == asked.Parameters.Count)
+        {
+            throw new InvalidOperationException(
+                $"The answer to 'check' names the parameter '{unbound.Parameter}', which was not asked with."
+            );
+        }
+
+        var type = asked.Parameters[index].DataTypeName;
+        return new DescribeFailure(
+            ToolDiagnostics.TypeCannotBeBound,
+            new EquatableArray<string>([type, Written(query.Parameters[index]), query.Name]),
+            DescribeStep.CheckParameters,
+            new EquatableArray<string>([unbound.Message]),
+            type.Contains('"', StringComparison.Ordinal) ? BindQuotedHelp : BindHelp
+        );
+    }
+
+    /// <summary>
+    /// <c>SQLSRC225</c>: a table, a column or a type that the query uses went while it was described, since another
+    /// session dropped it between two calls.  The server said nothing, so there is no server line, and the help says
+    /// to run the tool again.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="step">The step whose call found out: <c>catalog</c> or <c>resolve type</c>.</param>
+    /// <param name="what">
+    /// What went, as the end of a sentence: <c>the table of the column 'id' no longer exists</c>.
+    /// </param>
+    public static DescribeFailure SchemaChanged(DescribeRequest query, DescribeStep step, string what) =>
+        new(
+            ToolDiagnostics.ServerRejectedQuery,
+            new EquatableArray<string>([query.Name, what]),
+            step,
+            EquatableArray<string>.Empty,
+            SchemaChangedHelp
+        );
 
     // SQLSRC225.  The server's lines say what is wrong, so there is no help.
     private static DescribeFailure Rejected(

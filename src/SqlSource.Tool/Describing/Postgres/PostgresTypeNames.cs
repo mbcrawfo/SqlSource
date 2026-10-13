@@ -31,12 +31,15 @@ internal static class PostgresTypeNames
     public static string Identifier(string name) =>
         IsBare(name) ? name : $"\"{name.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
 
-    // format_type(oid, -1) of char is "bpchar": only a char with a length is "character".
+    // format_type(oid, -1) of char is "bpchar": only a char with a length is "character".  Of bit it is "bit" with
+    // the quotes, since plain bit means bit(1): the tool writes the length form itself and keeps the server's
+    // spelling without one, as it does for bpchar.
     private static string InCatalog(PostgresTypeRow row, PostgresFacets facets) =>
         row.Typname switch
         {
             "bpchar" when facets.Length is { } length => Invariant($"character({length})"),
-            "varchar" or "bit" or "varbit" when facets.Length is { } length => Invariant($"{row.FormatType}({length})"),
+            "varchar" or "varbit" when facets.Length is { } length => Invariant($"{row.FormatType}({length})"),
+            "bit" when facets.Length is { } length => Invariant($"bit({length})"),
             "numeric" when facets is { Precision: { } precision, Scale: { } scale } => Invariant(
                 $"numeric({precision},{scale})"
             ),

@@ -44,6 +44,17 @@
       }
     },
     {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 2
+      },
+      "answer": {
+        "columns": [],
+        "error": null
+      }
+    },
+    {
       "method": "types",
       "request": {
         "oids": [
@@ -84,6 +95,27 @@
           }
         ],
         "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "DELETE FROM users WHERE status = @status AND deleted_at IS NOT NULL",
+        "parameters": [
+          {
+            "name": "status",
+            "dataTypeName": "public.user_status"
+          },
+          {
+            "name": "tenant",
+            "dataTypeName": "integer"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [],
+        "error": null,
+        "driverError": null
       }
     },
     {

@@ -293,6 +293,17 @@ public class ToolDiagnosticsTests
             );
 
     [Fact]
+    public void ColumnTypeNotSupported_Message_HoldsTheColumnTheQueryAndTheType() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ColumnTypeNotSupported.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "row",
+                "ListPairs",
+                "record"
+            )
+            .ShouldBe("The column 'row' of the query 'ListPairs' has the type 'record', which cannot be described");
+
+    [Fact]
     public void QueryHasSeveralStatements_Message_HoldsTheQuery() =>
         string.Format(
                 CultureInfo.InvariantCulture,
@@ -300,6 +311,30 @@ public class ToolDiagnosticsTests
                 "Cleanup"
             )
             .ShouldBe("The query 'Cleanup' holds more than one statement");
+
+    [Fact]
+    public void ParametersReadDifferently_Message_HoldsTheQueryAndWhatDiffers() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ParametersReadDifferently.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "ListUsers",
+                "column 1 is text for Npgsql and integer for SqlSource"
+            )
+            .ShouldBe(
+                "Npgsql reads the parameters of the query 'ListUsers' differently from SqlSource: "
+                    + "column 1 is text for Npgsql and integer for SqlSource"
+            );
+
+    [Fact]
+    public void TypeCannotBeBound_Message_HoldsTheTypeTheParameterAndTheQuery() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.TypeCannotBeBound.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "public.d2",
+                "@p",
+                "ListUsers"
+            )
+            .ShouldBe("Npgsql cannot bind the type 'public.d2' of the parameter '@p' of the query 'ListUsers'");
 
     [Fact]
     public void ServerRejectedQuery_Message_HoldsTheQueryAndTheServersMessage() =>

@@ -1,0 +1,274 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "INSERT INTO orders (user_id, total, note) VALUES ($1, $2, $3) RETURNING id, placed_at",
+        "types": [
+          "unknown",
+          "unknown",
+          "unknown"
+        ]
+      },
+      "answer": {
+        "parameterTypes": [
+          23,
+          1700,
+          25
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 3
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "id",
+            "typeOid": 20,
+            "tableOid": 16415,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 1,
+            "name": "placed_at",
+            "typeOid": 1184,
+            "tableOid": 16415,
+            "attributeNumber": 4,
+            "length": null,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16415
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16415,
+            "relkind": "r",
+            "schema": "public",
+            "name": "orders",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "d",
+                "generated": "",
+                "typeOid": 20,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "user_id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "total",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 4,
+                "name": "placed_at",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 5,
+                "name": "note",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 25,
+                "notNullValidated": null
+              }
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          20,
+          23,
+          25,
+          1184,
+          1700
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 20,
+            "typname": "int8",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "bigint",
+            "enumLabels": null
+          },
+          {
+            "oid": 23,
+            "typname": "int4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "integer",
+            "enumLabels": null
+          },
+          {
+            "oid": 25,
+            "typname": "text",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "text",
+            "enumLabels": null
+          },
+          {
+            "oid": 1184,
+            "typname": "timestamptz",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "D",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "timestamp with time zone",
+            "enumLabels": null
+          },
+          {
+            "oid": 1700,
+            "typname": "numeric",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "numeric",
+            "enumLabels": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "INSERT INTO orders (user_id, total, note) VALUES (@user_id, @total, @note) RETURNING id, placed_at",
+        "parameters": [
+          {
+            "name": "user_id",
+            "dataTypeName": "integer"
+          },
+          {
+            "name": "total",
+            "dataTypeName": "numeric"
+          },
+          {
+            "name": "note",
+            "dataTypeName": "text"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "id",
+            "typeOid": 20,
+            "dataTypeName": "bigint"
+          },
+          {
+            "name": "placed_at",
+            "typeOid": 1184,
+            "dataTypeName": "timestamp with time zone"
+          }
+        ],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}
