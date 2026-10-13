@@ -41,6 +41,8 @@ internal static class PostgresRows
 
     public static PostgresTypeRow Record { get; } = PseudoOf(2249, "record");
 
+    public static PostgresTypeRow RecordArray { get; } = ArrayOf(2287, "_record", Record);
+
     public static PostgresTypeRow BaseOf(
         long oid,
         string typname,

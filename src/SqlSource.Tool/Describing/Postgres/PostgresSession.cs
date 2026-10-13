@@ -210,11 +210,8 @@ internal sealed class PostgresSession : IDescribeSession
 
         // A statement without rows has nothing a join could null-extend.
         var gated = columns.Count > 0 && OuterJoinGate.IsGated(request.Sql);
-        return Described(
-            parameters.Value,
-            [.. columns.Select((column, index) => PostgresColumns.Build(column, origins[index], rows.Value, gated))],
-            gated
-        );
+        var built = BuildColumns(request, columns, origins, rows.Value, gated);
+        return built.Succeeded ? Described(parameters.Value, built.Value, gated) : Failed(built.Failure);
     }
 
     // The types the server resolved for the parameters of the query's list.  It lists a type for a "$n" that the SQL
@@ -316,6 +313,33 @@ internal sealed class PostgresSession : IDescribeSession
         }
 
         return Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure>.Of(parameters);
+    }
+
+    // The columns in order.  The first of a pseudo-type ends the describe: no value has such a type.  A domain is
+    // never over one, so the type the protocol reported is the one to ask.
+    private static Outcome<IReadOnlyList<SidecarColumn>, DescribeFailure> BuildColumns(
+        DescribeRequest request,
+        IReadOnlyList<PostgresColumnRow> columns,
+        ColumnOrigin?[] origins,
+        IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        bool gated
+    )
+    {
+        var built = new List<SidecarColumn>(columns.Count);
+        for (var index = 0; index < columns.Count; index++)
+        {
+            var column = columns[index];
+            if (PostgresTypes.IsPseudo(column.TypeOid, rows))
+            {
+                return Outcome<IReadOnlyList<SidecarColumn>, DescribeFailure>.Failed(
+                    PostgresErrors.ColumnPseudoType(request, column.Name, rows[column.TypeOid].FormatType)
+                );
+            }
+
+            built.Add(PostgresColumns.Build(column, origins[index], rows, gated));
+        }
+
+        return Outcome<IReadOnlyList<SidecarColumn>, DescribeFailure>.Of(built);
     }
 
     // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.  One

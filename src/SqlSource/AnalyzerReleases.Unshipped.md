@@ -66,4 +66,5 @@ SQLSRC225 | SqlSource | Error | Server rejected the query
 SQLSRC226 | SqlSource | Error | Parameter type could not be determined
 SQLSRC227 | SqlSource | Error | Parameter's first use does not fix its type
 SQLSRC228 | SqlSource | Error | Declared type is not valid
+SQLSRC229 | SqlSource | Error | Column type is not supported
 SQLSRC230 | SqlSource | Error | Query holds more than one statement

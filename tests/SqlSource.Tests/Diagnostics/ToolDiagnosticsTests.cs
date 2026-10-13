@@ -293,6 +293,17 @@ public class ToolDiagnosticsTests
             );
 
     [Fact]
+    public void ColumnTypeNotSupported_Message_HoldsTheColumnTheQueryAndTheType() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ColumnTypeNotSupported.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "row",
+                "ListPairs",
+                "record"
+            )
+            .ShouldBe("The column 'row' of the query 'ListPairs' has the type 'record', which cannot be described");
+
+    [Fact]
     public void QueryHasSeveralStatements_Message_HoldsTheQuery() =>
         string.Format(
                 CultureInfo.InvariantCulture,

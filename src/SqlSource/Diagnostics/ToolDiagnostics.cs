@@ -334,6 +334,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor ColumnTypeNotSupported = new(
+        id: "SQLSRC229",
+        title: "Column type is not supported",
+        messageFormat: "The column '{0}' of the query '{1}' has the type '{2}', which cannot be described",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc229",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor QueryHasSeveralStatements = new(
         id: "SQLSRC230",
         title: "Query holds more than one statement",
@@ -379,6 +390,7 @@ internal static class ToolDiagnostics
             ParameterTypeNotDetermined,
             ParameterFirstUseDoesNotFixType,
             DeclaredTypeNotValid,
+            ColumnTypeNotSupported,
             QueryHasSeveralStatements
         );
 }

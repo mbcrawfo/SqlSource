@@ -455,4 +455,20 @@ public sealed class ColumnTests(PostgresContainer postgres)
         NullabilityOf(materialized).ShouldBe([(null, "view")]);
         NullabilityOf(gated).ShouldBe([(null, "view"), (true, "heuristic")]);
     }
+
+    // A row built in the select list, and the alias of a subquery selected whole, are "record".
+    [Theory]
+    [InlineData("SELECT id, ROW(1, 2) FROM users", "row")]
+    [InlineData("SELECT s FROM (SELECT 1 AS a, 2 AS b) AS s", "s")]
+    public async Task Describe_ColumnOfAPseudoType_IsSqlsrc229NamingItAndItsType(string sql, string column)
+    {
+        var described = await Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql));
+
+        described.Value.ShouldBeNull();
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC229");
+        failure.Arguments.ShouldBe([column, Requests.Query, "record"]);
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.ServerLines.ShouldBeEmpty();
+    }
 }

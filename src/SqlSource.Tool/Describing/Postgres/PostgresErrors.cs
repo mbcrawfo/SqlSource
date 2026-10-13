@@ -36,6 +36,9 @@ internal static class PostgresErrors
     public const string PseudoTypeHelp =
         "declare a type that a value can have: a pseudo-type such as record or anyelement stands for no value";
 
+    public const string ColumnTypeHelp =
+        "cast the column to a concrete type, or give the expression an alias and a cast";
+
     private const string UndefinedObject = "42704";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
@@ -209,6 +212,22 @@ internal static class PostgresErrors
                 + $"used, or declare its type with -- param: {written} <type>"
         );
     }
+
+    /// <summary>
+    /// <c>SQLSRC229</c>: a column whose type is a pseudo-type.  The server describes such a column and says nothing,
+    /// so there is no server line.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="column">The column's name, as the server returned it.</param>
+    /// <param name="typeName">The pseudo-type, as <c>format_type</c> spells it.</param>
+    public static DescribeFailure ColumnPseudoType(DescribeRequest query, string column, string typeName) =>
+        new(
+            ToolDiagnostics.ColumnTypeNotSupported,
+            new EquatableArray<string>([column, query.Name, typeName]),
+            DescribeStep.ResolveType,
+            EquatableArray<string>.Empty,
+            ColumnTypeHelp
+        );
 
     // SQLSRC225.  The server's lines say what is wrong, so there is no help.
     private static DescribeFailure Rejected(

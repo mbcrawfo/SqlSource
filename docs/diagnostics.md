@@ -65,6 +65,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC226](#sqlsrc226) | Parameter type could not be determined |
 | [SQLSRC227](#sqlsrc227) | Parameter's first use does not fix its type |
 | [SQLSRC228](#sqlsrc228) | Declared type is not valid |
+| [SQLSRC229](#sqlsrc229) | Column type is not supported |
 | [SQLSRC230](#sqlsrc230) | Query holds more than one statement |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
@@ -977,6 +978,21 @@ A `-- param:` marker gives a parameter a type, and the tool asks the server to r
 ```
 
 Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `timestamp(3) without time zone`, `public.user_status`, `"My Schema"."Status"[]`.  A type in a schema that is not on the search path of the connection needs its schema.  A marker's type runs to the end of its line, but for a `null` or `not null` that ends it, so nothing else may follow it there.
+
+## SQLSRC229
+
+**Column type is not supported**
+
+A column of the query has a pseudo-type, a type that the server knows by name and that no value read from a column can be given.  `record` is the one a query meets: a row that is built in the select list and not taken apart again, `ROW(a, b)`, or the alias of a subquery selected whole.  An array of one, `record[]`, is another.  The tool cannot say what such a column holds, so the query is not described.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC229: The column 'row' of the query 'ListPairs' has the type 'record', which cannot be described
+    query: ListPairs, database app, postgres 18.4, Npgsql 10.0.3
+    step: resolve type
+    help: cast the column to a concrete type, or give the expression an alias and a cast
+```
+
+Select the fields of the row as columns of their own, or cast the expression to a type the database has: `ROW(a, b)::pair`, with `pair` a composite type, or `to_jsonb(s)` for a whole row.  A parameter of a pseudo-type that the query returns is reported for the parameter, as [SQLSRC226](#sqlsrc226) or [SQLSRC228](#sqlsrc228).
 
 ## SQLSRC230
 
