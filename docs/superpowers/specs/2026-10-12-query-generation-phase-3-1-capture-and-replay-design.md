@@ -107,7 +107,7 @@ A rule for every describer, which the capture relies on and which the tests of s
 
 - `CaptureMissException` derives from `InvalidOperationException`, as `DescriberFaultException` does and for the same reasons.  Under a run of the tool, phase 10's `replay`, it is a bug or a stale capture, and `SQLSRC200` reports it; under a test it fails the test with the question in the message.
 - A replaying exchange that was not asked every call of its capture is not an error: a fixture may hold more than one case asks.  `ReplayingExchange.Unused` gives the calls that were not asked, for a test that wants to know.
-- Neither exchange looks at `TRequest` or `TAnswer` beyond serializing them.  A describer's records are its own.  `CallRecordTests` in the tool's tests holds every request and answer record of every describer, found by reflection in the `Describing` namespace by a `Request` or `Answer` suffix, to the rule above: public members of the allowed kinds only, and a round trip through `CaptureJson.Options` that is equal.
+- Neither exchange looks at `TRequest` or `TAnswer` beyond serializing them.  A describer's exchange records are its own.  `CallRecordTests` in the tool's tests holds every record that is passed to `AskAsync`, found by reflection in each engine's namespace, `SqlSource.Tool.Describing.Postgres` from sub-phase 3.2, and in `FakeDescriber`'s, by a `Request` or `Answer` suffix, to the rule above: public members of the allowed kinds only, and a round trip through `CaptureJson.Options` that is equal.  The seam's own records in `Describing/Describers/`, `OpenRequest` with its exchange and clock and `DescribeRequest` with its lexemes, never cross the exchange and are not capture records.
 
 ### The host
 

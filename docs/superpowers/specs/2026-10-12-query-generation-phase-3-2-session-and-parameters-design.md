@@ -53,7 +53,7 @@ Settled in this spec:
 | What a parameter's type carries | No facets | The protocol gives a parameter an OID and no modifier; `$1::varchar(50)` is a `varchar`. |
 | What `DescribeAsync` answers in this sub-phase | A description with the parameters typed, `ResultKind.None` and no columns | The columns are sub-phase 3.3's.  The describer is registered nowhere, so no sidecar sees it; the fixtures of this sub-phase are statements without rows, which stay true. |
 | A declared type the server does not know | `SQLSRC228`, from a `42704` whose position falls inside the type list of the `PREPARE` | A `42704` in the SQL itself is the server rejecting the query, `SQLSRC225`.  The position tells the two apart; a `42704` with no position is `SQLSRC225`. |
-| A declared type's text | Held to the characters a type can be written with before it is put into the `PREPARE`; anything else is `SQLSRC228` | The marker's type is everything to the end of the line, and the tool interpolates it into SQL it sends.  `int) AS SELECT 1; DROP TABLE users; --` must never leave the tool. |
+| A declared type's text | Read against the grammar of a type name before it is put into the `PREPARE`; anything else is `SQLSRC228` | The marker's type is everything to the end of the line, and the tool interpolates it into SQL it sends.  `int) AS SELECT 1; DROP TABLE users; --` must never leave the tool, and neither must anything that is not a type. |
 | Every failure of `open` | `SQLSRC224`, whatever the SQLSTATE | A wrong password is `28P01` and a missing database `3D000`, and neither is the server rejecting a query. |
 | Where the position of an error points | Into the SQL as it was sent, the `$n` form, which the `prepare` event logs | The rewrite changes offsets after each placeholder, and mapping back through the lexemes buys little for a position the IDE cannot use anyway. |
 | `deallocate` after a `prepare` that failed | Not asked; the counter still advances | There is no statement to free.  The answer gains an `error` that is logged and never reported. |
@@ -92,7 +92,7 @@ In `src/SqlSource.Tool/Describing/Postgres/`.
 | `PostgresDescriber` | `IQueryDescriber` for `SqlDialect.PostgreSql`.  `OpenAsync` makes a `PostgresSession` and asks `open` through it |
 | `PostgresSession` | `IDescribeSession`: the exchange, the log, the connection holder, the statement counter, and `DescribeAsync` |
 | `PostgresConnection` | Holds the connection's value, and makes the `NpgsqlDataSource` and its connection on the first `live` call that needs them.  Disposed with the session.  Overrides `ToString` to leave the value out |
-| `DeclaredTypeText` | Holds a `-- param:` type to the characters a type is written with |
+| `DeclaredTypeText` | Reads a `-- param:` type against the grammar of a type name, and gives the text to put in the list or the reason it is refused |
 | `ParameterPlaceholders` | The statement check and the `$n` rewrite over the lexer's lexemes |
 | `PostgresTypes` | The `types` call, and builds a `PostgresType` from the rows for an OID |
 | `PostgresTypeNames` | Spells a type's `name` as the sidecar wants it |
@@ -115,7 +115,7 @@ In `src/SqlSource.Tool/Describing/Postgres/`.
 
 ### `DescribeAsync`
 
-1. **The statements.**  The sample SQL is lexed with the generator's lexer under the `postgres` rules.  A `;` in a `Text` lexeme is the end of a statement; one followed by nothing but white space and comments is the trailing one and is dropped from the text that is sent; any other is `SQLSRC230`, and nothing is sent.  Each declared type is held by `DeclaredTypeText` to letters, digits, `_`, space, `.`, `,`, `-`, `(`, `)`, `[`, `]` and `"`, with no `--` in it: enough for `varchar(50)`, `numeric(2,-3)`, `timestamp with time zone`, `"My Schema"."Status"[]`, and nothing that could end the list or the statement.  Any other is `SQLSRC228`, and nothing is sent.  The type list ends with a line break before `AS`, so a `--` the check missed could not reach the SQL.
+1. **The statements.**  The sample SQL is lexed with the generator's lexer under the `postgres` rules.  A `;` in a `Text` lexeme is the end of a statement; one followed by nothing but white space and comments is the trailing one and is dropped from the text that is sent; any other is `SQLSRC230`, and nothing is sent.  Each declared type is read by `DeclaredTypeText` against the grammar of a type name: one or more words, each a bare identifier of letters, digits and `_` or a quoted identifier with `""` for a quote, joined by spaces or by `.`; then an optional modifier, `(` with digits, commas, spaces and `-` inside `)`; then more words, for `timestamp(3) without time zone`; then any number of `[]`; and nothing else, no comment, no `;`, no quote left open, no second `(`.  That reads `int`, `varchar(50)`, `numeric(2,-3)`, `interval day to second(3)`, `"My Schema"."Status"[]`, and refuses `int) AS SELECT 1`, since a `)` without its `(` is not in the grammar.  A text the grammar refuses is `SQLSRC228`, and nothing is sent.  The type list still ends with a line break before `AS`, as a second line of defence.
 2. **The placeholders.**  Each `Parameter` lexeme is replaced by `$` and the one-based ordinal of its name in the request's parameter list, compared ignoring case.  A lexeme whose name is not in the list is a bug of the plan, and throws.  The type list has one item for each parameter of the list, in order: the declared type as the `-- param:` marker wrote it, or `unknown`.  A declared parameter that the SQL does not hold is in the list all the same: the server accepts a list longer than the placeholders used.
 3. **`prepare`**, with the next statement name.  An `error` ends the describe with the failure `PostgresErrors` gives for it, after step 5.
 4. **`types`** for the OIDs of the answer.  Each parameter gets its `PostgresType`, with `typeSource` `declared` or `inferred`.
@@ -156,8 +156,8 @@ The `types` call answers one row for each type in the closure of the OIDs asked 
 |----|----|----|
 | `42P18` | `SQLSRC226`, the parameter named from the `$n` of the message | Cast the parameter where it is used, `@p::int`, or declare its type with `-- param: @p int` |
 | `42P08` | `SQLSRC227`, the parameter named from the `$n` of the message | Declare the type with `-- param:`, or write the use that fixes the type before the one that does not: `(name = @name OR @name IS NULL)` |
-| `42704` with a position inside the type list of the `PREPARE` | `SQLSRC228`, the type and the parameter named from the position | Write a type the database has, schema-qualified if it is not on the search path |
-| A declared type `DeclaredTypeText` refuses | `SQLSRC228`, before anything is sent | Write the type as a column definition would: a name, a modifier in parentheses, `[]` |
+| `42704` with a position inside the type list of the `PREPARE` | `SQLSRC228` with `the database has no such type`, the type and the parameter named from the position | Write a type the database has, schema-qualified if it is not on the search path |
+| A declared type `DeclaredTypeText` refuses | `SQLSRC228` with `it is not written as a type name`, before anything is sent | Write the type as a column definition would: a name, a modifier in parentheses, `[]` |
 | Any other, with a SQLSTATE | `SQLSRC225`, with the server's message | None: the server's lines say what is wrong |
 | Any failure of `open`, with a SQLSTATE or without | `SQLSRC224` | Check that the database is running and that the connection string names it |
 | No SQLSTATE, from any other call | `SQLSRC225` | None |
@@ -190,10 +190,10 @@ In `ToolDiagnostics`, with the four places each needs, and ids assigned in the o
 | `SQLSRC225` | Server rejected the query | `The server rejected the query '{0}': {1}` | The query; the server's message, on one line |
 | `SQLSRC226` | Parameter type could not be determined | `The type of the parameter '{0}' of the query '{1}' could not be determined` | The parameter as written, with its prefix; the query |
 | `SQLSRC227` | Parameter's first use does not fix its type | `The first use of the parameter '{0}' of the query '{1}' does not fix its type` | The parameter; the query |
-| `SQLSRC228` | Declared type does not exist | `The type '{0}' declared for the parameter '{1}' of the query '{2}' does not exist` | The type as written; the parameter; the query |
+| `SQLSRC228` | Declared type is not valid | `The type '{0}' declared for the parameter '{1}' of the query '{2}' is not valid: {3}` | The type as written; the parameter; the query; `the database has no such type` or `it is not written as a type name` |
 | `SQLSRC230` | Query holds more than one statement | `The query '{0}' holds more than one statement` | The query |
 
-`SQLSRC230` has a `help:` line: one statement for each query; a `;` is allowed at the end alone.  `SQLSRC228` has two forms of help, one for a type the server does not know and one for a text the tool refuses.  `SQLSRC229`, `SQLSRC231` and `SQLSRC232` are sub-phase 3.3's.
+`SQLSRC230` has a `help:` line: one statement for each query; a `;` is allowed at the end alone.  `SQLSRC228` has two forms of its last argument and of its help, one for a type the server does not know and one for a text the tool refuses.  `SQLSRC229`, `SQLSRC231` and `SQLSRC232` are sub-phase 3.3's.
 
 ## The first fixtures
 
@@ -227,7 +227,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 | Where | Cases |
 |----|----|
 | `ParameterPlaceholdersTests` (tool tests) | `@id` once and twice; two parameters in order of first appearance; a name in another case; `@` inside a string, a comment, a quoted identifier and a dollar-quoted string left alone; the type list with declared and `unknown`; a declared-only parameter at the end; a trailing `;` with a comment after it dropped; a `;` in a string kept; a second statement is `SQLSRC230` and nothing is sent; the line break before `AS` |
-| `DeclaredTypeTextTests` (tool tests) | Each accepted form; `;`, `'`, `/*`, `--`, `)` followed by `AS`, and a line break refused as `SQLSRC228` |
+| `DeclaredTypeTextTests` (tool tests) | Each accepted form of the grammar; `;`, `'`, `/*`, `--`, `int) AS SELECT 1`, `int(`, `int(1)(2)`, `int[`, a quote left open, a word after `[]`, and a line break refused as `SQLSRC228` with its reason |
 | `PostgresTypeNamesTests` (tool tests) | Each row of the spelling: every faceted form, a schema-qualified type, an identifier that needs quotes, a quote doubled, an array of each, an array of a domain |
 | `PostgresTypesTests` (tool tests) | Each kind from rows made by the test; a domain over a domain; a multirange's subtype; a pseudo-type; an OID the rows lack throws |
 | `PostgresErrorsTests` (tool tests) | Each row of the table; the position moved by the `PREPARE` prefix; no position; a `42704` inside and outside the type list, and with no position; each `server:` line; a parameter named from `$2`; a `28P01` from `open` is `SQLSRC224` |

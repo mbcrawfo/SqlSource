@@ -619,12 +619,12 @@ By a spike against PostgreSQL 14 and 18 through Npgsql 10, run before the sub-ph
 - **The capture's key is the method and the request serialized**, not a hash of the arguments, so that a bundle reads; `FakeDescriber` exchanges plain records and nothing of the seam's types, and the tests' `RecordingExchange` gave way to the tool's `CapturingExchange`.  A describer's clock is `OpenRequest.Time`.
 - **The lexer-versus-Npgsql check compares columns, not names and count**: the count, the names and the type OIDs of a `SchemaOnly` describe of the original `@name` SQL through Npgsql, with each parameter bound by the sidecar's spelled type name, against the columns of the prepared statement.  Parameters above said names and count, which `DeriveParameters` would have given and the `PREPARE` route does not.  The check is best effort and `docs/tech-debt` says what it cannot see.
 - **The describer's events log what the server answered**, the rows of `types` and `tables` and the columns of `columns`, as Diagnostics above decided, and the `EXPLAIN` statement as sent with its plan; the capture holds the same.
-- **A declared type's text is held to the characters a type is written with** before it is put into the `PREPARE`, and a query of several statements is refused before anything is sent, so that nothing a `.sql` file holds can make the tool run a statement.
+- **A declared type's text is read against the grammar of a type name** before it is put into the `PREPARE`, and a query of several statements is refused before anything is sent, so that nothing a `.sql` file holds can make the tool run a statement.
 - **The diagnostics**, in `Diagnostics/ToolDiagnostics.cs`:
 
 | Ids | Sub-phase | About |
 |----|----|----|
-| `SQLSRC224` to `SQLSRC228`, `SQLSRC230` | 3.2 | A database that cannot be opened; the server rejected the query; `42P18`; `42P08`; a declared type that does not exist; several statements |
+| `SQLSRC224` to `SQLSRC228`, `SQLSRC230` | 3.2 | A database that cannot be opened; the server rejected the query; `42P18`; `42P08`; a declared type that is not valid, one the database lacks or one not written as a type name; several statements |
 | `SQLSRC229`, `SQLSRC231`, `SQLSRC232` | 3.3 | A column of a pseudo-type; the parameters as Npgsql reads them differ; a type Npgsql cannot bind |
 
 The server's errors and what the tool says, as settled:
