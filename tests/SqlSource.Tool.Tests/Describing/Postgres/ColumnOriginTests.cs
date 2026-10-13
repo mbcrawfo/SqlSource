@@ -57,4 +57,41 @@ public class ColumnOriginTests
                 ColumnOrigin.Find(PostgresTables.ColumnOf(0, "x", 23, Users, 42), PostgresTables.Of(Users))
             )
             .Message.ShouldContain("'users'");
+
+    // What Find would not throw for, nor look up: the answer is whole, or the column names no table.
+    [Fact]
+    public void MissingFrom_ColumnOfATable_IsNull() =>
+        ColumnOrigin
+            .MissingFrom(PostgresTables.ColumnOf(0, "mail", 1043, Users, 3), PostgresTables.Of(Users))
+            .ShouldBeNull();
+
+    [Fact]
+    public void MissingFrom_ColumnOfNoTable_IsNull() =>
+        ColumnOrigin
+            .MissingFrom(new PostgresColumnRow(0, "n", 20, 0, 0, null, null, null), PostgresTables.Of())
+            .ShouldBeNull();
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(-6)]
+    [InlineData(0)]
+    public void MissingFrom_SystemColumn_IsNullWhetherTheAnswerHoldsItsTableOrNot(int attributeNumber)
+    {
+        var column = new PostgresColumnRow(0, "ctid", 27, Users.Oid, attributeNumber, null, null, null);
+
+        ColumnOrigin.MissingFrom(column, PostgresTables.Of(Users)).ShouldBeNull();
+        ColumnOrigin.MissingFrom(column, PostgresTables.Of()).ShouldBeNull();
+    }
+
+    [Fact]
+    public void MissingFrom_TableTheAnswerLacks_NamesTheColumn() =>
+        ColumnOrigin
+            .MissingFrom(PostgresTables.ColumnOf(0, "mail", 1043, Users, 3), PostgresTables.Of())
+            .ShouldBe("the table of the column 'mail' no longer exists");
+
+    [Fact]
+    public void MissingFrom_AttributeTheAnswerLacks_NamesTheColumnAndTheTable() =>
+        ColumnOrigin
+            .MissingFrom(PostgresTables.ColumnOf(0, "x", 23, Users, 42), PostgresTables.Of(Users))
+            .ShouldBe("the column 'x' no longer exists in its table 'public.users'");
 }

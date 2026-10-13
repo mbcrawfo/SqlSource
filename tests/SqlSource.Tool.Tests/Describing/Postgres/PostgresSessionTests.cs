@@ -708,6 +708,131 @@ public class PostgresSessionTests
         exchange.Unused.ShouldBeEmpty();
     }
 
+    // Another session dropped the table, or a column of it, between "columns" and "tables": the answer lacks what
+    // "columns" named.  It is SQLSRC225 at the catalog and not a throw, nothing is asked after it, and the statement
+    // is still freed.
+    [Fact]
+    public async Task DescribeAsync_TableThatTablesLacks_IsSqlsrc225AtCatalogAndAsksNoTypes()
+    {
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT id FROM users", [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1));
+        _ = Tables(script, [users.Oid]);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT id FROM users"),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.Catalog);
+        failure.Arguments.ShouldBe(["Q", "the table of the column 'id' no longer exists"]);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DescribeAsync_AttributeThatTablesLacks_IsSqlsrc225AtCatalogAndAsksNoTypes()
+    {
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT id FROM users", [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1));
+        _ = Tables(script, [users.Oid], PostgresTables.TableOf(users.Oid, "users"));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT id FROM users"),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.Catalog);
+        failure.Arguments.ShouldBe(["Q", "the column 'id' no longer exists in its table 'public.users'"]);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // A type went between "tables" and "types": the answer lacks the row of a type that was asked for.  The first
+    // that has none is named, in the order of the request: the parameters, the columns, the origin attributes.  The
+    // script holds no "check", so none is asked.
+    [Fact]
+    public async Task DescribeAsync_TypeOfAColumnThatTypesLacks_IsSqlsrc225AtResolveTypeAndAsksNoCheck()
+    {
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT 1 AS n", [], new([], null));
+        _ = Columns(script, 1, 0, Expression(0, "n", 23));
+        _ = Resolves(script, [23]);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request("SELECT 1 AS n"), TestContext.Current.CancellationToken);
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.Arguments.ShouldBe(["Q", "the type of the column 'n' no longer exists"]);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DescribeAsync_TypeOfAParameterThatTypesLacks_IsSqlsrc225AtResolveTypeAndAsksNoCheck()
+    {
+        var script = new PostgresScript().Open();
+        _ = Prepares(script, 1, "SELECT 1 WHERE $1 = 1", ["unknown"], new PostgresPrepareAnswer([23], null));
+        _ = Resolves(script, [23]);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT 1 WHERE @id = 1", Inferred("id")),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.Arguments.ShouldBe(["Q", "the type of the parameter '@id' no longer exists"]);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The column's own type is there and the attribute's is not: a domain that went after "tables" named it.
+    [Fact]
+    public async Task DescribeAsync_TypeOfAnOriginAttributeThatTypesLacks_IsSqlsrc225NamingTheColumn()
+    {
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT email FROM users", [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "email", 1043, users, 3, length: 254));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [1043, PostgresRows.EmailT.Oid], PostgresRows.Varchar);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT email FROM users"),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.Arguments.ShouldBe(["Q", "the type of the column 'email' no longer exists in its table"]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
     // One script for a query of users.id and an aggregate, whatever its SQL says of a join.
     private static async Task<QueryDescription> DescribeUsersIdAsync(string sql)
     {

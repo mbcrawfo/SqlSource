@@ -50,6 +50,9 @@ internal static class PostgresErrors
         "Npgsql takes no type name that is written with quotes; declare the parameter as text with -- param: and "
         + "cast it to the type where it is used";
 
+    public const string SchemaChangedHelp =
+        "the database's schema changed while the query was described; run the tool again";
+
     private const string UndefinedObject = "42704";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
@@ -304,6 +307,25 @@ internal static class PostgresErrors
             type.Contains('"', StringComparison.Ordinal) ? BindQuotedHelp : BindHelp
         );
     }
+
+    /// <summary>
+    /// <c>SQLSRC225</c>: a table, a column or a type that the query uses went while it was described, since another
+    /// session dropped it between two calls.  The server said nothing, so there is no server line, and the help says
+    /// to run the tool again.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="step">The step whose call found out: <c>catalog</c> or <c>resolve type</c>.</param>
+    /// <param name="what">
+    /// What went, as the end of a sentence: <c>the table of the column 'id' no longer exists</c>.
+    /// </param>
+    public static DescribeFailure SchemaChanged(DescribeRequest query, DescribeStep step, string what) =>
+        new(
+            ToolDiagnostics.ServerRejectedQuery,
+            new EquatableArray<string>([query.Name, what]),
+            step,
+            EquatableArray<string>.Empty,
+            SchemaChangedHelp
+        );
 
     // SQLSRC225.  The server's lines say what is wrong, so there is no help.
     private static DescribeFailure Rejected(

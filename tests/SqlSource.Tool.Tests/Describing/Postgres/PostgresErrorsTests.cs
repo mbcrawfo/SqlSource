@@ -268,6 +268,28 @@ public class PostgresErrorsTests
         failure.ServerLines.ShouldBe(["Exception while reading from stream"]);
     }
 
+    // Nothing the server said: a table, a column or a type went while the query was described.  So there is no
+    // server line, and the help says to run the tool again.
+    [Fact]
+    public void SchemaChanged_TableThatWentAtTheCatalog_IsSqlsrc225WithNoServerLineAndTheHelp()
+    {
+        const string What = "the table of the column 'id' no longer exists";
+
+        var failure = PostgresErrors.SchemaChanged(Query(), DescribeStep.Catalog, What);
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe(["Q", What]);
+        failure.Step.ShouldBe(DescribeStep.Catalog);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
+    }
+
+    [Fact]
+    public void SchemaChanged_TypeThatWentAtResolveType_KeepsTheStepItWasGiven() =>
+        PostgresErrors
+            .SchemaChanged(Query(), DescribeStep.ResolveType, "the type of the column 'n' no longer exists")
+            .Step.ShouldBe(DescribeStep.ResolveType);
+
     // What PostgreSQL 13 says of "types".  The position is in the tool's own query of the catalog, which the user
     // never wrote, so there is no line for it; the detail and the hint of the server stay.
     [Fact]

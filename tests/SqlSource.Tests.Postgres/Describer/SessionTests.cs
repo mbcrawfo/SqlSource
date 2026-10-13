@@ -173,6 +173,42 @@ public sealed class SessionTests(PostgresContainer postgres)
         CaptureJson.TextOf(capture.Calls[3].Answer).ShouldContain(PostgresConnection.LostConnection);
     }
 
+    // Another session drops the table the query reads after "columns" named it: "tables" answers nothing for it.  That
+    // is SQLSRC225 at the catalog and not a throw, "types" and "check" are not asked, the statement is freed, and the
+    // session describes another query afterwards.
+    [Fact]
+    public async Task Describe_TableDroppedBetweenColumnsAndTables_IsSqlsrc225AtCatalogAndNoThrow()
+    {
+        await ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
+        var capture = new DescribeCapture("postgres");
+        var exchange = new DropsTheTableAfterColumns(postgres.ConnectionString);
+        var opened = await Sessions.OpenAsync(postgres.ConnectionString, new CapturingExchange(exchange, capture));
+        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        var token = TestContext.Current.CancellationToken;
+
+        var described = await session.DescribeAsync(Requests.Of("SELECT id FROM session_gone"), token);
+        var later = await session.DescribeAsync(Requests.Of("SELECT 1 AS one"), token);
+
+        var failure = ShouldBeRejected(described, DescribeStep.Catalog);
+        failure.Arguments.ShouldBe([Requests.Query, "the table of the column 'id' no longer exists"]);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
+        capture
+            .Calls.Take(5)
+            .Select(call => call.Method)
+            .ShouldBe(["open", "prepare", "columns", "tables", "deallocate"]);
+        later.Failure.ShouldBeNull();
+        _ = later.Value.ShouldNotBeNull();
+        (await Sessions.PreparedStatementsAsync(session)).ShouldBe(0);
+    }
+
+    private async Task ExecuteAsync(string sql)
+    {
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand(sql);
+        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+    }
+
     private static DescribeFailure ShouldBeRejected(
         Outcome<QueryDescription, DescribeFailure> described,
         DescribeStep step
@@ -201,6 +237,31 @@ public sealed class SessionTests(PostgresContainer postgres)
             if (method == "prepare" && Session is { } session)
             {
                 await Sessions.EndBackendAsync(session, connection);
+            }
+
+            return answer;
+        }
+    }
+
+    // Asks the server, and drops session_gone from a connection of its own when "columns" has answered, once.
+    private sealed class DropsTheTableAfterColumns(string connection) : IDescribeExchange
+    {
+        private bool _dropped;
+
+        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
+            string method,
+            TRequest request,
+            Func<TRequest, CancellationToken, Task<TAnswer>> live,
+            CancellationToken cancellationToken
+        )
+        {
+            var answer = await LiveExchange.Instance.AskAsync(method, request, live, cancellationToken);
+            if (method == "columns" && !_dropped)
+            {
+                _dropped = true;
+                await using var source = NpgsqlDataSource.Create(connection);
+                await using var command = source.CreateCommand("DROP TABLE session_gone");
+                _ = await command.ExecuteNonQueryAsync(cancellationToken);
             }
 
             return answer;

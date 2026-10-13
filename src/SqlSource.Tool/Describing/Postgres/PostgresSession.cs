@@ -186,6 +186,19 @@ internal sealed class PostgresSession : IDescribeSession
             return Failed(PostgresErrors.Tables(tables.Failure, request));
         }
 
+        // Another session may have dropped a table or a column since "columns": that is the server's change and not
+        // a bug, and ColumnOrigin.Find would throw for it.
+        if (
+            columns
+                .Select(column => ColumnOrigin.MissingFrom(column, tables.Value))
+                .OfType<string>()
+                .FirstOrDefault() is
+            { } gone
+        )
+        {
+            return Failed(PostgresErrors.SchemaChanged(request, DescribeStep.Catalog, gone));
+        }
+
         ColumnOrigin?[] origins = [.. columns.Select(column => ColumnOrigin.Find(column, tables.Value))];
 
         // After "tables": the type of an origin attribute is where a domain is found, so the one request of "types"
@@ -201,6 +214,11 @@ internal sealed class PostgresSession : IDescribeSession
         if (!rows.Succeeded)
         {
             return Failed(PostgresErrors.Types(rows.Failure, request));
+        }
+
+        if (MissingType(request, parameterOids, columns, origins, rows.Value) is { } lost)
+        {
+            return Failed(PostgresErrors.SchemaChanged(request, DescribeStep.ResolveType, lost));
         }
 
         var parameters = TypeParameters(request, parameterOids, rows.Value);
@@ -220,6 +238,45 @@ internal sealed class PostgresSession : IDescribeSession
         return await CheckAsync(request, parameters.Value, columns, rows.Value, cancellationToken) is { } differs
             ? Failed(differs)
             : Described(parameters.Value, built.Value, gated);
+    }
+
+    // The first type that was asked for and has no row, in the order of the request, or null: the parameters, the
+    // columns, the attributes of their origins.  A type that another session dropped since "tables" has none, and
+    // PostgresTypes.Build and the classes of a column would throw for it.  A type that the closure reaches by itself,
+    // the base of a domain or the element of an array, comes from the query of the row that reaches it, so it is
+    // never missing alone.
+    private static string? MissingType(
+        DescribeRequest request,
+        IReadOnlyList<long> parameterOids,
+        IReadOnlyList<PostgresColumnRow> columns,
+        ColumnOrigin?[] origins,
+        IReadOnlyDictionary<long, PostgresTypeRow> rows
+    )
+    {
+        for (var index = 0; index < parameterOids.Count; index++)
+        {
+            if (!rows.ContainsKey(parameterOids[index]))
+            {
+                var written = PostgresErrors.Written(request.Parameters[index]);
+                return $"the type of the parameter '{written}' no longer exists";
+            }
+        }
+
+        var column = columns.FirstOrDefault(column => !rows.ContainsKey(column.TypeOid));
+        if (column is not null)
+        {
+            return $"the type of the column '{column.Name}' no longer exists";
+        }
+
+        for (var index = 0; index < origins.Length; index++)
+        {
+            if (origins[index] is { } origin && !rows.ContainsKey(origin.Attribute.TypeOid))
+            {
+                return $"the type of the column '{columns[index].Name}' no longer exists in its table";
+            }
+        }
+
+        return null;
     }
 
     // The types the server resolved for the parameters of the query's list.  It lists a type for a "$n" that the SQL

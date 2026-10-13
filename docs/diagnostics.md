@@ -926,6 +926,8 @@ Mend the query, or bring the database to the schema the query was written for.  
 
 A statement that the server cannot prepare is reported so as well, though its SQL is valid: `CALL` and data definition such as `CREATE TABLE` are two, and of the first the server says `syntax error at or near "CALL"`.
 
+It is also given when a table, a column or a type that the query uses was dropped while the tool described it, since another session changed the schema between two of the tool's questions.  The message says what went, as in `the table of the column 'id' no longer exists`; there is no `server:` line, since the server said nothing, and the help says to run the tool again.
+
 It is also what a connection that the server ended while the queries were described is reported as.  The query that finds it out has what the server said last, `57P01: terminating connection due to administrator command` for a backend that was ended, or the driver's message with no SQLSTATE when the server said nothing.  Every query of that database after it has the line `the connection to the server was lost`, with no SQLSTATE: start the run again.
 
 ## SQLSRC226
