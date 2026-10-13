@@ -238,18 +238,29 @@ internal sealed class PostgresSession : IDescribeSession
 
         // After the columns, and after everything that sets a column's nullability: the last check of the match
         // reads it.
-        var match = MatchOf(built.Value, origins);
+        var match = MatchOf(request, built.Value, origins);
 
         return await CheckAsync(request, parameters.Value, columns, rows.Value, cancellationToken) is { } differs
             ? Failed(differs)
             : Described(parameters.Value, built.Value, gated, match);
     }
 
-    // A statement without rows has no match.
-    private static (SidecarTable? Table, string Result)? MatchOf(
+    // A statement without rows has no match, and no event of one.
+    private (SidecarTable? Table, string Result)? MatchOf(
+        DescribeRequest request,
         IReadOnlyList<SidecarColumn> columns,
         ColumnOrigin?[] origins
-    ) => columns.Count == 0 ? null : TableMatcher.Match(columns, origins);
+    )
+    {
+        if (columns.Count == 0)
+        {
+            return null;
+        }
+
+        var match = TableMatcher.Match(columns, origins);
+        PostgresEvents.TableMatch(_log, request.Name, match.Table, match.Result);
+        return match;
+    }
 
     // The first type that was asked for and has no row, in the order of the request, or null: the parameters, the
     // columns, the attributes of their origins.  A type that another session dropped since "tables" has none, and

@@ -971,7 +971,7 @@ After the method `Column`, add:
             "table-match",
             new("query", query),
             new("result", result),
-            new("table", table is null ? LogValue.Null : (LogValue)$"{table.Schema}.{table.Name}")
+            new("table", table is null ? LogValue.Null : (LogValue)$"{table.Schema}.{table.Table}")
         );
 ```
 

@@ -13,7 +13,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// removes the connection's value from every string.  A member is added and never renamed.  <c>open</c> has no
 /// event of its own: the run's <c>database.open</c> records what the session knows of its server.  A describe
 /// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, one <c>column</c> for each column,
-/// <c>check</c> and <c>deallocate</c>, in that order, each only when its call was made.
+/// <c>table-match</c>, <c>check</c> and <c>deallocate</c>, in that order, each only when its call was made, and
+/// <c>table-match</c> only for a statement with rows whose columns were all built.
 /// </remarks>
 internal static class PostgresEvents
 {
@@ -141,6 +142,18 @@ internal static class PostgresEvents
             new("nullable", column.Nullable is { } nullable ? (LogValue)nullable : LogValue.Null),
             new("nullableSource", column.NullableSource),
             new("gated", gated)
+        );
+
+    /// <summary>
+    /// <c>postgres.table-match</c>: <c>matched</c> with the relation whose column list the result is, as
+    /// <c>schema.name</c>, or the first check of the match that failed with no table.
+    /// </summary>
+    public static void TableMatch(IRunLog log, string query, SidecarTable? table, string result) =>
+        log.Write(
+            "table-match",
+            new("query", query),
+            new("result", result),
+            new("table", table is null ? LogValue.Null : (LogValue)$"{table.Schema}.{table.Table}")
         );
 
     /// <summary><c>postgres.deallocate</c>: the one place that says a statement could not be freed.</summary>
