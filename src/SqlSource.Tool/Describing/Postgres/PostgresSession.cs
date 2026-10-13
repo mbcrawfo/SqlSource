@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -83,11 +84,15 @@ internal sealed class PostgresSession : IDescribeSession
         """;
 
     private readonly IDescribeExchange _exchange;
+    private readonly IRunLog _log;
+    private readonly TimeProvider _time;
     private int _statements;
 
-    private PostgresSession(IDescribeExchange exchange, PostgresConnection connection, ServerInfo server)
+    private PostgresSession(OpenRequest request, IRunLog log, PostgresConnection connection, ServerInfo server)
     {
-        _exchange = exchange;
+        _exchange = request.Exchange;
+        _time = request.Time;
+        _log = log;
         Connection = connection;
         Server = server;
     }
@@ -101,6 +106,9 @@ internal sealed class PostgresSession : IDescribeSession
     internal PostgresConnection Connection { get; }
 
     /// <summary>Asks <c>open</c>, and gives the session of the server that answered.</summary>
+    /// <param name="request">The database, its connection, the exchange and the clock.</param>
+    /// <param name="log">Where the session's events go.</param>
+    /// <param name="cancellationToken">Ends the call.</param>
     [SuppressMessage(
         "Reliability",
         "CA2000:Dispose objects before losing scope",
@@ -110,6 +118,7 @@ internal sealed class PostgresSession : IDescribeSession
     )]
     public static async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,
+        IRunLog log,
         CancellationToken cancellationToken
     )
     {
@@ -128,7 +137,7 @@ internal sealed class PostgresSession : IDescribeSession
                 return Outcome<IDescribeSession, DescribeFailure>.Failed(PostgresErrors.Open(error, request.Database));
             }
 
-            var session = new PostgresSession(request.Exchange, connection, ServerOf(answer));
+            var session = new PostgresSession(request, log, connection, ServerOf(answer));
             kept = true;
             return Outcome<IDescribeSession, DescribeFailure>.Of(session);
         }
@@ -174,7 +183,7 @@ internal sealed class PostgresSession : IDescribeSession
             sql,
             types.Value
         );
-        var prepared = await _exchange.AskAsync("prepare", prepare, PrepareLiveAsync, cancellationToken);
+        var prepared = await PrepareAsync(request.Name, prepare, cancellationToken);
         if (prepared.Error is { } error)
         {
             // There is no statement to free.
@@ -189,12 +198,7 @@ internal sealed class PostgresSession : IDescribeSession
         {
             // With the describe's own token: a cancelled describe leaves the statement to die with its session.
             // The error of the call is never reported.
-            _ = await _exchange.AskAsync(
-                "deallocate",
-                new PostgresDeallocateRequest(prepare.Statement),
-                DeallocateLiveAsync,
-                cancellationToken
-            );
+            await DeallocateAsync(new PostgresDeallocateRequest(prepare.Statement), cancellationToken);
         }
     }
 
@@ -224,12 +228,7 @@ internal sealed class PostgresSession : IDescribeSession
         // The server lists a type for a "$n" that the SQL writes itself, after the query's own.  It is no parameter
         // of the query: the list's are the first.
         var oids = resolved.Take(count).ToList();
-        var answer = await _exchange.AskAsync(
-            "types",
-            new PostgresTypesRequest([.. oids.Distinct().Order()]),
-            TypesLiveAsync,
-            cancellationToken
-        );
+        var answer = await TypesAsync(new PostgresTypesRequest([.. oids.Distinct().Order()]), cancellationToken);
         if (answer.Error is { } error)
         {
             return Failed(PostgresErrors.Types(error, request));
@@ -289,6 +288,41 @@ internal sealed class PostgresSession : IDescribeSession
                 .. (answer.Settings ?? []).Select(static setting => new ServerSetting(setting.Name, setting.Value)),
             ])
         );
+
+    // Each call is asked through the exchange and written to the log where it happens, with how long it took by the
+    // run's clock.  Under a replay the event is written all the same.
+    private async Task<PostgresPrepareAnswer> PrepareAsync(
+        string query,
+        PostgresPrepareRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var started = _time.GetTimestamp();
+        var answer = await _exchange.AskAsync("prepare", request, PrepareLiveAsync, cancellationToken);
+        PostgresEvents.Prepare(_log, query, request, answer, ElapsedSince(started));
+        return answer;
+    }
+
+    private async Task<PostgresTypesAnswer> TypesAsync(
+        PostgresTypesRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var started = _time.GetTimestamp();
+        var answer = await _exchange.AskAsync("types", request, TypesLiveAsync, cancellationToken);
+        PostgresEvents.Types(_log, request, answer, ElapsedSince(started));
+        return answer;
+    }
+
+    // The error of the call is logged and never reported.
+    private async Task DeallocateAsync(PostgresDeallocateRequest request, CancellationToken cancellationToken)
+    {
+        var started = _time.GetTimestamp();
+        var answer = await _exchange.AskAsync("deallocate", request, DeallocateLiveAsync, cancellationToken);
+        PostgresEvents.Deallocate(_log, request, answer, ElapsedSince(started));
+    }
+
+    private long ElapsedSince(long started) => (long)_time.GetElapsedTime(started).TotalMilliseconds;
 
     // In each "live" function, what the server can cause is the answer's error.  A cancellation passes through, and
     // anything else is a bug.

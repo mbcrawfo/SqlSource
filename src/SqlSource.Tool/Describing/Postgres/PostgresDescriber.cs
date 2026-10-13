@@ -18,5 +18,5 @@ internal sealed class PostgresDescriber : IQueryDescriber
         OpenRequest request,
         IRunLog log,
         CancellationToken cancellationToken
-    ) => PostgresSession.OpenAsync(request, cancellationToken);
+    ) => PostgresSession.OpenAsync(request, log, cancellationToken);
 }
