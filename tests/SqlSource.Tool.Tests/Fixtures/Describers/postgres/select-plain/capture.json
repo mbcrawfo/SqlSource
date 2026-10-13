@@ -1,0 +1,1080 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT\n    u.id, u.name, u.email, u.status, u.tags, u.balance, u.created_at, u.deleted_at, u.name_upper,\n    s.flag, s.small, s.big, s.ratio, s.amount, s.code, s.label, s.born, s.at_time, s.at_local, s.span, s.token,\n    s.payload, s.document,\n    b.during, b.slots\nFROM users AS u\nCROSS JOIN samples AS s\nCROSS JOIN bookings AS b\nWHERE u.id = $1",
+        "types": [
+          "unknown"
+        ]
+      },
+      "answer": {
+        "parameterTypes": [
+          23
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 1
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "id",
+            "typeOid": 23,
+            "tableOid": 16396,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 1,
+            "name": "name",
+            "typeOid": 1043,
+            "tableOid": 16396,
+            "attributeNumber": 2,
+            "length": 100,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 2,
+            "name": "email",
+            "typeOid": 1043,
+            "tableOid": 16396,
+            "attributeNumber": 3,
+            "length": 254,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 3,
+            "name": "status",
+            "typeOid": 16390,
+            "tableOid": 16396,
+            "attributeNumber": 4,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 4,
+            "name": "tags",
+            "typeOid": 1009,
+            "tableOid": 16396,
+            "attributeNumber": 5,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 5,
+            "name": "balance",
+            "typeOid": 1700,
+            "tableOid": 16396,
+            "attributeNumber": 6,
+            "length": null,
+            "precision": 18,
+            "scale": 2
+          },
+          {
+            "ordinal": 6,
+            "name": "created_at",
+            "typeOid": 1184,
+            "tableOid": 16396,
+            "attributeNumber": 7,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 7,
+            "name": "deleted_at",
+            "typeOid": 1184,
+            "tableOid": 16396,
+            "attributeNumber": 8,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 8,
+            "name": "name_upper",
+            "typeOid": 25,
+            "tableOid": 16396,
+            "attributeNumber": 9,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 9,
+            "name": "flag",
+            "typeOid": 16,
+            "tableOid": 16450,
+            "attributeNumber": 2,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 10,
+            "name": "small",
+            "typeOid": 21,
+            "tableOid": 16450,
+            "attributeNumber": 3,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 11,
+            "name": "big",
+            "typeOid": 20,
+            "tableOid": 16450,
+            "attributeNumber": 4,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 12,
+            "name": "ratio",
+            "typeOid": 700,
+            "tableOid": 16450,
+            "attributeNumber": 5,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 13,
+            "name": "amount",
+            "typeOid": 701,
+            "tableOid": 16450,
+            "attributeNumber": 6,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 14,
+            "name": "code",
+            "typeOid": 1042,
+            "tableOid": 16450,
+            "attributeNumber": 7,
+            "length": 2,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 15,
+            "name": "label",
+            "typeOid": 25,
+            "tableOid": 16450,
+            "attributeNumber": 8,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 16,
+            "name": "born",
+            "typeOid": 1082,
+            "tableOid": 16450,
+            "attributeNumber": 9,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 17,
+            "name": "at_time",
+            "typeOid": 1083,
+            "tableOid": 16450,
+            "attributeNumber": 10,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 18,
+            "name": "at_local",
+            "typeOid": 1114,
+            "tableOid": 16450,
+            "attributeNumber": 11,
+            "length": null,
+            "precision": 3,
+            "scale": null
+          },
+          {
+            "ordinal": 19,
+            "name": "span",
+            "typeOid": 1186,
+            "tableOid": 16450,
+            "attributeNumber": 12,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 20,
+            "name": "token",
+            "typeOid": 2950,
+            "tableOid": 16450,
+            "attributeNumber": 13,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 21,
+            "name": "payload",
+            "typeOid": 17,
+            "tableOid": 16450,
+            "attributeNumber": 14,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 22,
+            "name": "document",
+            "typeOid": 3802,
+            "tableOid": 16450,
+            "attributeNumber": 15,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 23,
+            "name": "during",
+            "typeOid": 3910,
+            "tableOid": 16433,
+            "attributeNumber": 3,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 24,
+            "name": "slots",
+            "typeOid": 4451,
+            "tableOid": 16433,
+            "attributeNumber": 4,
+            "length": null,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16396,
+          16433,
+          16450
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16396,
+            "relkind": "r",
+            "schema": "public",
+            "name": "users",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "a",
+                "generated": "",
+                "typeOid": 23
+              },
+              {
+                "attnum": 2,
+                "name": "name",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1043
+              },
+              {
+                "attnum": 3,
+                "name": "email",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16387
+              },
+              {
+                "attnum": 4,
+                "name": "status",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16390
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1009
+              },
+              {
+                "attnum": 6,
+                "name": "balance",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700
+              },
+              {
+                "attnum": 7,
+                "name": "created_at",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184
+              },
+              {
+                "attnum": 8,
+                "name": "deleted_at",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184
+              },
+              {
+                "attnum": 9,
+                "name": "name_upper",
+                "notNull": false,
+                "identity": "",
+                "generated": "s",
+                "typeOid": 25
+              }
+            ]
+          },
+          {
+            "oid": 16433,
+            "relkind": "r",
+            "schema": "public",
+            "name": "bookings",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "d",
+                "generated": "",
+                "typeOid": 20
+              },
+              {
+                "attnum": 2,
+                "name": "user_id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23
+              },
+              {
+                "attnum": 3,
+                "name": "during",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 3910
+              },
+              {
+                "attnum": 4,
+                "name": "slots",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 4451
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1009
+              }
+            ]
+          },
+          {
+            "oid": 16450,
+            "relkind": "r",
+            "schema": "public",
+            "name": "samples",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23
+              },
+              {
+                "attnum": 2,
+                "name": "flag",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16
+              },
+              {
+                "attnum": 3,
+                "name": "small",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 21
+              },
+              {
+                "attnum": 4,
+                "name": "big",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 20
+              },
+              {
+                "attnum": 5,
+                "name": "ratio",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 700
+              },
+              {
+                "attnum": 6,
+                "name": "amount",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 701
+              },
+              {
+                "attnum": 7,
+                "name": "code",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1042
+              },
+              {
+                "attnum": 8,
+                "name": "label",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 25
+              },
+              {
+                "attnum": 9,
+                "name": "born",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1082
+              },
+              {
+                "attnum": 10,
+                "name": "at_time",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1083
+              },
+              {
+                "attnum": 11,
+                "name": "at_local",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1114
+              },
+              {
+                "attnum": 12,
+                "name": "span",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1186
+              },
+              {
+                "attnum": 13,
+                "name": "token",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 2950
+              },
+              {
+                "attnum": 14,
+                "name": "payload",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 17
+              },
+              {
+                "attnum": 15,
+                "name": "document",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 3802
+              }
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          16,
+          17,
+          20,
+          21,
+          23,
+          25,
+          700,
+          701,
+          1009,
+          1042,
+          1043,
+          1082,
+          1083,
+          1114,
+          1184,
+          1186,
+          1700,
+          2950,
+          3802,
+          3910,
+          4451,
+          16387,
+          16390
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 16,
+            "typname": "bool",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "B",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "boolean",
+            "enumLabels": null
+          },
+          {
+            "oid": 17,
+            "typname": "bytea",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "U",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "bytea",
+            "enumLabels": null
+          },
+          {
+            "oid": 20,
+            "typname": "int8",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "bigint",
+            "enumLabels": null
+          },
+          {
+            "oid": 21,
+            "typname": "int2",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "smallint",
+            "enumLabels": null
+          },
+          {
+            "oid": 23,
+            "typname": "int4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "integer",
+            "enumLabels": null
+          },
+          {
+            "oid": 25,
+            "typname": "text",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "text",
+            "enumLabels": null
+          },
+          {
+            "oid": 700,
+            "typname": "float4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "real",
+            "enumLabels": null
+          },
+          {
+            "oid": 701,
+            "typname": "float8",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "double precision",
+            "enumLabels": null
+          },
+          {
+            "oid": 1009,
+            "typname": "_text",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "A",
+            "typelem": 25,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "text[]",
+            "enumLabels": null
+          },
+          {
+            "oid": 1042,
+            "typname": "bpchar",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "bpchar",
+            "enumLabels": null
+          },
+          {
+            "oid": 1043,
+            "typname": "varchar",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "character varying",
+            "enumLabels": null
+          },
+          {
+            "oid": 1082,
+            "typname": "date",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "D",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "date",
+            "enumLabels": null
+          },
+          {
+            "oid": 1083,
+            "typname": "time",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "D",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "time without time zone",
+            "enumLabels": null
+          },
+          {
+            "oid": 1114,
+            "typname": "timestamp",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "D",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "timestamp without time zone",
+            "enumLabels": null
+          },
+          {
+            "oid": 1184,
+            "typname": "timestamptz",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "D",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "timestamp with time zone",
+            "enumLabels": null
+          },
+          {
+            "oid": 1186,
+            "typname": "interval",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "T",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "interval",
+            "enumLabels": null
+          },
+          {
+            "oid": 1700,
+            "typname": "numeric",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "numeric",
+            "enumLabels": null
+          },
+          {
+            "oid": 2950,
+            "typname": "uuid",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "U",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "uuid",
+            "enumLabels": null
+          },
+          {
+            "oid": 3802,
+            "typname": "jsonb",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "U",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "jsonb",
+            "enumLabels": null
+          },
+          {
+            "oid": 3904,
+            "typname": "int4range",
+            "nspname": "pg_catalog",
+            "typtype": "r",
+            "typcategory": "R",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": 23,
+            "multirangeRngsubtype": null,
+            "formatType": "int4range",
+            "enumLabels": null
+          },
+          {
+            "oid": 3910,
+            "typname": "tstzrange",
+            "nspname": "pg_catalog",
+            "typtype": "r",
+            "typcategory": "R",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": 1184,
+            "multirangeRngsubtype": null,
+            "formatType": "tstzrange",
+            "enumLabels": null
+          },
+          {
+            "oid": 4451,
+            "typname": "int4multirange",
+            "nspname": "pg_catalog",
+            "typtype": "m",
+            "typcategory": "R",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": 23,
+            "formatType": "int4multirange",
+            "enumLabels": null
+          },
+          {
+            "oid": 16387,
+            "typname": "email_t",
+            "nspname": "public",
+            "typtype": "d",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 1043,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "email_t",
+            "enumLabels": null
+          },
+          {
+            "oid": 16390,
+            "typname": "user_status",
+            "nspname": "public",
+            "typtype": "e",
+            "typcategory": "E",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "user_status",
+            "enumLabels": [
+              "active",
+              "disabled"
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT\n    u.id, u.name, u.email, u.status, u.tags, u.balance, u.created_at, u.deleted_at, u.name_upper,\n    s.flag, s.small, s.big, s.ratio, s.amount, s.code, s.label, s.born, s.at_time, s.at_local, s.span, s.token,\n    s.payload, s.document,\n    b.during, b.slots\nFROM users AS u\nCROSS JOIN samples AS s\nCROSS JOIN bookings AS b\nWHERE u.id = @id",
+        "parameters": [
+          {
+            "name": "id",
+            "dataTypeName": "integer"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "id",
+            "typeOid": 23,
+            "dataTypeName": "integer"
+          },
+          {
+            "name": "name",
+            "typeOid": 1043,
+            "dataTypeName": "character varying(100)"
+          },
+          {
+            "name": "email",
+            "typeOid": 1043,
+            "dataTypeName": "character varying(254)"
+          },
+          {
+            "name": "status",
+            "typeOid": 16390,
+            "dataTypeName": "public.user_status"
+          },
+          {
+            "name": "tags",
+            "typeOid": 1009,
+            "dataTypeName": "text[]"
+          },
+          {
+            "name": "balance",
+            "typeOid": 1700,
+            "dataTypeName": "numeric(18, 2)"
+          },
+          {
+            "name": "created_at",
+            "typeOid": 1184,
+            "dataTypeName": "timestamp with time zone"
+          },
+          {
+            "name": "deleted_at",
+            "typeOid": 1184,
+            "dataTypeName": "timestamp with time zone"
+          },
+          {
+            "name": "name_upper",
+            "typeOid": 25,
+            "dataTypeName": "text"
+          },
+          {
+            "name": "flag",
+            "typeOid": 16,
+            "dataTypeName": "boolean"
+          },
+          {
+            "name": "small",
+            "typeOid": 21,
+            "dataTypeName": "smallint"
+          },
+          {
+            "name": "big",
+            "typeOid": 20,
+            "dataTypeName": "bigint"
+          },
+          {
+            "name": "ratio",
+            "typeOid": 700,
+            "dataTypeName": "real"
+          },
+          {
+            "name": "amount",
+            "typeOid": 701,
+            "dataTypeName": "double precision"
+          },
+          {
+            "name": "code",
+            "typeOid": 1042,
+            "dataTypeName": "character(2)"
+          },
+          {
+            "name": "label",
+            "typeOid": 25,
+            "dataTypeName": "text"
+          },
+          {
+            "name": "born",
+            "typeOid": 1082,
+            "dataTypeName": "date"
+          },
+          {
+            "name": "at_time",
+            "typeOid": 1083,
+            "dataTypeName": "time without time zone"
+          },
+          {
+            "name": "at_local",
+            "typeOid": 1114,
+            "dataTypeName": "timestamp(3) without time zone"
+          },
+          {
+            "name": "span",
+            "typeOid": 1186,
+            "dataTypeName": "interval"
+          },
+          {
+            "name": "token",
+            "typeOid": 2950,
+            "dataTypeName": "uuid"
+          },
+          {
+            "name": "payload",
+            "typeOid": 17,
+            "dataTypeName": "bytea"
+          },
+          {
+            "name": "document",
+            "typeOid": 3802,
+            "dataTypeName": "jsonb"
+          },
+          {
+            "name": "during",
+            "typeOid": 3910,
+            "dataTypeName": "tstzrange"
+          },
+          {
+            "name": "slots",
+            "typeOid": 4451,
+            "dataTypeName": "int4multirange"
+          }
+        ],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}

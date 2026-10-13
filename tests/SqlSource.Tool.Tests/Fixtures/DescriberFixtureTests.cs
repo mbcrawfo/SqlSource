@@ -61,9 +61,9 @@ public sealed class DescriberFixtureTests : IDisposable
         replayed.ShouldBe(fixture.Expected);
     }
 
-    // The cases of the first describer.  A build that copied none would leave the theory with nothing to run.
+    // The cases of the PostgreSQL describer.  A build that copied none would leave the theory with nothing to run.
     [Fact]
-    public void Cases_OfPostgres_HoldTheFirstFour()
+    public void Cases_OfPostgres_HoldEveryCase()
     {
         var names = Found.Select(static found => found.ToString()).ToList();
 
@@ -72,6 +72,14 @@ public sealed class DescriberFixtureTests : IDisposable
             {
                 "postgres/delete-declared-only",
                 "postgres/insert-declared",
+                "postgres/insert-returning",
+                "postgres/select-declared-domain",
+                "postgres/select-expressions",
+                "postgres/select-left-join",
+                "postgres/select-other-schema",
+                "postgres/select-plain",
+                "postgres/select-suffix-names",
+                "postgres/select-view",
                 "postgres/update-array-and-range",
                 "postgres/update-inferred",
             }
@@ -85,12 +93,13 @@ public sealed class DescriberFixtureTests : IDisposable
     [Theory]
     [InlineData("prepare")]
     [InlineData("columns")]
+    [InlineData("tables", "select-plain")]
     [InlineData("types")]
     [InlineData("check")]
     [InlineData("deallocate")]
-    public async Task Replay_CaptureWithACallRemoved_ThrowsACaptureMiss(string method)
+    public async Task Replay_CaptureWithACallRemoved_ThrowsACaptureMiss(string method, string from = "update-inferred")
     {
-        var source = Found.Single(static found => found.ToString() == "postgres/update-inferred");
+        var source = Found.Single(found => found.ToString() == "postgres/" + from);
         var capture = CaptureJson.Read(source.Capture).Value.ShouldNotBeNull();
         var cut = new DescribeCapture(capture.Engine);
         foreach (var call in capture.Calls.Where(call => call.Method != method))
