@@ -1,7 +1,10 @@
 using System;
+using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Tests.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 using Xunit;
@@ -62,7 +65,7 @@ public class DescriberTests
         var token = TestContext.Current.CancellationToken;
 
         var opened = await describer.OpenAsync(
-            new OpenRequest("billing", "Host=db", exchange),
+            new OpenRequest("billing", "Host=db", exchange, TimeProvider.System),
             NullRunLog.Instance,
             token
         );
@@ -86,7 +89,7 @@ public class DescriberTests
         var token = TestContext.Current.CancellationToken;
 
         var opened = await describer.OpenAsync(
-            new OpenRequest("billing", "Host=db", new RecordingExchange()),
+            new OpenRequest("billing", "Host=db", new RecordingExchange(), TimeProvider.System),
             NullRunLog.Instance,
             token
         );
@@ -98,11 +101,91 @@ public class DescriberTests
         described.Failure.ShouldNotBeNull().Step.ShouldBe(DescribeStep.DescribeColumns);
     }
 
+    private static readonly DescribeRequest GetUser = new(
+        "GetUser",
+        "SELECT 1;",
+        EquatableArray<SqlQueryParameter>.Empty
+    );
+
+    private static async Task<IDescribeSession> OpenAsync(FakeDescriber describer)
+    {
+        var opened = await describer.OpenAsync(
+            new OpenRequest("billing", "Host=db", LiveExchange.Instance, TimeProvider.System),
+            NullRunLog.Instance,
+            TestContext.Current.CancellationToken
+        );
+        return opened.Value.ShouldNotBeNull();
+    }
+
+    // What the describer of the tests is given goes through its plain records and comes back as it was.
+    [Fact]
+    public async Task DescribeAsync_DescriptionWithEveryPart_ComesBackEqual()
+    {
+        var describer = new FakeDescriber { Server = FakeDescriber.ServerWith("17.1", "4.5.6") };
+        describer.Descriptions["GetUser"] = FakeDescriber.TypedRows;
+
+        await using var session = await OpenAsync(describer);
+        var described = await session.DescribeAsync(GetUser, TestContext.Current.CancellationToken);
+
+        described.Value.ShouldBe(FakeDescriber.TypedRows);
+        session.Server.ShouldBe(describer.Server);
+    }
+
+    [Fact]
+    public async Task DescribeAsync_FailureGivenToTheDescriber_ComesBackWithEveryPart()
+    {
+        var describer = new FakeDescriber();
+        describer.Failures["GetUser"] = FakeDescriber.Failure(
+            "GetUser",
+            DescribeStep.Explain,
+            "check the SQL",
+            "line one",
+            "line two"
+        );
+
+        await using var session = await OpenAsync(describer);
+        var described = await session.DescribeAsync(GetUser, TestContext.Current.CancellationToken);
+
+        described.Value.ShouldBeNull();
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC999");
+        failure
+            .Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture)
+            .ShouldBe("The server rejected the query '{0}'");
+        failure.Descriptor.HelpLinkUri.ShouldBe("https://example.test/sqlsrc999");
+        failure.Arguments.ToArray().ShouldBe(["GetUser"]);
+        failure.Step.ShouldBe(DescribeStep.Explain);
+        failure.ServerLines.ToArray().ShouldBe(["line one", "line two"]);
+        failure.Help.ShouldBe("check the SQL");
+    }
+
+    // The describer of the tests carries the types its tests give it.  Phase 6 adds SQL Server's.
+    [Fact]
+    public async Task DescribeAsync_DescriptionWithASqlServerType_IsNotCarriedThroughTheExchange()
+    {
+        var describer = new FakeDescriber();
+        describer.Descriptions["GetUser"] = FakeDescriber.NoRows with
+        {
+            Parameters = TestSidecars.Of(new DescribedParameter("id", TestSidecars.SqlServer(), null)),
+        };
+
+        await using var session = await OpenAsync(describer);
+
+        _ = await Should.ThrowAsync<NotSupportedException>(async () =>
+            await session.DescribeAsync(GetUser, TestContext.Current.CancellationToken)
+        );
+    }
+
     // A record prints its members, and one of these is a secret.
     [Fact]
     public void ToString_OpenRequest_LeavesTheConnectionOut()
     {
-        var request = new OpenRequest("billing", Secrets.ConnectionWithWord, LiveExchange.Instance);
+        var request = new OpenRequest(
+            "billing",
+            Secrets.ConnectionWithWord,
+            LiveExchange.Instance,
+            TimeProvider.System
+        );
 
         request.ToString().ShouldBe("OpenRequest { Database = billing }");
     }

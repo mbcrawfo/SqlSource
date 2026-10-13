@@ -1,18 +1,22 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
+using SqlSource.Tests.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Tests;
 
-// The describer of the tests.  It is given a description, a failure or an exception for a query's name, makes every
-// call through the exchange as a real one must, and keeps what it was asked.  A query it was told nothing about is
-// a statement without rows and without typed parameters.
+// The describer of the tests.  It is given a description, a failure or an exception for a query's name, and keeps
+// what it was asked.  It makes every call through the exchange as a real one must: what crosses is the plain
+// records of FakeDescriberCalls.cs, which FakeCalls maps to the seam's types on this side, so a run of it can be
+// captured and replayed.  Under a replay its "live" functions never run: it then keeps nothing and its hooks do
+// not fire.  A query it was told nothing about is a statement without rows and without typed parameters.
 internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) : IQueryDescriber
 {
     // No describer ships yet, so no descriptor of a server's error exists; the tests bring one.
@@ -52,6 +56,45 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
             null,
             "not-needed",
             "no-origin"
+        );
+
+    // A statement with every part a description has: a parameter with its declared type, columns of a base type,
+    // of an array and of an enum, their origins, the table the result matches, and the provenance.
+    public static QueryDescription TypedRows { get; } =
+        new(
+            SidecarResultKind.Rows,
+            TestSidecars.Of(new DescribedParameter("id", TestSidecars.Postgres(), SidecarValues.TypeSource.Declared)),
+            TestSidecars.Of(
+                TestSidecars.Column(
+                    0,
+                    "id",
+                    TestSidecars.Postgres(),
+                    origin: new SidecarOrigin("public", "users", "id"),
+                    identity: true,
+                    computed: false
+                ),
+                TestSidecars.Column(
+                    1,
+                    "tags",
+                    TestSidecars.Postgres(
+                        "text[]",
+                        SidecarValues.Kind.Array,
+                        internalName: "_text",
+                        element: TestSidecars.Postgres("text", internalName: "text")
+                    ),
+                    nullable: true
+                ),
+                TestSidecars.Column(
+                    2,
+                    "mood",
+                    TestSidecars.Postgres("mood", SidecarValues.Kind.Enum, "public", "mood", labels: ["sad", "happy"]),
+                    nullable: null,
+                    nullableSource: null
+                )
+            ),
+            new SidecarTable("public", "users"),
+            SidecarValues.Plan.Walked,
+            SidecarValues.TableMatch.Matched
         );
 
     public SqlDialect Dialect => dialect;
@@ -113,14 +156,21 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     ) =>
         new(Rejected, new EquatableArray<string>([argument]), step, new EquatableArray<string>([.. serverLines]), help);
 
-    public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
+    [SuppressMessage(
+        "Reliability",
+        "CA2000:Dispose objects before losing scope",
+        Justification = "The session is its caller's to close: the run closes what it opened.  The analyzer follows "
+            + "a disposable that is returned itself and not one that is returned in an Outcome."
+    )]
+    public async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,
         IRunLog log,
         CancellationToken cancellationToken
-    ) =>
-        request.Exchange.AskAsync(
+    )
+    {
+        var answer = await request.Exchange.AskAsync(
             "open",
-            request.Database,
+            FakeOpenRequest.Instance,
             (_, _) =>
             {
                 Opened.Add(request);
@@ -130,69 +180,102 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
                     throw exception;
                 }
 
-                if (OpensNothing)
-                {
-                    return Task.FromResult<Outcome<IDescribeSession, DescribeFailure>>(null!);
-                }
-
-                if (OpenFailsWithNothing)
-                {
-                    return Task.FromResult(Outcome<IDescribeSession, DescribeFailure>.Failed(null!));
-                }
-
-                if (OpensWithNoSession)
-                {
-                    return Task.FromResult(Outcome<IDescribeSession, DescribeFailure>.Of(null!));
-                }
-
                 return Task.FromResult(
                     OpenFailure is { } failure
-                        ? Outcome<IDescribeSession, DescribeFailure>.Failed(failure)
-                        : Outcome<IDescribeSession, DescribeFailure>.Of(new Session(this, request.Exchange, log))
+                        ? new FakeOpenAnswer(null, FakeCalls.Plain(failure))
+                        : new FakeOpenAnswer(FakeCalls.Plain(Server), null)
                 );
             },
             cancellationToken
         );
 
-    private sealed class Session(FakeDescriber owner, IDescribeExchange exchange, IRunLog log) : IDescribeSession
-    {
-        public ServerInfo Server => owner.Server;
+        // What a describer with a bug returns.  None of it is an answer of an engine, so none of it crosses the
+        // exchange.
+        if (OpensNothing)
+        {
+            return null!;
+        }
 
-        public Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
+        if (OpenFailsWithNothing)
+        {
+            return Outcome<IDescribeSession, DescribeFailure>.Failed(null!);
+        }
+
+        if (OpensWithNoSession)
+        {
+            return Outcome<IDescribeSession, DescribeFailure>.Of(null!);
+        }
+
+        if (answer.Error is { } error)
+        {
+            return Outcome<IDescribeSession, DescribeFailure>.Failed(FakeCalls.Seam(error));
+        }
+
+        var server = FakeCalls.Seam(
+            answer.Server ?? throw new InvalidOperationException("The answer to 'open' holds no server and no error.")
+        );
+        return Outcome<IDescribeSession, DescribeFailure>.Of(new Session(this, request.Exchange, log, server));
+    }
+
+    // The server is what "open" answered, so that a replayed session has the server of its capture.
+    private sealed class Session(FakeDescriber owner, IDescribeExchange exchange, IRunLog log, ServerInfo server)
+        : IDescribeSession
+    {
+        public ServerInfo Server => server;
+
+        public async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
             DescribeRequest request,
             CancellationToken cancellationToken
-        ) =>
-            exchange.AskAsync(
+        )
+        {
+            var answer = await exchange.AskAsync(
                 "describe",
-                request,
-                async (asked, token) =>
+                FakeCalls.Plain(request),
+                async (_, token) =>
                 {
-                    owner.Described.Add(asked);
-                    owner.OnDescribe?.Invoke(log, asked);
+                    owner.Described.Add(request);
+                    owner.OnDescribe?.Invoke(log, request);
                     if (owner.BeforeDescribe is { } before)
                     {
-                        await before(asked);
+                        await before(request);
                         token.ThrowIfCancellationRequested();
                     }
 
-                    if (owner.Exceptions.TryGetValue(asked.Name, out var exception))
+                    if (owner.Exceptions.TryGetValue(request.Name, out var exception))
                     {
                         throw exception;
                     }
 
-                    if (owner.DescribeResult is { } result)
-                    {
-                        return result()!;
-                    }
-
-                    return owner.Failures.TryGetValue(asked.Name, out var failure)
-                        ? Outcome<QueryDescription, DescribeFailure>.Failed(failure)
-                        : Outcome<QueryDescription, DescribeFailure>.Of(
-                            owner.Descriptions.GetValueOrDefault(asked.Name, NoRows)
+                    return owner.Failures.TryGetValue(request.Name, out var failure)
+                        ? new FakeDescribeAnswer(null, FakeCalls.Plain(failure))
+                        : new FakeDescribeAnswer(
+                            FakeCalls.Plain(owner.Descriptions.GetValueOrDefault(request.Name, NoRows)),
+                            null
                         );
                 },
                 cancellationToken
             );
+
+            // What a describer with a bug returns, in place of the query's result.
+            if (owner.DescribeResult is { } result)
+            {
+                return result()!;
+            }
+
+            if (answer.Error is { } error)
+            {
+                return Outcome<QueryDescription, DescribeFailure>.Failed(FakeCalls.Seam(error));
+            }
+
+            return Outcome<QueryDescription, DescribeFailure>.Of(
+                FakeCalls.Seam(
+                    answer.Description
+                        ?? throw new InvalidOperationException(
+                            "The answer to 'describe' holds no description and no error."
+                        )
+                )
+            );
+        }
 
         public ValueTask DisposeAsync()
         {

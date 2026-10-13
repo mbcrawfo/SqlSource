@@ -100,7 +100,7 @@ internal static class DatabaseRuns
         var trace = reporter.Trace.Without(value);
         var engine = SqlDialectName.Canonical(database.Dialect);
         var guard = new Guard(value, host.GetEnvironmentVariable, cancellationToken);
-        var request = new OpenRequest(database.Name, value, host.Exchange(database.Name));
+        var request = new OpenRequest(database.Name, value, host.Exchange(database.Name), host.Time);
         var log = new SessionRunLog(reporter.Trace.Log, value, engine + ".");
         var opened = await guard.CallAsync(() => describer.OpenAsync(request, log, cancellationToken));
         // The value and not Succeeded, here and where a query is described: a describer may have given null for
