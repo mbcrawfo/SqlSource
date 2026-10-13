@@ -17,9 +17,10 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </summary>
 /// <remarks>
 /// A query is described through one prepared statement: <c>PREPARE</c> takes a declared type as written, resolves
-/// it, checks it against every use of its parameter, and infers the rest.  A prepared statement is session state
-/// and survives a rollback, so it is freed in a <c>finally</c>, outside any transaction; one left behind would be
-/// a leak until the session ends.  Its name is a counter, since the name is part of a request and a capture must be
+/// it, checks it against every use of its parameter, and infers the rest.  The statement is then described through
+/// an <c>EXECUTE</c> that is never run, which gives its columns.  A prepared statement is session state and
+/// survives a rollback, so it is freed in a <c>finally</c>, outside any transaction; one left behind would be a
+/// leak until the session ends.  Its name is a counter, since the name is part of a request and a capture must be
 /// the same each time it is recorded.
 /// </remarks>
 internal sealed class PostgresSession : IDescribeSession
@@ -144,7 +145,7 @@ internal sealed class PostgresSession : IDescribeSession
 
         try
         {
-            return await TypeParametersAsync(request, prepared, cancellationToken);
+            return await DescribePreparedAsync(request, prepare.Statement, prepared, cancellationToken);
         }
         finally
         {
@@ -154,49 +155,105 @@ internal sealed class PostgresSession : IDescribeSession
         }
     }
 
-    // Each parameter of the query's list gets the type the server resolved for it.
-    private async Task<Outcome<QueryDescription, DescribeFailure>> TypeParametersAsync(
+    // What is asked of a statement that was prepared, in this order: its columns, and every type that the
+    // parameters and the columns have, once.
+    private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
+        string statement,
         PostgresPrepareAnswer prepared,
         CancellationToken cancellationToken
     )
+    {
+        var parameterOids = ParameterOids(request, prepared);
+
+        var answer = await ColumnsAsync(
+            new PostgresColumnsRequest(statement, request.Parameters.Count),
+            cancellationToken
+        );
+        if (answer.Error is { } refused)
+        {
+            return Failed(PostgresErrors.Columns(refused, request));
+        }
+
+        var columns =
+            answer.Columns
+            ?? throw new InvalidOperationException("The answer to 'columns' holds no columns and no error.");
+
+        var rows = await RowsOfAsync(
+            [.. parameterOids, .. columns.Select(static column => column.TypeOid)],
+            cancellationToken
+        );
+        if (!rows.Succeeded)
+        {
+            return Failed(PostgresErrors.Types(rows.Failure, request));
+        }
+
+        var parameters = TypeParameters(request, parameterOids, rows.Value);
+        if (!parameters.Succeeded)
+        {
+            return Failed(parameters.Failure);
+        }
+
+        return Described(parameters.Value, [.. columns.Select(column => PostgresColumns.Build(column, rows.Value))]);
+    }
+
+    // The types the server resolved for the parameters of the query's list.  It lists a type for a "$n" that the SQL
+    // writes itself, after the query's own: that is no parameter of the query, and the list's are the first.
+    private static IReadOnlyList<long> ParameterOids(DescribeRequest request, PostgresPrepareAnswer prepared)
     {
         var count = request.Parameters.Count;
         var resolved =
             prepared.ParameterTypes
             ?? throw new InvalidOperationException("The answer to 'prepare' holds no types and no error.");
-        if (resolved.Count < count)
-        {
-            throw new InvalidOperationException(
+        return resolved.Count < count
+            ? throw new InvalidOperationException(
                 $"The server resolved {resolved.Count} types for the {count} parameters of '{request.Name}'."
+            )
+            : [.. resolved.Take(count)];
+    }
+
+    // The rows of every type asked for, by OID.  The request is sorted and holds each OID once, so that it is the
+    // same however a query orders what it names.  Nothing is asked when there is no type to ask for.
+    private async Task<Outcome<IReadOnlyDictionary<long, PostgresTypeRow>, PostgresServerError>> RowsOfAsync(
+        IReadOnlyList<long> oids,
+        CancellationToken cancellationToken
+    )
+    {
+        if (oids.Count == 0)
+        {
+            return Outcome<IReadOnlyDictionary<long, PostgresTypeRow>, PostgresServerError>.Of(
+                new Dictionary<long, PostgresTypeRow>()
             );
         }
 
-        if (count == 0)
-        {
-            return Described([]);
-        }
-
-        // The server lists a type for a "$n" that the SQL writes itself, after the query's own.  It is no parameter
-        // of the query: the list's are the first.
-        var oids = resolved.Take(count).ToList();
         var answer = await TypesAsync(new PostgresTypesRequest([.. oids.Distinct().Order()]), cancellationToken);
-        if (answer.Error is { } error)
-        {
-            return Failed(PostgresErrors.Types(error, request));
-        }
+        return answer.Error is { } error
+            ? Outcome<IReadOnlyDictionary<long, PostgresTypeRow>, PostgresServerError>.Failed(error)
+            : Outcome<IReadOnlyDictionary<long, PostgresTypeRow>, PostgresServerError>.Of(
+                (
+                    answer.Rows
+                    ?? throw new InvalidOperationException("The answer to 'types' holds no rows and no error.")
+                ).ToDictionary(static row => row.Oid)
+            );
+    }
 
-        var rows = (
-            answer.Rows ?? throw new InvalidOperationException("The answer to 'types' holds no rows and no error.")
-        ).ToDictionary(static row => row.Oid);
-        var parameters = new List<DescribedParameter>(count);
-        for (var index = 0; index < count; index++)
+    // Each parameter of the query's list gets the type the server resolved for it.
+    private static Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure> TypeParameters(
+        DescribeRequest request,
+        IReadOnlyList<long> oids,
+        IReadOnlyDictionary<long, PostgresTypeRow> rows
+    )
+    {
+        var parameters = new List<DescribedParameter>(oids.Count);
+        for (var index = 0; index < oids.Count; index++)
         {
             var parameter = request.Parameters[index];
             if (PostgresTypes.IsPseudo(oids[index], rows))
             {
                 // The server accepts a pseudo-type, declared or inferred, and no value has one.
-                return Failed(PostgresErrors.PseudoType(request, parameter, rows[oids[index]].FormatType));
+                return Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure>.Failed(
+                    PostgresErrors.PseudoType(request, parameter, rows[oids[index]].FormatType)
+                );
             }
 
             // A parameter has no facets: the protocol gives it an OID and no modifier.
@@ -209,21 +266,29 @@ internal sealed class PostgresSession : IDescribeSession
             );
         }
 
-        return Described(parameters);
+        return Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure>.Of(parameters);
     }
 
-    // The parameters, the result kind None and nothing else: the session asks the server for no columns.
-    private static Outcome<QueryDescription, DescribeFailure> Described(IReadOnlyList<DescribedParameter> parameters) =>
-        Outcome<QueryDescription, DescribeFailure>.Of(
-            new QueryDescription(
-                SidecarResultKind.None,
-                new EquatableArray<DescribedParameter>([.. parameters]),
-                null,
-                null,
-                null,
-                null
-            )
+    // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.
+    private static Outcome<QueryDescription, DescribeFailure> Described(
+        IReadOnlyList<DescribedParameter> parameters,
+        IReadOnlyList<SidecarColumn> columns
+    )
+    {
+        var typed = new EquatableArray<DescribedParameter>([.. parameters]);
+        return Outcome<QueryDescription, DescribeFailure>.Of(
+            columns.Count == 0
+                ? new QueryDescription(SidecarResultKind.None, typed, null, null, null, null)
+                : new QueryDescription(
+                    SidecarResultKind.Rows,
+                    typed,
+                    new EquatableArray<SidecarColumn>([.. columns]),
+                    null,
+                    SidecarValues.Plan.NotNeeded,
+                    SidecarValues.TableMatch.NoOrigin
+                )
         );
+    }
 
     public ValueTask DisposeAsync() => Connection.DisposeAsync();
 
@@ -254,6 +319,11 @@ internal sealed class PostgresSession : IDescribeSession
         PostgresEvents.Prepare(_log, query, request, answer, ElapsedSince(started));
         return answer;
     }
+
+    private Task<PostgresColumnsAnswer> ColumnsAsync(
+        PostgresColumnsRequest request,
+        CancellationToken cancellationToken
+    ) => _exchange.AskAsync("columns", request, _live.ColumnsAsync, cancellationToken);
 
     private async Task<PostgresTypesAnswer> TypesAsync(
         PostgresTypesRequest request,

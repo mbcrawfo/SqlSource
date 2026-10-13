@@ -105,3 +105,35 @@ internal sealed record PostgresTypeRow(
     string FormatType,
     IReadOnlyList<string>? EnumLabels
 );
+
+/// <summary>Everything that decides the answer of <c>columns</c>.</summary>
+/// <param name="Statement">The prepared statement to describe.</param>
+/// <param name="Parameters">
+/// How many parameters the query's list has: the statement is given a <c>NULL</c> for each.
+/// </param>
+internal sealed record PostgresColumnsRequest(string Statement, int Parameters);
+
+/// <summary>The columns of a prepared statement, or why it could not be described.</summary>
+/// <param name="Columns">The columns in order.  A statement without rows has none.</param>
+/// <param name="Error">What the server said, or null.</param>
+internal sealed record PostgresColumnsAnswer(IReadOnlyList<PostgresColumnRow>? Columns, PostgresServerError? Error);
+
+/// <summary>One column, as the row description of the protocol and Npgsql's reading of it hold it.</summary>
+/// <param name="Ordinal">The column's place, from zero.</param>
+/// <param name="Name">The name as the server returned it.</param>
+/// <param name="TypeOid">The type.  The protocol reports the base of a domain, with the domain's modifier.</param>
+/// <param name="TableOid">The table the column comes from, or zero.</param>
+/// <param name="AttributeNumber">The column of that table, zero for none and below zero for a system column.</param>
+/// <param name="Length">Npgsql's <c>ColumnSize</c>, or null.</param>
+/// <param name="Precision">Npgsql's <c>NumericPrecision</c>, or null.</param>
+/// <param name="Scale">Npgsql's <c>NumericScale</c>, or null.</param>
+internal sealed record PostgresColumnRow(
+    int Ordinal,
+    string Name,
+    long TypeOid,
+    long TableOid,
+    int AttributeNumber,
+    int? Length,
+    int? Precision,
+    int? Scale
+);

@@ -84,6 +84,7 @@ public sealed class DescriberFixtureTests : IDisposable
     // A describer whose calls changed fails its fixtures, and never passes silently.
     [Theory]
     [InlineData("prepare")]
+    [InlineData("columns")]
     [InlineData("types")]
     [InlineData("deallocate")]
     public async Task Replay_CaptureWithACallRemoved_ThrowsACaptureMiss(string method)

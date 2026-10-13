@@ -26,6 +26,8 @@ public class PostgresEventsTests
 
     private static readonly PostgresDeallocateRequest Deallocate = new("sqlsource_1");
 
+    private static readonly PostgresColumnsRequest Columns = new("sqlsource_1", 1);
+
     private static LogValue Member(LogMember[] members, string name) =>
         members.Single(member => member.Name == name).Value;
 
@@ -44,6 +46,7 @@ public class PostgresEventsTests
         var script = new PostgresScript()
             .Open()
             .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
+            .Answer("columns", Columns, PostgresScript.NoColumns)
             .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
             .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
 
@@ -128,6 +131,7 @@ public class PostgresEventsTests
         var script = new PostgresScript()
             .Open()
             .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
+            .Answer("columns", Columns, PostgresScript.NoColumns)
             .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer(null, refused))
             .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
 
@@ -163,6 +167,7 @@ public class PostgresEventsTests
         var script = new PostgresScript()
             .Open()
             .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
+            .Answer("columns", Columns, PostgresScript.NoColumns)
             .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
             .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(gone));
 
@@ -181,6 +186,7 @@ public class PostgresEventsTests
         var script = new PostgresScript()
             .Open()
             .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
+            .Answer("columns", Columns, PostgresScript.NoColumns)
             .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
             .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
 

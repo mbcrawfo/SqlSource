@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
+using Npgsql.Schema;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -119,6 +121,57 @@ internal sealed class PostgresLive(PostgresConnection connection)
             return new PostgresPrepareAnswer(null, PostgresConnection.ErrorOf(exception));
         }
     }
+
+    /// <summary>
+    /// Asks <c>columns</c>: describes the prepared statement through an <c>EXECUTE</c> that is parsed and never run.
+    /// </summary>
+    /// <remarks>
+    /// Under <see cref="CommandBehavior.SchemaOnly" /> the driver sends no <c>Execute</c>.  Without
+    /// <see cref="CommandBehavior.KeyInfo" /> it fills the schema from the row description alone and asks the
+    /// server nothing more.  The text holds a name the tool made and nothing of a user's.
+    /// </remarks>
+    public async Task<PostgresColumnsAnswer> ColumnsAsync(PostgresColumnsRequest asked, CancellationToken token)
+    {
+        try
+        {
+            await using var command = await connection.CommandAsync(ExecuteText(asked), token);
+            await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SchemaOnly, token);
+            var columns = new List<PostgresColumnRow>(reader.FieldCount);
+
+            // The async method is the base class's and gives the base type; each item is the driver's own.
+            foreach (var column in (await reader.GetColumnSchemaAsync(token)).Cast<NpgsqlDbColumn>())
+            {
+                columns.Add(
+                    new PostgresColumnRow(
+                        columns.Count,
+                        column.ColumnName,
+                        column.TypeOID,
+                        column.TableOID,
+                        column.ColumnAttributeNumber ?? 0,
+                        column.ColumnSize,
+                        column.NumericPrecision,
+                        column.NumericScale
+                    )
+                );
+            }
+
+            return new PostgresColumnsAnswer(columns, null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresColumnsAnswer(null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
+    /// <summary>
+    /// The text <c>columns</c> sends: the statement with a <c>NULL</c> for each parameter.  The server describes an
+    /// <c>EXECUTE</c> whatever the number of its arguments, so a statement with a <c>$n</c> of its own is described
+    /// too.
+    /// </summary>
+    public static string ExecuteText(PostgresColumnsRequest asked) =>
+        asked.Parameters == 0
+            ? $"EXECUTE {asked.Statement}"
+            : $"EXECUTE {asked.Statement}({string.Join(", ", Enumerable.Repeat("NULL", asked.Parameters))})";
 
     /// <summary>Asks <c>types</c>.</summary>
     public async Task<PostgresTypesAnswer> TypesAsync(PostgresTypesRequest asked, CancellationToken token)

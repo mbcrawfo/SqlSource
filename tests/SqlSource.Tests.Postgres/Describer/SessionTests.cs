@@ -154,11 +154,11 @@ public sealed class SessionTests(PostgresContainer postgres)
             .ServerLines.ShouldBe([PostgresConnection.LostConnection]);
     }
 
-    // The statement is prepared and the session ends before its types are read.  "types" answers the error that is
-    // reported, and "deallocate", which is asked whatever became of the describe, answers one too and replaces
+    // The statement is prepared and the session ends before its columns are read.  "columns" answers the error that
+    // is reported, and "deallocate", which is asked whatever became of the describe, answers one too and replaces
     // nothing.
     [Fact]
-    public async Task Describe_ServerEndsTheSessionBetweenPrepareAndTypes_IsSqlsrc225AndNoThrow()
+    public async Task Describe_ServerEndsTheSessionBetweenPrepareAndColumns_IsSqlsrc225AndNoThrow()
     {
         var capture = new DescribeCapture("postgres");
         var exchange = new EndsTheBackendAfterPrepare(postgres.ConnectionString);
@@ -168,8 +168,8 @@ public sealed class SessionTests(PostgresContainer postgres)
 
         var described = await session.DescribeAsync(Requests.Of(Sql), TestContext.Current.CancellationToken);
 
-        _ = ShouldBeRejected(described, DescribeStep.ResolveType);
-        capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "types", "deallocate"]);
+        _ = ShouldBeRejected(described, DescribeStep.DescribeColumns);
+        capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "columns", "deallocate"]);
         CaptureJson.TextOf(capture.Calls[3].Answer).ShouldContain(PostgresConnection.LostConnection);
     }
 

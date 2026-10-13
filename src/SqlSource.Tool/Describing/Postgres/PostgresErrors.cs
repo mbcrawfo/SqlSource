@@ -164,6 +164,13 @@ internal static class PostgresErrors
         Rejected(error, query, DescribeStep.ResolveType, ServerLines(error with { Position = null }, 0));
 
     /// <summary>
+    /// <c>SQLSRC225</c> at the step <c>describe columns</c>: the prepared statement could not be described.  There
+    /// is no position line: a position the server gives is in the tool's own <c>EXECUTE</c>.
+    /// </summary>
+    public static DescribeFailure Columns(PostgresServerError error, DescribeRequest query) =>
+        Rejected(error, query, DescribeStep.DescribeColumns, ServerLines(error with { Position = null }, 0));
+
+    /// <summary>
     /// A parameter whose type is a pseudo-type.  The server accepts one and says nothing, so there is no server
     /// line.  A declared one is <c>SQLSRC228</c>; an inferred one is <c>SQLSRC226</c>, whose help says what the
     /// server gave.

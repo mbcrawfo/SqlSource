@@ -16,6 +16,9 @@ public class PostgresTypeNamesTests
     [InlineData("bpchar", "bpchar", null, null, null, "bpchar")]
     [InlineData("bpchar", "bpchar", 2, null, null, "character(2)")]
     [InlineData("bit", "bit", 8, null, null, "bit(8)")]
+    // A server quotes bit, a keyword: format_type(1560, -1) is "bit" with the quotes.
+    [InlineData("bit", "\"bit\"", 8, null, null, "bit(8)")]
+    [InlineData("bit", "\"bit\"", null, null, null, "bit")]
     [InlineData("varbit", "bit varying", 5, null, null, "bit varying(5)")]
     [InlineData("numeric", "numeric", null, null, null, "numeric")]
     [InlineData("numeric", "numeric", null, 18, 2, "numeric(18,2)")]

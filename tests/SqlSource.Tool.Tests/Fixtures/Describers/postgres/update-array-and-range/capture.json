@@ -46,6 +46,17 @@
       }
     },
     {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 3
+      },
+      "answer": {
+        "columns": [],
+        "error": null
+      }
+    },
+    {
       "method": "types",
       "request": {
         "oids": [

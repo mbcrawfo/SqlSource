@@ -20,6 +20,8 @@ internal static class PostgresRows
 
     public static PostgresTypeRow TextArray { get; } = ArrayOf(1009, "_text", Text);
 
+    public static PostgresTypeRow VarcharArray { get; } = ArrayOf(1015, "_varchar", Varchar);
+
     public static PostgresTypeRow EmailT { get; } = DomainOf(16387, "email_t", Varchar);
 
     public static PostgresTypeRow UserStatus { get; } = EnumOf(16390, "user_status", "active", "disabled");

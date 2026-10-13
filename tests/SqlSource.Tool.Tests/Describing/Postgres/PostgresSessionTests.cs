@@ -22,6 +22,16 @@ public class PostgresSessionTests
 
     private static SqlQueryParameter Declared(string name, string type) => new(name, type, null, true);
 
+    // A column of an expression: it names no table.
+    private static PostgresColumnRow Expression(
+        int ordinal,
+        string name,
+        long typeOid,
+        int? length = null,
+        int? precision = null,
+        int? scale = null
+    ) => new(ordinal, name, typeOid, 0, 0, length, precision, scale);
+
     // The script holds "open" alone: nothing may be asked for a text of two statements.
     [Theory]
     [InlineData("DELETE FROM users WHERE id = @id; DELETE FROM orders")]
@@ -71,13 +81,42 @@ public class PostgresSessionTests
 
     private static readonly PostgresDeallocateAnswer Freed = new(null);
 
-    private static PostgresScript Prepares(
+    // "prepare" alone: for a describe that ends there, and for one whose columns the test writes.
+    private static PostgresScript PreparesOnly(
         PostgresScript script,
         int number,
         string sql,
         string[] types,
         PostgresPrepareAnswer answer
     ) => script.Answer("prepare", new PostgresPrepareRequest($"sqlsource_{number}", sql, types), answer);
+
+    // "prepare", and "columns" answering no column when the statement was prepared with a type for each parameter
+    // of the list: most of these tests are about the parameters.
+    private static PostgresScript Prepares(
+        PostgresScript script,
+        int number,
+        string sql,
+        string[] types,
+        PostgresPrepareAnswer answer
+    )
+    {
+        _ = PreparesOnly(script, number, sql, types, answer);
+        return answer.ParameterTypes is { } resolved && resolved.Count >= types.Length
+            ? Columns(script, number, types.Length)
+            : script;
+    }
+
+    private static PostgresScript Columns(
+        PostgresScript script,
+        int number,
+        int parameters,
+        params PostgresColumnRow[] columns
+    ) =>
+        script.Answer(
+            "columns",
+            new PostgresColumnsRequest($"sqlsource_{number}", parameters),
+            new PostgresColumnsAnswer(columns, null)
+        );
 
     private static PostgresScript Frees(PostgresScript script, int number, PostgresDeallocateAnswer? answer = null) =>
         script.Answer("deallocate", new PostgresDeallocateRequest($"sqlsource_{number}"), answer ?? Freed);
@@ -388,6 +427,124 @@ public class PostgresSessionTests
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
         failure.Step.ShouldBe(DescribeStep.ResolveType);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DescribeAsync_StatementWithColumns_IsRowsWithEachColumnsTypeAndFacets()
+    {
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT 1, 'a'::varchar(100), 2::numeric(18,2)", [], new([], null));
+        _ = Columns(
+            script,
+            1,
+            0,
+            Expression(0, "?column?", 23),
+            Expression(1, "varchar", 1043, length: 100),
+            Expression(2, "numeric", 1700, precision: 18, scale: 2)
+        );
+        _ = Resolves(script, [23, 1043, 1700], PostgresRows.Int4, PostgresRows.Varchar, PostgresRows.Numeric);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT 1, 'a'::varchar(100), 2::numeric(18,2)"),
+            TestContext.Current.CancellationToken
+        );
+
+        var description = described.Value.ShouldNotBeNull();
+        description.ResultKind.ShouldBe(SidecarResultKind.Rows);
+        description.MatchesTable.ShouldBeNull();
+        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
+        description
+            .Columns.ShouldNotBeNull()
+            .Select(column => (column.Ordinal, column.Name, column.Type.Name))
+            .ShouldBe([
+                (0, "?column?", "integer"),
+                (1, "varchar", "character varying(100)"),
+                (2, "numeric", "numeric(18,2)"),
+            ]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // A statement without rows has no columns, no table and no provenance.
+    [Fact]
+    public async Task DescribeAsync_StatementWithoutColumns_IsNoneWithNoProvenance()
+    {
+        var script = new PostgresScript().Open();
+        _ = Prepares(script, 1, "DELETE FROM samples WHERE id = $1", ["unknown"], new([23], null));
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("DELETE FROM samples WHERE id = @id", Inferred("id")),
+            TestContext.Current.CancellationToken
+        );
+
+        var description = described.Value.ShouldNotBeNull();
+        description.ResultKind.ShouldBe(SidecarResultKind.None);
+        description.Columns.ShouldBeNull();
+        description.Plan.ShouldBeNull();
+        description.TableMatch.ShouldBeNull();
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // "types" is asked once, for the parameters and the columns together, sorted and each OID once.
+    [Fact]
+    public async Task DescribeAsync_ParametersAndColumns_AskTypesOnceForBoth()
+    {
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT $1::text AS a, 1 AS b, 2 AS c", ["unknown"], new([25], null));
+        _ = Columns(script, 1, 1, Expression(0, "a", 25), Expression(1, "b", 23), Expression(2, "c", 23));
+        _ = Resolves(script, [23, 25], PostgresRows.Int4, PostgresRows.Text);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT @p::text AS a, 1 AS b, 2 AS c", Inferred("p")),
+            TestContext.Current.CancellationToken
+        );
+
+        var description = described.Value.ShouldNotBeNull();
+        description
+            .Parameters.ShouldHaveSingleItem()
+            .Type.ShouldBe(TestSidecars.Postgres("text", internalName: "text"));
+        description
+            .Columns.ShouldNotBeNull()
+            .Select(column => column.Type.Name)
+            .ShouldBe(["text", "integer", "integer"]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The position the server gives is in the tool's own EXECUTE, so there is no "at character" line.
+    [Fact]
+    public async Task DescribeAsync_ColumnsThatFails_IsSqlsrc225AtDescribeColumnsAndFreesTheStatement()
+    {
+        var dropped = new PostgresServerError(
+            "57P01",
+            "terminating connection due to administrator command",
+            null,
+            null,
+            9
+        );
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT 1", [], new([], null));
+        _ = script.Answer(
+            "columns",
+            new PostgresColumnsRequest("sqlsource_1", 0),
+            new PostgresColumnsAnswer(null, dropped)
+        );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request("SELECT 1"), TestContext.Current.CancellationToken);
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.ShouldBe(["57P01: terminating connection due to administrator command"]);
         exchange.Unused.ShouldBeEmpty();
     }
 }

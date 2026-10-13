@@ -19,19 +19,10 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class ParameterTests(PostgresContainer postgres)
 {
-    private async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
+    private Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         DescribeRequest request,
         IDescribeExchange? exchange = null
-    )
-    {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString, exchange);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
-
-        var described = await session.DescribeAsync(request, TestContext.Current.CancellationToken);
-
-        (await Sessions.PreparedStatementsAsync(session)).ShouldBe(0);
-        return described;
-    }
+    ) => Sessions.DescribeAsync(postgres.ConnectionString, request, exchange);
 
     // A table of these tests alone, which a describe must leave as it is.  The fixture schema has none of the name.
     private const string Canary = "describer_canary";
@@ -268,15 +259,13 @@ public sealed class ParameterTests(PostgresContainer postgres)
         element: TestSidecars.Postgres("text", internalName: "text")
     );
 
+    // The parameters of a query that is described.  Its columns are ColumnTests' business.
     private async Task<EquatableArray<DescribedParameter>> ShouldDescribeAsync(DescribeRequest request)
     {
         var described = await DescribeAsync(request);
 
         described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-        var description = described.Value.ShouldNotBeNull();
-        description.ResultKind.ShouldBe(SidecarResultKind.None);
-        description.Columns.ShouldBeNull();
-        return description.Parameters;
+        return described.Value.ShouldNotBeNull().Parameters;
     }
 
     private static DescribedParameter Inferred(string name, PostgresType type) =>
