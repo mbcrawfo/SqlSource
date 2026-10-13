@@ -960,7 +960,7 @@ Declare the parameter's type with `-- param: @name text`, or turn the condition 
 
 A `-- param:` marker gives a parameter a type, and the tool asks the server to resolve that type and to check it against every use of the parameter.  This type cannot be used, for the reason the message ends with:
 
-- `it is not written as a type name`: the text is not a type as a column definition writes one.  The tool puts a declared type into the statement it sends, so it reads the text first and sends nothing that is not a name, PostgreSQL's own type words such as `varying` or `without time zone`, one modifier in parentheses, and `[]`.
+- `it is not written as a type name`: the text is not a type as a column definition writes one.  The tool puts a declared type into the statement it sends, so it reads the text first and sends nothing that is not a name, PostgreSQL's own type words such as `varying` or `without time zone`, one modifier in parentheses, and `[]`.  The server can give the same reason: an error other than "no such type" that it positions at a declared type is reported so, `numeric(2,-3)` on PostgreSQL 14 for one, which has no negative scale, and the `server:` line then says what the server made of the type.
 - `the database has no such type`: the server knows no type of that name on the session's search path.
 - `it is a pseudo-type`: the server knows the name, and no value has that type, `record` and `anyelement` for two.
 
