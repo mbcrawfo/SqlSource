@@ -1,0 +1,99 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "DELETE FROM users WHERE status = $1 AND deleted_at IS NOT NULL",
+        "types": [
+          "unknown",
+          "int"
+        ]
+      },
+      "answer": {
+        "parameterTypes": [
+          16390,
+          23
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          23,
+          16390
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 23,
+            "typname": "int4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "integer",
+            "enumLabels": null
+          },
+          {
+            "oid": 16390,
+            "typname": "user_status",
+            "nspname": "public",
+            "typtype": "e",
+            "typcategory": "E",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "user_status",
+            "enumLabels": [
+              "active",
+              "disabled"
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}

@@ -279,6 +279,72 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor DatabaseCannotBeOpened = new(
+        id: "SQLSRC224",
+        title: "Database could not be opened",
+        messageFormat: "The database '{0}' could not be opened",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc224",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ServerRejectedQuery = new(
+        id: "SQLSRC225",
+        title: "Server rejected the query",
+        messageFormat: "The server rejected the query '{0}': {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc225",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ParameterTypeNotDetermined = new(
+        id: "SQLSRC226",
+        title: "Parameter type could not be determined",
+        messageFormat: "The type of the parameter '{0}' of the query '{1}' could not be determined",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc226",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ParameterFirstUseDoesNotFixType = new(
+        id: "SQLSRC227",
+        title: "Parameter's first use does not fix its type",
+        messageFormat: "The first use of the parameter '{0}' of the query '{1}' does not fix its type",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc227",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor DeclaredTypeNotValid = new(
+        id: "SQLSRC228",
+        title: "Declared type is not valid",
+        messageFormat: "The type '{0}' declared for the parameter '{1}' of the query '{2}' is not valid: {3}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc228",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor QueryHasSeveralStatements = new(
+        id: "SQLSRC230",
+        title: "Query holds more than one statement",
+        messageFormat: "The query '{0}' holds more than one statement",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc230",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -307,6 +373,12 @@ internal static class ToolDiagnostics
             ProjectNotRestored,
             SidecarOfNewerTool,
             DirectoryCannotBeRead,
-            SolutionCannotBeRead
+            SolutionCannotBeRead,
+            DatabaseCannotBeOpened,
+            ServerRejectedQuery,
+            ParameterTypeNotDetermined,
+            ParameterFirstUseDoesNotFixType,
+            DeclaredTypeNotValid,
+            QueryHasSeveralStatements
         );
 }

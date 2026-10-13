@@ -239,3 +239,9 @@ dotnet_diagnostic.CA2007.severity = none
 dotnet_diagnostic.CA1515.severity = none
 # CA1031 (catch a specific exception): the two catches that turn any exception into SQLSRC200.
 dotnet_diagnostic.CA1031.severity = none
+
+[src/SqlSource.Tool/Describing/Postgres/PostgresConnection.cs]
+# CA2100 (review SQL for user input): the one place that makes every command of the PostgreSQL describer and its one
+# batch, which carries the PREPARE.  PREPARE and DEALLOCATE take no parameters, and what the describer puts into them
+# is a counter, a type that DeclaredTypeText read, and the user's own SQL, which is what is to be described.
+dotnet_diagnostic.CA2100.severity = none

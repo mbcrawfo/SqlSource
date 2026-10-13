@@ -30,6 +30,7 @@
         <PackageReadmeFile>README.md</PackageReadmeFile>
     </PropertyGroup>
     <ItemGroup>
+        <InternalsVisibleTo Include="SqlSource.Tests.Postgres" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>
     <ItemGroup>
@@ -39,6 +40,8 @@
         -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
         <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" />
+        <!-- The driver of the PostgreSQL describer, Describing/Postgres/. -->
+        <PackageReference Include="Npgsql" />
         <PackageReference Include="System.CommandLine" />
     </ItemGroup>
     <ItemGroup>

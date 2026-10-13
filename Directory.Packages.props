@@ -28,12 +28,19 @@
         <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
         <!-- Reads .sln and .slnx files for the tool, as the dotnet command does with the same library. -->
         <PackageVersion Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
+        <!--
+            The driver of the PostgreSQL describer.  The tool's driver is its own: the floor of the Npgsql that a
+            consumer's project may use is decided with the generated code, not here.
+        -->
+        <PackageVersion Include="Npgsql" Version="10.0.3" />
         <PackageVersion Include="NSubstitute" Version="6.2.0" />
         <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
         <PackageVersion Include="Roslynator.Analyzers" Version="5.0.0" />
         <PackageVersion Include="Shouldly" Version="4.3.0" />
         <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
         <PackageVersion Include="System.CommandLine" Version="2.0.12" />
+        <!-- Starts the PostgreSQL that tests/SqlSource.Tests.Postgres describes against.  It needs Docker. -->
+        <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
         <PackageVersion Include="xunit.analyzers" Version="2.1.0" />
         <PackageVersion Include="xunit.v3" Version="4.0.1" />
     </ItemGroup>

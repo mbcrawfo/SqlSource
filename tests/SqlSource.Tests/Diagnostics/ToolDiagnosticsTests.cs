@@ -267,4 +267,67 @@ public class ToolDiagnosticsTests
                 "Access is denied."
             )
             .ShouldBe($"'/work/Users.sql.json' could not be {tried}: Access is denied.");
+
+    [Fact]
+    public void DatabaseCannotBeOpened_Message_HoldsTheDatabase() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DatabaseCannotBeOpened.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "app"
+            )
+            .ShouldBe("The database 'app' could not be opened");
+
+    [Fact]
+    public void DeclaredTypeNotValid_Message_HoldsTheTypeTheParameterTheQueryAndTheReason() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DeclaredTypeNotValid.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "nope_t",
+                "@p",
+                "GetUser",
+                "the database has no such type"
+            )
+            .ShouldBe(
+                "The type 'nope_t' declared for the parameter '@p' of the query 'GetUser' is not valid: the database "
+                    + "has no such type"
+            );
+
+    [Fact]
+    public void QueryHasSeveralStatements_Message_HoldsTheQuery() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.QueryHasSeveralStatements.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "Cleanup"
+            )
+            .ShouldBe("The query 'Cleanup' holds more than one statement");
+
+    [Fact]
+    public void ServerRejectedQuery_Message_HoldsTheQueryAndTheServersMessage() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ServerRejectedQuery.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "GetUser",
+                "relation \"nope\" does not exist"
+            )
+            .ShouldBe("The server rejected the query 'GetUser': relation \"nope\" does not exist");
+
+    [Fact]
+    public void ParameterTypeNotDetermined_Message_HoldsTheParameterAndTheQuery() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ParameterTypeNotDetermined.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "@p",
+                "IsNull"
+            )
+            .ShouldBe("The type of the parameter '@p' of the query 'IsNull' could not be determined");
+
+    [Fact]
+    public void ParameterFirstUseDoesNotFixType_Message_HoldsTheParameterAndTheQuery() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ParameterFirstUseDoesNotFixType.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "@name",
+                "FindUsers"
+            )
+            .ShouldBe("The first use of the parameter '@name' of the query 'FindUsers' does not fix its type");
 }

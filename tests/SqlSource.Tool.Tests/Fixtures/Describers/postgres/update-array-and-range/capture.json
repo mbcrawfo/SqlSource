@@ -1,0 +1,138 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "UPDATE bookings SET during = $1, tags = $2 WHERE id = $3",
+        "types": [
+          "unknown",
+          "unknown",
+          "unknown"
+        ]
+      },
+      "answer": {
+        "parameterTypes": [
+          3910,
+          1009,
+          20
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          20,
+          1009,
+          3910
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 20,
+            "typname": "int8",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "bigint",
+            "enumLabels": null
+          },
+          {
+            "oid": 25,
+            "typname": "text",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "text",
+            "enumLabels": null
+          },
+          {
+            "oid": 1009,
+            "typname": "_text",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "A",
+            "typelem": 25,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "text[]",
+            "enumLabels": null
+          },
+          {
+            "oid": 1184,
+            "typname": "timestamptz",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "D",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "timestamp with time zone",
+            "enumLabels": null
+          },
+          {
+            "oid": 3910,
+            "typname": "tstzrange",
+            "nspname": "pg_catalog",
+            "typtype": "r",
+            "typcategory": "R",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": 1184,
+            "multirangeRngsubtype": null,
+            "formatType": "tstzrange",
+            "enumLabels": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}

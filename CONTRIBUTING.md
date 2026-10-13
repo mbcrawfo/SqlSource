@@ -7,7 +7,7 @@ How to set up a development environment, build, test and check the code, and wha
 | Tool | Version | Notes |
 |----|----|----|
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0.401 or a later 10.0 release | Pinned in `global.json` |
-| [Docker](https://docs.docker.com/get-started/get-docker/) | Any current release | Runs the pinned lint images used by the scripts in `tools/` |
+| [Docker](https://docs.docker.com/get-started/get-docker/) | Any current release | Runs the pinned lint images used by the scripts in `tools/`, and the PostgreSQL that `tests/SqlSource.Tests.Postgres` describes against |
 | [jq](https://jqlang.org/download/) | Any current release | Only for Claude Code: the commit hook in `.claude/hooks/` uses it to read the command being run |
 | `unzip` | Any | `tools/check-package.sh` lists the contents of the packages with it.  Present on macOS and most Linux distributions. |
 
@@ -27,7 +27,7 @@ dotnet build SqlSource.slnx
 dotnet test --solution SqlSource.slnx
 ```
 
-The solution has two projects that ship and three test projects:
+The solution has two projects that ship and four test projects:
 
 | Project | Is |
 |----|----|
@@ -39,12 +39,29 @@ The solution has two projects that ship and three test projects:
 | `tests/SqlSource.Tests` | A current version | Every test of the generator |
 | `tests/SqlSource.Tests.RoslynFloor` | 4.8.0, the oldest supported | The generator driver tests: the files of `tests/SqlSource.Tests/Generator/`, compiled a second time |
 | `tests/SqlSource.Tool.Tests` | A current version | The tests of the tool, which run the whole command in process with their own output, working directory and environment.  `TerminationTests` alone starts the tool that was built in a process of its own: to send it a signal, where the system has signals, and to close its console on Windows, which only `nightly.yml` runs.  It also compiles the harness of `tests/SqlSource.Tests/Generator/`, three files, for `GeneratorParityTests`, which runs the generator and the tool over the same sources |
+| `tests/SqlSource.Tests.Postgres` | A current version | The PostgreSQL describer against a real server, which Testcontainers starts in Docker: one container for the run, with the database `fixtures` and the schema `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql`.  It compiles the fixture harness of `tests/SqlSource.Tool.Tests/Fixtures/`, three files, and `tests/SqlSource.Tests/Snapshot/TestSidecars.cs` |
 
 A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both, so it may use only Roslyn API that 4.8.0 has, and the C# it hands to the compiler is C# 12 at most.  `GeneratorHarness.cs`, `InMemoryAdditionalText.cs` and `TestOptionsProvider.cs` of that folder are compiled into `tests/SqlSource.Tool.Tests` as well, so a change to one of them must build there too.
 
 `tests/SqlSource.Tests` also uses the generator the way a consumer does: the types in `EndToEnd/` are compiled with the generator loaded, and the project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  It gets them by path and the generator through a project reference; `tools/check-package-install.sh`, under Package below, is what installs the packed package.
 
 `tests/SqlSource.Tool.Tests/Fixtures/Projects/` holds small projects that are no part of the solution.  `ManifestTargetTests` and `FixtureProjectTests` copy one to a temporary folder outside the repository, with the package's two MSBuild files and `global.json` beside it, and run `dotnet msbuild` on it for real, the second through the tool's own code, so these tests need the SDK that `global.json` pins and take a second or two each.  MSBuild reads the environment for its properties, and the workflow has a variable named `CONFIGURATION`, so in CI a fixture is evaluated as `Release`: a test of a fixture expects no `Debug`, in a constant or in a path.  A fixture is never built or restored, and a test leaves nothing in the repository.  A file under that folder is copied to the test project's output as it is; add a project there as a folder with an `App.csproj` that imports `../build/SqlSource.props` and `../build/SqlSource.targets`.
+
+`tests/SqlSource.Tests.Postgres` needs Docker running, and its first run pulls the image.  The image is `postgres:18`, named in one place, `PostgresContainer.DefaultImage`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported:
+
+```bash
+SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14 dotnet test --project tests/SqlSource.Tests.Postgres
+```
+
+`dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh`, runs it on the default image.
+
+The describer's fixtures are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/`: a folder for each case with its `query.sql`, the `capture.json` of describing it and the `expected.json` of its sidecar.  `tests/SqlSource.Tool.Tests` replays each from its capture with no database, and `tests/SqlSource.Tests.Postgres` describes each against the container and compares the entry, so a describer that asks something else fails the first and one that answers something else fails the second.  After a change to what the describer asks or answers, or to `schema.sql`, record them again and read the diff before it is committed:
+
+```bash
+tools/record-fixtures.sh
+```
+
+To add a case, add its folder with a `query.sql` and run the script.  A recorded file is never edited by hand.
 
 To run the tool from its source:
 
@@ -76,7 +93,7 @@ This builds in `Release` and writes two packages with one version, `artifacts/pa
 tools/check-package.sh artifacts/packages
 ```
 
-This checks what the two packages hold.  `SqlSource`: the generator under `analyzers/`, `build/SqlSource.props` and `build/SqlSource.targets`, the readme, and nothing under `lib/`.  `SqlSource.Tool`: the tool under `tools/net8.0/any/` with the generator's assembly, Roslyn and the library that reads a solution beside it, `DotnetToolSettings.xml`, the readme, which is `src/SqlSource.Tool/README.md`, and no documentation file of an assembly.  It fails when the two have different versions.  Without an argument it packs both into a temporary folder first.
+This checks what the two packages hold.  `SqlSource`: the generator under `analyzers/`, `build/SqlSource.props` and `build/SqlSource.targets`, the readme, and nothing under `lib/`.  `SqlSource.Tool`: the tool under `tools/net8.0/any/` with the generator's assembly, Roslyn, the library that reads a solution and Npgsql beside it, `DotnetToolSettings.xml`, the readme, which is `src/SqlSource.Tool/README.md`, and no documentation file of an assembly.  It fails when the two have different versions.  Without an argument it packs both into a temporary folder first.
 
 ```bash
 tools/check-package-install.sh artifacts/packages
@@ -128,10 +145,10 @@ The scripts in `tools/` each run a linter from a pinned Docker image:
 | Workflow | Runs on | Does |
 |----|----|----|
 | `ci.yml` | Pull requests to `main`, pushes to `main` | Calls `build.yml` and ends with the `ci` job |
-| `build.yml` | Called by `ci.yml` and `publish.yml` | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, `dotnet pack`, and the three package checks |
+| `build.yml` | Called by `ci.yml` and `publish.yml` | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, the tests of `tests/SqlSource.Tests.Postgres` again on PostgreSQL 14, `dotnet pack`, and the three package checks |
 | `publish.yml` | `v*` tags, manual runs on `main` | Calls `build.yml`, pushes the two packages to nuget.org, and creates a GitHub release for a tag |
 | `coverage-comment.yml` | A successful `ci.yml` run for a pull request | Posts the coverage report as a comment on the pull request, or updates the comment it posted before |
-| `nightly.yml` | Every night, manual runs, pull requests that change the file | Restores, builds in `Release` and runs the tests on `windows-latest` and `macos-latest` |
+| `nightly.yml` | Every night, manual runs, pull requests that change the file | Restores, builds in `Release` and runs the tests that need no container on `windows-latest` and `macos-latest` |
 
 Each run uploads two artifacts: `packages`, the two `.nupkg` files, and `coverage`, the HTML, Cobertura and markdown reports.  The test results and the coverage summary are also in the run's job summary.
 
@@ -139,7 +156,7 @@ Each run uploads two artifacts: `packages`, the two `.nupkg` files, and `coverag
 
 The `ci` job succeeds only when every other job in `ci.yml` succeeded or was skipped.  It is the one status check to require in the `main` ruleset.
 
-`ci.yml` runs on Linux alone.  `nightly.yml` is what runs the tests on Windows and macOS, where paths, quoting, exit codes and the kill of a process differ.  It runs no check that needs Docker and packs nothing, and it is no required check: a failure is mended in a pull request of its own.  To try a branch on both systems before it is merged, start the workflow by hand:
+`ci.yml` runs on Linux alone.  `nightly.yml` is what runs the tests on Windows and macOS, where paths, quoting, exit codes and the kill of a process differ.  It runs no check that needs Docker, not `tests/SqlSource.Tests.Postgres`, whose container its runners cannot start, and packs nothing, and it is no required check: a failure is mended in a pull request of its own.  To try a branch on both systems before it is merged, start the workflow by hand:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>

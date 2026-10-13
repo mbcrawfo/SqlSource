@@ -63,7 +63,7 @@ Settled in this spec:
 - Columns, the catalog, nullability, the table match, the walk.  Sub-phases 3.3 to 3.5.
 - The lexer-versus-Npgsql check.  Sub-phase 3.3, which has the columns to compare.
 - Driver logging, and registering the describer in `ToolHost.Create`.  Sub-phase 3.6.
-- The two logical databases, `app` and `billing`, of the end-to-end tests.  Phase 5; this sub-phase applies `app` alone.
+- The two logical databases, `app` and `billing`, of the end-to-end tests.  Phase 5; this sub-phase has the one database `fixtures`, with the fixture schema.
 
 ## The test project
 
@@ -77,6 +77,7 @@ Settled in this spec:
 | `Describer/FixtureCasesTests` | For each case under `Fixtures/Describers/postgres/`, describes `query.sql` live and compares with `expected.json`; with `SQLSOURCE_RECORD_FIXTURES` set, writes `capture.json` and `expected.json` instead |
 | `SQLSOURCE_TESTS_POSTGRES_IMAGE` | The image, `postgres:18` when not set.  The tag is in one place, `PostgresContainer` |
 
+- The helpers that the project shares with the other test projects are compiled into it by exact path in its `.csproj`, as `tests/SqlSource.Tool.Tests` compiles `TestSidecars.cs`: `FixtureCase.cs`, `FixtureCases.cs` and `FixtureReplay.cs` of `tests/SqlSource.Tool.Tests/Fixtures/`, and `tests/SqlSource.Tests/Snapshot/TestSidecars.cs`.  `tests/AGENTS.md` names each, since a move or rename of one changes the `.csproj`.
 - The fixture cases of the tool's tests are read from the repository, not from an output folder: `FixtureCasesTests` finds `tests/SqlSource.Tool.Tests/Fixtures/Describers/` from its own assembly's location by walking up to the folder that holds `SqlSource.slnx`, since recording writes there.
 - The live comparison of a case sets `serverVersion` to one value on both entries before comparing the texts, and `expected.json` keeps the version the case was recorded against: CI runs the same cases on 14 and 18, and the default tag moves from one patch to the next.
 - A test that wants a session makes a `PostgresDescriber`, an `OpenRequest` with the container's connection string, a `LiveExchange` and `TimeProvider.System`, and a `NullRunLog` or a recording one.
@@ -106,7 +107,7 @@ In `src/SqlSource.Tool/Describing/Postgres/`.
 |----|----|----|
 | `open` | Nothing | `serverVersion`: `current_setting('server_version')` cut at its first space; `driverVersion`: the Npgsql assembly's; `settings`: `search_path`, `plan_cache_mode` and `standard_conforming_strings` as name and value; or `error` |
 | `prepare` | `statement`, `sql`, `types` | `parameterTypes`: `parameter_types::oid[]` of `pg_prepared_statements` for the name, in order; or `error` |
-| `types` | `oids`, sorted and distinct | `rows`, one for each type of the closure, in `oid` order |
+| `types` | `oids`, sorted and distinct | `rows`, one for each type of the closure, in `oid` order; or `error` |
 | `deallocate` | `statement` | `error`, or null |
 
 `ServerInfo` is built from `open`: `Driver` is `Npgsql`, `DriverVersion` and `Version` the answer's, `Settings` the three.
@@ -118,7 +119,7 @@ In `src/SqlSource.Tool/Describing/Postgres/`.
 1. **The statements.**  The sample SQL is lexed with the generator's lexer under the `postgres` rules.  A `;` in a `Text` lexeme is the end of a statement; one followed by nothing but white space and comments is the trailing one and is dropped from the text that is sent; any other is `SQLSRC230`, and nothing is sent.  Each declared type is read by `DeclaredTypeText` against the grammar of a type name: a name, one bare identifier of letters, digits and `_` or one quoted identifier with `""` for a quote, or two joined by `.`; then any of PostgreSQL's own type words, `varying`, `precision`, `national`, `character`, `with`, `without`, `time`, `zone`, `year`, `month`, `day`, `hour`, `minute`, `second` and `to`, compared ignoring case, with an optional modifier, `(` with digits, commas, spaces and `-` inside `)`, before or among them; then any number of `[]`; and nothing else, no other bare word, no comment, no `;`, no quote left open, no second `(`.  That reads `int`, `varchar(50)`, `numeric(2,-3)`, `character varying(50)`, `double precision`, `timestamp(3) without time zone`, `interval day to second(3)`, `"My Schema"."Status"[]`, and refuses `int) AS SELECT 1`, since a `)` without its `(` is not in the grammar, and `int AS SELECT foo`, since `AS` is no type word.  A text the grammar refuses is `SQLSRC228`, and nothing is sent.  The type list still ends with a line break before `AS`, as a second line of defence, and any error the server positions inside the type list is `SQLSRC228` too, whatever its SQLSTATE.
 2. **The placeholders.**  Each `Parameter` lexeme is replaced by `$` and the one-based ordinal of its name in the request's parameter list, compared ignoring case.  A lexeme whose name is not in the list is a bug of the plan, and throws.  The type list has one item for each parameter of the list, in order: the declared type as the `-- param:` marker wrote it, or `unknown`.  A declared parameter that the SQL does not hold is in the list all the same: the server accepts a list longer than the placeholders used.
 3. **`prepare`**, with the next statement name.  An `error` ends the describe with the failure `PostgresErrors` gives for it, after step 5.
-4. **`types`** for the OIDs of the answer.  Each parameter gets its `PostgresType`, with `typeSource` `declared` or `inferred`.
+4. **`types`** for the OIDs of the answer.  Each parameter gets its `PostgresType`, with `typeSource` `declared` or `inferred`.  An `error` ends the describe with the failure `PostgresErrors` gives for it, at the step `resolve type`, after step 5.
 5. **`deallocate`**, in a `finally`, when `prepare` answered without `error`, with the same cancellation token: a cancelled describe leaves the statement to die with its session.  Its own `error` is logged and never reported.
 
 The description is the parameters, `ResultKind.None`, and null for everything else, until sub-phase 3.3.
@@ -163,7 +164,7 @@ The `types` call answers one row for each type in the closure of the OIDs asked 
 | Any failure of `open`, with a SQLSTATE or without | `SQLSRC224` | Check that the database is running and that the connection string names it |
 | No SQLSTATE, from any other call | `SQLSRC225` | None |
 
-The `server:` lines, verbatim and in this order: `<SQLSTATE>: <message>` or `<message>` alone, then `detail: <detail>`, `hint: <hint>` and `at character <position>` for each the server gave, where the position is the one in the SQL as sent, the server's position less the length of the `PREPARE` text before the SQL, and no line when the server gave none.  The `step:` is `describe parameters` for `prepare` and `SQLSRC230`, `resolve type` for `types`, and none for `open`.
+The `server:` lines, verbatim and in this order: `<SQLSTATE>: <message>` or `<message>` alone, then `detail: <detail>`, `hint: <hint>` and `at character <position>` for each the server gave, where the position is the one in the SQL as sent, the server's position less the length of the `PREPARE` text before the SQL, and no line when the server gave none.  The `step:` is `describe parameters` for `prepare`, for `SQLSRC230` and for a declared type the tool refuses, `resolve type` for `types`, and none for `open`.
 
 The driver's message on a failed `open` names the host or the user, `Failed to connect to tcp://host:5432`, `password authentication failed for user "app"`, and reaches the console, the log's `diagnostic` event and the capture's `open` answer.  The tool does not read a connection string and cannot take a part of it out; `docs/tech-debt/TD-0034` gains the case, and sub-phase 3.6's driver events keep it in mind.
 
@@ -176,7 +177,7 @@ Through the log the describer is given, each with `durationMs`:
 | Event | Members |
 |----|----|
 | `postgres.prepare` | `query`, `statement`, `sql`, `types`, `parameterTypes` or `error` |
-| `postgres.types` | `oids`, `rows`: each row as the answer holds it |
+| `postgres.types` | `oids`, `rows`: each row as the answer holds it, or `error` |
 | `postgres.deallocate` | `statement`, `error` |
 
 `open` has no event of its own: the run's `database.open` records what the session knows of its server.
@@ -214,8 +215,8 @@ The theory `DescriberFixtureTests.Replay_Case_GivesTheExpectedEntry` in `SqlSour
 One pull request, one commit for each step.  Each leaves `./pre-commit-validation.sh` passing and brings its tests and the documents it makes wrong.
 
 1. The epic outline: the row of 3.2 says In progress.
-2. The test project with `PostgresContainer` and `Schema/app.sql`, the solution, `build.yml`, `nightly.yml` and `CONTRIBUTING.md`.  One test that opens a connection and reads the server's version.
-3. Npgsql, `PostgresDescriber`, `PostgresSession`, `PostgresConnection`, the `open` call and `SQLSRC224`.
+2. The test project with `PostgresContainer`, the fixture schema `schema.sql`, Npgsql pinned in `Directory.Packages.props` and referenced by the test project, which applies the schema with it, the linked helpers, the solution, `build.yml`, `nightly.yml`, `CONTRIBUTING.md` and `tests/AGENTS.md`.  One test that opens a connection and reads the server's version.
+3. The tool's reference to Npgsql, with `Npgsql.dll` among the files `tools/check-package.sh` wants in the tool's package, `PostgresDescriber`, `PostgresSession`, `PostgresConnection`, the `open` call and `SQLSRC224`.
 4. `ParameterPlaceholders`, `DeclaredTypeText`, `SQLSRC230` and the refusing form of `SQLSRC228`.
 5. `prepare` and `deallocate`, with `PostgresErrors` and `SQLSRC225` to `SQLSRC228`.
 6. `types`, `PostgresTypes` and `PostgresTypeNames`.
@@ -233,7 +234,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 | `PostgresTypesTests` (tool tests) | Each kind from rows made by the test; a domain over a domain; a multirange's subtype; a pseudo-type; an OID the rows lack throws |
 | `PostgresErrorsTests` (tool tests) | Each row of the table; the position moved by the `PREPARE` prefix; no position; a `42704` inside and outside the type list, and with no position; a `42601` inside the type list; each `server:` line; a parameter named from `$2`; a `28P01` from `open` is `SQLSRC224` |
 | `SessionTests` (container) | `open` gives the version cut at the space, `Npgsql` as the driver and the three settings; a wrong password, a missing database and an unreachable host are `SQLSRC224` with the driver's message; the connection's whole value is in no text of the failure |
-| `ParameterTests` (container) | Every type of `Schema/app.sql` inferred: base types, a `varchar`, a `numeric`, `timestamptz`, a domain, an enum with its labels, an array, a range, a multirange; a declared `int`, `varchar(50)`, `public.user_status`, a domain, an array; a declared type checked against a use that rejects it, `SQLSRC225`; `SELECT @p IS NULL` is `SQLSRC226`; `(@name IS NULL OR name = @name)` is `SQLSRC227` and with a declaration is typed; `(name = @name OR @name IS NULL)` is typed; `-- param: @p nope_t` is `SQLSRC228`; a declared-only parameter; a parameter used twice; two statements are `SQLSRC230` and `pg_prepared_statements` is empty after each test; a syntax error and an unknown table are `SQLSRC225` with the server's position in the user's SQL |
+| `ParameterTests` (container) | Every type of the fixture schema inferred: base types, a `varchar`, a `numeric`, `timestamptz`, a domain, an enum with its labels, an array, a range, a multirange; a declared `int`, `varchar(50)`, `public.user_status`, a domain, an array; a declared type checked against a use that rejects it, `SQLSRC225`; `SELECT @p IS NULL` is `SQLSRC226`; `(@name IS NULL OR name = @name)` is `SQLSRC227` and with a declaration is typed; `(name = @name OR @name IS NULL)` is typed; `-- param: @p nope_t` is `SQLSRC228`; a declared-only parameter; a parameter used twice; two statements are `SQLSRC230` and `pg_prepared_statements` is empty after each test; a syntax error and an unknown table are `SQLSRC225` with the server's position in the user's SQL |
 | `FixtureCasesTests` (container) | Every case's live entry equals `expected.json` |
 | `DescriberFixtureTests` (tool tests) | Every case replays to `expected.json`; a capture with a call removed fails with `CaptureMissException` |
 | `SecretTests` of sub-phase 2.5 | A `PostgresDescriber` given a connection string that cannot be opened, with a marker word in it: `SQLSRC224` is printed and the word is nowhere |
@@ -242,6 +243,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 
 - `src/SqlSource.Tool/AGENTS.md`: `Describing/Postgres/` and the route, `PREPARE` and the prepared statement's lifecycle, why `DEALLOCATE` is outside the transaction and in a `finally`; the statement check before anything is sent; that the connection is made inside a `live` function and nowhere else; that a data source is made for each session; the names of the calls and their records are a contract with the captures; the four places a server error's id comes from.
 - `CONTRIBUTING.md`: the fourth test project and what it needs: Docker for the tests, the image pulled on first run, `SQLSOURCE_TESTS_POSTGRES_IMAGE`, the two runs of CI, what nightly leaves out, and `tools/record-fixtures.sh`.
+- `tests/AGENTS.md`: the fourth project, and the four files it compiles by exact path.
 - `tools/AGENTS.md`: `record-fixtures.sh` is not a check.
 - `docs/diagnostics.md`: `SQLSRC224` to `SQLSRC228` and `SQLSRC230`.
 - `src/SqlSource.Tool/README.md`: nothing changes; the tool still has no describer registered.

@@ -60,8 +60,16 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC221](#sqlsrc221) | Sidecar was written by a newer tool |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
+| [SQLSRC224](#sqlsrc224) | Database could not be opened |
+| [SQLSRC225](#sqlsrc225) | Server rejected the query |
+| [SQLSRC226](#sqlsrc226) | Parameter type could not be determined |
+| [SQLSRC227](#sqlsrc227) | Parameter's first use does not fix its type |
+| [SQLSRC228](#sqlsrc228) | Declared type is not valid |
+| [SQLSRC230](#sqlsrc230) | Query holds more than one statement |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
+
+The ids from `SQLSRC224` on are the errors of describing a query against PostgreSQL, which this version of the tool does not do yet: it reports [SQLSRC216](#sqlsrc216) for every such query.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
@@ -881,3 +889,108 @@ $ dotnet sqlsource describe
 ```
 
 Mend the file.  `dotnet sln list` reads it the same way.
+
+## SQLSRC224
+
+**Database could not be opened**
+
+The tool could not open a session with the database of a query that must be described: nothing answers at the address, the server refused the user or the password, the database does not exist, or the driver cannot read the connection string.  The lines that start with `server:` are what the server or the driver said, as they said it.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC224: The database 'app' could not be opened
+    query: GetUser, database app, postgres
+    server: 28P01: password authentication failed for user "app"
+    help: check that the database is running and that the connection string names it
+```
+
+Start the database, or correct the connection string that `--connection` or the database's variable gives.  When the line is `Npgsql cannot read the connection string`, the string is not written as Npgsql wants one, `Host=localhost;Database=app;Username=app;Password=...`: the tool does not repeat what the driver said of it, since that can quote the string.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.
+
+## SQLSRC225
+
+**Server rejected the query**
+
+The tool asked the server to prepare the query, and the server refused it: a syntax error, a table or a column the database does not have, an operator that does not exist for the types it is given.  The message ends with what the server said, and the `server:` lines give all of it: the SQLSTATE and the message, then its `detail:` and `hint:` where it gave them.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'GetUser': relation "user" does not exist
+    query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    server: 42P01: relation "user" does not exist
+    server: at character 15
+```
+
+Mend the query, or bring the database to the schema the query was written for.  `at character` counts from the start of the query's SQL as the tool sent it: without its comments, with each token's default in the token's place and `$1` in the place of each parameter, so it is close to the place in the file and not always the same.  Run with `--log` for the SQL as it was sent.  An error at the step `resolve type` has no `at character` line: there the server refused the tool's own question about a type, and not the query.  A type that a `-- param:` marker declares is checked against every use of the parameter, so a declared `int` compared with a text column is this error too.
+
+A statement that the server cannot prepare is reported so as well, though its SQL is valid: `CALL` and data definition such as `CREATE TABLE` are two, and of the first the server says `syntax error at or near "CALL"`.
+
+It is also what a connection that the server ended while the queries were described is reported as.  The query that finds it out has what the server said last, `57P01: terminating connection due to administrator command` for a backend that was ended, or the driver's message with no SQLSTATE when the server said nothing.  Every query of that database after it has the line `the connection to the server was lost`, with no SQLSTATE: start the run again.
+
+## SQLSRC226
+
+**Parameter type could not be determined**
+
+The server gives each parameter a type from the way the query uses it, and nothing in this query says what the parameter is: `SELECT @p IS NULL` holds for a value of any type.
+
+```console
+/work/App/Queries/Checks.sql(1,10): error SQLSRC226: The type of the parameter '@p' of the query 'IsNull' could not be determined
+    query: IsNull, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    server: 42P18: could not determine data type of parameter $1
+    help: cast the parameter where it is used, @p::int, or declare its type with -- param: @p int
+```
+
+Cast the parameter where it is used, or declare its type with a `-- param:` marker.  The same error, at the step `resolve type` and with no `server:` line, says that the server did give the parameter a type and that the type is a pseudo-type, which no value has: `row_to_json(@p)` makes `@p` a `record`.  Its `help:` line names the pseudo-type, and the fix is the same.
+
+## SQLSRC227
+
+**Parameter's first use does not fix its type**
+
+PostgreSQL takes a parameter's type from its first use.  Here the first use says nothing of the type and a later one does, which the server refuses.  The pattern of an optional filter does it: in `(@name IS NULL OR name = @name)` the first `@name` could be anything.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC227: The first use of the parameter '@name' of the query 'FindUsers' does not fix its type
+    query: FindUsers, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    server: 42P08: could not determine data type of parameter $1
+    server: at character 28
+    help: declare the type with -- param:, or write the use that fixes the type before the one that does not: (name = @name OR @name IS NULL)
+```
+
+Declare the parameter's type with `-- param: @name text`, or turn the condition round so that the use that fixes the type comes first.
+
+## SQLSRC228
+
+**Declared type is not valid**
+
+A `-- param:` marker gives a parameter a type, and the tool asks the server to resolve that type and to check it against every use of the parameter.  This type cannot be used, for the reason the message ends with:
+
+- `it is not written as a type name`: the text is not a type as a column definition writes one.  The tool puts a declared type into the statement it sends, so it reads the text first and sends nothing that is not a name, PostgreSQL's own type words such as `varying` or `without time zone`, one modifier in parentheses, and `[]`.  The server can give the same reason: an error other than "no such type" that it positions at a declared type is reported so, `numeric(2,-3)` on PostgreSQL 14 for one, which has no negative scale, and the `server:` line then says what the server made of the type.
+- `the database has no such type`: the server knows no type of that name on the session's search path.
+- `it is a pseudo-type`: the server knows the name, and no value has that type, `record` and `anyelement` for two, or it is an array of such a type, `cstring[]`.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC228: The type 'user_state' declared for the parameter '@status' of the query 'ListUsers' is not valid: the database has no such type
+    query: ListUsers, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    server: 42704: type "user_state" does not exist
+    help: write a type the database has, schema-qualified if it is not on the search path
+```
+
+Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `timestamp(3) without time zone`, `public.user_status`, `"My Schema"."Status"[]`.  A type in a schema that is not on the search path of the connection needs its schema.  A marker's type runs to the end of its line, but for a `null` or `not null` that ends it, so nothing else may follow it there.
+
+## SQLSRC230
+
+**Query holds more than one statement**
+
+A query is one statement.  The tool prepares it on the server to describe it, and it found a second statement in the text.  Nothing of such a query is sent.
+
+```console
+/work/App/Queries/Cleanup.sql(1,10): error SQLSRC230: The query 'Cleanup' holds more than one statement
+    query: Cleanup, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    help: one statement for each query; a ; is allowed at the end alone
+```
+
+Give each statement a `-- name:` of its own.  A `;` at the end of the statement is allowed, with white space and comments after it; a `;` inside a string, a dollar-quoted string or a comment does not count.  A `;` inside parentheses counts as the end of a statement, since the tool does not read the structure of the SQL; no statement that can be prepared holds one.
+
+This check is a help and not what keeps a second statement from being run.  The tool hands the query to the server as one statement that the driver cannot split, and the server refuses a text of several before it runs anything.  So a text that the tool reads as one statement and the server as two, which takes a `$` straight after a character such as `§`, is [SQLSRC225](#sqlsrc225) with the server's `42601: cannot insert multiple commands into a prepared statement`, and nothing of it is run.

@@ -1,6 +1,7 @@
 # Builds and tests on Windows and macOS every night.  ci.yml covers Linux on every pull request, and this covers what
 # differs elsewhere: paths, quoting, exit codes, and how a process and what it started are killed.
-# No check that needs Docker, and no pack: the lint images are Linux images, and build.yml has both.
+# No check that needs Docker, no test that needs a container, and no pack: the lint images and the PostgreSQL image
+# are Linux images, and build.yml has all three.
 # It is no required check.  A pull request that changes this file runs it, so that a change to it is tried.
 name: Nightly
 
@@ -63,8 +64,14 @@ jobs:
       - name: Build
         run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION" --no-restore
 
+      # Each project but tests/SqlSource.Tests.Postgres, whose container these runners cannot start.  Every project
+      # runs even when an earlier one failed.
       - name: Test
-        run: >-
-          dotnet test --solution "$SOLUTION" --configuration "$CONFIGURATION" --no-build
-          --results-directory artifacts/test-results
-          --report-github
+        run: |
+          status=0
+          for project in tests/SqlSource.Tests tests/SqlSource.Tests.RoslynFloor tests/SqlSource.Tool.Tests; do
+              dotnet test --project "$project" --configuration "$CONFIGURATION" --no-build \
+                  --results-directory "artifacts/test-results/$(basename "$project")" \
+                  --report-github || status=1
+          done
+          exit "$status"
