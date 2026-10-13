@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0044`
+Next id: `TD-0046`
 
 ## Active items
 
@@ -34,6 +34,8 @@ Next id: `TD-0044`
 | [TD-0041](TD-0041-ca2000-is-suppressed-on-the-opener-of-the-log.md) | Open | 2026-10-11 | Low | `RunLogFile.Open` suppresses `CA2000`, since the analyzer does not follow a disposable that is returned in an `Outcome`, so a log that a later edit leaks there is not reported; the describer of the tests has the same on its `OpenAsync`, and so has `PostgresSession.OpenAsync` of the PostgreSQL describer |
 | [TD-0042](TD-0042-allocations-of-a-parse-that-no-budget-sees.md) | Open | 2026-10-11 | Low | A query's marker scope is under no allocation budget, a summary of one line makes a list and, on .NET Framework, a copy, and a scope holds the name of its input model twice |
 | [TD-0043](TD-0043-small-gaps-of-the-postgresql-describers-parameters.md) | Open | 2026-10-13 | Low | The PostgreSQL describer types the parameters of a query's list and says nothing of a `$n` that the SQL writes itself; it spells a type of a schema whose name is a reserved word without quotes; a describe that is cancelled leaves its prepared statement to die with the session; a `prepare` whose `PREPARE` succeeds and whose read of the types fails leaves its statement too; a statement that `PREPARE` does not take, `CALL` or data definition, is reported as rejected by the server; nothing checks that the server is PostgreSQL 14 or later; `int2vector` and `oidvector` are described as arrays; a proxy that pools by transaction, or Npgsql's multiplexing, was never tried; and an exception of `open` that is no `NpgsqlException` is a throw |
+| [TD-0044](TD-0044-small-gaps-of-the-postgresql-describers-columns.md) | Open | 2026-10-13 | Low | The PostgreSQL describer records no modifier for a type of an extension, for an array's element or for the fields of an interval, says `view` for a foreign table, believes a `NOT NULL` that is `NOT VALID`, throws `SQLSRC200` for a table that another session drops between `columns` and `tables`, and gives a parameter of a domain no length from the domain's modifier |
+| [TD-0045](TD-0045-the-check-against-npgsql-is-best-effort.md) | Open | 2026-10-13 | Low | The check of the lexer against Npgsql compares columns alone, so a `$n` of the SQL's own and a disagreement in a predicate pass, an error of `check` that is no disagreement is `SQLSRC231`, and a type with a quoted name, `"char"`, a domain over a domain and a bit type cannot be bound, `SQLSRC232` |
 
 ## Columns
 

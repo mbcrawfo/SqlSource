@@ -1,0 +1,29 @@
+# TD-0045 - The check against Npgsql is best effort, and some types cannot be bound
+
+## Problem
+
+The PostgreSQL describer prepares a query with `$n` where SqlSource's lexer found a parameter, and then asks Npgsql to describe the SQL as written, to prove that Npgsql finds the same parameters ([`NpgsqlCheck`](../../src/SqlSource.Tool/Describing/Postgres/NpgsqlCheck.cs), [`PostgresLive.CheckAsync`](../../src/SqlSource.Tool/Describing/Postgres/PostgresLive.cs)).  It compares the columns of the two results.  Eight things about it are not whole:
+
+- **A disagreement that leaves the columns alone passes.**  If the two read a `@` differently inside a predicate, and the server accepts both readings, the result has the same columns and the check says `same`.
+- **A `$n` that the SQL writes itself passes.**  `SELECT 1 FROM users WHERE id = @id AND name = $2` is described by both: Npgsql sends `$1` for `@id`, leaves `$2`, and the server types it.  At run time nothing binds it.  This is the first item of [TD-0043](TD-0043-small-gaps-of-the-postgresql-describers-parameters.md).
+- **Npgsql's `:name` form.**  Npgsql reads `:id` as a parameter when the command has one of that name, and SqlSource does not read the form.  A query that writes both `@id` and `:id` for one parameter is one SqlSource prepares as a syntax error, `SQLSRC225`, so the check never sees it; it is listed because the two readers differ there and nothing but the server's refusal covers it.
+- **An array of a domain that is returned.**  Npgsql sends a parameter of `email_t[]` as `character varying[]`, and the server keeps the domain.  `SELECT @p AS p` is `SQLSRC231`, rightly, with a help line that speaks of a `@`.
+- **An error of `check` that is no disagreement reads as one.**  The spec says an error of `check` is `SQLSRC231`, so a connection lost, or a table dropped, between `types` and `check` is reported as "Npgsql reads the parameters ... differently", with the help about a `@`.
+- **Four kinds of type cannot be bound by their spelled name**, and a query with such a parameter is `SQLSRC232`: a type whose name or schema needs quotes, since Npgsql takes `My Schema.Status` and not `"My Schema"."Status"`; `"char"`, which the server gives a parameter that is compared with `pg_class.relkind`; a domain over a domain, for which Npgsql says `Writing is not supported`; and the bit string type.  `format_type(oid, -1)` of `bit` is `"bit"`, with the quotes, since plain `bit` means `bit(1)`; the describer keeps that spelling for a bit without a length, and a parameter has no length, so every parameter of a bit type is spelled `"bit"`, which Npgsql refuses.  Every query with a bit parameter is therefore `SQLSRC232`.  Only `bit` was tried: `varbit`, which is spelled `bit varying` without quotes, was not.
+- **A refusal costs a round trip for each parameter.**  Npgsql throws the same two exceptions for a type it cannot bind and for a text it will not send, so the live function asks again for each parameter alone to tell which.
+
+## Why it exists
+
+The check was specified as a comparison of columns because that is what a describe gives: Npgsql does not say which placeholders it found.  The spelled name is the sidecar's, chosen in sub-phase 3.2 to be what PostgreSQL writes, and Npgsql's `DataTypeName` has a syntax of its own, without quotes.  The round trips are on the path of a failure alone.
+
+## Impact
+
+Low today, since the describer is registered nowhere until sub-phase 3.6 and nothing binds by `DataTypeName` until phase 8.  The first two let a query through that fails when it runs, with the driver's error and no word of SqlSource's.  The fifth tells a user who has lost a connection to look for a `@`.  The sixth refuses queries that are valid: a project whose schema has a quoted name cannot declare a parameter of one of its types, and must cast a `text` parameter in the SQL.  Of the four kinds the bit type is the commonest, since it needs no unusual schema: every parameter of a bit type is refused.
+
+## Proposed fix
+
+For the first two, compare the parameters and not only the columns: after the check's describe, read the parameter types of the statement Npgsql prepared, which the protocol's `ParameterDescription` holds, and compare their count with the query's list; or refuse a `$` followed by a digit in a `Text` lexeme before anything is sent.  For the fourth, give `SQLSRC231` a second help line when what differs is a type and a parameter is an array of a domain.  For the fifth, report an error of `check` whose SQLSTATE is no syntax or name error, or that has none of the server's, as `SQLSRC225` at the step `check parameters`.  For the sixth, decide in phase 8 how generated code names a type to Npgsql, and let the sidecar hold that: a second member beside `name`, the unquoted `schema.name` form that Npgsql takes, and for `"char"` and a domain over a domain the base type's name with a cast in the SQL the generator emits; the name that generated code gives Npgsql for a bit string is `bit`.  The seventh needs none.
+
+## Trigger
+
+Phase 8, whose generated code binds a parameter by the sidecar's `name`; sub-phase 3.6, which registers the describer and gives `SQLSRC232` to users.
