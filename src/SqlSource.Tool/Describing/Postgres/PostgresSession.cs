@@ -208,9 +208,12 @@ internal sealed class PostgresSession : IDescribeSession
             return Failed(parameters.Failure);
         }
 
+        // A statement without rows has nothing a join could null-extend.
+        var gated = columns.Count > 0 && OuterJoinGate.IsGated(request.Sql);
         return Described(
             parameters.Value,
-            [.. columns.Select((column, index) => PostgresColumns.Build(column, origins[index], rows.Value))]
+            [.. columns.Select((column, index) => PostgresColumns.Build(column, origins[index], rows.Value, gated))],
+            gated
         );
     }
 
@@ -315,13 +318,16 @@ internal sealed class PostgresSession : IDescribeSession
         return Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure>.Of(parameters);
     }
 
-    // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.
+    // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.  One
+    // with rows says whether it needed a plan: "unavailable" for a gated query, until the walk exists.
     private static Outcome<QueryDescription, DescribeFailure> Described(
         IReadOnlyList<DescribedParameter> parameters,
-        IReadOnlyList<SidecarColumn> columns
+        IReadOnlyList<SidecarColumn> columns,
+        bool gated
     )
     {
         var typed = new EquatableArray<DescribedParameter>([.. parameters]);
+        var plan = gated ? SidecarValues.Plan.Unavailable : SidecarValues.Plan.NotNeeded;
         return Outcome<QueryDescription, DescribeFailure>.Of(
             columns.Count == 0
                 ? new QueryDescription(SidecarResultKind.None, typed, null, null, null, null)
@@ -330,7 +336,7 @@ internal sealed class PostgresSession : IDescribeSession
                     typed,
                     new EquatableArray<SidecarColumn>([.. columns]),
                     null,
-                    SidecarValues.Plan.NotNeeded,
+                    plan,
                     SidecarValues.TableMatch.NoOrigin
                 )
         );

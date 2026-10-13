@@ -16,7 +16,8 @@ public class PostgresColumnsTests
             .Build(
                 new PostgresColumnRow(2, "balance", 1700, 0, 0, null, 18, 2),
                 null,
-                PostgresRows.Of(PostgresRows.Numeric)
+                PostgresRows.Of(PostgresRows.Numeric),
+                false
             )
             .ShouldBe(
                 new SidecarColumn(
@@ -38,7 +39,8 @@ public class PostgresColumnsTests
         var column = PostgresColumns.Build(
             new PostgresColumnRow(0, "names", 1015, 0, 0, 10, null, null),
             null,
-            PostgresRows.Of(PostgresRows.VarcharArray, PostgresRows.Varchar)
+            PostgresRows.Of(PostgresRows.VarcharArray, PostgresRows.Varchar),
+            false
         );
 
         column.Type.ShouldBe(
@@ -58,7 +60,8 @@ public class PostgresColumnsTests
                 PostgresColumns.Build(
                     new PostgresColumnRow(0, "c", 23, 0, 0, null, null, null),
                     null,
-                    PostgresRows.Of()
+                    PostgresRows.Of(),
+                    false
                 )
             )
             .Message.ShouldContain("23");
@@ -79,12 +82,27 @@ public class PostgresColumnsTests
     }
 
     [Fact]
+    public void Build_NotNullColumnOfATable_IsNotNullableUnlessTheQueryIsGated()
+    {
+        var users = PostgresTables.Users;
+        var rows = PostgresRows.Of(PostgresRows.Int4);
+        var column = PostgresTables.ColumnOf(0, "id", 23, users, 1);
+
+        var plain = Build(column, users, rows);
+        var gated = Build(column, users, rows, gated: true);
+
+        (plain.Nullable, plain.NullableSource).ShouldBe((false, SidecarValues.NullableSource.Catalog));
+        (gated.Nullable, gated.NullableSource).ShouldBe((true, SidecarValues.NullableSource.Heuristic));
+    }
+
+    [Fact]
     public void Build_ColumnWithoutAnOrigin_SaysNothingOfIdentityOrComputed()
     {
         var column = PostgresColumns.Build(
             new PostgresColumnRow(0, "n", 23, 0, 0, null, null, null),
             null,
-            PostgresRows.Of(PostgresRows.Int4)
+            PostgresRows.Of(PostgresRows.Int4),
+            false
         );
 
         column.Origin.ShouldBeNull();
@@ -118,6 +136,7 @@ public class PostgresColumnsTests
     private static SidecarColumn Build(
         PostgresColumnRow column,
         PostgresTableRow table,
-        System.Collections.Generic.IReadOnlyDictionary<long, PostgresTypeRow> rows
-    ) => PostgresColumns.Build(column, ColumnOrigin.Find(column, PostgresTables.Of(table)), rows);
+        System.Collections.Generic.IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        bool gated = false
+    ) => PostgresColumns.Build(column, ColumnOrigin.Find(column, PostgresTables.Of(table)), rows, gated);
 }

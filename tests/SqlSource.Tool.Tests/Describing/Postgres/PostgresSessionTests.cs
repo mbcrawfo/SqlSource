@@ -645,4 +645,68 @@ public class PostgresSessionTests
         failure.ServerLines.ShouldBe(["42501: permission denied for table pg_attribute"]);
         exchange.Unused.ShouldBeEmpty();
     }
+
+    // One script for a query of users.id and an aggregate, whatever its SQL says of a join.
+    private static async Task<QueryDescription> DescribeUsersIdAsync(string sql)
+    {
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, sql, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(sql), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        return described.Value.ShouldNotBeNull();
+    }
+
+    [Fact]
+    public async Task DescribeAsync_QueryWithoutAGateWord_TakesNullabilityFromTheCatalogAndNeedsNoPlan()
+    {
+        var description = await DescribeUsersIdAsync("SELECT id, count(*) OVER () AS n FROM users");
+
+        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        description
+            .Columns.ShouldNotBeNull()
+            .Select(column => (column.Nullable, column.NullableSource))
+            .ShouldBe([(false, "catalog"), (null, "no-origin")]);
+    }
+
+    // The walk does not exist yet, which is what "unavailable" says.
+    [Fact]
+    public async Task DescribeAsync_GatedQuery_MakesEveryOriginColumnNullableAndSaysThePlanIsUnavailable()
+    {
+        var description = await DescribeUsersIdAsync(
+            "SELECT u.id, count(*) OVER () AS n FROM users u LEFT JOIN orders o ON o.user_id = u.id"
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
+        description.MatchesTable.ShouldBeNull();
+        description
+            .Columns.ShouldNotBeNull()
+            .Select(column => (column.Nullable, column.NullableSource))
+            .ShouldBe([(true, "heuristic"), (null, "no-origin")]);
+    }
+
+    // A statement without rows has no provenance, gate word or not.
+    [Fact]
+    public async Task DescribeAsync_GatedStatementWithoutRows_HasNoPlan()
+    {
+        var script = new PostgresScript().Open();
+        _ = Prepares(script, 1, "DELETE FROM users WHERE left(name, 1) = 'a'", [], new([], null));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("DELETE FROM users WHERE left(name, 1) = 'a'"),
+            TestContext.Current.CancellationToken
+        );
+
+        described.Value.ShouldNotBeNull().Plan.ShouldBeNull();
+    }
 }

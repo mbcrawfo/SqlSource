@@ -10,6 +10,8 @@ internal static class PostgresRows
 {
     public static PostgresTypeRow Int4 { get; } = BaseOf(23, "int4", "integer", "N");
 
+    public static PostgresTypeRow Int8 { get; } = BaseOf(20, "int8", "bigint", "N");
+
     public static PostgresTypeRow Text { get; } = BaseOf(25, "text", "text", "S");
 
     public static PostgresTypeRow Varchar { get; } = BaseOf(1043, "varchar", "character varying", "S");

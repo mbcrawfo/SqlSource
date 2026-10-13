@@ -357,4 +357,102 @@ public sealed class ColumnTests(PostgresContainer postgres)
             .Calls.Select(call => call.Method)
             .ShouldBe(["open", "prepare", "columns", "tables", "types", "deallocate"]);
     }
+
+    private static (bool? Nullable, string? Source)[] NullabilityOf(IEnumerable<SidecarColumn> columns) =>
+        [.. columns.Select(static column => (column.Nullable, column.NullableSource))];
+
+    // The query of the spec's Goal, without its join.
+    [Fact]
+    public async Task Describe_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()
+    {
+        var description = await ShouldDescribeAsync(
+            "SELECT u.id, u.email, count(*) OVER () AS n FROM users u WHERE u.id = @id"
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        NullabilityOf(description.Columns.ShouldNotBeNull())
+            .ShouldBe([(false, "catalog"), (true, "catalog"), (null, "no-origin")]);
+    }
+
+    // The query of the spec's Goal: each row of its table.
+    [Fact]
+    public async Task Describe_LeftJoin_IsGatedAndEveryOriginColumnIsNullableByTheHeuristic()
+    {
+        var description = await ShouldDescribeAsync(
+            "SELECT u.id, u.email, o.total, count(*) OVER () AS n "
+                + "FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = @id"
+        );
+
+        var columns = description.Columns.ShouldNotBeNull();
+        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        description.MatchesTable.ShouldBeNull();
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
+        TypeNamesOf(columns).ShouldBe(["integer", "public.email_t", "numeric(18,2)", "bigint"]);
+        NullabilityOf(columns)
+            .ShouldBe([(true, "heuristic"), (true, "heuristic"), (true, "heuristic"), (null, "no-origin")]);
+        columns
+            .Select(column => column.Origin)
+            .ShouldBe([Origin("users", "id"), Origin("users", "email"), Origin("orders", "total"), null]);
+    }
+
+    // A subtotal row holds NULL in a NOT NULL grouping column, with no outer join in sight, and the column keeps
+    // its origin.
+    [Theory]
+    [InlineData("SELECT status, count(*) FROM users GROUP BY ROLLUP (status)")]
+    [InlineData("SELECT status, count(*) FROM users GROUP BY CUBE (status)")]
+    [InlineData("SELECT status, count(*) FROM users GROUP BY GROUPING SETS ((status), ())")]
+    public async Task Describe_GroupingSetsOverANotNullColumn_IsGated(string sql)
+    {
+        var description = await ShouldDescribeAsync(sql);
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        var status = description.Columns.ShouldNotBeNull()[0];
+        status.Origin.ShouldBe(Origin("users", "status"));
+        (status.Nullable, status.NullableSource).ShouldBe((true, "heuristic"));
+    }
+
+    // The gate reads words: a function named as one gates a query that has no join.
+    [Fact]
+    public async Task Describe_FunctionNamedAsAGateWord_IsGated()
+    {
+        var description = await ShouldDescribeAsync("SELECT id, left(name, 3) AS l FROM users");
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(true, "heuristic"), (null, "no-origin")]);
+    }
+
+    [Fact]
+    public async Task Describe_GateWordInAStringOrAComment_IsNotGated()
+    {
+        var description = await ShouldDescribeAsync("SELECT id, 'left join' AS s FROM users -- outer");
+
+        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+    }
+
+    // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  A view's column says "view"
+    // in a gated query too.
+    [Fact]
+    public async Task Describe_ColumnsOfAViewAndOfAMaterializedView_SayView()
+    {
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        await using (
+            var create = source.CreateCommand(
+                "CREATE MATERIALIZED VIEW IF NOT EXISTS column_users AS SELECT id, name FROM users"
+            )
+        )
+        {
+            _ = await create.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        }
+
+        var view = await ColumnsOfAsync("SELECT id, name, email, status FROM active_users");
+        var materialized = await ColumnsOfAsync("SELECT id FROM column_users");
+        var gated = await ColumnsOfAsync(
+            "SELECT v.id, o.total FROM active_users v LEFT JOIN orders o ON o.user_id = v.id"
+        );
+
+        NullabilityOf(view).ShouldAllBe(found => found.Nullable == null && found.Source == "view");
+        NullabilityOf(materialized).ShouldBe([(null, "view")]);
+        NullabilityOf(gated).ShouldBe([(null, "view"), (true, "heuristic")]);
+    }
 }
