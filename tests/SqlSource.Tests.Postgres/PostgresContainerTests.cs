@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
@@ -35,15 +36,10 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public void Image_WithoutTheVariable_IsTheDefault()
+    public void Image_OfTheRun_IsTheVariablesValueOrTheDefault()
     {
-        if (string.IsNullOrEmpty(System.Environment.GetEnvironmentVariable(PostgresContainer.ImageVariable)))
-        {
-            PostgresContainer.Image.ShouldBe(PostgresContainer.DefaultImage);
-        }
-        else
-        {
-            PostgresContainer.Image.ShouldNotBeEmpty();
-        }
+        var named = Environment.GetEnvironmentVariable(PostgresContainer.ImageVariable);
+
+        PostgresContainer.Image.ShouldBe(string.IsNullOrEmpty(named) ? PostgresContainer.DefaultImage : named);
     }
 }

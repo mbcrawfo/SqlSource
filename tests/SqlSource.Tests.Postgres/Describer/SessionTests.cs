@@ -83,6 +83,46 @@ public sealed class SessionTests(PostgresContainer postgres)
         failure.ServerLines.ShouldBe(["Failed to connect to 127.0.0.1:1"]);
     }
 
+    // The exchange asks the server, so that the session's connection is open, and then fails.  The caller of the
+    // session sees that exception, and the connection is not left behind: the server ends the backend when the
+    // driver closes it, which takes a moment, so it is asked until none is left or a few seconds have passed.
+    [Fact]
+    public async Task OpenAsync_ExchangeThatThrowsAfterTheServerAnswered_RethrowsItAndLeavesNoConnection()
+    {
+        var token = TestContext.Current.CancellationToken;
+        var application = "sqlsource-test-" + Guid.NewGuid().ToString("N");
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { ApplicationName = application };
+        var thrown = new InvalidOperationException("the exchange failed after the server answered");
+
+        var caught = await Should.ThrowAsync<InvalidOperationException>(
+            Sessions.OpenAsync(connection.ConnectionString, new ThrowsAfterTheServerAnswered(thrown))
+        );
+
+        caught.ShouldBeSameAs(thrown);
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        var backends = await BackendsOfAsync(own, application, token);
+        for (var attempt = 0; backends > 0 && attempt < 100; attempt++)
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(50), token);
+            backends = await BackendsOfAsync(own, application, token);
+        }
+
+        backends.ShouldBe(0, "the failed session left its connection open");
+    }
+
+    private static async Task<long> BackendsOfAsync(
+        NpgsqlDataSource source,
+        string application,
+        CancellationToken token
+    )
+    {
+        await using var count = source.CreateCommand(
+            "SELECT count(*) FROM pg_catalog.pg_stat_activity WHERE application_name = @application"
+        );
+        _ = count.Parameters.AddWithValue("application", application);
+        return (long)(await count.ExecuteScalarAsync(token)).ShouldNotBeNull();
+    }
+
     private const string Sql = "SELECT 1 FROM users WHERE id = @id";
 
     // A server ends a backend when it restarts, when an administrator says so and after an idle timeout.  The
@@ -156,6 +196,21 @@ public sealed class SessionTests(PostgresContainer postgres)
             }
 
             return answer;
+        }
+    }
+
+    // Asks the server, and then throws what it was given.
+    private sealed class ThrowsAfterTheServerAnswered(Exception exception) : IDescribeExchange
+    {
+        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
+            string method,
+            TRequest request,
+            Func<TRequest, CancellationToken, Task<TAnswer>> live,
+            CancellationToken cancellationToken
+        )
+        {
+            _ = await live(request, cancellationToken);
+            throw exception;
         }
     }
 

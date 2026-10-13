@@ -32,11 +32,20 @@ public sealed class PostgresContainer : IAsyncLifetime
     {
         var token = TestContext.Current.CancellationToken;
         await _container.StartAsync(token);
-        await using var source = NpgsqlDataSource.Create(ConnectionString);
-        await using var command = source.CreateCommand(
-            await File.ReadAllTextAsync(RepositoryPaths.PostgresSchema, token)
-        );
-        _ = await command.ExecuteNonQueryAsync(token);
+        try
+        {
+            await using var source = NpgsqlDataSource.Create(ConnectionString);
+            await using var command = source.CreateCommand(
+                await File.ReadAllTextAsync(RepositoryPaths.PostgresSchema, token)
+            );
+            _ = await command.ExecuteNonQueryAsync(token);
+        }
+        catch
+        {
+            // The container has started, so it is removed here and not left to xunit or to the reaper.
+            await _container.DisposeAsync();
+            throw;
+        }
     }
 
     public ValueTask DisposeAsync() => _container.DisposeAsync();

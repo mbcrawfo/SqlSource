@@ -113,6 +113,41 @@ public class PostgresEventsTests
             );
     }
 
+    // A types call that failed has its error in the place of the rows.
+    [Fact]
+    public async Task Describe_TypesThatFails_WritesItsErrorInThePlaceOfTheRows()
+    {
+        var log = new RecordingLog();
+        var refused = new PostgresServerError(
+            "57014",
+            "canceling statement due to statement timeout",
+            null,
+            null,
+            null
+        );
+        var script = new PostgresScript()
+            .Open()
+            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
+            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer(null, refused))
+            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+
+        await DescribeAsync(script, log);
+
+        log.Events.Select(written => written.Name).ShouldBe(["prepare", "types", "deallocate"]);
+        var types = log.Events[1].Members;
+        NamesOf(types).ShouldBe(["oids", "error", "durationMs"]);
+        Member(types, "error")
+            .ShouldBe(
+                LogValue.MapOf(
+                    new("sqlState", "57014"),
+                    new("message", "canceling statement due to statement timeout"),
+                    new("detail", LogValue.Null),
+                    new("hint", LogValue.Null),
+                    new("position", LogValue.Null)
+                )
+            );
+    }
+
     // The error of "deallocate" is nowhere but here.
     [Fact]
     public async Task Describe_DeallocateThatFails_WritesTheErrorThatIsNeverReported()
@@ -154,5 +189,23 @@ public class PostgresEventsTests
         log.Events.Select(written => written.Name)
             .ShouldBe(["postgres.prepare", "postgres.types", "postgres.deallocate"]);
         Member(log.Events[0].Members, "sql").ShouldBe((LogValue)"SELECT 1 FROM *** WHERE id = $1");
+    }
+
+    // The same inside a map: the message of an error is a string one level down.
+    [Fact]
+    public async Task Describe_ThroughTheLogOfASession_RemovesTheSecretFromTheMessageOfAnError()
+    {
+        var log = new RecordingLog();
+        var rejected = new PostgresServerError("42P01", "relation \"users\" does not exist", null, null, null);
+        var script = new PostgresScript().Open().Answer("prepare", Prepare, new PostgresPrepareAnswer(null, rejected));
+
+        await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."));
+
+        var (name, members) = log.Events.ShouldHaveSingleItem();
+        name.ShouldBe("postgres.prepare");
+        var error = Member(members, "error").ShouldBeOfType<LogValue.Members>();
+        error
+            .Values.Single(value => value.Name == "message")
+            .Value.ShouldBe((LogValue)"relation \"***\" does not exist");
     }
 }

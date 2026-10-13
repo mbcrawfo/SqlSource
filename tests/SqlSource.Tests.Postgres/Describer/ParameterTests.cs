@@ -285,7 +285,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     private static DescribedParameter Declared(string name, PostgresType type) =>
         new(name, type, SidecarValues.TypeSource.Declared);
 
-    // The goal of the sub-phase.
+    // The server gives a parameter the type of the column it is compared with.
     [Fact]
     public async Task Describe_ParametersComparedWithColumns_AreInferredFromThem()
     {
@@ -329,7 +329,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
         parameters.ShouldBe([Inferred("p", TestSidecars.Postgres(name, internalName: internalName))]);
     }
 
-    // A parameter keeps its domain; a column, in the next sub-phase, is flattened to its base by the protocol.
+    // A parameter keeps its domain; a column is flattened to its base by the protocol.
     [Fact]
     public async Task Describe_DomainEnumArrayRangeAndMultirangeInferred_HaveTheirParts()
     {

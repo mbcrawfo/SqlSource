@@ -16,13 +16,15 @@ internal static class PostgresTypes
 {
     /// <summary>
     /// Whether the type is a pseudo-type, <c>record</c>, <c>cstring</c>, <c>anyelement</c>, or an array of one,
-    /// <c>cstring[]</c>: one that no value has and that cannot be described.  The server accepts one as a
-    /// parameter's type, declared or inferred.
+    /// <c>cstring[]</c>, or a domain over either: one that no value has and that cannot be described.  The server
+    /// accepts one as a parameter's type, declared or inferred.
     /// </summary>
     public static bool IsPseudo(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows)
     {
         var row = Row(oid, rows);
-        return row.Typtype == "p" || (IsArray(row) && IsPseudo(row.Typelem, rows));
+        return row.Typtype == "p"
+            || (IsArray(row) && IsPseudo(row.Typelem, rows))
+            || (row.Typtype == "d" && IsPseudo(row.Typbasetype, rows));
     }
 
     /// <summary>The record of a type.</summary>

@@ -19,7 +19,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// wrong.
 /// </para>
 /// <para>
-/// That refusal is the first one and no guarantee, since the lexer and the server do not always split a text alike:
+/// That refusal is the first one and no guarantee, since the lexer and the server do not always split a text alike,
+/// and a setting of the session, <c>standard_conforming_strings</c>, changes what the server reads as a string:
 /// <c>SELECT 1 AS §$x$; DROP TABLE t; --$x$</c> is one statement to the lexer, which reads <c>$x$</c> after a
 /// <c>§</c> as the start of a dollar-quoted string, and two to the server, which reads <c>§$x$</c> as an
 /// identifier.  What keeps a second statement from being run is how the text is sent:

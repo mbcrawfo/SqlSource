@@ -186,6 +186,21 @@ public class PostgresTypesTests
         PostgresTypes.IsPseudo(1009, rows).ShouldBeFalse();
     }
 
+    // A domain follows its base, as an array follows its element.
+    [Fact]
+    public void IsPseudo_DomainOverAPseudoTypeOrAnArrayOfOne_IsTrueAndOverAnyOtherTypeFalse()
+    {
+        var cstring = PostgresRows.PseudoOf(2275, "cstring");
+        var cstrings = PostgresRows.ArrayOf(1263, "_cstring", cstring);
+        var over = PostgresRows.DomainOf(16600, "over_cstring", cstring);
+        var overArray = PostgresRows.DomainOf(16601, "over_cstrings", cstrings);
+        var rows = PostgresRows.Of(cstring, cstrings, over, overArray, PostgresRows.Varchar, PostgresRows.EmailT);
+
+        PostgresTypes.IsPseudo(over.Oid, rows).ShouldBeTrue();
+        PostgresTypes.IsPseudo(overArray.Oid, rows).ShouldBeTrue();
+        PostgresTypes.IsPseudo(PostgresRows.EmailT.Oid, rows).ShouldBeFalse();
+    }
+
     // The session asks IsPseudo first, so a pseudo-type here is a bug.
     [Fact]
     public void Build_PseudoType_Throws() =>

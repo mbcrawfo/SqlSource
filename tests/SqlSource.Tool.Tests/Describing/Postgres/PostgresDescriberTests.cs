@@ -14,7 +14,8 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 public class PostgresDescriberTests
 {
     [Fact]
-    public void Dialect_IsPostgreSql() => new PostgresDescriber().Dialect.ShouldBe(SqlDialect.PostgreSql);
+    public void Dialect_OfTheDescriber_IsPostgreSql() =>
+        new PostgresDescriber().Dialect.ShouldBe(SqlDialect.PostgreSql);
 
     // The connection of a script is the word "replay", which no driver could open: nothing of Npgsql runs.
     [Fact]

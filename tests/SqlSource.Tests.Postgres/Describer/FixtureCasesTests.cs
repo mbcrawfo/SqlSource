@@ -84,6 +84,7 @@ public sealed class FixtureCasesTests(PostgresContainer postgres)
         key.ShouldBeGreaterThanOrEqualTo(0, "the entry has no serverVersion");
         var value = key + VersionKey.Length;
         var end = sidecar.IndexOf('"', value);
+        end.ShouldBeGreaterThanOrEqualTo(0, "the serverVersion of the entry has no closing quote");
         return string.Concat(sidecar.AsSpan(0, value), "*", sidecar.AsSpan(end));
     }
 }
