@@ -32,9 +32,10 @@ Settled in this spec:
 | Decision | Choice | Why |
 |----|----|----|
 | Which of Npgsql's categories reach the log, at which level | `Npgsql.Command` and `Npgsql.Transaction` at Debug and above; every other category, `Npgsql.Connection` among them, at Warning and above | Npgsql's connection messages at Debug name the host and the database.  The command messages hold the SQL as sent, which is the tool's own, and the transaction messages the order of begin and rollback. |
-| What a driver event holds | `category`, `level`, `eventId`, `message`, and for an exception its type and message | The message is the driver's text through `SessionRunLog`, so the whole connection value is removed if it is ever there.  No stack trace. |
+| What a driver event holds | `category`, `level`, `eventId`, `message`, and for an exception its type and message, except that an event of `Npgsql.Connection` carries no exception | The message is the driver's text through `SessionRunLog`, so the whole connection value is removed if it is ever there.  No stack trace.  A failed open's exception names the host and the user, and the `diagnostic` event of `SQLSRC224` already holds that text once, under `TD-0034`. |
+| How the fixture equality of the command test compares | After setting `serverVersion` and `database` to one value on both entries | The project's database is `app` and the fixture's `postgres`, and the server is whichever CI run this is. |
 | When the factory is wired | Only when the run has a log | A `NullRunLog` run pays nothing for formatting messages nobody reads. |
-| Where the command is proven whole | `tests/SqlSource.Tests.Postgres`, running `Cli.RunAsync` with a host whose registry holds the describer, over a project of the tool's tests compiled into it by link | The tool's own tests have no database.  The helpers that make a project and a host exist in `tests/SqlSource.Tool.Tests` and are shared the way the generator's harness is shared with that project. |
+| Where the command is proven whole | `tests/SqlSource.Tests.Postgres`, running `Cli.RunAsync` with a host whose registry holds the describer and whose `Exchange` gives `LiveExchange.Instance`, over a project of the tool's tests compiled into it by link | The tool's own tests have no database.  The helpers that make a project and a host exist in `tests/SqlSource.Tool.Tests` and are shared the way the generator's harness is shared with that project.  `CliRun` brings `FakeDescriber` and its `SQLSRC999`, so the project gets `AnalyzerReleases.Shipped.md` and `AnalyzerReleases.Unshipped.md` of its own, as the tool's tests have. |
 
 ## Out of scope
 
@@ -63,20 +64,20 @@ Npgsql depends on `Microsoft.Extensions.Logging.Abstractions`, so the tool refer
 
 | Case | Asserts |
 |----|----|
-| `describe` over a project with queries of each kind of this phase's fixtures | Exit `0`; the sidecars are written and `SidecarReader` reads them; each entry equals the describer's fixture of the same query |
+| `describe` over a project with queries of each kind of this phase's fixtures, against the `fixtures` database | Exit `0`; the sidecars are written and `SidecarReader` reads them; each entry equals the describer's fixture of the same query, `serverVersion` and `database` set equal first |
 | `describe` again | Every query skipped, no file's time changes |
 | `--check` | Exit `0` |
 | A column added to a table, then `--check` | Exit `2`, `SQLSRC219` for the `SELECT *` query |
 | `describe --force` after the change | Exit `0`, the sidecar holds the column |
 | A query the server rejects beside one it accepts, in one file | Exit `1`, `SQLSRC225` at the first and `SQLSRC217` for the file |
-| `--log`, with a connection string whose host, user, database and application name are distinctive words | The file holds `postgres.driver` events and none of the four words; `SecretTests`' marker word is nowhere |
-| A connection string that cannot be opened | `SQLSRC224`, exit `1` |
+| `--log`, with a connection string whose host, user, database and application name are distinctive words, for a run that opens | The file holds `postgres.driver` events and none of the four words; `SecretTests`' marker word is nowhere |
+| A connection string that cannot be opened, with `--log` | `SQLSRC224`, exit `1`; the `diagnostic` event holds the driver's message, which `TD-0034` records, and no `postgres.driver` event holds the host |
 
-One test runs the packed command as a subprocess, `sqlsource describe` with `--connection`, against the container, to prove the command line end to end; it is the test the epic asks for in each end-to-end project.
+One test runs the built tool in a process of its own, as `TerminationTests` starts it through `Programs.cs`, with `describe` and `--connection` against the container, to prove the command line end to end; it is the test the epic asks for in each end-to-end project, and `tools/check-tool-install.sh` already proves the package.
 
 ## Closing phase 3
 
-- `src/SqlSource.Tool/README.md`: "this version has no describer" goes; a section on PostgreSQL: the connection string is Npgsql's; what is described and how, in a paragraph; `-- param:` and when it is needed, with the optional-filter pattern; the override suffixes; what nullability can say and what it cannot, a view and a subquery kept by the planner among the cannots; that the tool prepares and explains and executes nothing, and leaves the session as it found it; the server versions supported.
+- `src/SqlSource.Tool/README.md`: "this version has no describer" goes; a section on PostgreSQL: the connection string is Npgsql's; what is described and how, in a paragraph; `-- param:` and when it is needed, with the optional-filter pattern; the override suffixes; what nullability can say and what it cannot, a view, a foreign table, a grouping set and a subquery kept by the planner among the cannots, and what `plan: unavailable` means; that the tool prepares and explains and executes nothing, and leaves the session as it found it; the server versions supported.
 - The epic outline: the row of phase 3 says Done; the phase 3 section records what the sub-phases settled, as phase 2's does; the table of ids gains this phase's; the notes on nullability and on the describer's route are as the spike settled them.
 - `src/SqlSource.Tool/AGENTS.md` is read against the code as it ended up, and corrected.
 - `CONTRIBUTING.md` says what the container project proves now.
@@ -97,7 +98,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 
 | Where | Cases |
 |----|----|
-| `NpgsqlRunLoggerTests` (tool tests) | A message of each category at each level: written or dropped as the table says; the event's members; an exception's type and message; scopes are no-ops; a `NullRunLog` run builds no factory |
+| `NpgsqlRunLoggerTests` (tool tests) | A message of each category at each level: written or dropped as the table says; the event's members; an exception's type and message, and none for `Npgsql.Connection`; scopes are no-ops; a `NullRunLog` run builds no factory |
 | `DescribeCommandTests` (container) | The table above |
 | `ToolHostTests` (tool tests) | The real host's registry finds a describer for `postgres` and none for `mssql` |
 | `tools/check-tool-install.sh` | Unchanged: `describe` in an empty folder is still `SQLSRC201` |
