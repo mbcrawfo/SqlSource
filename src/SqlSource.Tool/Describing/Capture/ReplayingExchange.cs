@@ -14,7 +14,8 @@ namespace SqlSource.Tool.Describing.Capture;
 /// </summary>
 /// <remarks>
 /// <para>
-/// A call is found by its method and by its request as <see cref="CaptureJson.KeyOf" /> writes it.  A question the
+/// A call is found by its method and by its request as <see cref="CaptureJson.KeyOf" /> writes it, which leaves out
+/// its null members so that a request's record can gain a nullable one.  A question the
 /// capture holds more than once gets its answers in the capture's order, one each time it is asked.  A question
 /// with no answer left is a <see cref="CaptureMissException" />.
 /// </para>
@@ -44,13 +45,14 @@ internal sealed class ReplayingExchange(DescribeCapture capture) : IDescribeExch
         CancellationToken cancellationToken
     )
     {
-        var key = CaptureJson.KeyOf(CaptureJson.ToElement(request));
+        var asked = CaptureJson.ToElement(request);
+        var key = CaptureJson.KeyOf(asked);
         var recorded =
             _calls.Find(candidate =>
                 !candidate.Given
                 && string.Equals(candidate.Call.Method, method, StringComparison.Ordinal)
                 && string.Equals(candidate.Key, key, StringComparison.Ordinal)
-            ) ?? throw CaptureMissException.NoAnswer(method, key);
+            ) ?? throw CaptureMissException.NoAnswer(method, CaptureJson.TextOf(asked));
         recorded.Given = true;
         return Task.FromResult(Read<TAnswer>(method, recorded.Call.Answer));
     }

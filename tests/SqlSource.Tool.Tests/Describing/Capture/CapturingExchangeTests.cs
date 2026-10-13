@@ -43,7 +43,7 @@ public class CapturingExchangeTests
         _ = await session.DescribeAsync(GetUser, TestContext.Current.CancellationToken);
 
         _capture
-            .Calls.Select(call => $"{call.Method} {CaptureJson.KeyOf(call.Request)} {CaptureJson.KeyOf(call.Answer)}")
+            .Calls.Select(call => $"{call.Method} {CaptureJson.TextOf(call.Request)} {CaptureJson.TextOf(call.Answer)}")
             .ShouldBe([
                 "open {} {\"server\":{\"version\":\"16.4\",\"driver\":\"FakeDriver\",\"driverVersion\":\"1.2.3\","
                     + "\"settings\":[]},\"error\":null}",
@@ -83,7 +83,7 @@ public class CapturingExchangeTests
         var opened = await OpenAsync();
 
         _ = opened.Failure.ShouldNotBeNull();
-        var answer = CaptureJson.KeyOf(_capture.Calls.ShouldHaveSingleItem().Answer);
+        var answer = CaptureJson.TextOf(_capture.Calls.ShouldHaveSingleItem().Answer);
         answer.ShouldStartWith("{\"server\":null,\"error\":{\"id\":\"SQLSRC999\",");
         answer.ShouldContain("\"serverLines\":[\"connection refused\"]");
     }

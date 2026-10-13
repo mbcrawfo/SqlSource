@@ -31,6 +31,12 @@ internal static class CaptureJson
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
     };
 
+    // A key is escaped as a request is written, so that a request with no null member has its own text for a key.
+    private static readonly JsonWriterOptions KeyOptions = new()
+    {
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
     /// <summary>
     /// How every request and every answer is written: camel-case names, every member, a null one included, and
     /// no indentation.
@@ -51,7 +57,33 @@ internal static class CaptureJson
     /// question.  A request that was read from a file and the same request asked anew have one key, whatever the
     /// file's indentation.
     /// </summary>
-    public static string KeyOf(JsonElement element) => JsonSerializer.Serialize(element, Options);
+    /// <remarks>
+    /// <para>
+    /// A key is the request without its null members, at every depth, so that a request's record can gain a
+    /// nullable member: a call that was recorded before the member was there answers the request that has it as
+    /// null.  A null in a list is a value of the list and stays, and so does every value that is not null, a zero
+    /// and an empty list among them.
+    /// </para>
+    /// <para>
+    /// A key is made anew at each replay, of the recorded request and of the asked one alike, and is in no file:
+    /// the file holds the request whole, and that is the contract.
+    /// </para>
+    /// </remarks>
+    public static string KeyOf(JsonElement element)
+    {
+        using var stream = new MemoryStream();
+        using (var json = new Utf8JsonWriter(stream, KeyOptions))
+        {
+            WriteKey(json, element);
+        }
+
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    /// <summary>
+    /// A request or an answer of a capture on one line, with every member: what a message shows of it.
+    /// </summary>
+    public static string TextOf(JsonElement element) => JsonSerializer.Serialize(element, Options);
 
     /// <summary>The file of a capture.</summary>
     public static string Write(DescribeCapture capture)
@@ -105,6 +137,39 @@ internal static class CaptureJson
         }
     }
 
+    // Options that leave a null out do nothing for an element, so the members are written one by one.
+    private static void WriteKey(Utf8JsonWriter json, JsonElement element)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            json.WriteStartObject();
+            foreach (var member in element.EnumerateObject())
+            {
+                if (member.Value.ValueKind != JsonValueKind.Null)
+                {
+                    json.WritePropertyName(member.Name);
+                    WriteKey(json, member.Value);
+                }
+            }
+
+            json.WriteEndObject();
+        }
+        else if (element.ValueKind == JsonValueKind.Array)
+        {
+            json.WriteStartArray();
+            foreach (var item in element.EnumerateArray())
+            {
+                WriteKey(json, item);
+            }
+
+            json.WriteEndArray();
+        }
+        else
+        {
+            element.WriteTo(json);
+        }
+    }
+
     private static Outcome<DescribeCapture, string> ReadRoot(JsonElement root)
     {
         if (root.ValueKind != JsonValueKind.Object)
@@ -129,7 +194,7 @@ internal static class CaptureJson
             );
         }
 
-        if (TextOf(root, EngineKey) is not { } engine)
+        if (StringOf(root, EngineKey) is not { } engine)
         {
             return Failed("The capture has no engine.");
         }
@@ -159,13 +224,13 @@ internal static class CaptureJson
     // An element is cloned: the document it was read from is disposed when the capture is returned.
     private static CaptureCall? ReadCall(JsonElement call) =>
         call.ValueKind == JsonValueKind.Object
-        && TextOf(call, MethodKey) is { } method
+        && StringOf(call, MethodKey) is { } method
         && call.TryGetProperty(RequestKey, out var request)
         && call.TryGetProperty(AnswerKey, out var answer)
             ? new CaptureCall(method, request.Clone(), answer.Clone())
             : null;
 
-    private static string? TextOf(JsonElement parent, string key) =>
+    private static string? StringOf(JsonElement parent, string key) =>
         parent.TryGetProperty(key, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
 
     private static Outcome<DescribeCapture, string> Failed(string reason) =>

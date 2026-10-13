@@ -30,7 +30,9 @@ internal sealed class CaptureMissException : InvalidOperationException
 
     /// <summary>The capture holds no call of the method with the request, or every one was given out.</summary>
     /// <param name="method">The name of the question.</param>
-    /// <param name="request">The request's JSON, as <see cref="CaptureJson.KeyOf" /> gives it.</param>
+    /// <param name="request">
+    /// The request's JSON with every member, as <see cref="CaptureJson.TextOf" /> gives it.
+    /// </param>
     public static CaptureMissException NoAnswer(string method, string request) =>
         new($"The capture has no further answer to '{method}' for the request {request}.");
 

@@ -188,7 +188,7 @@ public class ReplayingExchangeTests
 
         _ = await AskAsync(exchange, Question("SELECT 1;"));
 
-        CaptureJson.KeyOf(exchange.Unused.ShouldHaveSingleItem().Request).ShouldContain("SELECT 2;");
+        CaptureJson.TextOf(exchange.Unused.ShouldHaveSingleItem().Request).ShouldContain("SELECT 2;");
     }
 
     // A fixture is a file: the request found in it must be the one that was asked when it was recorded.
@@ -228,7 +228,7 @@ public class ReplayingExchangeTests
         return capture;
     }
 
-    private static string Asked => CaptureJson.KeyOf(CaptureJson.ToElement(Question()));
+    private static string Asked => CaptureJson.TextOf(CaptureJson.ToElement(Question()));
 
     // System.Text.Json reads a member that is absent, or null, as null whatever the record says of it.  A null
     // where the record has none is no answer the describer can read, and it is told so with the member's name.
@@ -301,19 +301,69 @@ public class ReplayingExchangeTests
         (await AskAsync(exchange, Question())).ShouldBe("1");
     }
 
-    // The request is the key with every member in it, so a request's record cannot gain one: every call that
-    // was recorded before would be a question the capture lacks.
+    private static FakeDescribeRequest WithParameter(string? type, bool? nullable, bool isDeclared) =>
+        new("GetUser", "SELECT @id;", [new FakeListedParameter("id", type, nullable, isDeclared)]);
+
+    private static string RecordedWithParameter(string members) =>
+        "{\"name\":\"GetUser\",\"sql\":\"SELECT @id;\",\"parameters\":[{" + members + "}]}";
+
+    private static string OneAnswer => CaptureJson.TextOf(CaptureJson.ToElement(Answer("1")));
+
+    // A request's record may gain a nullable member.  The key has no null member, so a call that was recorded
+    // before the member was there answers the request that has it as null.
     [Fact]
-    public async Task AskAsync_RequestThatGainedAMemberSinceItWasRecorded_IsACallTheCaptureLacks()
+    public async Task AskAsync_RequestThatGainedAMemberThatIsNull_FindsTheCall()
+    {
+        var exchange = new ReplayingExchange(
+            Written(RecordedWithParameter("\"name\":\"id\",\"isDeclared\":true"), OneAnswer)
+        );
+
+        (await AskAsync(exchange, WithParameter(type: null, nullable: null, isDeclared: true))).ShouldBe("1");
+    }
+
+    // A member that holds a value is another question than the one recorded without it: an empty list is a value.
+    [Fact]
+    public async Task AskAsync_RequestThatGainedAMemberThatIsNotNull_IsACallTheCaptureLacks()
     {
         var exchange = new ReplayingExchange(
             Written( /*lang=json,strict*/
                 "{\"name\":\"GetUser\",\"sql\":\"SELECT 1;\"}",
-                CaptureJson.KeyOf(CaptureJson.ToElement(Answer("1")))
+                OneAnswer
             )
         );
 
         _ = await Should.ThrowAsync<CaptureMissException>(async () => await AskAsync(exchange, Question()));
+    }
+
+    // A member of a value type is never null, so it is in every key: a request's record gains only nullable ones.
+    [Fact]
+    public async Task AskAsync_RequestThatGainedAMemberOfAValueType_IsACallTheCaptureLacks()
+    {
+        var exchange = new ReplayingExchange(
+            Written(RecordedWithParameter("\"name\":\"id\",\"type\":\"int4\",\"nullable\":false"), OneAnswer)
+        );
+
+        _ = await Should.ThrowAsync<CaptureMissException>(async () =>
+            await AskAsync(exchange, WithParameter("int4", nullable: false, isDeclared: false))
+        );
+    }
+
+    // A null is no wildcard: a request with a null member does not take the answer of one recorded with a value.
+    [Fact]
+    public async Task AskAsync_RequestWithANullWhereTheRecordedOneHasAValue_IsACallTheCaptureLacks()
+    {
+        var exchange = new ReplayingExchange(
+            Written(RecordedWithParameter("\"name\":\"id\",\"type\":\"int4\",\"isDeclared\":true"), OneAnswer)
+        );
+
+        var thrown = await Should.ThrowAsync<CaptureMissException>(async () =>
+            await AskAsync(exchange, WithParameter(type: null, nullable: null, isDeclared: true))
+        );
+
+        // The message shows the request whole, its null members too, as the capture's file would hold it.
+        thrown.Message.ShouldContain( /*lang=json,strict*/
+            "{\"name\":\"id\",\"type\":null,\"nullable\":null,\"isDeclared\":true}"
+        );
     }
 
     // The two shapes fit: what is replayed can be recorded again, and is the same file.

@@ -187,6 +187,51 @@ public class CaptureJsonTests
         key.ShouldBe(JsonSerializer.Serialize(request, CaptureJson.Options));
     }
 
+    // A request's record may gain a nullable member: a key has no null member, at any depth, so a request that was
+    // recorded before the member was there and the same request asked now are one question.
+    [Fact]
+    public void KeyOf_RequestWithNullMembers_LeavesThemOutAtEveryDepth()
+    {
+        var request = new
+        {
+            Sql = "a",
+            Added = (string?)null,
+            Items = new[] { new { Name = "id", Type = (string?)null } },
+            Nested = new { Flag = (bool?)null, Count = 0 },
+        };
+
+        CaptureJson
+            .KeyOf(CaptureJson.ToElement(request))
+            .ShouldBe( /*lang=json,strict*/
+                "{\"sql\":\"a\",\"items\":[{\"name\":\"id\"}],\"nested\":{\"count\":0}}"
+            );
+    }
+
+    // A null in a list is a value of the list and no member, so it stays, and two lists that differ by one stay two
+    // questions.  A zero, a false, an empty text and an empty list are values too.
+    [Fact]
+    public void KeyOf_NullInAListAndValuesThatAreNotNull_Stay()
+    {
+        using var document = JsonDocument.Parse(
+            "{\"items\":[\"a\",null],\"count\":0,\"flag\":false,\"text\":\"\",\"empty\":[],\"gone\":null}"
+        );
+
+        CaptureJson
+            .KeyOf(document.RootElement)
+            .ShouldBe( /*lang=json,strict*/
+                "{\"items\":[\"a\",null],\"count\":0,\"flag\":false,\"text\":\"\",\"empty\":[]}"
+            );
+    }
+
+    // What a capture holds, and what a message shows, is the request with every member.
+    [Fact]
+    public void TextOf_RequestWithNullMembers_WritesEveryMember() =>
+        CaptureJson
+            .TextOf(CaptureJson.ToElement(new { Sql = "a", Added = (string?)null }))
+            .ShouldBe( /*lang=json,strict*/
+                "{\"sql\":\"a\",\"added\":null}"
+            );
+
     private static DescribeCapture WithRequest<T>(T request)
     {
         var capture = new DescribeCapture("postgres");
