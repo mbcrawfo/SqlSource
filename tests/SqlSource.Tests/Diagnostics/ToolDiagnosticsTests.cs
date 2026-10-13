@@ -300,4 +300,34 @@ public class ToolDiagnosticsTests
                 "Cleanup"
             )
             .ShouldBe("The query 'Cleanup' holds more than one statement");
+
+    [Fact]
+    public void ServerRejectedQuery_Message_HoldsTheQueryAndTheServersMessage() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ServerRejectedQuery.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "GetUser",
+                "relation \"nope\" does not exist"
+            )
+            .ShouldBe("The server rejected the query 'GetUser': relation \"nope\" does not exist");
+
+    [Fact]
+    public void ParameterTypeNotDetermined_Message_HoldsTheParameterAndTheQuery() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ParameterTypeNotDetermined.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "@p",
+                "IsNull"
+            )
+            .ShouldBe("The type of the parameter '@p' of the query 'IsNull' could not be determined");
+
+    [Fact]
+    public void ParameterFirstUseDoesNotFixType_Message_HoldsTheParameterAndTheQuery() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.ParameterFirstUseDoesNotFixType.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "@name",
+                "FindUsers"
+            )
+            .ShouldBe("The first use of the parameter '@name' of the query 'FindUsers' does not fix its type");
 }

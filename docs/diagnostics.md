@@ -61,6 +61,9 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
 | [SQLSRC224](#sqlsrc224) | Database could not be opened |
+| [SQLSRC225](#sqlsrc225) | Server rejected the query |
+| [SQLSRC226](#sqlsrc226) | Parameter type could not be determined |
+| [SQLSRC227](#sqlsrc227) | Parameter's first use does not fix its type |
 | [SQLSRC228](#sqlsrc228) | Declared type is not valid |
 | [SQLSRC230](#sqlsrc230) | Query holds more than one statement |
 
@@ -901,6 +904,55 @@ The tool could not open a session with the database of a query that must be desc
 ```
 
 Start the database, or correct the connection string that `--connection` or the database's variable gives.  When the line is `Npgsql cannot read the connection string`, the string is not written as Npgsql wants one, `Host=localhost;Database=app;Username=app;Password=...`: the tool does not repeat what the driver said of it, since that can quote the string.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.
+
+## SQLSRC225
+
+**Server rejected the query**
+
+The tool asked the server to prepare the query, and the server refused it: a syntax error, a table or a column the database does not have, an operator that does not exist for the types it is given.  The message ends with what the server said, and the `server:` lines give all of it: the SQLSTATE and the message, then its `detail:` and `hint:` where it gave them.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'GetUser': relation "user" does not exist
+    query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    server: 42P01: relation "user" does not exist
+    server: at character 15
+```
+
+Mend the query, or bring the database to the schema the query was written for.  `at character` counts from the start of the query's SQL as the tool sent it: without its comments, with each token's default in the token's place and `$1` in the place of each parameter, so it is close to the place in the file and not always the same.  Run with `--log` for the SQL as it was sent.  A type that a `-- param:` marker declares is checked against every use of the parameter, so a declared `int` compared with a text column is this error too.  It is also what a connection that dropped while a query was described is reported as, with the driver's message and no SQLSTATE.
+
+## SQLSRC226
+
+**Parameter type could not be determined**
+
+The server gives each parameter a type from the way the query uses it, and nothing in this query says what the parameter is: `SELECT @p IS NULL` holds for a value of any type.
+
+```console
+/work/App/Queries/Checks.sql(1,10): error SQLSRC226: The type of the parameter '@p' of the query 'IsNull' could not be determined
+    query: IsNull, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    server: 42P18: could not determine data type of parameter $1
+    help: cast the parameter where it is used, @p::int, or declare its type with -- param: @p int
+```
+
+Cast the parameter where it is used, or declare its type with a `-- param:` marker.  The same error, at the step `resolve type` and with no `server:` line, says that the server did give the parameter a type and that the type is a pseudo-type, which no value has: `row_to_json(@p)` makes `@p` a `record`.  Its `help:` line names the pseudo-type, and the fix is the same.
+
+## SQLSRC227
+
+**Parameter's first use does not fix its type**
+
+PostgreSQL takes a parameter's type from its first use.  Here the first use says nothing of the type and a later one does, which the server refuses.  The pattern of an optional filter does it: in `(@name IS NULL OR name = @name)` the first `@name` could be anything.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC227: The first use of the parameter '@name' of the query 'FindUsers' does not fix its type
+    query: FindUsers, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    server: 42P08: could not determine data type of parameter $1
+    server: at character 28
+    help: declare the type with -- param:, or write the use that fixes the type before the one that does not: (name = @name OR @name IS NULL)
+```
+
+Declare the parameter's type with `-- param: @name text`, or turn the condition round so that the use that fixes the type comes first.
 
 ## SQLSRC228
 

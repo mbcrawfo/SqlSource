@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using SqlSource.Diagnostics;
@@ -20,6 +21,19 @@ internal static class PostgresErrors
         "write the type as a column definition would: a name, a modifier in parentheses, []";
 
     public const string SeveralStatementsHelp = "one statement for each query; a ; is allowed at the end alone";
+
+    public const string NoSuchType = "the database has no such type";
+
+    public const string NoSuchTypeHelp =
+        "write a type the database has, schema-qualified if it is not on the search path";
+
+    public const string FirstUseHelp =
+        "declare the type with -- param:, or write the use that fixes the type before the one that does not: "
+        + "(name = @name OR @name IS NULL)";
+
+    private const string UndefinedObject = "42704";
+    private const string IndeterminateDatatype = "42P18";
+    private const string AmbiguousParameter = "42P08";
 
     /// <summary>
     /// <c>SQLSRC224</c>: no session.  Every failure of <c>open</c> is this one, whatever its SQLSTATE: a wrong
@@ -88,10 +102,117 @@ internal static class PostgresErrors
         );
 
     /// <summary>
+    /// What a failed <c>prepare</c> is reported as.  An error the server positions inside the type list is the
+    /// declared type's, <c>SQLSRC228</c>; <c>42P18</c> and <c>42P08</c> name a parameter, <c>SQLSRC226</c> and
+    /// <c>SQLSRC227</c>; anything else is the server rejecting the query, <c>SQLSRC225</c>.
+    /// </summary>
+    public static DescribeFailure Prepare(
+        PostgresServerError error,
+        DescribeRequest query,
+        PostgresPrepareRequest prepare
+    )
+    {
+        var head = ParameterPlaceholders.HeadLength(prepare.Statement, prepare.Types);
+        var lines = ServerLines(error, head);
+        if (DeclaredAt(error, query, prepare, head) is { } declared)
+        {
+            return error.SqlState == UndefinedObject
+                ? DeclaredType(query, declared, NoSuchType, DescribeStep.DescribeParameters, lines, NoSuchTypeHelp)
+                : DeclaredType(query, declared, NotATypeName, DescribeStep.DescribeParameters, lines, NotATypeNameHelp);
+        }
+
+        if (error.SqlState is IndeterminateDatatype or AmbiguousParameter && NamedIn(error.Message, query) is { } named)
+        {
+            var written = Written(named);
+            return error.SqlState == IndeterminateDatatype
+                ? new DescribeFailure(
+                    ToolDiagnostics.ParameterTypeNotDetermined,
+                    new EquatableArray<string>([written, query.Name]),
+                    DescribeStep.DescribeParameters,
+                    lines,
+                    $"cast the parameter where it is used, {written}::int, or declare its type with "
+                        + $"-- param: {written} int"
+                )
+                : new DescribeFailure(
+                    ToolDiagnostics.ParameterFirstUseDoesNotFixType,
+                    new EquatableArray<string>([written, query.Name]),
+                    DescribeStep.DescribeParameters,
+                    lines,
+                    FirstUseHelp
+                );
+        }
+
+        return Rejected(error, query, DescribeStep.DescribeParameters, lines);
+    }
+
+    /// <summary>
     /// A parameter as the SQL writes one: the server names it <c>$1</c>, and the user wrote <c>@id</c>.
     /// </summary>
     public static string Written(SqlQueryParameter parameter) =>
         SqlDialectRules.PostgreSql.ParameterPrefix + parameter.Name;
+
+    // SQLSRC225.  The server's lines say what is wrong, so there is no help.
+    private static DescribeFailure Rejected(
+        PostgresServerError error,
+        DescribeRequest query,
+        DescribeStep step,
+        EquatableArray<string> serverLines
+    ) =>
+        new(
+            ToolDiagnostics.ServerRejectedQuery,
+            new EquatableArray<string>([query.Name, error.Message]),
+            step,
+            serverLines,
+            null
+        );
+
+    // The parameter whose declared type the server's position falls in, or null: for no position, one in the SQL,
+    // and one at an item that is the tool's own "unknown".
+    private static SqlQueryParameter? DeclaredAt(
+        PostgresServerError error,
+        DescribeRequest query,
+        PostgresPrepareRequest prepare,
+        int head
+    )
+    {
+        if (error.Position is not { } position || position > head || prepare.Types.Count == 0)
+        {
+            return null;
+        }
+
+        var parameter = query.Parameters[ParameterPlaceholders.TypeAt(prepare.Statement, prepare.Types, position)];
+        return parameter.Type is null ? null : parameter;
+    }
+
+    // The parameter of the first "$n" of a message, or null when it has none or n is no ordinal of the list.
+    private static SqlQueryParameter? NamedIn(string message, DescribeRequest query)
+    {
+        var dollar = message.IndexOf('$', StringComparison.Ordinal);
+        while (dollar >= 0)
+        {
+            var end = dollar + 1;
+            while (end < message.Length && char.IsAsciiDigit(message[end]))
+            {
+                end++;
+            }
+
+            if (
+                int.TryParse(
+                    message.AsSpan(dollar + 1, end - dollar - 1),
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out var ordinal
+                )
+            )
+            {
+                return ordinal >= 1 && ordinal <= query.Parameters.Count ? query.Parameters[ordinal - 1] : null;
+            }
+
+            dollar = message.IndexOf('$', end);
+        }
+
+        return null;
+    }
 
     // SQLSRC228, whose last argument is the reason the type cannot be used.
     private static DescribeFailure DeclaredType(

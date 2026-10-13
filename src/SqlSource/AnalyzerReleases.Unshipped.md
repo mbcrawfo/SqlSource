@@ -62,5 +62,8 @@ SQLSRC221 | SqlSource | Error | Sidecar was written by a newer tool
 SQLSRC222 | SqlSource | Error | Directory cannot be read
 SQLSRC223 | SqlSource | Error | Solution cannot be read
 SQLSRC224 | SqlSource | Error | Database could not be opened
+SQLSRC225 | SqlSource | Error | Server rejected the query
+SQLSRC226 | SqlSource | Error | Parameter type could not be determined
+SQLSRC227 | SqlSource | Error | Parameter's first use does not fix its type
 SQLSRC228 | SqlSource | Error | Declared type is not valid
 SQLSRC230 | SqlSource | Error | Query holds more than one statement

@@ -290,6 +290,39 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor ServerRejectedQuery = new(
+        id: "SQLSRC225",
+        title: "Server rejected the query",
+        messageFormat: "The server rejected the query '{0}': {1}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc225",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ParameterTypeNotDetermined = new(
+        id: "SQLSRC226",
+        title: "Parameter type could not be determined",
+        messageFormat: "The type of the parameter '{0}' of the query '{1}' could not be determined",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc226",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ParameterFirstUseDoesNotFixType = new(
+        id: "SQLSRC227",
+        title: "Parameter's first use does not fix its type",
+        messageFormat: "The first use of the parameter '{0}' of the query '{1}' does not fix its type",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc227",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor DeclaredTypeNotValid = new(
         id: "SQLSRC228",
         title: "Declared type is not valid",
@@ -342,6 +375,9 @@ internal static class ToolDiagnostics
             DirectoryCannotBeRead,
             SolutionCannotBeRead,
             DatabaseCannotBeOpened,
+            ServerRejectedQuery,
+            ParameterTypeNotDetermined,
+            ParameterFirstUseDoesNotFixType,
             DeclaredTypeNotValid,
             QueryHasSeveralStatements
         );

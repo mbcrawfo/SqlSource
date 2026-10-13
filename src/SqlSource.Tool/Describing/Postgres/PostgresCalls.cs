@@ -46,3 +46,24 @@ internal sealed record PostgresServerError(
     string? Hint,
     int? Position
 );
+
+/// <summary>Everything that decides the answer of <c>prepare</c>.</summary>
+/// <param name="Statement">The name of the prepared statement: a counter within its session, never random.</param>
+/// <param name="Sql">The query's one statement, with <c>$n</c> in the place of each parameter.</param>
+/// <param name="Types">
+/// The type list: a declared type as written or <c>unknown</c>, for each parameter in order.
+/// </param>
+internal sealed record PostgresPrepareRequest(string Statement, string Sql, IReadOnlyList<string> Types);
+
+/// <summary>The types the server resolved, or why it prepared nothing.</summary>
+/// <param name="ParameterTypes">
+/// <c>parameter_types</c> of <c>pg_prepared_statements</c> for the statement, as OIDs, in order.
+/// </param>
+/// <param name="Error">What the server said, or null.</param>
+internal sealed record PostgresPrepareAnswer(IReadOnlyList<long>? ParameterTypes, PostgresServerError? Error);
+
+/// <summary>The request of <c>deallocate</c>: the statement to free.</summary>
+internal sealed record PostgresDeallocateRequest(string Statement);
+
+/// <summary>Null when the statement was freed.  An error here is logged and never reported.</summary>
+internal sealed record PostgresDeallocateAnswer(PostgresServerError? Error);

@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -13,6 +14,13 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// A session with one PostgreSQL database.  Every call it makes to the server goes through the exchange, and the
 /// connection is made inside a <c>live</c> function and nowhere else.
 /// </summary>
+/// <remarks>
+/// A query is described through one prepared statement: <c>PREPARE</c> takes a declared type as written, resolves
+/// it, checks it against every use of its parameter, and infers the rest.  A prepared statement is session state
+/// and survives a rollback, so it is freed in a <c>finally</c>, outside any transaction; one left behind would be
+/// a leak until the session ends.  Its name is a counter, since the name is part of a request and a capture must be
+/// the same each time it is recorded.
+/// </remarks>
 internal sealed class PostgresSession : IDescribeSession
 {
     public const string DriverName = "Npgsql";
@@ -24,8 +32,15 @@ internal sealed class PostgresSession : IDescribeSession
         "SELECT pg_catalog.current_setting('server_version'), pg_catalog.current_setting('search_path'), "
         + "pg_catalog.current_setting('plan_cache_mode'), pg_catalog.current_setting('standard_conforming_strings')";
 
-    private PostgresSession(PostgresConnection connection, ServerInfo server)
+    private const string ParameterTypesSql =
+        "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = @name";
+
+    private readonly IDescribeExchange _exchange;
+    private int _statements;
+
+    private PostgresSession(IDescribeExchange exchange, PostgresConnection connection, ServerInfo server)
     {
+        _exchange = exchange;
         Connection = connection;
         Server = server;
     }
@@ -66,7 +81,7 @@ internal sealed class PostgresSession : IDescribeSession
                 return Outcome<IDescribeSession, DescribeFailure>.Failed(PostgresErrors.Open(error, request.Database));
             }
 
-            var session = new PostgresSession(connection, ServerOf(answer));
+            var session = new PostgresSession(request.Exchange, connection, ServerOf(answer));
             kept = true;
             return Outcome<IDescribeSession, DescribeFailure>.Of(session);
         }
@@ -88,32 +103,61 @@ internal sealed class PostgresSession : IDescribeSession
         return space < 0 ? serverVersion : serverVersion[..space];
     }
 
-    // The calls arrive in the next steps.  Until then a query that passes the two checks has no typed parameter.
-    public Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
+    public async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         DescribeRequest request,
         CancellationToken cancellationToken
     )
     {
-        if (ParameterPlaceholders.Rewrite(request.Sql, request.Parameters) is null)
+        // Before anything is sent: one statement, and every declared type written as a type name.
+        if (ParameterPlaceholders.Rewrite(request.Sql, request.Parameters) is not { } sql)
         {
-            return Task.FromResult(Failed(PostgresErrors.SeveralStatements(request)));
+            return Failed(PostgresErrors.SeveralStatements(request));
         }
 
         var types = ParameterPlaceholders.TypeList(request.Parameters);
-        return Task.FromResult(
-            types.Succeeded
-                ? Outcome<QueryDescription, DescribeFailure>.Of(
-                    new QueryDescription(
-                        SidecarResultKind.None,
-                        EquatableArray<DescribedParameter>.Empty,
-                        null,
-                        null,
-                        null,
-                        null
-                    )
-                )
-                : Failed(PostgresErrors.TypeRefused(request, types.Failure))
+        if (!types.Succeeded)
+        {
+            return Failed(PostgresErrors.TypeRefused(request, types.Failure));
+        }
+
+        // The counter advances for a prepare that fails too: a name is used once.
+        _statements++;
+        var prepare = new PostgresPrepareRequest(
+            string.Create(CultureInfo.InvariantCulture, $"sqlsource_{_statements}"),
+            sql,
+            types.Value
         );
+        var prepared = await _exchange.AskAsync("prepare", prepare, PrepareLiveAsync, cancellationToken);
+        if (prepared.Error is { } error)
+        {
+            // There is no statement to free.
+            return Failed(PostgresErrors.Prepare(error, request, prepare));
+        }
+
+        try
+        {
+            return Outcome<QueryDescription, DescribeFailure>.Of(
+                new QueryDescription(
+                    SidecarResultKind.None,
+                    EquatableArray<DescribedParameter>.Empty,
+                    null,
+                    null,
+                    null,
+                    null
+                )
+            );
+        }
+        finally
+        {
+            // With the describe's own token: a cancelled describe leaves the statement to die with its session.
+            // The error of the call is never reported.
+            _ = await _exchange.AskAsync(
+                "deallocate",
+                new PostgresDeallocateRequest(prepare.Statement),
+                DeallocateLiveAsync,
+                cancellationToken
+            );
+        }
     }
 
     public ValueTask DisposeAsync() => Connection.DisposeAsync();
@@ -132,7 +176,8 @@ internal sealed class PostgresSession : IDescribeSession
             ])
         );
 
-    // What the server can cause is the answer's error.  A cancellation passes through, and anything else is a bug.
+    // In each "live" function, what the server can cause is the answer's error.  A cancellation passes through, and
+    // anything else is a bug.
     private static async Task<PostgresOpenAnswer> OpenLiveAsync(PostgresConnection connection, CancellationToken token)
     {
         try
@@ -154,6 +199,46 @@ internal sealed class PostgresSession : IDescribeSession
         catch (NpgsqlException exception)
         {
             return new PostgresOpenAnswer(null, null, null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
+    private async Task<PostgresPrepareAnswer> PrepareLiveAsync(PostgresPrepareRequest asked, CancellationToken token)
+    {
+        try
+        {
+            var text = ParameterPlaceholders.PrepareText(asked.Statement, asked.Types, asked.Sql);
+            await using (var prepare = await Connection.CommandAsync(text, token))
+            {
+                _ = await prepare.ExecuteNonQueryAsync(token);
+            }
+
+            await using var read = await Connection.CommandAsync(ParameterTypesSql, token);
+            _ = read.Parameters.AddWithValue("name", asked.Statement);
+            var types =
+                await read.ExecuteScalarAsync(token) as uint[]
+                ?? throw new InvalidOperationException($"The server lists no prepared statement '{asked.Statement}'.");
+            return new PostgresPrepareAnswer([.. types.Select(static oid => (long)oid)], null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresPrepareAnswer(null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
+    private async Task<PostgresDeallocateAnswer> DeallocateLiveAsync(
+        PostgresDeallocateRequest asked,
+        CancellationToken token
+    )
+    {
+        try
+        {
+            await using var command = await Connection.CommandAsync($"DEALLOCATE {asked.Statement}", token);
+            _ = await command.ExecuteNonQueryAsync(token);
+            return new PostgresDeallocateAnswer(null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresDeallocateAnswer(PostgresConnection.ErrorOf(exception));
         }
     }
 }
