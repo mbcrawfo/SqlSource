@@ -9,22 +9,27 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </summary>
 internal static class PostgresColumns
 {
-    /// <summary>The column, with the type the protocol reported and its facets.</summary>
+    /// <summary>The column, with its type, its facets and its origin.</summary>
     /// <param name="column">The row of <c>columns</c>.</param>
+    /// <param name="origin">Where the column comes from, or null.</param>
     /// <param name="rows">The rows of the closure, by OID.</param>
     /// <exception cref="InvalidOperationException">
-    /// The rows lack the column's type, or the type is a pseudo-type.
+    /// The rows lack a type of the column, or the type is a pseudo-type.
     /// </exception>
-    public static SidecarColumn Build(PostgresColumnRow column, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>
+    public static SidecarColumn Build(
+        PostgresColumnRow column,
+        ColumnOrigin? origin,
+        IReadOnlyDictionary<long, PostgresTypeRow> rows
+    ) =>
         new(
             column.Ordinal,
             column.Name,
-            PostgresTypes.Build(column.TypeOid, rows, FacetsOf(column, rows)),
+            PostgresTypes.Build(ColumnTypes.OidOf(column, origin, rows), rows, FacetsOf(column, rows)),
             null,
             SidecarValues.NullableSource.NoOrigin,
-            null,
-            null,
-            null
+            origin is null ? null : new SidecarOrigin(origin.Table.Schema, origin.Table.Name, origin.Attribute.Name),
+            origin is null ? null : origin.Attribute.Identity.Length > 0,
+            origin is null ? null : origin.Attribute.Generated.Length > 0
         );
 
     // The facets are read by the type the protocol reported, which is the one whose modifier they decode.

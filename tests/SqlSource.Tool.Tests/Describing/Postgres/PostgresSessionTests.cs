@@ -241,6 +241,9 @@ public class PostgresSessionTests
     private static PostgresScript Resolves(PostgresScript script, long[] oids, params PostgresTypeRow[] rows) =>
         script.Answer("types", new PostgresTypesRequest(oids), new PostgresTypesAnswer(rows, null));
 
+    private static PostgresScript Tables(PostgresScript script, long[] oids, params PostgresTableRow[] tables) =>
+        script.Answer("tables", new PostgresTablesRequest(oids), new PostgresTablesAnswer(tables, null));
+
     [Fact]
     public async Task DescribeAsync_InferredAndDeclaredParameters_AreTypedInTheListsOrder()
     {
@@ -545,6 +548,101 @@ public class PostgresSessionTests
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
         failure.Step.ShouldBe(DescribeStep.DescribeColumns);
         failure.ServerLines.ShouldBe(["57P01: terminating connection due to administrator command"]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // "tables" is asked once, for each table once and sorted, whatever the order of the columns.  "types" is then
+    // asked for the types of the origin attributes too, which is where a domain is found.
+    [Fact]
+    public async Task DescribeAsync_ColumnsOfTables_AskTablesOnceAndTypesForTheOriginsToo()
+    {
+        var users = PostgresTables.Users;
+        var orders = PostgresTables.Orders;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT o.total, u.email, u.id FROM orders o, users u", [], new([], null));
+        _ = Columns(
+            script,
+            1,
+            0,
+            PostgresTables.ColumnOf(0, "total", 1700, orders, 3, precision: 18, scale: 2),
+            PostgresTables.ColumnOf(1, "email", 1043, users, 3, length: 254),
+            PostgresTables.ColumnOf(2, "id", 23, users, 1)
+        );
+        _ = Tables(script, [users.Oid, orders.Oid], users, orders);
+        _ = Resolves(
+            script,
+            [23, 1043, 1700, PostgresRows.EmailT.Oid],
+            PostgresRows.Int4,
+            PostgresRows.Varchar,
+            PostgresRows.Numeric,
+            PostgresRows.EmailT
+        );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT o.total, u.email, u.id FROM orders o, users u"),
+            TestContext.Current.CancellationToken
+        );
+
+        var columns = described.Value.ShouldNotBeNull().Columns.ShouldNotBeNull();
+        columns.Select(column => column.Type.Name).ShouldBe(["numeric(18,2)", "public.email_t", "integer"]);
+        columns
+            .Select(column => column.Origin)
+            .ShouldBe([
+                new SidecarOrigin("public", "orders", "total"),
+                new SidecarOrigin("public", "users", "email"),
+                new SidecarOrigin("public", "users", "id"),
+            ]);
+        columns.Select(column => column.Identity).ShouldBe([false, false, true]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // A system column names its table, which is asked for, and has no origin.
+    [Fact]
+    public async Task DescribeAsync_SystemColumn_HasNoOrigin()
+    {
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT ctid FROM users", [], new([], null));
+        _ = Columns(script, 1, 0, new PostgresColumnRow(0, "ctid", 27, users.Oid, -1, null, null, null));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [27], PostgresRows.Tid);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT ctid FROM users"),
+            TestContext.Current.CancellationToken
+        );
+
+        var column = described.Value.ShouldNotBeNull().Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+        column.Origin.ShouldBeNull();
+        column.Type.Name.ShouldBe("tid");
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public async Task DescribeAsync_TablesThatFails_IsSqlsrc225AtCatalog()
+    {
+        var refused = new PostgresServerError("42501", "permission denied for table pg_attribute", null, null, 300);
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT id FROM users", [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1));
+        _ = script.Answer("tables", new PostgresTablesRequest([users.Oid]), new PostgresTablesAnswer(null, refused));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT id FROM users"),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.Catalog);
+        failure.ServerLines.ShouldBe(["42501: permission denied for table pg_attribute"]);
         exchange.Unused.ShouldBeEmpty();
     }
 }

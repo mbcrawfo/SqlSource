@@ -29,6 +29,27 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private const string ParameterTypesSql =
         "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = @name";
 
+    // Every relation asked for with its columns, in one query.  The join is a left one, so that a table without a
+    // column of its own is answered too, with one row that holds no attribute.
+    private const string TablesSql = """
+        SELECT
+            c.oid,
+            c.relkind::text,
+            n.nspname::text,
+            c.relname::text,
+            a.attnum,
+            a.attname::text,
+            a.attnotnull,
+            a.attidentity::text,
+            a.attgenerated::text,
+            a.atttypid
+        FROM pg_catalog.pg_class AS c
+        JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
+        LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+        WHERE c.oid = ANY (@oids)
+        ORDER BY c.oid, a.attnum
+        """;
+
     // The closure of the types asked for, in one query: a recursive term that follows the element of an array, the
     // base of a domain, the subtype of a range and the range of a multirange.  A domain has the category of its
     // base, so an array is a base type of the category A.
@@ -160,6 +181,62 @@ internal sealed class PostgresLive(PostgresConnection connection)
         catch (NpgsqlException exception)
         {
             return new PostgresColumnsAnswer(null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
+    /// <summary>Asks <c>tables</c>: one query of the catalog for every table the columns of a statement name.</summary>
+    public async Task<PostgresTablesAnswer> TablesAsync(PostgresTablesRequest asked, CancellationToken token)
+    {
+        try
+        {
+            await using var command = await connection.CommandAsync(TablesSql, token);
+            _ = command.Parameters.Add(
+                new NpgsqlParameter("oids", asked.Oids.Select(static oid => (uint)oid).ToArray())
+                {
+                    DataTypeName = "oid[]",
+                }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            var tables = new List<PostgresTableRow>();
+            List<PostgresAttributeRow> columns = [];
+            while (await reader.ReadAsync(token))
+            {
+                long oid = await reader.GetFieldValueAsync<uint>(0, token);
+                if (tables.Count == 0 || tables[^1].Oid != oid)
+                {
+                    columns = [];
+                    tables.Add(
+                        new PostgresTableRow(
+                            oid,
+                            reader.GetString(1),
+                            reader.GetString(2),
+                            reader.GetString(3),
+                            columns
+                        )
+                    );
+                }
+
+                // The one row of a table without a column of its own holds no attribute.
+                if (!await reader.IsDBNullAsync(4, token))
+                {
+                    columns.Add(
+                        new PostgresAttributeRow(
+                            reader.GetInt16(4),
+                            reader.GetString(5),
+                            reader.GetBoolean(6),
+                            reader.GetString(7),
+                            reader.GetString(8),
+                            await reader.GetFieldValueAsync<uint>(9, token)
+                        )
+                    );
+                }
+            }
+
+            return new PostgresTablesAnswer(tables, null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresTablesAnswer(null, PostgresConnection.ErrorOf(exception));
         }
     }
 

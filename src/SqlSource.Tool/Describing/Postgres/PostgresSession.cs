@@ -155,8 +155,8 @@ internal sealed class PostgresSession : IDescribeSession
         }
     }
 
-    // What is asked of a statement that was prepared, in this order: its columns, and every type that the
-    // parameters and the columns have, once.
+    // What is asked of a statement that was prepared, in this order: its columns, the tables they name, and every
+    // type that the parameters, the columns and their origins have, once.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
         string statement,
@@ -179,8 +179,22 @@ internal sealed class PostgresSession : IDescribeSession
             answer.Columns
             ?? throw new InvalidOperationException("The answer to 'columns' holds no columns and no error.");
 
+        var tables = await TablesOfAsync(columns, cancellationToken);
+        if (!tables.Succeeded)
+        {
+            return Failed(PostgresErrors.Tables(tables.Failure, request));
+        }
+
+        ColumnOrigin?[] origins = [.. columns.Select(column => ColumnOrigin.Find(column, tables.Value))];
+
+        // After "tables": the type of an origin attribute is where a domain is found, so the one request of "types"
+        // needs the catalog's answer.
         var rows = await RowsOfAsync(
-            [.. parameterOids, .. columns.Select(static column => column.TypeOid)],
+            [
+                .. parameterOids,
+                .. columns.Select(static column => column.TypeOid),
+                .. origins.OfType<ColumnOrigin>().Select(static origin => origin.Attribute.TypeOid),
+            ],
             cancellationToken
         );
         if (!rows.Succeeded)
@@ -194,7 +208,10 @@ internal sealed class PostgresSession : IDescribeSession
             return Failed(parameters.Failure);
         }
 
-        return Described(parameters.Value, [.. columns.Select(column => PostgresColumns.Build(column, rows.Value))]);
+        return Described(
+            parameters.Value,
+            [.. columns.Select((column, index) => PostgresColumns.Build(column, origins[index], rows.Value))]
+        );
     }
 
     // The types the server resolved for the parameters of the query's list.  It lists a type for a "$n" that the SQL
@@ -234,6 +251,35 @@ internal sealed class PostgresSession : IDescribeSession
                     answer.Rows
                     ?? throw new InvalidOperationException("The answer to 'types' holds no rows and no error.")
                 ).ToDictionary(static row => row.Oid)
+            );
+    }
+
+    // The tables the columns name, by OID.  The request is sorted and holds each table once.  Nothing is asked when
+    // no column names a table.
+    private async Task<Outcome<IReadOnlyDictionary<long, PostgresTableRow>, PostgresServerError>> TablesOfAsync(
+        IReadOnlyList<PostgresColumnRow> columns,
+        CancellationToken cancellationToken
+    )
+    {
+        long[] oids =
+        [
+            .. columns.Select(static column => column.TableOid).Where(static oid => oid != 0).Distinct().Order(),
+        ];
+        if (oids.Length == 0)
+        {
+            return Outcome<IReadOnlyDictionary<long, PostgresTableRow>, PostgresServerError>.Of(
+                new Dictionary<long, PostgresTableRow>()
+            );
+        }
+
+        var answer = await TablesAsync(new PostgresTablesRequest(oids), cancellationToken);
+        return answer.Error is { } error
+            ? Outcome<IReadOnlyDictionary<long, PostgresTableRow>, PostgresServerError>.Failed(error)
+            : Outcome<IReadOnlyDictionary<long, PostgresTableRow>, PostgresServerError>.Of(
+                (
+                    answer.Tables
+                    ?? throw new InvalidOperationException("The answer to 'tables' holds no tables and no error.")
+                ).ToDictionary(static table => table.Oid)
             );
     }
 
@@ -324,6 +370,11 @@ internal sealed class PostgresSession : IDescribeSession
         PostgresColumnsRequest request,
         CancellationToken cancellationToken
     ) => _exchange.AskAsync("columns", request, _live.ColumnsAsync, cancellationToken);
+
+    private Task<PostgresTablesAnswer> TablesAsync(
+        PostgresTablesRequest request,
+        CancellationToken cancellationToken
+    ) => _exchange.AskAsync("tables", request, _live.TablesAsync, cancellationToken);
 
     private async Task<PostgresTypesAnswer> TypesAsync(
         PostgresTypesRequest request,

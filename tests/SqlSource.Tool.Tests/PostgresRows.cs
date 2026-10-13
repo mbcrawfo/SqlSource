@@ -24,6 +24,11 @@ internal static class PostgresRows
 
     public static PostgresTypeRow EmailT { get; } = DomainOf(16387, "email_t", Varchar);
 
+    // A domain over a domain.
+    public static PostgresTypeRow D2 { get; } = DomainOf(16500, "d2", EmailT);
+
+    public static PostgresTypeRow Tid { get; } = BaseOf(27, "tid", "tid", "U");
+
     public static PostgresTypeRow UserStatus { get; } = EnumOf(16390, "user_status", "active", "disabled");
 
     public static PostgresTypeRow Tstzrange { get; } = RangeOf(3910, "tstzrange", Timestamptz);

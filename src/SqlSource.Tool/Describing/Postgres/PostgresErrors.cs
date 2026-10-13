@@ -171,6 +171,13 @@ internal static class PostgresErrors
         Rejected(error, query, DescribeStep.DescribeColumns, ServerLines(error with { Position = null }, 0));
 
     /// <summary>
+    /// <c>SQLSRC225</c> at the step <c>catalog</c>: the tables of the columns could not be read.  There is no
+    /// position line: a position the server gives is in the tool's own query of the catalog.
+    /// </summary>
+    public static DescribeFailure Tables(PostgresServerError error, DescribeRequest query) =>
+        Rejected(error, query, DescribeStep.Catalog, ServerLines(error with { Position = null }, 0));
+
+    /// <summary>
     /// A parameter whose type is a pseudo-type.  The server accepts one and says nothing, so there is no server
     /// line.  A declared one is <c>SQLSRC228</c>; an inferred one is <c>SQLSRC226</c>, whose help says what the
     /// server gave.

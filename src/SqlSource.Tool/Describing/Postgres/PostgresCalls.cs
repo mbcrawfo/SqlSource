@@ -137,3 +137,45 @@ internal sealed record PostgresColumnRow(
     int? Precision,
     int? Scale
 );
+
+/// <summary>The request of <c>tables</c>.</summary>
+/// <param name="Oids">The tables the columns of a statement name, sorted and each once.</param>
+internal sealed record PostgresTablesRequest(IReadOnlyList<long> Oids);
+
+/// <summary>The tables asked for, or why the catalog could not be read.</summary>
+/// <param name="Tables">One for each table that exists, in <c>oid</c> order.</param>
+/// <param name="Error">What the server said, or null.</param>
+internal sealed record PostgresTablesAnswer(IReadOnlyList<PostgresTableRow>? Tables, PostgresServerError? Error);
+
+/// <summary>What the catalog says of one relation.</summary>
+/// <param name="Oid">The relation.</param>
+/// <param name="Relkind"><c>r</c> for a table, <c>v</c> for a view, <c>m</c>, <c>f</c>, <c>p</c>.</param>
+/// <param name="Schema">Its schema.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="Columns">
+/// Every attribute with <c>attnum</c> above zero that is not dropped, in <c>attnum</c> order.  A table without a
+/// column of its own has none.
+/// </param>
+internal sealed record PostgresTableRow(
+    long Oid,
+    string Relkind,
+    string Schema,
+    string Name,
+    IReadOnlyList<PostgresAttributeRow> Columns
+);
+
+/// <summary>What the catalog says of one column of a relation.</summary>
+/// <param name="Attnum">The column's number in its relation.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="NotNull"><c>attnotnull</c>.</param>
+/// <param name="Identity"><c>attidentity</c>: empty, <c>a</c> or <c>d</c>.</param>
+/// <param name="Generated"><c>attgenerated</c>: empty, <c>s</c> or <c>v</c>.</param>
+/// <param name="TypeOid"><c>atttypid</c>: the declared type, a domain where the column is one.</param>
+internal sealed record PostgresAttributeRow(
+    int Attnum,
+    string Name,
+    bool NotNull,
+    string Identity,
+    string Generated,
+    long TypeOid
+);

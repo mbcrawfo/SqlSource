@@ -165,4 +165,196 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "columns", "types", "deallocate"]);
     }
+
+    // Two tables of these tests alone: one with the modifiers the fixture schema lacks, and one with no column.
+    // They are made once and left: the container is thrown away, and the fixtures are recorded in one of their own.
+    private const string OwnTables = """
+        CREATE TABLE IF NOT EXISTS column_types (
+            n0 numeric(18, 0),
+            n1 numeric(5),
+            n numeric,
+            ts3 timestamp(3),
+            tstz0 timestamptz(0),
+            ttz2 timetz(2),
+            t4 time(4),
+            i3 interval(3),
+            b3 bit(3),
+            b1 bit,
+            vb5 varbit(5),
+            vb varbit,
+            c1 char,
+            bp bpchar,
+            vc varchar,
+            em email_t NOT NULL,
+            ems email_t[],
+            statuses user_status[]
+        );
+        CREATE TABLE IF NOT EXISTS column_empty ();
+        """;
+
+    // The name of each column's type as the server spells it with its modifier, with the schema before a type that
+    // is not of pg_catalog: format_type leaves the schema out of a type on the search path.
+    private const string FormatTypes = """
+        SELECT CASE WHEN n.nspname = 'pg_catalog' THEN '' ELSE n.nspname || '.' END
+            || pg_catalog.format_type(a.atttypid, a.atttypmod)
+        FROM pg_catalog.pg_attribute AS a
+        JOIN pg_catalog.pg_type AS t ON t.oid = a.atttypid
+        JOIN pg_catalog.pg_namespace AS n ON n.oid = t.typnamespace
+        WHERE a.attrelid = CAST(@table AS regclass) AND a.attnum > 0 AND NOT a.attisdropped
+        ORDER BY a.attnum
+        """;
+
+    private async Task MakeOwnTablesAsync()
+    {
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand(OwnTables);
+        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+    }
+
+    private async Task<List<string>> FormatTypesOfAsync(string table)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand(FormatTypes);
+        _ = command.Parameters.AddWithValue("table", table);
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var names = new List<string>();
+        while (await reader.ReadAsync(token))
+        {
+            names.Add(reader.GetString(0));
+        }
+
+        return names;
+    }
+
+    private static SidecarOrigin Origin(string table, string column, string schema = "public") =>
+        new(schema, table, column);
+
+    // Every column of every table and view of the fixture schema, and of the table of these tests: the name the
+    // describer spells is the one format_type gives the column, domains, enums, arrays and ranges included.
+    [Theory]
+    [InlineData("users")]
+    [InlineData("orders")]
+    [InlineData("bookings")]
+    [InlineData("samples")]
+    [InlineData("billing.invoices")]
+    [InlineData("active_users")]
+    [InlineData("user_orders")]
+    [InlineData("column_types")]
+    public async Task Describe_EveryColumnOfATable_IsSpelledAsFormatTypeSpellsIt(string table)
+    {
+        await MakeOwnTablesAsync();
+
+        var columns = await ColumnsOfAsync($"SELECT * FROM {table}");
+
+        TypeNamesOf(columns).ShouldBe(await FormatTypesOfAsync(table));
+    }
+
+    [Fact]
+    public async Task Describe_ColumnsOfATable_HaveTheirOrigin()
+    {
+        var columns = await ColumnsOfAsync("SELECT u.id AS user_id, email, amount FROM users u, billing.invoices");
+
+        columns
+            .Select(column => column.Origin)
+            .ShouldBe([Origin("users", "id"), Origin("users", "email"), Origin("invoices", "amount", "billing")]);
+    }
+
+    // ctid and xmin name their table with an attribute number below zero, and a table may have no column at all.
+    [Fact]
+    public async Task Describe_SystemColumns_HaveNoOrigin()
+    {
+        await MakeOwnTablesAsync();
+
+        var ofUsers = await ColumnsOfAsync("SELECT ctid, xmin, id FROM users");
+        var ofEmpty = await ColumnsOfAsync("SELECT ctid FROM column_empty");
+
+        ofUsers.Select(column => column.Origin).ShouldBe([null, null, Origin("users", "id")]);
+        TypeNamesOf(ofUsers).ShouldBe(["tid", "xid", "integer"]);
+        ofEmpty.ShouldHaveSingleItem().Origin.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Describe_IdentityAndGeneratedColumns_SayWhatTheyAre()
+    {
+        var columns = await ColumnsOfAsync(
+            "SELECT u.id, u.name, u.name_upper, o.id AS order_id FROM users u, orders o"
+        );
+
+        columns.Select(column => column.Identity).ShouldBe([true, false, false, true]);
+        columns.Select(column => column.Computed).ShouldBe([false, false, true, false]);
+    }
+
+    [Fact]
+    public async Task Describe_ExpressionColumns_HaveNoOriginAndSayNothingOfIdentity()
+    {
+        var columns = await ColumnsOfAsync("SELECT count(*) AS n, upper(name) AS u FROM users GROUP BY name");
+
+        columns.ShouldAllBe(column => column.Origin == null && column.Identity == null && column.Computed == null);
+        TypeNamesOf(columns).ShouldBe(["bigint", "text"]);
+    }
+
+    // The column is its domain.  An expression over it has no origin and says the base type; a cast to the domain
+    // says the base type with the domain's modifier, as the protocol reports it.
+    [Fact]
+    public async Task Describe_DomainColumnAndExpressionsOverIt_SayTheDomainOrItsBase()
+    {
+        var columns = await ColumnsOfAsync(
+            "SELECT email, COALESCE(email, 'x@y') AS c, NULL::email_t AS n, email::text AS t FROM users"
+        );
+
+        TypeNamesOf(columns).ShouldBe(["public.email_t", "character varying", "character varying(254)", "text"]);
+        var domain = columns[0].Type.ShouldBeOfType<PostgresType>();
+        domain.Kind.ShouldBe(SidecarValues.Kind.Domain);
+        domain.Base.ShouldNotBeNull().Name.ShouldBe("character varying(254)");
+        columns.Skip(1).ShouldAllBe(column => column.Origin == null);
+    }
+
+    // The USING column of an inner join is the left table's; of a full join it is a COALESCE of both, and no
+    // table's.
+    [Fact]
+    public async Task Describe_UsingColumn_HasTheLeftOriginOfAnInnerJoinAndNoneOfAFullJoin()
+    {
+        var inner = await ColumnsOfAsync("SELECT user_id FROM orders JOIN bookings USING (user_id)");
+        var full = await ColumnsOfAsync("SELECT user_id FROM orders FULL JOIN bookings USING (user_id)");
+
+        inner.ShouldHaveSingleItem().Origin.ShouldBe(Origin("orders", "user_id"));
+        full.ShouldHaveSingleItem().Origin.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task Describe_Union_HasNoOrigin() =>
+        (await ColumnsOfAsync("SELECT id FROM users UNION ALL SELECT user_id FROM orders"))
+            .ShouldHaveSingleItem()
+            .Origin.ShouldBeNull();
+
+    [Fact]
+    public async Task Describe_SubqueryAndCte_KeepOrigins()
+    {
+        var columns = await ColumnsOfAsync(
+            "WITH c AS (SELECT id, name FROM users) "
+                + "SELECT c.id, s.total FROM c JOIN (SELECT user_id, total FROM orders) AS s ON s.user_id = c.id"
+        );
+
+        columns.Select(column => column.Origin).ShouldBe([Origin("users", "id"), Origin("orders", "total")]);
+    }
+
+    // The origin of a view's column is the view: what stands behind it is the view's own business.
+    [Fact]
+    public async Task Describe_ColumnOfAView_HasTheViewAsItsOrigin() =>
+        (await ColumnsOfAsync("SELECT name FROM active_users"))
+            .ShouldHaveSingleItem()
+            .Origin.ShouldBe(Origin("active_users", "name"));
+
+    [Fact]
+    public async Task Describe_QueryOfATable_AsksTablesBetweenColumnsAndTypes()
+    {
+        var capture = new DescribeCapture("postgres");
+
+        _ = await ShouldDescribeAsync("SELECT id FROM users", new CapturingExchange(LiveExchange.Instance, capture));
+
+        capture
+            .Calls.Select(call => call.Method)
+            .ShouldBe(["open", "prepare", "columns", "tables", "types", "deallocate"]);
+    }
 }
