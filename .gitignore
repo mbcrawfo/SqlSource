@@ -413,6 +413,9 @@ FodyWeavers.xsd
 # Nested git worktrees
 .claude/worktrees/
 
+# Personal instructions for Claude Code, which are not shared
+CLAUDE.local.md
+
 # Superpowers working files: brainstorm companions, plan-execution ledgers and review packages
 .superpowers/
 
