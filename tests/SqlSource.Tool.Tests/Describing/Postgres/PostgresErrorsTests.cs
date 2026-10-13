@@ -1,4 +1,6 @@
 using Shouldly;
+using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
 
@@ -48,4 +50,36 @@ public class PostgresErrorsTests
         PostgresErrors
             .ServerLines(new PostgresServerError("42601", "syntax error", null, null, position), 31)
             .ShouldBe(["42601: syntax error"]);
+
+    private static DescribeRequest Query(params SqlQueryParameter[] parameters) =>
+        new("Q", "SELECT 1", new EquatableArray<SqlQueryParameter>([.. parameters]));
+
+    private static SqlQueryParameter Declared(string name, string type) => new(name, type, null, true);
+
+    [Fact]
+    public void SeveralStatements_Query_IsSqlsrc230WithItsHelp()
+    {
+        var failure = PostgresErrors.SeveralStatements(Query());
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC230");
+        failure.Arguments.ShouldBe(["Q"]);
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.SeveralStatementsHelp);
+    }
+
+    // The type as the marker wrote it, and the parameter as the SQL writes one, with its prefix.
+    [Fact]
+    public void TypeRefused_Parameter_IsSqlsrc228ThatSaysItIsNoTypeName()
+    {
+        var parameter = Declared("tenant", "int) AS SELECT 1");
+
+        var failure = PostgresErrors.TypeRefused(Query(parameter), parameter);
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC228");
+        failure.Arguments.ShouldBe(["int) AS SELECT 1", "@tenant", "Q", "it is not written as a type name"]);
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.NotATypeNameHelp);
+    }
 }

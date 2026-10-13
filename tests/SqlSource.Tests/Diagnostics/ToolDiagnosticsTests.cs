@@ -276,4 +276,28 @@ public class ToolDiagnosticsTests
                 "app"
             )
             .ShouldBe("The database 'app' could not be opened");
+
+    [Fact]
+    public void DeclaredTypeNotValid_Message_HoldsTheTypeTheParameterTheQueryAndTheReason() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DeclaredTypeNotValid.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "nope_t",
+                "@p",
+                "GetUser",
+                "the database has no such type"
+            )
+            .ShouldBe(
+                "The type 'nope_t' declared for the parameter '@p' of the query 'GetUser' is not valid: the database "
+                    + "has no such type"
+            );
+
+    [Fact]
+    public void QueryHasSeveralStatements_Message_HoldsTheQuery() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.QueryHasSeveralStatements.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "Cleanup"
+            )
+            .ShouldBe("The query 'Cleanup' holds more than one statement");
 }

@@ -88,25 +88,38 @@ internal sealed class PostgresSession : IDescribeSession
         return space < 0 ? serverVersion : serverVersion[..space];
     }
 
-    // The steps of a describe arrive with the calls they make.  Until then a query has no typed parameter.
+    // The calls arrive in the next steps.  Until then a query that passes the two checks has no typed parameter.
     public Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         DescribeRequest request,
         CancellationToken cancellationToken
-    ) =>
-        Task.FromResult(
-            Outcome<QueryDescription, DescribeFailure>.Of(
-                new QueryDescription(
-                    SidecarResultKind.None,
-                    EquatableArray<DescribedParameter>.Empty,
-                    null,
-                    null,
-                    null,
-                    null
+    )
+    {
+        if (ParameterPlaceholders.Rewrite(request.Sql, request.Parameters) is null)
+        {
+            return Task.FromResult(Failed(PostgresErrors.SeveralStatements(request)));
+        }
+
+        var types = ParameterPlaceholders.TypeList(request.Parameters);
+        return Task.FromResult(
+            types.Succeeded
+                ? Outcome<QueryDescription, DescribeFailure>.Of(
+                    new QueryDescription(
+                        SidecarResultKind.None,
+                        EquatableArray<DescribedParameter>.Empty,
+                        null,
+                        null,
+                        null,
+                        null
+                    )
                 )
-            )
+                : Failed(PostgresErrors.TypeRefused(request, types.Failure))
         );
+    }
 
     public ValueTask DisposeAsync() => Connection.DisposeAsync();
+
+    private static Outcome<QueryDescription, DescribeFailure> Failed(DescribeFailure failure) =>
+        Outcome<QueryDescription, DescribeFailure>.Failed(failure);
 
     private static ServerInfo ServerOf(PostgresOpenAnswer answer) =>
         new(

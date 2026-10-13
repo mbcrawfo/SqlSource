@@ -290,6 +290,28 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor DeclaredTypeNotValid = new(
+        id: "SQLSRC228",
+        title: "Declared type is not valid",
+        messageFormat: "The type '{0}' declared for the parameter '{1}' of the query '{2}' is not valid: {3}",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc228",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor QueryHasSeveralStatements = new(
+        id: "SQLSRC230",
+        title: "Query holds more than one statement",
+        messageFormat: "The query '{0}' holds more than one statement",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc230",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -319,6 +341,8 @@ internal static class ToolDiagnostics
             SidecarOfNewerTool,
             DirectoryCannotBeRead,
             SolutionCannotBeRead,
-            DatabaseCannotBeOpened
+            DatabaseCannotBeOpened,
+            DeclaredTypeNotValid,
+            QueryHasSeveralStatements
         );
 }

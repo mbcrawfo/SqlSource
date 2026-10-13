@@ -61,6 +61,8 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
 | [SQLSRC224](#sqlsrc224) | Database could not be opened |
+| [SQLSRC228](#sqlsrc228) | Declared type is not valid |
+| [SQLSRC230](#sqlsrc230) | Query holds more than one statement |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
@@ -899,3 +901,38 @@ The tool could not open a session with the database of a query that must be desc
 ```
 
 Start the database, or correct the connection string that `--connection` or the database's variable gives.  When the line is `Npgsql cannot read the connection string`, the string is not written as Npgsql wants one, `Host=localhost;Database=app;Username=app;Password=...`: the tool does not repeat what the driver said of it, since that can quote the string.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.
+
+## SQLSRC228
+
+**Declared type is not valid**
+
+A `-- param:` marker gives a parameter a type, and the tool asks the server to resolve that type and to check it against every use of the parameter.  This type cannot be used, for the reason the message ends with:
+
+- `it is not written as a type name`: the text is not a type as a column definition writes one.  The tool puts a declared type into the statement it sends, so it reads the text first and sends nothing that is not a name, PostgreSQL's own type words such as `varying` or `without time zone`, one modifier in parentheses, and `[]`.
+- `the database has no such type`: the server knows no type of that name on the session's search path.
+- `it is a pseudo-type`: the server knows the name, and no value has that type, `record` and `anyelement` for two.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC228: The type 'user_state' declared for the parameter '@status' of the query 'ListUsers' is not valid: the database has no such type
+    query: ListUsers, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    server: 42704: type "user_state" does not exist
+    help: write a type the database has, schema-qualified if it is not on the search path
+```
+
+Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `timestamp(3) without time zone`, `public.user_status`, `"My Schema"."Status"[]`.  A type in a schema that is not on the search path of the connection needs its schema.  A marker's type runs to the end of its line, but for a `null` or `not null` that ends it, so nothing else may follow it there.
+
+## SQLSRC230
+
+**Query holds more than one statement**
+
+A query is one statement.  The tool prepares it on the server to describe it, and a text with a second statement would have the first prepared and the second run.  Nothing of such a query is sent.
+
+```console
+/work/App/Queries/Cleanup.sql(1,10): error SQLSRC230: The query 'Cleanup' holds more than one statement
+    query: Cleanup, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    help: one statement for each query; a ; is allowed at the end alone
+```
+
+Give each statement a `-- name:` of its own.  A `;` at the end of the statement is allowed, with white space and comments after it; a `;` inside a string, a dollar-quoted string or a comment does not count.
