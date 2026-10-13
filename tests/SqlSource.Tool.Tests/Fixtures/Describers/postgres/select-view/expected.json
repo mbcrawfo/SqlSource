@@ -10,9 +10,12 @@
       "database": "postgres",
       "serverVersion": "18.4",
       "resultKind": "rows",
-      "matchesTable": null,
+      "matchesTable": {
+        "schema": "public",
+        "table": "active_users"
+      },
       "plan": "not-needed",
-      "tableMatch": "no-origin",
+      "tableMatch": "matched",
       "parameters": [],
       "columns": [
         {

@@ -156,7 +156,8 @@ internal sealed class PostgresSession : IDescribeSession
     }
 
     // What is asked of a statement that was prepared, in this order: its columns, the tables they name, and every
-    // type that the parameters, the columns and their origins have, once, and Npgsql's own reading of the SQL.
+    // type that the parameters, the columns and their origins have, once, and Npgsql's own reading of the SQL.  The
+    // table match is made between the columns and the check, and asks nothing.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
         string statement,
@@ -235,10 +236,20 @@ internal sealed class PostgresSession : IDescribeSession
             return Failed(built.Failure);
         }
 
+        // After the columns, and after everything that sets a column's nullability: the last check of the match
+        // reads it.
+        var match = MatchOf(built.Value, origins);
+
         return await CheckAsync(request, parameters.Value, columns, rows.Value, cancellationToken) is { } differs
             ? Failed(differs)
-            : Described(parameters.Value, built.Value, gated);
+            : Described(parameters.Value, built.Value, gated, match);
     }
+
+    // A statement without rows has no match.
+    private static (SidecarTable? Table, string Result)? MatchOf(
+        IReadOnlyList<SidecarColumn> columns,
+        ColumnOrigin?[] origins
+    ) => columns.Count == 0 ? null : TableMatcher.Match(columns, origins);
 
     // The first type that was asked for and has no row, in the order of the request, or null: the parameters, the
     // columns, the attributes of their origins.  A type that another session dropped since "tables" has none, and
@@ -443,26 +454,28 @@ internal sealed class PostgresSession : IDescribeSession
         );
 
     // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.  One
-    // with rows says whether it needed a plan: "unavailable" for a gated query, until the walk exists.
+    // with rows says whether it needed a plan, "unavailable" for a gated query, until the walk exists, and which
+    // table its result is, or the first check of the match that failed.
     private static Outcome<QueryDescription, DescribeFailure> Described(
         IReadOnlyList<DescribedParameter> parameters,
         IReadOnlyList<SidecarColumn> columns,
-        bool gated
+        bool gated,
+        (SidecarTable? Table, string Result)? match
     )
     {
         var typed = new EquatableArray<DescribedParameter>([.. parameters]);
         var plan = gated ? SidecarValues.Plan.Unavailable : SidecarValues.Plan.NotNeeded;
         return Outcome<QueryDescription, DescribeFailure>.Of(
-            columns.Count == 0
-                ? new QueryDescription(SidecarResultKind.None, typed, null, null, null, null)
-                : new QueryDescription(
+            match is { } found
+                ? new QueryDescription(
                     SidecarResultKind.Rows,
                     typed,
                     new EquatableArray<SidecarColumn>([.. columns]),
-                    null,
+                    found.Table,
                     plan,
-                    SidecarValues.TableMatch.NoOrigin
+                    found.Result
                 )
+                : new QueryDescription(SidecarResultKind.None, typed, null, null, null, null)
         );
     }
 

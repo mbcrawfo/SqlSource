@@ -534,6 +534,7 @@ public class PostgresSessionTests
         var description = described.Value.ShouldNotBeNull();
         description.ResultKind.ShouldBe(SidecarResultKind.None);
         description.Columns.ShouldBeNull();
+        description.MatchesTable.ShouldBeNull();
         description.Plan.ShouldBeNull();
         description.TableMatch.ShouldBeNull();
         exchange.Unused.ShouldBeEmpty();
@@ -897,6 +898,69 @@ public class PostgresSessionTests
         );
 
         described.Value.ShouldNotBeNull().Plan.ShouldBeNull();
+    }
+
+    // A table of two columns, whole in the answer of "tables".
+    private static readonly PostgresTableRow Labels = PostgresTables.TableOf(
+        16500,
+        "labels",
+        PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true),
+        PostgresTables.Attribute(2, "label", PostgresRows.Text.Oid)
+    );
+
+    // One script for a query whose columns are the two of labels in their order, the second under the name given.
+    private static async Task<QueryDescription> DescribeLabelsAsync(string sql, string second = "label")
+    {
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, sql, [], new([], null));
+        _ = Columns(
+            script,
+            1,
+            0,
+            PostgresTables.ColumnOf(0, "id", 23, Labels, 1),
+            PostgresTables.ColumnOf(1, second, 25, Labels, 2)
+        );
+        _ = Tables(script, [Labels.Oid], Labels);
+        _ = Resolves(script, [23, 25], PostgresRows.Int4, PostgresRows.Text);
+        _ = Checks(script, sql, [], Expression(0, "id", 23), Expression(1, second, 25));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(sql), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        return described.Value.ShouldNotBeNull();
+    }
+
+    // The match asks nothing: the script holds the calls of any query with columns, and no other.
+    [Fact]
+    public async Task DescribeAsync_EveryColumnOfATableInItsOrder_SaysTheTable()
+    {
+        var description = await DescribeLabelsAsync("SELECT * FROM labels");
+
+        description.MatchesTable.ShouldBe(new SidecarTable("public", "labels"));
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.Matched);
+    }
+
+    // The name is the one the server returned.
+    [Fact]
+    public async Task DescribeAsync_ColumnUnderAnotherName_MatchesNothingAndSaysNamesDiffer()
+    {
+        var description = await DescribeLabelsAsync("SELECT id, label AS \"label!\" FROM labels", "label!");
+
+        description.MatchesTable.ShouldBeNull();
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.NamesDiffer);
+    }
+
+    // The match is made after the columns are built: it reads the nullability the gate gave them.
+    [Fact]
+    public async Task DescribeAsync_GatedQueryOverATablesList_MatchesNothingAndSaysNullabilityDiffers()
+    {
+        var description = await DescribeLabelsAsync("SELECT l.* FROM orders o LEFT JOIN labels l ON l.id = o.id");
+
+        description.MatchesTable.ShouldBeNull();
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.NullabilityDiffers);
+        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
     }
 
     // No value has a pseudo-type, so the query is not described.  The script answers no call after "types".

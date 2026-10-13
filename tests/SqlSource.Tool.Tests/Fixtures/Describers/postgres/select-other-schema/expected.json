@@ -10,9 +10,12 @@
       "database": "postgres",
       "serverVersion": "18.4",
       "resultKind": "rows",
-      "matchesTable": null,
+      "matchesTable": {
+        "schema": "billing",
+        "table": "invoices"
+      },
       "plan": "not-needed",
-      "tableMatch": "no-origin",
+      "tableMatch": "matched",
       "parameters": [
         {
           "name": "order_id",
