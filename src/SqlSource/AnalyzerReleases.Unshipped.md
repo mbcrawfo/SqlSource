@@ -61,3 +61,4 @@ SQLSRC220 | SqlSource | Error | Project was not restored
 SQLSRC221 | SqlSource | Error | Sidecar was written by a newer tool
 SQLSRC222 | SqlSource | Error | Directory cannot be read
 SQLSRC223 | SqlSource | Error | Solution cannot be read
+SQLSRC224 | SqlSource | Error | Database could not be opened

@@ -6,6 +6,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.Postgres;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;
@@ -94,6 +95,30 @@ public sealed class SecretTests : IDisposable
         );
         log.ShouldNotContain(Secrets.Marker);
         log.ShouldContain("\"id\":\"SQLSRC999\"");
+    }
+
+    // The describer of PostgreSQL itself, given a connection that nothing answers: the port 1 of this machine
+    // refuses at once.  What the driver says is printed, and the value is nowhere: not printed, not in the log, not
+    // in the capture.
+    [Fact]
+    public async Task Run_PostgresDescriberThatCannotOpen_PrintsSqlsrc224AndNothingOfTheValue()
+    {
+        _scene.Run.Describers.Clear();
+        _scene.Run.Describers.Add(new PostgresDescriber());
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] =
+            "Host=127.0.0.1;Port=1;Timeout=5;Password=" + Secrets.Marker;
+
+        var result = await _scene.DescribeAsync("--log", "run.log");
+
+        ShouldHold(result, "224");
+        result.Error.ShouldContain("    server: Failed to connect to 127.0.0.1:1");
+        var log = await File.ReadAllTextAsync(
+            _scene.Run.Folder.PathOf("run.log"),
+            TestContext.Current.CancellationToken
+        );
+        log.ShouldNotContain(Secrets.Marker);
+        log.ShouldContain("\"id\":\"SQLSRC224\"");
+        CaptureJson.Write(_scene.Run.Capture).ShouldNotContain(Secrets.Marker);
     }
 
     [Fact]

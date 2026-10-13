@@ -40,6 +40,8 @@
         -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
         <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" />
+        <!-- The driver of the PostgreSQL describer, Describing/Postgres/. -->
+        <PackageReference Include="Npgsql" />
         <PackageReference Include="System.CommandLine" />
     </ItemGroup>
     <ItemGroup>

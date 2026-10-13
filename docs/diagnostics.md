@@ -60,8 +60,11 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC221](#sqlsrc221) | Sidecar was written by a newer tool |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
+| [SQLSRC224](#sqlsrc224) | Database could not be opened |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
+
+The ids from `SQLSRC224` on are the errors of describing a query against PostgreSQL, which this version of the tool does not do yet: it reports [SQLSRC216](#sqlsrc216) for every such query.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
@@ -881,3 +884,18 @@ $ dotnet sqlsource describe
 ```
 
 Mend the file.  `dotnet sln list` reads it the same way.
+
+## SQLSRC224
+
+**Database could not be opened**
+
+The tool could not open a session with the database of a query that must be described: nothing answers at the address, the server refused the user or the password, the database does not exist, or the driver cannot read the connection string.  The lines that start with `server:` are what the server or the driver said, as they said it.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC224: The database 'app' could not be opened
+    query: GetUser, database app, postgres
+    server: 28P01: password authentication failed for user "app"
+    help: check that the database is running and that the connection string names it
+```
+
+Start the database, or correct the connection string that `--connection` or the database's variable gives.  When the line is `Npgsql cannot read the connection string`, the string is not written as Npgsql wants one, `Host=localhost;Database=app;Username=app;Password=...`: the tool does not repeat what the driver said of it, since that can quote the string.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.

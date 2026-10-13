@@ -267,4 +267,13 @@ public class ToolDiagnosticsTests
                 "Access is denied."
             )
             .ShouldBe($"'/work/Users.sql.json' could not be {tried}: Access is denied.");
+
+    [Fact]
+    public void DatabaseCannotBeOpened_Message_HoldsTheDatabase() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.DatabaseCannotBeOpened.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "app"
+            )
+            .ShouldBe("The database 'app' could not be opened");
 }

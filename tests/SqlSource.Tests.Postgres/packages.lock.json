@@ -349,6 +349,7 @@
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[5.9.0, )",
           "Microsoft.VisualStudio.SolutionPersistence": "[1.0.52, )",
+          "Npgsql": "[10.0.3, )",
           "SqlSource": "[0.1.0-dev, )",
           "System.CommandLine": "[2.0.12, )"
         }

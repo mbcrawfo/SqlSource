@@ -279,6 +279,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor DatabaseCannotBeOpened = new(
+        id: "SQLSRC224",
+        title: "Database could not be opened",
+        messageFormat: "The database '{0}' could not be opened",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc224",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -307,6 +318,7 @@ internal static class ToolDiagnostics
             ProjectNotRestored,
             SidecarOfNewerTool,
             DirectoryCannotBeRead,
-            SolutionCannotBeRead
+            SolutionCannotBeRead,
+            DatabaseCannotBeOpened
         );
 }
