@@ -19,8 +19,10 @@ namespace SqlSource.Tool.Describing.Capture;
 /// with no answer left is a <see cref="CaptureMissException" />.
 /// </para>
 /// <para>
-/// A capture that holds more than was asked is no error: <see cref="Unused" /> says what was left.  An answer that
-/// lacks a member of its record is read with the member's default, since a capture may be older than the record.
+/// A capture that holds more than was asked is no error: <see cref="Unused" /> says what was left.  A capture may
+/// be older than a record: an answer that lacks a nullable member is read with null there, and one that lacks a
+/// member that is not nullable is a <see cref="CaptureMissException" /> that names the member
+/// (<see cref="AnswerNulls" />).
 /// </para>
 /// </remarks>
 /// <param name="capture">The calls to answer from.  It is read once, when the exchange is made.</param>
@@ -55,16 +57,28 @@ internal sealed class ReplayingExchange(DescribeCapture capture) : IDescribeExch
 
     private static TAnswer Read<TAnswer>(string method, JsonElement answer)
     {
+        TAnswer? read;
         try
         {
-            return answer.Deserialize<TAnswer>(CaptureJson.Options) is { } read
-                ? read
-                : throw CaptureMissException.Unreadable(method, typeof(TAnswer), "it is null");
+            read = answer.Deserialize<TAnswer>(CaptureJson.Options);
         }
         catch (JsonException exception)
         {
             throw CaptureMissException.Unreadable(method, typeof(TAnswer), exception.Message);
         }
+
+        if (read is null)
+        {
+            throw CaptureMissException.Unreadable(method, typeof(TAnswer), "it is null");
+        }
+
+        return AnswerNulls.Find(read) is { } member
+            ? throw CaptureMissException.Unreadable(
+                method,
+                typeof(TAnswer),
+                $"its member '{member}' is null or missing"
+            )
+            : read;
     }
 
     // A call of the capture with its key, and whether its answer was given out.

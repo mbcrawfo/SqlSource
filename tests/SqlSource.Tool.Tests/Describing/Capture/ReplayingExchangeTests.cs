@@ -217,6 +217,105 @@ public class ReplayingExchangeTests
         _live.ShouldBe(0);
     }
 
+    // A capture of one call, "ask", from the texts of its request and its answer: what an older version of a
+    // record wrote, or a hand that edited the file.
+    private static DescribeCapture Written(string request, string answer)
+    {
+        using var asked = JsonDocument.Parse(request);
+        using var answered = JsonDocument.Parse(answer);
+        var capture = new DescribeCapture("postgres");
+        capture.Add(new CaptureCall("ask", asked.RootElement.Clone(), answered.RootElement.Clone()));
+        return capture;
+    }
+
+    private static string Asked => CaptureJson.KeyOf(CaptureJson.ToElement(Question()));
+
+    // System.Text.Json reads a member that is absent, or null, as null whatever the record says of it.  A null
+    // where the record has none is no answer the describer can read, and it is told so with the member's name.
+    [Theory]
+    [InlineData( /*lang=json,strict*/
+        "{\"server\":{\"version\":\"1\",\"driver\":null,\"driverVersion\":null},\"error\":null}",
+        "server.settings"
+    )]
+    [InlineData(
+        /*lang=json,strict*/
+        "{\"server\":{\"version\":null,\"driver\":null,\"driverVersion\":null,\"settings\":[]},\"error\":null}",
+        "server.version"
+    )]
+    [InlineData(
+        /*lang=json,strict*/
+        "{\"server\":{\"version\":\"1\",\"driver\":null,\"driverVersion\":null,\"settings\":[null]},\"error\":null}",
+        "server.settings[0]"
+    )]
+    [InlineData(
+        "{\"server\":{\"version\":\"1\",\"driver\":null,\"driverVersion\":null,\"settings\":[{\"name\":\"a\"}]},"
+            + "\"error\":null}",
+        "server.settings[0].value"
+    )]
+    public async Task AskAsync_AnswerWithANullWhereTheRecordHasNone_ThrowsNamingTheMember(string answer, string member)
+    {
+        var exchange = new ReplayingExchange(Written(Asked, answer));
+
+        var thrown = await Should.ThrowAsync<CaptureMissException>(async () => await AskAsync(exchange, Question()));
+
+        thrown.Message.ShouldBe(
+            $"The capture's answer to 'ask' cannot be read as FakeOpenAnswer: its member '{member}' is null or missing"
+        );
+    }
+
+    // A capture outlives the version that wrote it: an answer's record may have gained a nullable member since.
+    [Fact]
+    public async Task AskAsync_AnswerThatLacksANullableMember_IsReadWithNullThere()
+    {
+        var exchange = new ReplayingExchange(
+            Written(
+                Asked, /*lang=json,strict*/
+                "{\"server\":{\"version\":\"1\",\"settings\":[]}}"
+            )
+        );
+
+        var answer = await exchange.AskAsync(
+            "ask",
+            Question(),
+            (_, _) => Task.FromResult(Answer("live")),
+            TestContext.Current.CancellationToken
+        );
+
+        var server = answer.Server.ShouldNotBeNull();
+        server.Version.ShouldBe("1");
+        server.Driver.ShouldBeNull();
+        answer.Error.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task AskAsync_AnswerWithAMemberTheRecordLacks_IsReadWithoutIt()
+    {
+        var exchange = new ReplayingExchange(
+            Written(
+                Asked,
+                "{\"server\":{\"version\":\"1\",\"driver\":null,\"driverVersion\":null,\"settings\":[],\"added\":7},"
+                    + "\"error\":null,\"more\":\"x\"}"
+            )
+        );
+
+        (await AskAsync(exchange, Question())).ShouldBe("1");
+    }
+
+    // The request is the key with every member in it, so a request's record cannot gain one: every call that
+    // was recorded before would be a question the capture lacks.
+    [Fact]
+    public async Task AskAsync_RequestThatGainedAMemberSinceItWasRecorded_IsACallTheCaptureLacks()
+    {
+        var exchange = new ReplayingExchange(
+            Written( /*lang=json,strict*/
+                "{\"name\":\"GetUser\",\"sql\":\"SELECT 1;\"}",
+                CaptureJson.KeyOf(CaptureJson.ToElement(Answer("1")))
+            )
+        );
+
+        _ = await Should.ThrowAsync<CaptureMissException>(async () => await AskAsync(exchange, Question()));
+    }
+
     // The two shapes fit: what is replayed can be recorded again, and is the same file.
     [Fact]
     public async Task AskAsync_CapturedWhileReplaying_GivesTheCaptureAgain()

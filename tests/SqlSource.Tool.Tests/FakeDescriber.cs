@@ -15,8 +15,10 @@ namespace SqlSource.Tool.Tests;
 // The describer of the tests.  It is given a description, a failure or an exception for a query's name, and keeps
 // what it was asked.  It makes every call through the exchange as a real one must: what crosses is the plain
 // records of FakeDescriberCalls.cs, which FakeCalls maps to the seam's types on this side, so a run of it can be
-// captured and replayed.  Under a replay its "live" functions never run: it then keeps nothing and its hooks do
-// not fire.  A query it was told nothing about is a statement without rows and without typed parameters.
+// captured and replayed.  Under a replay its "live" functions never run: it then keeps nothing it was asked, and
+// its exceptions and the hooks that run before a call do nothing; the results of a describer with a bug and what
+// closing does still hold.  A query it was told nothing about is a statement without rows and without typed
+// parameters.
 internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) : IQueryDescriber
 {
     // No describer ships yet, so no descriptor of a server's error exists; the tests bring one.

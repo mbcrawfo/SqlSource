@@ -17,7 +17,11 @@ namespace SqlSource.Tool.Tests.Describing.Capture;
 // the namespace of an engine's describer or of the describer of the tests.
 public class CallRecordTests
 {
-    private static readonly string[] Namespaces = ["SqlSource.Tool.Describing.Postgres", "SqlSource.Tool.Tests"];
+    // A namespace of an engine's describer, with every namespace under it.
+    private static readonly string[] Under = ["SqlSource.Tool.Describing.Postgres"];
+
+    // The namespace of the describer of the tests, and no namespace under it: the tests have their own types there.
+    private static readonly string[] Exactly = ["SqlSource.Tool.Tests"];
 
     private static readonly Type[] Scalars = [typeof(string), typeof(int), typeof(long), typeof(bool)];
 
@@ -27,15 +31,7 @@ public class CallRecordTests
         typeof(FakeDescriber).Assembly,
     }
         .SelectMany(static assembly => assembly.GetTypes())
-        .Where(static type =>
-            type.IsClass
-            && type.Namespace is { } name
-            && Namespaces.Contains(name)
-            && (
-                type.Name.EndsWith("Request", StringComparison.Ordinal)
-                || type.Name.EndsWith("Answer", StringComparison.Ordinal)
-            )
-        )
+        .Where(static type => IsRecordOfACall(type, Under, Exactly))
         .ToDictionary(static type => type.FullName!, StringComparer.Ordinal);
 
     public static TheoryData<string> Records => [with(Found.Keys.Order(StringComparer.Ordinal))];
@@ -86,6 +82,52 @@ public class CallRecordTests
     [InlineData(typeof(Outcome<QueryDescription, DescribeFailure>))]
     public void ShouldBePlain_TypeOfTheSeam_Fails(Type type) =>
         Should.Throw<ShouldAssertException>(() => ShouldBePlain(type, []));
+
+    // A describer's records may be in a namespace under its own, and are found there.  A namespace that only begins
+    // with the same letters is another one.
+    [Theory]
+    [InlineData("SqlSource.Tool.Describing", true)]
+    [InlineData("SqlSource.Tool.Describing.Describers", true)]
+    [InlineData("SqlSource.Tool.Describing.Desc", false)]
+    public void IsRecordOfACall_TypeUnderANamespace_IsFoundThere(string root, bool found) =>
+        IsRecordOfACall(typeof(DescribeRequest), [root], []).ShouldBe(found);
+
+    [Fact]
+    public void IsRecordOfACall_TypeInANamespaceUnderTheTests_IsNotFound() =>
+        IsRecordOfACall(typeof(SampleStructRequest), Under, Exactly).ShouldBeFalse();
+
+    // A struct and a generic record are no records a capture may hold.  Each is found by its name, so that the rule
+    // can refuse it.  The search meets a generic record as its definition, whose member is of no type yet.
+    [Fact]
+    public void IsRecordOfACall_StructOrGenericRecord_IsFoundAndFails()
+    {
+        Type[] types =
+        [
+            typeof(SampleStructRequest),
+            new SampleGenericAnswer<int>(7).GetType().GetGenericTypeDefinition(),
+        ];
+
+        foreach (var type in types)
+        {
+            IsRecordOfACall(type, [], ["SqlSource.Tool.Tests.Describing.Capture"]).ShouldBeTrue(type.Name);
+            _ = Should.Throw<ShouldAssertException>(() => ShouldBePlain(type, []));
+        }
+    }
+
+    // Whether a type is taken for a record of a call: by its name and its namespace alone, whatever kind of type it
+    // is, so that one that breaks the rule is found and fails, and is not passed over.
+    private static bool IsRecordOfACall(Type type, string[] under, string[] exactly)
+    {
+        var name = type.Name.Split('`')[0];
+        return type.Namespace is { } found
+            && (
+                exactly.Contains(found)
+                || under.Any(root => found == root || found.StartsWith(root + ".", StringComparison.Ordinal))
+            )
+            && (
+                name.EndsWith("Request", StringComparison.Ordinal) || name.EndsWith("Answer", StringComparison.Ordinal)
+            );
+    }
 
     private static PropertyInfo[] Members(Type type) => type.GetProperties(BindingFlags.Public | BindingFlags.Instance);
 
