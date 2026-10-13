@@ -93,13 +93,21 @@ public sealed class SessionTests(PostgresContainer postgres)
         var application = "sqlsource-test-" + Guid.NewGuid().ToString("N");
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { ApplicationName = application };
         var thrown = new InvalidOperationException("the exchange failed after the server answered");
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        var exchange = new ThrowsAfterTheServerAnswered(
+            thrown,
+            async () => await BackendsOfAsync(own, application, token)
+        );
 
         var caught = await Should.ThrowAsync<InvalidOperationException>(
-            Sessions.OpenAsync(connection.ConnectionString, new ThrowsAfterTheServerAnswered(thrown))
+            Sessions.OpenAsync(connection.ConnectionString, exchange)
         );
 
         caught.ShouldBeSameAs(thrown);
-        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        exchange.BackendsWhileOpen.ShouldBe(
+            1,
+            "the session did not connect, so the count of none below proves nothing"
+        );
         var backends = await BackendsOfAsync(own, application, token);
         for (var attempt = 0; backends > 0 && attempt < 100; attempt++)
         {
@@ -199,9 +207,13 @@ public sealed class SessionTests(PostgresContainer postgres)
         }
     }
 
-    // Asks the server, and then throws what it was given.
-    private sealed class ThrowsAfterTheServerAnswered(Exception exception) : IDescribeExchange
+    // Asks the server, counts the backends of the test's application name while the connection is open, and then
+    // throws what it was given.
+    private sealed class ThrowsAfterTheServerAnswered(Exception exception, Func<Task<long>> countBackends)
+        : IDescribeExchange
     {
+        public long BackendsWhileOpen { get; private set; } = -1;
+
         public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
             string method,
             TRequest request,
@@ -210,6 +222,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         )
         {
             _ = await live(request, cancellationToken);
+            BackendsWhileOpen = await countBackends();
             throw exception;
         }
     }

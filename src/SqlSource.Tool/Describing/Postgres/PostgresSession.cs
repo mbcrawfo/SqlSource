@@ -260,8 +260,7 @@ internal sealed class PostgresSession : IDescribeSession
         return Described(parameters);
     }
 
-    // The parameters and nothing else: the description has no result kind and no columns, since the session asks the
-    // server for none.
+    // The parameters, the result kind None and nothing else: the session asks the server for no columns.
     private static Outcome<QueryDescription, DescribeFailure> Described(IReadOnlyList<DescribedParameter> parameters) =>
         Outcome<QueryDescription, DescribeFailure>.Of(
             new QueryDescription(
