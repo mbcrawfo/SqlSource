@@ -175,11 +175,13 @@ public class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
 
-    // And a NOT NULL column of a table with an INSTEAD rule, whose RETURNING rows come from the rule's action.
+    // And a NOT NULL column of a table with an INSTEAD rule, in the plan of the defect: the INSERT into t2 is
+    // replaced by the rule's INSERT into t3, so the root ModifyTable is t3's and its Output names t3, while the row
+    // description keeps t2 as the column's origin.  The walk maps t3, nothing extends it, and the answer is t2's.
     [Fact]
     public void Run_NotNullColumnOfATableWithAnInsteadRule_IsNullableByTheCatalog()
     {
-        var redirected = PostgresTables.TableOf(
+        var ruled = PostgresTables.TableOf(
             16705,
             "t2",
             PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
@@ -187,11 +189,16 @@ public class NullabilityWalkTests
         {
             HasInsteadRule = true,
         };
-        var row = PostgresTables.ColumnOf(0, "id", 23, redirected, 1);
-        var origin = ColumnOrigin.Find(row, PostgresTables.Of(redirected));
+        var row = PostgresTables.ColumnOf(0, "id", 23, ruled, 1);
+        var origin = ColumnOrigin.Find(row, PostgresTables.Of(ruled));
         var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+        var plan = Over("ModifyTable", Scan("x") with { NodeType = "Result", Alias = null }) with
+        {
+            Alias = "t3",
+            Output = ["t3.id"],
+        };
 
-        var outcome = NullabilityWalk.Run(Scan("t2", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+        var outcome = NullabilityWalk.Run(plan, [column], [origin], oldAndNewMayBeNamed: false);
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }

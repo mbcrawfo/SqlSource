@@ -238,17 +238,17 @@ public class TableMatcherTests
     [Fact]
     public void Match_TableWithAnInsteadRule_MatchesAsTheNullableColumnsItHas()
     {
-        var redirected = PostgresTables.TableOf(
+        var ruled = PostgresTables.TableOf(
             13,
-            "redirected",
+            "ruled",
             PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
         ) with
         {
             HasInsteadRule = true,
         };
 
-        Match(Whole(redirected)).ShouldBe((new SidecarTable("public", "redirected"), SidecarValues.TableMatch.Matched));
-        Match(From(redirected, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
+        Match(Whole(ruled)).ShouldBe((new SidecarTable("public", "ruled"), SidecarValues.TableMatch.Matched));
+        Match(From(ruled, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
     }
 
     // Each case fails two checks, and the answer is the one that comes first in the format's order.

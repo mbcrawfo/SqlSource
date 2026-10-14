@@ -168,8 +168,8 @@ internal sealed record PostgresTablesAnswer(IReadOnlyList<PostgresTableRow>? Tab
 /// </param>
 /// <param name="HasInsteadRule">
 /// Whether the relation has a <c>DO INSTEAD</c> rule on <c>INSERT</c>, <c>UPDATE</c> or <c>DELETE</c>, by
-/// <c>pg_rewrite</c>: the rule redirects the statement to another relation, and the rows of a <c>RETURNING</c> list
-/// come from the rule's action, while the row description keeps this relation as each column's origin.  It is no
+/// <c>pg_rewrite</c>: the statement is replaced by the rule's action, usually on another relation, whose rows the
+/// <c>RETURNING</c> list gives, while the row description keeps this relation as each column's origin.  It is no
 /// catalog column.  Null in an answer recorded before the member existed, which reads as no such rule.
 /// </param>
 internal sealed record PostgresTableRow(

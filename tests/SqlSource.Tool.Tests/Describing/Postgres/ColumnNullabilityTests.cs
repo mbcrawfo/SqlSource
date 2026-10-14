@@ -188,8 +188,8 @@ public class ColumnNullabilityTests
             .Of(Origin("p", notNull: true, relhassubclass: true, hasForeignPartition: true), gated: true)
             .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
 
-    // A DO INSTEAD rule on INSERT, UPDATE or DELETE redirects the statement to another relation: the rows of a
-    // RETURNING list come from the rule's action, while the row description keeps this relation as the origin.  A
+    // A DO INSTEAD rule on INSERT, UPDATE or DELETE replaces the statement by its action, usually on another
+    // relation, whose rows the RETURNING list gives, while the row description keeps this relation as the origin.  A
     // rule on a partitioned table is allowed.
     [Theory]
     [InlineData("r")]

@@ -481,7 +481,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
             DO INSTEAD INSERT INTO ir_other VALUES (NULL, NEW.x) RETURNING ir_other.*;
         """;
 
-    // The rule redirects the INSERT, and the rows of its RETURNING list are the rule's action's, while the row
+    // The rule replaces the INSERT by its action, and the rows of its RETURNING list are the action's, while the row
     // description keeps the target as the column's origin: the column is nullable whatever the target's NOT NULL
     // says, whether the query is gated or not.  The gated one's plan inserts into the other table under its own
     // alias, which the walk maps to the target's column and finds nothing extends.
