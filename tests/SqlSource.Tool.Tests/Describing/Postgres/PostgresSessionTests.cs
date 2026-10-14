@@ -33,6 +33,51 @@ public class PostgresSessionTests
         int? scale = null
     ) => new(ordinal, name, typeOid, 0, 0, length, precision, scale);
 
+    [Theory]
+    [InlineData("18.4", 18)]
+    [InlineData("13.12", 13)]
+    [InlineData("9.6.24", 9)]
+    [InlineData("18beta1", 18)]
+    [InlineData("devel", null)]
+    public void MajorVersionOf_VersionAsRecorded_IsItsLeadingDigits(string version, int? expected) =>
+        PostgresSession.MajorVersionOf(version).ShouldBe(expected);
+
+    // The script holds "open" alone: the server is refused before any query is described.
+    [Theory]
+    [InlineData("13.12")]
+    [InlineData("9.6.24")]
+    public async Task OpenAsync_ServerOlderThanTheFloor_IsSqlsrc235(string version)
+    {
+        var exchange = new PostgresScript()
+            .Answer("open", PostgresOpenRequest.Instance, PostgresScript.Opened with { ServerVersion = version })
+            .Play();
+
+        var opened = await PostgresScript.OpenAsync(exchange);
+
+        opened.Value.ShouldBeNull();
+        var failure = opened.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC235");
+        failure.Arguments.ShouldBe([PostgresScript.Database, version, "14"]);
+        failure.Step.ShouldBeNull();
+        failure.ServerLines.ShouldBeEmpty();
+    }
+
+    // A version with no leading digits is not refused: the tool cannot tell what it is.
+    [Theory]
+    [InlineData("14.0")]
+    [InlineData("18beta1")]
+    [InlineData("devel")]
+    public async Task OpenAsync_ServerAtOrAboveTheFloor_Opens(string version)
+    {
+        var exchange = new PostgresScript()
+            .Answer("open", PostgresOpenRequest.Instance, PostgresScript.Opened with { ServerVersion = version })
+            .Play();
+
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        session.Server.Version.ShouldBe(version);
+    }
+
     // The script holds "open" alone: nothing may be asked for a text of two statements.
     [Theory]
     [InlineData("DELETE FROM users WHERE id = @id; DELETE FROM orders")]

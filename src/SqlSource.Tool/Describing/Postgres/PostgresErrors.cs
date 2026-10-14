@@ -15,6 +15,9 @@ internal static class PostgresErrors
 {
     public const string OpenHelp = "check that the database is running and that the connection string names it";
 
+    public const string VersionNotSupportedHelp =
+        "upgrade the server, or describe against a database of PostgreSQL 14 or later";
+
     public const string NotATypeName = "it is not written as a type name";
 
     public const string NotATypeNameHelp =
@@ -76,6 +79,25 @@ internal static class PostgresErrors
             null,
             ServerLines(error, 0),
             OpenHelp
+        );
+
+    /// <summary>
+    /// <c>SQLSRC235</c>: the server is older than <see cref="PostgresSession.MinimumMajorVersion" />.  Nothing of a
+    /// query is sent, and the failure holds no server line: the server said nothing.
+    /// </summary>
+    /// <param name="database">The database.</param>
+    /// <param name="version">The server's version, as it is recorded.</param>
+    public static DescribeFailure VersionNotSupported(string database, string version) =>
+        new(
+            ToolDiagnostics.ServerVersionNotSupported,
+            new EquatableArray<string>([
+                database,
+                version,
+                PostgresSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture),
+            ]),
+            null,
+            EquatableArray<string>.Empty,
+            VersionNotSupportedHelp
         );
 
     /// <summary>

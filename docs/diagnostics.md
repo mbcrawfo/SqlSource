@@ -1093,7 +1093,7 @@ The tool supports PostgreSQL 14 and later, and the server that the database's co
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC235: The database 'app' runs PostgreSQL 13.12, and the tool supports 14 and later
-    query: GetUser, database app, postgres 13.12, Npgsql 10.0.3
+    query: GetUser, database app, postgres
     help: upgrade the server, or describe against a database of PostgreSQL 14 or later
 ```
 

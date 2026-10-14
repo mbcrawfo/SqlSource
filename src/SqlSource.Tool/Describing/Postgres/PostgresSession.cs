@@ -29,6 +29,9 @@ internal sealed class PostgresSession : IDescribeSession
 {
     public const string DriverName = "Npgsql";
 
+    /// <summary>The oldest major version of PostgreSQL the describer supports.</summary>
+    public const int MinimumMajorVersion = 14;
+
     private readonly IDescribeExchange _exchange;
     private readonly IRunLog _log;
     private readonly PostgresLive _live;
@@ -99,7 +102,15 @@ internal sealed class PostgresSession : IDescribeSession
                 return Outcome<IDescribeSession, DescribeFailure>.Failed(PostgresErrors.Open(error, request.Database));
             }
 
-            var session = new PostgresSession(request, log, connection, live, ServerOf(answer), explainSettings);
+            var server = ServerOf(answer);
+            if (MajorVersionOf(server.Version) is { } major && major < MinimumMajorVersion)
+            {
+                return Outcome<IDescribeSession, DescribeFailure>.Failed(
+                    PostgresErrors.VersionNotSupported(request.Database, server.Version)
+                );
+            }
+
+            var session = new PostgresSession(request, log, connection, live, server, explainSettings);
             kept = true;
             return Outcome<IDescribeSession, DescribeFailure>.Of(session);
         }
@@ -119,6 +130,24 @@ internal sealed class PostgresSession : IDescribeSession
     {
         var space = serverVersion.IndexOf(' ', StringComparison.Ordinal);
         return space < 0 ? serverVersion : serverVersion[..space];
+    }
+
+    /// <summary>
+    /// The major version of a version as a sidecar records it: its leading digits, so <c>13.12</c> is 13 and
+    /// <c>18beta1</c> is 18.  Null when it starts with no digit, or with more of them than an <see cref="int" />
+    /// holds: the tool cannot tell what it is.
+    /// </summary>
+    public static int? MajorVersionOf(string version)
+    {
+        var end = 0;
+        while (end < version.Length && char.IsAsciiDigit(version[end]))
+        {
+            end++;
+        }
+
+        return int.TryParse(version.AsSpan(0, end), NumberStyles.None, CultureInfo.InvariantCulture, out var major)
+            ? major
+            : null;
     }
 
     public async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
