@@ -70,3 +70,7 @@ SQLSRC229 | SqlSource | Error | Column type is not supported
 SQLSRC230 | SqlSource | Error | Query holds more than one statement
 SQLSRC231 | SqlSource | Error | Parameters as Npgsql reads them differ
 SQLSRC232 | SqlSource | Error | Type cannot be bound by Npgsql
+SQLSRC233 | SqlSource | Error | Statement cannot be described
+SQLSRC234 | SqlSource | Error | Query writes a positional parameter
+SQLSRC235 | SqlSource | Error | Server version is not supported
+SQLSRC236 | SqlSource | Error | Connection does not keep a session

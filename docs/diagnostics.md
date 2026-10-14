@@ -69,6 +69,10 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC230](#sqlsrc230) | Query holds more than one statement |
 | [SQLSRC231](#sqlsrc231) | Parameters as Npgsql reads them differ |
 | [SQLSRC232](#sqlsrc232) | Type cannot be bound by Npgsql |
+| [SQLSRC233](#sqlsrc233) | Statement cannot be described |
+| [SQLSRC234](#sqlsrc234) | Query writes a positional parameter |
+| [SQLSRC235](#sqlsrc235) | Server version is not supported |
+| [SQLSRC236](#sqlsrc236) | Connection does not keep a session |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
@@ -924,7 +928,7 @@ The tool asked the server to prepare the query, and the server refused it: a syn
 
 Mend the query, or bring the database to the schema the query was written for.  `at character` counts from the start of the query's SQL as the tool sent it: without its comments, with each token's default in the token's place and `$1` in the place of each parameter, so it is close to the place in the file and not always the same.  Run with `--log` for the SQL as it was sent.  An error at the step `resolve type` has no `at character` line: there the server refused the tool's own question about a type, and not the query.  A type that a `-- param:` marker declares is checked against every use of the parameter, so a declared `int` compared with a text column is this error too.
 
-A statement that the server cannot prepare is reported so as well, though its SQL is valid: `CALL` and data definition such as `CREATE TABLE` are two, and of the first the server says `syntax error at or near "CALL"`.
+A statement that the server cannot prepare, though its SQL is valid, such as `CALL` or `CREATE TABLE`, is [SQLSRC233](#sqlsrc233) and not this error.
 
 It is also given when a table, a column or a type that the query uses was dropped while the tool described it, since another session changed the schema between two of the tool's questions.  The message says what went, as in `the table of the column 'id' no longer exists`; there is no `server:` line, since the server said nothing, and the help says to run the tool again.
 
@@ -1046,3 +1050,69 @@ The code SqlSource generates binds a parameter by the name of its type, as the s
 ```
 
 Declare the parameter as a type Npgsql binds and cast it where it is used: `-- param: @status text` with `@status::"My Schema"."Status"` in the SQL.  The error is also given for a parameter that only a `-- param:` marker declares: Npgsql resolves the type of every parameter it is handed.
+
+## SQLSRC233
+
+**Statement cannot be described**
+
+The tool describes a query by asking the server to prepare it, and the server prepares only `SELECT` (without `INTO`), `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `VALUES` and `TABLE`, with `WITH` around any of them.  This query starts with a statement of another kind: `CALL`, `CREATE`, `EXPLAIN`, `SHOW`, `SET` and the rest of the commands the server refuses to prepare.  The tool reads the first word of the statement before it sends anything, so the message names that word and the server is not asked.
+
+```console
+/work/App/Queries/Archive.sql(1,10): error SQLSRC233: The query 'Archive' is a CALL statement, which the tool cannot describe
+    query: Archive, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    help: give the query -- output: sql; the tool describes SELECT without INTO, INSERT, UPDATE, DELETE, MERGE, VALUES and TABLE
+```
+
+Give the query `-- output: sql`, which keeps the SQL as it is and generates a method that runs it without describing it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker: the tool does not decide on its own that such a query needs no entry, since that would override what you wrote.
+
+`SELECT ... INTO` is refused as `SELECT INTO` on every version of the server.  PostgreSQL 15 and later prepare it and 14 does not, but it creates a table, as `CREATE TABLE AS` does, and a sidecar must not depend on the server it was described against.  Write `CREATE TABLE ... AS` with `-- output: sql`, or select the rows and insert them in a second query.  A statement that the tool's check misses and that the server names as one it cannot prepare, `42P14: utility statements cannot be prepared`, is this error too, and the message then reads "is a utility statement".
+
+A word that the tool does not know stays [SQLSRC225](#sqlsrc225): `SELEC 1` is a typo and the server says so.  Describing `CALL` and data definition is tracked as D-0002.
+
+## SQLSRC234
+
+**Query writes a positional parameter**
+
+The tool finds a query's parameters by their `@name` and sends the SQL with `$1`, `$2` in their places.  A `$n` that the SQL writes itself would be taken for one of those, so the types the server gave would not be the parameters' own, and the code the tool generates, which binds parameters by name, could not fill it.  Nothing of such a query is sent.  The message names the `$n` as it is written.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC234: The query 'GetUser' writes the parameter '$1' itself
+    query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    help: write the parameter as @name; generated code binds parameters by name
+```
+
+Write the parameter as `@name`.  A `$` followed by a digit that is part of a name (`a$1`), or that stands in a string, a dollar-quoted string, a quoted identifier or a comment, is text and not a parameter.
+
+## SQLSRC235
+
+**Server version is not supported**
+
+The tool supports PostgreSQL 14 and later, and the server that the database's connection string reaches is older.  The version is read when the session is opened, before any query is sent, and it is the one the server reports.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC235: The database 'app' runs PostgreSQL 13.12, and the tool supports 14 and later
+    query: GetUser, database app, postgres 13.12, Npgsql 10.0.3
+    help: upgrade the server, or describe against a database of PostgreSQL 14 or later
+```
+
+Upgrade the server, or point the tool at a database of PostgreSQL 14 or later, a copy of the schema on a newer server for one.  The error is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed.  A version that does not start with a number is not refused, since the tool cannot tell what it is.
+
+## SQLSRC236
+
+**Connection does not keep a session**
+
+The tool prepares a statement on the server and asks about it in later steps, which only works when every step reaches the same session.  This connection does not keep one.  There are two causes:
+
+- The connection string sets `Multiplexing=true`, which shares physical connections between commands.  It is found when the database is opened, before the tool connects.
+- A pooler in transaction mode, such as PgBouncer, sits between the tool and the server.  It hands each transaction to a backend of its own, so the statement the tool prepared is not found: the tool finds out at a query, when the statement is missing from the session, or when the server answers `26000` (the statement does not exist) or `42P05` (it already exists).
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC236: The connection to the database 'app' does not keep one session
+    query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    help: connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true
+```
+
+Connect directly to the server: the address of the database itself, not of the pooler, and without `Multiplexing=true`.  Hosted providers that pool connections offer a direct endpoint beside the pooled one.  The tool needs this only to describe queries; the code it generates runs through whatever connection the application uses.  The error at `open` is reported once for the database, and each of its queries counts as failed.
