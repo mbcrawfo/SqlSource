@@ -139,7 +139,8 @@
               }
             ],
             "relhassubclass": false,
-            "hasForeignPartition": false
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
           }
         ],
         "error": null

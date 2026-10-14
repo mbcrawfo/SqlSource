@@ -175,6 +175,27 @@ public class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
 
+    // And a NOT NULL column of a table with an INSTEAD rule, whose RETURNING rows come from the rule's action.
+    [Fact]
+    public void Run_NotNullColumnOfATableWithAnInsteadRule_IsNullableByTheCatalog()
+    {
+        var redirected = PostgresTables.TableOf(
+            16705,
+            "t2",
+            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+        ) with
+        {
+            HasInsteadRule = true,
+        };
+        var row = PostgresTables.ColumnOf(0, "id", 23, redirected, 1);
+        var origin = ColumnOrigin.Find(row, PostgresTables.Of(redirected));
+        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+
+        var outcome = NullabilityWalk.Run(Scan("t2", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+
+        AnswersOf(outcome).ShouldBe([(true, "catalog")]);
+    }
+
     [Theory]
     [InlineData("Subquery Scan")]
     [InlineData("CTE Scan")]

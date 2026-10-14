@@ -29,11 +29,12 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private const string ParameterTypesSql =
         "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = @name";
 
-    // Every relation asked for with its columns, in one query.  The relations are read first, so that the one thing
-    // that costs a walk of the catalog, whether a partitioned table has a foreign table anywhere in its partition
-    // tree, is computed once for each relation and not once for each of its columns; it is false and never null for
-    // any other.  The join to the attributes is a left one, so that a table without a column of its own is answered
-    // too, with one row that holds no attribute.
+    // Every relation asked for with its columns, in one query.  The relations are read first, so that what is said of
+    // a relation as a whole is computed once for each relation and not once for each of its columns: whether a
+    // partitioned table has a foreign table anywhere in its partition tree, which costs a walk of the catalog and is
+    // false and never null for any other, and whether the relation has an INSTEAD rule on INSERT, UPDATE or DELETE
+    // (an ev_type of '1' is SELECT), never null.  The join to the attributes is a left one, so that a table without
+    // a column of its own is answered too, with one row that holds no attribute.
     private const string TablesSql = """
         WITH relations AS MATERIALIZED (
             SELECT
@@ -47,7 +48,12 @@ internal sealed class PostgresLive(PostgresConnection connection)
                     FROM pg_catalog.pg_partition_tree(c.oid) AS t
                     JOIN pg_catalog.pg_class AS f ON f.oid = t.relid
                     WHERE f.relkind = 'f'
-                ) AS has_foreign_partition
+                ) AS has_foreign_partition,
+                EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_rewrite AS w
+                    WHERE w.ev_class = c.oid AND w.ev_type <> '1' AND w.is_instead
+                ) AS has_instead_rule
             FROM pg_catalog.pg_class AS c
             WHERE c.oid = ANY (@oids)
         )
@@ -64,7 +70,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
             a.atttypid,
             k.convalidated,
             r.relhassubclass,
-            r.has_foreign_partition
+            r.has_foreign_partition,
+            r.has_instead_rule
         FROM relations AS r
         JOIN pg_catalog.pg_namespace AS n ON n.oid = r.relnamespace
         LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = r.oid AND a.attnum > 0 AND NOT a.attisdropped
@@ -239,7 +246,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
                             reader.GetString(3),
                             columns,
                             reader.GetBoolean(11),
-                            reader.GetBoolean(12)
+                            reader.GetBoolean(12),
+                            reader.GetBoolean(13)
                         )
                     );
                 }

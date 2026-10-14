@@ -14,7 +14,8 @@ public class ColumnNullabilityTests
         bool notNull,
         bool? notNullValidated = null,
         bool? relhassubclass = false,
-        bool? hasForeignPartition = false
+        bool? hasForeignPartition = false,
+        bool? hasInsteadRule = false
     ) =>
         new(
             PostgresTables.TableOf(7, "t") with
@@ -22,6 +23,7 @@ public class ColumnNullabilityTests
                 Relkind = relkind,
                 Relhassubclass = relhassubclass,
                 HasForeignPartition = hasForeignPartition,
+                HasInsteadRule = hasInsteadRule,
             },
             PostgresTables.Attribute(1, "c", PostgresRows.Int4.Oid, notNull, notNullValidated: notNullValidated)
         );
@@ -184,5 +186,42 @@ public class ColumnNullabilityTests
     public void Of_GatedQueryOverAPartitionedTableWithAForeignPartition_IsNullableByTheHeuristic() =>
         ColumnNullability
             .Of(Origin("p", notNull: true, relhassubclass: true, hasForeignPartition: true), gated: true)
+            .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
+
+    // A DO INSTEAD rule on INSERT, UPDATE or DELETE redirects the statement to another relation: the rows of a
+    // RETURNING list come from the rule's action, while the row description keeps this relation as the origin.  A
+    // rule on a partitioned table is allowed.
+    [Theory]
+    [InlineData("r")]
+    [InlineData("p")]
+    public void Of_NotNullColumnOfATableWithAnInsteadRule_IsNullableByTheCatalog(string relkind) =>
+        ColumnNullability
+            .Of(Origin(relkind, notNull: true, hasInsteadRule: true), gated: false)
+            .ShouldBe((true, SidecarValues.NullableSource.Catalog));
+
+    // False is a relation without such a rule, and null an answer recorded before the member existed.
+    [Theory]
+    [InlineData("r", false)]
+    [InlineData("r", null)]
+    [InlineData("p", false)]
+    [InlineData("p", null)]
+    public void Of_NotNullColumnOfATableWithoutAnInsteadRuleOrUnsaid_IsNotNullableByTheCatalog(
+        string relkind,
+        bool? hasInsteadRule
+    ) =>
+        ColumnNullability
+            .Of(Origin(relkind, notNull: true, hasInsteadRule: hasInsteadRule), gated: false)
+            .ShouldBe((false, SidecarValues.NullableSource.Catalog));
+
+    [Fact]
+    public void Of_ViewWithAnInsteadRule_IsStillUnknownAndSaysView() =>
+        ColumnNullability
+            .Of(Origin("v", notNull: true, hasInsteadRule: true), gated: false)
+            .ShouldBe((null, SidecarValues.NullableSource.View));
+
+    [Fact]
+    public void Of_GatedQueryOverATableWithAnInsteadRule_IsNullableByTheHeuristic() =>
+        ColumnNullability
+            .Of(Origin("r", notNull: true, hasInsteadRule: true), gated: true)
             .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
 }

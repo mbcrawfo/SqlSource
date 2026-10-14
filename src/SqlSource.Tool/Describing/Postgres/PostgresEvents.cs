@@ -278,7 +278,8 @@ internal static class PostgresEvents
             new("name", table.Name),
             new("columns", LogValue.ListOf(table.Columns.Select(AttributeOf))),
             new("relhassubclass", table.Relhassubclass is { } children ? (LogValue)children : LogValue.Null),
-            new("hasForeignPartition", table.HasForeignPartition is { } foreign ? (LogValue)foreign : LogValue.Null)
+            new("hasForeignPartition", table.HasForeignPartition is { } foreign ? (LogValue)foreign : LogValue.Null),
+            new("hasInsteadRule", table.HasInsteadRule is { } instead ? (LogValue)instead : LogValue.Null)
         );
 
     private static LogValue AttributeOf(PostgresAttributeRow attribute) =>

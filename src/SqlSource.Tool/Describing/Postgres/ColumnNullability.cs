@@ -19,7 +19,10 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <c>NOT NULL</c>, but a foreign table may be a partition: it inherits the parent's <c>NOT NULL</c>, which nothing
 /// enforces on its remote rows, and a query of the parent reads them.  So a <c>NOT NULL</c> column of a partitioned
 /// table with a foreign table anywhere in its partition tree is nullable too, and one of a partitioned table without
-/// one is the catalog's.
+/// one is the catalog's.  So is a <c>NOT NULL</c> column of a table or a partitioned table with a
+/// <c>DO INSTEAD</c> rule on <c>INSERT</c>, <c>UPDATE</c> or <c>DELETE</c>: the rule redirects the statement to
+/// another relation, and the rows of its <c>RETURNING</c> list come from the rule's action, where the column may be
+/// nullable or set to <c>NULL</c>, while the row description keeps this table as the column's origin.
 /// </remarks>
 internal static class ColumnNullability
 {
@@ -35,12 +38,13 @@ internal static class ColumnNullability
             { Table.Relkind: "v" or "m" or "f" } => (null, SidecarValues.NullableSource.View),
             _ when gated => (true, SidecarValues.NullableSource.Heuristic),
 
-            // A child of an inheritance parent may have dropped the NOT NULL it inherited, and nothing enforces it on
-            // the remote rows of a foreign partition.
-            { Table: { Relkind: "r", Relhassubclass: true } or { Relkind: "p", HasForeignPartition: true } } => (
-                true,
-                SidecarValues.NullableSource.Catalog
-            ),
+            // A child of an inheritance parent may have dropped the NOT NULL it inherited, nothing enforces it on the
+            // remote rows of a foreign partition, and the rows of an INSTEAD rule's RETURNING are another relation's.
+            {
+                Table: { Relkind: "r", Relhassubclass: true }
+                    or { Relkind: "p", HasForeignPartition: true }
+                    or { Relkind: "r" or "p", HasInsteadRule: true }
+            } => (true, SidecarValues.NullableSource.Catalog),
             { } found => (
                 found.Attribute is not { NotNull: true, NotNullValidated: not false },
                 SidecarValues.NullableSource.Catalog

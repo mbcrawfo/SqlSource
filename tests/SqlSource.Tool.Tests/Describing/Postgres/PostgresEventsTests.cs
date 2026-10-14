@@ -309,9 +309,19 @@ public class PostgresEventsTests
             .ShouldBeOfType<LogValue.Members>();
         users
             .Values.Select(value => value.Name)
-            .ShouldBe(["oid", "relkind", "schema", "name", "columns", "relhassubclass", "hasForeignPartition"]);
+            .ShouldBe([
+                "oid",
+                "relkind",
+                "schema",
+                "name",
+                "columns",
+                "relhassubclass",
+                "hasForeignPartition",
+                "hasInsteadRule",
+            ]);
         users.Values[5].Value.ShouldBe((LogValue)false);
         users.Values[6].Value.ShouldBe((LogValue)false);
+        users.Values[7].Value.ShouldBe((LogValue)false);
         users
             .Values[4]
             .Value.ShouldBeOfType<LogValue.Items>()
@@ -509,7 +519,7 @@ public class PostgresEventsTests
     }
 
     // A table of one column, whole in the answer of "tables", and the query that is the table.  It says nothing of a
-    // foreign partition, as an answer recorded before the member existed.
+    // foreign partition or of an INSTEAD rule, as an answer recorded before the members existed.
     private static readonly PostgresTableRow Ids = PostgresTables.TableOf(
         16500,
         "users",
@@ -517,6 +527,7 @@ public class PostgresEventsTests
     ) with
     {
         HasForeignPartition = null,
+        HasInsteadRule = null,
     };
 
     private static readonly DescribeRequest Whole = new(
@@ -557,6 +568,8 @@ public class PostgresEventsTests
             .ShouldBeOfType<LogValue.Members>();
         ids.Values[6].Name.ShouldBe("hasForeignPartition");
         ids.Values[6].Value.ShouldBe(LogValue.Null);
+        ids.Values[7].Name.ShouldBe("hasInsteadRule");
+        ids.Values[7].Value.ShouldBe(LogValue.Null);
         var match = log.Events[6].Members;
         Member(match, "query").ShouldBe((LogValue)"ListIds");
         Member(match, "result").ShouldBe((LogValue)"matched");

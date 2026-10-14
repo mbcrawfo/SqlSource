@@ -153,7 +153,8 @@
               }
             ],
             "relhassubclass": false,
-            "hasForeignPartition": false
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
           },
           {
             "oid": 16472,
@@ -199,7 +200,8 @@
               }
             ],
             "relhassubclass": false,
-            "hasForeignPartition": false
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
           }
         ],
         "error": null

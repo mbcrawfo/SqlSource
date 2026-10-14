@@ -472,6 +472,48 @@ public sealed class ColumnTests(PostgresContainer postgres)
         NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
     }
 
+    // A table with a DO INSTEAD rule on INSERT, and the table the rule writes to instead, of this test alone, made by
+    // SQL that can be run again.  The rule writes NULL into the other table's id and returns the other table's row.
+    private const string InsteadRuleTables = """
+        CREATE TABLE IF NOT EXISTS ir_target (id integer NOT NULL, x integer);
+        CREATE TABLE IF NOT EXISTS ir_other (id integer, x integer);
+        CREATE OR REPLACE RULE ir_target_insert AS ON INSERT TO ir_target
+            DO INSTEAD INSERT INTO ir_other VALUES (NULL, NEW.x) RETURNING ir_other.*;
+        """;
+
+    // The rule redirects the INSERT, and the rows of its RETURNING list are the rule's action's, while the row
+    // description keeps the target as the column's origin: the column is nullable whatever the target's NOT NULL
+    // says, whether the query is gated or not.  The gated one's plan inserts into the other table under its own
+    // alias, which the walk maps to the target's column and finds nothing extends.
+    [Fact]
+    public async Task Describe_ReturningOfATableWithAnInsteadRule_IsNullableByTheCatalog()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        {
+            await using var made = source.CreateCommand(InsteadRuleTables);
+            _ = await made.ExecuteNonQueryAsync(token);
+
+            // The premise: the INSERT returns the rule's row, whose id is NULL.  The row is rolled back.
+            await using var connection = await source.OpenConnectionAsync(token);
+            await using var transaction = await connection.BeginTransactionAsync(token);
+            await using var inserted = connection.CreateCommand();
+            inserted.CommandText = "INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id";
+            (await inserted.ExecuteScalarAsync(token)).ShouldBe(DBNull.Value);
+            await transaction.RollbackAsync(token);
+        }
+
+        var plain = await ShouldDescribeAsync("INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id");
+        var gated = await ShouldDescribeAsync(
+            "INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id, left('a', 1) AS l"
+        );
+
+        plain.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        NullabilityOf(plain.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog")]);
+        gated.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        NullabilityOf(gated.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog"), (null, "no-origin")]);
+    }
+
     // The query of the spec's Goal, without its join.
     [Fact]
     public async Task Describe_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()

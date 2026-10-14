@@ -234,6 +234,23 @@ public class TableMatcherTests
         Match(From(parted, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
     }
 
+    // And a table with an INSTEAD rule, whose RETURNING rows come from the rule's action.
+    [Fact]
+    public void Match_TableWithAnInsteadRule_MatchesAsTheNullableColumnsItHas()
+    {
+        var redirected = PostgresTables.TableOf(
+            13,
+            "redirected",
+            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+        ) with
+        {
+            HasInsteadRule = true,
+        };
+
+        Match(Whole(redirected)).ShouldBe((new SidecarTable("public", "redirected"), SidecarValues.TableMatch.Matched));
+        Match(From(redirected, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
+    }
+
     // Each case fails two checks, and the answer is the one that comes first in the format's order.
     [Fact]
     public void Match_TwoChecksThatFail_GivesTheFirst()

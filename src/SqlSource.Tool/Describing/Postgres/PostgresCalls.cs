@@ -166,6 +166,12 @@ internal sealed record PostgresTablesAnswer(IReadOnlyList<PostgresTableRow>? Tab
 /// nothing enforces on its remote rows.  False for a relation that is not partitioned.  It is no catalog column.
 /// Null in an answer recorded before the member existed, which reads as no foreign partition.
 /// </param>
+/// <param name="HasInsteadRule">
+/// Whether the relation has a <c>DO INSTEAD</c> rule on <c>INSERT</c>, <c>UPDATE</c> or <c>DELETE</c>, by
+/// <c>pg_rewrite</c>: the rule redirects the statement to another relation, and the rows of a <c>RETURNING</c> list
+/// come from the rule's action, while the row description keeps this relation as each column's origin.  It is no
+/// catalog column.  Null in an answer recorded before the member existed, which reads as no such rule.
+/// </param>
 internal sealed record PostgresTableRow(
     long Oid,
     string Relkind,
@@ -173,7 +179,8 @@ internal sealed record PostgresTableRow(
     string Name,
     IReadOnlyList<PostgresAttributeRow> Columns,
     bool? Relhassubclass,
-    bool? HasForeignPartition
+    bool? HasForeignPartition,
+    bool? HasInsteadRule
 );
 
 /// <summary>What the catalog says of one column of a relation.</summary>
