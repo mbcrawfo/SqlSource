@@ -7,6 +7,8 @@ internal sealed class NullRunLog : IRunLog
 
     public static NullRunLog Instance { get; } = new();
 
+    public bool Writes => false;
+
     public void Write(string name, params LogMember[] members)
     {
         // Nothing is kept: the run has no --log.

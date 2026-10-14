@@ -109,6 +109,8 @@ internal sealed class RunLogFile : IRunLog, IDisposable
             ToolDiagnostic.ForFile(ToolDiagnostics.FileCannotBeChanged, path, "written", reason)
         );
 
+    public bool Writes => true;
+
     public void Write(string name, params LogMember[] members)
     {
         lock (_gate)

@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Logging;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
@@ -37,7 +38,7 @@ public sealed class ExplainTests(PostgresContainer postgres)
     public async Task ExplainAsync_PreparedStatement_AnswersAGenericPlanThatPlanNodeReads()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = new PostgresConnection(postgres.ConnectionString);
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
         var live = new PostgresLive(connection);
         await PrepareAsync(live);
 
@@ -64,7 +65,7 @@ public sealed class ExplainTests(PostgresContainer postgres)
     )
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = new PostgresConnection(postgres.ConnectionString);
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
         var live = new PostgresLive(connection);
         var prepared = await live.PrepareAsync(
             new PostgresPrepareRequest(
@@ -90,7 +91,7 @@ public sealed class ExplainTests(PostgresContainer postgres)
     public async Task ExplainAsync_StatementThatWasNotPrepared_AnswersTheErrorAndLeavesNoTransaction()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = new PostgresConnection(postgres.ConnectionString);
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
         var live = new PostgresLive(connection);
 
         var answer = await live.ExplainAsync(new PostgresExplainRequest("walk_nothing", 0, []), token);
@@ -114,7 +115,7 @@ public sealed class ExplainTests(PostgresContainer postgres)
     public async Task ExplainAsync_Update_ChangesNoRow()
     {
         var token = TestContext.Current.CancellationToken;
-        await using var connection = new PostgresConnection(postgres.ConnectionString);
+        await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
         var live = new PostgresLive(connection);
         await using (var made = await connection.CommandAsync(Rows, token))
         {

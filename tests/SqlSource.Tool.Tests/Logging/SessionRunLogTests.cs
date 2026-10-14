@@ -60,4 +60,11 @@ public sealed class SessionRunLogTests
 
         _inner.Events[0].Name.ShouldBe("postgres.run.end ***");
     }
+
+    [Fact]
+    public void Writes_OverALog_IsWhatTheInnerLogSays()
+    {
+        new SessionRunLog(NullRunLog.Instance, "x", "postgres.").Writes.ShouldBeFalse();
+        new SessionRunLog(new RecordingLog(), "x", "postgres.").Writes.ShouldBeTrue();
+    }
 }

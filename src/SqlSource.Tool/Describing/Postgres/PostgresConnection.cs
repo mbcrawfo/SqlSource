@@ -2,7 +2,9 @@ using System;
 using System.Data;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
 using Npgsql;
+using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -23,7 +25,11 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </para>
 /// </remarks>
 /// <param name="connectionString">The connection's value.  It goes to the driver and to nothing else.</param>
-internal sealed class PostgresConnection(string connectionString) : IAsyncDisposable
+/// <param name="log">
+/// The describer's log.  It is given to the driver alone, which writes its own messages to it when the log keeps
+/// anything: see <see cref="NpgsqlRunLogger" />.
+/// </param>
+internal sealed class PostgresConnection(string connectionString, IRunLog log) : IAsyncDisposable
 {
     /// <summary>
     /// What is said of a connection string the driver cannot read.  The driver's own text is not passed on: its
@@ -39,6 +45,7 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
 
     private NpgsqlDataSource? _source;
     private NpgsqlConnection? _connection;
+    private ILoggerFactory? _driverLog;
 
     /// <summary>The version of the driver, as <c>major.minor.patch</c>.</summary>
     public static string? DriverVersion => typeof(NpgsqlConnection).Assembly.GetName().Version?.ToString(3);
@@ -60,7 +67,7 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
 
         try
         {
-            _source ??= NpgsqlDataSource.Create(connectionString);
+            _source ??= BuildSource();
             _connection = await _source.OpenConnectionAsync(cancellationToken);
             return _connection;
         }
@@ -70,6 +77,20 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
             // no host.  A user's mistake, and so an answer of "open" like any other.  The exception is not kept.
             throw new NpgsqlException(UnreadableConnectionString);
         }
+    }
+
+    // The builder reads the string, so its ArgumentException for one it cannot read is thrown here, inside the
+    // caller's try.
+    private NpgsqlDataSource BuildSource()
+    {
+        var builder = new NpgsqlDataSourceBuilder(connectionString);
+        _driverLog = NpgsqlRunLogger.For(log);
+        if (_driverLog is not null)
+        {
+            _ = builder.UseLoggerFactory(_driverLog);
+        }
+
+        return builder.Build();
     }
 
     /// <summary>
@@ -153,6 +174,8 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
             {
                 await _source.DisposeAsync();
             }
+
+            _driverLog?.Dispose();
         }
     }
 
