@@ -137,6 +137,32 @@ public sealed class WalkTests(PostgresContainer postgres)
         ).ShouldBe([(true, "heuristic"), (true, "heuristic")]);
     }
 
+    // PostgreSQL 18 resolves the old and the new row written as quoted identifiers too, and an inner scope's alias
+    // "old" prints as old.id as the old row does.  The quoted names are what gate the query.
+    [Fact]
+    public async Task Describe_InsertSelectFromATableQuotedOld_KeepsTheHeuristicForOld()
+    {
+        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+
+        (
+            await WalkedAsync(
+                "INSERT INTO orders (user_id, total) SELECT \"old\".id, 0 FROM users \"old\" "
+                    + "RETURNING \"old\".id, \"new\".id"
+            )
+        ).ShouldBe([(true, "heuristic"), (true, "heuristic")]);
+    }
+
+    // The quoted old row of an INSERT is NULL on every row, and the statement has no other word of the gate.
+    [Fact]
+    public async Task Describe_ReturningQuotedOldWithNoOtherGateWord_IsGatedAndKeepsTheHeuristic()
+    {
+        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+
+        (
+            await WalkedAsync("INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING \"old\".id")
+        ).ShouldBe([(true, "heuristic")]);
+    }
+
     // PostgreSQL 18's old row cannot be given the name of a table of the statement: the server refuses it.
     [Fact]
     public async Task Describe_OldAliasThatIsAlsoATablesAlias_IsRefusedByTheServer()

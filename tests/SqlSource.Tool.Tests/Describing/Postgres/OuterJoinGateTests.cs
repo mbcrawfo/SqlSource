@@ -66,12 +66,23 @@ public class OuterJoinGateTests
     [InlineData("SELECT x_left, left_x, left1, a.fullname FROM users")]
     [InlineData("SELECT groupings, cubed, outermost, rights FROM users")]
     [InlineData("SELECT renewal, older, newest, merged, new_value, old_id FROM t")]
-    [InlineData("SELECT \"new\", \"old\" FROM t")]
     [InlineData("SELECT 'merge' FROM t")]
+    // Only OLD and NEW are names the server resolves when quoted: a quoted word of the others does not count.
+    [InlineData("SELECT \"left\" FROM t")]
     // A parameter is no word of the SQL.
     [InlineData("SELECT id FROM users WHERE id = @left")]
     [InlineData("")]
     public void IsGated_QueryThatHoldsNoWord_IsNotGated(string sql) => OuterJoinGate.IsGated(sql).ShouldBeFalse();
+
+    [Theory]
+    [MemberData(nameof(QuotedOldOrNew))]
+    public void IsGated_QuotedOldOrNewOrUnicodeEscapedIdentifier_IsGated(string sql) =>
+        OuterJoinGate.IsGated(sql).ShouldBeTrue();
+
+    [Theory]
+    [MemberData(nameof(NoQuotedOldOrNew))]
+    public void IsGated_OldOrNewInAStringACommentOrAnotherQuotedName_IsNotGated(string sql) =>
+        OuterJoinGate.IsGated(sql).ShouldBeFalse();
 
     // Whether a reference at a ModifyTable may be PostgreSQL 18's old or new row.
     [Theory]
@@ -82,15 +93,53 @@ public class OuterJoinGateTests
         OuterJoinGate.NamesOldOrNew(sql).ShouldBeTrue();
 
     [Theory]
+    [MemberData(nameof(QuotedOldOrNew))]
+    public void NamesOldOrNew_QuotedOldOrNewOrUnicodeEscapedIdentifier_NamesThem(string sql) =>
+        OuterJoinGate.NamesOldOrNew(sql).ShouldBeTrue();
+
+    [Theory]
+    [MemberData(nameof(NoQuotedOldOrNew))]
+    public void NamesOldOrNew_OldOrNewInAStringACommentOrAnotherQuotedName_DoesNotNameThem(string sql) =>
+        OuterJoinGate.NamesOldOrNew(sql).ShouldBeFalse();
+
+    [Theory]
     [InlineData("SELECT 1")]
-    // Inside a string, a comment and a quoted identifier.
+    // Inside a string and a comment.
     [InlineData("SELECT 'old' FROM t")]
     [InlineData("SELECT id FROM t -- old")]
-    [InlineData("SELECT \"old\".id FROM t \"old\"")]
     // A longer word that holds one.
     [InlineData("SELECT bold, newest FROM t")]
     // The other words of the gate.
     [InlineData("SELECT a.id FROM a LEFT JOIN b ON true")]
     public void NamesOldOrNew_QueryThatHoldsNeither_DoesNotNameThem(string sql) =>
         OuterJoinGate.NamesOldOrNew(sql).ShouldBeFalse();
+
+    // PostgreSQL 18 resolves "old" and "new" as the old and the new row of a RETURNING list, so a quoted identifier
+    // of either name counts, in any case.  The tool does not decode the escapes of a Unicode-escaped identifier, so
+    // any one counts.
+    public static TheoryData<string> QuotedOldOrNew =>
+        [
+            "INSERT INTO t (id) VALUES (1) RETURNING \"old\".id",
+            "INSERT INTO t (id) VALUES (1) RETURNING \"NEW\".id",
+            "INSERT INTO t (id) VALUES (1) RETURNING \"Old\".id",
+            "INSERT INTO t (id) VALUES (1) RETURNING U&\"\\006Fld\".id",
+            "INSERT INTO t (id) VALUES (1) RETURNING U&\"!006Fld\" UESCAPE '!'",
+            "INSERT INTO t (id) VALUES (1) RETURNING u&\"x\".id",
+            // Wherever it stands, a table's alias included: the walk then maps only the target's alias.
+            "SELECT \"new\", \"old\" FROM t",
+            "SELECT \"old\".id FROM t \"old\"",
+        ];
+
+    // A string never counts, nor a comment, nor a quoted identifier of another name: "o""ld" is the name o"ld.
+    public static TheoryData<string> NoQuotedOldOrNew =>
+        [
+            "SELECT 'old' FROM t",
+            "SELECT E'new' FROM t",
+            "SELECT U&'old' FROM t",
+            "SELECT $$old$$ FROM t",
+            "SELECT id FROM t -- \"old\"",
+            "SELECT \"bold\" FROM t",
+            "SELECT \"new_total\" FROM t",
+            "SELECT \"o\"\"ld\" FROM t",
+        ];
 }
