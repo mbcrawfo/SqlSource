@@ -67,8 +67,14 @@ internal static class PostgresTypes
         };
     }
 
+    // int2vector and oidvector have the category A and an element, as an array has, but they are no arrays: the
+    // protocol has each as a base type of its own, and Npgsql binds it by its name.
+    private const long Int2vector = 22;
+    private const long Oidvector = 30;
+
     // A domain has the category of its base, so an array is a base type of the category A.
-    private static bool IsArray(PostgresTypeRow row) => row is { Typtype: "b", Typcategory: "A" };
+    private static bool IsArray(PostgresTypeRow row) =>
+        row is { Typtype: "b", Typcategory: "A" } && row.Oid is not (Int2vector or Oidvector);
 
     private static PostgresType Array(PostgresTypeRow row, IReadOnlyDictionary<long, PostgresTypeRow> rows)
     {

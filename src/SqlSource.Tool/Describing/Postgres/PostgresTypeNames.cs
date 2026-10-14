@@ -10,8 +10,10 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <remarks>
 /// A type of <c>pg_catalog</c> is its SQL spelling, <c>character varying(100)</c>.  A type of any other schema is the
 /// schema and the name, whatever the session's <c>search_path</c>, so that the value does not depend on the
-/// session.  An identifier is quoted unless it is lower-case letters, digits and <c>_</c>: a reserved word is not
-/// quoted, which <c>docs/tech-debt/TD-0043</c> records.
+/// session.  An identifier is quoted unless it is lower-case letters, digits and <c>_</c>.  A reserved word is not
+/// quoted, as in <c>user.status</c>: the name is the one that Npgsql binds, Npgsql takes that name bare and refuses
+/// any name with a quote in it, and the container test
+/// <c>Describe_TypeOfASchemaNamedByAReservedWord_IsSpelledBare</c> pins it.
 /// </remarks>
 internal static class PostgresTypeNames
 {

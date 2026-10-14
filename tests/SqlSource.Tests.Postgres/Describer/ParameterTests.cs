@@ -425,6 +425,55 @@ public sealed class ParameterTests(PostgresContainer postgres)
             Inferred("id", TestSidecars.Postgres()),
         ]);
 
+    // They carry the category A and an element, and they are no arrays.  A describe passes only when Npgsql binds
+    // the name, so that it succeeds proves that it does.
+    [Theory]
+    [InlineData("SELECT 1 FROM pg_index WHERE indkey = @k", "k", "int2vector")]
+    [InlineData("SELECT 1 FROM pg_proc WHERE proargtypes = @a", "a", "oidvector")]
+    public async Task Describe_ParameterComparedWithInt2vectorOrOidvector_IsABaseType(
+        string sql,
+        string name,
+        string type
+    ) =>
+        (await ShouldDescribeAsync(Requests.Of(sql))).ShouldBe([
+            Inferred(name, TestSidecars.Postgres(type, internalName: type)),
+        ]);
+
+    // The name is the one Npgsql binds, and Npgsql takes user.status bare and refuses it quoted.  The describe
+    // succeeds only when Npgsql binds the name, so the bare spelling is the one to keep.
+    [Fact]
+    public async Task Describe_TypeOfASchemaNamedByAReservedWord_IsSpelledBare()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using (var create = own.CreateCommand("CREATE SCHEMA \"user\""))
+        {
+            _ = await create.ExecuteNonQueryAsync(token);
+        }
+
+        try
+        {
+            await using (var type = own.CreateCommand("CREATE TYPE \"user\".status AS ENUM ('a')"))
+            {
+                _ = await type.ExecuteNonQueryAsync(token);
+            }
+
+            var parameters = await ShouldDescribeAsync(Requests.Of("""SELECT 1 WHERE @s = 'a'::"user".status"""));
+
+            parameters.ShouldBe([
+                Inferred(
+                    "s",
+                    TestSidecars.Postgres("user.status", SidecarValues.Kind.Enum, "user", "status", labels: ["a"])
+                ),
+            ]);
+        }
+        finally
+        {
+            await using var drop = own.CreateCommand("""DROP SCHEMA IF EXISTS "user" CASCADE""");
+            _ = await drop.ExecuteNonQueryAsync(token);
+        }
+    }
+
     // The server accepts a pseudo-type, declared or inferred, and an array of one.  A .sql file can cause each, so
     // none throws.
     [Theory]
