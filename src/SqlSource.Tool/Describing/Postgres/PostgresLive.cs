@@ -252,10 +252,12 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// <c>EXECUTE</c> whatever the number of its arguments, so a statement with a <c>$n</c> of its own is described
     /// too.
     /// </summary>
-    public static string ExecuteText(PostgresColumnsRequest asked) =>
-        asked.Parameters == 0
-            ? $"EXECUTE {asked.Statement}"
-            : $"EXECUTE {asked.Statement}({string.Join(", ", Enumerable.Repeat("NULL", asked.Parameters))})";
+    public static string ExecuteText(PostgresColumnsRequest asked) => ExecuteText(asked.Statement, asked.Parameters);
+
+    private static string ExecuteText(string statement, int parameters) =>
+        parameters == 0
+            ? $"EXECUTE {statement}"
+            : $"EXECUTE {statement}({string.Join(", ", Enumerable.Repeat("NULL", parameters))})";
 
     /// <summary>Asks <c>types</c>.</summary>
     public async Task<PostgresTypesAnswer> TypesAsync(PostgresTypesRequest asked, CancellationToken token)
@@ -412,6 +414,51 @@ internal sealed class PostgresLive(PostgresConnection connection)
             Value = DBNull.Value,
             DataTypeName = dataTypeName,
         };
+
+    private const string ForceGenericPlanSql = "SET LOCAL plan_cache_mode = force_generic_plan";
+
+    /// <summary>
+    /// Asks <c>explain</c>: the generic plan of the prepared statement, in a transaction that is rolled back.
+    /// </summary>
+    /// <remarks>
+    /// <c>EXPLAIN</c> without <c>ANALYZE</c> plans the statement and does not run it.  Under
+    /// <c>force_generic_plan</c> the <c>NULL</c> of a parameter is not folded into the plan, so <c>id = $1</c>
+    /// stays a condition.  Disposing a transaction that was not ended rolls it back, so a failure at any step
+    /// leaves no setting behind.  The texts hold a name the tool made, settings of a closed list and nothing of a
+    /// user's.
+    /// </remarks>
+    public async Task<PostgresExplainAnswer> ExplainAsync(PostgresExplainRequest asked, CancellationToken token)
+    {
+        try
+        {
+            await using var transaction = await connection.BeginAsync(token);
+            foreach (var text in SetTexts(asked))
+            {
+                await using var set = await connection.CommandAsync(text, token);
+                _ = await set.ExecuteNonQueryAsync(token);
+            }
+
+            await using var command = await connection.CommandAsync(ExplainText(asked), token);
+            var plan =
+                await command.ExecuteScalarAsync(token) as string
+                ?? throw new InvalidOperationException("The server answered 'explain' with no text.");
+            await transaction.RollbackAsync(token);
+            return new PostgresExplainAnswer(plan, null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresExplainAnswer(null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
+    /// <summary>The text <c>explain</c> sends for the plan.</summary>
+    public static string ExplainText(PostgresExplainRequest asked) =>
+        "EXPLAIN (VERBOSE, FORMAT JSON) " + ExecuteText(asked.Statement, asked.Parameters);
+
+    /// <summary>What <c>explain</c> sets for its transaction, in order: the generic plan, then each setting.</summary>
+    /// <exception cref="ArgumentException">A setting is not of <see cref="PlannerSettings" />.</exception>
+    public static IReadOnlyList<string> SetTexts(PostgresExplainRequest asked) =>
+        [ForceGenericPlanSql, .. asked.Settings.Select(PlannerSettings.SetText)];
 
     /// <summary>Asks <c>deallocate</c>.</summary>
     public async Task<PostgresDeallocateAnswer> DeallocateAsync(

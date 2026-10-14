@@ -81,6 +81,13 @@ internal sealed class PostgresConnection(string connectionString) : IAsyncDispos
         new(sql, await OpenAsync(cancellationToken));
 
     /// <summary>
+    /// A transaction on the session's connection.  Its caller rolls it back, and disposes it: disposing one that
+    /// was not ended rolls it back too.
+    /// </summary>
+    public async Task<NpgsqlTransaction> BeginAsync(CancellationToken cancellationToken) =>
+        await (await OpenAsync(cancellationToken)).BeginTransactionAsync(cancellationToken);
+
+    /// <summary>
     /// A batch of one command that holds a user's SQL.  Its caller adds parameters to the command, runs or describes
     /// it, and disposes the batch.
     /// </summary>

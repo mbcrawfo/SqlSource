@@ -220,3 +220,19 @@ internal sealed record PostgresCheckColumn(string Name, long TypeOid, string Dat
 /// <param name="Parameter">The first parameter of the list whose type is refused.</param>
 /// <param name="Message">Npgsql's own message.</param>
 internal sealed record PostgresBindError(string Parameter, string Message);
+
+/// <summary>Everything that decides the answer of <c>explain</c>.</summary>
+/// <param name="Statement">The prepared statement to plan.</param>
+/// <param name="Parameters">The number of parameters of the query's list: a <c>NULL</c> is passed for each.</param>
+/// <param name="Settings">
+/// Settings of the planner as <c>name=value</c>, each of <see cref="PlannerSettings" />.  The tool passes none; a
+/// test forces a join method with them.
+/// </param>
+internal sealed record PostgresExplainRequest(string Statement, int Parameters, IReadOnlyList<string> Settings);
+
+/// <summary>The generic plan of a statement, or why the server gave none.</summary>
+/// <param name="Plan">
+/// The text <c>EXPLAIN (VERBOSE, FORMAT JSON)</c> returned, as the server wrote it.
+/// </param>
+/// <param name="Error">What the server said, or null.  It is logged and never reported.</param>
+internal sealed record PostgresExplainAnswer(string? Plan, PostgresServerError? Error);
