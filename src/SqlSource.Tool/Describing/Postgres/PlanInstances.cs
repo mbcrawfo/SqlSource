@@ -48,7 +48,6 @@ internal sealed class PlanInstances
     private const string Both = "both";
     private const string None = "none";
     private const string ModifyTable = "ModifyTable";
-    private const string MixedAggregate = "MixedAggregate";
 
     private static readonly HashSet<string> RelationScans =
     [
@@ -124,7 +123,9 @@ internal sealed class PlanInstances
             Reason ??= WalkReasons.UnknownJoinType;
         }
 
-        if (node.HasGroupingSets || node.NodeType == MixedAggregate)
+        // EXPLAIN (FORMAT JSON) writes every aggregate as "Aggregate", with its strategy apart, and one that mixes
+        // hashing and sorting has a "Grouping Sets" key like any other: the key is the one thing to look for.
+        if (node.HasGroupingSets)
         {
             Reason ??= WalkReasons.GroupingSets;
         }

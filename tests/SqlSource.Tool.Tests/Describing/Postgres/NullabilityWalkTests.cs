@@ -333,7 +333,6 @@ public class NullabilityWalkTests
                 "grouping-sets",
                 Text(Over("Aggregate", Scan("a")) with { HasGroupingSets = true, Output = ["a.id", "a.opt"] })
             },
-            { "grouping-sets", Text(Over("MixedAggregate", Scan("a")) with { Output = ["a.id", "a.opt"] }) },
         };
 
     // The first is a UNION's Append, which has no Output; the second has fewer entries than the result has columns.

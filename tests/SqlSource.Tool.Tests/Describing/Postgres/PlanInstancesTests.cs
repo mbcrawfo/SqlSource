@@ -138,10 +138,6 @@ public class PlanInstancesTests
         PlanInstances.Find(plan).Reason.ShouldBe(WalkReasons.GroupingSets);
     }
 
-    [Fact]
-    public void Find_MixedAggregate_IsUnusable() =>
-        PlanInstances.Find(Over("MixedAggregate", Scan("u"))).Reason.ShouldBe(WalkReasons.GroupingSets);
-
     // The grouping sets of a subquery's own plan are found too, when the planner flattened the scan away.
     [Fact]
     public void Find_GroupingSetsUnderAJoin_IsUnusable()
