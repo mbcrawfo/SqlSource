@@ -50,6 +50,37 @@ public class PostgresSessionTests
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC230");
     }
 
+    // The script holds "open" alone: a statement that PREPARE does not take is refused before anything is asked.
+    [Fact]
+    public async Task DescribeAsync_CallStatement_IsSqlsrc233AndAsksNothing()
+    {
+        await using var session = await PostgresScript.SessionAsync(new PostgresScript().Open().Play());
+
+        var described = await session.DescribeAsync(
+            Request("CALL archive(@id)", Inferred("id")),
+            TestContext.Current.CancellationToken
+        );
+
+        described.Value.ShouldBeNull();
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC233");
+        failure.Arguments.ShouldBe(["Q", "CALL"]);
+    }
+
+    // The statements are counted before the kind is read.
+    [Fact]
+    public async Task DescribeAsync_SeveralStatementsThatStartWithCall_IsSqlsrc230()
+    {
+        await using var session = await PostgresScript.SessionAsync(new PostgresScript().Open().Play());
+
+        var described = await session.DescribeAsync(
+            Request("CALL a(); CALL b()"),
+            TestContext.Current.CancellationToken
+        );
+
+        described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC230");
+    }
+
     [Fact]
     public async Task DescribeAsync_DeclaredTypeThatIsNoTypeName_IsSqlsrc228AndAsksNothing()
     {

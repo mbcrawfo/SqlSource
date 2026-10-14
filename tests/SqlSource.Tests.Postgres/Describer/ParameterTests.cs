@@ -43,6 +43,24 @@ public sealed class ParameterTests(PostgresContainer postgres)
         MethodsOf(capture).ShouldBe(["open"]);
     }
 
+    // PREPARE takes none of these, and SELECT ... INTO only from 15: the tool refuses all three on every server, and
+    // asks the server nothing.
+    [Theory]
+    [InlineData("CALL p(@a)", "CALL")]
+    [InlineData("CREATE TEMP TABLE t AS SELECT @a::int", "CREATE")]
+    [InlineData("SELECT @a::int AS a INTO TEMP t", "SELECT INTO")]
+    public async Task Describe_StatementPrepareDoesNotTake_IsSqlsrc233AndSendsNothing(string sql, string kind)
+    {
+        var capture = new DescribeCapture("postgres");
+
+        var described = await DescribeAsync(Requests.Of(sql), new CapturingExchange(LiveExchange.Instance, capture));
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC233");
+        failure.Arguments.ShouldBe([Requests.Query, kind]);
+        MethodsOf(capture).ShouldBe(["open"]);
+    }
+
     [Fact]
     public async Task Describe_DeclaredTypeThatIsNoTypeName_IsSqlsrc228AndSendsNothing()
     {

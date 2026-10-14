@@ -126,10 +126,16 @@ internal sealed class PostgresSession : IDescribeSession
         CancellationToken cancellationToken
     )
     {
-        // Before anything is sent: one statement, and every declared type written as a type name.
+        // Before anything is sent: one statement, of a kind PREPARE takes, and every declared type written as a type
+        // name.
         if (ParameterPlaceholders.Rewrite(request.Sql, request.Parameters) is not { } sql)
         {
             return Failed(PostgresErrors.SeveralStatements(request));
+        }
+
+        if (StatementShape.RefusedKind(request.Sql) is { } kind)
+        {
+            return Failed(PostgresErrors.NotDescribable(request, kind));
         }
 
         var types = ParameterPlaceholders.TypeList(request.Parameters);

@@ -22,6 +22,10 @@ internal static class PostgresErrors
 
     public const string SeveralStatementsHelp = "one statement for each query; a ; is allowed at the end alone";
 
+    public const string NotDescribableHelp =
+        "give the query -- output: sql; the tool describes SELECT without INTO, INSERT, UPDATE, DELETE, MERGE, VALUES "
+        + "and TABLE";
+
     public const string NoSuchType = "the database has no such type";
 
     public const string NoSuchTypeHelp =
@@ -54,6 +58,7 @@ internal static class PostgresErrors
         "the database's schema changed while the query was described; run the tool again";
 
     private const string UndefinedObject = "42704";
+    private const string UtilityStatement = "42P14";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
 
@@ -111,6 +116,20 @@ internal static class PostgresErrors
         );
 
     /// <summary>
+    /// <c>SQLSRC233</c>: the statement is of a kind that <c>PREPARE</c> does not take.  Nothing of it is sent.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="kind">The kind, in upper case, as <see cref="StatementShape.RefusedKind" /> gives it.</param>
+    public static DescribeFailure NotDescribable(DescribeRequest query, string kind) =>
+        new(
+            ToolDiagnostics.StatementCannotBeDescribed,
+            new EquatableArray<string>([query.Name, kind]),
+            DescribeStep.DescribeParameters,
+            EquatableArray<string>.Empty,
+            NotDescribableHelp
+        );
+
+    /// <summary>
     /// <c>SQLSRC228</c> for a type that <see cref="DeclaredTypeText" /> refuses.  Nothing of the query is sent.
     /// </summary>
     public static DescribeFailure TypeRefused(DescribeRequest query, SqlQueryParameter parameter) =>
@@ -124,8 +143,9 @@ internal static class PostgresErrors
         );
 
     /// <summary>
-    /// What a failed <c>prepare</c> is reported as.  An error the server positions inside the type list is the
-    /// declared type's, <c>SQLSRC228</c>; <c>42P18</c> and <c>42P08</c> name a parameter, <c>SQLSRC226</c> and
+    /// What a failed <c>prepare</c> is reported as.  <c>42P14</c>, a utility statement, is <c>SQLSRC233</c>, as a
+    /// backstop for what <see cref="StatementShape" /> misses; an error the server positions inside the type list is
+    /// the declared type's, <c>SQLSRC228</c>; <c>42P18</c> and <c>42P08</c> name a parameter, <c>SQLSRC226</c> and
     /// <c>SQLSRC227</c>; anything else is the server rejecting the query, <c>SQLSRC225</c>.
     /// </summary>
     public static DescribeFailure Prepare(
@@ -136,6 +156,12 @@ internal static class PostgresErrors
     {
         var head = ParameterPlaceholders.HeadLength(prepare.Statement, prepare.Types);
         var lines = ServerLines(error, head);
+        if (error.SqlState == UtilityStatement)
+        {
+            // The server did not say which statement it was, so the kind is no word of one.
+            return NotDescribable(query, "utility") with { ServerLines = lines };
+        }
+
         if (DeclaredAt(error, query, prepare, head) is { } declared)
         {
             return error.SqlState == UndefinedObject

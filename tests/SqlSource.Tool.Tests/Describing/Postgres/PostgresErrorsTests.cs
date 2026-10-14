@@ -70,6 +70,18 @@ public class PostgresErrorsTests
         failure.Help.ShouldBe(PostgresErrors.SeveralStatementsHelp);
     }
 
+    [Fact]
+    public void NotDescribable_Kind_IsSqlsrc233WithItsHelp()
+    {
+        var failure = PostgresErrors.NotDescribable(Query(), "CALL");
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC233");
+        failure.Arguments.ShouldBe(["Q", "CALL"]);
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.NotDescribableHelp);
+    }
+
     // The type as the marker wrote it, and the parameter as the SQL writes one, with its prefix.
     [Fact]
     public void TypeRefused_Parameter_IsSqlsrc228ThatSaysItIsNoTypeName()
@@ -90,6 +102,23 @@ public class PostgresErrorsTests
 
     private static PostgresServerError Error(string state, string message, int? position = null, string? hint = null) =>
         new(state, message, null, hint, position);
+
+    // The backstop for what the tool's own check misses: the kind is the word "utility", never a word of a statement.
+    [Fact]
+    public void Prepare_UtilityStatementsCannotBePrepared_IsSqlsrc233()
+    {
+        var failure = PostgresErrors.Prepare(
+            new PostgresServerError("42P14", "utility statements cannot be prepared", null, null, null),
+            Query(),
+            Prepared("sqlsource_1")
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC233");
+        failure.Arguments.ShouldBe(["Q", "utility"]);
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        failure.ServerLines.ShouldBe(["42P14: utility statements cannot be prepared"]);
+        failure.Help.ShouldBe(PostgresErrors.NotDescribableHelp);
+    }
 
     // 42P18 has no position.  The server names the parameter $2, and the user wrote @b.
     [Fact]
