@@ -24,6 +24,44 @@
         <Compile Include="../SqlSource.Tool.Tests/Fixtures/FixtureReplay.cs" Link="Fixtures/FixtureReplay.cs" />
         <!-- The builder of a sidecar's records.  tests/SqlSource.Tests owns the file. -->
         <Compile Include="../SqlSource.Tests/Snapshot/TestSidecars.cs" Link="Snapshot/TestSidecars.cs" />
+        <!--
+            The harness of a whole command, which DescribeCommandTests runs in process against the container, and
+            the start of the built tool and the copy of a fixture project, which ToolProcessTests runs it on.
+            tests/SqlSource.Tool.Tests owns the files and runs the same command with no database.
+        -->
+        <Compile Include="../SqlSource.Tool.Tests/CliResult.cs" Link="Tool/CliResult.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/CliRun.cs" Link="Tool/CliRun.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/FakeProcessRunner.cs" Link="Tool/FakeProcessRunner.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/FakeProject.cs" Link="Tool/FakeProject.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/Hosts.cs" Link="Tool/Hosts.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/LogReader.cs" Link="Tool/LogReader.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/Plans.cs" Link="Tool/Plans.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/Programs.cs" Link="Tool/Programs.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/Secrets.cs" Link="Tool/Secrets.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/SidecarFiles.cs" Link="Tool/SidecarFiles.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/TempFolder.cs" Link="Tool/TempFolder.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/TestProject.cs" Link="Tool/TestProject.cs" />
+        <Compile Include="../SqlSource.Tool.Tests/Fixtures/FixtureProjects.cs" Link="Fixtures/FixtureProjects.cs" />
+        <!--
+            The fixture project Single, with the package's MSBuild files and the repository's global.json beside it,
+            in the output where FixtureProjects copies them from.
+        -->
+        <None
+            Include="../SqlSource.Tool.Tests/Fixtures/Projects/Single/**"
+            Link="Fixtures/Projects/Single/%(RecursiveDir)%(Filename)%(Extension)"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None
+            Include="../../src/SqlSource/build/SqlSource.props"
+            Link="Fixtures/build/SqlSource.props"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None
+            Include="../../src/SqlSource/build/SqlSource.targets"
+            Link="Fixtures/build/SqlSource.targets"
+            CopyToOutputDirectory="PreserveNewest"
+        />
+        <None Include="../../global.json" Link="Fixtures/global.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />

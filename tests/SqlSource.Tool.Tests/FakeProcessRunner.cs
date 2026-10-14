@@ -26,11 +26,9 @@ internal sealed class FakeProcessRunner : IProcessRunner
 
     public FakeProject Default { get; set; } = new();
 
-    // Runs before each answer, while the request counts as running.
+    // Runs before each answer, while the request counts as running.  A ProcessGate's PassAsync here holds each
+    // request until the test lets it go.
     public Func<ProcessRequest, CancellationToken, Task>? BeforeAnswer { get; set; }
-
-    // Holds each request until the test lets it go, while the request counts as running.
-    public ProcessGate? Gate { get; set; }
 
     // Every request, in the order they came.
     public IReadOnlyList<ProcessRequest> Requests => [.. _requests];
@@ -77,11 +75,6 @@ internal sealed class FakeProcessRunner : IProcessRunner
             if (BeforeAnswer is not null)
             {
                 await BeforeAnswer(request, cancellationToken);
-            }
-
-            if (Gate is not null)
-            {
-                await Gate.PassAsync(request, cancellationToken);
             }
 
             cancellationToken.ThrowIfCancellationRequested();
