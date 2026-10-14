@@ -1,7 +1,9 @@
 using System;
 using System.IO;
 using Shouldly;
+using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Processes;
 using Xunit;
 
@@ -22,7 +24,8 @@ public class ToolHostTests
         _ = host.Processes.ShouldBeOfType<ProcessRunner>();
         host.TempDirectory.ShouldBe(Path.GetTempPath());
         host.ProcessorCount.ShouldBe(Environment.ProcessorCount);
-        host.Describers.ShouldBeSameAs(DescriberRegistry.Empty);
+        _ = host.Describers.Find(SqlDialect.PostgreSql).ShouldBeOfType<PostgresDescriber>();
+        host.Describers.Find(SqlDialect.SqlServer).ShouldBeNull();
         host.Exchange("billing").ShouldBeSameAs(LiveExchange.Instance);
         host.Time.ShouldBeSameAs(TimeProvider.System);
     }

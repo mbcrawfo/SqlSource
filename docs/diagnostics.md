@@ -72,7 +72,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
-The ids from `SQLSRC224` on are the errors of describing a query against PostgreSQL, which this version of the tool does not do yet: it reports [SQLSRC216](#sqlsrc216) for every such query.
+The ids from `SQLSRC224` on are the errors of describing a query against PostgreSQL, which this version of the tool does for the `postgres` dialect.  It reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#projects-that-share-internals).
 
@@ -778,13 +778,13 @@ Set the variable of each database, as the `help:` line names them, or give each 
 
 **No describer for the dialect**
 
-The query must be described, its dialect is one whose databases can be asked, and this version of the `sqlsource` tool has nothing that asks them.  It is not [SQLSRC209](#sqlsrc209), which is about a dialect that no version can describe.
+The query must be described, its dialect is one whose databases can be asked, and this version of the `sqlsource` tool has nothing that asks them.  It describes `postgres` and not yet `mssql`.  It is not [SQLSRC209](#sqlsrc209), which is about a dialect that no version can describe.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC216: This version of sqlsource cannot describe 'postgres'
+/work/App/Queries/Users.sql(1,10): error SQLSRC216: This version of sqlsource cannot describe 'mssql'
 ```
 
-Update the tool, with `dotnet tool update SqlSource.Tool`, to a version that describes the dialect; this version describes none.  Until then, set the output of the queries to `sql`, with `SqlSourceOutput` or an `-- output: sql` marker, to use their constants and methods without types.  The error is reported at each query that the run would have described, and each counts as failed.
+Update the tool, with `dotnet tool update SqlSource.Tool`, to a version that describes the dialect; this version describes `postgres` alone.  Until then, set the output of the queries to `sql`, with `SqlSourceOutput` or an `-- output: sql` marker, to use their constants and methods without types.  The error is reported at each query that the run would have described, and each counts as failed.
 
 ## SQLSRC217
 

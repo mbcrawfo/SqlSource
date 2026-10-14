@@ -6,7 +6,7 @@ using SqlSource.Parsing;
 namespace SqlSource.Tool.Describing.Describers;
 
 /// <summary>
-/// The describers of a run, one for a dialect.  The real host's has none until phase 3 registers PostgreSQL's.
+/// The describers of a run, one for a dialect.  The real host's has PostgreSQL's; SQL Server's comes in phase 6.
 /// </summary>
 internal sealed class DescriberRegistry
 {

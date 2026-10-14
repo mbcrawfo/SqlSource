@@ -9,8 +9,8 @@ using SqlSource.Tool.Logging;
 namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
-/// Asks a PostgreSQL to describe queries, through Npgsql.  It is registered nowhere until sub-phase 3.6 registers it:
-/// the released tool has none for <c>postgres</c>.
+/// Asks a PostgreSQL to describe queries, through Npgsql.  The real host registers it, so the released tool
+/// describes the queries of the <c>postgres</c> dialect.
 /// </summary>
 /// <remarks>
 /// Every <c>explain</c> of the describer carries settings of the planner.  The tool makes it with none, so the
