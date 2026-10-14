@@ -267,7 +267,17 @@ public class PostgresEventsTests
         await DescribeAsync(script, log, Listing);
 
         log.Events.Select(written => written.Name)
-            .ShouldBe(["prepare", "columns", "tables", "types", "column", "column", "check", "deallocate"]);
+            .ShouldBe([
+                "prepare",
+                "columns",
+                "tables",
+                "types",
+                "column",
+                "column",
+                "table-match",
+                "check",
+                "deallocate",
+            ]);
 
         var columns = log.Events[1].Members;
         NamesOf(columns).ShouldBe(["query", "statement", "columns", "durationMs"]);
@@ -330,7 +340,13 @@ public class PostgresEventsTests
         Member(count, "nullable").ShouldBe(LogValue.Null);
         Member(count, "nullableSource").ShouldBe((LogValue)"no-origin");
 
-        var check = log.Events[6].Members;
+        var match = log.Events[6].Members;
+        NamesOf(match).ShouldBe(["query", "result", "table"]);
+        Member(match, "query").ShouldBe((LogValue)"ListUsers");
+        Member(match, "result").ShouldBe((LogValue)"no-origin");
+        Member(match, "table").ShouldBe(LogValue.Null);
+
+        var check = log.Events[7].Members;
         NamesOf(check).ShouldBe(["query", "parameters", "result", "differs", "durationMs"]);
         Member(check, "result").ShouldBe((LogValue)"same");
         Member(check, "differs").ShouldBe(LogValue.Null);
@@ -485,6 +501,87 @@ public class PostgresEventsTests
         var id = log.Events.First(written => written.Name == "postgres.column").Members;
         Member(id, "origin")
             .ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "***"), new("column", "id")));
+    }
+
+    // A table of one column, whole in the answer of "tables", and the query that is the table.
+    private static readonly PostgresTableRow Ids = PostgresTables.TableOf(
+        16500,
+        "users",
+        PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+    );
+
+    private static readonly DescribeRequest Whole = new(
+        "ListIds",
+        "SELECT * FROM users",
+        EquatableArray<SqlQueryParameter>.Empty
+    );
+
+    private static PostgresScript WholeScript()
+    {
+        var id = PostgresTables.ColumnOf(0, "id", 23, Ids, 1);
+        return new PostgresScript()
+            .Open()
+            .Answer(
+                "prepare",
+                new PostgresPrepareRequest("sqlsource_1", Whole.Sql, []),
+                new PostgresPrepareAnswer([], null)
+            )
+            .Answer("columns", new PostgresColumnsRequest("sqlsource_1", 0), new PostgresColumnsAnswer([id], null))
+            .Answer("tables", new PostgresTablesRequest([Ids.Oid]), new PostgresTablesAnswer([Ids], null))
+            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
+            .Answer("check", new PostgresCheckRequest(Whole.Sql, []), Sees(id))
+            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+    }
+
+    [Fact]
+    public async Task Describe_QueryThatIsATable_WritesTheTableInTableMatch()
+    {
+        var log = new RecordingLog();
+
+        await DescribeAsync(WholeScript(), log, Whole);
+
+        log.Events.Select(written => written.Name)
+            .ShouldBe(["prepare", "columns", "tables", "types", "column", "table-match", "check", "deallocate"]);
+        var match = log.Events[5].Members;
+        Member(match, "query").ShouldBe((LogValue)"ListIds");
+        Member(match, "result").ShouldBe((LogValue)"matched");
+        Member(match, "table").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "users")));
+    }
+
+    // The match is in the log when the check that follows it fails.
+    [Fact]
+    public async Task Describe_CheckThatDiffers_StillWritesTheTableMatchBeforeIt()
+    {
+        var log = new RecordingLog();
+        var script = ListingScript().Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn));
+
+        await DescribeAsync(script, log, Listing);
+
+        log.Events.Select(written => written.Name)
+            .ShouldBe([
+                "prepare",
+                "columns",
+                "tables",
+                "types",
+                "column",
+                "column",
+                "table-match",
+                "check",
+                "deallocate",
+            ]);
+        Member(log.Events.Single(written => written.Name == "check").Members, "result").ShouldBe((LogValue)"differ");
+    }
+
+    // A table's name is a user's text, and the connection's value is taken out of it as out of any string.
+    [Fact]
+    public async Task Describe_ThroughTheLogOfASession_RemovesTheSecretFromTheTableOfATableMatch()
+    {
+        var log = new RecordingLog();
+
+        await DescribeAsync(WholeScript(), new SessionRunLog(log, "users", "postgres."), Whole);
+
+        var match = log.Events.Single(written => written.Name == "postgres.table-match").Members;
+        Member(match, "table").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "***")));
     }
 
     // The same inside a map: the message of an error is a string one level down.

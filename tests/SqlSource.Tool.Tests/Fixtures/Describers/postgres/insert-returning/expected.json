@@ -12,7 +12,7 @@
       "resultKind": "rows",
       "matchesTable": null,
       "plan": "not-needed",
-      "tableMatch": "no-origin",
+      "tableMatch": "columns-differ",
       "parameters": [
         {
           "name": "user_id",

@@ -12,7 +12,7 @@
       "resultKind": "rows",
       "matchesTable": null,
       "plan": "not-needed",
-      "tableMatch": "no-origin",
+      "tableMatch": "several-tables",
       "parameters": [
         {
           "name": "id",
