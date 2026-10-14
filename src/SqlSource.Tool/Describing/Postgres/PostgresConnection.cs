@@ -84,13 +84,17 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     private NpgsqlDataSource BuildSource()
     {
         var builder = new NpgsqlDataSourceBuilder(connectionString);
-        _driverLog = NpgsqlRunLogger.For(log);
-        if (_driverLog is not null)
+        var driverLog = NpgsqlRunLogger.For(log);
+        if (driverLog is not null)
         {
-            _ = builder.UseLoggerFactory(_driverLog);
+            _ = builder.UseLoggerFactory(driverLog);
         }
 
-        return builder.Build();
+        // The factory is the connection's to dispose once it has a data source, and not before: a build that
+        // throws leaves the field as it was, and the next call makes a factory of its own.
+        var source = builder.Build();
+        _driverLog = driverLog;
+        return source;
     }
 
     /// <summary>
