@@ -48,7 +48,7 @@ In the shell, `zsh` does not split an unquoted variable into words; run a loop o
 
 ## Finishing
 
-`./pre-commit-validation.sh` before each commit, in a separate command; the hook validates the working tree, not the index.  Lines over 120 characters fail `editorconfig-checker`, and a rewritten comment is where they appear.  Check `VersionPrefix` against the highest `v*` tag before opening the pull request.
+`./pre-commit-validation.sh` before each commit, and again on the final tree before the push; nothing runs it for you.  Lines over 120 characters fail `editorconfig-checker`, and a rewritten comment is where they appear.  Check `VersionPrefix` against the highest `v*` tag before opening the pull request.
 
 ## Common mistakes
 
