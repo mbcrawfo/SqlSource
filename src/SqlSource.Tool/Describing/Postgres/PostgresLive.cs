@@ -439,10 +439,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
             }
 
             await using var command = await connection.CommandAsync(ExplainText(asked), token);
-            var plan =
-                await command.ExecuteScalarAsync(token) as string
-                ?? throw new InvalidOperationException("The server answered 'explain' with no text.");
+            var plan = await command.ExecuteScalarAsync(token) as string;
             await transaction.RollbackAsync(token);
+
+            // An answer that is no text is no plan, which the session reads as unreadable: never a failed describe.
             return new PostgresExplainAnswer(plan, null);
         }
         catch (NpgsqlException exception)
