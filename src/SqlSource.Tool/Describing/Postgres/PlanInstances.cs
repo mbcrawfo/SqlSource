@@ -70,8 +70,10 @@ internal sealed class PlanInstances
     private PlanInstances(PlanNode root)
     {
         _target = root.NodeType == ModifyTable ? root.Alias : null;
-        RootNamesAnInstance = NamesAnInstance(root, isRoot: true);
         Visit(root, 0, extended: false);
+        RootNamesAnInstance =
+            NamesAnInstance(root, isRoot: true)
+            && (root.NodeType != ModifyTable || _nodes.TrueForAll(static visited => visited.Node.JoinType is null));
     }
 
     /// <summary>
@@ -84,8 +86,10 @@ internal sealed class PlanInstances
     public IReadOnlyList<VisitedNode> Nodes => _nodes;
 
     /// <summary>
-    /// Whether the root is itself a relation instance, which is when a bare name in its <c>Output</c> is a column
-    /// of that relation.
+    /// Whether a bare name in the root's <c>Output</c> is a column of the root's relation, which is when the root is
+    /// a scan of a relation, or a <c>ModifyTable</c> with no join under it.  A <c>RETURNING</c> list prints a bare
+    /// name for a relation the planner proved empty and replaced with a <c>Result</c> too, and under a join that
+    /// name may be a column a join null-extends.
     /// </summary>
     public bool RootNamesAnInstance { get; }
 

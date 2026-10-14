@@ -174,6 +174,23 @@ public class NullabilityWalkTests
         AnswersOf(Run(plan, NotNull, Optional)).ShouldBe([(false, "catalog"), (true, "catalog")]);
     }
 
+    // A bare name under a join at a ModifyTable may be a column of a relation the planner proved empty and replaced
+    // with a Result, which the join null-extends: here "id" is the left join's inner side, NULL on every row.
+    [Fact]
+    public void Run_BareNameAtARootModifyTableOverAJoin_IsUnmappable()
+    {
+        var plan = Over(
+            "ModifyTable",
+            Join("Inner", Join("Left", Scan("a"), Scan("x") with { NodeType = "Result", Alias = null }), Scan("t"))
+        ) with
+        {
+            Alias = "t",
+            Output = ["id", "t.id"],
+        };
+
+        AnswersOf(Run(plan, NotNull, NotNull)).ShouldBe([(true, "heuristic"), (false, "catalog")]);
+    }
+
     // A MERGE that inserts what the target lacks and deletes what the source lacks: the row returned is the
     // target's own, and the source's columns are NULL for a row that was deleted.
     [Fact]

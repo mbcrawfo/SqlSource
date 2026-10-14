@@ -161,9 +161,23 @@ public class PlanInstancesTests
         var instances = PlanInstances.Find(plan);
 
         instances.Reason.ShouldBeNull();
-        instances.RootNamesAnInstance.ShouldBeTrue();
+        instances.RootNamesAnInstance.ShouldBeFalse();
         ExtendedIn(instances, "t").ShouldBeFalse();
         ExtendedIn(instances, "s").ShouldBeTrue();
+    }
+
+    // A RETURNING list prints a bare name for a relation the planner proved empty and replaced with a Result, which
+    // no node names: under a join a bare name says nothing of which relation it is a column of.
+    [Fact]
+    public void Find_RootModifyTableOverAJoin_NamesNoInstanceByABareName()
+    {
+        var plan = Over("ModifyTable", Join("Inner", Scan("t"), Scan("a"))) with { Alias = "t" };
+
+        var instances = PlanInstances.Find(plan);
+
+        instances.RootNamesAnInstance.ShouldBeFalse();
+        instances.TryFind("t", out var extended).ShouldBeTrue();
+        extended.ShouldBeFalse();
     }
 
     // An INSERT has a Result under it and no scan of its target.

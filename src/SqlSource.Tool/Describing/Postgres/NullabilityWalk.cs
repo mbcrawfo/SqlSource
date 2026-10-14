@@ -133,7 +133,7 @@ internal static class NullabilityWalk
             null => false,
             { Alias: { } alias } => instances.TryFind(alias, out extended),
 
-            // A bare name is a column of the root's own relation, which has no join above it.
+            // A bare name is a column of the root's own relation, which no join extends: the root has no join under it.
             _ => instances.RootNamesAnInstance,
         };
 

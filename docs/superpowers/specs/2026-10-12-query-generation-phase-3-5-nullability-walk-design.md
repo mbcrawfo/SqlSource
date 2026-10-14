@@ -108,7 +108,7 @@ The text is an array of one object whose `Plan` is the root.  Anything else is a
 | The entry | Reads as | The column |
 |----|----|----|
 | `alias.column`, either part a bare identifier or a quoted one with `""` for a quote | A reference to the instance named `alias` | Mappable when the alias is an instance of step 1 |
-| A bare identifier | A reference to the root itself | Mappable when the root is a scan of a relation, or a `ModifyTable`, with an `Alias` |
+| A bare identifier | A reference to the root itself | Mappable when the root is a scan of a relation with an `Alias`, or a `ModifyTable` with an `Alias` and no join among the nodes of step 1 |
 | Anything else: an operator, a parenthesis, a space, `$1`, `NULL::numeric`, `(SubPlan 1)`, `COALESCE(u.id, p.id)` | An expression | Unmappable |
 | An alias that names a `Subquery Scan`, `CTE Scan`, `Function Scan`, `Values Scan`, `WorkTable Scan` or any other node that is no scan of a relation | | Unmappable |
 
@@ -131,7 +131,7 @@ Sub-phase 3.4's match runs after the walk, on the nullability it set.
 - A join the planner removed leaves a scan at the root with qualified names, `u.id`.
 - A `LEFT JOIN` with a `WHERE` on the nullable side, or followed by an inner join on it, plans as `Inner`.
 - `ModifyTable`'s `Output` is the `RETURNING` list; an `INSERT` has a `Result` child with `$1`; an `UPDATE ... FROM` has a join child.
-- An `UPDATE` or a `DELETE` has a scan of its target under the `ModifyTable`, with the `ModifyTable`'s own `Alias`, on 14 and 18.  A `DELETE` of one table prints bare names, `id`, and an `UPDATE ... FROM` qualified ones, `u.id`.
+- An `UPDATE` or a `DELETE` has a scan of its target under the `ModifyTable`, with the `ModifyTable`'s own `Alias`, on 14 and 18.  A `DELETE` of one table prints bare names, `id`, and an `UPDATE ... FROM` qualified ones, `u.id`.  A `RETURNING` of a relation the planner proved empty under an outer join prints a bare name too, `id`, from a `Result` under the join, which the review of the walk found on 17 and 18: so a bare name at a `ModifyTable` is its target's only when no join is under it.
 - The `OLD` and `NEW` of a `RETURNING` list of PostgreSQL 18 print as `old.id` and `new.name`, or under the names `WITH (OLD AS o, NEW AS n)` gives them, and never under the target's alias: no instance has such an alias, so the column is unmappable and stays `heuristic`.
 - A `MERGE` with `WHEN NOT MATCHED BY SOURCE` and `WHEN NOT MATCHED BY TARGET` plans as a `Full` join under the `ModifyTable`: the source's columns are `outer-join`, and the target's are the row acted on.
 - A `UNION` root is an `Append` with no `Output`: unusable, every origin column `heuristic`, which the set operation deserves since its columns have no origin anyway.
