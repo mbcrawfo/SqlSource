@@ -7,6 +7,7 @@ using SqlSource.Snapshot;
 using SqlSource.Tests.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Logging;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresPlans;
 
@@ -309,9 +310,9 @@ public class PostgresSessionTests
         exchange.Unused.ShouldBeEmpty();
     }
 
-    // The error of "deallocate" is logged and never reported.
+    // The error of "deallocate" is logged and never reported: not even 26000, which anywhere else is SQLSRC236.
     [Fact]
-    public async Task DescribeAsync_DeallocateThatFails_IsStillDescribed()
+    public async Task DescribeAsync_DeallocateAnswers26000_IsDescribed()
     {
         var script = new PostgresScript().Open();
         _ = Prepares(script, 1, "DELETE FROM samples", [], new PostgresPrepareAnswer([], null));
@@ -324,7 +325,8 @@ public class PostgresSessionTests
         );
         _ = Checks(script, "DELETE FROM samples", []);
         var exchange = Frees(script, 1, new PostgresDeallocateAnswer(gone)).Play();
-        await using var session = await PostgresScript.SessionAsync(exchange);
+        var log = new RecordingLog();
+        await using var session = await PostgresScript.SessionAsync(exchange, log);
 
         var described = await session.DescribeAsync(
             Request("DELETE FROM samples"),
@@ -333,6 +335,136 @@ public class PostgresSessionTests
 
         _ = described.Value.ShouldNotBeNull();
         described.Failure.ShouldBeNull();
+        var (_, members) = log.Events.Last(written => written.Name == "deallocate");
+        var error = members.Single(member => member.Name == "error").Value.ShouldBeOfType<LogValue.Members>();
+        error.Values[0].ShouldBe(new LogMember("sqlState", "26000"));
+    }
+
+    // 42P05 at "prepare": a backend that a past run left a statement on.  The statement is not ours to free, so
+    // "deallocate" is not asked: the script holds none.
+    [Fact]
+    public async Task DescribeAsync_PrepareAnswers42P05_IsSqlsrc236AndFreesNothing()
+    {
+        var exists = new PostgresServerError(
+            "42P05",
+            "prepared statement \"sqlsource_1\" already exists",
+            null,
+            null,
+            null
+        );
+        var exchange = PreparesOnly(
+                new PostgresScript().Open(),
+                1,
+                "DELETE FROM samples",
+                [],
+                new PostgresPrepareAnswer(null, exists)
+            )
+            .Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("DELETE FROM samples"),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.Arguments.ShouldBe([PostgresScript.Database]);
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The statement that was prepared is not listed: PostgresLive answers the fixed message, with no SQLSTATE.
+    [Fact]
+    public async Task DescribeAsync_PrepareAnswersStatementNotListed_IsSqlsrc236()
+    {
+        var unlisted = new PostgresServerError(null, PostgresLive.StatementNotListed, null, null, null);
+        var exchange = PreparesOnly(
+                new PostgresScript().Open(),
+                1,
+                "DELETE FROM samples",
+                [],
+                new PostgresPrepareAnswer(null, unlisted)
+            )
+            .Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("DELETE FROM samples"),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.ServerLines.ShouldBe([PostgresLive.StatementNotListed]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The statement went with the backend that held it: the free is still asked.
+    [Fact]
+    public async Task DescribeAsync_ColumnsAnswers26000_IsSqlsrc236AtDescribeColumns()
+    {
+        var gone = new PostgresServerError(
+            "26000",
+            "prepared statement \"sqlsource_1\" does not exist",
+            null,
+            null,
+            null
+        );
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "DELETE FROM samples", [], new PostgresPrepareAnswer([], null));
+        _ = script.Answer(
+            "columns",
+            new PostgresColumnsRequest("sqlsource_1", 0),
+            new PostgresColumnsAnswer(null, gone)
+        );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("DELETE FROM samples"),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.Arguments.ShouldBe([PostgresScript.Database]);
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The walk is the one call after "check" that names the statement, so it finds out too.  The plan of a session
+    // that lost its statement is no heuristic: the describe fails, and the statement is freed.
+    [Fact]
+    public async Task DescribeAsync_ExplainAnswers26000_IsSqlsrc236AtExplain()
+    {
+        var gone = new PostgresServerError(
+            "26000",
+            "prepared statement \"sqlsource_1\" does not exist",
+            null,
+            null,
+            null
+        );
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, GatedUsersId, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        _ = Checks(script, GatedUsersId, [], Expression(0, "id", 23), Expression(1, "n", 20));
+        _ = Explains(script, 1, 0, new PostgresExplainAnswer(null, gone));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(GatedUsersId), TestContext.Current.CancellationToken);
+
+        described.Value.ShouldBeNull();
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.Arguments.ShouldBe([PostgresScript.Database]);
+        failure.Step.ShouldBe(DescribeStep.Explain);
+        failure.ServerLines.ShouldBe(["26000: prepared statement \"sqlsource_1\" does not exist"]);
+        exchange.Unused.ShouldBeEmpty();
     }
 
     // The declared type goes into the list as written, and the rest is "unknown".
@@ -460,6 +592,29 @@ public class PostgresSessionTests
         parameters.Select(parameter => parameter.Name).ShouldBe(["name", "id", "tenant"]);
         parameters.Select(parameter => parameter.TypeSource).ShouldBe(["inferred", "inferred", "declared"]);
         parameters[2].Type.ShouldBe(TestSidecars.Postgres());
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The SQL holds no "$n" of its own, so the server resolves no more types than the list: a text that the tool's
+    // lexer and the server read differently could still make it list more.  The extra type is left out of what is
+    // asked and described.
+    [Fact]
+    public async Task DescribeAsync_MoreTypesThanParameters_AsksAndDescribesTheListsTypesAlone()
+    {
+        var script = new PostgresScript().Open();
+        _ = Prepares(script, 1, "DELETE FROM samples", ["int"], new PostgresPrepareAnswer([23, 1043], null));
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = Checks(script, "DELETE FROM samples", [("tenant", "integer")]);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("DELETE FROM samples", Declared("tenant", "int")),
+            TestContext.Current.CancellationToken
+        );
+
+        var parameters = described.Value.ShouldNotBeNull().Parameters;
+        parameters.Select(parameter => parameter.Name).ShouldBe(["tenant"]);
         exchange.Unused.ShouldBeEmpty();
     }
 

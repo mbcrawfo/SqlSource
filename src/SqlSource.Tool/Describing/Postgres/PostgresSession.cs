@@ -32,6 +32,7 @@ internal sealed class PostgresSession : IDescribeSession
     /// <summary>The oldest major version of PostgreSQL the describer supports.</summary>
     public const int MinimumMajorVersion = 14;
 
+    private readonly string _database;
     private readonly IDescribeExchange _exchange;
     private readonly IRunLog _log;
     private readonly PostgresLive _live;
@@ -48,6 +49,7 @@ internal sealed class PostgresSession : IDescribeSession
         IReadOnlyList<string> explainSettings
     )
     {
+        _database = request.Database;
         _exchange = request.Exchange;
         _time = request.Time;
         _log = log;
@@ -189,7 +191,7 @@ internal sealed class PostgresSession : IDescribeSession
         if (prepared.Error is { } error)
         {
             // There is no statement to free.
-            return Failed(PostgresErrors.Prepare(error, request, prepare));
+            return Failed(PostgresErrors.Prepare(error, request, prepare, _database));
         }
 
         try
@@ -224,7 +226,7 @@ internal sealed class PostgresSession : IDescribeSession
         );
         if (answer.Error is { } refused)
         {
-            return Failed(PostgresErrors.Columns(refused, request));
+            return Failed(PostgresErrors.Columns(refused, request, _database));
         }
 
         var columns =
@@ -292,9 +294,25 @@ internal sealed class PostgresSession : IDescribeSession
         }
 
         // After the check, and for a gated query alone: one that is not gated pays nothing.
-        var walked = gated
-            ? await WalkAsync(request, statement, ArgumentCount(prepared), built.Value, origins, cancellationToken)
-            : null;
+        WalkOutcome? walked = null;
+        if (gated)
+        {
+            var walk = await WalkAsync(
+                request,
+                statement,
+                ArgumentCount(prepared),
+                built.Value,
+                origins,
+                cancellationToken
+            );
+            if (!walk.Succeeded)
+            {
+                return Failed(walk.Failure);
+            }
+
+            walked = walk.Value;
+        }
+
         var recorded = RecordedColumns(built.Value, walked);
 
         // After everything that sets a column's nullability: the last check of the match reads it.
@@ -317,8 +335,9 @@ internal sealed class PostgresSession : IDescribeSession
 
     // Asks for the generic plan of the statement, with a NULL for each of its arguments, and walks it.  A plan the
     // server will not give is no fault of the query: the error is logged and never reported, and the columns keep
-    // the heuristic, as they do when the text is no plan.
-    private async Task<WalkOutcome> WalkAsync(
+    // the heuristic, as they do when the text is no plan.  The one error that is reported is 26000, a statement
+    // that is gone: the connection does not keep a session, and the describe is no longer of this query.
+    private async Task<Outcome<WalkOutcome, DescribeFailure>> WalkAsync(
         DescribeRequest request,
         string statement,
         int arguments,
@@ -332,6 +351,17 @@ internal sealed class PostgresSession : IDescribeSession
         var answer = await _exchange.AskAsync("explain", asked, _live.ExplainAsync, cancellationToken);
         PostgresEvents.Explain(_log, request.Name, asked, answer, ElapsedSince(started));
 
+        if (answer.Error is { SqlState: PostgresErrors.InvalidSqlStatementName } gone)
+        {
+            return Outcome<WalkOutcome, DescribeFailure>.Failed(
+                PostgresErrors.SessionNotKept(
+                    _database,
+                    DescribeStep.Explain,
+                    PostgresErrors.ServerLines(gone with { Position = null }, 0)
+                )
+            );
+        }
+
         var outcome = answer switch
         {
             { Error: not null } => NullabilityWalk.Unavailable(WalkReasons.ExplainFailed, columns),
@@ -344,7 +374,7 @@ internal sealed class PostgresSession : IDescribeSession
             _ => NullabilityWalk.Unavailable(WalkReasons.Unreadable, columns),
         };
         PostgresEvents.Walk(_log, request.Name, outcome);
-        return outcome;
+        return Outcome<WalkOutcome, DescribeFailure>.Of(outcome);
     }
 
     // A statement without rows has no match, and no event of one.

@@ -1108,11 +1108,23 @@ The tool prepares a statement on the server and asks about it in later steps, wh
 - The connection string sets `Multiplexing=true`, which shares physical connections between commands.  It is found when the database is opened, before the tool connects.
 - A pooler in transaction mode, such as PgBouncer, sits between the tool and the server.  It hands each transaction to a backend of its own, so the statement the tool prepared is not found: the tool finds out at a query, when the statement is missing from the session, or when the server answers `26000` (the statement does not exist) or `42P05` (it already exists).
 
+For `Multiplexing=true` the tool refuses before it connects, so no query has been sent and the server is not yet known; the `server:` line is the tool's own text:
+
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC236: The connection to the database 'app' does not keep one session
-    query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
-    step: describe parameters
+    query: GetUser, database app, postgres
+    server: Multiplexing=true does not keep one session
     help: connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true
 ```
 
-Connect directly to the server: the address of the database itself, not of the pooler, and without `Multiplexing=true`.  Hosted providers that pool connections offer a direct endpoint beside the pooled one.  The tool needs this only to describe queries; the code it generates runs through whatever connection the application uses.  The error at `open` is reported once for the database, and each of its queries counts as failed.
+Behind a pooler the session has opened, so the query line names the server and the driver, and the error is at the step whose call found out, with the server's own line when it gave one:
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC236: The connection to the database 'app' does not keep one session
+    query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe columns
+    server: 26000: prepared statement "sqlsource_1" does not exist
+    help: connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true
+```
+
+Connect directly to the server: the address of the database itself, not of the pooler, and without `Multiplexing=true`.  Hosted providers that pool connections offer a direct endpoint beside the pooled one.  The tool needs this only to describe queries; the code it generates runs through whatever connection the application uses.  The error for `Multiplexing=true` is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed; one found at a query is reported at that query.

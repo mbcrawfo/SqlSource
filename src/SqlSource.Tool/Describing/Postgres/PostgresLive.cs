@@ -19,6 +19,12 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </remarks>
 internal sealed class PostgresLive(PostgresConnection connection)
 {
+    /// <summary>
+    /// What <c>prepare</c> answers when <c>pg_prepared_statements</c> does not list the statement that was just
+    /// prepared: the read ran on another backend than the <c>PREPARE</c>, which a pooler in transaction mode does.
+    /// </summary>
+    public const string StatementNotListed = "the server does not list the statement it prepared";
+
     // The settings of a session that change a description, in the order "open" answers them.
     private static readonly string[] SettingNames = ["search_path", "plan_cache_mode", "standard_conforming_strings"];
 
@@ -155,6 +161,12 @@ internal sealed class PostgresLive(PostgresConnection connection)
     }
 
     /// <summary>Asks <c>prepare</c>.</summary>
+    /// <remarks>
+    /// The one known cause of a read that fails is a connection that the server ended between the <c>PREPARE</c> and
+    /// the read, and a lost connection has no position, so nothing is counted against the <c>PREPARE</c>'s text.  If
+    /// a call is ever added between the two, this needs revisiting.  A read that finds no row is
+    /// <see cref="StatementNotListed" />, an answer and not a fault: it is a backend that is not the one prepared on.
+    /// </remarks>
     public async Task<PostgresPrepareAnswer> PrepareAsync(PostgresPrepareRequest asked, CancellationToken token)
     {
         try
@@ -165,9 +177,14 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
             await using var read = await connection.CommandAsync(ParameterTypesSql, token);
             _ = read.Parameters.AddWithValue("name", asked.Statement);
-            var types =
-                await read.ExecuteScalarAsync(token) as uint[]
-                ?? throw new InvalidOperationException($"The server lists no prepared statement '{asked.Statement}'.");
+            if (await read.ExecuteScalarAsync(token) is not uint[] types)
+            {
+                return new PostgresPrepareAnswer(
+                    null,
+                    new PostgresServerError(null, StatementNotListed, null, null, null)
+                );
+            }
+
             return new PostgresPrepareAnswer([.. types.Select(static oid => (long)oid)], null);
         }
         catch (NpgsqlException exception)

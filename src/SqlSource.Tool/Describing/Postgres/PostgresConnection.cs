@@ -43,6 +43,12 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// </summary>
     public const string LostConnection = "the connection to the server was lost";
 
+    /// <summary>
+    /// What is said of a connection string that sets <c>Multiplexing=true</c>: the driver then shares physical
+    /// connections between commands, and a prepared statement is session state that a later command may not find.
+    /// </summary>
+    public const string MultiplexingRefused = "Multiplexing=true does not keep one session";
+
     private NpgsqlDataSource? _source;
     private NpgsqlConnection? _connection;
     private ILoggerFactory? _driverLog;
@@ -52,8 +58,8 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
 
     /// <summary>The session's connection, opened by the first call.</summary>
     /// <exception cref="NpgsqlException">
-    /// The server could not be reached or refused, the driver cannot read the connection string, or the connection
-    /// was open and is so no longer.
+    /// The server could not be reached or refused, the driver cannot read the connection string, the string sets
+    /// <c>Multiplexing=true</c>, or the connection was open and is so no longer.
     /// </exception>
     public async Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken)
     {
@@ -80,10 +86,15 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     }
 
     // The builder reads the string, so its ArgumentException for one it cannot read is thrown here, inside the
-    // caller's try.
+    // caller's try.  Multiplexing is refused before anything is built or connected, whatever the keyword's case.
     private NpgsqlDataSource BuildSource()
     {
         var builder = new NpgsqlDataSourceBuilder(connectionString);
+        if (builder.ConnectionStringBuilder.Multiplexing)
+        {
+            throw new NpgsqlException(MultiplexingRefused);
+        }
+
         var driverLog = NpgsqlRunLogger.For(log);
         if (driverLog is not null)
         {
