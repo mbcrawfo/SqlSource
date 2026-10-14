@@ -74,6 +74,18 @@ public sealed class WalkTests(PostgresContainer postgres)
             )
         ).ShouldBe([(false, "catalog"), (false, "catalog"), (false, "catalog"), (false, "catalog")]);
 
+    // A $n that the SQL writes itself is a parameter of the prepared statement and of no list: EXPLAIN EXECUTE is
+    // refused with fewer arguments than the statement has, so the plan is asked with the server's count.  The $n is
+    // in the join's condition, since in the WHERE it would make the join inner.
+    [Fact]
+    public async Task Describe_QueryWithADollarParameterOfItsOwn_IsWalked() =>
+        (
+            await WalkedAsync(
+                "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id AND o.id = $2 "
+                    + "WHERE u.id = @id"
+            )
+        ).ShouldBe([(false, "catalog"), (true, "outer-join")]);
+
     // The tool leaves the database as it found it: no statement, and the settings as "open" read them.
     [Fact]
     public async Task Describe_GatedQuery_LeavesNoStatementAndThePlanCacheModeAsOpenReadIt()

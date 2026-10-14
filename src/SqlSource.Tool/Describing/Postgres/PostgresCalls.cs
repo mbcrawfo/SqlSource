@@ -228,7 +228,10 @@ internal sealed record PostgresBindError(string Parameter, string Message);
 
 /// <summary>Everything that decides the answer of <c>explain</c>.</summary>
 /// <param name="Statement">The prepared statement to plan.</param>
-/// <param name="Parameters">The number of parameters of the query's list: a <c>NULL</c> is passed for each.</param>
+/// <param name="Parameters">
+/// The number of parameter types the server resolved for the statement, a <c>$n</c> that the SQL writes itself
+/// included: a <c>NULL</c> is passed for each, since <c>EXPLAIN EXECUTE</c> takes no other number.
+/// </param>
 /// <param name="Settings">
 /// Settings of the planner as <c>name=value</c>, each of <see cref="PlannerSettings" />.  The tool passes none; a
 /// test forces a join method with them.

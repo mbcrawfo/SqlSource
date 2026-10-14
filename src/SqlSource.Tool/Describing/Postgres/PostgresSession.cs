@@ -252,7 +252,9 @@ internal sealed class PostgresSession : IDescribeSession
         }
 
         // After the check, and for a gated query alone: one that is not gated pays nothing.
-        var walked = gated ? await WalkAsync(request, statement, built.Value, origins, cancellationToken) : null;
+        var walked = gated
+            ? await WalkAsync(request, statement, ArgumentCount(prepared), built.Value, origins, cancellationToken)
+            : null;
         var recorded = RecordedColumns(built.Value, walked);
 
         // After everything that sets a column's nullability: the last check of the match reads it.
@@ -266,18 +268,26 @@ internal sealed class PostgresSession : IDescribeSession
         WalkOutcome? walked
     ) => walked is null ? built : [.. walked.Columns.Select(static column => column.Column)];
 
-    // Asks for the generic plan of the statement and walks it.  A plan the server will not give is no fault of the
-    // query: the error is logged and never reported, and the columns keep the heuristic, as they do when the text
-    // is no plan.
+    // How many arguments an EXECUTE of the statement takes: a type for each parameter the server resolved, which
+    // counts a "$n" that the SQL writes itself.  The describe of "columns" takes any number, and EXPLAIN EXECUTE
+    // refuses any but this one.
+    private static int ArgumentCount(PostgresPrepareAnswer prepared) =>
+        prepared.ParameterTypes?.Count
+        ?? throw new InvalidOperationException("The answer to 'prepare' holds no types and no error.");
+
+    // Asks for the generic plan of the statement, with a NULL for each of its arguments, and walks it.  A plan the
+    // server will not give is no fault of the query: the error is logged and never reported, and the columns keep
+    // the heuristic, as they do when the text is no plan.
     private async Task<WalkOutcome> WalkAsync(
         DescribeRequest request,
         string statement,
+        int arguments,
         IReadOnlyList<SidecarColumn> columns,
         ColumnOrigin?[] origins,
         CancellationToken cancellationToken
     )
     {
-        var asked = new PostgresExplainRequest(statement, request.Parameters.Count, _explainSettings);
+        var asked = new PostgresExplainRequest(statement, arguments, _explainSettings);
         var started = _time.GetTimestamp();
         var answer = await _exchange.AskAsync("explain", asked, _live.ExplainAsync, cancellationToken);
         PostgresEvents.Explain(_log, request.Name, asked, answer, ElapsedSince(started));

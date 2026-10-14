@@ -72,9 +72,9 @@ Settled in this spec:
 
 | Method | Request | Answer |
 |----|----|----|
-| `explain` | `statement`, `parameters`: the count, `settings`: `name=value` pairs, usually empty | `plan`: the JSON text the server returned; or `error` |
+| `explain` | `statement`, `parameters`: the number of types the server resolved for the statement, `settings`: `name=value` pairs, usually empty | `plan`: the JSON text the server returned; or `error` |
 
-The `live` function: `BEGIN`; `SET LOCAL plan_cache_mode = force_generic_plan`; one `SET LOCAL` for each setting; `EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE <name>(NULL, ...)`, or `EXECUTE <name>` for a statement without parameters; `ROLLBACK`.  A failure at any step rolls back and is the answer's `error`.  The rollback is on the same connection, outside the exchange's view: it is part of the one call.  Nothing is executed but the `EXPLAIN` itself, which plans and does not run the statement.
+The `live` function: `BEGIN`; `SET LOCAL plan_cache_mode = force_generic_plan`; one `SET LOCAL` for each setting; `EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE <name>(NULL, ...)`, or `EXECUTE <name>` for a statement without parameters; `ROLLBACK`.  A `NULL` is passed for each type the server resolved, a `$n` that the SQL writes itself included, since `EXPLAIN EXECUTE` refuses any other number: the adversarial review of #49 found that the count of the query's list made such a query `unavailable` every time.  A failure at any step rolls back and is the answer's `error`.  The rollback is on the same connection, outside the exchange's view: it is part of the one call.  Nothing is executed but the `EXPLAIN` itself, which plans and does not run the statement.
 
 The settings a request may carry: `enable_hashjoin`, `enable_mergejoin`, `enable_nestloop`, `enable_memoize`, `enable_material`, each `on` or `off`.  `PostgresDescriber` takes them at construction, for the tests; a name outside the list throws.
 

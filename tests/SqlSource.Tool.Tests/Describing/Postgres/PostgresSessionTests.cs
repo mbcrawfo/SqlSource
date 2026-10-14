@@ -993,7 +993,8 @@ public class PostgresSessionTests
         exchange.Unused.ShouldBeEmpty();
     }
 
-    // The plan is asked with a NULL for each parameter of the query's list, as "columns" is.
+    // The plan is asked with a NULL for each parameter the server resolved, which for this query are those of its
+    // list.
     [Fact]
     public async Task DescribeAsync_GatedQueryWithAParameter_AsksThePlanWithTheNumberOfItsParameters()
     {
@@ -1023,6 +1024,41 @@ public class PostgresSessionTests
 
         exchange.Unused.ShouldBeEmpty();
         AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([(false, "catalog")]);
+    }
+
+    // EXPLAIN EXECUTE checks the count of its arguments, as the describe of "columns" does not: a query that writes
+    // a $n of its own is planned with a NULL for each type the server resolved, and "columns" keeps the list's count.
+    [Fact]
+    public async Task DescribeAsync_GatedQueryWithADollarParameterOfItsOwn_AsksThePlanWithTheServersCount()
+    {
+        var sql = "SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = @id AND o.id = $2";
+        var users = PostgresTables.Users;
+        var id = PostgresTables.ColumnOf(0, "id", 23, users, 1);
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(
+            script,
+            1,
+            "SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = $1 AND o.id = $2",
+            ["unknown"],
+            new([23, 23], null)
+        );
+        _ = Columns(script, 1, 1, id);
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = Checks(script, sql, [("id", "integer")], Expression(0, "id", 23));
+        _ = Explains(script, 1, 2, PlanOf(Join("Left", Scan("u"), Scan("o")) with { Output = ["u.id"] }));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request(sql, Inferred("id")),
+            TestContext.Current.CancellationToken
+        );
+
+        exchange.Unused.ShouldBeEmpty();
+        var description = described.Value.ShouldNotBeNull();
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([(false, "catalog")]);
     }
 
     // A statement without rows has no provenance and asks for no plan, gate word or not.
