@@ -278,15 +278,18 @@ internal sealed class PostgresSession : IDescribeSession
     )
     {
         var asked = new PostgresExplainRequest(statement, request.Parameters.Count, _explainSettings);
+        var started = _time.GetTimestamp();
         var answer = await _exchange.AskAsync("explain", asked, _live.ExplainAsync, cancellationToken);
-        if (answer.Error is not null)
-        {
-            return NullabilityWalk.Unavailable(WalkReasons.ExplainFailed, columns);
-        }
+        PostgresEvents.Explain(_log, request.Name, asked, answer, ElapsedSince(started));
 
-        return answer.Plan is { } text && PlanNode.Read(text) is { } root
-            ? NullabilityWalk.Run(root, columns, origins)
-            : NullabilityWalk.Unavailable(WalkReasons.Unreadable, columns);
+        var outcome = answer switch
+        {
+            { Error: not null } => NullabilityWalk.Unavailable(WalkReasons.ExplainFailed, columns),
+            { Plan: { } text } when PlanNode.Read(text) is { } root => NullabilityWalk.Run(root, columns, origins),
+            _ => NullabilityWalk.Unavailable(WalkReasons.Unreadable, columns),
+        };
+        PostgresEvents.Walk(_log, request.Name, outcome);
+        return outcome;
     }
 
     // A statement without rows has no match, and no event of one.

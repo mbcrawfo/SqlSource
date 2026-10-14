@@ -14,7 +14,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// event of its own: the run's <c>database.open</c> records what the session knows of its server.  A describe
 /// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, one <c>column</c> for each column,
 /// <c>check</c>, <c>table-match</c> and <c>deallocate</c>, in that order, each only when its call was
-/// made, and <c>table-match</c> only for a statement with rows whose check agreed.
+/// made, and <c>table-match</c> only for a statement with rows whose check agreed.  A gated query with rows
+/// writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>, one <c>walk.node</c> for each node the
+/// walk visited, one <c>walk.column</c> for each column, and <c>walk</c>.
 /// </remarks>
 internal static class PostgresEvents
 {
@@ -159,6 +161,79 @@ internal static class PostgresEvents
                 table is null ? LogValue.Null : LogValue.MapOf(new("schema", table.Schema), new("table", table.Table))
             )
         );
+
+    /// <summary>
+    /// <c>postgres.explain</c>: the <c>EXPLAIN</c> as it was sent, with the settings it ran under, and the plan's
+    /// text or the error.  The log's writer cuts a string at 1 MiB.
+    /// </summary>
+    public static void Explain(
+        IRunLog log,
+        string query,
+        PostgresExplainRequest request,
+        PostgresExplainAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            "explain",
+            new("query", query),
+            new("statement", request.Statement),
+            new("settings", LogValue.ListOfTexts(request.Settings)),
+            new("sql", PostgresLive.ExplainText(request)),
+            answer.Error is { } error ? new LogMember(Error, ErrorOf(error)) : new LogMember("plan", answer.Plan),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
+    /// The events of a walk, in this order: <c>postgres.walk.node</c> for each node that was visited,
+    /// <c>postgres.walk.column</c> for each column, and <c>postgres.walk</c> with the plan's value and, when it is
+    /// <c>unavailable</c>, the reason.  It is the one place that tells a failed <c>EXPLAIN</c> from a plan the
+    /// walk could not use.
+    /// </summary>
+    /// <remarks>
+    /// The relation of a node is its schema and its name apart, as the table of <c>table-match</c> is: a name may
+    /// hold a dot.
+    /// </remarks>
+    public static void Walk(IRunLog log, string query, WalkOutcome outcome)
+    {
+        foreach (var visited in outcome.Nodes)
+        {
+            var node = visited.Node;
+            log.Write(
+                "walk.node",
+                new("depth", visited.Depth),
+                new("nodeType", node.NodeType),
+                new("joinType", node.JoinType),
+                new("parentRelationship", node.ParentRelationship),
+                new("alias", node.Alias),
+                new(
+                    "relation",
+                    node.RelationName is { } relation
+                        ? LogValue.MapOf(new("schema", node.Schema), new("table", relation))
+                        : LogValue.Null
+                ),
+                new("nullExtends", visited.NullExtends)
+            );
+        }
+
+        foreach (var walked in outcome.Columns)
+        {
+            var column = walked.Column;
+            log.Write(
+                "walk.column",
+                new("ordinal", column.Ordinal),
+                new("name", column.Name),
+                new("output", walked.Output),
+                new("alias", walked.Reference?.Alias),
+                new("column", walked.Reference?.Column),
+                new("mapped", walked.Mapped),
+                new("nullExtended", walked.NullExtended),
+                new("nullable", column.Nullable is { } nullable ? (LogValue)nullable : LogValue.Null),
+                new("nullableSource", column.NullableSource)
+            );
+        }
+
+        log.Write("walk", new("query", query), new("plan", outcome.Plan), new("reason", outcome.Reason));
+    }
 
     /// <summary><c>postgres.deallocate</c>: the one place that says a statement could not be freed.</summary>
     public static void Deallocate(
