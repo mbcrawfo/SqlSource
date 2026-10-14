@@ -10,7 +10,8 @@ using Xunit;
 namespace SqlSource.Tool.Tests;
 
 // Holds each request of a FakeProcessRunner until the test lets it go, so that a test picks the order of the answers
-// and how many requests wait at one time, with no sleep.  A held request counts as running.
+// and how many requests wait at one time, with no sleep.  PassAsync is the runner's BeforeAnswer, so a held request
+// counts as running.
 internal sealed class ProcessGate
 {
     // How long a test waits for a request that does not come, before it fails.  No test passes by this time.

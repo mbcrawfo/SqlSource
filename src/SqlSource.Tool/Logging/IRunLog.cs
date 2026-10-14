@@ -10,6 +10,11 @@ namespace SqlSource.Tool.Logging;
 /// </remarks>
 internal interface IRunLog
 {
+    /// <summary>
+    /// Whether the log keeps what it is given, so that a step whose events cost something to make can skip them.
+    /// </summary>
+    bool Writes { get; }
+
     /// <summary>Writes one event.</summary>
     /// <param name="name">The event's name: <c>run.start</c>, or <c>postgres.</c> and a describer's own.</param>
     /// <param name="members">Its members, in the order they are written.</param>

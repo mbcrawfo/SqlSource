@@ -8,5 +8,7 @@ internal sealed class RecordingLog : IRunLog
 {
     public List<(string Name, LogMember[] Members)> Events { get; } = [];
 
+    public bool Writes => true;
+
     public void Write(string name, params LogMember[] members) => Events.Add((name, members));
 }

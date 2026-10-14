@@ -180,7 +180,8 @@ public sealed class RunProjectsTests : IDisposable
     {
         _runner.Projects[_a] = new FakeProject { EvaluationExitCode = 1, Error = "error of A" };
         _runner.Projects[_c] = new FakeProject { Manifest = "SqlSourceManifest=7\n" };
-        var gate = _runner.Gate = new ProcessGate();
+        var gate = new ProcessGate();
+        _runner.BeforeAnswer = gate.PassAsync;
 
         var find = FindInSolutionAsync();
         // A is answered last: its one request waits while B and C are asked about twice each.

@@ -21,7 +21,7 @@ namespace SqlSource.Tool.Tests;
 // parameters.
 internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) : IQueryDescriber
 {
-    // No describer ships yet, so no descriptor of a server's error exists; the tests bring one.
+    // The fake's own descriptor of a server's error, which exists in the tests alone.
     public static readonly DiagnosticDescriptor Rejected = new(
         id: "SQLSRC999",
         title: "Query was rejected",

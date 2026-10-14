@@ -25,12 +25,12 @@ The nullability walk needs a plan, and planning folds immutable functions; nothi
 
 ## Impact
 
-Low.  Only a function that the user's own database marks immutable wrongly can run, and only for a gated query that calls it with constant arguments.  Until sub-phase 3.6 registers the describer the released tool describes nothing, so nothing runs.  Sub-phase 3.6 must say so where it documents the describer for users.
+Low.  Only a function that the user's own database marks immutable wrongly can run, and only for a gated query that calls it with constant arguments.  The released tool describes `postgres` since sub-phase 3.6, and [its readme](../../src/SqlSource.Tool/README.md) says that planning a query with one of the gate's words runs such a function.
 
 ## Proposed fix
 
-None in code that keeps the walk: the walk needs the plan, and the planner gives no plan without folding.  Document it for users in sub-phase 3.6: the describe plans a query with an outer join, and planning runs a function marked `IMMUTABLE` with constant arguments.  A user whose database has such a function with an effect can describe against a database where it is harmless, a copy of the schema for one.
+None in code that keeps the walk: the walk needs the plan, and the planner gives no plan without folding.  A user whose database has such a function with an effect can describe against a database where it is harmless, a copy of the schema for one.
 
 ## Trigger
 
-Sub-phase 3.6's documentation of the describer for users.
+A user's report of an effect that a describe left; a version of PostgreSQL whose `EXPLAIN` can plan a statement without folding its immutable functions.

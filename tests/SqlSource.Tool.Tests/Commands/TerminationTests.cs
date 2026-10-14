@@ -37,7 +37,7 @@ public sealed class TerminationTests : IDisposable
         var project = ProjectThatWaits(waiting);
         var temp = Directory.CreateDirectory(_fixtures.PathOf("tmp")).FullName;
 
-        using var tool = StartTool(temp, "describe", project);
+        using var tool = Programs.StartTool(_fixtures.Root, temp, "describe", project);
         try
         {
             var output = tool.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
@@ -90,9 +90,10 @@ public sealed class TerminationTests : IDisposable
             WorkingDirectory = _fixtures.Root,
             CreateNoWindow = true,
             Arguments =
-                $"/c start \"{title}\" /wait dotnet --roll-forward LatestMajor \"{ToolPath}\" describe \"{project}\"",
+                $"/c start \"{title}\" /wait dotnet --roll-forward LatestMajor "
+                + $"\"{Programs.ToolPath}\" describe \"{project}\"",
         };
-        SetEnvironment(start, temp);
+        Programs.SetToolEnvironment(start, temp);
         using var shell = Process.Start(start)!;
         try
         {
@@ -129,9 +130,6 @@ public sealed class TerminationTests : IDisposable
         }
     }
 
-    // The tool that was built beside the tests.
-    private static string ToolPath => Path.Combine(AppContext.BaseDirectory, "SqlSource.Tool.dll");
-
     // A copy of a fixture whose manifest target writes the file given and then waits for two minutes, so that a
     // run of it ends only when it is told to: a test that failed to tell it sees a run that goes on.
     private string ProjectThatWaits(string waiting)
@@ -151,42 +149,6 @@ public sealed class TerminationTests : IDisposable
             """
         );
         return project;
-    }
-
-    // Starts the tool with the temporary directory given.
-    private Process StartTool(string temp, params string[] arguments)
-    {
-        var start = new ProcessStartInfo("dotnet")
-        {
-            WorkingDirectory = _fixtures.Root,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            RedirectStandardInput = true,
-        };
-
-        // The tool beside the tests has the libraries that the tests were given, which are of the tests' runtime
-        // and not of the older one that the tool asks for.
-        start.ArgumentList.Add("--roll-forward");
-        start.ArgumentList.Add("LatestMajor");
-        start.ArgumentList.Add(ToolPath);
-        foreach (var argument in arguments)
-        {
-            start.ArgumentList.Add(argument);
-        }
-
-        SetEnvironment(start, temp);
-        var tool = Process.Start(start)!;
-        tool.StandardInput.Close();
-        return tool;
-    }
-
-    // Path.GetTempPath reads the first where there are signals, and the others on Windows.
-    private static void SetEnvironment(ProcessStartInfo start, string temp)
-    {
-        start.Environment["TMPDIR"] = temp;
-        start.Environment["TMP"] = temp;
-        start.Environment["TEMP"] = temp;
-        start.Environment["DOTNET_NOLOGO"] = "true";
     }
 
     // Closes the console whose window has the title, and gives what "taskkill" said, for a test that fails.

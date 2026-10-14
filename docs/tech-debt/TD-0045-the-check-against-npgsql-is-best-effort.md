@@ -19,7 +19,7 @@ The check was specified as a comparison of columns because that is what a descri
 
 ## Impact
 
-Low today, since the describer is registered nowhere until sub-phase 3.6 and nothing binds by `DataTypeName` until phase 8.  The first two let a query through that fails when it runs, with the driver's error and no word of SqlSource's.  The fifth tells a user who has lost a connection to look for a `@`.  The sixth refuses queries that are valid: a project whose schema has a quoted name cannot declare a parameter of one of its types, and must cast a `text` parameter in the SQL.  Of the kinds, the composite type is likely the commonest, and the bit type needs no unusual schema: every parameter of plain `bit` is refused.  The eighth costs nothing while only a parameter's own `name` is bound.  It costs a wrong type, silently, the day generated code binds by the `name` of a `base` or an `element`, which the sixth's fix would do for a domain over a domain whose base has a modifier.
+Low.  Nothing binds by `DataTypeName` until phase 8, and the describer is registered since sub-phase 3.6, so `SQLSRC231` and `SQLSRC232` can reach a user.  The first two let a query through that fails when it runs, with the driver's error and no word of SqlSource's.  The fifth tells a user who has lost a connection to look for a `@`.  The sixth refuses queries that are valid: a project whose schema has a quoted name cannot declare a parameter of one of its types, and must cast a `text` parameter in the SQL.  Of the kinds, the composite type is likely the commonest, and the bit type needs no unusual schema: every parameter of plain `bit` is refused.  The eighth costs nothing while only a parameter's own `name` is bound.  It costs a wrong type, silently, the day generated code binds by the `name` of a `base` or an `element`, which the sixth's fix would do for a domain over a domain whose base has a modifier.
 
 ## Proposed fix
 
@@ -27,4 +27,4 @@ For the first two, compare the parameters and not only the columns: after the ch
 
 ## Trigger
 
-Phase 8, whose generated code binds a parameter by the sidecar's `name`; sub-phase 3.6, which registers the describer and gives `SQLSRC232` to users; for the eighth, the fix of TD-0044, which puts the whole modifier of a type in `name`.
+Phase 8, whose generated code binds a parameter by the sidecar's `name`; a user's report of `SQLSRC231` or `SQLSRC232` on a query that is valid; for the eighth, the fix of TD-0044, which puts the whole modifier of a type in `name`.

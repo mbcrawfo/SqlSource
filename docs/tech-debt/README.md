@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0048`
+Next id: `TD-0049`
 
 ## Active items
 
@@ -38,6 +38,7 @@ Next id: `TD-0048`
 | [TD-0045](TD-0045-the-check-against-npgsql-is-best-effort.md) | Open | 2026-10-13 | Low | The check of the lexer against Npgsql compares columns alone, so a `$n` of the SQL's own and a disagreement in a predicate pass, an error of `check` that is no disagreement is `SQLSRC231`, and a type with a quoted name, `"char"`, a domain over a domain, a composite type, a table's row type, `regclass`, a type of the system catalogs, an array of a type whose name is 63 characters long and a bit type spelled `"bit"` cannot be bound, `SQLSRC232`; and a name that holds a modifier is no name to bind by |
 | [TD-0046](TD-0046-the-walk-leaves-some-columns-to-the-heuristic.md) | Open | 2026-10-13 | Low | The nullability walk leaves a column to the heuristic when it comes through a subquery or a CTE the planner kept, from a partitioned or inherited table, or from a foreign table, or when the root of a query of one relation is not its scan, a `Limit` or a `Sort` for two, and asks for a plan that it has no use for |
 | [TD-0047](TD-0047-explain-evaluates-immutable-functions.md) | Open | 2026-10-14 | Low | The `EXPLAIN` that plans a gated query of the PostgreSQL describer runs a function the database wrongly marks `IMMUTABLE`, when it is called with constant arguments, and an effect of it outside the transaction, a sequence's for one, survives the rollback |
+| [TD-0048](TD-0048-driver-levels-trust-npgsqls-messages.md) | Open | 2026-10-14 | Low | The run log forwards Npgsql's messages at levels, Debug for commands and transactions and Warning for every other category, that trust the driver not to name the host, the user or the database, and the tool removes only the connection's whole value |
 
 ## Columns
 

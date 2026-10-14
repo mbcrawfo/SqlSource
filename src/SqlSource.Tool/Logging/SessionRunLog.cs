@@ -24,6 +24,8 @@ namespace SqlSource.Tool.Logging;
 /// <param name="prefix">What stands before each event's name: the engine and a dot, for a describer.</param>
 internal sealed class SessionRunLog(IRunLog inner, string secret, string? prefix = null) : IRunLog
 {
+    public bool Writes => inner.Writes;
+
     public void Write(string name, params LogMember[] members) =>
         inner.Write(prefix + Redaction.Of(name, secret), [.. members.Select(Clean)]);
 

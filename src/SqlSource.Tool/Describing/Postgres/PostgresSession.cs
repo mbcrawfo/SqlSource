@@ -83,7 +83,7 @@ internal sealed class PostgresSession : IDescribeSession
         CancellationToken cancellationToken
     )
     {
-        var connection = new PostgresConnection(request.Connection);
+        var connection = new PostgresConnection(request.Connection, log);
         var live = new PostgresLive(connection);
         var kept = false;
         try

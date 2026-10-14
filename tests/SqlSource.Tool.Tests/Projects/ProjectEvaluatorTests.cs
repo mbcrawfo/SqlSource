@@ -471,7 +471,8 @@ public sealed class ProjectEvaluatorTests : IDisposable
     {
         var projects = Projects(6);
         _processors = projects.Length;
-        var gate = _runner.Gate = new ProcessGate();
+        var gate = new ProcessGate();
+        _runner.BeforeAnswer = gate.PassAsync;
 
         var run = EvaluateAsync(projects);
         // Each project is asked about twice.  The last project gets both its answers first, and the first project
@@ -499,7 +500,8 @@ public sealed class ProjectEvaluatorTests : IDisposable
     )
     {
         _processors = processors;
-        var gate = _runner.Gate = new ProcessGate();
+        var gate = new ProcessGate();
+        _runner.BeforeAnswer = gate.PassAsync;
         var projects = Projects(20);
 
         var run = EvaluateAsync(projects);
@@ -528,7 +530,8 @@ public sealed class ProjectEvaluatorTests : IDisposable
     [Fact]
     public async Task Evaluate_TwoRunsAtOnceOnOneProject_DoNotShareAManifestFile()
     {
-        var gate = _runner.Gate = new ProcessGate();
+        var gate = new ProcessGate();
+        _runner.BeforeAnswer = gate.PassAsync;
 
         var runs = Task.WhenAll(EvaluateAsync([_project]), EvaluateAsync([_project]));
         // Each run has asked and neither has an answer, so both have their folders.
