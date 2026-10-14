@@ -138,6 +138,11 @@ internal sealed class PostgresSession : IDescribeSession
             return Failed(PostgresErrors.NotDescribable(request, kind));
         }
 
+        if (StatementShape.PositionalParameter(request.Sql) is { } written)
+        {
+            return Failed(PostgresErrors.PositionalParameter(request, written));
+        }
+
         var types = ParameterPlaceholders.TypeList(request.Parameters);
         if (!types.Succeeded)
         {
@@ -274,9 +279,9 @@ internal sealed class PostgresSession : IDescribeSession
         WalkOutcome? walked
     ) => walked is null ? built : [.. walked.Columns.Select(static column => column.Column)];
 
-    // How many arguments an EXECUTE of the statement takes: a type for each parameter the server resolved, which
-    // counts a "$n" that the SQL writes itself.  The describe of "columns" takes any number, and EXPLAIN EXECUTE
-    // refuses any but this one.
+    // How many arguments an EXECUTE of the statement takes: a type for each parameter the server resolved, which is
+    // the query's own, since the SQL holds no "$n" of its own.  The describe of "columns" takes any number, and
+    // EXPLAIN EXECUTE refuses any but this one.
     private static int ArgumentCount(PostgresPrepareAnswer prepared) =>
         prepared.ParameterTypes?.Count
         ?? throw new InvalidOperationException("The answer to 'prepare' holds no types and no error.");
@@ -369,8 +374,9 @@ internal sealed class PostgresSession : IDescribeSession
         return null;
     }
 
-    // The types the server resolved for the parameters of the query's list.  It lists a type for a "$n" that the SQL
-    // writes itself, after the query's own: that is no parameter of the query, and the list's are the first.
+    // The types the server resolved for the parameters of the query's list, which are the first of its types.  The SQL
+    // holds no "$n" of its own, so the server resolves no more; a text that the tool's lexer and the server read
+    // differently could still make it list more, and the extra are left out.
     private static IReadOnlyList<long> ParameterOids(DescribeRequest request, PostgresPrepareAnswer prepared)
     {
         var count = request.Parameters.Count;

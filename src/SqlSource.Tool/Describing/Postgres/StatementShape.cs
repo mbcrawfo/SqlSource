@@ -23,12 +23,20 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// word on the list: the <c>ALTER</c>, <c>CREATE</c> and <c>DROP</c> forms, <c>SET</c> for the variable and for
 /// <c>SET CONSTRAINTS</c>, <c>SECURITY</c> for <c>SECURITY LABEL</c>, and <c>BEGIN</c>, <c>START</c>, <c>COMMIT</c>,
 /// <c>END</c>, <c>ROLLBACK</c>, <c>ABORT</c>, <c>SAVEPOINT</c>, <c>RELEASE</c> and <c>PREPARE</c> for the
-/// transactions.  <c>SELECT … INTO</c> is no first word: <see cref="RefusedKind" /> reads the <c>INTO</c> itself.
+/// transactions.  <c>SELECT … INTO</c> is no first word: <see cref="RefusedKind" /> reads the <c>INTO</c> itself.  An
+/// <c>INTO</c> directly after <c>AS</c> or after a <c>.</c> is a column label, as in <c>SELECT 1 AS into</c> and
+/// <c>SELECT t.into FROM t</c>, and is not the clause.
+/// </para>
+/// <para>
+/// <see cref="PositionalParameter" /> reads the same lexemes for a <c>$n</c> that the SQL writes itself.
 /// </para>
 /// </remarks>
 internal static class StatementShape
 {
     private const string SelectInto = "SELECT INTO";
+
+    // The "word" that stands for a "." in front of the next one: no word is spelled so.
+    private const string Dot = ".";
 
     private static readonly FrozenSet<string> Refused = FrozenSet.ToFrozenSet(
         [
@@ -84,10 +92,10 @@ internal static class StatementShape
     /// <summary>
     /// The kind of the statement in upper case when <c>PREPARE</c> does not take it, or null for a statement to send:
     /// its first word when that is on the list of words to refuse, <c>SELECT INTO</c> for a word <c>INTO</c> at
-    /// parenthesis depth 0 that does not directly follow <c>INSERT</c> or <c>MERGE</c>, with only white space and
-    /// comments between.  Only <c>Text</c> lexemes hold words, so a string, a quoted identifier, a comment and a
-    /// parameter never count.  The first word is the first thing after comments, hints, white space and any leading
-    /// <c>(</c>.
+    /// parenthesis depth 0 that does not directly follow <c>INSERT</c>, <c>MERGE</c>, <c>AS</c> or a <c>.</c>, with
+    /// only white space and comments between.  Only <c>Text</c> lexemes hold words, so a string, a quoted identifier,
+    /// a comment and a parameter never count.  The first word is the first thing after comments, hints, white space
+    /// and any leading <c>(</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The SQL does not lex: a bug of the plan, whose parser read the same text.
@@ -138,7 +146,7 @@ internal static class StatementShape
                             return word.ToUpper(CultureInfo.InvariantCulture);
                         }
                     }
-                    else if (depth == 0 && IsInto(word) && !FollowsInsertOrMerge(previous))
+                    else if (depth == 0 && IsInto(word) && !FollowsInsertOrMerge(previous) && !IsLabel(previous))
                     {
                         return SelectInto;
                     }
@@ -168,7 +176,51 @@ internal static class StatementShape
                     return null;
                 }
 
-                previous = null;
+                previous = c == '.' ? Dot : null;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// The first positional parameter that the SQL writes itself, <c>$</c> and its digits as written (<c>$2</c>), or
+    /// null.  A <c>$</c> and an ASCII digit in a <c>Text</c> lexeme is one unless the character before the <c>$</c>
+    /// can continue a name (<c>a$1</c>); a <c>$</c> that starts a lexeme is never part of a name.  A string, a quoted
+    /// identifier, a dollar-quoted string and a comment are lexemes of their own and are not read.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The SQL does not lex: a bug of the plan, whose parser read the same text.
+    /// </exception>
+    public static string? PositionalParameter(string sql)
+    {
+        foreach (var lexeme in Lexemes(sql))
+        {
+            if (lexeme.Kind != SqlLexemeKind.Text)
+            {
+                continue;
+            }
+
+            var text = sql.AsSpan(lexeme.Span.Start, lexeme.Span.Length);
+            for (var index = 0; index < text.Length - 1; index++)
+            {
+                if (text[index] != '$' || !char.IsAsciiDigit(text[index + 1]))
+                {
+                    continue;
+                }
+
+                if (index > 0 && IsWordCharacter(text[index - 1]))
+                {
+                    continue;
+                }
+
+                var end = index + 1;
+                while (end < text.Length && char.IsAsciiDigit(text[end]))
+                {
+                    end++;
+                }
+
+                return text[index..end].ToString();
             }
         }
 
@@ -176,6 +228,10 @@ internal static class StatementShape
     }
 
     private static bool IsInto(string word) => string.Equals(word, "INTO", StringComparison.OrdinalIgnoreCase);
+
+    // An INTO directly after AS or after a "." is a column label, as in "SELECT 1 AS into" and "SELECT t.into".
+    private static bool IsLabel(string? previous) =>
+        previous is Dot || string.Equals(previous, "AS", StringComparison.OrdinalIgnoreCase);
 
     private static bool FollowsInsertOrMerge(string? previous) =>
         previous is not null

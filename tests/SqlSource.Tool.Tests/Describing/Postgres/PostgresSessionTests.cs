@@ -67,6 +67,23 @@ public class PostgresSessionTests
         failure.Arguments.ShouldBe(["Q", "CALL"]);
     }
 
+    // The script holds "open" alone: a "$n" that the SQL writes is refused before anything is asked.
+    [Fact]
+    public async Task DescribeAsync_PositionalParameterInTheSql_IsSqlsrc234AndAsksNothing()
+    {
+        await using var session = await PostgresScript.SessionAsync(new PostgresScript().Open().Play());
+
+        var described = await session.DescribeAsync(
+            Request("SELECT 1 FROM users WHERE id = @id AND name = $2", Inferred("id")),
+            TestContext.Current.CancellationToken
+        );
+
+        described.Value.ShouldBeNull();
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC234");
+        failure.Arguments.ShouldBe(["Q", "$2"]);
+    }
+
     // The statements are counted before the kind is read.
     [Fact]
     public async Task DescribeAsync_SeveralStatementsThatStartWithCall_IsSqlsrc230()
@@ -398,33 +415,6 @@ public class PostgresSessionTests
         parameters.Select(parameter => parameter.Name).ShouldBe(["name", "id", "tenant"]);
         parameters.Select(parameter => parameter.TypeSource).ShouldBe(["inferred", "inferred", "declared"]);
         parameters[2].Type.ShouldBe(TestSidecars.Postgres());
-        exchange.Unused.ShouldBeEmpty();
-    }
-
-    // A "$2" that the SQL writes itself is typed by the server after the query's own: it is no parameter of the
-    // query, and "types" is not asked for it.
-    [Fact]
-    public async Task DescribeAsync_MoreTypesThanParameters_TypesTheListAlone()
-    {
-        var script = new PostgresScript().Open();
-        _ = Prepares(
-            script,
-            1,
-            "SELECT 1 FROM users WHERE id = $1 AND name = $2",
-            ["unknown"],
-            new PostgresPrepareAnswer([23, 25], null)
-        );
-        _ = Resolves(script, [23], PostgresRows.Int4);
-        _ = Checks(script, "SELECT 1 FROM users WHERE id = @id AND name = $2", [("id", "integer")]);
-        var exchange = Frees(script, 1).Play();
-        await using var session = await PostgresScript.SessionAsync(exchange);
-
-        var described = await session.DescribeAsync(
-            Request("SELECT 1 FROM users WHERE id = @id AND name = $2", Inferred("id")),
-            TestContext.Current.CancellationToken
-        );
-
-        described.Value.ShouldNotBeNull().Parameters.ShouldHaveSingleItem().Name.ShouldBe("id");
         exchange.Unused.ShouldBeEmpty();
     }
 
@@ -1055,41 +1045,6 @@ public class PostgresSessionTests
 
         exchange.Unused.ShouldBeEmpty();
         AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([(false, "catalog")]);
-    }
-
-    // EXPLAIN EXECUTE checks the count of its arguments, as the describe of "columns" does not: a query that writes
-    // a $n of its own is planned with a NULL for each type the server resolved, and "columns" keeps the list's count.
-    [Fact]
-    public async Task DescribeAsync_GatedQueryWithADollarParameterOfItsOwn_AsksThePlanWithTheServersCount()
-    {
-        var sql = "SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = @id AND o.id = $2";
-        var users = PostgresTables.Users;
-        var id = PostgresTables.ColumnOf(0, "id", 23, users, 1);
-        var script = new PostgresScript().Open();
-        _ = PreparesOnly(
-            script,
-            1,
-            "SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = $1 AND o.id = $2",
-            ["unknown"],
-            new([23, 23], null)
-        );
-        _ = Columns(script, 1, 1, id);
-        _ = Tables(script, [users.Oid], users);
-        _ = Resolves(script, [23], PostgresRows.Int4);
-        _ = Checks(script, sql, [("id", "integer")], Expression(0, "id", 23));
-        _ = Explains(script, 1, 2, PlanOf(Join("Left", Scan("u"), Scan("o")) with { Output = ["u.id"] }));
-        var exchange = Frees(script, 1).Play();
-        await using var session = await PostgresScript.SessionAsync(exchange);
-
-        var described = await session.DescribeAsync(
-            Request(sql, Inferred("id")),
-            TestContext.Current.CancellationToken
-        );
-
-        exchange.Unused.ShouldBeEmpty();
-        var description = described.Value.ShouldNotBeNull();
-        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        AnswersOf(description).ShouldBe([(false, "catalog")]);
     }
 
     // A statement without rows has no provenance and asks for no plan, gate word or not.

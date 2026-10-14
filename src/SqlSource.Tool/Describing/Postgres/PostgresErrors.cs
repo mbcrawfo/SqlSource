@@ -26,6 +26,9 @@ internal static class PostgresErrors
         "give the query -- output: sql; the tool describes SELECT without INTO, INSERT, UPDATE, DELETE, MERGE, VALUES "
         + "and TABLE";
 
+    public const string PositionalParameterHelp =
+        "write the parameter as @name; generated code binds parameters by name";
+
     public const string NoSuchType = "the database has no such type";
 
     public const string NoSuchTypeHelp =
@@ -127,6 +130,20 @@ internal static class PostgresErrors
             DescribeStep.DescribeParameters,
             EquatableArray<string>.Empty,
             NotDescribableHelp
+        );
+
+    /// <summary>
+    /// <c>SQLSRC234</c>: the SQL writes a positional parameter itself.  Nothing of it is sent.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="written">The parameter as written, such as <c>$2</c>.</param>
+    public static DescribeFailure PositionalParameter(DescribeRequest query, string written) =>
+        new(
+            ToolDiagnostics.PositionalParameterWritten,
+            new EquatableArray<string>([query.Name, written]),
+            DescribeStep.DescribeParameters,
+            EquatableArray<string>.Empty,
+            PositionalParameterHelp
         );
 
     /// <summary>

@@ -445,11 +445,21 @@ public sealed class ParameterTests(PostgresContainer postgres)
         failure.ServerLines.ShouldBeEmpty();
     }
 
-    // "$2" is no parameter of SqlSource.  The server types it after the query's own, and the query's own are what
-    // is described.
+    // "$2" is no parameter of SqlSource, and generated code binds by name: the tool refuses it, and asks the server
+    // nothing.
     [Fact]
-    public async Task Describe_SqlWithAPlaceholderOfItsOwn_TypesTheListedParametersAlone() =>
-        (await ShouldDescribeAsync(Requests.Of("SELECT 1 FROM users WHERE id = @id AND name = $2"))).ShouldBe([
-            Inferred("id", TestSidecars.Postgres()),
-        ]);
+    public async Task Describe_SqlWithAPlaceholderOfItsOwn_IsSqlsrc234AndSendsNothing()
+    {
+        var capture = new DescribeCapture("postgres");
+
+        var described = await DescribeAsync(
+            Requests.Of("SELECT 1 FROM users WHERE id = @id AND name = $2"),
+            new CapturingExchange(LiveExchange.Instance, capture)
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC234");
+        failure.Arguments.ShouldBe([Requests.Query, "$2"]);
+        MethodsOf(capture).ShouldBe(["open"]);
+    }
 }

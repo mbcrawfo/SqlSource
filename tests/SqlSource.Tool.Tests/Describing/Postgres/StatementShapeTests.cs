@@ -84,6 +84,11 @@ public class StatementShapeTests
     [InlineData("SELECT 'INTO' FROM t")]
     [InlineData("SELECT 1 -- INTO t")]
     [InlineData("SELECT (SELECT 1 INTO t)")]
+    // A column label, after AS or after a ".", is no INTO clause.
+    [InlineData("SELECT 1 AS into")]
+    [InlineData("SELECT 1 as INTO FROM t")]
+    [InlineData("SELECT t.into FROM t")]
+    [InlineData("SELECT t.\"a\".into FROM t")]
     // A word of the list inside the statement is no first word.
     [InlineData("SELECT 1 FROM t WHERE a = 'CALL' OR b = \"drop\"")]
     // Nothing to read, or no word first.
@@ -99,6 +104,8 @@ public class StatementShapeTests
     [InlineData("WITH x AS (SELECT 1) SELECT * INTO t FROM x")]
     [InlineData("SELECT a /* c */ INTO -- c\n t FROM users")]
     [InlineData("SELECT @a::int AS a INTO TEMP t")]
+    // A ")" ends the word before it, so the INTO after it is the clause's, whatever came before.
+    [InlineData("SELECT (1) INTO t")]
     public void RefusedKind_SelectInto_IsSelectInto(string sql) =>
         StatementShape.RefusedKind(sql).ShouldBe("SELECT INTO");
 
@@ -109,6 +116,37 @@ public class StatementShapeTests
     [InlineData("MERGE /* c */ INTO t USING s ON true WHEN MATCHED THEN DELETE")]
     public void RefusedKind_InsertOrMergeWithCommentBeforeInto_IsNull(string sql) =>
         StatementShape.RefusedKind(sql).ShouldBeNull();
+
+    [Theory]
+    [InlineData("SELECT 1 FROM users WHERE id = @id AND name = $2", "$2")]
+    [InlineData("SELECT @a, $1", "$1")]
+    [InlineData("SELECT $12", "$12")]
+    [InlineData("SELECT 1 WHERE (a=$3)", "$3")]
+    [InlineData("SELECT a$1, $2 FROM t", "$2")]
+    public void PositionalParameter_DollarAndDigits_IsItAsWritten(string sql, string written) =>
+        StatementShape.PositionalParameter(sql).ShouldBe(written);
+
+    // A "$" that continues a name, or that is inside a string, a quoted identifier, a dollar-quoted string or a
+    // comment, is no parameter.
+    [Theory]
+    [InlineData("SELECT a$1 FROM t")]
+    [InlineData("SELECT '$1'")]
+    [InlineData("SELECT E'cost $1'")]
+    [InlineData("SELECT U&'$1'")]
+    [InlineData("SELECT $$ $1 $$")]
+    [InlineData("SELECT $tag$ $1 $tag$")]
+    [InlineData("SELECT \"a$1\" FROM t")]
+    [InlineData("SELECT 1 -- $1")]
+    [InlineData("SELECT 1 /* $1 */")]
+    [InlineData("SELECT $ 1")]
+    [InlineData("SELECT @a")]
+    [InlineData("")]
+    public void PositionalParameter_NotAParameter_IsNull(string sql) =>
+        StatementShape.PositionalParameter(sql).ShouldBeNull();
+
+    [Fact]
+    public void PositionalParameter_TextThatDoesNotLex_Throws() =>
+        Should.Throw<System.InvalidOperationException>(() => StatementShape.PositionalParameter("SELECT 'open"));
 
     [Fact]
     public void RefusedKind_TextThatDoesNotLex_Throws() =>
