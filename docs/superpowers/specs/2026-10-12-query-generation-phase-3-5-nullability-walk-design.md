@@ -140,7 +140,7 @@ Sub-phase 3.4's match runs after the walk, on the nullability it set.
 - A view is flattened; its scans get unique aliases, `u_1`, and the view's columns are walked as its own joins dictate, with `view` where nothing null-extends them.
 - Aliases are unique in a plan; a quoted one prints as `"Order".total`.
 - A view's columns have the view as their origin while the plan prints its base tables' aliases, `u_1.id`: the one place where the origin and the mapped instance name different relations, which is why a view's mapped column that nothing extends stays `view`.
-- A partitioned table or an inheritance parent scans as an `Append` of `Member` children, which step 1 does not collect, so its columns are `heuristic` unless the planner pruned to one partition; `docs/tech-debt` records it beside the subquery scans.  A column of an inheritance parent is nullable with `catalog` wherever it is mapped, since a child may have dropped the `NOT NULL` it inherited, which the adversarial review of #49 found after this spec.
+- A partitioned table or an inheritance parent scans as an `Append` of `Member` children, which step 1 does not collect, so its columns are `heuristic` unless the planner pruned to one partition; `docs/tech-debt` records it beside the subquery scans.  A column of an inheritance parent is nullable with `catalog` wherever it is mapped, since a child may have dropped the `NOT NULL` it inherited, and so is a column of a partitioned table with a foreign table anywhere in its partition tree, since nothing enforces the `NOT NULL` a foreign partition inherits on its remote rows: the adversarial review of #49 found both after this spec.
 
 ### Events
 

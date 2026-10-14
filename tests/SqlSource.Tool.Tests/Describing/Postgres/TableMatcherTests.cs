@@ -215,6 +215,25 @@ public class TableMatcherTests
         Match(From(parent, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
     }
 
+    // So does a partitioned table with a foreign partition.
+    [Fact]
+    public void Match_PartitionedTableWithAForeignPartition_MatchesAsTheNullableColumnsItHas()
+    {
+        var parted = PostgresTables.TableOf(
+            12,
+            "parted",
+            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+        ) with
+        {
+            Relkind = "p",
+            Relhassubclass = true,
+            HasForeignPartition = true,
+        };
+
+        Match(Whole(parted)).ShouldBe((new SidecarTable("public", "parted"), SidecarValues.TableMatch.Matched));
+        Match(From(parted, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
+    }
+
     // Each case fails two checks, and the answer is the one that comes first in the format's order.
     [Fact]
     public void Match_TwoChecksThatFail_GivesTheFirst()

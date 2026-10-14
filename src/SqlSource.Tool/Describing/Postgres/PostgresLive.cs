@@ -30,7 +30,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
         "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = @name";
 
     // Every relation asked for with its columns, in one query.  The join is a left one, so that a table without a
-    // column of its own is answered too, with one row that holds no attribute.
+    // column of its own is answered too, with one row that holds no attribute.  The last column is whether a
+    // partitioned table has a foreign table anywhere in its partition tree, false and never null for any other.
     private const string TablesSql = """
         SELECT
             c.oid,
@@ -44,7 +45,13 @@ internal sealed class PostgresLive(PostgresConnection connection)
             a.attgenerated::text,
             a.atttypid,
             k.convalidated,
-            c.relhassubclass
+            c.relhassubclass,
+            c.relkind = 'p' AND EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_partition_tree(c.oid) AS t
+                JOIN pg_catalog.pg_class AS f ON f.oid = t.relid
+                WHERE f.relkind = 'f'
+            )
         FROM pg_catalog.pg_class AS c
         JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
         LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
@@ -219,7 +226,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
                             reader.GetString(2),
                             reader.GetString(3),
                             columns,
-                            reader.GetBoolean(11)
+                            reader.GetBoolean(11),
+                            reader.GetBoolean(12)
                         )
                     );
                 }

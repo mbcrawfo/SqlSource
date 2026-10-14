@@ -15,8 +15,11 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// that has or had inheritance children (<c>relhassubclass</c>): before PostgreSQL 18 a child may drop a
 /// <c>NOT NULL</c> it inherited, and a query of the parent reads the child's rows.  The rule is the same on every
 /// version, and costs the parent's columns on 18, where a child cannot drop it, and those of a table whose last
-/// child was dropped, whose flag PostgreSQL clears lazily.  A partitioned table is not affected: a partition can
-/// never drop its parent's <c>NOT NULL</c>.
+/// child was dropped, whose flag PostgreSQL clears lazily.  A partition can never drop its parent's
+/// <c>NOT NULL</c>, but a foreign table may be a partition: it inherits the parent's <c>NOT NULL</c>, which nothing
+/// enforces on its remote rows, and a query of the parent reads them.  So a <c>NOT NULL</c> column of a partitioned
+/// table with a foreign table anywhere in its partition tree is nullable too, and one of a partitioned table without
+/// one is the catalog's.
 /// </remarks>
 internal static class ColumnNullability
 {
@@ -32,8 +35,12 @@ internal static class ColumnNullability
             { Table.Relkind: "v" or "m" or "f" } => (null, SidecarValues.NullableSource.View),
             _ when gated => (true, SidecarValues.NullableSource.Heuristic),
 
-            // A child of an inheritance parent may have dropped the NOT NULL it inherited.
-            { Table: { Relkind: "r", Relhassubclass: true } } => (true, SidecarValues.NullableSource.Catalog),
+            // A child of an inheritance parent may have dropped the NOT NULL it inherited, and nothing enforces it on
+            // the remote rows of a foreign partition.
+            { Table: { Relkind: "r", Relhassubclass: true } or { Relkind: "p", HasForeignPartition: true } } => (
+                true,
+                SidecarValues.NullableSource.Catalog
+            ),
             { } found => (
                 found.Attribute is not { NotNull: true, NotNullValidated: not false },
                 SidecarValues.NullableSource.Catalog

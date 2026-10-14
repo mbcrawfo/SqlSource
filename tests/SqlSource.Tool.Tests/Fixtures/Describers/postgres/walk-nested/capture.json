@@ -178,7 +178,8 @@
                 "notNullValidated": null
               }
             ],
-            "relhassubclass": false
+            "relhassubclass": false,
+            "hasForeignPartition": false
           },
           {
             "oid": 16415,
@@ -232,7 +233,8 @@
                 "notNullValidated": null
               }
             ],
-            "relhassubclass": false
+            "relhassubclass": false,
+            "hasForeignPartition": false
           },
           {
             "oid": 16459,
@@ -277,7 +279,8 @@
                 "notNullValidated": true
               }
             ],
-            "relhassubclass": false
+            "relhassubclass": false,
+            "hasForeignPartition": false
           }
         ],
         "error": null

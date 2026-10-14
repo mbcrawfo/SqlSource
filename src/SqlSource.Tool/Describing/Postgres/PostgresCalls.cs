@@ -160,13 +160,20 @@ internal sealed record PostgresTablesAnswer(IReadOnlyList<PostgresTableRow>? Tab
 /// <c>relhassubclass</c>: whether the relation has or had inheritance children, which PostgreSQL clears only
 /// lazily after the last is dropped.  Null in an answer recorded before the member existed.
 /// </param>
+/// <param name="HasForeignPartition">
+/// Whether the relation is a partitioned table (<c>p</c>) with a foreign table (<c>f</c>) anywhere in its partition
+/// tree, at any depth, by <c>pg_partition_tree</c>: a foreign partition inherits the parent's <c>NOT NULL</c>, which
+/// nothing enforces on its remote rows.  False for a relation that is not partitioned.  It is no catalog column.
+/// Null in an answer recorded before the member existed, which reads as no foreign partition.
+/// </param>
 internal sealed record PostgresTableRow(
     long Oid,
     string Relkind,
     string Schema,
     string Name,
     IReadOnlyList<PostgresAttributeRow> Columns,
-    bool? Relhassubclass
+    bool? Relhassubclass,
+    bool? HasForeignPartition
 );
 
 /// <summary>What the catalog says of one column of a relation.</summary>

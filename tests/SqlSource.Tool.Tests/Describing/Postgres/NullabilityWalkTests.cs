@@ -152,6 +152,29 @@ public class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
 
+    // And a NOT NULL column of a partitioned table with a foreign partition, which nothing holds to it.
+    [Fact]
+    public void Run_NotNullColumnOfAPartitionedTableWithAForeignPartition_IsNullableByTheCatalog()
+    {
+        var parted = PostgresTables.TableOf(
+            16704,
+            "pt",
+            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+        ) with
+        {
+            Relkind = "p",
+            Relhassubclass = true,
+            HasForeignPartition = true,
+        };
+        var row = PostgresTables.ColumnOf(0, "id", 23, parted, 1);
+        var origin = ColumnOrigin.Find(row, PostgresTables.Of(parted));
+        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+
+        var outcome = NullabilityWalk.Run(Scan("pt", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+
+        AnswersOf(outcome).ShouldBe([(true, "catalog")]);
+    }
+
     [Theory]
     [InlineData("Subquery Scan")]
     [InlineData("CTE Scan")]

@@ -240,7 +240,8 @@
                 "notNullValidated": null
               }
             ],
-            "relhassubclass": false
+            "relhassubclass": false,
+            "hasForeignPartition": false
           }
         ],
         "error": null

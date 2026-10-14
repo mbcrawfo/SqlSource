@@ -145,7 +145,8 @@
                 "notNullValidated": true
               }
             ],
-            "relhassubclass": false
+            "relhassubclass": false,
+            "hasForeignPartition": false
           }
         ],
         "error": null

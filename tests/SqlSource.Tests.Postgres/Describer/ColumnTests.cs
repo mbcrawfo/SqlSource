@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -423,6 +424,50 @@ public sealed class ColumnTests(PostgresContainer postgres)
         }
 
         var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM inh_parent p");
+
+        NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
+    }
+
+    // A partitioned table, of this test alone, with a foreign partition through postgres_fdw over a loopback server
+    // to the container's own database, at the server's port inside the container, made by SQL that can be run
+    // again.  Its remote row holds NULL in v, which the parent says is NOT NULL.
+    private static string ForeignPartitionTables(NpgsqlConnectionStringBuilder connection) =>
+        $$"""
+            CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+            CREATE SERVER IF NOT EXISTS fp_loop FOREIGN DATA WRAPPER postgres_fdw
+                OPTIONS (dbname {{Literal(connection.Database)}}, host 'localhost', port '5432');
+            CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER SERVER fp_loop
+                OPTIONS (user {{Literal(connection.Username)}}, password {{Literal(connection.Password)}});
+            CREATE TABLE IF NOT EXISTS fp_remote (id integer NOT NULL, kind integer NOT NULL, v text);
+            INSERT INTO fp_remote SELECT 1, 2, NULL WHERE NOT EXISTS (SELECT 1 FROM fp_remote);
+            CREATE TABLE IF NOT EXISTS fp_parted (id integer NOT NULL, kind integer NOT NULL, v text NOT NULL)
+                PARTITION BY LIST (kind);
+            CREATE TABLE IF NOT EXISTS fp_parted_1 PARTITION OF fp_parted FOR VALUES IN (1);
+            CREATE FOREIGN TABLE IF NOT EXISTS fp_parted_2 PARTITION OF fp_parted FOR VALUES IN (2)
+                SERVER fp_loop OPTIONS (table_name 'fp_remote');
+            """;
+
+    private static string Literal(string? value) =>
+        $"'{(value ?? string.Empty).Replace("'", "''", StringComparison.Ordinal)}'";
+
+    // A foreign partition inherits its parent's NOT NULL, which nothing enforces on the remote rows, and a query of
+    // the parent reads them: both columns' origin is the parent, so both are nullable, on every version.
+    [Fact]
+    public async Task Describe_ColumnsOfAPartitionedTableWithAForeignPartition_AreNullableByTheCatalog()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        {
+            await using var made = source.CreateCommand(
+                ForeignPartitionTables(new NpgsqlConnectionStringBuilder(postgres.ConnectionString))
+            );
+            _ = await made.ExecuteNonQueryAsync(token);
+        }
+
+        // The premise: a query of the parent returns the remote row's NULL.
+        (await ScalarAsync("SELECT p.v IS NULL FROM fp_parted p WHERE p.id = 1")).ShouldBe(true);
+
+        var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM fp_parted p");
 
         NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
     }

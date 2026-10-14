@@ -309,8 +309,9 @@ public class PostgresEventsTests
             .ShouldBeOfType<LogValue.Members>();
         users
             .Values.Select(value => value.Name)
-            .ShouldBe(["oid", "relkind", "schema", "name", "columns", "relhassubclass"]);
+            .ShouldBe(["oid", "relkind", "schema", "name", "columns", "relhassubclass", "hasForeignPartition"]);
         users.Values[5].Value.ShouldBe((LogValue)false);
+        users.Values[6].Value.ShouldBe((LogValue)false);
         users
             .Values[4]
             .Value.ShouldBeOfType<LogValue.Items>()
@@ -507,12 +508,16 @@ public class PostgresEventsTests
             .ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "***"), new("column", "id")));
     }
 
-    // A table of one column, whole in the answer of "tables", and the query that is the table.
+    // A table of one column, whole in the answer of "tables", and the query that is the table.  It says nothing of a
+    // foreign partition, as an answer recorded before the member existed.
     private static readonly PostgresTableRow Ids = PostgresTables.TableOf(
         16500,
         "users",
         PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
-    );
+    ) with
+    {
+        HasForeignPartition = null,
+    };
 
     private static readonly DescribeRequest Whole = new(
         "ListIds",
@@ -546,6 +551,12 @@ public class PostgresEventsTests
 
         log.Events.Select(written => written.Name)
             .ShouldBe(["prepare", "columns", "tables", "types", "column", "check", "table-match", "deallocate"]);
+        var ids = Member(log.Events[2].Members, "tables")
+            .ShouldBeOfType<LogValue.Items>()
+            .Values[0]
+            .ShouldBeOfType<LogValue.Members>();
+        ids.Values[6].Name.ShouldBe("hasForeignPartition");
+        ids.Values[6].Value.ShouldBe(LogValue.Null);
         var match = log.Events[6].Members;
         Member(match, "query").ShouldBe((LogValue)"ListIds");
         Member(match, "result").ShouldBe((LogValue)"matched");

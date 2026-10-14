@@ -13,13 +13,15 @@ public class ColumnNullabilityTests
         string relkind,
         bool notNull,
         bool? notNullValidated = null,
-        bool? relhassubclass = false
+        bool? relhassubclass = false,
+        bool? hasForeignPartition = false
     ) =>
         new(
             PostgresTables.TableOf(7, "t") with
             {
                 Relkind = relkind,
                 Relhassubclass = relhassubclass,
+                HasForeignPartition = hasForeignPartition,
             },
             PostgresTables.Attribute(1, "c", PostgresRows.Int4.Oid, notNull, notNullValidated: notNullValidated)
         );
@@ -132,7 +134,7 @@ public class ColumnNullabilityTests
             .Of(Origin("r", notNull: true, relhassubclass: relhassubclass), gated: false)
             .ShouldBe((false, SidecarValues.NullableSource.Catalog));
 
-    // A partition can never drop its parent's NOT NULL.
+    // A partition can never drop its parent's NOT NULL, and none of this table's is a foreign table.
     [Fact]
     public void Of_NotNullColumnOfAPartitionedTableWithPartitions_IsNotNullableByTheCatalog() =>
         ColumnNullability
@@ -146,5 +148,41 @@ public class ColumnNullabilityTests
     public void Of_GatedQueryOverATableWithOrWithoutChildren_IsNullableByTheHeuristic(bool? relhassubclass) =>
         ColumnNullability
             .Of(Origin("r", notNull: true, relhassubclass: relhassubclass), gated: true)
+            .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
+
+    // A foreign table may be a partition of a partitioned table: it inherits the parent's NOT NULL, which nothing
+    // enforces on its remote rows, and a query of the parent reads them.
+    [Fact]
+    public void Of_NotNullColumnOfAPartitionedTableWithAForeignPartition_IsNullableByTheCatalog() =>
+        ColumnNullability
+            .Of(Origin("p", notNull: true, relhassubclass: true, hasForeignPartition: true), gated: false)
+            .ShouldBe((true, SidecarValues.NullableSource.Catalog));
+
+    // False is a partitioned table without a foreign partition, and null an answer recorded before the member
+    // existed.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void Of_NotNullColumnOfAPartitionedTableWithoutAForeignPartitionOrUnsaid_IsNotNullableByTheCatalog(
+        bool? hasForeignPartition
+    ) =>
+        ColumnNullability
+            .Of(
+                Origin("p", notNull: true, relhassubclass: true, hasForeignPartition: hasForeignPartition),
+                gated: false
+            )
+            .ShouldBe((false, SidecarValues.NullableSource.Catalog));
+
+    // The member says something of a partitioned table alone, and tables never sets it for another.
+    [Fact]
+    public void Of_NotNullColumnOfATableThatSaysAForeignPartition_IsNotNullableByTheCatalog() =>
+        ColumnNullability
+            .Of(Origin("r", notNull: true, relhassubclass: false, hasForeignPartition: true), gated: false)
+            .ShouldBe((false, SidecarValues.NullableSource.Catalog));
+
+    [Fact]
+    public void Of_GatedQueryOverAPartitionedTableWithAForeignPartition_IsNullableByTheHeuristic() =>
+        ColumnNullability
+            .Of(Origin("p", notNull: true, relhassubclass: true, hasForeignPartition: true), gated: true)
             .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
 }
