@@ -46,7 +46,7 @@ public sealed class DescriberFixtureTests : IDisposable
     private static IQueryDescriber DescriberOf(FixtureCase fixture) =>
         fixture.Engine switch
         {
-            "postgres" => new PostgresDescriber(),
+            "postgres" => new PostgresDescriber(fixture.ExplainSettings),
             _ => throw new InvalidOperationException($"No describer is known for the engine of the case {fixture}."),
         };
 
@@ -93,6 +93,43 @@ public sealed class DescriberFixtureTests : IDisposable
                 "postgres/select-view",
                 "postgres/update-array-and-range",
                 "postgres/update-inferred",
+                "postgres/walk-aggregate",
+                "postgres/walk-anti",
+                "postgres/walk-chain",
+                "postgres/walk-cte-inlined",
+                "postgres/walk-cte-materialized",
+                "postgres/walk-cube",
+                "postgres/walk-full",
+                "postgres/walk-full-hash",
+                "postgres/walk-full-merge",
+                "postgres/walk-grouping-sets",
+                "postgres/walk-lateral",
+                "postgres/walk-left",
+                "postgres/walk-left-hash",
+                "postgres/walk-left-merge",
+                "postgres/walk-left-nestloop",
+                "postgres/walk-natural",
+                "postgres/walk-nested",
+                "postgres/walk-order-by-unselected",
+                "postgres/walk-proved-empty",
+                "postgres/walk-quoted-alias",
+                "postgres/walk-reduced-by-join",
+                "postgres/walk-reduced-by-where",
+                "postgres/walk-removed",
+                "postgres/walk-returning",
+                "postgres/walk-right",
+                "postgres/walk-right-hash",
+                "postgres/walk-right-merge",
+                "postgres/walk-right-nestloop",
+                "postgres/walk-rollup",
+                "postgres/walk-self-join",
+                "postgres/walk-semi-anti",
+                "postgres/walk-subquery-flattened",
+                "postgres/walk-subquery-kept",
+                "postgres/walk-union",
+                "postgres/walk-using",
+                "postgres/walk-view",
+                "postgres/walk-view-nullable-side",
             }
         )
         {
@@ -107,6 +144,7 @@ public sealed class DescriberFixtureTests : IDisposable
     [InlineData("tables", "select-plain")]
     [InlineData("types")]
     [InlineData("check")]
+    [InlineData("explain", "select-left-join")]
     [InlineData("deallocate")]
     public async Task Replay_CaptureWithACallRemoved_ThrowsACaptureMiss(string method, string from = "update-inferred")
     {

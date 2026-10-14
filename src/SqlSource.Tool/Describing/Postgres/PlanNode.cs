@@ -1,0 +1,173 @@
+using System.Collections.Generic;
+using System.Text.Json;
+
+namespace SqlSource.Tool.Describing.Postgres;
+
+/// <summary>
+/// A node of a plan as <c>EXPLAIN (VERBOSE, FORMAT JSON)</c> writes it: the keys the walk reads, and no other.
+/// </summary>
+/// <param name="NodeType"><c>Node Type</c>: <c>Hash Join</c>, <c>Seq Scan</c>.</param>
+/// <param name="JoinType"><c>Join Type</c>, which a join alone has: <c>Left</c>, <c>Right Anti</c>.</param>
+/// <param name="ParentRelationship">
+/// <c>Parent Relationship</c>: <c>Outer</c> and <c>Inner</c> for the sides of a join and the one input of any
+/// other node; <c>InitPlan</c>, <c>SubPlan</c>, <c>Member</c> and <c>Subquery</c> for another plan.  Null on the
+/// root.
+/// </param>
+/// <param name="Output">
+/// <c>Output</c>: the node's target list as text.  On the root it is the result's, in order, with what a sort or a
+/// group added after it.
+/// </param>
+/// <param name="Alias"><c>Alias</c>, as the name is and not as it is printed: <c>Order</c> for <c>"Order"</c>.</param>
+/// <param name="RelationName"><c>Relation Name</c>.</param>
+/// <param name="Schema"><c>Schema</c>.</param>
+/// <param name="SubplanName"><c>Subplan Name</c>.</param>
+/// <param name="CteName"><c>CTE Name</c>.</param>
+/// <param name="HasGroupingSets">Whether the node has a <c>Grouping Sets</c> key, whatever it holds.</param>
+/// <param name="Plans"><c>Plans</c>: the children, empty when the node has none.</param>
+internal sealed record PlanNode(
+    string NodeType,
+    string? JoinType,
+    string? ParentRelationship,
+    IReadOnlyList<string>? Output,
+    string? Alias,
+    string? RelationName,
+    string? Schema,
+    string? SubplanName,
+    string? CteName,
+    bool HasGroupingSets,
+    IReadOnlyList<PlanNode> Plans
+)
+{
+    // Each node is two levels of the text, and the reader's own limit of 64 would refuse a plan of thirty.
+    private const int MaxDepth = 512;
+
+    /// <summary>
+    /// The root of a plan's text, or null: the text is an array of one object whose <c>Plan</c> is the root, and
+    /// anything else is a plan that cannot be used.  A key the walk does not read is ignored.
+    /// </summary>
+    public static PlanNode? Read(string text)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(text, new JsonDocumentOptions { MaxDepth = MaxDepth });
+            var root = document.RootElement;
+            return
+                root.ValueKind == JsonValueKind.Array
+                && root.GetArrayLength() == 1
+                && root[0].ValueKind == JsonValueKind.Object
+                && root[0].TryGetProperty("Plan", out var plan)
+                ? NodeOf(plan)
+                : null;
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
+    private static PlanNode? NodeOf(JsonElement element)
+    {
+        if (
+            element.ValueKind != JsonValueKind.Object
+            || !TryText(element, "Node Type", out var nodeType)
+            || nodeType is null
+            || !TryText(element, "Join Type", out var joinType)
+            || !TryText(element, "Parent Relationship", out var relationship)
+            || !TryTexts(element, "Output", out var output)
+            || !TryText(element, "Alias", out var alias)
+            || !TryText(element, "Relation Name", out var relation)
+            || !TryText(element, "Schema", out var schema)
+            || !TryText(element, "Subplan Name", out var subplan)
+            || !TryText(element, "CTE Name", out var cte)
+            || !TryNodes(element, out var plans)
+        )
+        {
+            return null;
+        }
+
+        return new PlanNode(
+            nodeType,
+            joinType,
+            relationship,
+            output,
+            alias,
+            relation,
+            schema,
+            subplan,
+            cte,
+            element.TryGetProperty("Grouping Sets", out _),
+            plans
+        );
+    }
+
+    // False when the key holds what is no string.  A key that is absent is null.
+    private static bool TryText(JsonElement element, string key, out string? text)
+    {
+        text = null;
+        if (!element.TryGetProperty(key, out var value))
+        {
+            return true;
+        }
+
+        text = value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+        return text is not null;
+    }
+
+    // False when the key holds what is no array of strings.  A key that is absent is null.
+    private static bool TryTexts(JsonElement element, string key, out IReadOnlyList<string>? texts)
+    {
+        texts = null;
+        if (!element.TryGetProperty(key, out var value))
+        {
+            return true;
+        }
+
+        if (value.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var read = new List<string>(value.GetArrayLength());
+        foreach (var item in value.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String || item.GetString() is not { } text)
+            {
+                return false;
+            }
+
+            read.Add(text);
+        }
+
+        texts = read;
+        return true;
+    }
+
+    // False when "Plans" holds what is no array of nodes.  A node without the key has no child.
+    private static bool TryNodes(JsonElement element, out IReadOnlyList<PlanNode> nodes)
+    {
+        nodes = [];
+        if (!element.TryGetProperty(nameof(Plans), out var value))
+        {
+            return true;
+        }
+
+        if (value.ValueKind != JsonValueKind.Array)
+        {
+            return false;
+        }
+
+        var read = new List<PlanNode>(value.GetArrayLength());
+        foreach (var item in value.EnumerateArray())
+        {
+            if (NodeOf(item) is not { } node)
+            {
+                return false;
+            }
+
+            read.Add(node);
+        }
+
+        nodes = read;
+        return true;
+    }
+}

@@ -29,28 +29,55 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private const string ParameterTypesSql =
         "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = @name";
 
-    // Every relation asked for with its columns, in one query.  The join is a left one, so that a table without a
-    // column of its own is answered too, with one row that holds no attribute.
+    // Every relation asked for with its columns, in one query.  The relations are read first, so that what is said of
+    // a relation as a whole is computed once for each relation and not once for each of its columns: whether a
+    // partitioned table has a foreign table anywhere in its partition tree, which costs a walk of the catalog and is
+    // false and never null for any other, and whether the relation has an INSTEAD rule on INSERT, UPDATE or DELETE
+    // (an ev_type of '1' is SELECT), never null.  The join to the attributes is a left one, so that a table without
+    // a column of its own is answered too, with one row that holds no attribute.
     private const string TablesSql = """
+        WITH relations AS MATERIALIZED (
+            SELECT
+                c.oid,
+                c.relkind,
+                c.relnamespace,
+                c.relname,
+                c.relhassubclass,
+                c.relkind = 'p' AND EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_partition_tree(c.oid) AS t
+                    JOIN pg_catalog.pg_class AS f ON f.oid = t.relid
+                    WHERE f.relkind = 'f'
+                ) AS has_foreign_partition,
+                EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_rewrite AS w
+                    WHERE w.ev_class = c.oid AND w.ev_type <> '1' AND w.is_instead
+                ) AS has_instead_rule
+            FROM pg_catalog.pg_class AS c
+            WHERE c.oid = ANY (@oids)
+        )
         SELECT
-            c.oid,
-            c.relkind::text,
+            r.oid,
+            r.relkind::text,
             n.nspname::text,
-            c.relname::text,
+            r.relname::text,
             a.attnum,
             a.attname::text,
             a.attnotnull,
             a.attidentity::text,
             a.attgenerated::text,
             a.atttypid,
-            k.convalidated
-        FROM pg_catalog.pg_class AS c
-        JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
-        LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+            k.convalidated,
+            r.relhassubclass,
+            r.has_foreign_partition,
+            r.has_instead_rule
+        FROM relations AS r
+        JOIN pg_catalog.pg_namespace AS n ON n.oid = r.relnamespace
+        LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = r.oid AND a.attnum > 0 AND NOT a.attisdropped
         LEFT JOIN pg_catalog.pg_constraint AS k
-            ON k.conrelid = c.oid AND k.contype = 'n' AND k.conkey = ARRAY[a.attnum]
-        WHERE c.oid = ANY (@oids)
-        ORDER BY c.oid, a.attnum
+            ON k.conrelid = r.oid AND k.contype = 'n' AND k.conkey = ARRAY[a.attnum]
+        ORDER BY r.oid, a.attnum
         """;
 
     // The closure of the types asked for, in one query: a recursive term that follows the element of an array, the
@@ -217,7 +244,10 @@ internal sealed class PostgresLive(PostgresConnection connection)
                             reader.GetString(1),
                             reader.GetString(2),
                             reader.GetString(3),
-                            columns
+                            columns,
+                            reader.GetBoolean(11),
+                            reader.GetBoolean(12),
+                            reader.GetBoolean(13)
                         )
                     );
                 }
@@ -252,10 +282,12 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// <c>EXECUTE</c> whatever the number of its arguments, so a statement with a <c>$n</c> of its own is described
     /// too.
     /// </summary>
-    public static string ExecuteText(PostgresColumnsRequest asked) =>
-        asked.Parameters == 0
-            ? $"EXECUTE {asked.Statement}"
-            : $"EXECUTE {asked.Statement}({string.Join(", ", Enumerable.Repeat("NULL", asked.Parameters))})";
+    public static string ExecuteText(PostgresColumnsRequest asked) => ExecuteText(asked.Statement, asked.Parameters);
+
+    private static string ExecuteText(string statement, int parameters) =>
+        parameters == 0
+            ? $"EXECUTE {statement}"
+            : $"EXECUTE {statement}({string.Join(", ", Enumerable.Repeat("NULL", parameters))})";
 
     /// <summary>Asks <c>types</c>.</summary>
     public async Task<PostgresTypesAnswer> TypesAsync(PostgresTypesRequest asked, CancellationToken token)
@@ -412,6 +444,53 @@ internal sealed class PostgresLive(PostgresConnection connection)
             Value = DBNull.Value,
             DataTypeName = dataTypeName,
         };
+
+    private const string ForceGenericPlanSql = "SET LOCAL plan_cache_mode = force_generic_plan";
+
+    /// <summary>
+    /// Asks <c>explain</c>: the generic plan of the prepared statement, in a transaction that is rolled back.
+    /// </summary>
+    /// <remarks>
+    /// <c>EXPLAIN</c> without <c>ANALYZE</c> plans the statement and does not execute it.  Planning evaluates an
+    /// immutable function whose arguments are constants, inside the transaction that is rolled back: a function
+    /// wrongly marked immutable runs, and an effect outside the transaction, a sequence's for one, remains
+    /// (TD-0047).  Under <c>force_generic_plan</c> the <c>NULL</c> of a parameter is not folded into the plan, so
+    /// <c>id = $1</c> stays a condition.  Disposing a transaction that was not ended rolls it back, so a failure at
+    /// any step leaves no setting behind.  The texts hold a name the tool made, settings of a closed list and
+    /// nothing of a user's.
+    /// </remarks>
+    public async Task<PostgresExplainAnswer> ExplainAsync(PostgresExplainRequest asked, CancellationToken token)
+    {
+        try
+        {
+            await using var transaction = await connection.BeginAsync(token);
+            foreach (var text in SetTexts(asked))
+            {
+                await using var set = await connection.CommandAsync(text, token);
+                _ = await set.ExecuteNonQueryAsync(token);
+            }
+
+            await using var command = await connection.CommandAsync(ExplainText(asked), token);
+            var plan = await command.ExecuteScalarAsync(token) as string;
+            await transaction.RollbackAsync(token);
+
+            // An answer that is no text is no plan, which the session reads as unreadable: never a failed describe.
+            return new PostgresExplainAnswer(plan, null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresExplainAnswer(null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
+    /// <summary>The text <c>explain</c> sends for the plan.</summary>
+    public static string ExplainText(PostgresExplainRequest asked) =>
+        "EXPLAIN (VERBOSE, FORMAT JSON) " + ExecuteText(asked.Statement, asked.Parameters);
+
+    /// <summary>What <c>explain</c> sets for its transaction, in order: the generic plan, then each setting.</summary>
+    /// <exception cref="ArgumentException">A setting is not of <see cref="PlannerSettings" />.</exception>
+    public static IReadOnlyList<string> SetTexts(PostgresExplainRequest asked) =>
+        [ForceGenericPlanSql, .. asked.Settings.Select(PlannerSettings.SetText)];
 
     /// <summary>Asks <c>deallocate</c>.</summary>
     public async Task<PostgresDeallocateAnswer> DeallocateAsync(

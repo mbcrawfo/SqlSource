@@ -6,6 +6,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
+using static SqlSource.Tool.Tests.PostgresPlans;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -274,8 +275,8 @@ public class PostgresEventsTests
                 "types",
                 "column",
                 "column",
-                "table-match",
                 "check",
+                "table-match",
                 "deallocate",
             ]);
 
@@ -306,7 +307,21 @@ public class PostgresEventsTests
             .ShouldBeOfType<LogValue.Items>()
             .Values[0]
             .ShouldBeOfType<LogValue.Members>();
-        users.Values.Select(value => value.Name).ShouldBe(["oid", "relkind", "schema", "name", "columns"]);
+        users
+            .Values.Select(value => value.Name)
+            .ShouldBe([
+                "oid",
+                "relkind",
+                "schema",
+                "name",
+                "columns",
+                "relhassubclass",
+                "hasForeignPartition",
+                "hasInsteadRule",
+            ]);
+        users.Values[5].Value.ShouldBe((LogValue)false);
+        users.Values[6].Value.ShouldBe((LogValue)false);
+        users.Values[7].Value.ShouldBe((LogValue)false);
         users
             .Values[4]
             .Value.ShouldBeOfType<LogValue.Items>()
@@ -340,16 +355,16 @@ public class PostgresEventsTests
         Member(count, "nullable").ShouldBe(LogValue.Null);
         Member(count, "nullableSource").ShouldBe((LogValue)"no-origin");
 
-        var match = log.Events[6].Members;
+        var check = log.Events[6].Members;
+        NamesOf(check).ShouldBe(["query", "parameters", "result", "differs", "durationMs"]);
+        Member(check, "result").ShouldBe((LogValue)"same");
+        Member(check, "differs").ShouldBe(LogValue.Null);
+
+        var match = log.Events[7].Members;
         NamesOf(match).ShouldBe(["query", "result", "table"]);
         Member(match, "query").ShouldBe((LogValue)"ListUsers");
         Member(match, "result").ShouldBe((LogValue)"no-origin");
         Member(match, "table").ShouldBe(LogValue.Null);
-
-        var check = log.Events[7].Members;
-        NamesOf(check).ShouldBe(["query", "parameters", "result", "differs", "durationMs"]);
-        Member(check, "result").ShouldBe((LogValue)"same");
-        Member(check, "differs").ShouldBe(LogValue.Null);
     }
 
     [Fact]
@@ -503,12 +518,17 @@ public class PostgresEventsTests
             .ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "***"), new("column", "id")));
     }
 
-    // A table of one column, whole in the answer of "tables", and the query that is the table.
+    // A table of one column, whole in the answer of "tables", and the query that is the table.  It says nothing of a
+    // foreign partition or of an INSTEAD rule, as an answer recorded before the members existed.
     private static readonly PostgresTableRow Ids = PostgresTables.TableOf(
         16500,
         "users",
         PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
-    );
+    ) with
+    {
+        HasForeignPartition = null,
+        HasInsteadRule = null,
+    };
 
     private static readonly DescribeRequest Whole = new(
         "ListIds",
@@ -541,16 +561,24 @@ public class PostgresEventsTests
         await DescribeAsync(WholeScript(), log, Whole);
 
         log.Events.Select(written => written.Name)
-            .ShouldBe(["prepare", "columns", "tables", "types", "column", "table-match", "check", "deallocate"]);
-        var match = log.Events[5].Members;
+            .ShouldBe(["prepare", "columns", "tables", "types", "column", "check", "table-match", "deallocate"]);
+        var ids = Member(log.Events[2].Members, "tables")
+            .ShouldBeOfType<LogValue.Items>()
+            .Values[0]
+            .ShouldBeOfType<LogValue.Members>();
+        ids.Values[6].Name.ShouldBe("hasForeignPartition");
+        ids.Values[6].Value.ShouldBe(LogValue.Null);
+        ids.Values[7].Name.ShouldBe("hasInsteadRule");
+        ids.Values[7].Value.ShouldBe(LogValue.Null);
+        var match = log.Events[6].Members;
         Member(match, "query").ShouldBe((LogValue)"ListIds");
         Member(match, "result").ShouldBe((LogValue)"matched");
         Member(match, "table").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "users")));
     }
 
-    // The match is in the log when the check that follows it fails.
+    // A check that fails ends the describe before the match is made.
     [Fact]
-    public async Task Describe_CheckThatDiffers_StillWritesTheTableMatchBeforeIt()
+    public async Task Describe_CheckThatDiffers_WritesNoTableMatch()
     {
         var log = new RecordingLog();
         var script = ListingScript().Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn));
@@ -558,17 +586,7 @@ public class PostgresEventsTests
         await DescribeAsync(script, log, Listing);
 
         log.Events.Select(written => written.Name)
-            .ShouldBe([
-                "prepare",
-                "columns",
-                "tables",
-                "types",
-                "column",
-                "column",
-                "table-match",
-                "check",
-                "deallocate",
-            ]);
+            .ShouldBe(["prepare", "columns", "tables", "types", "column", "column", "check", "deallocate"]);
         Member(log.Events.Single(written => written.Name == "check").Members, "result").ShouldBe((LogValue)"differ");
     }
 
@@ -600,5 +618,234 @@ public class PostgresEventsTests
         error
             .Values.Single(value => value.Name == "message")
             .Value.ShouldBe((LogValue)"relation \"***\" does not exist");
+    }
+
+    private static readonly DescribeRequest Joined = new(
+        "ListUserTotals",
+        "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id",
+        new EquatableArray<SqlQueryParameter>([])
+    );
+
+    private static readonly PostgresColumnRow UserId = PostgresTables.ColumnOf(0, "id", 23, PostgresTables.Users, 1);
+
+    private static readonly PostgresColumnRow Total = PostgresTables.ColumnOf(
+        1,
+        "total",
+        1700,
+        PostgresTables.Orders,
+        3
+    );
+
+    // The plan of Joined: users is the side the join keeps.
+    private static readonly string JoinedPlan = Text(
+        Join("Left", Scan("u"), Scan("o")) with
+        {
+            Output = ["u.id", "o.total"],
+        }
+    );
+
+    // The whole script of Joined, a gated query, with the answer of "explain" the test gives.
+    private static PostgresScript JoinedScript(PostgresExplainAnswer explain) =>
+        new PostgresScript()
+            .Open()
+            .Answer(
+                "prepare",
+                new PostgresPrepareRequest("sqlsource_1", Joined.Sql, []),
+                new PostgresPrepareAnswer([], null)
+            )
+            .Answer(
+                "columns",
+                new PostgresColumnsRequest("sqlsource_1", 0),
+                new PostgresColumnsAnswer([UserId, Total], null)
+            )
+            .Answer(
+                "tables",
+                new PostgresTablesRequest([PostgresTables.Users.Oid, PostgresTables.Orders.Oid]),
+                new PostgresTablesAnswer([PostgresTables.Users, PostgresTables.Orders], null)
+            )
+            .Answer(
+                "types",
+                new PostgresTypesRequest([23, 1700]),
+                new PostgresTypesAnswer([PostgresRows.Int4, PostgresRows.Numeric], null)
+            )
+            .Answer("check", new PostgresCheckRequest(Joined.Sql, []), Sees(UserId, Total))
+            .Answer("explain", new PostgresExplainRequest("sqlsource_1", 0, []), explain)
+            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+
+    [Fact]
+    public async Task Describe_GatedQuery_WritesExplainANodeForEachAColumnForEachAndWalkBeforeTheMatch()
+    {
+        var log = new RecordingLog();
+
+        await DescribeAsync(JoinedScript(new PostgresExplainAnswer(JoinedPlan, null)), log, Joined);
+
+        log.Events.Select(written => written.Name)
+            .ShouldBe([
+                "prepare",
+                "columns",
+                "tables",
+                "types",
+                "column",
+                "column",
+                "check",
+                "explain",
+                "walk.node",
+                "walk.node",
+                "walk.node",
+                "walk.column",
+                "walk.column",
+                "walk",
+                "table-match",
+                "deallocate",
+            ]);
+
+        var explain = log.Events[7].Members;
+        NamesOf(explain).ShouldBe(["query", "statement", "settings", "sql", "plan", "durationMs"]);
+        Member(explain, "query").ShouldBe((LogValue)"ListUserTotals");
+        Member(explain, "statement").ShouldBe((LogValue)"sqlsource_1");
+        Member(explain, "settings").ShouldBe(LogValue.ListOfTexts([]));
+        Member(explain, "sql").ShouldBe((LogValue)"EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlsource_1");
+        Member(explain, "plan").ShouldBe((LogValue)JoinedPlan);
+        _ = Member(explain, "durationMs").ShouldBeOfType<LogValue.Number>();
+
+        var join = log.Events[8].Members;
+        NamesOf(join)
+            .ShouldBe(["depth", "nodeType", "joinType", "parentRelationship", "alias", "relation", "nullExtends"]);
+        Member(join, "depth").ShouldBe((LogValue)0L);
+        Member(join, "nodeType").ShouldBe((LogValue)"Hash Join");
+        Member(join, "joinType").ShouldBe((LogValue)"Left");
+        Member(join, "parentRelationship").ShouldBe(LogValue.Null);
+        Member(join, "alias").ShouldBe(LogValue.Null);
+        Member(join, "relation").ShouldBe(LogValue.Null);
+        Member(join, "nullExtends").ShouldBe((LogValue)"inner");
+
+        var orders = log.Events[10].Members;
+        Member(orders, "depth").ShouldBe((LogValue)1L);
+        Member(orders, "nodeType").ShouldBe((LogValue)"Seq Scan");
+        Member(orders, "joinType").ShouldBe(LogValue.Null);
+        Member(orders, "parentRelationship").ShouldBe((LogValue)"Inner");
+        Member(orders, "alias").ShouldBe((LogValue)"o");
+        Member(orders, "relation").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "o")));
+        Member(orders, "nullExtends").ShouldBe((LogValue)"none");
+
+        var total = log.Events[12].Members;
+        NamesOf(total)
+            .ShouldBe([
+                "ordinal",
+                "name",
+                "output",
+                "alias",
+                "column",
+                "mapped",
+                "nullExtended",
+                "nullable",
+                "nullableSource",
+            ]);
+        Member(total, "ordinal").ShouldBe((LogValue)1L);
+        Member(total, "name").ShouldBe((LogValue)"total");
+        Member(total, "output").ShouldBe((LogValue)"o.total");
+        Member(total, "alias").ShouldBe((LogValue)"o");
+        Member(total, "column").ShouldBe((LogValue)"total");
+        Member(total, "mapped").ShouldBe((LogValue)true);
+        Member(total, "nullExtended").ShouldBe((LogValue)true);
+        Member(total, "nullable").ShouldBe((LogValue)true);
+        Member(total, "nullableSource").ShouldBe((LogValue)"outer-join");
+
+        var walk = log.Events[13].Members;
+        NamesOf(walk).ShouldBe(["query", "plan", "reason"]);
+        Member(walk, "query").ShouldBe((LogValue)"ListUserTotals");
+        Member(walk, "plan").ShouldBe((LogValue)"walked");
+        Member(walk, "reason").ShouldBe(LogValue.Null);
+    }
+
+    // The column event of sub-phase 3.3 is written when the column is built, with the heuristic's answer: the
+    // walk's own event holds what the sidecar records.
+    [Fact]
+    public async Task Describe_GatedQuery_KeepsTheHeuristicInTheColumnEventAndTheAnswerInTheWalks()
+    {
+        var log = new RecordingLog();
+
+        await DescribeAsync(JoinedScript(new PostgresExplainAnswer(JoinedPlan, null)), log, Joined);
+
+        var built = log.Events.First(written => written.Name == "column").Members;
+        Member(built, "nullableSource").ShouldBe((LogValue)"heuristic");
+        Member(built, "gated").ShouldBe((LogValue)true);
+        var walked = log.Events.First(written => written.Name == "walk.column").Members;
+        Member(walked, "nullable").ShouldBe((LogValue)false);
+        Member(walked, "nullableSource").ShouldBe((LogValue)"catalog");
+    }
+
+    // The log is where a failed EXPLAIN is told from a bug of the walk.
+    [Fact]
+    public async Task Describe_ExplainThatFails_WritesItsErrorAndTheReasonAndNoNode()
+    {
+        var log = new RecordingLog();
+        var refused = new PostgresServerError(
+            "57014",
+            "canceling statement due to statement timeout",
+            null,
+            null,
+            null
+        );
+
+        await DescribeAsync(JoinedScript(new PostgresExplainAnswer(null, refused)), log, Joined);
+
+        log.Events.Select(written => written.Name)
+            .Skip(7)
+            .ShouldBe(["explain", "walk.column", "walk.column", "walk", "table-match", "deallocate"]);
+        var explain = log.Events[7].Members;
+        NamesOf(explain).ShouldBe(["query", "statement", "settings", "sql", "error", "durationMs"]);
+        Member(explain, "error")
+            .ShouldBe(
+                LogValue.MapOf(
+                    new("sqlState", "57014"),
+                    new("message", "canceling statement due to statement timeout"),
+                    new("detail", LogValue.Null),
+                    new("hint", LogValue.Null),
+                    new("position", LogValue.Null)
+                )
+            );
+        var column = log.Events[8].Members;
+        Member(column, "output").ShouldBe(LogValue.Null);
+        Member(column, "mapped").ShouldBe((LogValue)false);
+        Member(column, "nullableSource").ShouldBe((LogValue)"heuristic");
+        var walk = log.Events.Single(written => written.Name == "walk").Members;
+        Member(walk, "plan").ShouldBe((LogValue)"unavailable");
+        Member(walk, "reason").ShouldBe((LogValue)"explain-failed");
+    }
+
+    [Theory]
+    [InlineData("not json", "unreadable")]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append"}}]""",
+        "no-output"
+    )]
+    public async Task Describe_PlanThatCannotBeUsed_WritesItsReason(string plan, string reason)
+    {
+        var log = new RecordingLog();
+
+        await DescribeAsync(JoinedScript(new PostgresExplainAnswer(plan, null)), log, Joined);
+
+        var walk = log.Events.Single(written => written.Name == "walk").Members;
+        Member(walk, "plan").ShouldBe((LogValue)"unavailable");
+        Member(walk, "reason").ShouldBe((LogValue)reason);
+    }
+
+    // A plan holds a user's names, and the connection's value is taken out of it as out of any string.
+    [Fact]
+    public async Task Describe_ThroughTheLogOfASession_RemovesTheSecretFromThePlanAndFromANode()
+    {
+        var log = new RecordingLog();
+
+        await DescribeAsync(
+            JoinedScript(new PostgresExplainAnswer(JoinedPlan, null)),
+            new SessionRunLog(log, "Seq Scan", "postgres."),
+            Joined
+        );
+
+        var plan = Member(log.Events.Single(written => written.Name == "postgres.explain").Members, "plan");
+        plan.ShouldBeOfType<LogValue.Text>().Value.ShouldNotContain("Seq Scan");
+        var scan = log.Events.Last(written => written.Name == "postgres.walk.node").Members;
+        Member(scan, "nodeType").ShouldBe((LogValue)"***");
     }
 }

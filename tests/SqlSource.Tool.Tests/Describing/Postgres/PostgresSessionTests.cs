@@ -8,6 +8,7 @@ using SqlSource.Tests.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
+using static SqlSource.Tool.Tests.PostgresPlans;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -140,6 +141,16 @@ public class PostgresSessionTests
                 null
             )
         );
+
+    // "explain" for the statement, with no setting, answering what the test gives.
+    private static PostgresScript Explains(
+        PostgresScript script,
+        int number,
+        int parameters,
+        PostgresExplainAnswer answer
+    ) => script.Answer("explain", new PostgresExplainRequest($"sqlsource_{number}", parameters, []), answer);
+
+    private static PostgresExplainAnswer PlanOf(PlanNode root) => new(Text(root), null);
 
     // The trailing ";" is not sent, the parameter is $1, and the statement is freed when the describe is done.
     [Fact]
@@ -835,7 +846,7 @@ public class PostgresSessionTests
     }
 
     // One script for a query of users.id and an aggregate, whatever its SQL says of a join.
-    private static async Task<QueryDescription> DescribeUsersIdAsync(string sql)
+    private static async Task<QueryDescription> DescribeUsersIdAsync(string sql, PostgresExplainAnswer? explain = null)
     {
         var users = PostgresTables.Users;
         var script = new PostgresScript().Open();
@@ -844,6 +855,11 @@ public class PostgresSessionTests
         _ = Tables(script, [users.Oid], users);
         _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
         _ = Checks(script, sql, [], Expression(0, "id", 23), Expression(1, "n", 20));
+        if (explain is not null)
+        {
+            _ = Explains(script, 1, 0, explain);
+        }
+
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -865,24 +881,187 @@ public class PostgresSessionTests
             .ShouldBe([(false, "catalog"), (null, "no-origin")]);
     }
 
-    // The walk does not exist yet, which is what "unavailable" says.
+    private const string GatedUsersId =
+        "SELECT u.id, count(*) OVER () AS n FROM users u LEFT JOIN orders o ON o.user_id = u.id";
+
+    private static (bool? Nullable, string? Source)[] AnswersOf(QueryDescription description) =>
+        [.. description.Columns.ShouldNotBeNull().Select(static column => (column.Nullable, column.NullableSource))];
+
+    // users is the side the join keeps: its NOT NULL column stays so, by the catalog.
     [Fact]
-    public async Task DescribeAsync_GatedQuery_MakesEveryOriginColumnNullableAndSaysThePlanIsUnavailable()
+    public async Task DescribeAsync_GatedQueryWhoseJoinKeepsTheColumnsSide_TakesTheCatalogsAnswerAndIsWalked()
     {
-        var description = await DescribeUsersIdAsync(
-            "SELECT u.id, count(*) OVER () AS n FROM users u LEFT JOIN orders o ON o.user_id = u.id"
+        var plan = Join("Left", Scan("u"), Scan("o")) with { Output = ["u.id", "count(*) OVER (?)"] };
+
+        var description = await DescribeUsersIdAsync(GatedUsersId, PlanOf(plan));
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+    }
+
+    // The settings of the describer are in the request, so a capture recorded with them is replayed with them.
+    [Fact]
+    public async Task DescribeAsync_DescriberWithSettings_AsksThePlanWithThem()
+    {
+        var users = PostgresTables.Users;
+        var plan = Join("Left", Scan("u"), Scan("o")) with { Output = ["u.id", "count(*) OVER (?)"] };
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, GatedUsersId, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        _ = Checks(script, GatedUsersId, [], Expression(0, "id", 23), Expression(1, "n", 20));
+        _ = script.Answer(
+            "explain",
+            new PostgresExplainRequest("sqlsource_1", 0, ["enable_hashjoin=off", "enable_mergejoin=off"]),
+            PlanOf(plan)
         );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(
+            exchange,
+            explainSettings: ["enable_hashjoin=off", "enable_mergejoin=off"]
+        );
+
+        var described = await session.DescribeAsync(Request(GatedUsersId), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        described.Value.ShouldNotBeNull().Plan.ShouldBe(SidecarValues.Plan.Walked);
+    }
+
+    // The same query planned with users as the side the join null-extends.
+    [Fact]
+    public async Task DescribeAsync_GatedQueryWhoseJoinExtendsTheColumnsSide_IsNullableByTheOuterJoin()
+    {
+        var plan = Join("Right", Scan("u"), Scan("o")) with { Output = ["u.id", "count(*) OVER (?)"] };
+
+        var description = await DescribeUsersIdAsync(GatedUsersId, PlanOf(plan));
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([(true, "outer-join"), (null, "no-origin")]);
+    }
+
+    public static TheoryData<string?, string?> PlansThatCannotBeUsed =>
+        new()
+        {
+            // The server gave no plan: the error is logged and never reported.
+            { null, "canceling statement due to statement timeout" },
+            // The text is no plan.
+            { "not json", null },
+            { "[]", null },
+            // An answer that holds neither.
+            { null, null },
+            // A plan that is read and cannot be used.
+            { Text(Join("Sideways", Scan("u"), Scan("o")) with { Output = ["u.id", "n"] }), null },
+        };
+
+    [Theory]
+    [MemberData(nameof(PlansThatCannotBeUsed))]
+    public async Task DescribeAsync_GatedQueryWithoutAPlanTheWalkCanUse_IsDescribedByTheHeuristicAndUnavailable(
+        string? plan,
+        string? error
+    )
+    {
+        var answer = new PostgresExplainAnswer(
+            plan,
+            error is null ? null : new PostgresServerError("57014", error, null, null, null)
+        );
+
+        var description = await DescribeUsersIdAsync(GatedUsersId, answer);
 
         description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
-        description.MatchesTable.ShouldBeNull();
-        description
-            .Columns.ShouldNotBeNull()
-            .Select(column => (column.Nullable, column.NullableSource))
-            .ShouldBe([(true, "heuristic"), (null, "no-origin")]);
+        AnswersOf(description).ShouldBe([(true, "heuristic"), (null, "no-origin")]);
     }
 
-    // A statement without rows has no provenance, gate word or not.
+    // A check that fails ends the describe before the plan is asked for: the script holds no "explain".
+    [Fact]
+    public async Task DescribeAsync_GatedQueryWhoseCheckDiffers_IsTheFailureAndAsksNoPlan()
+    {
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, GatedUsersId, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        _ = Checks(script, GatedUsersId, [], Expression(0, "id", 23));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(GatedUsersId), TestContext.Current.CancellationToken);
+
+        described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC231");
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The plan is asked with a NULL for each parameter the server resolved, which for this query are those of its
+    // list.
+    [Fact]
+    public async Task DescribeAsync_GatedQueryWithAParameter_AsksThePlanWithTheNumberOfItsParameters()
+    {
+        var sql = "SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = @id";
+        var users = PostgresTables.Users;
+        var id = PostgresTables.ColumnOf(0, "id", 23, users, 1);
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(
+            script,
+            1,
+            "SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = $1",
+            ["unknown"],
+            new([23], null)
+        );
+        _ = Columns(script, 1, 1, id);
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = Checks(script, sql, [("id", "integer")], Expression(0, "id", 23));
+        _ = Explains(script, 1, 1, PlanOf(Join("Left", Scan("u"), Scan("o")) with { Output = ["u.id"] }));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request(sql, Inferred("id")),
+            TestContext.Current.CancellationToken
+        );
+
+        exchange.Unused.ShouldBeEmpty();
+        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([(false, "catalog")]);
+    }
+
+    // EXPLAIN EXECUTE checks the count of its arguments, as the describe of "columns" does not: a query that writes
+    // a $n of its own is planned with a NULL for each type the server resolved, and "columns" keeps the list's count.
+    [Fact]
+    public async Task DescribeAsync_GatedQueryWithADollarParameterOfItsOwn_AsksThePlanWithTheServersCount()
+    {
+        var sql = "SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = @id AND o.id = $2";
+        var users = PostgresTables.Users;
+        var id = PostgresTables.ColumnOf(0, "id", 23, users, 1);
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(
+            script,
+            1,
+            "SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = $1 AND o.id = $2",
+            ["unknown"],
+            new([23, 23], null)
+        );
+        _ = Columns(script, 1, 1, id);
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = Checks(script, sql, [("id", "integer")], Expression(0, "id", 23));
+        _ = Explains(script, 1, 2, PlanOf(Join("Left", Scan("u"), Scan("o")) with { Output = ["u.id"] }));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request(sql, Inferred("id")),
+            TestContext.Current.CancellationToken
+        );
+
+        exchange.Unused.ShouldBeEmpty();
+        var description = described.Value.ShouldNotBeNull();
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([(false, "catalog")]);
+    }
+
+    // A statement without rows has no provenance and asks for no plan, gate word or not.
     [Fact]
     public async Task DescribeAsync_GatedStatementWithoutRows_HasNoPlan()
     {
@@ -909,7 +1088,11 @@ public class PostgresSessionTests
     );
 
     // One script for a query whose columns are the two of labels in their order, the second under the name given.
-    private static async Task<QueryDescription> DescribeLabelsAsync(string sql, string second = "label")
+    private static async Task<QueryDescription> DescribeLabelsAsync(
+        string sql,
+        string second = "label",
+        PostgresExplainAnswer? explain = null
+    )
     {
         var script = new PostgresScript().Open();
         _ = PreparesOnly(script, 1, sql, [], new([], null));
@@ -923,6 +1106,11 @@ public class PostgresSessionTests
         _ = Tables(script, [Labels.Oid], Labels);
         _ = Resolves(script, [23, 25], PostgresRows.Int4, PostgresRows.Text);
         _ = Checks(script, sql, [], Expression(0, "id", 23), Expression(1, second, 25));
+        if (explain is not null)
+        {
+            _ = Explains(script, 1, 0, explain);
+        }
+
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -952,13 +1140,48 @@ public class PostgresSessionTests
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NamesDiffer);
     }
 
-    // The match is made after the columns are built: it reads the nullability the gate gave them.
+    // The match is made after the walk and reads the nullability it set: labels is the side the join extends, so
+    // its NOT NULL column is nullable and the result is not the table's.
     [Fact]
-    public async Task DescribeAsync_GatedQueryOverATablesList_MatchesNothingAndSaysNullabilityDiffers()
+    public async Task DescribeAsync_GatedQueryThatExtendsATablesList_MatchesNothingAndSaysNullabilityDiffers()
     {
-        var description = await DescribeLabelsAsync("SELECT l.* FROM orders o LEFT JOIN labels l ON l.id = o.id");
+        var plan = Join("Left", Scan("o"), Scan("l")) with { Output = ["l.id", "l.label"] };
+
+        var description = await DescribeLabelsAsync(
+            "SELECT l.* FROM orders o LEFT JOIN labels l ON l.id = o.id",
+            explain: PlanOf(plan)
+        );
 
         description.MatchesTable.ShouldBeNull();
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.NullabilityDiffers);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+    }
+
+    // The other way round, labels keeps every row as it is, and the result is the table's.
+    [Fact]
+    public async Task DescribeAsync_GatedQueryThatKeepsATablesList_MatchesTheTable()
+    {
+        var plan = Join("Left", Scan("l"), Scan("o")) with { Output = ["l.id", "l.label"] };
+
+        var description = await DescribeLabelsAsync(
+            "SELECT l.* FROM labels l LEFT JOIN orders o ON o.id = l.id",
+            explain: PlanOf(plan)
+        );
+
+        description.MatchesTable.ShouldBe(new SidecarTable("public", "labels"));
+        description.TableMatch.ShouldBe(SidecarValues.TableMatch.Matched);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+    }
+
+    // Without a plan the heuristic stands, and the match reads that.
+    [Fact]
+    public async Task DescribeAsync_GatedQueryOverATablesListWithoutAPlan_SaysNullabilityDiffers()
+    {
+        var description = await DescribeLabelsAsync(
+            "SELECT l.* FROM labels l LEFT JOIN orders o ON o.id = l.id",
+            explain: new PostgresExplainAnswer(null, new PostgresServerError(null, "lost", null, null, null))
+        );
+
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NullabilityDiffers);
         description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
     }

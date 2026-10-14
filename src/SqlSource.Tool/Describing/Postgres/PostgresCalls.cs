@@ -156,12 +156,31 @@ internal sealed record PostgresTablesAnswer(IReadOnlyList<PostgresTableRow>? Tab
 /// Every attribute with <c>attnum</c> above zero that is not dropped, in <c>attnum</c> order.  A table without a
 /// column of its own has none.
 /// </param>
+/// <param name="Relhassubclass">
+/// <c>relhassubclass</c>: whether the relation has or had inheritance children, which PostgreSQL clears only
+/// lazily after the last is dropped.  Null in an answer recorded before the member existed.
+/// </param>
+/// <param name="HasForeignPartition">
+/// Whether the relation is a partitioned table (<c>p</c>) with a foreign table (<c>f</c>) anywhere in its partition
+/// tree, at any depth, by <c>pg_partition_tree</c>: a foreign partition inherits the parent's <c>NOT NULL</c>, which
+/// nothing enforces on its remote rows.  False for a relation that is not partitioned.  It is no catalog column.
+/// Null in an answer recorded before the member existed, which reads as no foreign partition.
+/// </param>
+/// <param name="HasInsteadRule">
+/// Whether the relation has a <c>DO INSTEAD</c> rule on <c>INSERT</c>, <c>UPDATE</c> or <c>DELETE</c>, by
+/// <c>pg_rewrite</c>: the statement is replaced by the rule's action, usually on another relation, whose rows the
+/// <c>RETURNING</c> list gives, while the row description keeps this relation as each column's origin.  It is no
+/// catalog column.  Null in an answer recorded before the member existed, which reads as no such rule.
+/// </param>
 internal sealed record PostgresTableRow(
     long Oid,
     string Relkind,
     string Schema,
     string Name,
-    IReadOnlyList<PostgresAttributeRow> Columns
+    IReadOnlyList<PostgresAttributeRow> Columns,
+    bool? Relhassubclass,
+    bool? HasForeignPartition,
+    bool? HasInsteadRule
 );
 
 /// <summary>What the catalog says of one column of a relation.</summary>
@@ -220,3 +239,22 @@ internal sealed record PostgresCheckColumn(string Name, long TypeOid, string Dat
 /// <param name="Parameter">The first parameter of the list whose type is refused.</param>
 /// <param name="Message">Npgsql's own message.</param>
 internal sealed record PostgresBindError(string Parameter, string Message);
+
+/// <summary>Everything that decides the answer of <c>explain</c>.</summary>
+/// <param name="Statement">The prepared statement to plan.</param>
+/// <param name="Parameters">
+/// The number of parameter types the server resolved for the statement, a <c>$n</c> that the SQL writes itself
+/// included: a <c>NULL</c> is passed for each, since <c>EXPLAIN EXECUTE</c> takes no other number.
+/// </param>
+/// <param name="Settings">
+/// Settings of the planner as <c>name=value</c>, each of <see cref="PlannerSettings" />.  The tool passes none; a
+/// test forces a join method with them.
+/// </param>
+internal sealed record PostgresExplainRequest(string Statement, int Parameters, IReadOnlyList<string> Settings);
+
+/// <summary>The generic plan of a statement, or why the server gave none.</summary>
+/// <param name="Plan">
+/// The text <c>EXPLAIN (VERBOSE, FORMAT JSON)</c> returned, as the server wrote it.
+/// </param>
+/// <param name="Error">What the server said, or null.  It is logged and never reported.</param>
+internal sealed record PostgresExplainAnswer(string? Plan, PostgresServerError? Error);

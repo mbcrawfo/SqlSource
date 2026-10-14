@@ -1,0 +1,2 @@
+enable_hashjoin=off
+enable_mergejoin=off

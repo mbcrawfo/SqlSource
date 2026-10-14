@@ -1,0 +1,262 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT u.id, left(u.name, 1) AS initial\nFROM users u\nWHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)\n    AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)",
+        "types": []
+      },
+      "answer": {
+        "parameterTypes": [],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 0
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "id",
+            "typeOid": 23,
+            "tableOid": 16396,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 1,
+            "name": "initial",
+            "typeOid": 25,
+            "tableOid": 0,
+            "attributeNumber": 0,
+            "length": null,
+            "precision": null,
+            "scale": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16396
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16396,
+            "relkind": "r",
+            "schema": "public",
+            "name": "users",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "a",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "name",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1043,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "email",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16387,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 4,
+                "name": "status",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16390,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1009,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 6,
+                "name": "balance",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 7,
+                "name": "created_at",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 8,
+                "name": "deleted_at",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 9,
+                "name": "name_upper",
+                "notNull": false,
+                "identity": "",
+                "generated": "s",
+                "typeOid": 25,
+                "notNullValidated": null
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          23,
+          25
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 23,
+            "typname": "int4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "integer",
+            "enumLabels": null
+          },
+          {
+            "oid": 25,
+            "typname": "text",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "text",
+            "enumLabels": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT u.id, left(u.name, 1) AS initial\nFROM users u\nWHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)\n    AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)",
+        "parameters": []
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "id",
+            "typeOid": 23,
+            "dataTypeName": "integer"
+          },
+          {
+            "name": "initial",
+            "typeOid": 25,
+            "dataTypeName": "text"
+          }
+        ],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
+      "method": "explain",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 0,
+        "settings": []
+      },
+      "answer": {
+        "plan": "[\n  {\n    \"Plan\": {\n      \"Node Type\": \"Hash Join\",\n      \"Parallel Aware\": false,\n      \"Async Capable\": false,\n      \"Join Type\": \"Inner\",\n      \"Startup Cost\": 39.35,\n      \"Total Cost\": 61.25,\n      \"Plan Rows\": 52,\n      \"Plan Width\": 36,\n      \"Disabled\": false,\n      \"Output\": [\"u.id\", \"\\\"left\\\"((u.name)::text, 1)\"],\n      \"Inner Unique\": true,\n      \"Hash Cond\": \"(u.id = o.user_id)\",\n      \"Plans\": [\n        {\n          \"Node Type\": \"Hash Join\",\n          \"Parent Relationship\": \"Outer\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Join Type\": \"Right Anti\",\n          \"Startup Cost\": 14.72,\n          \"Total Cost\": 35.64,\n          \"Plan Rows\": 105,\n          \"Plan Width\": 222,\n          \"Disabled\": false,\n          \"Output\": [\"u.id\", \"u.name\"],\n          \"Inner Unique\": true,\n          \"Hash Cond\": \"(b.user_id = u.id)\",\n          \"Plans\": [\n            {\n              \"Node Type\": \"Seq Scan\",\n              \"Parent Relationship\": \"Outer\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Relation Name\": \"bookings\",\n              \"Schema\": \"public\",\n              \"Alias\": \"b\",\n              \"Startup Cost\": 0.00,\n              \"Total Cost\": 16.00,\n              \"Plan Rows\": 600,\n              \"Plan Width\": 4,\n              \"Disabled\": false,\n              \"Output\": [\"b.id\", \"b.user_id\", \"b.during\", \"b.slots\", \"b.tags\"]\n            },\n            {\n              \"Node Type\": \"Hash\",\n              \"Parent Relationship\": \"Inner\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Startup Cost\": 12.10,\n              \"Total Cost\": 12.10,\n              \"Plan Rows\": 210,\n              \"Plan Width\": 222,\n              \"Disabled\": false,\n              \"Output\": [\"u.id\", \"u.name\"],\n              \"Plans\": [\n                {\n                  \"Node Type\": \"Seq Scan\",\n                  \"Parent Relationship\": \"Outer\",\n                  \"Parallel Aware\": false,\n                  \"Async Capable\": false,\n                  \"Relation Name\": \"users\",\n                  \"Schema\": \"public\",\n                  \"Alias\": \"u\",\n                  \"Startup Cost\": 0.00,\n                  \"Total Cost\": 12.10,\n                  \"Plan Rows\": 210,\n                  \"Plan Width\": 222,\n                  \"Disabled\": false,\n                  \"Output\": [\"u.id\", \"u.name\"]\n                }\n              ]\n            }\n          ]\n        },\n        {\n          \"Node Type\": \"Hash\",\n          \"Parent Relationship\": \"Inner\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Startup Cost\": 22.12,\n          \"Total Cost\": 22.12,\n          \"Plan Rows\": 200,\n          \"Plan Width\": 4,\n          \"Disabled\": false,\n          \"Output\": [\"o.user_id\"],\n          \"Plans\": [\n            {\n              \"Node Type\": \"Aggregate\",\n              \"Strategy\": \"Hashed\",\n              \"Partial Mode\": \"Simple\",\n              \"Parent Relationship\": \"Outer\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Startup Cost\": 20.12,\n              \"Total Cost\": 22.12,\n              \"Plan Rows\": 200,\n              \"Plan Width\": 4,\n              \"Disabled\": false,\n              \"Output\": [\"o.user_id\"],\n              \"Group Key\": [\"o.user_id\"],\n              \"Planned Partitions\": 0,\n              \"Plans\": [\n                {\n                  \"Node Type\": \"Seq Scan\",\n                  \"Parent Relationship\": \"Outer\",\n                  \"Parallel Aware\": false,\n                  \"Async Capable\": false,\n                  \"Relation Name\": \"orders\",\n                  \"Schema\": \"public\",\n                  \"Alias\": \"o\",\n                  \"Startup Cost\": 0.00,\n                  \"Total Cost\": 18.10,\n                  \"Plan Rows\": 810,\n                  \"Plan Width\": 4,\n                  \"Disabled\": false,\n                  \"Output\": [\"o.user_id\"]\n                }\n              ]\n            }\n          ]\n        }\n      ]\n    }\n  }\n]",
+        "error": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}

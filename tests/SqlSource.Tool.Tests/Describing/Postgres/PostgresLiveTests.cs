@@ -1,3 +1,4 @@
+using System;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
@@ -16,4 +17,33 @@ public class PostgresLiveTests
         PostgresLive
             .ExecuteText(new PostgresColumnsRequest("sqlsource_7", 3))
             .ShouldBe("EXECUTE sqlsource_7(NULL, NULL, NULL)");
+
+    [Fact]
+    public void ExplainText_StatementWithoutParameters_ExplainsTheExecuteAlone() =>
+        PostgresLive
+            .ExplainText(new PostgresExplainRequest("sqlsource_1", 0, []))
+            .ShouldBe("EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlsource_1");
+
+    [Fact]
+    public void ExplainText_StatementWithParameters_HasANullForEach() =>
+        PostgresLive
+            .ExplainText(new PostgresExplainRequest("sqlsource_7", 2, []))
+            .ShouldBe("EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlsource_7(NULL, NULL)");
+
+    // The generic plan first, then each setting in the order of the request.
+    [Fact]
+    public void SetTexts_RequestWithSettings_ForcesTheGenericPlanThenSetsEach() =>
+        PostgresLive
+            .SetTexts(new PostgresExplainRequest("sqlsource_1", 0, ["enable_nestloop=off", "enable_hashjoin=off"]))
+            .ShouldBe([
+                "SET LOCAL plan_cache_mode = force_generic_plan",
+                "SET LOCAL enable_nestloop = off",
+                "SET LOCAL enable_hashjoin = off",
+            ]);
+
+    [Fact]
+    public void SetTexts_SettingOutsideTheList_Throws() =>
+        Should.Throw<ArgumentException>(() =>
+            PostgresLive.SetTexts(new PostgresExplainRequest("sqlsource_1", 0, ["work_mem=1"]))
+        );
 }

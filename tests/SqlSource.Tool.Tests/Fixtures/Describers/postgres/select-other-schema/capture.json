@@ -144,7 +144,10 @@
                 "typeOid": 1082,
                 "notNullValidated": true
               }
-            ]
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
           }
         ],
         "error": null

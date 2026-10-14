@@ -27,7 +27,7 @@ internal static class PostgresTables
         );
 
     public static PostgresTableRow TableOf(long oid, string name, params PostgresAttributeRow[] columns) =>
-        new(oid, "r", "public", name, columns);
+        new(oid, "r", "public", name, columns, false, false, false);
 
     public static PostgresAttributeRow Attribute(
         int attnum,

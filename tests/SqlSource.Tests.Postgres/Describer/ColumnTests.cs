@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -398,6 +399,121 @@ public sealed class ColumnTests(PostgresContainer postgres)
         NullabilityOf(columns).ShouldBe([(true, "catalog"), (false, "catalog")]);
     }
 
+    // A legacy inheritance parent and its child, of this test alone, made by SQL that can be run again.
+    private const string InheritanceTables = """
+        CREATE TABLE IF NOT EXISTS inh_parent (id integer NOT NULL, v text NOT NULL);
+        CREATE TABLE IF NOT EXISTS inh_child () INHERITS (inh_parent);
+        """;
+
+    // Before PostgreSQL 18 a child may drop a NOT NULL it inherited, and a query of the parent reads the child's
+    // rows, so a NULL comes back for a column the parent says is NOT NULL.  18 refuses the drop, and the answer is
+    // the same there: the rule does not depend on the version.
+    [Fact]
+    public async Task Describe_ColumnsOfAnInheritanceParent_AreNullableByTheCatalog()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        {
+            await using var made = source.CreateCommand(InheritanceTables);
+            _ = await made.ExecuteNonQueryAsync(token);
+            if (await ServerMajorAsync() < 18)
+            {
+                await using var dropped = source.CreateCommand("ALTER TABLE inh_child ALTER COLUMN v DROP NOT NULL");
+                _ = await dropped.ExecuteNonQueryAsync(token);
+            }
+        }
+
+        var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM inh_parent p");
+
+        NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
+    }
+
+    // A partitioned table, of this test alone, with a foreign partition through postgres_fdw over a loopback server
+    // to the container's own database, at the server's port inside the container, made by SQL that can be run
+    // again.  Its remote row holds NULL in v, which the parent says is NOT NULL.
+    private static string ForeignPartitionTables(NpgsqlConnectionStringBuilder connection) =>
+        $$"""
+            CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+            CREATE SERVER IF NOT EXISTS fp_loop FOREIGN DATA WRAPPER postgres_fdw
+                OPTIONS (dbname {{Literal(connection.Database)}}, host 'localhost', port '5432');
+            CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER SERVER fp_loop
+                OPTIONS (user {{Literal(connection.Username)}}, password {{Literal(connection.Password)}});
+            CREATE TABLE IF NOT EXISTS fp_remote (id integer NOT NULL, kind integer NOT NULL, v text);
+            INSERT INTO fp_remote SELECT 1, 2, NULL WHERE NOT EXISTS (SELECT 1 FROM fp_remote);
+            CREATE TABLE IF NOT EXISTS fp_parted (id integer NOT NULL, kind integer NOT NULL, v text NOT NULL)
+                PARTITION BY LIST (kind);
+            CREATE TABLE IF NOT EXISTS fp_parted_1 PARTITION OF fp_parted FOR VALUES IN (1);
+            CREATE FOREIGN TABLE IF NOT EXISTS fp_parted_2 PARTITION OF fp_parted FOR VALUES IN (2)
+                SERVER fp_loop OPTIONS (table_name 'fp_remote');
+            """;
+
+    private static string Literal(string? value) =>
+        $"'{(value ?? string.Empty).Replace("'", "''", StringComparison.Ordinal)}'";
+
+    // A foreign partition inherits its parent's NOT NULL, which nothing enforces on the remote rows, and a query of
+    // the parent reads them: both columns' origin is the parent, so both are nullable, on every version.
+    [Fact]
+    public async Task Describe_ColumnsOfAPartitionedTableWithAForeignPartition_AreNullableByTheCatalog()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        {
+            await using var made = source.CreateCommand(
+                ForeignPartitionTables(new NpgsqlConnectionStringBuilder(postgres.ConnectionString))
+            );
+            _ = await made.ExecuteNonQueryAsync(token);
+        }
+
+        // The premise: a query of the parent returns the remote row's NULL.
+        (await ScalarAsync("SELECT p.v IS NULL FROM fp_parted p WHERE p.id = 1")).ShouldBe(true);
+
+        var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM fp_parted p");
+
+        NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
+    }
+
+    // A table with a DO INSTEAD rule on INSERT, and the table the rule writes to instead, of this test alone, made by
+    // SQL that can be run again.  The rule writes NULL into the other table's id and returns the other table's row.
+    private const string InsteadRuleTables = """
+        CREATE TABLE IF NOT EXISTS ir_target (id integer NOT NULL, x integer);
+        CREATE TABLE IF NOT EXISTS ir_other (id integer, x integer);
+        CREATE OR REPLACE RULE ir_target_insert AS ON INSERT TO ir_target
+            DO INSTEAD INSERT INTO ir_other VALUES (NULL, NEW.x) RETURNING ir_other.*;
+        """;
+
+    // The rule replaces the INSERT by its action, and the rows of its RETURNING list are the action's, while the row
+    // description keeps the target as the column's origin: the column is nullable whatever the target's NOT NULL
+    // says, whether the query is gated or not.  The gated one's plan inserts into the other table under its own
+    // alias, which the walk maps to the target's column and finds nothing extends.
+    [Fact]
+    public async Task Describe_ReturningOfATableWithAnInsteadRule_IsNullableByTheCatalog()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        {
+            await using var made = source.CreateCommand(InsteadRuleTables);
+            _ = await made.ExecuteNonQueryAsync(token);
+
+            // The premise: the INSERT returns the rule's row, whose id is NULL.  The row is rolled back.
+            await using var connection = await source.OpenConnectionAsync(token);
+            await using var transaction = await connection.BeginTransactionAsync(token);
+            await using var inserted = connection.CreateCommand();
+            inserted.CommandText = "INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id";
+            (await inserted.ExecuteScalarAsync(token)).ShouldBe(DBNull.Value);
+            await transaction.RollbackAsync(token);
+        }
+
+        var plain = await ShouldDescribeAsync("INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id");
+        var gated = await ShouldDescribeAsync(
+            "INSERT INTO ir_target (id, x) VALUES (1, 2) RETURNING id, left('a', 1) AS l"
+        );
+
+        plain.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        NullabilityOf(plain.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog")]);
+        gated.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        NullabilityOf(gated.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog"), (null, "no-origin")]);
+    }
+
     // The query of the spec's Goal, without its join.
     [Fact]
     public async Task Describe_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()
@@ -413,7 +529,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     // The query of the spec's Goal: each row of its table.
     [Fact]
-    public async Task Describe_LeftJoin_IsGatedAndEveryOriginColumnIsNullableByTheHeuristic()
+    public async Task Describe_LeftJoin_IsWalkedAndOnlyTheExtendedSideIsNullableByTheJoin()
     {
         var description = await ShouldDescribeAsync(
             "SELECT u.id, u.email, o.total, count(*) OVER () AS n "
@@ -421,19 +537,19 @@ public sealed class ColumnTests(PostgresContainer postgres)
         );
 
         var columns = description.Columns.ShouldNotBeNull();
-        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         description.MatchesTable.ShouldBeNull();
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
         TypeNamesOf(columns).ShouldBe(["integer", "public.email_t", "numeric(18,2)", "bigint"]);
         NullabilityOf(columns)
-            .ShouldBe([(true, "heuristic"), (true, "heuristic"), (true, "heuristic"), (null, "no-origin")]);
+            .ShouldBe([(false, "catalog"), (true, "catalog"), (true, "outer-join"), (null, "no-origin")]);
         columns
             .Select(column => column.Origin)
             .ShouldBe([Origin("users", "id"), Origin("users", "email"), Origin("orders", "total"), null]);
     }
 
     // A subtotal row holds NULL in a NOT NULL grouping column, with no outer join in sight, and the column keeps
-    // its origin.
+    // its origin.  The walk refuses a plan with a grouping set, so the heuristic stands.
     [Theory]
     [InlineData("SELECT status, count(*) FROM users GROUP BY ROLLUP (status)")]
     [InlineData("SELECT status, count(*) FROM users GROUP BY CUBE (status)")]
@@ -449,9 +565,10 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     // PostgreSQL 18's old and new row of a RETURNING list are NULL for the row an INSERT had no old one of, and
-    // each column keeps its table as its origin, with no outer join in the plan.
+    // each column keeps its table as its origin, and the plan prints them as old.id and new.id, which name no
+    // relation instance.
     [Fact]
-    public async Task Describe_ReturningOldAndNew_IsGated()
+    public async Task Describe_ReturningOldAndNew_KeepsTheHeuristic()
     {
         Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
 
@@ -459,16 +576,17 @@ public sealed class ColumnTests(PostgresContainer postgres)
             "INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING old.id, new.id"
         );
 
-        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         var columns = description.Columns.ShouldNotBeNull();
         columns.Select(column => column.Origin).ShouldBe([Origin("orders", "id"), Origin("orders", "id")]);
         NullabilityOf(columns).ShouldBe([(true, "heuristic"), (true, "heuristic")]);
     }
 
     // A MERGE of PostgreSQL 17 that deletes the rows of the target the source lacks returns the source's columns
-    // as NULL, and the column keeps the source's table as its origin.
+    // as NULL, and the column keeps the source's table as its origin.  The MERGE plans as a join that extends the
+    // source, and the row returned is the target's own.
     [Fact]
-    public async Task Describe_MergeReturning_IsGated()
+    public async Task Describe_MergeReturning_ExtendsTheSourceAndNotTheTarget()
     {
         Assert.SkipWhen(await ServerMajorAsync() < 17, "PostgreSQL before 17 has no RETURNING for MERGE.");
 
@@ -477,20 +595,20 @@ public sealed class ColumnTests(PostgresContainer postgres)
                 + "WHEN NOT MATCHED BY SOURCE THEN DELETE RETURNING u.id, o.id"
         );
 
-        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         var columns = description.Columns.ShouldNotBeNull();
         columns[0].Origin.ShouldBe(Origin("users", "id"));
-        (columns[0].Nullable, columns[0].NullableSource).ShouldBe((true, "heuristic"));
+        NullabilityOf(columns).ShouldBe([(true, "outer-join"), (false, "catalog")]);
     }
 
     // The gate reads words: a function named as one gates a query that has no join.
     [Fact]
-    public async Task Describe_FunctionNamedAsAGateWord_IsGated()
+    public async Task Describe_FunctionNamedAsAGateWord_IsWalkedAndFindsNothing()
     {
         var description = await ShouldDescribeAsync("SELECT id, left(name, 3) AS l FROM users");
 
-        description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
-        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(true, "heuristic"), (null, "no-origin")]);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(false, "catalog"), (null, "no-origin")]);
     }
 
     [Fact]
@@ -502,8 +620,8 @@ public sealed class ColumnTests(PostgresContainer postgres)
         NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(false, "catalog"), (null, "no-origin")]);
     }
 
-    // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  A view's column says "view"
-    // in a gated query too.
+    // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  In a gated query a view's
+    // column says "view" where no join extends it.
     [Fact]
     public async Task Describe_ColumnsOfAViewAndOfAMaterializedView_SayView()
     {
@@ -525,7 +643,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         NullabilityOf(view).ShouldAllBe(found => found.Nullable == null && found.Source == "view");
         NullabilityOf(materialized).ShouldBe([(null, "view")]);
-        NullabilityOf(gated).ShouldBe([(null, "view"), (true, "heuristic")]);
+        NullabilityOf(gated).ShouldBe([(null, "view"), (true, "outer-join")]);
     }
 
     // A table's row selected whole is a column of the table's composite type, which is no pseudo-type.

@@ -158,7 +158,7 @@ public class TableMatcherTests
         Match([.. Whole(Items with { Relkind = relkind }).Select(static cell => cell.WithNullable(null))])
             .ShouldBe((new SidecarTable("public", "items"), SidecarValues.TableMatch.Matched));
 
-    // What the walk of sub-phase 3.5 does to a view's column on the nullable side of a join.
+    // A view's column that the walk found on the nullable side of a join is recorded nullable, which the match reads.
     [Fact]
     public void Match_ColumnOfAViewRecordedNullable_IsNullabilityDiffers()
     {
@@ -196,6 +196,59 @@ public class TableMatcherTests
 
         Match(Whole(loose)).ShouldBe((new SidecarTable("public", "loose"), SidecarValues.TableMatch.Matched));
         Match(From(loose, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
+    }
+
+    // A table with inheritance children has nullable columns by the same rule, so SELECT * from it still matches.
+    [Fact]
+    public void Match_TableWithChildren_MatchesAsTheNullableColumnsItHas()
+    {
+        var parent = PostgresTables.TableOf(
+            11,
+            "parent",
+            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+        ) with
+        {
+            Relhassubclass = true,
+        };
+
+        Match(Whole(parent)).ShouldBe((new SidecarTable("public", "parent"), SidecarValues.TableMatch.Matched));
+        Match(From(parent, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
+    }
+
+    // So does a partitioned table with a foreign partition.
+    [Fact]
+    public void Match_PartitionedTableWithAForeignPartition_MatchesAsTheNullableColumnsItHas()
+    {
+        var parted = PostgresTables.TableOf(
+            12,
+            "parted",
+            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+        ) with
+        {
+            Relkind = "p",
+            Relhassubclass = true,
+            HasForeignPartition = true,
+        };
+
+        Match(Whole(parted)).ShouldBe((new SidecarTable("public", "parted"), SidecarValues.TableMatch.Matched));
+        Match(From(parted, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
+    }
+
+    // And a table with an INSTEAD rule, whose RETURNING rows come from the rule's action.
+    [Fact]
+    public void Match_TableWithAnInsteadRule_MatchesAsTheNullableColumnsItHas()
+    {
+        var ruled = PostgresTables.TableOf(
+            13,
+            "ruled",
+            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+        ) with
+        {
+            HasInsteadRule = true,
+        };
+
+        Match(Whole(ruled)).ShouldBe((new SidecarTable("public", "ruled"), SidecarValues.TableMatch.Matched));
+        Match(From(ruled, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
     }
 
     // Each case fails two checks, and the answer is the one that comes first in the format's order.

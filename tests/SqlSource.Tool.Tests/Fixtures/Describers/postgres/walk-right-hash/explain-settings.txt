@@ -1,0 +1,2 @@
+enable_mergejoin=off
+enable_nestloop=off

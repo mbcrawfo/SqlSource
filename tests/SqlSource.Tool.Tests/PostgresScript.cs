@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -52,15 +53,19 @@ internal sealed class PostgresScript
     public static Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         IDescribeExchange exchange,
         IRunLog? log = null,
-        string connection = Connection
+        string connection = Connection,
+        IReadOnlyList<string>? explainSettings = null
     ) =>
-        new PostgresDescriber().OpenAsync(
+        new PostgresDescriber(explainSettings ?? []).OpenAsync(
             new OpenRequest(Database, connection, exchange, TimeProvider.System),
             log ?? NullRunLog.Instance,
             TestContext.Current.CancellationToken
         );
 
     // The session of a script whose "open" answered a server.
-    public static async Task<IDescribeSession> SessionAsync(IDescribeExchange exchange, IRunLog? log = null) =>
-        (await OpenAsync(exchange, log)).Value.ShouldNotBeNull();
+    public static async Task<IDescribeSession> SessionAsync(
+        IDescribeExchange exchange,
+        IRunLog? log = null,
+        IReadOnlyList<string>? explainSettings = null
+    ) => (await OpenAsync(exchange, log, explainSettings: explainSettings)).Value.ShouldNotBeNull();
 }
