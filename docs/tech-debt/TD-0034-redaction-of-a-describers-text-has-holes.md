@@ -13,7 +13,7 @@ Before a text that a describer gave is printed, [`Redaction`](../../src/SqlSourc
 
 ## Why it exists
 
-The tool does not read a connection string and so knows no part of one, and the first describer, PostgreSQL's, was registered only in sub-phase 3.6, so its driver's texts have been met in its tests and in no user's run.  What the tool could mend alone is mended: the descriptor of a failure is searched, a failure's server lines are searched joined, and a value that the sidecar holds without the describer is no fault.
+The tool does not read a connection string and so knows no part of one, and the first describer, PostgreSQL's, was not registered until sub-phase 3.6, so its driver's texts have been met in its tests and in no user's run.  What the tool could mend alone is mended: the descriptor of a failure is searched, a failure's server lines are searched joined, and a value that the sidecar holds without the describer is no fault.
 
 ## Impact
 

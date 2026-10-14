@@ -34,6 +34,9 @@ public sealed class DescribeCommandTests : IDisposable
     private const string LogDatabase = "sqlsrc_numbat";
     private const string LogApplication = "sqlsrc_quokka";
 
+    // Not the password that CreateLogRoleAndDatabaseAsync gives the role.
+    private const string WrongPassword = "sqlsrc_not_the_password";
+
     // The cases of the describer's fixtures that a describer with no settings of the planner describes.  A case
     // with an explain-settings.txt turns join methods off, which a run of the command cannot.
     private static readonly IReadOnlyList<FixtureCase> Cases =
@@ -245,6 +248,40 @@ public sealed class DescribeCommandTests : IDisposable
         foreach (var driver in events.Where(logged => NameOf(logged) == DriverEvent))
         {
             driver.GetRawText().ShouldNotContain(host);
+        }
+    }
+
+    // The commonest real failure: the server rejects the role's password.  The diagnostic says what the driver said,
+    // which names the role (TD-0034).  Npgsql 10.0.3 writes no driver event for it, so the check of the driver's
+    // events holds for a later version that does.
+    [Fact]
+    public async Task Describe_WrongPasswordWithLog_IsSqlsrc224AndNoDriverEventHoldsTheUserOrTheHost()
+    {
+        await CreateLogRoleAndDatabaseAsync();
+        _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
+        var connection = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString)
+        {
+            Username = LogRole,
+            Password = WrongPassword,
+            Database = LogDatabase,
+        };
+        var log = _run.Folder.PathOf("run.log");
+
+        var result = await DescribeWithAsync(connection.ConnectionString, "--log", log);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("error SQLSRC224: ");
+        var events = LogReader.Read(log);
+        events.ShouldContain(logged =>
+            NameOf(logged) == "diagnostic"
+            && logged.GetProperty("id").GetString() == "SQLSRC224"
+            && logged.GetProperty("lines").GetArrayLength() > 0
+        );
+        foreach (var driver in events.Where(logged => NameOf(logged) == DriverEvent))
+        {
+            var text = driver.GetRawText();
+            text.ShouldNotContain(LogRole);
+            text.ShouldNotContain(connection.Host!);
         }
     }
 
