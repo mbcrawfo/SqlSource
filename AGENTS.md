@@ -15,13 +15,12 @@ These apply to all development in this project.
 
 ## Commits
 
-Every commit must pass `./pre-commit-validation.sh`.  In Claude Code this is enforced: a `PreToolUse` hook, `.claude/hooks/pre-commit-validation.sh`, registered in `.claude/settings.json`, runs that script before any Bash command that contains `git commit` and blocks the command when a check fails.  Other agents run the script themselves before committing.
+Every commit must pass `./pre-commit-validation.sh`.  Nothing enforces this: no hook runs the script for you, so running it is your job, every time.
 
-1. **Validate before you commit.**  Run `./pre-commit-validation.sh` first and fix what it reports.  A blocked commit only tells you that validation failed; the details come from running the script.
-2. **Fix first, commit in a separate command.**  The hook runs before the command starts and checks the working tree as it is at that moment, not the staged content.  A command such as `./format.sh && git commit` is validated before `format.sh` has run.
-3. **Never work around the hook.**  Do not reach `git commit` through an alias, a wrapper, a line continuation or any other spelling the hook does not match, and do not edit the hook or `.claude/settings.json` to get a commit through.  If a check is wrong, tell the user.
-4. **Expect it to fire on the phrase, not the intent.**  Matching is textual, so a command that only mentions `git commit` inside a quoted string, or runs `git commit-tree` or `git commit-graph`, is validated too and is blocked when the tree fails.  Keep the phrase out of commands that do not commit.
-5. **It needs the full toolchain.**  The commit is blocked when Docker is not running, when `jq` is not installed, or when the local tools have not been restored.  Fix the environment; see `CONTRIBUTING.md`.
+1. **Validate before you commit.**  Run `./pre-commit-validation.sh` after your last edit and fix what it reports before you commit.  A run only covers the tree it ran on; an edit made after a passing run, however small, needs another run.
+2. **Never push a branch that has not passed.**  This is the rule that matters most.  Before every push, run `./pre-commit-validation.sh` on the tree exactly as it will be pushed and see it pass.  CI runs the same checks, so a failure there is one you could have found locally, and it costs a full CI run, a fix, another push and another wait.  Do not push on the strength of an earlier run, of a run on another commit, or of the belief that a change is too small to break anything.
+3. **Never skip a check.**  Do not commit or push past a failure, and do not edit the script to make one go away.  If a check is wrong, tell the user.
+4. **It needs the full toolchain.**  The script fails when Docker is not running or when the local tools have not been restored.  Fix the environment; see `CONTRIBUTING.md`.
 
 ## Pull requests
 
