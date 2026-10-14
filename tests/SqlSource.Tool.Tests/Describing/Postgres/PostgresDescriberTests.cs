@@ -17,6 +17,13 @@ public class PostgresDescriberTests
     public void Dialect_OfTheDescriber_IsPostgreSql() =>
         new PostgresDescriber().Dialect.ShouldBe(SqlDialect.PostgreSql);
 
+    // The list is closed: nothing else reaches a SET LOCAL, and a describer that would send it is never made.
+    [Theory]
+    [InlineData("work_mem=1")]
+    [InlineData("enable_hashjoin=off; DROP TABLE users")]
+    public void Constructor_SettingOutsideTheList_Throws(string setting) =>
+        Should.Throw<ArgumentException>(() => new PostgresDescriber(["enable_nestloop=off", setting]));
+
     // The connection of a script is the word "replay", which no driver could open: nothing of Npgsql runs.
     [Fact]
     public async Task OpenAsync_ReplayedOpen_GivesTheServerOfTheAnswerAndTouchesNoConnection()

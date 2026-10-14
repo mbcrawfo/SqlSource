@@ -46,7 +46,7 @@ public sealed class DescriberFixtureTests : IDisposable
     private static IQueryDescriber DescriberOf(FixtureCase fixture) =>
         fixture.Engine switch
         {
-            "postgres" => new PostgresDescriber(),
+            "postgres" => new PostgresDescriber(fixture.ExplainSettings),
             _ => throw new InvalidOperationException($"No describer is known for the engine of the case {fixture}."),
         };
 

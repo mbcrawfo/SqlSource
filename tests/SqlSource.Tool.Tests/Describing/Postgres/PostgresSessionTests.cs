@@ -899,6 +899,35 @@ public class PostgresSessionTests
         AnswersOf(description).ShouldBe([(false, "catalog"), (null, "no-origin")]);
     }
 
+    // The settings of the describer are in the request, so a capture recorded with them is replayed with them.
+    [Fact]
+    public async Task DescribeAsync_DescriberWithSettings_AsksThePlanWithThem()
+    {
+        var users = PostgresTables.Users;
+        var plan = Join("Left", Scan("u"), Scan("o")) with { Output = ["u.id", "count(*) OVER (?)"] };
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, GatedUsersId, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        _ = Checks(script, GatedUsersId, [], Expression(0, "id", 23), Expression(1, "n", 20));
+        _ = script.Answer(
+            "explain",
+            new PostgresExplainRequest("sqlsource_1", 0, ["enable_hashjoin=off", "enable_mergejoin=off"]),
+            PlanOf(plan)
+        );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(
+            exchange,
+            explainSettings: ["enable_hashjoin=off", "enable_mergejoin=off"]
+        );
+
+        var described = await session.DescribeAsync(Request(GatedUsersId), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        described.Value.ShouldNotBeNull().Plan.ShouldBe(SidecarValues.Plan.Walked);
+    }
+
     // The same query planned with users as the side the join null-extends.
     [Fact]
     public async Task DescribeAsync_GatedQueryWhoseJoinExtendsTheColumnsSide_IsNullableByTheOuterJoin()

@@ -48,7 +48,7 @@ public sealed class FixtureCasesTests(PostgresContainer postgres)
 
         var live = await FixtureReplay.DescribeThroughAsync(
             fixture,
-            static _ => new PostgresDescriber(),
+            static found => new PostgresDescriber(found.ExplainSettings),
             postgres.ConnectionString,
             LiveExchange.Instance
         );
@@ -63,7 +63,7 @@ public sealed class FixtureCasesTests(PostgresContainer postgres)
 
         var expected = await FixtureReplay.DescribeThroughAsync(
             fixture,
-            static _ => new PostgresDescriber(),
+            static found => new PostgresDescriber(found.ExplainSettings),
             postgres.ConnectionString,
             new CapturingExchange(LiveExchange.Instance, capture)
         );

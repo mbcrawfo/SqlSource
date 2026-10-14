@@ -33,6 +33,7 @@ internal sealed class PostgresSession : IDescribeSession
     private readonly IRunLog _log;
     private readonly PostgresLive _live;
     private readonly TimeProvider _time;
+    private readonly IReadOnlyList<string> _explainSettings;
     private int _statements;
 
     private PostgresSession(
@@ -40,7 +41,8 @@ internal sealed class PostgresSession : IDescribeSession
         IRunLog log,
         PostgresConnection connection,
         PostgresLive live,
-        ServerInfo server
+        ServerInfo server,
+        IReadOnlyList<string> explainSettings
     )
     {
         _exchange = request.Exchange;
@@ -49,6 +51,7 @@ internal sealed class PostgresSession : IDescribeSession
         _live = live;
         Connection = connection;
         Server = server;
+        _explainSettings = explainSettings;
     }
 
     public ServerInfo Server { get; }
@@ -62,6 +65,9 @@ internal sealed class PostgresSession : IDescribeSession
     /// <summary>Asks <c>open</c>, and gives the session of the server that answered.</summary>
     /// <param name="request">The database, its connection, the exchange and the clock.</param>
     /// <param name="log">Where the session's events go.</param>
+    /// <param name="explainSettings">
+    /// The settings of the planner that every <c>explain</c> carries: none, but in a test.
+    /// </param>
     /// <param name="cancellationToken">Ends the call.</param>
     [SuppressMessage(
         "Reliability",
@@ -73,6 +79,7 @@ internal sealed class PostgresSession : IDescribeSession
     public static async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,
         IRunLog log,
+        IReadOnlyList<string> explainSettings,
         CancellationToken cancellationToken
     )
     {
@@ -92,7 +99,7 @@ internal sealed class PostgresSession : IDescribeSession
                 return Outcome<IDescribeSession, DescribeFailure>.Failed(PostgresErrors.Open(error, request.Database));
             }
 
-            var session = new PostgresSession(request, log, connection, live, ServerOf(answer));
+            var session = new PostgresSession(request, log, connection, live, ServerOf(answer), explainSettings);
             kept = true;
             return Outcome<IDescribeSession, DescribeFailure>.Of(session);
         }
@@ -270,7 +277,7 @@ internal sealed class PostgresSession : IDescribeSession
         CancellationToken cancellationToken
     )
     {
-        var asked = new PostgresExplainRequest(statement, request.Parameters.Count, PlannerSettings.None);
+        var asked = new PostgresExplainRequest(statement, request.Parameters.Count, _explainSettings);
         var answer = await _exchange.AskAsync("explain", asked, _live.ExplainAsync, cancellationToken);
         if (answer.Error is not null)
         {
