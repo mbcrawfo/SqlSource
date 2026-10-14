@@ -5,7 +5,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
 /// The outer-join gate: whether a query holds a word that can make a <c>NOT NULL</c> column of a table come back
-/// <c>NULL</c>.  For a query that is gated the catalog's <c>NOT NULL</c> is not believed.
+/// <c>NULL</c>.  For a query that is gated the catalog's <c>NOT NULL</c> is believed only where the walk proves that
+/// no join extends the column.
 /// </summary>
 /// <remarks>
 /// The words are the four of an outer join, the three of the grouping sets and three more.  The grouping sets put
@@ -13,12 +14,13 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <c>GROUPING SETS</c> and the function.  <c>OLD</c> and <c>NEW</c> are the old and the new row of a
 /// <c>RETURNING</c> list of PostgreSQL 18, all <c>NULL</c> for the row an <c>INSERT</c> had no old one of and a
 /// <c>DELETE</c> has no new one of; <c>MERGE</c> has a <c>RETURNING</c> list that holds the source's columns as
-/// <c>NULL</c> for a row that <c>WHEN NOT MATCHED BY SOURCE</c> acted on.  Each keeps the table's origin in the
-/// row description, and none has an outer join in its plan.  What the list must keep is the rule that a column is
-/// never <c>false</c> when the server can return <c>NULL</c> for it.  The lexer of the generator says what is a
-/// string, a comment or a quoted identifier, and only what is left is searched.  The gate reads words and no
-/// structure: <c>left(name, 3)</c> gates a query that has no join, which costs one walk that finds nothing and
-/// never a wrong answer.
+/// <c>NULL</c> for a row that <c>WHEN NOT MATCHED BY SOURCE</c> acted on.  Each keeps the table's origin in the row
+/// description.  The walk answers for them as for any gated query: a <c>MERGE</c> plans as a join that null-extends
+/// its source, and the old and the new row print under names that are no relation instance's, so their columns keep
+/// the heuristic.  What the list must keep is the rule that a column is never <c>false</c> when the server can
+/// return <c>NULL</c> for it.  The lexer of the generator says what is a string, a comment or a quoted identifier,
+/// and only what is left is searched.  The gate reads words and no structure: <c>left(name, 3)</c> gates a query that
+/// has no join, which costs one walk that finds nothing and never a wrong answer.
 /// </remarks>
 internal static class OuterJoinGate
 {

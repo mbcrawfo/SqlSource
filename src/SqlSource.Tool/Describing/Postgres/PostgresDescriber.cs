@@ -9,7 +9,7 @@ using SqlSource.Tool.Logging;
 namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
-/// Asks a PostgreSQL to describe queries, through Npgsql.  It is registered nowhere until the describer is whole:
+/// Asks a PostgreSQL to describe queries, through Npgsql.  It is registered nowhere until sub-phase 3.6 registers it:
 /// the released tool has none for <c>postgres</c>.
 /// </summary>
 /// <remarks>

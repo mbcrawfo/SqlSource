@@ -158,7 +158,7 @@ public class TableMatcherTests
         Match([.. Whole(Items with { Relkind = relkind }).Select(static cell => cell.WithNullable(null))])
             .ShouldBe((new SidecarTable("public", "items"), SidecarValues.TableMatch.Matched));
 
-    // What the walk of sub-phase 3.5 does to a view's column on the nullable side of a join.
+    // A view's column that the walk found on the nullable side of a join is recorded nullable, which the match reads.
     [Fact]
     public void Match_ColumnOfAViewRecordedNullable_IsNullabilityDiffers()
     {
