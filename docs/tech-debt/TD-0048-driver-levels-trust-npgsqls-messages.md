@@ -14,11 +14,11 @@ Sub-phase 3.6 wanted the driver's account of what it sent, to explain a run that
 
 ## Impact
 
-Low.  Only a run with `--log` forwards anything, and only a message that names the host, the user or the database, at a level the tool forwards, reaches the file.  The container test of sub-phase 3.6, `Describe_ConnectionRefusedWithLog_IsSqlsrc224AndNoDriverEventHoldsTheHost`, refuses a connection to a host that is up and checks every `postgres.driver` event for the host, the user, the database and the application name; it holds for the Npgsql the tool pins, 10.0.3.
+Low.  Only a run with a log, by `--log` or by `SQLSOURCE_LOG`, forwards anything, and only a message that names the host, the user or the database, at a level the tool forwards, reaches the file.  Two container tests of sub-phase 3.6, in `DescribeCommandTests`, hold it for the Npgsql the tool pins, 10.0.3.  `Describe_WithLog_HoldsDriverEventsAndNoConnectionWord` describes through a connection whose user, database and application name are words of its own, and finds none of them, nor the host, anywhere in the log, which holds the driver's events of `Npgsql.Command`.  `Describe_ConnectionRefusedWithLog_IsSqlsrc224AndNoDriverEventHoldsTheHost` is refused by a host that is up, on port 1, and checks every `postgres.driver` event for the host.  Npgsql 10.0.3 writes no event for a refused connect, so that check runs over none today: it is there for a version that writes one.
 
 ## Proposed fix
 
-When Npgsql is updated, run that test, and the container test of the log, against the new version and read the release notes for its logging: a message at Debug of `Npgsql.Command` or `Npgsql.Transaction`, or at Warning or above of any category, that names an endpoint, a user or a database is a reason to raise the level of its category, or to drop its message.  If the test ever fails, the levels are wrong and not the test.  A lasting fix is to forward by event id instead of by category: a list of the ids that are known to be safe, written in `NpgsqlRunLogger`, so that a message that is new to a version is dropped until someone reads it.
+When Npgsql is updated, run the two tests against the new version and read the release notes for its logging: a message at Debug of `Npgsql.Command` or `Npgsql.Transaction`, or at Warning or above of any category, that names an endpoint, a user or a database is a reason to raise the level of its category, or to drop its message.  If the test ever fails, the levels are wrong and not the test.  A lasting fix is to forward by event id instead of by category: a list of the ids that are known to be safe, written in `NpgsqlRunLogger`, so that a message that is new to a version is dropped until someone reads it.
 
 ## Trigger
 

@@ -23,7 +23,7 @@ internal sealed class CliRun : IDisposable
     // Answers every "dotnet msbuild" of the run.  A project it was told nothing about uses SqlSource.
     public FakeProcessRunner Processes { get; } = new();
 
-    // The describers of the run.  None, as in the released tool, unless a test adds one.
+    // The describers of the run.  None unless a test adds one, where the released tool has PostgreSQL's.
     public List<IQueryDescriber> Describers { get; } = [];
 
     public CliRun()

@@ -20,7 +20,7 @@ The first: refusing a `$n` needs the tool to tell one from a dollar-quoted strin
 
 ## Impact
 
-Low today, since the describer is registered nowhere until sub-phase 3.6.  The first two need a query or a schema that few projects have.  The third costs nothing: the session ends.  The fourth costs nothing in practice, since a connection that fails there has ended.  The fifth is the one that a user meets first once the describer is registered: a project that keeps one `CALL` beside its queries gets no sidecar for that file, and an error that sends its author looking for a mistake in valid SQL.  The sixth gives a user of an old server an error on every query with a parameter that names nothing they wrote.  The seventh needs a parameter that is compared with a column of the catalog.  The eighth and the ninth are unknown in size: a pooled connection is common where a database is hosted, and a describe through one may end the run with `SQLSRC200`.
+Low.  The describer is registered since sub-phase 3.6, so each of these can reach a user.  The first two need a query or a schema that few projects have.  The third costs nothing: the session ends.  The fourth costs nothing in practice, since a connection that fails there has ended.  The fifth is the one that a user meets first: a project that keeps one `CALL` beside its queries gets no sidecar for that file, and an error that sends its author looking for a mistake in valid SQL.  The sixth gives a user of an old server an error on every query with a parameter that names nothing they wrote.  The seventh needs a parameter that is compared with a column of the catalog.  The eighth and the ninth are unknown in size: a pooled connection is common where a database is hosted, and a describe through one may end the run with `SQLSRC200`.
 
 ## Proposed fix
 
@@ -28,4 +28,4 @@ For the first, report a `$` followed by a digit in a `Text` lexeme, outside an i
 
 ## Trigger
 
-Phase 8, whose generated code sends the SQL as written, for the first, and binds a parameter by the sidecar's `name`, for the second; sub-phase 3.6, which registers the describer and so gives it to users, for the fifth to the ninth.
+Phase 8, whose generated code sends the SQL as written, for the first, and binds a parameter by the sidecar's `name`, for the second; for the fifth to the ninth, a user who meets one, since sub-phase 3.6 gave the describer to users.

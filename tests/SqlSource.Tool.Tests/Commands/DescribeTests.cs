@@ -253,7 +253,7 @@ public sealed class DescribeTests : IDisposable
         result.Error.ShouldStartWith($"sqlsource : error SQLSRC203: '{path}' is not a .sln, .slnx or .csproj file");
     }
 
-    // The released tool has no describer, so a query that must be described is SQLSRC216.
+    // A run of the tests has no describer unless the test adds one, so a query that must be described is SQLSRC216.
     [Fact]
     public async Task Run_ProjectWithAQueryToDescribe_IsSqlsrc216AndASummaryLine()
     {

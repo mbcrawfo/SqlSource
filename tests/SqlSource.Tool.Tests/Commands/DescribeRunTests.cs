@@ -305,7 +305,7 @@ public sealed class DescribeRunTests : IDisposable
         _scene.Describer.Opened.ShouldHaveSingleItem().Connection.ShouldBe("Host=one");
     }
 
-    // The released tool: no describer is registered until phase 3.
+    // No describer is registered for the dialect, as the released tool has none for mssql.
     [Fact]
     public async Task Run_NoDescriberRegistered_IsSqlsrc216AtEachQueryAndNothingIsWritten()
     {
