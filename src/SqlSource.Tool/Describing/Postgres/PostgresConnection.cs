@@ -81,6 +81,8 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     public const string GssUnavailable = "GSS authentication is not available on this machine";
 
     // The type of the runtime whose static constructor loads the GSS library: Interop+NetSecurityNative+GssInitializer.
+    // It is initialized by the static constructor of Interop+NetSecurityNative, so the exception that comes out is for
+    // that type, with this one as its inner exception.
     private const string GssInitializer = "GssInitializer";
 
     private NpgsqlDataSource? _source;
@@ -145,10 +147,13 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// <c>KerberosServiceName</c> and <c>GSS Encryption Mode</c>: <c>GSSEncrypt</c> wraps its failures in an
     /// <see cref="NpgsqlException" />, and <c>AuthenticateGSS</c> throws an <see cref="NpgsqlException" /> for a
     /// status other than success; neither text quotes the connection string.  What neither wraps is the
-    /// <see cref="TypeInitializationException" /> of <c>Interop.NetSecurityNative.GssInitializer</c> when the
-    /// operating system's GSS library cannot be loaded, which Npgsql's own comment in <c>GSSEncrypt</c> names and
-    /// <c>AuthenticateGSS</c> does not catch: it is mapped by that type's name alone.  It is read and not
-    /// provoked, since the machine that wrote this has GSS.
+    /// <see cref="TypeInitializationException" /> that comes out when the operating system's GSS library cannot be
+    /// loaded, which Npgsql's own comment in <c>GSSEncrypt</c> names and <c>AuthenticateGSS</c> does not catch.  In
+    /// dotnet/runtime (<c>v8.0.0</c> and <c>v10.0.0</c> alike) <c>Interop.NetSecurityNative.GssInitializer</c> is run
+    /// only by <c>NetSecurityNative</c>'s own static constructor
+    /// (<c>Interop.NetSecurityNative.IsNtlmInstalled.cs</c>), so the exception is for <c>NetSecurityNative</c> with
+    /// the one for <c>GssInitializer</c> inside it: <see cref="IsGssUnavailable" /> walks that chain.  It is read
+    /// and not provoked, since the machine that wrote this has GSS; a unit test builds the chain.
     /// </description>
     /// </item>
     /// <item>
@@ -210,12 +215,35 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
             // SslPassword, a line of a password file that is no entry.
             throw new NpgsqlException(UnusableFile);
         }
-        catch (TypeInitializationException exception)
-            when (exception.TypeName.EndsWith(GssInitializer, StringComparison.Ordinal))
+        catch (TypeInitializationException exception) when (IsGssUnavailable(exception))
         {
             // The operating system's GSS library cannot be loaded, and the server asked for it.
             throw new NpgsqlException(GssUnavailable);
         }
+    }
+
+    /// <summary>
+    /// Whether a type initializer failed because the operating system's GSS library cannot be loaded: the failed
+    /// type, or one further in, is <c>Interop+NetSecurityNative+GssInitializer</c>.  The runtime runs it from the
+    /// static constructor of <c>Interop+NetSecurityNative</c>, so the first call into that type throws a
+    /// <see cref="TypeInitializationException" /> for <c>NetSecurityNative</c> whose inner exception is the one for
+    /// <c>GssInitializer</c>; a later call rethrows the same.
+    /// </summary>
+    internal static bool IsGssUnavailable(TypeInitializationException exception)
+    {
+        for (
+            Exception? current = exception;
+            current is TypeInitializationException failed;
+            current = failed.InnerException
+        )
+        {
+            if (failed.TypeName.EndsWith(GssInitializer, StringComparison.Ordinal))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // The builder reads the string, so its ArgumentException for one it cannot read is thrown here, inside the

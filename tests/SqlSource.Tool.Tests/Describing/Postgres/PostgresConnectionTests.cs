@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
@@ -175,6 +176,44 @@ public class PostgresConnectionTests
             "primary",
             PostgresConnection.UnsupportedSettings
         );
+
+    // The runtime runs the GSS loader from the static constructor of NetSecurityNative: the first call into it throws
+    // for that type, with the loader's type inside.  The chain is built by hand, since this machine has GSS.
+    [Fact]
+    public void IsGssUnavailable_ExceptionOfNetSecurityNativeWithTheLoaderInside_IsTrue() =>
+        PostgresConnection
+            .IsGssUnavailable(
+                new TypeInitializationException(
+                    "Interop+NetSecurityNative",
+                    new TypeInitializationException(
+                        "Interop+NetSecurityNative+GssInitializer",
+                        new InvalidOperationException()
+                    )
+                )
+            )
+            .ShouldBeTrue();
+
+    [Fact]
+    public void IsGssUnavailable_ExceptionOfTheLoaderAlone_IsTrue() =>
+        PostgresConnection
+            .IsGssUnavailable(
+                new TypeInitializationException(
+                    "Interop+NetSecurityNative+GssInitializer",
+                    new InvalidOperationException()
+                )
+            )
+            .ShouldBeTrue();
+
+    [Fact]
+    public void IsGssUnavailable_ExceptionOfAnotherType_IsFalse() =>
+        PostgresConnection
+            .IsGssUnavailable(
+                new TypeInitializationException(
+                    "SqlSource.Tool.Something",
+                    new TypeInitializationException("Interop+Sys", new InvalidOperationException())
+                )
+            )
+            .ShouldBeFalse();
 
     private const bool AgreesToTls = true;
     private const bool AsksForPassword = false;
