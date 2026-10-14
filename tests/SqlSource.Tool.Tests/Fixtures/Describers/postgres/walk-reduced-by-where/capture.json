@@ -1,0 +1,322 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT u.id, o.total\nFROM users u LEFT JOIN orders o ON o.user_id = u.id\nWHERE o.total > $1",
+        "types": [
+          "unknown"
+        ]
+      },
+      "answer": {
+        "parameterTypes": [
+          1700
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 1
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "id",
+            "typeOid": 23,
+            "tableOid": 16396,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": null,
+            "scale": null
+          },
+          {
+            "ordinal": 1,
+            "name": "total",
+            "typeOid": 1700,
+            "tableOid": 16415,
+            "attributeNumber": 3,
+            "length": null,
+            "precision": 18,
+            "scale": 2
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16396,
+          16415
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16396,
+            "relkind": "r",
+            "schema": "public",
+            "name": "users",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "a",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "name",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1043,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "email",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16387,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 4,
+                "name": "status",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16390,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1009,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 6,
+                "name": "balance",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 7,
+                "name": "created_at",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 8,
+                "name": "deleted_at",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 9,
+                "name": "name_upper",
+                "notNull": false,
+                "identity": "",
+                "generated": "s",
+                "typeOid": 25,
+                "notNullValidated": null
+              }
+            ]
+          },
+          {
+            "oid": 16415,
+            "relkind": "r",
+            "schema": "public",
+            "name": "orders",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "d",
+                "generated": "",
+                "typeOid": 20,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "user_id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "total",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 4,
+                "name": "placed_at",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 5,
+                "name": "note",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 25,
+                "notNullValidated": null
+              }
+            ]
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          23,
+          1700
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 23,
+            "typname": "int4",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "integer",
+            "enumLabels": null
+          },
+          {
+            "oid": 1700,
+            "typname": "numeric",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "numeric",
+            "enumLabels": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT u.id, o.total\nFROM users u LEFT JOIN orders o ON o.user_id = u.id\nWHERE o.total > @min",
+        "parameters": [
+          {
+            "name": "min",
+            "dataTypeName": "numeric"
+          }
+        ]
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "id",
+            "typeOid": 23,
+            "dataTypeName": "integer"
+          },
+          {
+            "name": "total",
+            "typeOid": 1700,
+            "dataTypeName": "numeric(18, 2)"
+          }
+        ],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
+      "method": "explain",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 1,
+        "settings": []
+      },
+      "answer": {
+        "plan": "[\n  {\n    \"Plan\": {\n      \"Node Type\": \"Hash Join\",\n      \"Parallel Aware\": false,\n      \"Async Capable\": false,\n      \"Join Type\": \"Inner\",\n      \"Startup Cost\": 14.72,\n      \"Total Cost\": 35.57,\n      \"Plan Rows\": 270,\n      \"Plan Width\": 24,\n      \"Disabled\": false,\n      \"Output\": [\"u.id\", \"o.total\"],\n      \"Inner Unique\": true,\n      \"Hash Cond\": \"(o.user_id = u.id)\",\n      \"Plans\": [\n        {\n          \"Node Type\": \"Seq Scan\",\n          \"Parent Relationship\": \"Outer\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Relation Name\": \"orders\",\n          \"Schema\": \"public\",\n          \"Alias\": \"o\",\n          \"Startup Cost\": 0.00,\n          \"Total Cost\": 20.12,\n          \"Plan Rows\": 270,\n          \"Plan Width\": 24,\n          \"Disabled\": false,\n          \"Output\": [\"o.id\", \"o.user_id\", \"o.total\", \"o.placed_at\", \"o.note\"],\n          \"Filter\": \"(o.total > $1)\"\n        },\n        {\n          \"Node Type\": \"Hash\",\n          \"Parent Relationship\": \"Inner\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Startup Cost\": 12.10,\n          \"Total Cost\": 12.10,\n          \"Plan Rows\": 210,\n          \"Plan Width\": 4,\n          \"Disabled\": false,\n          \"Output\": [\"u.id\"],\n          \"Plans\": [\n            {\n              \"Node Type\": \"Seq Scan\",\n              \"Parent Relationship\": \"Outer\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Relation Name\": \"users\",\n              \"Schema\": \"public\",\n              \"Alias\": \"u\",\n              \"Startup Cost\": 0.00,\n              \"Total Cost\": 12.10,\n              \"Plan Rows\": 210,\n              \"Plan Width\": 4,\n              \"Disabled\": false,\n              \"Output\": [\"u.id\"]\n            }\n          ]\n        }\n      ]\n    }\n  }\n]",
+        "error": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}
