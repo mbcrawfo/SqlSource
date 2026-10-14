@@ -180,7 +180,8 @@
                 "typeOid": 25,
                 "notNullValidated": null
               }
-            ]
+            ],
+            "relhassubclass": false
           },
           {
             "oid": 16415,
@@ -233,7 +234,8 @@
                 "typeOid": 25,
                 "notNullValidated": null
               }
-            ]
+            ],
+            "relhassubclass": false
           }
         ],
         "error": null

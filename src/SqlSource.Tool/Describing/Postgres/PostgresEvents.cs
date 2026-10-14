@@ -276,7 +276,8 @@ internal static class PostgresEvents
             new("relkind", table.Relkind),
             new("schema", table.Schema),
             new("name", table.Name),
-            new("columns", LogValue.ListOf(table.Columns.Select(AttributeOf)))
+            new("columns", LogValue.ListOf(table.Columns.Select(AttributeOf))),
+            new("relhassubclass", table.Relhassubclass is { } children ? (LogValue)children : LogValue.Null)
         );
 
     private static LogValue AttributeOf(PostgresAttributeRow attribute) =>

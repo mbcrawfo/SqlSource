@@ -133,7 +133,8 @@
                 "typeOid": 25,
                 "notNullValidated": null
               }
-            ]
+            ],
+            "relhassubclass": false
           }
         ],
         "error": null

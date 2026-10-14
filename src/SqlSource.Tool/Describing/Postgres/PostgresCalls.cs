@@ -156,12 +156,17 @@ internal sealed record PostgresTablesAnswer(IReadOnlyList<PostgresTableRow>? Tab
 /// Every attribute with <c>attnum</c> above zero that is not dropped, in <c>attnum</c> order.  A table without a
 /// column of its own has none.
 /// </param>
+/// <param name="Relhassubclass">
+/// <c>relhassubclass</c>: whether the relation has or had inheritance children, which PostgreSQL clears only
+/// lazily after the last is dropped.  Null in an answer recorded before the member existed.
+/// </param>
 internal sealed record PostgresTableRow(
     long Oid,
     string Relkind,
     string Schema,
     string Name,
-    IReadOnlyList<PostgresAttributeRow> Columns
+    IReadOnlyList<PostgresAttributeRow> Columns,
+    bool? Relhassubclass
 );
 
 /// <summary>What the catalog says of one column of a relation.</summary>

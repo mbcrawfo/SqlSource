@@ -307,7 +307,10 @@ public class PostgresEventsTests
             .ShouldBeOfType<LogValue.Items>()
             .Values[0]
             .ShouldBeOfType<LogValue.Members>();
-        users.Values.Select(value => value.Name).ShouldBe(["oid", "relkind", "schema", "name", "columns"]);
+        users
+            .Values.Select(value => value.Name)
+            .ShouldBe(["oid", "relkind", "schema", "name", "columns", "relhassubclass"]);
+        users.Values[5].Value.ShouldBe((LogValue)false);
         users
             .Values[4]
             .Value.ShouldBeOfType<LogValue.Items>()

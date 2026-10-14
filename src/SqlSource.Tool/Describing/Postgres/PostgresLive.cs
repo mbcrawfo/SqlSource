@@ -43,7 +43,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
             a.attidentity::text,
             a.attgenerated::text,
             a.atttypid,
-            k.convalidated
+            k.convalidated,
+            c.relhassubclass
         FROM pg_catalog.pg_class AS c
         JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
         LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
@@ -217,7 +218,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
                             reader.GetString(1),
                             reader.GetString(2),
                             reader.GetString(3),
-                            columns
+                            columns,
+                            reader.GetBoolean(11)
                         )
                     );
                 }

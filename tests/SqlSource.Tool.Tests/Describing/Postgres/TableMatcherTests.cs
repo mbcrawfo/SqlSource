@@ -198,6 +198,23 @@ public class TableMatcherTests
         Match(From(loose, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
     }
 
+    // A table with inheritance children has nullable columns by the same rule, so SELECT * from it still matches.
+    [Fact]
+    public void Match_TableWithChildren_MatchesAsTheNullableColumnsItHas()
+    {
+        var parent = PostgresTables.TableOf(
+            11,
+            "parent",
+            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+        ) with
+        {
+            Relhassubclass = true,
+        };
+
+        Match(Whole(parent)).ShouldBe((new SidecarTable("public", "parent"), SidecarValues.TableMatch.Matched));
+        Match(From(parent, 1).WithNullable(false)).ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
+    }
+
     // Each case fails two checks, and the answer is the one that comes first in the format's order.
     [Fact]
     public void Match_TwoChecksThatFail_GivesTheFirst()

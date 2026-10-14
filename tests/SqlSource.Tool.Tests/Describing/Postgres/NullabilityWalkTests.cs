@@ -131,6 +131,27 @@ public class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
 
+    // And a NOT NULL column of a table that has inheritance children, whose child may have dropped it.
+    [Fact]
+    public void Run_NotNullColumnOfATableWithChildren_IsNullableByTheCatalog()
+    {
+        var parent = PostgresTables.TableOf(
+            16703,
+            "p",
+            PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true)
+        ) with
+        {
+            Relhassubclass = true,
+        };
+        var row = PostgresTables.ColumnOf(0, "id", 23, parent, 1);
+        var origin = ColumnOrigin.Find(row, PostgresTables.Of(parent));
+        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+
+        var outcome = NullabilityWalk.Run(Scan("p", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+
+        AnswersOf(outcome).ShouldBe([(true, "catalog")]);
+    }
+
     [Theory]
     [InlineData("Subquery Scan")]
     [InlineData("CTE Scan")]

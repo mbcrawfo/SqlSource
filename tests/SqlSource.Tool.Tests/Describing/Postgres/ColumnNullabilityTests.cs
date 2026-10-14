@@ -5,14 +5,21 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
-// The five rows of the spec's table, in its order: the first that fits a column is its answer.
+// The rows of the spec's table, in its order, and the rules of the catalog the reviews added: the first that fits a
+// column is its answer.
 public class ColumnNullabilityTests
 {
-    private static ColumnOrigin Origin(string relkind, bool notNull, bool? notNullValidated = null) =>
+    private static ColumnOrigin Origin(
+        string relkind,
+        bool notNull,
+        bool? notNullValidated = null,
+        bool? relhassubclass = false
+    ) =>
         new(
             PostgresTables.TableOf(7, "t") with
             {
                 Relkind = relkind,
+                Relhassubclass = relhassubclass,
             },
             PostgresTables.Attribute(1, "c", PostgresRows.Int4.Oid, notNull, notNullValidated: notNullValidated)
         );
@@ -105,5 +112,39 @@ public class ColumnNullabilityTests
     public void Of_ConstraintNotValidatedInAGatedQuery_IsStillNullableByTheHeuristic() =>
         ColumnNullability
             .Of(Origin("r", notNull: true, notNullValidated: false), gated: true)
+            .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
+
+    // A child of a legacy inheritance parent may drop a NOT NULL it inherited, before PostgreSQL 18, and a query of
+    // the parent reads the child's rows.  So a table that has or had children is nullable whatever its own column
+    // says, on every version.
+    [Fact]
+    public void Of_NotNullColumnOfATableWithChildren_IsNullableByTheCatalog() =>
+        ColumnNullability
+            .Of(Origin("r", notNull: true, relhassubclass: true), gated: false)
+            .ShouldBe((true, SidecarValues.NullableSource.Catalog));
+
+    // False is a table that never had a child, and null an answer recorded before the member existed.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void Of_NotNullColumnOfATableWithoutChildrenOrUnsaid_IsNotNullableByTheCatalog(bool? relhassubclass) =>
+        ColumnNullability
+            .Of(Origin("r", notNull: true, relhassubclass: relhassubclass), gated: false)
+            .ShouldBe((false, SidecarValues.NullableSource.Catalog));
+
+    // A partition can never drop its parent's NOT NULL.
+    [Fact]
+    public void Of_NotNullColumnOfAPartitionedTableWithPartitions_IsNotNullableByTheCatalog() =>
+        ColumnNullability
+            .Of(Origin("p", notNull: true, relhassubclass: true), gated: false)
+            .ShouldBe((false, SidecarValues.NullableSource.Catalog));
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [InlineData(null)]
+    public void Of_GatedQueryOverATableWithOrWithoutChildren_IsNullableByTheHeuristic(bool? relhassubclass) =>
+        ColumnNullability
+            .Of(Origin("r", notNull: true, relhassubclass: relhassubclass), gated: true)
             .ShouldBe((true, SidecarValues.NullableSource.Heuristic));
 }

@@ -144,7 +144,8 @@
                 "typeOid": 1082,
                 "notNullValidated": true
               }
-            ]
+            ],
+            "relhassubclass": false
           }
         ],
         "error": null

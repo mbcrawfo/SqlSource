@@ -11,7 +11,12 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// join can have touched the column.  A gated query makes every column of a table nullable here, and
 /// <see cref="NullabilityWalk" /> then answers for each column whose relation instance the plan names.  A
 /// <c>NOT NULL</c> that PostgreSQL 18 holds as not validated (<c>NOT VALID</c>) sets the catalog's flag while rows
-/// that were there before may hold <c>NULL</c>, so it is nullable too.
+/// that were there before may hold <c>NULL</c>, so it is nullable too.  So is a <c>NOT NULL</c> column of a table
+/// that has or had inheritance children (<c>relhassubclass</c>): before PostgreSQL 18 a child may drop a
+/// <c>NOT NULL</c> it inherited, and a query of the parent reads the child's rows.  The rule is the same on every
+/// version, and costs the parent's columns on 18, where a child cannot drop it, and those of a table whose last
+/// child was dropped, whose flag PostgreSQL clears lazily.  A partitioned table is not affected: a partition can
+/// never drop its parent's <c>NOT NULL</c>.
 /// </remarks>
 internal static class ColumnNullability
 {
@@ -26,6 +31,9 @@ internal static class ColumnNullability
             // PostgreSQL records no NOT NULL for a view's column and does not enforce a foreign table's.
             { Table.Relkind: "v" or "m" or "f" } => (null, SidecarValues.NullableSource.View),
             _ when gated => (true, SidecarValues.NullableSource.Heuristic),
+
+            // A child of an inheritance parent may have dropped the NOT NULL it inherited.
+            { Table: { Relkind: "r", Relhassubclass: true } } => (true, SidecarValues.NullableSource.Catalog),
             { } found => (
                 found.Attribute is not { NotNull: true, NotNullValidated: not false },
                 SidecarValues.NullableSource.Catalog

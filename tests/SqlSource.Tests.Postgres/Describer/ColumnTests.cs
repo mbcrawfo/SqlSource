@@ -398,6 +398,35 @@ public sealed class ColumnTests(PostgresContainer postgres)
         NullabilityOf(columns).ShouldBe([(true, "catalog"), (false, "catalog")]);
     }
 
+    // A legacy inheritance parent and its child, of this test alone, made by SQL that can be run again.
+    private const string InheritanceTables = """
+        CREATE TABLE IF NOT EXISTS inh_parent (id integer NOT NULL, v text NOT NULL);
+        CREATE TABLE IF NOT EXISTS inh_child () INHERITS (inh_parent);
+        """;
+
+    // Before PostgreSQL 18 a child may drop a NOT NULL it inherited, and a query of the parent reads the child's
+    // rows, so a NULL comes back for a column the parent says is NOT NULL.  18 refuses the drop, and the answer is
+    // the same there: the rule does not depend on the version.
+    [Fact]
+    public async Task Describe_ColumnsOfAnInheritanceParent_AreNullableByTheCatalog()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        {
+            await using var made = source.CreateCommand(InheritanceTables);
+            _ = await made.ExecuteNonQueryAsync(token);
+            if (await ServerMajorAsync() < 18)
+            {
+                await using var dropped = source.CreateCommand("ALTER TABLE inh_child ALTER COLUMN v DROP NOT NULL");
+                _ = await dropped.ExecuteNonQueryAsync(token);
+            }
+        }
+
+        var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM inh_parent p");
+
+        NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
+    }
+
     // The query of the spec's Goal, without its join.
     [Fact]
     public async Task Describe_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()
