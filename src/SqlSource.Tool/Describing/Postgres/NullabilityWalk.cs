@@ -77,7 +77,7 @@ internal static class NullabilityWalk
         var instances = PlanInstances.Find(root);
 
         // PostgreSQL prints the target list first and what a sort or a group added after it, so the entry of a
-        // column is the one at its ordinal.  A UNION's Append has no Output at all.
+        // column is the one at its ordinal.  A UNION ALL's Append has no Output at all.
         if (root.Output is not { } entries || entries.Count < columns.Count)
         {
             return Unusable(WalkReasons.NoOutput, root, instances, columns);

@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using Shouldly;
 using SqlSource.Tool.Describing.Capture;
+using SqlSource.Tool.Describing.Postgres;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Fixtures;
@@ -137,7 +138,7 @@ public class WalkMatrixTests
             .EnumerateArray()
             .Select(static setting => setting.GetString())
             .ShouldBe(fixture.ExplainSettings);
-        PlanOf(name).ShouldContain($"\"Node Type\": \"{node}\"");
+        PlanNode.Read(PlanOf(name)).ShouldNotBeNull().NodeType.ShouldBe(node);
     }
 
     // The shapes whose plan is what the case is for.

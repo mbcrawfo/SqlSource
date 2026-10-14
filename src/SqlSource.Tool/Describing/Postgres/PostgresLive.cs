@@ -423,11 +423,13 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// Asks <c>explain</c>: the generic plan of the prepared statement, in a transaction that is rolled back.
     /// </summary>
     /// <remarks>
-    /// <c>EXPLAIN</c> without <c>ANALYZE</c> plans the statement and does not run it.  Under
-    /// <c>force_generic_plan</c> the <c>NULL</c> of a parameter is not folded into the plan, so <c>id = $1</c>
-    /// stays a condition.  Disposing a transaction that was not ended rolls it back, so a failure at any step
-    /// leaves no setting behind.  The texts hold a name the tool made, settings of a closed list and nothing of a
-    /// user's.
+    /// <c>EXPLAIN</c> without <c>ANALYZE</c> plans the statement and does not execute it.  Planning evaluates an
+    /// immutable function whose arguments are constants, inside the transaction that is rolled back: a function
+    /// wrongly marked immutable runs, and an effect outside the transaction, a sequence's for one, remains
+    /// (TD-0047).  Under <c>force_generic_plan</c> the <c>NULL</c> of a parameter is not folded into the plan, so
+    /// <c>id = $1</c> stays a condition.  Disposing a transaction that was not ended rolls it back, so a failure at
+    /// any step leaves no setting behind.  The texts hold a name the tool made, settings of a closed list and
+    /// nothing of a user's.
     /// </remarks>
     public async Task<PostgresExplainAnswer> ExplainAsync(PostgresExplainRequest asked, CancellationToken token)
     {

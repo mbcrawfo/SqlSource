@@ -109,9 +109,9 @@ public sealed class ExplainTests(PostgresContainer postgres)
         INSERT INTO walk_explain_rows VALUES (1, 'kept') ON CONFLICT (id) DO UPDATE SET label = 'kept';
         """;
 
-    // An UPDATE is planned and not run.
+    // An UPDATE is planned and not executed: its row is unchanged.
     [Fact]
-    public async Task ExplainAsync_Update_RunsNothing()
+    public async Task ExplainAsync_Update_ChangesNoRow()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new PostgresConnection(postgres.ConnectionString);
