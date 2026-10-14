@@ -50,8 +50,10 @@ Settled in this spec:
 | Join types the walk knows | `Inner`, `Left`, `Right`, `Full`, `Semi`, `Anti`, `Right Semi`, `Right Anti` | The last two are PostgreSQL 16's, and null-extend nothing. |
 | Which children are a join's sides | Children whose `Parent Relationship` is `Outer` or `Inner` | `InitPlan`, `SubPlan`, `Member` and `Subquery` children are other plans: a CTE's plan hangs under whichever node first needs it, and its scans are not instances of this plan's joins. |
 | Where a relation instance may be found | The root and the nodes reached from it through `Outer` and `Inner` children | The same reason: an alias under an `InitPlan` is the CTE's, reached from here only through a `CTE Scan`. |
-| What names a relation instance | `Alias` on a scan of a relation: `Seq Scan`, `Index Scan`, `Index Only Scan`, `Bitmap Heap Scan`, `Tid Scan`, `Tid Range Scan`, `Sample Scan`, and `ModifyTable`, whose `Alias` is its target | A `RETURNING` list refers to the target by its alias, and the target is no scan of the plan. |
+| What names a relation instance | `Alias` on a scan of a relation: `Seq Scan`, `Index Scan`, `Index Only Scan`, `Bitmap Heap Scan`, `Tid Scan`, `Tid Range Scan`, `Sample Scan`, and `ModifyTable` at the root, whose `Alias` is its target | A `RETURNING` list refers to the target by its alias, and the row it returns is the one the statement acted on, which no join null-extends. |
+| The target's own scan | A scan under a root `ModifyTable` with the `ModifyTable`'s `Alias` is the target itself: the same instance, with the root's empty path, and no doubled alias | An `UPDATE` or a `DELETE` scans its target under the `ModifyTable` with the same alias, on 14 and 18 alike, so every `RETURNING` of one would be unusable otherwise.  A `MERGE` whose target is under a `Full` join still returns the row it inserted or deleted. |
 | When the plan is asked for | For a gated query with rows, after the `check` call and before `deallocate` | A query that is not gated pays nothing, as the epic wants, and the order keeps the captures of sub-phase 3.3 valid for every query that is not gated. |
+| When the table match is made | After the `check` call and the walk, where sub-phase 3.4 made it before `check` | Its last check reads the nullability the walk set.  It asks the server nothing, so no capture changes; a query whose `check` fails has no `postgres.tableMatch` event. |
 | Planner settings | The `explain` request carries a list of `enable_*` settings for the tests; the tool itself passes none | The matrix forces each join method.  A setting's name is one of a fixed list the describer holds, so nothing else reaches a `SET LOCAL`. |
 | An `EXPLAIN` that fails | Logged, not reported: `plan` is `unavailable` and every origin column is `heuristic` | A plan the server will not give is not a fault of the query, and the heuristic is safe. |
 | A plan that was obtained and cannot be used | `plan` is `unavailable` too, and the `postgres.walk` event's `reason` tells the two apart | The sidecar format wrote `unavailable` for a failed `EXPLAIN` alone; its meaning is widened, additively, to "the walk had no plan it could use", and the outline and the tool's readme say so.  The log is where "a walk bug" is told from "`EXPLAIN` failed". |
@@ -96,7 +98,7 @@ The text is an array of one object whose `Plan` is the root.  Anything else is a
 
 `NullabilityWalk.Run(plan, columns)` in `src/SqlSource.Tool/Describing/Postgres/`, over the root node and the columns as sub-phase 3.3 built them, with their origins and the catalog's answer for each.  It gives each column its `nullable` and `nullableSource`, and the `plan` value.
 
-**1. The instances.**  From the root, following children whose `ParentRelationship` is `Outer` or `Inner`, collect every node that names a relation instance, with the path of join nodes above it and the relationship under which each was passed.  A join node is one with a `JoinType`.  A `JoinType` that is not one of the eight, an `Alias` found twice, or a node with `HasGroupingSets` or of `Node Type` `MixedAggregate` makes the plan unusable.
+**1. The instances.**  From the root, following children whose `ParentRelationship` is `Outer` or `Inner`, collect every node that names a relation instance, with the path of join nodes above it and the relationship under which each was passed.  A join node is one with a `JoinType`.  A root `ModifyTable` with an `Alias` is an instance with an empty path, and a scan below it with that `Alias` is the same instance and is not collected again.  A `JoinType` that is not one of the eight, an `Alias` found twice otherwise, or a node with `HasGroupingSets` or of `Node Type` `MixedAggregate` makes the plan unusable.
 
 **2. Null-extension.**  An instance is null-extended when a join on its path is `Left` and the instance is under its `Inner` child, `Right` and under its `Outer` child, or `Full`.
 
@@ -105,7 +107,7 @@ The text is an array of one object whose `Plan` is the root.  Anything else is a
 | The entry | Reads as | The column |
 |----|----|----|
 | `alias.column`, either part a bare identifier or a quoted one with `""` for a quote | A reference to the instance named `alias` | Mappable when the alias is an instance of step 1 |
-| A bare identifier | A reference to the root itself | Mappable when the root is a scan of a relation with an `Alias` |
+| A bare identifier | A reference to the root itself | Mappable when the root is a scan of a relation, or a `ModifyTable`, with an `Alias` |
 | Anything else: an operator, a parenthesis, a space, `$1`, `NULL::numeric`, `(SubPlan 1)`, `COALESCE(u.id, p.id)` | An expression | Unmappable |
 | An alias that names a `Subquery Scan`, `CTE Scan`, `Function Scan`, `Values Scan`, `WorkTable Scan` or any other node that is no scan of a relation | | Unmappable |
 
@@ -128,6 +130,9 @@ Sub-phase 3.4's match runs after the walk, on the nullability it set.
 - A join the planner removed leaves a scan at the root with qualified names, `u.id`.
 - A `LEFT JOIN` with a `WHERE` on the nullable side, or followed by an inner join on it, plans as `Inner`.
 - `ModifyTable`'s `Output` is the `RETURNING` list; an `INSERT` has a `Result` child with `$1`; an `UPDATE ... FROM` has a join child.
+- An `UPDATE` or a `DELETE` has a scan of its target under the `ModifyTable`, with the `ModifyTable`'s own `Alias`, on 14 and 18.  A `DELETE` of one table prints bare names, `id`, and an `UPDATE ... FROM` qualified ones, `u.id`.
+- The `OLD` and `NEW` of a `RETURNING` list of PostgreSQL 18 print as `old.id` and `new.name`, or under the names `WITH (OLD AS o, NEW AS n)` gives them, and never under the target's alias: no instance has such an alias, so the column is unmappable and stays `heuristic`.
+- A `MERGE` with `WHEN NOT MATCHED BY SOURCE` and `WHEN NOT MATCHED BY TARGET` plans as a `Full` join under the `ModifyTable`: the source's columns are `outer-join`, and the target's are the row acted on.
 - A `UNION` root is an `Append` with no `Output`: unusable, every origin column `heuristic`, which the set operation deserves since its columns have no origin anyway.
 - A `LEFT JOIN ... ON ... AND o.id IS NULL` the planner proved empty prints bare names, `total`, from a `Result` node beside a real scan: unmappable, `heuristic`.
 - A view is flattened; its scans get unique aliases, `u_1`, and the view's columns are walked as its own joins dictate, with `view` where nothing null-extends them.
@@ -143,6 +148,8 @@ Sub-phase 3.4's match runs after the walk, on the nullability it set.
 | `postgres.walk.node` | One for each node visited in step 1: `depth`, `nodeType`, `joinType`, `parentRelationship`, `alias`, `relation`: `schema.name`, `nullExtends`: `inner`, `outer`, `both` or `none` |
 | `postgres.walk.column` | One for each column: `ordinal`, `name`, `output`: the entry, `alias`, `column`, `mapped`, `nullExtended`, `nullable`, `nullableSource` |
 | `postgres.walk` | `query`, `plan`: the value, `reason` when `unavailable`: `explain-failed`, `unreadable`, `no-output`, `unknown-join-type`, `doubled-alias` or `grouping-sets` |
+
+`postgres.column` of sub-phase 3.3 is logged when a column is built, before the plan is asked for: for a gated query it holds the heuristic's answer, and `postgres.walk.column` holds the one the sidecar records.
 
 ### Diagnostics
 
@@ -180,6 +187,8 @@ Each a fixture case under `Fixtures/Describers/postgres/`, with its expected nul
 | `walk-rollup`, `walk-cube`, `walk-grouping-sets` | A `NOT NULL` grouping column: `heuristic`, `plan` `unavailable` with `grouping-sets` |
 | `walk-order-by-unselected` | `ORDER BY` a column not in the select list over an outer join: the selected columns as the join dictates |
 
+Sub-phase 3.2's `FixtureCasesTests` describes every case live on 14 and on 18 and compares each with the one `expected.json`, so a case must give the same nullability on both.  The cases are described against `postgres:14` before what was recorded is committed.
+
 ## Order of work
 
 One pull request, one commit for each step.  Each leaves `./pre-commit-validation.sh` passing and brings its tests and the documents it makes wrong.
@@ -199,9 +208,9 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 |----|----|
 | `PlanNodeTests` (tool tests) | Each key read, `Grouping Sets` as presence; unknown keys ignored; no `Plans`; a text that is not an array of one plan is unusable |
 | `OutputReferenceTests` (tool tests) | `u.id`, `users.id`, `"Order".total`, `"a""b".c`, `id`; each of the expression forms is none |
-| `NullabilityWalkTests` (tool tests) | Over plans written by the test: each join type and each side; a `Right Semi` extends nothing; a chain of two joins; a swapped `Right`; an `InitPlan` child not traversed and its alias not found; a `Subquery Scan` alias unmappable; a bare name at a scan root and under a join; a doubled alias is unusable; an unknown join type is unusable; a `Grouping Sets` key and a `MixedAggregate` are unusable; a root without `Output`; fewer entries than columns; each row of the column table; a view origin null-extended and not; each `reason` |
-| `WalkTests` (container) | Every case of the matrix live, on 14 and 18 through CI's two runs; a settings name outside the list throws; `pg_prepared_statements` is empty and `plan_cache_mode` is what `open` read after each describe |
-| `FixtureCasesTests`, `DescriberFixtureTests` | The matrix, and the re-recorded cases |
+| `NullabilityWalkTests` (tool tests) | Over plans written by the test: each join type and each side; a `Right Semi` extends nothing; a chain of two joins; a swapped `Right`; an `InitPlan` child not traversed and its alias not found; a `Subquery Scan` alias unmappable; a bare name at a scan root and under a join; a doubled alias is unusable; a root `ModifyTable` over a scan of its own alias is usable, its target not null-extended under a `Full` join, and bare names resolve at it; an `old.id` is unmappable; an unknown join type is unusable; a `Grouping Sets` key and a `MixedAggregate` are unusable; a root without `Output`; fewer entries than columns; each row of the column table; a view origin null-extended and not; each `reason` |
+| `WalkTests` (container) | A settings name outside the list throws; `pg_prepared_statements` is empty and `plan_cache_mode` is what `open` read after each describe; on 17 and later, a `MERGE ... RETURNING` with the source's columns `outer-join` and the target's `catalog`; on 18, a `RETURNING` with `OLD` and `NEW`, `heuristic`.  The last two are no fixtures: 14 has neither |
+| `FixtureCasesTests`, `DescriberFixtureTests` | The matrix, live on 14 and 18 through CI's two runs and replayed without Docker, and the re-recorded cases |
 
 ## Documentation
 
