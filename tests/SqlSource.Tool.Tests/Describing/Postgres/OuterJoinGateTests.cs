@@ -72,4 +72,25 @@ public class OuterJoinGateTests
     [InlineData("SELECT id FROM users WHERE id = @left")]
     [InlineData("")]
     public void IsGated_QueryThatHoldsNoWord_IsNotGated(string sql) => OuterJoinGate.IsGated(sql).ShouldBeFalse();
+
+    // Whether a reference at a ModifyTable may be PostgreSQL 18's old or new row.
+    [Theory]
+    [InlineData("INSERT INTO t (id) VALUES (1) RETURNING old.id")]
+    [InlineData("INSERT INTO t (id) VALUES (1) RETURNING NEW.id")]
+    [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS o) o.id")]
+    public void NamesOldOrNew_QueryThatHoldsOldOrNew_NamesThem(string sql) =>
+        OuterJoinGate.NamesOldOrNew(sql).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("SELECT 1")]
+    // Inside a string, a comment and a quoted identifier.
+    [InlineData("SELECT 'old' FROM t")]
+    [InlineData("SELECT id FROM t -- old")]
+    [InlineData("SELECT \"old\".id FROM t \"old\"")]
+    // A longer word that holds one.
+    [InlineData("SELECT bold, newest FROM t")]
+    // The other words of the gate.
+    [InlineData("SELECT a.id FROM a LEFT JOIN b ON true")]
+    public void NamesOldOrNew_QueryThatHoldsNeither_DoesNotNameThem(string sql) =>
+        OuterJoinGate.NamesOldOrNew(sql).ShouldBeFalse();
 }

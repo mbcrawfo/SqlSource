@@ -285,7 +285,12 @@ internal sealed class PostgresSession : IDescribeSession
         var outcome = answer switch
         {
             { Error: not null } => NullabilityWalk.Unavailable(WalkReasons.ExplainFailed, columns),
-            { Plan: { } text } when PlanNode.Read(text) is { } root => NullabilityWalk.Run(root, columns, origins),
+            { Plan: { } text } when PlanNode.Read(text) is { } root => NullabilityWalk.Run(
+                root,
+                columns,
+                origins,
+                OuterJoinGate.NamesOldOrNew(request.Sql)
+            ),
             _ => NullabilityWalk.Unavailable(WalkReasons.Unreadable, columns),
         };
         PostgresEvents.Walk(_log, request.Name, outcome);

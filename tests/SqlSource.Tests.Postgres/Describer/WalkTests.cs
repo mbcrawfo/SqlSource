@@ -112,18 +112,32 @@ public sealed class WalkTests(PostgresContainer postgres)
             (true, "catalog"),
         ]);
 
-    // The gate lets the query in for the word, and here the word is a table's alias: an instance like any other,
-    // on every version.
+    // The gate lets the query in for the word, and here the word is a table's alias.  The plan prints a table
+    // aliased old as it prints PostgreSQL 18's old row, so in a statement that names the word any alias but the
+    // target's keeps the heuristic, on every version.
     [Fact]
-    public async Task Describe_TableAliasedOld_IsAnInstanceLikeAnyOther() =>
+    public async Task Describe_TableAliasedOld_KeepsTheHeuristicForItsColumns() =>
         (
             await WalkedAsync(
                 "UPDATE users u SET name = @name FROM orders old WHERE old.user_id = u.id RETURNING old.total, u.id"
             )
-        ).ShouldBe([(false, "catalog"), (false, "catalog")]);
+        ).ShouldBe([(true, "heuristic"), (false, "catalog")]);
 
-    // PostgreSQL 18's old row cannot be given the name of a table of the statement, so an alias in the plan is
-    // never both: the walk can take an alias it finds for the relation instance.
+    // An alias of an inner scope reaches the plan under its own name: the SELECT of an INSERT ... SELECT aliases
+    // users old, and the old row of the RETURNING list prints as old.id too, NULL on every row an INSERT returns.
+    [Fact]
+    public async Task Describe_InsertSelectFromATableAliasedOld_KeepsTheHeuristicForOld()
+    {
+        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+
+        (
+            await WalkedAsync(
+                "INSERT INTO orders (user_id, total) SELECT old.id, 0 FROM users old RETURNING old.id, new.id"
+            )
+        ).ShouldBe([(true, "heuristic"), (true, "heuristic")]);
+    }
+
+    // PostgreSQL 18's old row cannot be given the name of a table of the statement: the server refuses it.
     [Fact]
     public async Task Describe_OldAliasThatIsAlsoATablesAlias_IsRefusedByTheServer()
     {

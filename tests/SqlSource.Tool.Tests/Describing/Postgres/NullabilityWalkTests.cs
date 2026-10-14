@@ -54,10 +54,12 @@ public class NullabilityWalkTests
         return (columns, origins);
     }
 
-    private static WalkOutcome Run(PlanNode root, params Asked[] asked)
+    private static WalkOutcome Run(PlanNode root, params Asked[] asked) => Run(root, false, asked);
+
+    private static WalkOutcome Run(PlanNode root, bool oldAndNewMayBeNamed, params Asked[] asked)
     {
         var (columns, origins) = Built(asked);
-        return NullabilityWalk.Run(root, columns, origins);
+        return NullabilityWalk.Run(root, columns, origins, oldAndNewMayBeNamed);
     }
 
     private static (bool? Nullable, string? Source)[] AnswersOf(WalkOutcome outcome) =>
@@ -124,7 +126,7 @@ public class NullabilityWalkTests
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(table));
         var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
 
-        var outcome = NullabilityWalk.Run(Scan("n", "id"), [column], [origin]);
+        var outcome = NullabilityWalk.Run(Scan("n", "id"), [column], [origin], oldAndNewMayBeNamed: false);
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
@@ -204,6 +206,29 @@ public class NullabilityWalkTests
 
         AnswersOf(Run(plan, NotNull, NotNull)).ShouldBe([(false, "catalog"), (true, "outer-join")]);
     }
+
+    // PostgreSQL 18 prints its old row as "old.id", and an inner scope may alias a table "old" as well: in a
+    // statement that names OLD or NEW, only the target's alias is mapped at a ModifyTable.
+    private static readonly PlanNode ModifyOverOld = Over("ModifyTable", Scan("old")) with
+    {
+        Alias = "ord2",
+        Output = ["old.id", "ord2.id"],
+    };
+
+    [Fact]
+    public void Run_AliasAtAModifyTableThatIsNotTheTargets_WhenOldOrNewMayBeNamed_KeepsTheHeuristic() =>
+        AnswersOf(Run(ModifyOverOld, true, NotNull, NotNull)).ShouldBe([(true, "heuristic"), (false, "catalog")]);
+
+    // The flag is what decides: without it the same plan maps the alias.
+    [Fact]
+    public void Run_AliasAtAModifyTableThatIsNotTheTargets_WhenNeitherIsNamed_TakesTheCatalogsAnswer() =>
+        AnswersOf(Run(ModifyOverOld, false, NotNull, NotNull)).ShouldBe([(false, "catalog"), (false, "catalog")]);
+
+    // The old and the new row are a RETURNING list's alone.
+    [Fact]
+    public void Run_RootThatIsNoModifyTable_IsNotAffectedByOldOrNew() =>
+        AnswersOf(Run(LeftJoin("a.id", "b.id"), true, NotNull, NotNull))
+            .ShouldBe([(false, "catalog"), (true, "outer-join")]);
 
     [Fact]
     public void Run_QuotedAlias_NamesTheInstanceOfThatName()
@@ -295,7 +320,10 @@ public class NullabilityWalkTests
     {
         var (columns, origins) = Built(NotNull);
 
-        var walked = NullabilityWalk.Run(LeftJoin("a.id"), columns, origins).Columns.ShouldHaveSingleItem().Column;
+        var walked = NullabilityWalk
+            .Run(LeftJoin("a.id"), columns, origins, oldAndNewMayBeNamed: false)
+            .Columns.ShouldHaveSingleItem()
+            .Column;
 
         walked.ShouldBe(columns[0] with { Nullable = false, NullableSource = "catalog" });
     }

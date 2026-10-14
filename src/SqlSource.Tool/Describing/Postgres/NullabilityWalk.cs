@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
@@ -48,6 +49,13 @@ internal sealed record WalkOutcome(
 /// <c>Subquery Scan</c> is not matched to the subquery's own plan by name: a column renamed to another's name
 /// would be read as the other.
 /// </para>
+/// <para>
+/// At a root <c>ModifyTable</c> PostgreSQL 18 prints the old and the new row of a <c>RETURNING</c> list as
+/// <c>old.column</c> and <c>new.column</c>, or under the names <c>WITH (OLD AS ..., NEW AS ...)</c> gives them, and
+/// a table of an inner scope, the <c>SELECT</c> of an <c>INSERT</c> or a subquery in <c>FROM</c>, can have the same
+/// alias in the plan.  In a statement that names <c>OLD</c> or <c>NEW</c> a qualified reference there maps only to the
+/// target's own alias, which the server never lets the old or the new row take.
+/// </para>
 /// </remarks>
 internal static class NullabilityWalk
 {
@@ -55,10 +63,15 @@ internal static class NullabilityWalk
     /// <param name="root">The root of the plan.</param>
     /// <param name="columns">The columns as they were built for a gated query, with the heuristic's answer.</param>
     /// <param name="origins">Where each column comes from, or null, in the order of the columns.</param>
+    /// <param name="oldAndNewMayBeNamed">
+    /// Whether the query's SQL names <c>OLD</c> or <c>NEW</c>, so that a reference at a root <c>ModifyTable</c> may be
+    /// PostgreSQL 18's old or new row.
+    /// </param>
     public static WalkOutcome Run(
         PlanNode root,
         IReadOnlyList<SidecarColumn> columns,
-        IReadOnlyList<ColumnOrigin?> origins
+        IReadOnlyList<ColumnOrigin?> origins,
+        bool oldAndNewMayBeNamed
     )
     {
         var instances = PlanInstances.Find(root);
@@ -75,10 +88,14 @@ internal static class NullabilityWalk
             return Unusable(reason, root, instances, columns);
         }
 
+        // The one alias a qualified reference may name at a ModifyTable that may return the old or the new row, or
+        // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
+        var onlyAlias = oldAndNewMayBeNamed && root.NodeType == "ModifyTable" ? root.Alias ?? string.Empty : null;
+
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
         {
-            walked.Add(ColumnOf(columns[index], origins[index], entries[index], instances));
+            walked.Add(ColumnOf(columns[index], origins[index], entries[index], instances, onlyAlias));
         }
 
         return new WalkOutcome(SidecarValues.Plan.Walked, null, instances.Nodes, walked);
@@ -117,7 +134,8 @@ internal static class NullabilityWalk
         SidecarColumn column,
         ColumnOrigin? origin,
         string entry,
-        PlanInstances instances
+        PlanInstances instances,
+        string? onlyAlias
     )
     {
         // Nothing of the plan can make a column without an origin non-nullable: it is not looked up.
@@ -131,7 +149,8 @@ internal static class NullabilityWalk
         var mapped = reference switch
         {
             null => false,
-            { Alias: { } alias } => instances.TryFind(alias, out extended),
+            { Alias: { } alias } => (onlyAlias is null || string.Equals(alias, onlyAlias, StringComparison.Ordinal))
+                && instances.TryFind(alias, out extended),
 
             // A bare name is a column of the root's own relation, which no join extends: the root has no join under it.
             _ => instances.RootNamesAnInstance,
