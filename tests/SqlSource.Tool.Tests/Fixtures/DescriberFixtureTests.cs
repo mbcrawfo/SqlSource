@@ -107,6 +107,7 @@ public sealed class DescriberFixtureTests : IDisposable
     [InlineData("tables", "select-plain")]
     [InlineData("types")]
     [InlineData("check")]
+    [InlineData("explain", "select-left-join")]
     [InlineData("deallocate")]
     public async Task Replay_CaptureWithACallRemoved_ThrowsACaptureMiss(string method, string from = "update-inferred")
     {

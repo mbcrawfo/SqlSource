@@ -3976,6 +3976,7 @@ The nullability walk of the PostgreSQL describer ([`NullabilityWalk`](../../src/
 - **A column of a partitioned table or of an inheritance parent.**  It scans as an `Append` of `Member` children, whose aliases are `p_1` and `p_2` while the `Output` above prints `p.id`.  The planner prunes at run time, so a generic plan keeps the `Append` unless the table has one partition.
 - **A column of a foreign table**, whose `Foreign Scan` is no scan of the seven kinds: it stays `null` with `view` where a join extends it, and is not `outer-join`.
 - **A column of an extension's `Custom Scan`**, Citus and TimescaleDB for two.
+- **A bare name in the `RETURNING` list of an `UPDATE` or a `DELETE` with any join under its `ModifyTable`**, a `WHERE id IN (...)` that plans as a semi join for one.  A bare name there may be a column of a relation the planner proved empty under an outer join, so the walk takes it for the target's only with no join under the `ModifyTable`.  Only a join that null-extends can hide such a relation, and the rule could narrow to those.
 
 Two more things are not whole:
 

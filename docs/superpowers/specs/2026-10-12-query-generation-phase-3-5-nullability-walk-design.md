@@ -41,7 +41,7 @@ Changed from the epic by the spike, and recorded in the outline:
 | How the plan is obtained, on every version | `SET LOCAL plan_cache_mode = force_generic_plan` and `EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE <name>(NULL, ...)` on the statement sub-phase 3.2 prepared, in a transaction that is rolled back | `EXPLAIN (GENERIC_PLAN)` of PostgreSQL 16 was planned for 16 and later.  Through Npgsql, with the parameters bound as nulls, 18.4 folded `u.id = $1` to a `Result` node with `One-Time Filter: false`: the hazard the epic named.  The `PREPARE` route gives a true generic plan on 14 and 18 alike, so the version boundary is gone. |
 | A `Subquery Scan` or `CTE Scan` | A reference to one is unmappable: the column is `heuristic` | The epic said to map its outputs to the child plan's by position.  The scan's `Output` lists the subquery's columns by name, `c.total`, and the child plan's `Output` is positional expressions, `o.total`; the names of the subquery's columns are nowhere in the plan.  Matching by name is unsafe when a column is renamed to another column's name, so the reference stays unknown.  A subquery the planner flattens has no such scan and is walked exactly. |
 | An unmappable `Output` entry | Degrades that column alone, to `heuristic` with an origin and `no-origin` without | The epic's safety net dropped the whole query.  A column's answer does not depend on another's, and a plan that cannot be used at all still drops every column. |
-| A bare column name in `Output` | Resolves only when the root node is itself a scan of a relation | A single-relation query prints bare names, and so does a `Result` node that replaced a scan the planner proved empty, while another scan remains.  The one safe reading is the one with nothing to confuse it with. |
+| A bare column name in `Output` | Resolves only when the root node is itself a scan of a relation, or a `ModifyTable` with no join under it | A single-relation query prints bare names, and so does a `Result` node that replaced a scan the planner proved empty, while another scan remains.  The one safe reading is the one with nothing to confuse it with. |
 
 Settled in this spec:
 
@@ -216,7 +216,7 @@ One pull request, one commit for each step.  Each leaves `./pre-commit-validatio
 
 ## Documentation
 
-- `src/SqlSource.Tool/AGENTS.md`: the `PREPARE` route and why `GENERIC_PLAN` is not used; which children are sides and which are other plans; a `Subquery Scan` or `CTE Scan` is unmappable and name matching is refused; a bare name resolves at a scan root alone; the walk degrades a column alone, and the plan whole; the settings are for the tests and the list is closed.
+- `src/SqlSource.Tool/AGENTS.md`: the `PREPARE` route and why `GENERIC_PLAN` is not used; which children are sides and which are other plans; a `Subquery Scan` or `CTE Scan` is unmappable and name matching is refused; a bare name resolves at a scan root, or at a `ModifyTable` root with no join under it, alone; the walk degrades a column alone, and the plan whole; the settings are for the tests and the list is closed.
 - `docs/tech-debt`: references through a `Subquery Scan` or `CTE Scan` are unknown, what mapping them would need, and why name matching is unsafe; the columns of a partitioned or inherited table under an `Append`.
 - `docs/diagnostics.md`, `src/SqlSource.Tool/README.md`, the repository's `README.md`, `CONTRIBUTING.md`, `docs/publishing.md`: nothing changes.
 - `docs/deferred`: nothing is expected.

@@ -427,6 +427,18 @@
       }
     },
     {
+      "method": "explain",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 0,
+        "settings": []
+      },
+      "answer": {
+        "plan": "[\n  {\n    \"Plan\": {\n      \"Node Type\": \"Hash Join\",\n      \"Parallel Aware\": false,\n      \"Async Capable\": false,\n      \"Join Type\": \"Left\",\n      \"Startup Cost\": 14.72,\n      \"Total Cost\": 35.00,\n      \"Plan Rows\": 810,\n      \"Plan Width\": 358,\n      \"Disabled\": false,\n      \"Output\": [\"u.id\", \"u.name\", \"u.email\", \"u.status\", \"u.tags\", \"u.balance\", \"u.created_at\", \"u.deleted_at\", \"u.name_upper\"],\n      \"Inner Unique\": true,\n      \"Hash Cond\": \"(o.user_id = u.id)\",\n      \"Plans\": [\n        {\n          \"Node Type\": \"Seq Scan\",\n          \"Parent Relationship\": \"Outer\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Relation Name\": \"orders\",\n          \"Schema\": \"public\",\n          \"Alias\": \"o\",\n          \"Startup Cost\": 0.00,\n          \"Total Cost\": 18.10,\n          \"Plan Rows\": 810,\n          \"Plan Width\": 4,\n          \"Disabled\": false,\n          \"Output\": [\"o.id\", \"o.user_id\", \"o.total\", \"o.placed_at\", \"o.note\"]\n        },\n        {\n          \"Node Type\": \"Hash\",\n          \"Parent Relationship\": \"Inner\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Startup Cost\": 12.10,\n          \"Total Cost\": 12.10,\n          \"Plan Rows\": 210,\n          \"Plan Width\": 358,\n          \"Disabled\": false,\n          \"Output\": [\"u.id\", \"u.name\", \"u.email\", \"u.status\", \"u.tags\", \"u.balance\", \"u.created_at\", \"u.deleted_at\", \"u.name_upper\"],\n          \"Plans\": [\n            {\n              \"Node Type\": \"Seq Scan\",\n              \"Parent Relationship\": \"Outer\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Relation Name\": \"users\",\n              \"Schema\": \"public\",\n              \"Alias\": \"u\",\n              \"Startup Cost\": 0.00,\n              \"Total Cost\": 12.10,\n              \"Plan Rows\": 210,\n              \"Plan Width\": 358,\n              \"Disabled\": false,\n              \"Output\": [\"u.id\", \"u.name\", \"u.email\", \"u.status\", \"u.tags\", \"u.balance\", \"u.created_at\", \"u.deleted_at\", \"u.name_upper\"]\n            }\n          ]\n        }\n      ]\n    }\n  }\n]",
+        "error": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"

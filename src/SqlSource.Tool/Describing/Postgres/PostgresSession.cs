@@ -18,7 +18,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <remarks>
 /// A query is described through one prepared statement: <c>PREPARE</c> takes a declared type as written, resolves
 /// it, checks it against every use of its parameter, and infers the rest.  The statement is then described through
-/// an <c>EXECUTE</c> that is never run, which gives its columns.  A prepared statement is session state and
+/// an <c>EXECUTE</c> that is never run, which gives its columns.  For a query that the outer-join gate lets in, an
+/// <c>EXPLAIN</c> of that <c>EXECUTE</c> under <c>force_generic_plan</c> gives the plan that
+/// <see cref="NullabilityWalk" /> walks.  A prepared statement is session state and
 /// survives a rollback, so it is freed in a <c>finally</c>, outside any transaction; one left behind would be a
 /// leak until the session ends.  Its name is a counter, since the name is part of a request and a capture must be
 /// the same each time it is recorded.
@@ -156,8 +158,9 @@ internal sealed class PostgresSession : IDescribeSession
     }
 
     // What is asked of a statement that was prepared, in this order: its columns, the tables they name, and every
-    // type that the parameters, the columns and their origins have, once, and Npgsql's own reading of the SQL.  The
-    // table match is made between the columns and the check, and asks nothing.
+    // type that the parameters, the columns and their origins have, once; Npgsql's own reading of the SQL; and, for
+    // a gated query with rows, its generic plan.  The table match is made last and asks nothing: it reads the
+    // nullability the walk set.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
         string statement,
@@ -236,13 +239,47 @@ internal sealed class PostgresSession : IDescribeSession
             return Failed(built.Failure);
         }
 
-        // After the columns, and after everything that sets a column's nullability: the last check of the match
-        // reads it.
-        var match = MatchOf(request, built.Value, origins);
+        if (await CheckAsync(request, parameters.Value, columns, rows.Value, cancellationToken) is { } differs)
+        {
+            return Failed(differs);
+        }
 
-        return await CheckAsync(request, parameters.Value, columns, rows.Value, cancellationToken) is { } differs
-            ? Failed(differs)
-            : Described(parameters.Value, built.Value, gated, match);
+        // After the check, and for a gated query alone: one that is not gated pays nothing.
+        var walked = gated ? await WalkAsync(request, statement, built.Value, origins, cancellationToken) : null;
+        var recorded = RecordedColumns(built.Value, walked);
+
+        // After everything that sets a column's nullability: the last check of the match reads it.
+        var match = MatchOf(request, recorded, origins);
+        return Described(parameters.Value, recorded, walked?.Plan ?? SidecarValues.Plan.NotNeeded, match);
+    }
+
+    // The columns as they are recorded: the walk's when there was one, and else as they were built.
+    private static IReadOnlyList<SidecarColumn> RecordedColumns(
+        IReadOnlyList<SidecarColumn> built,
+        WalkOutcome? walked
+    ) => walked is null ? built : [.. walked.Columns.Select(static column => column.Column)];
+
+    // Asks for the generic plan of the statement and walks it.  A plan the server will not give is no fault of the
+    // query: the error is logged and never reported, and the columns keep the heuristic, as they do when the text
+    // is no plan.
+    private async Task<WalkOutcome> WalkAsync(
+        DescribeRequest request,
+        string statement,
+        IReadOnlyList<SidecarColumn> columns,
+        ColumnOrigin?[] origins,
+        CancellationToken cancellationToken
+    )
+    {
+        var asked = new PostgresExplainRequest(statement, request.Parameters.Count, PlannerSettings.None);
+        var answer = await _exchange.AskAsync("explain", asked, _live.ExplainAsync, cancellationToken);
+        if (answer.Error is not null)
+        {
+            return NullabilityWalk.Unavailable(WalkReasons.ExplainFailed, columns);
+        }
+
+        return answer.Plan is { } text && PlanNode.Read(text) is { } root
+            ? NullabilityWalk.Run(root, columns, origins)
+            : NullabilityWalk.Unavailable(WalkReasons.Unreadable, columns);
     }
 
     // A statement without rows has no match, and no event of one.
@@ -465,17 +502,16 @@ internal sealed class PostgresSession : IDescribeSession
         );
 
     // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.  One
-    // with rows says whether it needed a plan, "unavailable" for a gated query, until the walk exists, and which
-    // table its result is, or the first check of the match that failed.
+    // with rows says what became of its plan, "not-needed" when it was not gated, and which table its result is,
+    // or the first check of the match that failed.
     private static Outcome<QueryDescription, DescribeFailure> Described(
         IReadOnlyList<DescribedParameter> parameters,
         IReadOnlyList<SidecarColumn> columns,
-        bool gated,
+        string plan,
         (SidecarTable? Table, string Result)? match
     )
     {
         var typed = new EquatableArray<DescribedParameter>([.. parameters]);
-        var plan = gated ? SidecarValues.Plan.Unavailable : SidecarValues.Plan.NotNeeded;
         return Outcome<QueryDescription, DescribeFailure>.Of(
             match is { } found
                 ? new QueryDescription(

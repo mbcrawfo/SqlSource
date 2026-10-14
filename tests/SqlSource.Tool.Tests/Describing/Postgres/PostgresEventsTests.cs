@@ -274,8 +274,8 @@ public class PostgresEventsTests
                 "types",
                 "column",
                 "column",
-                "table-match",
                 "check",
+                "table-match",
                 "deallocate",
             ]);
 
@@ -340,16 +340,16 @@ public class PostgresEventsTests
         Member(count, "nullable").ShouldBe(LogValue.Null);
         Member(count, "nullableSource").ShouldBe((LogValue)"no-origin");
 
-        var match = log.Events[6].Members;
+        var check = log.Events[6].Members;
+        NamesOf(check).ShouldBe(["query", "parameters", "result", "differs", "durationMs"]);
+        Member(check, "result").ShouldBe((LogValue)"same");
+        Member(check, "differs").ShouldBe(LogValue.Null);
+
+        var match = log.Events[7].Members;
         NamesOf(match).ShouldBe(["query", "result", "table"]);
         Member(match, "query").ShouldBe((LogValue)"ListUsers");
         Member(match, "result").ShouldBe((LogValue)"no-origin");
         Member(match, "table").ShouldBe(LogValue.Null);
-
-        var check = log.Events[7].Members;
-        NamesOf(check).ShouldBe(["query", "parameters", "result", "differs", "durationMs"]);
-        Member(check, "result").ShouldBe((LogValue)"same");
-        Member(check, "differs").ShouldBe(LogValue.Null);
     }
 
     [Fact]
@@ -541,16 +541,16 @@ public class PostgresEventsTests
         await DescribeAsync(WholeScript(), log, Whole);
 
         log.Events.Select(written => written.Name)
-            .ShouldBe(["prepare", "columns", "tables", "types", "column", "table-match", "check", "deallocate"]);
-        var match = log.Events[5].Members;
+            .ShouldBe(["prepare", "columns", "tables", "types", "column", "check", "table-match", "deallocate"]);
+        var match = log.Events[6].Members;
         Member(match, "query").ShouldBe((LogValue)"ListIds");
         Member(match, "result").ShouldBe((LogValue)"matched");
         Member(match, "table").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "users")));
     }
 
-    // The match is in the log when the check that follows it fails.
+    // A check that fails ends the describe before the match is made.
     [Fact]
-    public async Task Describe_CheckThatDiffers_StillWritesTheTableMatchBeforeIt()
+    public async Task Describe_CheckThatDiffers_WritesNoTableMatch()
     {
         var log = new RecordingLog();
         var script = ListingScript().Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn));
@@ -558,17 +558,7 @@ public class PostgresEventsTests
         await DescribeAsync(script, log, Listing);
 
         log.Events.Select(written => written.Name)
-            .ShouldBe([
-                "prepare",
-                "columns",
-                "tables",
-                "types",
-                "column",
-                "column",
-                "table-match",
-                "check",
-                "deallocate",
-            ]);
+            .ShouldBe(["prepare", "columns", "tables", "types", "column", "column", "check", "deallocate"]);
         Member(log.Events.Single(written => written.Name == "check").Members, "result").ShouldBe((LogValue)"differ");
     }
 

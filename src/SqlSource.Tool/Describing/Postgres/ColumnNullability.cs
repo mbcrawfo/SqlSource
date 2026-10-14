@@ -8,9 +8,10 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </summary>
 /// <remarks>
 /// An answer is never "not nullable" unless the catalog says <c>NOT NULL</c>, the origin is a table, and no outer
-/// join can have touched the column.  Until the walk exists, a gated query makes every column of a table
-/// nullable.  A <c>NOT NULL</c> that PostgreSQL 18 holds as not validated (<c>NOT VALID</c>) sets the catalog's flag
-/// while rows that were there before may hold <c>NULL</c>, so it is nullable too.
+/// join can have touched the column.  A gated query makes every column of a table nullable here, and
+/// <see cref="NullabilityWalk" /> then answers for each column whose relation instance the plan names.  A
+/// <c>NOT NULL</c> that PostgreSQL 18 holds as not validated (<c>NOT VALID</c>) sets the catalog's flag while rows
+/// that were there before may hold <c>NULL</c>, so it is nullable too.
 /// </remarks>
 internal static class ColumnNullability
 {

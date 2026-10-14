@@ -11,7 +11,7 @@
       "serverVersion": "18.4",
       "resultKind": "rows",
       "matchesTable": null,
-      "plan": "unavailable",
+      "plan": "walked",
       "tableMatch": "nullability-differs",
       "parameters": [],
       "columns": [
@@ -25,7 +25,7 @@
             "internalName": "int4"
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -45,7 +45,7 @@
             "length": 100
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -71,7 +71,7 @@
             }
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -94,7 +94,7 @@
             ]
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -119,7 +119,7 @@
             }
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -140,7 +140,7 @@
             "scale": 2
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -159,7 +159,7 @@
             "internalName": "timestamptz"
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -178,7 +178,7 @@
             "internalName": "timestamptz"
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -197,7 +197,7 @@
             "internalName": "text"
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "users",

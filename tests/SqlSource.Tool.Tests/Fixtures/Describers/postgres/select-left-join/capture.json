@@ -370,6 +370,18 @@
       }
     },
     {
+      "method": "explain",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 1,
+        "settings": []
+      },
+      "answer": {
+        "plan": "[\n  {\n    \"Plan\": {\n      \"Node Type\": \"WindowAgg\",\n      \"Parallel Aware\": false,\n      \"Async Capable\": false,\n      \"Startup Cost\": 21.32,\n      \"Total Cost\": 28.38,\n      \"Plan Rows\": 4,\n      \"Plan Width\": 64,\n      \"Disabled\": false,\n      \"Output\": [\"u.id\", \"u.email\", \"o.total\", \"count(*) OVER w1\"],\n      \"Window\": \"w1 AS ()\",\n      \"Plans\": [\n        {\n          \"Node Type\": \"Nested Loop\",\n          \"Parent Relationship\": \"Outer\",\n          \"Parallel Aware\": false,\n          \"Async Capable\": false,\n          \"Join Type\": \"Left\",\n          \"Startup Cost\": 0.14,\n          \"Total Cost\": 28.33,\n          \"Plan Rows\": 4,\n          \"Plan Width\": 56,\n          \"Disabled\": false,\n          \"Output\": [\"u.id\", \"u.email\", \"o.total\"],\n          \"Inner Unique\": false,\n          \"Plans\": [\n            {\n              \"Node Type\": \"Index Scan\",\n              \"Parent Relationship\": \"Outer\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Scan Direction\": \"Forward\",\n              \"Index Name\": \"users_pkey\",\n              \"Relation Name\": \"users\",\n              \"Schema\": \"public\",\n              \"Alias\": \"u\",\n              \"Startup Cost\": 0.14,\n              \"Total Cost\": 8.16,\n              \"Plan Rows\": 1,\n              \"Plan Width\": 36,\n              \"Disabled\": false,\n              \"Output\": [\"u.id\", \"u.name\", \"u.email\", \"u.status\", \"u.tags\", \"u.balance\", \"u.created_at\", \"u.deleted_at\", \"u.name_upper\"],\n              \"Index Cond\": \"(u.id = $1)\"\n            },\n            {\n              \"Node Type\": \"Seq Scan\",\n              \"Parent Relationship\": \"Inner\",\n              \"Parallel Aware\": false,\n              \"Async Capable\": false,\n              \"Relation Name\": \"orders\",\n              \"Schema\": \"public\",\n              \"Alias\": \"o\",\n              \"Startup Cost\": 0.00,\n              \"Total Cost\": 20.12,\n              \"Plan Rows\": 4,\n              \"Plan Width\": 24,\n              \"Disabled\": false,\n              \"Output\": [\"o.id\", \"o.user_id\", \"o.total\", \"o.placed_at\", \"o.note\"],\n              \"Filter\": \"(o.user_id = $1)\"\n            }\n          ]\n        }\n      ]\n    }\n  }\n]",
+        "error": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"

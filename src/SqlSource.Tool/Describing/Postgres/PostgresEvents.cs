@@ -13,8 +13,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// removes the connection's value from every string.  A member is added and never renamed.  <c>open</c> has no
 /// event of its own: the run's <c>database.open</c> records what the session knows of its server.  A describe
 /// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, one <c>column</c> for each column,
-/// <c>table-match</c>, <c>check</c> and <c>deallocate</c>, in that order, each only when its call was made, and
-/// <c>table-match</c> only for a statement with rows whose columns were all built.
+/// <c>check</c>, <c>table-match</c> and <c>deallocate</c>, in that order, each only when its call was
+/// made, and <c>table-match</c> only for a statement with rows whose check agreed.
 /// </remarks>
 internal static class PostgresEvents
 {
