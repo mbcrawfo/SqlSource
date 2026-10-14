@@ -8,6 +8,7 @@ using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Tests;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
@@ -81,6 +82,26 @@ public sealed class SessionTests(PostgresContainer postgres)
         var failure = await ShouldNotOpenAsync("Host=127.0.0.1;Port=1;Timeout=5;Username=app;Password=" + Marker);
 
         failure.ServerLines.ShouldBe(["Failed to connect to 127.0.0.1:1"]);
+    }
+
+    // The server asks for a password and the string names a password file instead of a password: the driver reads
+    // the file then, and for one that is not there it throws what is no NpgsqlException and quotes the path.  The
+    // line is the tool's own.
+    [Fact]
+    public async Task OpenAsync_PasswordFileThatIsNotThere_IsSqlsrc224WithTheFixedLine()
+    {
+        using var folder = new TempFolder();
+        var path = folder.PathOf("passfile-that-is-not-there");
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
+        {
+            Password = null,
+            Passfile = path,
+        };
+
+        var failure = await ShouldNotOpenAsync(connection.ConnectionString);
+
+        failure.ServerLines.ShouldBe([PostgresConnection.UnreadableFile]);
+        Sessions.TextsOf(failure).ShouldAllBe(text => !text.Contains(path, StringComparison.Ordinal));
     }
 
     // The exchange asks the server, so that the session's connection is open, and then fails.  The caller of the

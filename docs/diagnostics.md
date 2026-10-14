@@ -901,7 +901,7 @@ Mend the file.  `dotnet sln list` reads it the same way.
 
 **Database could not be opened**
 
-The tool could not open a session with the database of a query that must be described: nothing answers at the address, the server refused the user or the password, the database does not exist, or the driver cannot read the connection string.  The lines that start with `server:` are what the server or the driver said, as they said it.
+The tool could not open a session with the database of a query that must be described: nothing answers at the address, the server refused the user or the password, the database does not exist, the driver cannot read the connection string, or a file that the connection string names cannot be used.  The lines that start with `server:` are what the server or the driver said, as they said it.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC224: The database 'app' could not be opened
@@ -910,7 +910,7 @@ The tool could not open a session with the database of a query that must be desc
     help: check that the database is running and that the connection string names it
 ```
 
-Start the database, or correct the connection string that `--connection` or the database's variable gives.  When the line is `Npgsql cannot read the connection string`, the string is not written as Npgsql wants one, `Host=localhost;Database=app;Username=app;Password=...`: the tool does not repeat what the driver said of it, since that can quote the string.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.
+Start the database, or correct the connection string that `--connection` or the database's variable gives.  When the line is `Npgsql cannot read the connection string`, the string is not written as Npgsql wants one, `Host=localhost;Database=app;Username=app;Password=...`: the tool does not repeat what the driver said of it, since that can quote the string.  The same holds for a file that the string or the environment names, a client certificate, a key or a password file (`SslCertificate`, `SslKey`, `Passfile`, or `PGSSLCERT`, `PGSSLKEY`, `PGPASSFILE`), whose path the driver's own text would quote: the line is `a file that the connection string or the environment names cannot be read` when the file or its folder is not there or the tool may not open it, and `a file that the connection string or the environment names is not what Npgsql expects: it is not in the right form, or its password is wrong` when the driver read it and could not use it, such as a line of a password file that is no entry.  `Npgsql does not support these settings of the connection string together` is a `Target Session Attributes` other than `Any` for one host, or a `Replication Mode` for several, and `GSS authentication is not available on this machine` is a server that asks for GSS where the operating system's GSS library cannot be loaded.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.
 
 ## SQLSRC225
 
