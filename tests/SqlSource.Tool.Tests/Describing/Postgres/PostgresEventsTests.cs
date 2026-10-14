@@ -545,7 +545,7 @@ public class PostgresEventsTests
         var match = log.Events[5].Members;
         Member(match, "query").ShouldBe((LogValue)"ListIds");
         Member(match, "result").ShouldBe((LogValue)"matched");
-        Member(match, "table").ShouldBe((LogValue)"public.users");
+        Member(match, "table").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "users")));
     }
 
     // The match is in the log when the check that follows it fails.
@@ -569,6 +569,7 @@ public class PostgresEventsTests
                 "check",
                 "deallocate",
             ]);
+        Member(log.Events.Single(written => written.Name == "check").Members, "result").ShouldBe((LogValue)"differ");
     }
 
     // A table's name is a user's text, and the connection's value is taken out of it as out of any string.
@@ -580,7 +581,7 @@ public class PostgresEventsTests
         await DescribeAsync(WholeScript(), new SessionRunLog(log, "users", "postgres."), Whole);
 
         var match = log.Events.Single(written => written.Name == "postgres.table-match").Members;
-        Member(match, "table").ShouldBe((LogValue)"public.***");
+        Member(match, "table").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "***")));
     }
 
     // The same inside a map: the message of an error is a string one level down.

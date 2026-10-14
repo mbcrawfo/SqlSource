@@ -148,13 +148,14 @@ public class TableMatcherTests
     }
 
     // PostgreSQL records no NOT NULL for a column of a view, and does not enforce a foreign table's: every column
-    // is unknown, in the result and in the relation.
+    // is unknown, in the result and in the relation, whatever the catalog's flag says.  The recorded value is set
+    // here and not taken from the rule the match asks, so the relation's side is what is held.
     [Theory]
     [InlineData("v")]
     [InlineData("m")]
     [InlineData("f")]
     public void Match_ViewMaterializedViewOrForeignTableWithEveryColumnUnknown_IsTheRelation(string relkind) =>
-        Match(Whole(Items with { Relkind = relkind }))
+        Match([.. Whole(Items with { Relkind = relkind }).Select(static cell => cell.WithNullable(null))])
             .ShouldBe((new SidecarTable("public", "items"), SidecarValues.TableMatch.Matched));
 
     // What the walk of sub-phase 3.5 does to a view's column on the nullable side of a join.
@@ -167,10 +168,20 @@ public class TableMatcherTests
             .ShouldBe((null, SidecarValues.TableMatch.NullabilityDiffers));
     }
 
+    // A partitioned table enforces its constraints as a table does: its columns have what the catalog says, which
+    // is set here and not taken from the rule the match asks.
     [Fact]
-    public void Match_PartitionedTable_IsTheTable() =>
-        Match(Whole(Items with { Relkind = "p" }))
+    public void Match_PartitionedTable_IsTheTable()
+    {
+        var parted = Items with { Relkind = "p" };
+
+        Match(
+                From(parted, 1).WithNullable(false),
+                From(parted, 2).WithNullable(false),
+                From(parted, 4).WithNullable(true)
+            )
             .ShouldBe((new SidecarTable("public", "items"), SidecarValues.TableMatch.Matched));
+    }
 
     // PostgreSQL 18 sets attnotnull for a NOT NULL that is NOT VALID, and the describer records the column as
     // nullable.  The table's column is nullable by the same rule, so SELECT * still matches.

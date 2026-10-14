@@ -145,15 +145,19 @@ internal static class PostgresEvents
         );
 
     /// <summary>
-    /// <c>postgres.table-match</c>: <c>matched</c> with the relation whose column list the result is, as
-    /// <c>schema.name</c>, or the first check of the match that failed with no table.
+    /// <c>postgres.table-match</c>: <c>matched</c> with the relation whose column list the result is, or the first
+    /// check of the match that failed with no table.  The relation is its schema and its name apart, as the origin
+    /// of a <c>column</c> is: a name may hold a dot.
     /// </summary>
     public static void TableMatch(IRunLog log, string query, SidecarTable? table, string result) =>
         log.Write(
             "table-match",
             new("query", query),
             new("result", result),
-            new("table", table is null ? LogValue.Null : (LogValue)$"{table.Schema}.{table.Table}")
+            new(
+                "table",
+                table is null ? LogValue.Null : LogValue.MapOf(new("schema", table.Schema), new("table", table.Table))
+            )
         );
 
     /// <summary><c>postgres.deallocate</c>: the one place that says a statement could not be freed.</summary>
