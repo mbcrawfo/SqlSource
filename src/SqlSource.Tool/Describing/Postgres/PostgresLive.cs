@@ -29,15 +29,33 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private const string ParameterTypesSql =
         "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = @name";
 
-    // Every relation asked for with its columns, in one query.  The join is a left one, so that a table without a
-    // column of its own is answered too, with one row that holds no attribute.  The last column is whether a
-    // partitioned table has a foreign table anywhere in its partition tree, false and never null for any other.
+    // Every relation asked for with its columns, in one query.  The relations are read first, so that the one thing
+    // that costs a walk of the catalog, whether a partitioned table has a foreign table anywhere in its partition
+    // tree, is computed once for each relation and not once for each of its columns; it is false and never null for
+    // any other.  The join to the attributes is a left one, so that a table without a column of its own is answered
+    // too, with one row that holds no attribute.
     private const string TablesSql = """
+        WITH relations AS MATERIALIZED (
+            SELECT
+                c.oid,
+                c.relkind,
+                c.relnamespace,
+                c.relname,
+                c.relhassubclass,
+                c.relkind = 'p' AND EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_partition_tree(c.oid) AS t
+                    JOIN pg_catalog.pg_class AS f ON f.oid = t.relid
+                    WHERE f.relkind = 'f'
+                ) AS has_foreign_partition
+            FROM pg_catalog.pg_class AS c
+            WHERE c.oid = ANY (@oids)
+        )
         SELECT
-            c.oid,
-            c.relkind::text,
+            r.oid,
+            r.relkind::text,
             n.nspname::text,
-            c.relname::text,
+            r.relname::text,
             a.attnum,
             a.attname::text,
             a.attnotnull,
@@ -45,20 +63,14 @@ internal sealed class PostgresLive(PostgresConnection connection)
             a.attgenerated::text,
             a.atttypid,
             k.convalidated,
-            c.relhassubclass,
-            c.relkind = 'p' AND EXISTS (
-                SELECT 1
-                FROM pg_catalog.pg_partition_tree(c.oid) AS t
-                JOIN pg_catalog.pg_class AS f ON f.oid = t.relid
-                WHERE f.relkind = 'f'
-            )
-        FROM pg_catalog.pg_class AS c
-        JOIN pg_catalog.pg_namespace AS n ON n.oid = c.relnamespace
-        LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = c.oid AND a.attnum > 0 AND NOT a.attisdropped
+            r.relhassubclass,
+            r.has_foreign_partition
+        FROM relations AS r
+        JOIN pg_catalog.pg_namespace AS n ON n.oid = r.relnamespace
+        LEFT JOIN pg_catalog.pg_attribute AS a ON a.attrelid = r.oid AND a.attnum > 0 AND NOT a.attisdropped
         LEFT JOIN pg_catalog.pg_constraint AS k
-            ON k.conrelid = c.oid AND k.contype = 'n' AND k.conkey = ARRAY[a.attnum]
-        WHERE c.oid = ANY (@oids)
-        ORDER BY c.oid, a.attnum
+            ON k.conrelid = r.oid AND k.contype = 'n' AND k.conkey = ARRAY[a.attnum]
+        ORDER BY r.oid, a.attnum
         """;
 
     // The closure of the types asked for, in one query: a recursive term that follows the element of an array, the
