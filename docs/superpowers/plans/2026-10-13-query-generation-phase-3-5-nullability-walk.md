@@ -31,6 +31,7 @@ Each was checked against PostgreSQL 14 and 18 while the plan was written.  The s
 - **The `relation` of `postgres.walk.node` is a map of `schema` and `table`**, as the `table` of `postgres.table-match` is, where the spec says `schema.name`: a name may hold a dot.  Task 9 records it in the outline.
 - **`postgres.walk.column` is written for every column of a gated query**, with a null `output` when there was no plan to read, and `postgres.walk` always holds `reason`, null when the plan was walked.
 - **`Describing/Postgres/` reaches 25 files and is left flat**, as the spec places the walk there.  Whether the walk becomes a folder is the next maintainability review's to decide.
+- **An `Anti` join null-extends its inner side, and a `Right Anti` its outer.**  The spec and the epic said an anti join extends nothing.  The review of Task 3 found, and a probe of 14 and 18 confirmed, that `a LEFT JOIN b ... WHERE b.x IS NULL` plans as an anti join whose `Output` still holds `b.id`, `NULL` in every row.  The spec is amended, the matrix gains `walk-anti`, and Task 9 records it in the outline.
 - **`schema.sql` is not changed.**  A container test that needs a table of its own makes it, as `TableMatchTests` does.
 
 ## Global Constraints
@@ -41,7 +42,7 @@ Each was checked against PostgreSQL 14 and 18 while the plan was written.  The s
 - The plan is asked for a gated query with rows alone, after `check` and before `deallocate`.  A query that is not gated asks nothing more than before, so its capture does not change.
 - The route on every version: `BEGIN`; `SET LOCAL plan_cache_mode = force_generic_plan`; one `SET LOCAL` for each setting; `EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE <name>(NULL, ...)`, or `EXECUTE <name>` without parameters; `ROLLBACK`.  `EXPLAIN (GENERIC_PLAN)` is not used.
 - The settings a request may carry are `enable_hashjoin`, `enable_mergejoin`, `enable_nestloop`, `enable_memoize` and `enable_material`, each `on` or `off`.  The tool itself passes none.
-- The join types the walk knows are `Inner`, `Left`, `Right`, `Full`, `Semi`, `Anti`, `Right Semi` and `Right Anti`.  `Left` extends its `Inner` child, `Right` its `Outer`, `Full` both, the rest nothing.
+- The join types the walk knows are `Inner`, `Left`, `Right`, `Full`, `Semi`, `Anti`, `Right Semi` and `Right Anti`.  `Left` and `Anti` extend their `Inner` child, `Right` and `Right Anti` their `Outer`, `Full` both, the rest nothing.  An anti join is what the planner makes of `a LEFT JOIN b ... WHERE b.x IS NULL`, and it returns `b`'s columns `NULL`.
 - Only children whose `Parent Relationship` is `Outer` or `Inner` are followed.
 - The reasons of `unavailable` are `explain-failed`, `unreadable`, `no-output`, `unknown-join-type`, `doubled-alias` and `grouping-sets`.
 - The methods of the exchange become `open`, `prepare`, `columns`, `tables`, `types`, `check`, `explain` and `deallocate`.  A record of a call is sealed and holds strings, integers, booleans, nullable ones, lists of them and records of the same kind.
@@ -1079,9 +1080,9 @@ public class PlanInstancesTests
     [InlineData("Right", true, false)]
     [InlineData("Full", true, true)]
     [InlineData("Semi", false, false)]
-    [InlineData("Anti", false, false)]
+    [InlineData("Anti", false, true)]
     [InlineData("Right Semi", false, false)]
-    [InlineData("Right Anti", false, false)]
+    [InlineData("Right Anti", true, false)]
     public void Find_JoinOfTwoScans_ExtendsTheSidesItsTypeSays(string joinType, bool outer, bool inner)
     {
         var instances = PlanInstances.Find(Join(joinType, Scan("a"), Scan("b")));
@@ -1392,10 +1393,10 @@ internal sealed class PlanInstances
         node.JoinType switch
         {
             null => None,
-            "Left" => "inner",
-            "Right" => "outer",
+            "Left" or "Anti" => "inner",
+            "Right" or "Right Anti" => "outer",
             "Full" => Both,
-            "Inner" or "Semi" or "Anti" or "Right Semi" or "Right Anti" => None,
+            "Inner" or "Semi" or "Right Semi" => None,
             _ => null,
         };
 
@@ -3415,7 +3416,7 @@ EOF
 ### Task 8: The matrix
 
 **Files:**
-- Create: 36 folders under `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/`, each with a `query.sql`, a recorded `capture.json` and `expected.json`, and eight of them with an `explain-settings.txt`
+- Create: 37 folders under `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/`, each with a `query.sql`, a recorded `capture.json` and `expected.json`, and eight of them with an `explain-settings.txt`
 - Create: `tests/SqlSource.Tool.Tests/Fixtures/WalkMatrixTests.cs`
 - Modify: `tests/SqlSource.Tool.Tests/Fixtures/DescriberFixtureTests.cs:68-98`
 
@@ -3500,6 +3501,7 @@ public class WalkMatrixTests
         ["walk-proved-empty"] = (Walked, [Kept, Heuristic]),
         ["walk-quoted-alias"] = (Walked, [Kept, Joined]),
         ["walk-semi-anti"] = (Walked, [Kept, NoOrigin]),
+        ["walk-anti"] = (Walked, [Kept, Joined, Joined]),
         ["walk-rollup"] = (Unavailable, [Heuristic, NoOrigin]),
         ["walk-cube"] = (Unavailable, [Heuristic, Heuristic, NoOrigin]),
         ["walk-grouping-sets"] = (Unavailable, [Heuristic, NoOrigin]),
@@ -3582,6 +3584,7 @@ public class WalkMatrixTests
     [InlineData("walk-cube", "\"Grouping Sets\"")]
     [InlineData("walk-grouping-sets", "\"Grouping Sets\"")]
     [InlineData("walk-full", "\"Join Type\": \"Full\"")]
+    [InlineData("walk-anti", "Anti\"")]
     public void Capture_CaseOfAShape_HoldsTheShape(string name, string holds) => PlanOf(name).ShouldContain(holds);
 
     [Theory]
@@ -3633,6 +3636,7 @@ Each case is a folder under `tests/SqlSource.Tool.Tests/Fixtures/Describers/post
 | `walk-proved-empty` | `WalkProvedEmpty` | `SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id AND 1 = 0` |
 | `walk-quoted-alias` | `WalkQuotedAlias` | `SELECT u.id, "Order".total FROM users u LEFT JOIN orders "Order" ON "Order".user_id = u.id` |
 | `walk-semi-anti` | `WalkSemiAnti` | `SELECT u.id, left(u.name, 1) AS initial FROM users u WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id) AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)` |
+| `walk-anti` | `WalkAnti` | `SELECT u.id, o.id AS order_id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE o.user_id IS NULL` |
 | `walk-rollup` | `WalkRollup` | `SELECT u.status, count(*) AS n FROM users u GROUP BY ROLLUP (u.status)` |
 | `walk-cube` | `WalkCube` | `SELECT u.status, u.name, count(*) AS n FROM users u GROUP BY CUBE (u.status, u.name)` |
 | `walk-grouping-sets` | `WalkGroupingSets` | `SELECT u.status, count(*) AS n FROM users u GROUP BY GROUPING SETS ((u.status), ())` |
@@ -3746,6 +3750,9 @@ query walk-semi-anti WalkSemiAnti 'SELECT u.id, left(u.name, 1) AS initial
 FROM users u
 WHERE EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)
   AND NOT EXISTS (SELECT 1 FROM bookings b WHERE b.user_id = u.id)'
+query walk-anti WalkAnti 'SELECT u.id, o.id AS order_id, o.total
+FROM users u LEFT JOIN orders o ON o.user_id = u.id
+WHERE o.user_id IS NULL'
 query walk-rollup WalkRollup 'SELECT u.status, count(*) AS n
 FROM users u
 GROUP BY ROLLUP (u.status)'
@@ -3761,7 +3768,7 @@ ORDER BY o.placed_at'
 ```
 
 Run: `find tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres -name query.sql -path '*walk-*' | wc -l`
-Expected: `36`
+Expected: `37`
 
 Run: `find tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres -name explain-settings.txt | wc -l`
 Expected: `8`
@@ -3771,7 +3778,7 @@ A `FULL JOIN` cannot be a nested loop, so there is no `walk-full-nestloop`: the 
 - [ ] **Step 4: Record**
 
 Run: `tools/record-fixtures.sh`
-Expected: `Recording 59 cases of postgres against postgres:18 ... done`
+Expected: `Recording 60 cases of postgres against postgres:18 ... done`
 
 Run: `git status --short tests/SqlSource.Tool.Tests/Fixtures/Describers | grep -v 'walk-'`
 Expected: nothing.  A case that existed before this task does not change.
@@ -3789,6 +3796,7 @@ In `tests/SqlSource.Tool.Tests/Fixtures/DescriberFixtureTests.cs`, add to the ar
 
 ```csharp
                 "postgres/walk-aggregate",
+                "postgres/walk-anti",
                 "postgres/walk-chain",
                 "postgres/walk-cte-inlined",
                 "postgres/walk-cte-materialized",
@@ -3829,7 +3837,7 @@ In `tests/SqlSource.Tool.Tests/Fixtures/DescriberFixtureTests.cs`, add to the ar
 - [ ] **Step 7: Replay without Docker, and describe on both servers**
 
 Run: `dotnet test --project tests/SqlSource.Tool.Tests -- --filter-class "SqlSource.Tool.Tests.Fixtures.DescriberFixtureTests"`
-Expected: PASS, 59 cases replayed.
+Expected: PASS, 60 cases replayed.
 
 Run: `dotnet test --project tests/SqlSource.Tests.Postgres -- --filter-class "SqlSource.Tests.Postgres.Describer.FixtureCasesTests"`
 Expected: PASS.
@@ -3852,7 +3860,7 @@ git add tests/SqlSource.Tool.Tests/Fixtures
 git commit -m "$(cat <<'EOF'
 Record the matrix of the nullability walk
 
-Thirty-six cases: each join type under each method the planner can
+Thirty-seven cases: each join type under each method the planner can
 choose for it, the shapes the planner flattens, reduces or removes, and
 the shapes the walk refuses.  WalkMatrixTests says what each must give,
 so that a recording is checked against the spec and not against itself.
@@ -3903,7 +3911,7 @@ Add these bullets after the bullet of the table match:
 
 ```markdown
 - **The plan of a gated query is a generic one, through the prepared statement** (`PostgresLive.ExplainAsync`).  `explain` runs `BEGIN`, `SET LOCAL plan_cache_mode = force_generic_plan`, a `SET LOCAL` for each setting of the request, `EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE <name>(NULL, ...)` and `ROLLBACK`, on every version.  `EXPLAIN (GENERIC_PLAN)` of PostgreSQL 16 is not used: through Npgsql, with the parameters bound as nulls, 18.4 folded `u.id = $1` into a `Result` with `One-Time Filter: false`.  `EXPLAIN` without `ANALYZE` plans and does not run, and disposing the transaction rolls it back when a step failed, so the session is left as it was found.  An `explain` that fails is logged and never reported: `plan` is `unavailable` and the heuristic stands.  It is asked after `check` and for a gated query with rows alone, so a query that is not gated has the capture it had.
-- **The walk follows a join's sides and nothing else** (`PlanInstances`).  A child whose `Parent Relationship` is `Outer` or `Inner` is a side of a join or the one input of another node; an `InitPlan`, a `SubPlan`, a `Member` and a `Subquery` are other plans, since a CTE's plan hangs under whichever node first needs it, and their scans are no instances of this plan's joins.  A relation instance is an `Alias` on a scan of a relation, the seven node types of `PlanInstances.RelationScans`, and it is null-extended when a join on the path from the root is `Left` with the instance under its `Inner` child, `Right` under its `Outer`, or `Full`.  A `LEFT JOIN` the planner swapped is a `Right` join with the sides swapped, and one it reduced is `Inner`: the rule needs neither told apart.  A join type outside the eight of `PlanInstances.ExtendsOf`, an alias found twice, a `Grouping Sets` key or a `MixedAggregate` makes the plan unusable, and so does a root without an `Output` for every column, a `UNION`'s `Append` for one.
+- **The walk follows a join's sides and nothing else** (`PlanInstances`).  A child whose `Parent Relationship` is `Outer` or `Inner` is a side of a join or the one input of another node; an `InitPlan`, a `SubPlan`, a `Member` and a `Subquery` are other plans, since a CTE's plan hangs under whichever node first needs it, and their scans are no instances of this plan's joins.  A relation instance is an `Alias` on a scan of a relation, the seven node types of `PlanInstances.RelationScans`, and it is null-extended when a join on the path from the root is `Left` or `Anti` with the instance under its `Inner` child, `Right` or `Right Anti` under its `Outer`, or `Full`.  An anti join is not only a `NOT EXISTS`: the planner makes one of `a LEFT JOIN b ... WHERE b.x IS NULL`, keeps `b`'s columns in its `Output` and returns them `NULL`, as `Anti` on 14 and `Right Anti` on 18.  A `LEFT JOIN` the planner swapped is a `Right` join with the sides swapped, and one it reduced is `Inner`: the rule needs neither told apart.  A join type outside the eight of `PlanInstances.ExtendsOf`, an alias found twice, a `Grouping Sets` key or a `MixedAggregate` makes the plan unusable, and so does a root without an `Output` for every column, a `UNION`'s `Append` for one.
 - **A `ModifyTable` at the root is its target, and the scan of the target under it is that same instance.**  An `UPDATE` and a `DELETE` scan their target under the `ModifyTable` with the `ModifyTable`'s own alias, on 14 and 18: read as a second instance it would be a doubled alias, and every `RETURNING` of one would be unusable.  The target is never null-extended, whatever join it is under, since the row a `RETURNING` list gives is the one the statement acted on; the source of a `MERGE` is extended as its join says.  PostgreSQL 18 prints the old and the new row as `old.id` and `new.id`, or under the names `WITH (OLD AS o, NEW AS n)` gives them, which the server refuses when a table of the statement has the name: so an alias the walk finds in the plan is a relation instance, and an `OLD` or `NEW` column is unmappable and keeps the heuristic.
 - **An entry of `Output` is a reference or it is nothing** (`OutputReference`).  `alias.column`, each part a name PostgreSQL prints bare, lower-case letters, digits and underscores, or in double quotes with `""` for a quote; or one bare name.  Anything else is an expression and its column keeps the heuristic: `"left"((u.name)::text, 1)` starts as a quoted name does and is none.  A bare name resolves only when the root is itself a relation instance, a scan or a `ModifyTable`: a `Result` that replaced a scan the planner proved empty prints bare names too, beside a scan that remains.  A reference to a `Subquery Scan` or a `CTE Scan` is unmappable and is not matched to the subquery's own plan by name: that plan's `Output` is positional expressions, the subquery's column names are nowhere in it, and a column renamed to another's name would be read as the other.  A subquery the planner flattens has no such scan and is walked exactly.  `docs/tech-debt/TD-0046-the-walk-leaves-some-columns-to-the-heuristic.md` records what mapping one would take.
 - **The walk degrades a column alone, and the plan whole** (`NullabilityWalk`).  An entry that cannot be mapped leaves its own column to the heuristic and the plan `walked`; a plan that cannot be used leaves every column to it and is `unavailable`.  A mapped column that nothing extends takes `ColumnNullability.Of` for a query that is not gated, so the rule of a `NOT NULL` is written once and a view's column stays `null` with `view`; one that a join extends is `true` with `outer-join`, a view's too.  A column without an origin is not looked up.  The walk never answers `false` on its own: when in doubt it is the heuristic.
@@ -3993,13 +4001,14 @@ Add at the end of Settled:
 ```markdown
 - **A `ModifyTable` sits over a scan of its own target**, with the same alias, on 14 and 18.  Sub-phase 3.5's spec was amended before its plan: the root's `ModifyTable` is the target instance with an empty path, the scan under it with that alias is the same instance and no doubled alias, and the target is never null-extended, since the row a `RETURNING` list gives is the one the statement acted on.  Any other alias found twice still makes the plan unusable.
 - **A query gated by `OLD`, `NEW` or `MERGE` is walked.**  A `MERGE` with `WHEN NOT MATCHED BY SOURCE` plans as a `Left` join that null-extends its source, with `WHEN NOT MATCHED BY TARGET` as a `Right` one that extends the target's scan, with both as a `Full` one: the source's columns of a `RETURNING` list take the join's answer and the target's the catalog's.  PostgreSQL 18 prints the old and the new row as `old.id` and `new.id`, or under the names `WITH (OLD AS o, NEW AS n)` gives them, and refuses such a name when a table of the statement has it: so an alias found in the plan is a relation instance, and a column of the old or the new row is unmappable and keeps the heuristic.
+- **An `Anti` join null-extends its inner side, and a `Right Anti` its outer.**  This outline and sub-phase 3.5's spec said an anti join extends nothing, which holds for a `NOT EXISTS`.  The planner also makes an anti join of `a LEFT JOIN b ... WHERE b.x IS NULL`, and its `Output` still holds `b.id`, `NULL` in every row: a `NOT NULL` column would have been `false` there.  The review of the walk found it, the spec was amended, and the fixture `walk-anti` holds it on 14, where the join is `Anti`, and on 18, where it is `Right Anti`.  A semi join shows nothing of its hidden side and extends nothing.
 - **The table match is made after `check` and the walk**, where sub-phase 3.4 made it before `check`: its last check reads the nullability the walk set.  It asks nothing, so no capture changed.  A query whose `check` fails writes no `postgres.table-match` event.
 - **A fixture case gives one answer on 14 and on 18**, since each is described on both against one `expected.json`.  The matrix's `ON ... AND o.id IS NULL` does not: 17 and later prove it false from the `NOT NULL` and print a bare name from a `Result`, `heuristic`, where 14 scans the table, `outer-join`.  The fixture `walk-proved-empty` is `AND 1 = 0`, which both prove, and the `IS NULL` shape is a container test.  Of the other rows of the matrix: a view over an outer join is walked only when the query holds a gate word of its own, so `walk-view` joins the view; the merged column of a `USING` or a `NATURAL` join has no origin only when the join is `FULL`; and a `UNION`'s columns have no origin, so `walk-union` is `unavailable` with nothing for the heuristic to answer.
 - **The `relation` of `postgres.walk.node` is a map of `schema` and `table`**, as the `table` of `postgres.table-match` is, where sub-phase 3.5's spec says `schema.name`.  `postgres.walk.column` is written for every column of a gated query, and `postgres.walk` always holds `reason`, null when the plan was walked.  `postgres.column` holds the heuristic's answer for a gated query.
 - **`src/SqlSource.Tool/README.md` says nothing of `plan`**, so the widened `unavailable` is recorded here and in `src/SqlSource.Tool/AGENTS.md` alone.
 ```
 
-Read the rest of the outline for a sentence this sub-phase made wrong: search it for `walk`, `GENERIC_PLAN`, `by position` and `unavailable`, and correct what you find where it stands.
+Read the rest of the outline for a sentence this sub-phase made wrong: search it for `walk`, `GENERIC_PLAN`, `by position`, `unavailable` and `Anti`, and correct what you find where it stands.
 
 - [ ] **Step 6: The version**
 

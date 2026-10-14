@@ -98,15 +98,16 @@ internal sealed class PlanInstances
     private static bool NamesAnInstance(PlanNode node, bool isRoot) =>
         node.Alias is not null && (RelationScans.Contains(node.NodeType) || (isRoot && node.NodeType == ModifyTable));
 
-    // Which side a join extends, "none" for a node that is no join, and null for a join type that is not known.
+    // Which side a join extends, "none" for a node that is no join, and null for a join type that is not known.  An
+    // anti join extends too: the planner makes one of a LEFT JOIN b ... WHERE b.x IS NULL and returns b's columns NULL.
     private static string? ExtendsOf(PlanNode node) =>
         node.JoinType switch
         {
             null => None,
-            "Left" => "inner",
-            "Right" => "outer",
+            "Left" or "Anti" => "inner",
+            "Right" or "Right Anti" => "outer",
             "Full" => Both,
-            "Inner" or "Semi" or "Anti" or "Right Semi" or "Right Anti" => None,
+            "Inner" or "Semi" or "Right Semi" => None,
             _ => null,
         };
 

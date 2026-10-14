@@ -23,9 +23,9 @@ public class PlanInstancesTests
     [InlineData("Right", true, false)]
     [InlineData("Full", true, true)]
     [InlineData("Semi", false, false)]
-    [InlineData("Anti", false, false)]
+    [InlineData("Anti", false, true)]
     [InlineData("Right Semi", false, false)]
-    [InlineData("Right Anti", false, false)]
+    [InlineData("Right Anti", true, false)]
     public void Find_JoinOfTwoScans_ExtendsTheSidesItsTypeSays(string joinType, bool outer, bool inner)
     {
         var instances = PlanInstances.Find(Join(joinType, Scan("a"), Scan("b")));
@@ -221,4 +221,8 @@ public class PlanInstancesTests
     [Fact]
     public void Find_RightJoin_SaysItExtendsItsOuterSide() =>
         PlanInstances.Find(Join("Right", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe("outer");
+
+    [Fact]
+    public void Find_AntiJoin_SaysItExtendsItsInnerSide() =>
+        PlanInstances.Find(Join("Anti", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe("inner");
 }
