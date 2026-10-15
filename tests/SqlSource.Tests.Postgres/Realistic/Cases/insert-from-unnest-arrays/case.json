@@ -1,0 +1,27 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "price", "nullable": false },
+    {
+      "name": "category_id",
+      "nullable": true,
+      "why": "the left join finds no category for a slug that is NULL or unknown; the sample's second slug is NULL"
+    },
+    {
+      "name": "discontinued_on",
+      "nullable": true,
+      "why": "the insert sets no products.discontinued_on, which has no default and stays NULL"
+    }
+  ],
+  "samples": [
+    {
+      "ids": "'{20,21}'",
+      "skus": "'{T-010,BK-001}'",
+      "names": "'{Clamp,Manual}'",
+      "prices": "'{4.50,12.00}'",
+      "category_slugs": "'{tools,NULL}'"
+    }
+  ]
+}

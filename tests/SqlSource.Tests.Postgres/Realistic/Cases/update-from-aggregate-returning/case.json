@@ -1,0 +1,18 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "order_id", "nullable": false },
+    { "name": "amount", "nullable": false },
+    { "name": "issued_on", "nullable": false },
+    { "name": "total", "nullable": false },
+    { "name": "line_count", "nullable": false },
+    {
+      "name": "last_discontinued_on",
+      "nullable": true,
+      "why": "max skips NULLs, and every product of order 1 has no discontinued_on"
+    }
+  ],
+  "samples": [
+    { "since": "'2024-01-01'" }
+  ]
+}

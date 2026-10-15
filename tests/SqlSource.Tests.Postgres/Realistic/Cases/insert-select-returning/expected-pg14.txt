@@ -1,0 +1,11 @@
+kind: rows
+plan: not-needed
+table-match: matched
+parameter @placed_at: timestamp with time zone (inferred)
+parameter @note: text (inferred)
+column 0 id: bigint | nullable false | catalog | public.orders.id
+column 1 account_id: integer | nullable false | catalog | public.orders.account_id
+column 2 placed_at: timestamp with time zone | nullable false | catalog | public.orders.placed_at
+column 3 shipped_at: timestamp with time zone | nullable true | catalog | public.orders.shipped_at
+column 4 note: text | nullable true | catalog | public.orders.note
+column 5 coupon: text | nullable true | catalog | public.orders.coupon

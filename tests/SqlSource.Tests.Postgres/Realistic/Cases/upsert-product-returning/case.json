@@ -1,0 +1,37 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    {
+      "name": "category_id",
+      "nullable": true,
+      "why": "products.category_id is nullable, and @category_id is declared null; the first sample sets none"
+    },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "price", "nullable": false },
+    {
+      "name": "discontinued_on",
+      "nullable": true,
+      "why": "products.discontinued_on is nullable, and @discontinued_on is declared null; the first sample sets none"
+    },
+    { "name": "inserted", "nullable": false }
+  ],
+  "samples": [
+    {
+      "id": "20",
+      "category_id": "NULL",
+      "sku": "'T-003'",
+      "name": "'Level'",
+      "price": "14.00",
+      "discontinued_on": "NULL"
+    },
+    {
+      "id": "99",
+      "category_id": "3",
+      "sku": "'HT-001'",
+      "name": "'Claw hammer'",
+      "price": "13.00",
+      "discontinued_on": "'2026-01-01'"
+    }
+  ]
+}

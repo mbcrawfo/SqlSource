@@ -1,0 +1,21 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "account_id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "the insert sets no orders.shipped_at, which has no default and stays NULL"
+    },
+    { "name": "note", "nullable": false },
+    {
+      "name": "coupon",
+      "nullable": true,
+      "why": "the CASE has no ELSE, so an account without the tag vip gets none; dave and erin have no vip"
+    }
+  ],
+  "samples": [
+    { "placed_at": "'2024-10-01 00:00+00'", "note": "'renewal'" }
+  ]
+}

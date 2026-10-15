@@ -1,0 +1,11 @@
+kind: rows
+plan: not-needed
+table-match: no-origin
+parameter @since: date (inferred)
+column 0 id: integer | nullable false | catalog | billing.invoices.id
+column 1 order_id: bigint | nullable false | catalog | billing.invoices.order_id
+column 2 amount: public.positive_amount | nullable true | catalog | billing.invoices.amount
+column 3 issued_on: date | nullable false | catalog | billing.invoices.issued_on
+column 4 total: numeric | nullable null | no-origin | -
+column 5 line_count: bigint | nullable null | no-origin | -
+column 6 last_discontinued_on: date | nullable null | no-origin | -
