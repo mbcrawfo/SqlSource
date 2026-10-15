@@ -331,7 +331,8 @@
           "parameters": [
             "id"
           ]
-        }
+        },
+        "textRefused": null
       }
     },
     {

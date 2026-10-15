@@ -329,7 +329,8 @@
         "sent": {
           "text": "SELECT user_id, o.total, b.during\nFROM orders o FULL JOIN bookings b USING (user_id)",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

@@ -261,11 +261,17 @@ internal sealed record PostgresCheckParameter(string Name, string DataTypeName);
 /// What Npgsql sent for the SQL, set with <paramref name="Columns" />.  Null in an answer recorded before the member
 /// existed, whose check compares the columns alone.
 /// </param>
+/// <param name="TextRefused">
+/// True when <paramref name="Error" /> is Npgsql's refusal of the text, and false for any other error: one of the
+/// server, or a connection that was lost.  Null in an answer recorded before the member existed, which reads as
+/// true: an error of such an answer without a SQLSTATE was the refusal of the text.
+/// </param>
 internal sealed record PostgresCheckAnswer(
     IReadOnlyList<PostgresCheckColumn>? Columns,
     PostgresServerError? Error,
     PostgresBindError? DriverError,
-    PostgresCheckSent? Sent = null
+    PostgresCheckSent? Sent = null,
+    bool? TextRefused = null
 );
 
 /// <summary>What Npgsql sent for the SQL of <c>check</c> (<see cref="BatchRewrites" />).</summary>

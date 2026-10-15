@@ -410,7 +410,8 @@
         "sent": {
           "text": "SELECT ym, ds, names, tag, tags, amount FROM modifiers",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

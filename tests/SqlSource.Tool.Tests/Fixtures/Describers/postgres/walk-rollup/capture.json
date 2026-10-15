@@ -245,7 +245,8 @@
         "sent": {
           "text": "SELECT u.status, count(*) AS n\nFROM users u\nGROUP BY ROLLUP (u.status)",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

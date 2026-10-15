@@ -447,7 +447,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresCheckAnswer(null, PostgresConnection.ErrorOf(exception), null);
+            return new PostgresCheckAnswer(null, PostgresConnection.ErrorOf(exception), null, null, false);
         }
         catch (NotSupportedException refused)
         {
@@ -481,11 +481,17 @@ internal sealed class PostgresLive(PostgresConnection connection)
                 }
             }
 
-            return new PostgresCheckAnswer(null, new PostgresServerError(null, message, null, null, null), null);
+            return new PostgresCheckAnswer(
+                null,
+                new PostgresServerError(null, message, null, null, null),
+                null,
+                null,
+                true
+            );
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresCheckAnswer(null, PostgresConnection.ErrorOf(exception), null);
+            return new PostgresCheckAnswer(null, PostgresConnection.ErrorOf(exception), null, null, false);
         }
     }
 

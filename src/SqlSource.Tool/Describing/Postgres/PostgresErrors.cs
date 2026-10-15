@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.Postgres;
@@ -58,15 +60,25 @@ internal static class PostgresErrors
         "cast the column to a concrete type, or give the expression an alias and a cast";
 
     public const string CheckHelp =
-        "a @ that one of the two reads as a parameter and the other as text; the server's lines say where";
+        "a @ that one of the two reads as a parameter and the other as text; the server's lines say where; a table, a "
+        + "column or a type that another session changed during the run shows the same way, so run describe again";
+
+    public const string ArrayOfDomainHelp =
+        "Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column "
+        + "it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar";
 
     public const string BindHelp =
         "Npgsql cannot send a value of this type; declare the parameter as text with -- param: and cast it to the "
         + "type where it is used; a later version may let a project declare a conversion for the type";
 
+    public const string UnnamedHelp =
+        "the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare "
+        + "the parameter as text with -- param: and cast it to the type where it is used";
+
     public const string SchemaChangedHelp =
         "the database's schema changed while the query was described; run the tool again";
 
+    private const string SyntaxOrAccessClass = "42";
     private const string UndefinedObject = "42704";
     private const string UtilityStatement = "42P14";
     private const string DuplicatePreparedStatement = "42P05";
@@ -391,14 +403,40 @@ internal static class PostgresErrors
             return CannotBind(query, parameters, asked, unbound);
         }
 
+        var lines = answer.Error is { } error
+            ? ServerLines(error with { Position = null }, 0)
+            : EquatableArray<string>.Empty;
+        if (answer.Error is { } failed && !ReadsDifferently(failed, answer))
+        {
+            return Rejected(failed, query, DescribeStep.CheckParameters, lines);
+        }
+
         return new DescribeFailure(
             ToolDiagnostics.ParametersReadDifferently,
             new EquatableArray<string>([query.Name, verdict.Differs ?? string.Empty]),
             DescribeStep.CheckParameters,
-            answer.Error is { } error ? ServerLines(error with { Position = null }, 0) : EquatableArray<string>.Empty,
-            CheckHelp
+            lines,
+            verdict.TypeDiffers && HasArrayOfDomain(parameters) ? ArrayOfDomainHelp : CheckHelp
         );
     }
+
+    // Whether an error of the server is what a misread @ gives: a syntax error or an access rule violation, class 42.
+    // An error without a SQLSTATE is either Npgsql's refusal of the text, which a misread @ can give, or a lost
+    // connection; the answer says which, and one recorded before it did is the refusal.
+    private static bool ReadsDifferently(PostgresServerError error, PostgresCheckAnswer answer) =>
+        error.SqlState is { } state
+            ? state.StartsWith(SyntaxOrAccessClass, StringComparison.Ordinal)
+            : answer.TextRefused ?? true;
+
+    // Npgsql sends such a parameter as an array of the domain's base, and the server keeps the domain.
+    private static bool HasArrayOfDomain(IReadOnlyList<DescribedParameter> parameters) =>
+        parameters.Any(parameter =>
+            parameter.Type is PostgresType { Element: { } element } array
+            && array.TryGetKind(out var kind)
+            && kind == PostgresTypeKind.Array
+            && element.TryGetKind(out var elementKind)
+            && elementKind == PostgresTypeKind.Domain
+        );
 
     /// <summary>
     /// <c>SQLSRC232</c> at the step <c>check parameters</c>, for a parameter whose type has no name that Npgsql could
@@ -414,7 +452,7 @@ internal static class PostgresErrors
             new EquatableArray<string>([typeName, Written(query.Parameters[parameter]), query.Name]),
             DescribeStep.CheckParameters,
             new EquatableArray<string>([PostgresBindNames.NoName]),
-            BindHelp
+            UnnamedHelp
         );
 
     // SQLSRC232.  The type is named by its name, as the SQL would spell it, and not by the name it was bound by; the

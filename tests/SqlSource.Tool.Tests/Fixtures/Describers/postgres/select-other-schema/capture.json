@@ -291,7 +291,8 @@
           "parameters": [
             "order_id"
           ]
-        }
+        },
+        "textRefused": null
       }
     },
     {

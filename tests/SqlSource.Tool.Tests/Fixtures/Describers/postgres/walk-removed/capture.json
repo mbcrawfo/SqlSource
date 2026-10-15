@@ -238,7 +238,8 @@
           "parameters": [
             "min"
           ]
-        }
+        },
+        "textRefused": null
       }
     },
     {

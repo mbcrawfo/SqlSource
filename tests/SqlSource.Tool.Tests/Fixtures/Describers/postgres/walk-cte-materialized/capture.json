@@ -320,7 +320,8 @@
         "sent": {
           "text": "WITH s AS MATERIALIZED (SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id)\nSELECT s.id, s.total FROM s",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

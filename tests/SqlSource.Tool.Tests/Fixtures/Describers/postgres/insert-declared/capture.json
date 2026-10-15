@@ -167,7 +167,8 @@
             "email",
             "status"
           ]
-        }
+        },
+        "textRefused": null
       }
     },
     {

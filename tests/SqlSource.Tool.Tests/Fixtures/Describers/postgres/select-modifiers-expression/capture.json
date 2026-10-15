@@ -167,7 +167,8 @@
         "sent": {
           "text": "SELECT\n    '1 day'::interval day to second(3) AS span,\n    CASE m.names[1] WHEN '' THEN m.names[2] ELSE m.names[1] END AS first_name\nFROM modifiers AS m",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

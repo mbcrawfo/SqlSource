@@ -11,7 +11,11 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <see cref="NpgsqlCheck.Same" />, <see cref="NpgsqlCheck.Differ" /> or <see cref="NpgsqlCheck.Unbound" />.
 /// </param>
 /// <param name="Differs">What differs, or Npgsql's message of a type it cannot bind.  Null when nothing does.</param>
-internal sealed record CheckVerdict(string Result, string? Differs);
+/// <param name="TypeDiffers">
+/// True when what differs is the type of a column.  A difference of where the parameters stand is no difference of
+/// a type.
+/// </param>
+internal sealed record CheckVerdict(string Result, string? Differs, bool TypeDiffers = false);
 
 /// <summary>
 /// The check of the tool's lexer against Npgsql.  The describer prepares a query with <c>$n</c> where its lexer
@@ -69,9 +73,13 @@ internal static class NpgsqlCheck
         var seen =
             answer.Columns
             ?? throw new InvalidOperationException("The answer to 'check' holds no columns and no error.");
-        var differs = answer.Sent is { } sent ? Placement(sent, sql, parameters) : null;
-        differs ??= Difference(seen, described, rows);
-        return differs is null ? new CheckVerdict(Same, null) : new CheckVerdict(Differ, differs);
+        if (answer.Sent is { } sent && Placement(sent, sql, parameters) is { } placed)
+        {
+            return new CheckVerdict(Differ, placed);
+        }
+
+        var (differs, isType) = Difference(seen, described, rows);
+        return differs is null ? new CheckVerdict(Same, null) : new CheckVerdict(Differ, differs, isType);
     }
 
     // Where the two texts first part, or null.  The tool's rewrite numbers a parameter by its place in the list it is
@@ -134,9 +142,9 @@ internal static class NpgsqlCheck
 
     private static string Quote(string text, int from) => text.Substring(from, Math.Min(Quoted, text.Length - from));
 
-    // The first thing that differs.  A type is compared as the protocol reported it, which both describes see: for
-    // a column of a domain that is the base.
-    private static string? Difference(
+    // The first thing that differs, and whether it is a type.  A type is compared as the protocol reported it, which
+    // both describes see: for a column of a domain that is the base.
+    private static (string? Differs, bool IsType) Difference(
         IReadOnlyList<PostgresCheckColumn> seen,
         IReadOnlyList<PostgresColumnRow> described,
         IReadOnlyDictionary<long, PostgresTypeRow> rows
@@ -144,7 +152,10 @@ internal static class NpgsqlCheck
     {
         if (seen.Count != described.Count)
         {
-            return Invariant($"the result has {seen.Count} columns for Npgsql and {described.Count} for SqlSource");
+            return (
+                Invariant($"the result has {seen.Count} columns for Npgsql and {described.Count} for SqlSource"),
+                false
+            );
         }
 
         for (var index = 0; index < seen.Count; index++)
@@ -152,21 +163,25 @@ internal static class NpgsqlCheck
             var (theirs, ours) = (seen[index], described[index]);
             if (!string.Equals(theirs.Name, ours.Name, StringComparison.Ordinal))
             {
-                return Invariant(
-                    $"column {index + 1} is named '{theirs.Name}' for Npgsql and '{ours.Name}' for SqlSource"
+                return (
+                    Invariant(
+                        $"column {index + 1} is named '{theirs.Name}' for Npgsql and '{ours.Name}' for SqlSource"
+                    ),
+                    false
                 );
             }
 
             if (theirs.TypeOid != ours.TypeOid)
             {
                 var oursNamed = NameOf(ours.TypeOid, rows);
-                return Invariant(
-                    $"column {index + 1} is {theirs.DataTypeName} for Npgsql and {oursNamed} for SqlSource"
+                return (
+                    Invariant($"column {index + 1} is {theirs.DataTypeName} for Npgsql and {oursNamed} for SqlSource"),
+                    true
                 );
             }
         }
 
-        return null;
+        return (null, false);
     }
 
     private static string NameOf(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>

@@ -410,7 +410,8 @@
           "parameters": [
             "name"
           ]
-        }
+        },
+        "textRefused": null
       }
     },
     {

@@ -1520,7 +1520,7 @@ public class PostgresSessionTests
         _ = script.Answer(
             "check",
             new PostgresCheckRequest("DELETE FROM samples WHERE id = @id", [new("id", "integer")]),
-            new PostgresCheckAnswer(null, refused, null)
+            new PostgresCheckAnswer(null, refused, null, null, true)
         );
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
@@ -1534,6 +1534,41 @@ public class PostgresSessionTests
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
         failure.Arguments.ShouldBe(["Q", refused.Message]);
         failure.ServerLines.ShouldBe([refused.Message]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The server did not answer, which says nothing of how Npgsql reads the text: it is the server rejecting the query.
+    [Fact]
+    public async Task DescribeAsync_CheckThatTheServerCancels_IsSqlsrc225AtCheckParameters()
+    {
+        var canceled = new PostgresServerError(
+            "57014",
+            "canceling statement due to statement timeout",
+            null,
+            null,
+            null
+        );
+        var script = new PostgresScript().Open();
+        _ = Prepares(script, 1, "DELETE FROM samples WHERE id = $1", ["unknown"], new([23], null));
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = script.Answer(
+            "check",
+            new PostgresCheckRequest("DELETE FROM samples WHERE id = @id", [new("id", "integer")]),
+            new PostgresCheckAnswer(null, canceled, null, null, false)
+        );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("DELETE FROM samples WHERE id = @id", Inferred("id")),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe(["Q", canceled.Message]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBe(["57014: canceling statement due to statement timeout"]);
         exchange.Unused.ShouldBeEmpty();
     }
 

@@ -337,7 +337,8 @@
         "sent": {
           "text": "SELECT\n    user_id,\n    count(*) AS orders,\n    upper(max(o.note)) AS loudest,\n    sum(o.total)::numeric(20, 4) AS spent,\n    'x' AS mark,\n    NULL AS nothing,\n    1\nFROM orders AS o\nJOIN bookings AS b USING (user_id)\nGROUP BY user_id",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

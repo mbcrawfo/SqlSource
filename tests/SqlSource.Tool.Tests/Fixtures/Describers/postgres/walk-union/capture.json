@@ -158,7 +158,8 @@
         "sent": {
           "text": "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id\nUNION ALL\nSELECT u.id, o.total FROM users u RIGHT JOIN orders o ON o.user_id = u.id",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

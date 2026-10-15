@@ -320,7 +320,8 @@
         "sent": {
           "text": "SELECT u.id, o.total\nFROM users u LEFT JOIN orders o ON o.user_id = u.id\nORDER BY o.placed_at",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

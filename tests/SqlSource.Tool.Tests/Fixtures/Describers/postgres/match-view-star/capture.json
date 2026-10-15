@@ -292,7 +292,8 @@
         "sent": {
           "text": "SELECT * FROM active_users",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

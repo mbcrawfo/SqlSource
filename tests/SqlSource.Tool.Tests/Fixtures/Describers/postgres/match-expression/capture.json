@@ -502,7 +502,8 @@
         "sent": {
           "text": "SELECT *, upper(name) AS shouted FROM users",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

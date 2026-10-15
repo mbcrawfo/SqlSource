@@ -297,7 +297,8 @@
         "sent": {
           "text": "SELECT u.status, u.name, count(*) AS n\nFROM users u\nGROUP BY CUBE (u.status, u.name)",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

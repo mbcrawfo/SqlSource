@@ -315,7 +315,8 @@
         "sent": {
           "text": "SELECT u.id, o.user_id, count(*) AS n\nFROM users u LEFT JOIN orders o ON o.user_id = u.id\nGROUP BY u.id, o.user_id",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

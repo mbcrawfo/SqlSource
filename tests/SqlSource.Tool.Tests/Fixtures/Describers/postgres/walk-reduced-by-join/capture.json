@@ -384,7 +384,8 @@
         "sent": {
           "text": "SELECT u.id, o.total, i.amount\nFROM users u\nLEFT JOIN orders o ON o.user_id = u.id\nJOIN billing.invoices i ON i.order_id = o.id",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

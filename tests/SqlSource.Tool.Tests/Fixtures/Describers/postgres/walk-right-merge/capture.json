@@ -417,7 +417,8 @@
           "parameters": [
             "name"
           ]
-        }
+        },
+        "textRefused": null
       }
     },
     {

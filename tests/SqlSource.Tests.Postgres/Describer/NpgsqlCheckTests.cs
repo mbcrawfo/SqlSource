@@ -192,7 +192,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     }
 
     // Npgsql sends an array of a domain as an array of its base, and the server keeps the domain: the column the
-    // parameter is returned as has two types.  docs/tech-debt records that the help speaks of a @.
+    // parameter is returned as has two types.  The help is the cast of the column, not the help of a @.
     [Fact]
     public async Task Describe_ArrayOfADomainReturnedAsAColumn_IsSqlsrc231NamingBothTypes()
     {
@@ -205,6 +205,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
             "column 1 is character varying[] for Npgsql and email_t[] for SqlSource",
         ]);
         failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.ArrayOfDomainHelp);
     }
 
     // A parameter written twice, as @id and as :id in a slice that reads the column id.  Npgsql places it in both
@@ -277,6 +278,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         answer.DriverError.ShouldBeNull();
         var error = answer.Error.ShouldNotBeNull();
         error.SqlState.ShouldBe(withAParameter ? null : "42601");
+        answer.TextRefused.ShouldBe(withAParameter);
         (await ScalarAsync("SELECT to_regclass('check_canary') IS NOT NULL")).ShouldBe(true);
     }
 
@@ -319,5 +321,6 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         );
 
         answer.Error.ShouldNotBeNull().SqlState.ShouldBe("42703");
+        answer.TextRefused.ShouldBe(false);
     }
 }

@@ -76,7 +76,9 @@ public class CheckVerdictTests
     [Fact]
     public void Read_ColumnWithAnotherType_DiffersNamingBothTypes() =>
         Read(Columns(new("id", 25, "text"), new("name", 1043, "character varying")), Described)
-            .ShouldBe(new CheckVerdict(NpgsqlCheck.Differ, "column 1 is text for Npgsql and integer for SqlSource"));
+            .ShouldBe(
+                new CheckVerdict(NpgsqlCheck.Differ, "column 1 is text for Npgsql and integer for SqlSource", true)
+            );
 
     // The first difference is the one reported.
     [Fact]

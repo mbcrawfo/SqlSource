@@ -298,7 +298,8 @@
           "parameters": [
             "email"
           ]
-        }
+        },
+        "textRefused": null
       }
     },
     {

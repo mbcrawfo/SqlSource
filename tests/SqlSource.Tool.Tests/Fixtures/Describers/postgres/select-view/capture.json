@@ -292,7 +292,8 @@
         "sent": {
           "text": "SELECT id, name, email, status FROM active_users",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {

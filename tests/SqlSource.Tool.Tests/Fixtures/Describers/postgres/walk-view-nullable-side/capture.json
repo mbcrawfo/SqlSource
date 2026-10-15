@@ -275,7 +275,8 @@
         "sent": {
           "text": "SELECT o.id, a.name\nFROM orders o LEFT JOIN active_users a ON a.id = o.user_id",
           "parameters": []
-        }
+        },
+        "textRefused": null
       }
     },
     {
