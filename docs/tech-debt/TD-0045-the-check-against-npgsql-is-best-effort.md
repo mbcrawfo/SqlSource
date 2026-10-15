@@ -26,4 +26,4 @@ For the first, compare the parameters and not only the columns: after the check'
 
 ## Trigger
 
-Phase 8, whose generated code binds a parameter by the sidecar's `name`; a user's report of `SQLSRC231` or `SQLSRC232` on a query that is valid; for the eighth, the fix of TD-0044, which puts the whole modifier of a type in `name`.
+Phase 8, whose generated code binds a parameter by the sidecar's `name`; a user's report of `SQLSRC231` or `SQLSRC232` on a query that is valid; for the seventh, the fix of TD-0044, which puts the whole modifier of a type in `name`.
