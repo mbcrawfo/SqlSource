@@ -220,6 +220,9 @@ internal sealed class PostgresSession : IDescribeSession
     {
         var parameterOids = ParameterOids(request, prepared);
 
+        // Behind a pooler in transaction mode this call can reach another backend: one that lacks the statement
+        // answers no columns and no error, which "check" reports as SQLSRC231, and one that holds a statement of the
+        // same name from an earlier run answers that statement's columns (TD-0049).
         var answer = await ColumnsAsync(
             request.Name,
             new PostgresColumnsRequest(statement, request.Parameters.Count),

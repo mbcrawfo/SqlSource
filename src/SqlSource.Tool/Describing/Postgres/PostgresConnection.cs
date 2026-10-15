@@ -167,7 +167,9 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// <para>
     /// Broad types are not caught: an <see cref="IOException" /> that is none of these, or an
     /// <see cref="InvalidOperationException" />, is a bug and surfaces as one.  An <see cref="NpgsqlException" /> that
-    /// quotes a path passes as it is: <c>docs/tech-debt/TD-0034</c>.
+    /// quotes a path passes as it is: <c>docs/tech-debt/TD-0034</c>.  A server that misbehaves can also reach the
+    /// catch of <see cref="FormatException" />, through Npgsql's decode of a SCRAM salt or its parse of an OID while
+    /// it loads the types, and is then reported with the file's message, <see cref="UnusableFile" />.
     /// </para>
     /// </remarks>
     /// <exception cref="NpgsqlException">

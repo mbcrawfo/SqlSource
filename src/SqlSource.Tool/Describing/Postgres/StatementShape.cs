@@ -25,7 +25,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <c>END</c>, <c>ROLLBACK</c>, <c>ABORT</c>, <c>SAVEPOINT</c>, <c>RELEASE</c> and <c>PREPARE</c> for the
 /// transactions.  <c>SELECT … INTO</c> is no first word: <see cref="RefusedKind" /> reads the <c>INTO</c> itself.  An
 /// <c>INTO</c> directly after <c>AS</c> or after a <c>.</c> is a column label, as in <c>SELECT 1 AS into</c> and
-/// <c>SELECT t.into FROM t</c>, and is not the clause.
+/// <c>SELECT t.into FROM t</c>, and is not the clause; the <c>.</c> that ends a number, <c>SELECT 1. INTO t</c>, is
+/// no label's.
 /// </para>
 /// <para>
 /// <see cref="PositionalParameter" /> reads the same lexemes for a <c>$n</c> that the SQL writes itself.
@@ -91,9 +92,10 @@ internal static class StatementShape
 
     /// <summary>
     /// The kind of the statement in upper case when <c>PREPARE</c> does not take it, or null for a statement to send:
-    /// its first word when that is on the list of words to refuse, <c>SELECT INTO</c> for a word <c>INTO</c> at
-    /// parenthesis depth 0 that does not directly follow <c>INSERT</c>, <c>MERGE</c>, <c>AS</c> or a <c>.</c>, with
-    /// only white space and comments between.  Only <c>Text</c> lexemes hold words, so a string, a quoted identifier,
+    /// its first word when that is on the list of words to refuse, <c>SELECT INTO</c> for a word <c>INTO</c> at the
+    /// parenthesis depth of the first word, so that <c>(SELECT 1 INTO t)</c> counts and a subquery does not, that
+    /// does not directly follow <c>INSERT</c>, <c>MERGE</c>, <c>AS</c> or a <c>.</c> after a name, with only white
+    /// space and comments between.  Only <c>Text</c> lexemes hold words, so a string, a quoted identifier,
     /// a comment and a parameter never count.  The first word is the first thing after comments, hints, white space
     /// and any leading <c>(</c>.
     /// </summary>
@@ -104,6 +106,9 @@ internal static class StatementShape
     {
         var first = true;
         var depth = 0;
+
+        // The "(" before the first word: the statement's own depth.
+        var leading = 0;
         string? previous = null;
         foreach (var lexeme in Lexemes(sql))
         {
@@ -146,7 +151,7 @@ internal static class StatementShape
                             return word.ToUpper(CultureInfo.InvariantCulture);
                         }
                     }
-                    else if (depth == 0 && IsInto(word) && !FollowsInsertOrMerge(previous) && !IsLabel(previous))
+                    else if (depth == leading && IsInto(word) && !FollowsInsertOrMerge(previous) && !IsLabel(previous))
                     {
                         return SelectInto;
                     }
@@ -164,6 +169,10 @@ internal static class StatementShape
                 if (c == '(')
                 {
                     depth++;
+                    if (first)
+                    {
+                        leading++;
+                    }
                 }
                 else if (c == ')')
                 {
@@ -176,7 +185,8 @@ internal static class StatementShape
                     return null;
                 }
 
-                previous = c == '.' ? Dot : null;
+                // A "." after a number ends the number, as in "1.", and is no qualifier of a label.
+                previous = c == '.' && !IsNumber(previous) ? Dot : null;
             }
         }
 
@@ -232,6 +242,9 @@ internal static class StatementShape
     // An INTO directly after AS or after a "." is a column label, as in "SELECT 1 AS into" and "SELECT t.into".
     private static bool IsLabel(string? previous) =>
         previous is Dot || string.Equals(previous, "AS", StringComparison.OrdinalIgnoreCase);
+
+    // A word that starts with a digit is a number: a name never does.
+    private static bool IsNumber(string? word) => word is { Length: > 0 } && char.IsAsciiDigit(word[0]);
 
     private static bool FollowsInsertOrMerge(string? previous) =>
         previous is not null

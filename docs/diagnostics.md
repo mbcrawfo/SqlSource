@@ -1064,7 +1064,7 @@ The tool describes a query by asking the server to prepare it, and the server pr
     help: give the query -- output: sql; the tool describes SELECT without INTO, INSERT, UPDATE, DELETE, MERGE, VALUES and TABLE
 ```
 
-Give the query `-- output: sql`, which keeps the SQL as it is and generates a method that runs it without describing it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker: the tool does not decide on its own that such a query needs no entry, since that would override what you wrote.
+Give the query `-- output: sql`: its SQL is still a string constant, or a method where the query has tokens, with no types, so the tool does not describe it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker: the tool does not decide on its own that such a query needs no entry, since that would override what you wrote.
 
 `SELECT ... INTO` is refused as `SELECT INTO` on every version of the server.  PostgreSQL 15 and later prepare it and 14 does not, but it creates a table, as `CREATE TABLE AS` does, and a sidecar must not depend on the server it was described against.  Write `CREATE TABLE ... AS` with `-- output: sql`, or select the rows and insert them in a second query.  A statement that the tool's check misses and that the server names as one it cannot prepare, `42P14: utility statements cannot be prepared`, is this error too, and the message then reads "is a utility statement".
 
@@ -1106,7 +1106,7 @@ Upgrade the server, or point the tool at a database of PostgreSQL 14 or later, a
 The tool prepares a statement on the server and asks about it in later steps, which only works when every step reaches the same session.  This connection does not keep one.  There are two causes:
 
 - The connection string sets `Multiplexing=true`, which shares physical connections between commands.  It is found when the database is opened, before the tool connects.
-- A pooler in transaction mode, such as PgBouncer, sits between the tool and the server.  It hands each transaction to a backend of its own, so the statement the tool prepared is not found: the tool finds out at a query, when the statement is missing from the session, or when the server answers `26000` (the statement does not exist) or `42P05` (it already exists).  A pooler can also hide itself: the describe of a statement that is missing on another backend can answer no columns and no error, and the run then reports [SQLSRC231](#sqlsrc231), so a pooler in transaction mode can show as that error, and the fix is the same, a direct connection.
+- A pooler in transaction mode, such as PgBouncer, sits between the tool and the server.  It hands each transaction to a backend of its own, so a later step can miss the statement the tool prepared.  The tool finds out at a query: the server does not list the statement, or answers `26000` (it does not exist) or `42P05` (it already exists).  Behind a pooler a describe can also answer no columns and no error, which the run reports as [SQLSRC231](#sqlsrc231); the fix is the same.
 
 For `Multiplexing=true` the tool refuses before it connects, so no query has been sent and the server is not yet known; the `server:` line is the tool's own text:
 
@@ -1117,13 +1117,13 @@ For `Multiplexing=true` the tool refuses before it connects, so no query has bee
     help: connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true
 ```
 
-Behind a pooler the session has opened, so the query line names the server and the driver, and the error is at the step whose call found out, with the server's own line when it gave one:
+Behind a pooler the session has opened, so the query line names the server and the driver, and the error is at the step whose call found out.  Here the server did not list the statement it had just prepared, and the `server:` line is the tool's own text; for `26000` and `42P05` it is the server's:
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC236: The connection to the database 'app' does not keep one session
     query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
-    step: describe columns
-    server: 26000: prepared statement "sqlsource_1" does not exist
+    step: describe parameters
+    server: the server does not list the statement it prepared
     help: connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true
 ```
 

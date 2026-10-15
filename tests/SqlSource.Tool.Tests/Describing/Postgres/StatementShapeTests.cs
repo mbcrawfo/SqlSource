@@ -84,6 +84,7 @@ public class StatementShapeTests
     [InlineData("SELECT 'INTO' FROM t")]
     [InlineData("SELECT 1 -- INTO t")]
     [InlineData("SELECT (SELECT 1 INTO t)")]
+    [InlineData("(SELECT (SELECT 1 INTO t))")]
     // A column label, after AS or after a ".", is no INTO clause.
     [InlineData("SELECT 1 AS into")]
     [InlineData("SELECT 1 as INTO FROM t")]
@@ -106,6 +107,12 @@ public class StatementShapeTests
     [InlineData("SELECT @a::int AS a INTO TEMP t")]
     // A ")" ends the word before it, so the INTO after it is the clause's, whatever came before.
     [InlineData("SELECT (1) INTO t")]
+    // The "." that ends a number is no label's.
+    [InlineData("SELECT 1. INTO t")]
+    [InlineData("SELECT 1.INTO t")]
+    // The depth is counted from the "(" before the first word.
+    [InlineData("(SELECT 1 INTO t)")]
+    [InlineData("((SELECT a INTO t FROM users))")]
     public void RefusedKind_SelectInto_IsSelectInto(string sql) =>
         StatementShape.RefusedKind(sql).ShouldBe("SELECT INTO");
 

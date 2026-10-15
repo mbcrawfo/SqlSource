@@ -110,11 +110,15 @@ public class PostgresConnectionTests
         );
     }
 
+    // The driver takes PGPASSWORD before it reads a password file, so with the variable set it never reads one.
+    private const string PasswordSetSkip = "PGPASSWORD is set, and the driver takes it before a password file.";
+
     // On Unix the system says "denied" for a folder where a file is read, which is also what a file without the
     // right to read says.
     [Fact]
     public async Task OpenAsync_PasswordFileThatIsAFolder_ThrowsTheFixedMessage()
     {
+        Assert.SkipWhen(Environment.GetEnvironmentVariable("PGPASSWORD") is not null, PasswordSetSkip);
         using var folder = new TempFolder();
         var path = folder.CreateFolder("a-folder");
 
@@ -129,6 +133,7 @@ public class PostgresConnectionTests
     [Fact]
     public async Task OpenAsync_PasswordFileWithAPathThatIsTooLong_ThrowsTheFixedMessage()
     {
+        Assert.SkipWhen(Environment.GetEnvironmentVariable("PGPASSWORD") is not null, PasswordSetSkip);
         var path = new string('p', 40_000);
 
         await ShouldRefuseAsync(
@@ -156,6 +161,7 @@ public class PostgresConnectionTests
     [Fact]
     public async Task OpenAsync_PasswordFileWithALineThatIsNotAnEntry_ThrowsTheFixedMessage()
     {
+        Assert.SkipWhen(Environment.GetEnvironmentVariable("PGPASSWORD") is not null, PasswordSetSkip);
         using var folder = new TempFolder();
         var path = folder.WriteFile("passfile", "s3cret-marker is no entry");
 

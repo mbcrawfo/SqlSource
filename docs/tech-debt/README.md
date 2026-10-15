@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0049`
+Next id: `TD-0050`
 
 ## Active items
 
@@ -38,6 +38,7 @@ Next id: `TD-0049`
 | [TD-0046](TD-0046-the-walk-leaves-some-columns-to-the-heuristic.md) | Open | 2026-10-13 | Low | The nullability walk leaves a column to the heuristic when it comes through a subquery or a CTE the planner kept, from a partitioned or inherited table, or from a foreign table, or when the root of a query of one relation is not its scan, a `Limit` or a `Sort` for two, and asks for a plan that it has no use for |
 | [TD-0047](TD-0047-explain-evaluates-immutable-functions.md) | Open | 2026-10-14 | Low | The `EXPLAIN` that plans a gated query of the PostgreSQL describer runs a function the database wrongly marks `IMMUTABLE`, when it is called with constant arguments, and an effect of it outside the transaction, a sequence's for one, survives the rollback |
 | [TD-0048](TD-0048-driver-levels-trust-npgsqls-messages.md) | Open | 2026-10-14 | Low | The run log forwards Npgsql's messages at levels, Debug for commands and transactions and Warning for every other category, that trust the driver not to name the host, the user or the database, and the tool removes only the connection's whole value |
+| [TD-0049](TD-0049-describe-behind-a-pooler-can-reach-another-backend.md) | Open | 2026-10-14 | Low | Behind a pooler in transaction mode, the `columns` and `explain` calls of the PostgreSQL describer can reach a backend that lacks the prepared statement, which `check` then reports as `SQLSRC231` and not `SQLSRC236`, or one that holds a statement of the same name from an earlier run, whose columns or plan are read for the query |
 
 ## Columns
 
