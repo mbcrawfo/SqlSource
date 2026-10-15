@@ -10,6 +10,8 @@
 --   erin (5)   no email, no settings, a NULL among her tags; no orders, no events, no reservations
 -- Product 14 is in no order.  Event 7 has an array of items, one with no sku and one whose sku is no product; event
 -- 8 is of an account 99 that is not in accounts, which events has no foreign key to.
+-- Invoice 4, a second and unpaid one of order 3, has a NULL amount: the NOT NULL of the domain positive_amount is
+-- not checked again for a NULL already typed as the domain, which the empty scalar subquery gives.
 
 INSERT INTO accounts (name, email, status, tags, settings, created_at, closed_at) VALUES
     ('alice', 'alice@example.com', 'active', '{vip,beta}', '{"theme":"dark","limits":{"daily":5}}',
@@ -59,6 +61,10 @@ INSERT INTO billing.invoices (id, order_id, amount, issued_on, paid_on) VALUES
     (1, 1, 114.00, '2024-05-03', '2024-05-10'),
     (2, 2, 29.00, '2024-06-02', NULL),
     (3, 3, 10.00, '2024-07-02', NULL);
+
+-- The domain's NOT NULL bypassed: amount is NULL.
+INSERT INTO billing.invoices (id, order_id, amount, issued_on, paid_on) VALUES
+    (4, 3, (SELECT i.amount FROM billing.invoices i WHERE false), '2024-07-15', NULL);
 
 -- Alice has events in both partitions, bob in 2024 alone, carol in 2025 alone.  Event 3 has no "device" key, which
 -- 1 and 2 have, and 6 has no payload.

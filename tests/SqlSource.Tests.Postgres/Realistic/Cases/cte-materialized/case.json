@@ -3,7 +3,11 @@
     { "name": "order_id", "nullable": false },
     { "name": "account_id", "nullable": false },
     { "name": "name", "nullable": false },
-    { "name": "amount", "nullable": false },
+    {
+      "name": "amount",
+      "nullable": true,
+      "why": "the domain's NOT NULL is not checked for a NULL already of the domain; unpaid invoice 4 has none"
+    },
     { "name": "issued_on", "nullable": false },
     {
       "name": "shipped_at",
