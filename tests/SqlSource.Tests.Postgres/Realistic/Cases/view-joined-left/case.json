@@ -2,13 +2,17 @@
   "columns": [
     { "name": "account_id", "nullable": false },
     { "name": "name", "nullable": false },
+    { "name": "status", "nullable": false },
     { "name": "order_id", "nullable": true, "why": "the view's left join finds no order for dave and erin" },
     { "name": "placed_at", "nullable": true, "why": "the view's left join finds no order for dave and erin" },
     {
       "name": "amount",
       "nullable": true,
-      "why": "the left join finds no invoice for order 4, nor for an account with no order"
+      "why": "the left join finds no invoice for an account with no order, dave and erin; invoice 4's amount is NULL"
     },
     { "name": "paid_on", "nullable": true, "why": "billing.invoices.paid_on is nullable; invoices 2 and 3 are unpaid" }
+  ],
+  "samples": [
+    { "since": "'2024-01-01'" }
   ]
 }

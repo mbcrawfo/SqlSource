@@ -2,7 +2,7 @@
 WITH removed AS (
     DELETE FROM reservations r
     WHERE upper(r.during) < @cutoff
-    RETURNING r.id, r.account_id, r.during
+    RETURNING *
 )
 INSERT INTO events (id, account_id, at, kind, payload)
 SELECT

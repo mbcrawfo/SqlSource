@@ -1,0 +1,19 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    {
+      "name": "id",
+      "nullable": true,
+      "why": "orders is on the nullable side of the left join; the active dave and erin have no order"
+    },
+    { "name": "name", "nullable": false },
+    {
+      "name": "placed_at",
+      "nullable": true,
+      "why": "orders is on the nullable side of the left join; the active dave and erin have no order"
+    }
+  ],
+  "samples": [
+    { "status": "'active'" }
+  ]
+}

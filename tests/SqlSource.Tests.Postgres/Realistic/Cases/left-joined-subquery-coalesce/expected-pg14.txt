@@ -1,0 +1,8 @@
+kind: rows
+plan: walked
+table-match: no-origin
+column 0 id: integer | nullable false | catalog | public.accounts.id
+column 1 name: character varying(100) | nullable false | catalog | public.accounts.name
+column 2 order_id: bigint | nullable true | outer-join | public.orders.id
+column 3 coupon_code: text | nullable null | no-origin | -
+column 4 channel: text | nullable null | no-origin | -
