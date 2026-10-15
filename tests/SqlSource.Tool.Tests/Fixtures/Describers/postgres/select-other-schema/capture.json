@@ -53,7 +53,7 @@
             "ordinal": 0,
             "name": "id",
             "typeOid": 23,
-            "tableOid": 16459,
+            "tableOid": 16470,
             "attributeNumber": 1,
             "length": null,
             "precision": null,
@@ -64,7 +64,7 @@
             "ordinal": 1,
             "name": "order_id",
             "typeOid": 20,
-            "tableOid": 16459,
+            "tableOid": 16470,
             "attributeNumber": 2,
             "length": null,
             "precision": null,
@@ -75,7 +75,7 @@
             "ordinal": 2,
             "name": "amount",
             "typeOid": 1700,
-            "tableOid": 16459,
+            "tableOid": 16470,
             "attributeNumber": 3,
             "length": null,
             "precision": 18,
@@ -86,7 +86,7 @@
             "ordinal": 3,
             "name": "issued_on",
             "typeOid": 1082,
-            "tableOid": 16459,
+            "tableOid": 16470,
             "attributeNumber": 4,
             "length": null,
             "precision": null,
@@ -101,13 +101,13 @@
       "method": "tables",
       "request": {
         "oids": [
-          16459
+          16470
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16459,
+            "oid": 16470,
             "relkind": "r",
             "schema": "billing",
             "name": "invoices",

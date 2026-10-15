@@ -49,7 +49,7 @@
             "ordinal": 0,
             "name": "id",
             "typeOid": 23,
-            "tableOid": 16468,
+            "tableOid": 16479,
             "attributeNumber": 1,
             "length": null,
             "precision": null,
@@ -60,7 +60,7 @@
             "ordinal": 1,
             "name": "name",
             "typeOid": 1043,
-            "tableOid": 16468,
+            "tableOid": 16479,
             "attributeNumber": 2,
             "length": 100,
             "precision": null,
@@ -71,7 +71,7 @@
             "ordinal": 2,
             "name": "email",
             "typeOid": 1043,
-            "tableOid": 16468,
+            "tableOid": 16479,
             "attributeNumber": 3,
             "length": 254,
             "precision": null,
@@ -81,8 +81,8 @@
           {
             "ordinal": 3,
             "name": "status",
-            "typeOid": 16390,
-            "tableOid": 16468,
+            "typeOid": 16392,
+            "tableOid": 16479,
             "attributeNumber": 4,
             "length": null,
             "precision": null,
@@ -97,13 +97,13 @@
       "method": "tables",
       "request": {
         "oids": [
-          16468
+          16479
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16468,
+            "oid": 16479,
             "relkind": "v",
             "schema": "public",
             "name": "active_users",
@@ -141,7 +141,7 @@
                 "notNull": false,
                 "identity": "",
                 "generated": "",
-                "typeOid": 16390,
+                "typeOid": 16392,
                 "notNullValidated": null
               }
             ],
@@ -160,7 +160,7 @@
           23,
           1043,
           16387,
-          16390
+          16392
         ]
       },
       "answer": {
@@ -208,7 +208,7 @@
             "typtypmod": 258
           },
           {
-            "oid": 16390,
+            "oid": 16392,
             "typname": "user_status",
             "nspname": "public",
             "typtype": "e",
@@ -283,7 +283,7 @@
           },
           {
             "name": "status",
-            "typeOid": 16390,
+            "typeOid": 16392,
             "dataTypeName": "public.user_status"
           }
         ],

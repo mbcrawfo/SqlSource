@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tests.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using Xunit;
@@ -102,6 +103,67 @@ public sealed class ColumnTests(PostgresContainer postgres)
         described.Name.ShouldBe(expected);
         var faceted = described.Element ?? described;
         (faceted.Length, faceted.Precision, faceted.Scale).ShouldBe((length, precision, scale));
+    }
+
+    // An expression has no origin: its modifier is the row description's alone.
+    [Fact]
+    public async Task Describe_ExpressionOfAnIntervalWithFields_KeepsTheFields()
+    {
+        var column = (await ColumnsOfAsync("SELECT '1 day'::interval day to second(3) AS span")).ShouldHaveSingleItem();
+
+        column.Origin.ShouldBeNull();
+        var type = column.Type.ShouldBeOfType<PostgresType>();
+        type.Name.ShouldBe("interval day to second(3)");
+        type.Precision.ShouldBe(3);
+    }
+
+    // The fixture schema's tagged is made over varchar's functions in public, as an extension's type would be: its
+    // name is the tool's schema.name and the tail of the server's spelling, and it has no facets, which the tool
+    // decodes for the types of pg_catalog alone.  An array of it is its element's name and [].
+    [Fact]
+    public async Task Describe_ColumnOfATypeWithItsOwnModifier_IsTheSchemaNameAndTheTail()
+    {
+        var columns = await ColumnsOfAsync("SELECT tag, tags FROM modifiers");
+
+        var tagged = TestSidecars.Postgres("public.tagged(7)", schema: "public", internalName: "tagged");
+        columns
+            .Select(static column => column.Type)
+            .ShouldBe([
+                tagged,
+                TestSidecars.Postgres(
+                    "public.tagged(7)[]",
+                    SidecarValues.Kind.Array,
+                    "public",
+                    "_tagged",
+                    element: tagged
+                ),
+            ]);
+    }
+
+    // A domain named interval in public hides nothing of the keyword's type, and format_type spells pg_catalog's
+    // interval without its schema whatever the search_path holds.
+    [Fact]
+    public async Task Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpelling()
+    {
+        await MakeOwnTablesAsync();
+        var token = TestContext.Current.CancellationToken;
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using (var create = own.CreateCommand("CREATE DOMAIN public.\"interval\" AS text"))
+        {
+            _ = await create.ExecuteNonQueryAsync(token);
+        }
+
+        try
+        {
+            var columns = await ColumnsOfAsync("SELECT c.i3, m.ds FROM column_types AS c, modifiers AS m");
+
+            TypeNamesOf(columns).ShouldBe(["interval(3)", "interval day to second(3)"]);
+        }
+        finally
+        {
+            await using var drop = own.CreateCommand("DROP DOMAIN IF EXISTS public.\"interval\"");
+            _ = await drop.ExecuteNonQueryAsync(token);
+        }
     }
 
     [Fact]
@@ -256,6 +318,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [InlineData("billing.invoices")]
     [InlineData("active_users")]
     [InlineData("user_orders")]
+    [InlineData("modifiers")]
     [InlineData("column_types")]
     public async Task Describe_EveryColumnOfATable_IsSpelledAsFormatTypeSpellsIt(string table)
     {

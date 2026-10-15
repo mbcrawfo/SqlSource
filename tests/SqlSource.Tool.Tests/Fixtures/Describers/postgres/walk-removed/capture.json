@@ -53,7 +53,7 @@
             "ordinal": 0,
             "name": "id",
             "typeOid": 20,
-            "tableOid": 16415,
+            "tableOid": 16421,
             "attributeNumber": 1,
             "length": null,
             "precision": null,
@@ -64,7 +64,7 @@
             "ordinal": 1,
             "name": "total",
             "typeOid": 1700,
-            "tableOid": 16415,
+            "tableOid": 16421,
             "attributeNumber": 3,
             "length": null,
             "precision": 18,
@@ -79,13 +79,13 @@
       "method": "tables",
       "request": {
         "oids": [
-          16415
+          16421
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16415,
+            "oid": 16421,
             "relkind": "r",
             "schema": "public",
             "name": "orders",

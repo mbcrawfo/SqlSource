@@ -60,7 +60,7 @@
             "ordinal": 1,
             "name": "total",
             "typeOid": 1700,
-            "tableOid": 16415,
+            "tableOid": 16421,
             "attributeNumber": 3,
             "length": null,
             "precision": 18,
@@ -71,7 +71,7 @@
             "ordinal": 2,
             "name": "during",
             "typeOid": 3910,
-            "tableOid": 16433,
+            "tableOid": 16439,
             "attributeNumber": 3,
             "length": null,
             "precision": null,
@@ -86,14 +86,14 @@
       "method": "tables",
       "request": {
         "oids": [
-          16415,
-          16433
+          16421,
+          16439
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16415,
+            "oid": 16421,
             "relkind": "r",
             "schema": "public",
             "name": "orders",
@@ -149,7 +149,7 @@
             "hasInsteadRule": false
           },
           {
-            "oid": 16433,
+            "oid": 16439,
             "relkind": "r",
             "schema": "public",
             "name": "bookings",

@@ -37,7 +37,7 @@
       },
       "answer": {
         "parameterTypes": [
-          16390,
+          16392,
           23
         ],
         "error": null
@@ -59,7 +59,7 @@
       "request": {
         "oids": [
           23,
-          16390
+          16392
         ]
       },
       "answer": {
@@ -79,7 +79,7 @@
             "typtypmod": -1
           },
           {
-            "oid": 16390,
+            "oid": 16392,
             "typname": "user_status",
             "nspname": "public",
             "typtype": "e",

@@ -1,0 +1,422 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT ym, ds, names, tag, tags, amount FROM modifiers",
+        "types": []
+      },
+      "answer": {
+        "parameterTypes": [],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 0
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "ym",
+            "typeOid": 1186,
+            "tableOid": 16465,
+            "attributeNumber": 1,
+            "length": null,
+            "precision": 65535,
+            "scale": null,
+            "typeModifier": 458751
+          },
+          {
+            "ordinal": 1,
+            "name": "ds",
+            "typeOid": 1186,
+            "tableOid": 16465,
+            "attributeNumber": 2,
+            "length": null,
+            "precision": 3,
+            "scale": null,
+            "typeModifier": 470286339
+          },
+          {
+            "ordinal": 2,
+            "name": "names",
+            "typeOid": 1015,
+            "tableOid": 16465,
+            "attributeNumber": 3,
+            "length": 10,
+            "precision": null,
+            "scale": null,
+            "typeModifier": 14
+          },
+          {
+            "ordinal": 3,
+            "name": "tag",
+            "typeOid": 16397,
+            "tableOid": 16465,
+            "attributeNumber": 4,
+            "length": null,
+            "precision": null,
+            "scale": null,
+            "typeModifier": 11
+          },
+          {
+            "ordinal": 4,
+            "name": "tags",
+            "typeOid": 16400,
+            "tableOid": 16465,
+            "attributeNumber": 5,
+            "length": null,
+            "precision": null,
+            "scale": null,
+            "typeModifier": 11
+          },
+          {
+            "ordinal": 5,
+            "name": "amount",
+            "typeOid": 1700,
+            "tableOid": 16465,
+            "attributeNumber": 6,
+            "length": null,
+            "precision": 10,
+            "scale": 2,
+            "typeModifier": 655366
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "tables",
+      "request": {
+        "oids": [
+          16465
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16465,
+            "relkind": "r",
+            "schema": "public",
+            "name": "modifiers",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "ym",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1186,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 2,
+                "name": "ds",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1186,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 3,
+                "name": "names",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1015,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 4,
+                "name": "tag",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16397,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16400,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 6,
+                "name": "amount",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16390,
+                "notNullValidated": null
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          1015,
+          1186,
+          1700,
+          16390,
+          16397,
+          16400
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1015,
+            "typname": "_varchar",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "A",
+            "typelem": 1043,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "character varying[]",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 1043,
+            "typname": "varchar",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "character varying",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 1186,
+            "typname": "interval",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "T",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "interval",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 1700,
+            "typname": "numeric",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "numeric",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 16390,
+            "typname": "money_t",
+            "nspname": "public",
+            "typtype": "d",
+            "typcategory": "N",
+            "typelem": 0,
+            "typbasetype": 1700,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "money_t",
+            "enumLabels": null,
+            "typtypmod": 655366
+          },
+          {
+            "oid": 16397,
+            "typname": "tagged",
+            "nspname": "public",
+            "typtype": "b",
+            "typcategory": "U",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "tagged",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 16400,
+            "typname": "_tagged",
+            "nspname": "public",
+            "typtype": "b",
+            "typcategory": "A",
+            "typelem": 16397,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "tagged[]",
+            "enumLabels": null,
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1043,
+            "modifier": 14
+          },
+          {
+            "oid": 1186,
+            "modifier": 458751
+          },
+          {
+            "oid": 1186,
+            "modifier": 470286339
+          },
+          {
+            "oid": 1700,
+            "modifier": 655366
+          },
+          {
+            "oid": 16397,
+            "modifier": 11
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "modifier": 14,
+            "formatType": "character varying(10)"
+          },
+          {
+            "oid": 1186,
+            "modifier": 458751,
+            "formatType": "interval year to month"
+          },
+          {
+            "oid": 1186,
+            "modifier": 470286339,
+            "formatType": "interval day to second(3)"
+          },
+          {
+            "oid": 1700,
+            "modifier": 655366,
+            "formatType": "numeric(10,2)"
+          },
+          {
+            "oid": 16397,
+            "modifier": 11,
+            "formatType": "tagged(7)"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT ym, ds, names, tag, tags, amount FROM modifiers",
+        "parameters": []
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "ym",
+            "typeOid": 1186,
+            "dataTypeName": "interval(65535)"
+          },
+          {
+            "name": "ds",
+            "typeOid": 1186,
+            "dataTypeName": "interval(3)"
+          },
+          {
+            "name": "names",
+            "typeOid": 1015,
+            "dataTypeName": "character varying(10)[]"
+          },
+          {
+            "name": "tag",
+            "typeOid": 16397,
+            "dataTypeName": "public.tagged"
+          },
+          {
+            "name": "tags",
+            "typeOid": 16400,
+            "dataTypeName": "public.tagged[]"
+          },
+          {
+            "name": "amount",
+            "typeOid": 1700,
+            "dataTypeName": "numeric(10, 2)"
+          }
+        ],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}

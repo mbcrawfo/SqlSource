@@ -410,6 +410,23 @@ public sealed class ParameterTests(PostgresContainer postgres)
         ]);
     }
 
+    // The domain's own type has no modifier, and its base has the domain's, decoded into a precision and a scale.
+    // email_t's base, with its length, is in the tests of declared and inferred domains above.
+    [Fact]
+    public async Task Describe_ParameterOfADomain_HasItsBaseWithTheDomainsModifier() =>
+        (await ShouldDescribeAsync(Requests.Of("UPDATE modifiers SET amount = @amount"))).ShouldBe([
+            Inferred(
+                "amount",
+                TestSidecars.Postgres(
+                    "public.money_t",
+                    SidecarValues.Kind.Domain,
+                    "public",
+                    "money_t",
+                    baseType: TestSidecars.Postgres("numeric(10,2)", internalName: "numeric", precision: 10, scale: 2)
+                )
+            ),
+        ]);
+
     [Fact]
     public async Task Describe_OptionalFilterWithADeclaration_IsTypedAsDeclared() =>
         (

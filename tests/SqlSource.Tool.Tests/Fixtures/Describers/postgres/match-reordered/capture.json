@@ -49,7 +49,7 @@
             "ordinal": 0,
             "name": "name",
             "typeOid": 1043,
-            "tableOid": 16396,
+            "tableOid": 16402,
             "attributeNumber": 2,
             "length": 100,
             "precision": null,
@@ -60,7 +60,7 @@
             "ordinal": 1,
             "name": "id",
             "typeOid": 23,
-            "tableOid": 16396,
+            "tableOid": 16402,
             "attributeNumber": 1,
             "length": null,
             "precision": null,
@@ -71,7 +71,7 @@
             "ordinal": 2,
             "name": "email",
             "typeOid": 1043,
-            "tableOid": 16396,
+            "tableOid": 16402,
             "attributeNumber": 3,
             "length": 254,
             "precision": null,
@@ -81,8 +81,8 @@
           {
             "ordinal": 3,
             "name": "status",
-            "typeOid": 16390,
-            "tableOid": 16396,
+            "typeOid": 16392,
+            "tableOid": 16402,
             "attributeNumber": 4,
             "length": null,
             "precision": null,
@@ -93,7 +93,7 @@
             "ordinal": 4,
             "name": "tags",
             "typeOid": 1009,
-            "tableOid": 16396,
+            "tableOid": 16402,
             "attributeNumber": 5,
             "length": null,
             "precision": null,
@@ -104,7 +104,7 @@
             "ordinal": 5,
             "name": "balance",
             "typeOid": 1700,
-            "tableOid": 16396,
+            "tableOid": 16402,
             "attributeNumber": 6,
             "length": null,
             "precision": 18,
@@ -115,7 +115,7 @@
             "ordinal": 6,
             "name": "created_at",
             "typeOid": 1184,
-            "tableOid": 16396,
+            "tableOid": 16402,
             "attributeNumber": 7,
             "length": null,
             "precision": null,
@@ -126,7 +126,7 @@
             "ordinal": 7,
             "name": "deleted_at",
             "typeOid": 1184,
-            "tableOid": 16396,
+            "tableOid": 16402,
             "attributeNumber": 8,
             "length": null,
             "precision": null,
@@ -137,7 +137,7 @@
             "ordinal": 8,
             "name": "name_upper",
             "typeOid": 25,
-            "tableOid": 16396,
+            "tableOid": 16402,
             "attributeNumber": 9,
             "length": null,
             "precision": null,
@@ -152,13 +152,13 @@
       "method": "tables",
       "request": {
         "oids": [
-          16396
+          16402
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16396,
+            "oid": 16402,
             "relkind": "r",
             "schema": "public",
             "name": "users",
@@ -196,7 +196,7 @@
                 "notNull": true,
                 "identity": "",
                 "generated": "",
-                "typeOid": 16390,
+                "typeOid": 16392,
                 "notNullValidated": true
               },
               {
@@ -264,7 +264,7 @@
           1184,
           1700,
           16387,
-          16390
+          16392
         ]
       },
       "answer": {
@@ -368,7 +368,7 @@
             "typtypmod": 258
           },
           {
-            "oid": 16390,
+            "oid": 16392,
             "typname": "user_status",
             "nspname": "public",
             "typtype": "e",
@@ -452,7 +452,7 @@
           },
           {
             "name": "status",
-            "typeOid": 16390,
+            "typeOid": 16392,
             "dataTypeName": "public.user_status"
           },
           {

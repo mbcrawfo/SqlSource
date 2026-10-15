@@ -1,0 +1,179 @@
+{
+  "captureVersion": 1,
+  "engine": "postgres",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "serverVersion": "18.4",
+        "driverVersion": "10.0.3",
+        "settings": [
+          {
+            "name": "search_path",
+            "value": "\"$user\", public"
+          },
+          {
+            "name": "plan_cache_mode",
+            "value": "auto"
+          },
+          {
+            "name": "standard_conforming_strings",
+            "value": "on"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "prepare",
+      "request": {
+        "statement": "sqlsource_1",
+        "sql": "SELECT\n    '1 day'::interval day to second(3) AS span,\n    CASE m.names[1] WHEN '' THEN m.names[2] ELSE m.names[1] END AS first_name\nFROM modifiers AS m",
+        "types": []
+      },
+      "answer": {
+        "parameterTypes": [],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 0
+      },
+      "answer": {
+        "columns": [
+          {
+            "ordinal": 0,
+            "name": "span",
+            "typeOid": 1186,
+            "tableOid": 0,
+            "attributeNumber": 0,
+            "length": null,
+            "precision": 3,
+            "scale": null,
+            "typeModifier": 470286339
+          },
+          {
+            "ordinal": 1,
+            "name": "first_name",
+            "typeOid": 1043,
+            "tableOid": 0,
+            "attributeNumber": 0,
+            "length": 10,
+            "precision": null,
+            "scale": null,
+            "typeModifier": 14
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "types",
+      "request": {
+        "oids": [
+          1043,
+          1186
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "typname": "varchar",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "S",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "character varying",
+            "enumLabels": null,
+            "typtypmod": -1
+          },
+          {
+            "oid": 1186,
+            "typname": "interval",
+            "nspname": "pg_catalog",
+            "typtype": "b",
+            "typcategory": "T",
+            "typelem": 0,
+            "typbasetype": 0,
+            "rngsubtype": null,
+            "multirangeRngsubtype": null,
+            "formatType": "interval",
+            "enumLabels": null,
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1043,
+            "modifier": 14
+          },
+          {
+            "oid": 1186,
+            "modifier": 470286339
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "modifier": 14,
+            "formatType": "character varying(10)"
+          },
+          {
+            "oid": 1186,
+            "modifier": 470286339,
+            "formatType": "interval day to second(3)"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "check",
+      "request": {
+        "sql": "SELECT\n    '1 day'::interval day to second(3) AS span,\n    CASE m.names[1] WHEN '' THEN m.names[2] ELSE m.names[1] END AS first_name\nFROM modifiers AS m",
+        "parameters": []
+      },
+      "answer": {
+        "columns": [
+          {
+            "name": "span",
+            "typeOid": 1186,
+            "dataTypeName": "interval(3)"
+          },
+          {
+            "name": "first_name",
+            "typeOid": 1043,
+            "dataTypeName": "character varying(10)"
+          }
+        ],
+        "error": null,
+        "driverError": null
+      }
+    },
+    {
+      "method": "deallocate",
+      "request": {
+        "statement": "sqlsource_1"
+      },
+      "answer": {
+        "error": null
+      }
+    }
+  ]
+}
