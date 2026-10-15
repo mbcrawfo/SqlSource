@@ -268,7 +268,15 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "INSERT INTO orders (user_id, total, note) VALUES ($1, $2, $3) RETURNING id, placed_at",
+          "parameters": [
+            "user_id",
+            "total",
+            "note"
+          ]
+        }
       }
     },
     {

@@ -114,7 +114,14 @@
       "answer": {
         "columns": [],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "UPDATE users SET name = $1 WHERE id = $2",
+          "parameters": [
+            "name",
+            "id"
+          ]
+        }
       }
     },
     {

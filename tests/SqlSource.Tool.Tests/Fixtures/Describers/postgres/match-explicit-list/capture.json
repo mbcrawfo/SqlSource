@@ -482,7 +482,11 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT id, name, email, status, tags, balance, created_at, deleted_at, name_upper FROM users",
+          "parameters": []
+        }
       }
     },
     {

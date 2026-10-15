@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
+using SqlSource.Parsing;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -13,12 +15,17 @@ internal sealed record CheckVerdict(string Result, string? Differs);
 
 /// <summary>
 /// The check of the tool's lexer against Npgsql.  The describer prepares a query with <c>$n</c> where its lexer
-/// found a parameter; generated code will send the SQL as written and let Npgsql find them.  Both describes give
-/// columns, and the two saw one query when the columns are equal in count, in names and in types.
+/// found a parameter; generated code will send the SQL as written and let Npgsql find them.  The two saw one query
+/// when Npgsql placed each parameter where the lexer did, and both describes gave columns equal in count, in names
+/// and in types.
 /// </summary>
 /// <remarks>
-/// The check is best effort.  A disagreement that leaves the columns alone, in a predicate for one, passes, and so
-/// does a <c>$n</c> that the SQL writes itself.  <c>docs/tech-debt</c> records what it does not see.
+/// The places of the parameters are compared in two texts: the one Npgsql sent, and the tool's own rewrite of the
+/// SQL with each parameter numbered as Npgsql numbered it.  A place one reads as a parameter and the other as text
+/// differs even where the server accepts both and the columns agree: <c>tags[:id]</c> in a predicate, with a column
+/// <c>id</c>, which Npgsql sends as <c>tags[$1]</c>.
+/// What the check still cannot see is a <c>$n</c> that the SQL writes itself, which <c>SQLSRC234</c> refuses before.
+/// An answer recorded before it held Npgsql's text is compared by its columns alone.
 /// </remarks>
 internal static class NpgsqlCheck
 {
@@ -27,15 +34,26 @@ internal static class NpgsqlCheck
     public const string Differ = "differ";
     public const string Unbound = "unbound";
 
-    /// <summary>Reads the answer of <c>check</c> against the answer of <c>columns</c>.</summary>
+    // How many characters of each text a difference quotes, from where the two part.
+    private const int Quoted = 10;
+
+    /// <summary>
+    /// Reads the answer of <c>check</c> against the tool's own rewrite of the SQL and the answer of <c>columns</c>.
+    /// </summary>
     /// <param name="answer">What Npgsql's describe of the original SQL gave.</param>
     /// <param name="described">The columns of the prepared statement.</param>
     /// <param name="rows">The rows of the closure, by OID, for the name of a type that differs.</param>
-    /// <exception cref="InvalidOperationException">The answer holds nothing.</exception>
+    /// <param name="sql">The query's SQL, for the tool's own rewrite.</param>
+    /// <param name="parameters">The query's parameters, for the tool's own rewrite.</param>
+    /// <exception cref="InvalidOperationException">
+    /// The answer holds nothing, or the SQL holds more than one statement, which <c>prepare</c> refuses first.
+    /// </exception>
     public static CheckVerdict Read(
         PostgresCheckAnswer answer,
         IReadOnlyList<PostgresColumnRow> described,
-        IReadOnlyDictionary<long, PostgresTypeRow> rows
+        IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        string sql,
+        EquatableArray<SqlQueryParameter> parameters
     )
     {
         if (answer.DriverError is { } unbound)
@@ -51,10 +69,70 @@ internal static class NpgsqlCheck
         var seen =
             answer.Columns
             ?? throw new InvalidOperationException("The answer to 'check' holds no columns and no error.");
-        return Difference(seen, described, rows) is { } differs
-            ? new CheckVerdict(Differ, differs)
-            : new CheckVerdict(Same, null);
+        var differs = answer.Sent is { } sent ? Placement(sent, sql, parameters) : null;
+        differs ??= Difference(seen, described, rows);
+        return differs is null ? new CheckVerdict(Same, null) : new CheckVerdict(Differ, differs);
     }
+
+    // Where the two texts first part, or null.  The tool's rewrite numbers a parameter by its place in the list it is
+    // given, so it is given the query's parameters in Npgsql's order: those Npgsql numbered, then the others, which
+    // neither text holds.
+    private static string? Placement(PostgresCheckSent sent, string sql, EquatableArray<SqlQueryParameter> parameters)
+    {
+        var order = new List<SqlQueryParameter>(parameters.Count);
+        foreach (var placed in sent.Parameters)
+        {
+            var name = placed.StartsWith('@') || placed.StartsWith(':') ? placed[1..] : placed;
+            var parameter = parameters.FirstOrDefault(parameter =>
+                string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
+            );
+            if (parameter is null)
+            {
+                return $"Npgsql placed @{name}, which SqlSource does not read as a parameter";
+            }
+
+            if (!order.Contains(parameter))
+            {
+                order.Add(parameter);
+            }
+        }
+
+        order.AddRange(parameters.Where(parameter => !order.Contains(parameter)));
+        var ours = (
+            ParameterPlaceholders.Rewrite(sql, new EquatableArray<SqlQueryParameter>([.. order]))
+            ?? throw new InvalidOperationException("The SQL of a query was prepared and holds more than one statement.")
+        ).TrimEnd();
+        var theirs = sent.Text.TrimEnd();
+        var at = 0;
+        while (at < ours.Length && at < theirs.Length && ours[at] == theirs[at])
+        {
+            at++;
+        }
+
+        if (at == ours.Length && at == theirs.Length)
+        {
+            return null;
+        }
+
+        // Two numbers that differ are quoted from their "$".
+        var digits = at;
+        while (digits > 0 && char.IsAsciiDigit(ours[digits - 1]))
+        {
+            digits--;
+        }
+
+        if (digits > 0 && ours[digits - 1] == '$')
+        {
+            at = digits - 1;
+        }
+
+        var (npgsql, sqlSource) = (Quote(theirs, at), Quote(ours, at));
+        return Invariant(
+            $"the SQL with $n parts at character {at + 1}: '{npgsql}' for Npgsql and '{sqlSource}' for SqlSource"
+        );
+    }
+
+    private static string Quote(string text, int from) => text.Substring(from, Math.Min(Quoted, text.Length - from));
 
     // The first thing that differs.  A type is compared as the protocol reported it, which both describes see: for
     // a column of a domain that is the base.

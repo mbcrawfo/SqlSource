@@ -283,7 +283,13 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT deleted_at AS \"deleted_at!\", name AS \"name?\" FROM users WHERE id = $1",
+          "parameters": [
+            "id"
+          ]
+        }
       }
     },
     {

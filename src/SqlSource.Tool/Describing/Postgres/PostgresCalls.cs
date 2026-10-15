@@ -257,11 +257,24 @@ internal sealed record PostgresCheckParameter(string Name, string DataTypeName);
 /// What the server said, or what Npgsql said of a text it would not send: it has no SQLSTATE then.
 /// </param>
 /// <param name="DriverError">The parameter whose type Npgsql cannot bind.</param>
+/// <param name="Sent">
+/// What Npgsql sent for the SQL, set with <paramref name="Columns" />.  Null in an answer recorded before the member
+/// existed, whose check compares the columns alone.
+/// </param>
 internal sealed record PostgresCheckAnswer(
     IReadOnlyList<PostgresCheckColumn>? Columns,
     PostgresServerError? Error,
-    PostgresBindError? DriverError
+    PostgresBindError? DriverError,
+    PostgresCheckSent? Sent = null
 );
+
+/// <summary>What Npgsql sent for the SQL of <c>check</c> (<see cref="BatchRewrites" />).</summary>
+/// <param name="Text">Npgsql's rewrite of the SQL, with <c>$n</c> in the place of each parameter it found.</param>
+/// <param name="Parameters">
+/// The <c>ParameterName</c> of the parameter each <c>$n</c> stands for, in the order of the numbers.  A parameter that
+/// the SQL does not reference is not among them.
+/// </param>
+internal sealed record PostgresCheckSent(string Text, IReadOnlyList<string> Parameters);
 
 /// <summary>A column as Npgsql's describe of the original SQL reports it.</summary>
 /// <param name="Name">The name.</param>

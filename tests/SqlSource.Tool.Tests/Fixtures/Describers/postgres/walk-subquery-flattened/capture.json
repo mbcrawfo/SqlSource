@@ -325,7 +325,13 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT s.id, s.total\nFROM (SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id) s\nWHERE s.id = $1",
+          "parameters": [
+            "id"
+          ]
+        }
       }
     },
     {

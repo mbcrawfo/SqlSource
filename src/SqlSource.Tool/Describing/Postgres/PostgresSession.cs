@@ -654,7 +654,7 @@ internal sealed class PostgresSession : IDescribeSession
         );
         var started = _time.GetTimestamp();
         var answer = await _exchange.AskAsync("check", asked, _live.CheckAsync, cancellationToken);
-        var verdict = NpgsqlCheck.Read(answer, columns, rows);
+        var verdict = NpgsqlCheck.Read(answer, columns, rows, request.Sql, request.Parameters);
         PostgresEvents.Check(_log, request.Name, asked, verdict, ElapsedSince(started));
         return PostgresErrors.Check(request, parameters, asked, answer, verdict);
     }

@@ -84,6 +84,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData("UPDATE users SET name = @name WHERE id = @id")]
     [InlineData("INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING id")]
     [InlineData("SELECT id FROM users WHERE id = @id; -- the end")]
+    [InlineData("SELECT '$1' AS a, id FROM users WHERE id = @id")]
     public async Task Describe_QueryNpgsqlReadsAsTheLexerDoes_PassesTheCheck(string sql) => await ShouldPassAsync(sql);
 
     // Npgsql ignores a parameter that the SQL does not reference, and still resolves its type.
@@ -204,6 +205,48 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
             "column 1 is character varying[] for Npgsql and email_t[] for SqlSource",
         ]);
         failure.ServerLines.ShouldBeEmpty();
+    }
+
+    // A parameter written twice, as @id and as :id in a slice that reads the column id.  Npgsql places it in both
+    // and drops the ":".  In "tags[1:id]" that leaves "tags[1$1]", which the server refuses.  In a slice without a
+    // lower bound, "tags[:id]", it leaves a subscript, "tags[$1]", which the server accepts, and in a predicate the
+    // columns are the same: only the texts differ.
+    [Theory]
+    [InlineData("SELECT tags[1:id] AS t FROM users WHERE id = @id", "syntax error at or near \"$1\"")]
+    [InlineData(
+        "SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL",
+        "the SQL with $n parts at character 45: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource"
+    )]
+    public async Task Describe_ColonParameterNpgsqlReadsInASlice_IsSqlsrc231(string sql, string differs)
+    {
+        var described = await DescribeAsync(sql);
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.Arguments.ShouldBe([Requests.Query, differs]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+    }
+
+    // What Npgsql sent: its rewrite of the SQL, and the name of the parameter each $n stands for.
+    [Fact]
+    public async Task CheckAsync_QueryWithParameters_AnswersNpgsqlsText()
+    {
+        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
+        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        var live = new PostgresLive(session.Connection);
+
+        var answer = await live.CheckAsync(
+            new PostgresCheckRequest(
+                "SELECT id FROM users WHERE id = @id",
+                [new PostgresCheckParameter("id", "integer")]
+            ),
+            TestContext.Current.CancellationToken
+        );
+
+        _ = answer.Columns.ShouldNotBeNull();
+        var sent = answer.Sent.ShouldNotBeNull();
+        sent.Text.ShouldBe("SELECT id FROM users WHERE id = $1");
+        sent.Parameters.ShouldBe(["id"]);
     }
 
     // The live function itself, with a text no describe can bring it: "prepare" refuses such a text first.  Npgsql

@@ -417,7 +417,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// anything: a type name it cannot bind, and a text in which it finds a <c>;</c> that something follows.  It
     /// throws a <see cref="NotSupportedException" />, an <see cref="InvalidCastException" /> or, for a name that is
     /// too long, an <see cref="ArgumentException" />, and the answer is the same for each.  Which of the two
-    /// refusals it was is found by asking for each parameter alone, with a text of the tool's own.
+    /// refusals it was is found by asking for each parameter alone, with a text of the tool's own.  With the columns,
+    /// the answer holds the text Npgsql sent and the order of its parameters (<see cref="BatchRewrites" />).
     /// </remarks>
     public async Task<PostgresCheckAnswer> CheckAsync(PostgresCheckRequest asked, CancellationToken token)
     {
@@ -442,7 +443,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
                 );
             }
 
-            return new PostgresCheckAnswer(columns, null, null);
+            return new PostgresCheckAnswer(columns, null, null, BatchRewrites.Of(batch.BatchCommands[0]));
         }
         catch (NpgsqlException exception)
         {

@@ -232,7 +232,13 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT o.id, o.total\nFROM orders o LEFT JOIN users u ON u.id = o.user_id\nWHERE o.total > $1",
+          "parameters": [
+            "min"
+          ]
+        }
       }
     },
     {

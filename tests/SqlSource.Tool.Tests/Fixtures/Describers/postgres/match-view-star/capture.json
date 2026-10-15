@@ -288,7 +288,11 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT * FROM active_users",
+          "parameters": []
+        }
       }
     },
     {

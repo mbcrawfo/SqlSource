@@ -1466,6 +1466,43 @@ public class PostgresSessionTests
         exchange.Unused.ShouldBeEmpty();
     }
 
+    // The columns agree and Npgsql sent another text: the session compares it with its own rewrite of the request's
+    // SQL, numbered as Npgsql numbered the parameters.
+    [Fact]
+    public async Task DescribeAsync_CheckWhoseTextDiffers_IsSqlsrc231SayingWhere()
+    {
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT $1::int AS a, $2 AS b", ["unknown", "unknown"], new([23, 25], null));
+        _ = Columns(script, 1, 2, Expression(0, "a", 23), Expression(1, "b", 25));
+        _ = Resolves(script, [23, 25], PostgresRows.Int4, PostgresRows.Text);
+        _ = script.Answer(
+            "check",
+            new PostgresCheckRequest("SELECT @p::int AS a, @q AS b", [new("p", "integer"), new("q", "text")]),
+            new PostgresCheckAnswer(
+                [new("a", 23, "integer"), new("b", 25, "text")],
+                null,
+                null,
+                new PostgresCheckSent("SELECT $2::int AS a, $2 AS b", ["q", "p"])
+            )
+        );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT @p::int AS a, @q AS b", Inferred("p"), Inferred("q")),
+            TestContext.Current.CancellationToken
+        );
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.Arguments.ShouldBe([
+            "Q",
+            "the SQL with $n parts at character 22: '$2 AS b' for Npgsql and '$1 AS b' for SqlSource",
+        ]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task DescribeAsync_CheckThatIsRefused_IsSqlsrc231WithTheLinesOfTheAnswer()
     {

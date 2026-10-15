@@ -411,7 +411,13 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT u.id, u.email, o.total, count(*) OVER () AS n\nFROM users u LEFT JOIN orders o ON o.user_id = u.id\nWHERE u.id = $1",
+          "parameters": [
+            "id"
+          ]
+        }
       }
     },
     {

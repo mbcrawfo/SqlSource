@@ -117,7 +117,13 @@
       "answer": {
         "columns": [],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "DELETE FROM users WHERE status = $1 AND deleted_at IS NOT NULL",
+          "parameters": [
+            "status"
+          ]
+        }
       }
     },
     {
