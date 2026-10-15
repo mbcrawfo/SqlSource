@@ -1,0 +1,7 @@
+failure: SQLSRC225
+argument: FindAccountsByIdOrName
+argument: operator does not exist: integer = text
+help: the server gave @term the type of its first use, which may not be the type meant: cast the parameter where it is used, @term::int, or declare its type with -- param: @term int
+server: 42883: operator does not exist: integer = text
+server: hint: No operator matches the given name and argument types. You might need to add explicit type casts.
+server: at character 72
