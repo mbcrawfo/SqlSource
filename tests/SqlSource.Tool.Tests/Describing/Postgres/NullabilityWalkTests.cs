@@ -109,6 +109,8 @@ public class NullabilityWalkTests
         AnswersOf(Run(LeftJoin("a.id", "b.id", "a.id + 1"), OfView, OfView, OfView))
             .ShouldBe([(null, "view"), (true, "outer-join"), (null, "view")]);
 
+    // The walk's rule over a foreign relkind, through a plain scan: a real Foreign Scan is mapped to no instance
+    // (TD-0046).
     [Fact]
     public void Run_ColumnOfAForeignTable_SaysForeignTableUnlessAJoinExtendsIt() =>
         AnswersOf(Run(LeftJoin("a.id", "b.id", "a.id + 1"), OfForeign, OfForeign, OfForeign))
