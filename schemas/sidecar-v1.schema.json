@@ -120,6 +120,7 @@
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string", "minLength": 1 },
+        "bindName": { "type": "string", "minLength": 1 },
         "kind": { "type": "string", "enum": ["base", "array", "domain", "enum", "range", "multirange", "composite"] },
         "schema": { "type": "string", "minLength": 1 },
         "internalName": { "type": "string", "minLength": 1 },
@@ -144,6 +145,7 @@
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string", "minLength": 1 },
+        "bindName": { "type": "string", "minLength": 1 },
         "maxLength": { "type": "integer", "minimum": -1 },
         "precision": { "type": "integer", "minimum": 0 },
         "scale": { "type": "integer", "minimum": 0 },

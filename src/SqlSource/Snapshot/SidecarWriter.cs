@@ -8,8 +8,8 @@ namespace SqlSource.Snapshot;
 /// <remarks>
 /// A key the format marks "always" is written with <c>null</c> when it has no value.  A key with a condition is
 /// written when the condition holds, whatever the model holds: an entry without rows has no <c>columns</c>, and a
-/// parameter without a type no <c>typeSource</c>.  A facet is written when it has a value.  The writer checks
-/// nothing and never throws: a model the schema would refuse is the caller's mistake.
+/// parameter without a type no <c>typeSource</c>.  A facet and a <c>bindName</c> are written when they have a value.
+/// The writer checks nothing and never throws: a model the schema would refuse is the caller's mistake.
 /// </remarks>
 internal static class SidecarWriter
 {
@@ -150,16 +150,27 @@ internal static class SidecarWriter
                 break;
             default:
                 json.BeginObject(key);
-                json.WriteString(SidecarKeys.Name, type.Name);
+                WriteName(json, type);
                 json.EndObject();
                 break;
+        }
+    }
+
+    // The two keys every engine's type object shares.  The bind name is written when the model holds one: the tool
+    // sets it on a parameter's own type and nowhere else.
+    private static void WriteName(SidecarJsonBuilder json, SidecarType type)
+    {
+        json.WriteString(SidecarKeys.Name, type.Name);
+        if (type.BindName is not null)
+        {
+            json.WriteString(SidecarKeys.BindName, type.BindName);
         }
     }
 
     private static void WritePostgres(SidecarJsonBuilder json, string key, PostgresType type)
     {
         json.BeginObject(key);
-        json.WriteString(SidecarKeys.Name, type.Name);
+        WriteName(json, type);
         json.WriteString(SidecarKeys.Kind, type.Kind);
         json.WriteString(SidecarKeys.Schema, type.Schema);
         json.WriteString(SidecarKeys.InternalName, type.InternalName);
@@ -215,7 +226,7 @@ internal static class SidecarWriter
     private static void WriteSqlServer(SidecarJsonBuilder json, string key, SqlServerType type)
     {
         json.BeginObject(key);
-        json.WriteString(SidecarKeys.Name, type.Name);
+        WriteName(json, type);
         json.WriteNumber(SidecarKeys.MaxLength, type.MaxLength);
         json.WriteNumber(SidecarKeys.Precision, type.Precision);
         json.WriteNumber(SidecarKeys.Scale, type.Scale);

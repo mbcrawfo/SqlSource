@@ -55,6 +55,30 @@ public class SidecarRoundTripTests
         types.OfType<OtherEngineType>().ShouldBeEmpty();
     }
 
+    // A bind name is read only on a parameter's own type, so the round trip is worth what the samples hold of it.
+    [Fact]
+    public void Samples_AsTheToolBuildsThem_HoldABindNameOnParameterTypesAndOnNoOtherType()
+    {
+        var samples = Samples(lenient: false);
+        var entries = samples.SelectMany(sidecar => sidecar.Queries).ToList();
+        var parameterTypes = entries.SelectMany(entry => entry.Parameters).Select(parameter => parameter.Type).ToList();
+        var columnTypes = entries
+            .SelectMany(entry => entry.Columns ?? Of<SidecarColumn>())
+            .Select(column => column.Type);
+
+        foreach (var engine in new[] { SidecarValues.Engine.Postgres, SidecarValues.Engine.SqlServer })
+        {
+            entries
+                .Where(entry => entry.Engine == engine)
+                .SelectMany(entry => entry.Parameters)
+                .ShouldContain(parameter => parameter.Type != null && parameter.Type.BindName != null);
+        }
+
+        parameterTypes.ShouldContain(type => type != null && type.BindName == null);
+        columnTypes.SelectMany(Flatten).ShouldAllBe(type => type.BindName == null);
+        parameterTypes.SelectMany(type => Flatten(type).Skip(1)).ShouldAllBe(type => type.BindName == null);
+    }
+
     [Fact]
     public void Samples_AsAReaderMayFindThem_HoldWhatTheToolNeverWrites()
     {
