@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using Xunit;
 
@@ -19,9 +21,6 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
     public const string RecordVariable = "SQLSOURCE_RECORD_REALISTIC";
 
     private const string RecordScript = "tools/record-realistic.sh";
-
-    // The majors that an expectation is recorded on, as CI runs them.
-    private static readonly int[] Recorded = [14, 18];
 
     public static TheoryData<string> Cases => [with(RealisticCases.All.Select(static found => found.Name))];
 
@@ -42,10 +41,7 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
             return;
         }
 
-        described.Succeeded.ShouldBeTrue($"{found} was refused:\n{RealisticRun.Render(described)}");
-        var columns = described.Value.Columns ?? [];
-        columns.Count.ShouldBe(found.Columns.Count, $"{found} has a column count other than its truth's");
-        columns.Select(static column => column.Name).ShouldBe(found.Columns.Select(static truth => truth.Name));
+        _ = RealisticRun.ColumnsOf(found, described);
     }
 
     [Theory]
@@ -53,17 +49,14 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
     public async Task Describe_Case_IsNotNullOnlyWhereTheTruthIs(string name)
     {
         var (found, _) = await StartAsync(name);
-        var description = await DescribedAsync(found);
+        var (columns, _) = await DescribedAsync(found);
 
-        var columns = description.Columns ?? [];
-        columns.Count.ShouldBe(found.Columns.Count, $"{found} has a column count other than its truth's");
-        for (var index = 0; index < found.Columns.Count; index++)
+        for (var index = 0; index < columns.Count; index++)
         {
             var truth = found.Columns[index];
-            var column = $"{found} column {columns[index].Ordinal} {truth.Name}";
-            if (truth.Nullable)
+            if (truth.Nullable && columns[index].Nullable == false)
             {
-                columns[index].Nullable.ShouldNotBe(false, $"{column} is not null, and can be NULL: {truth.Why}");
+                Assert.Fail($"{ColumnOf(found, index)} is not null, and can be NULL: {truth.Why}");
             }
         }
     }
@@ -73,12 +66,11 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
     public async Task Execute_Case_ReturnsNoNullWhereEitherSaysNotNull(string name)
     {
         var (found, _) = await StartAsync(name);
-        var description = await DescribedAsync(found);
-        var columns = description.Columns ?? [];
-        columns.Count.ShouldBe(found.Columns.Count, $"{found} has a column count other than its truth's");
+        var (columns, parameters) = await DescribedAsync(found);
+        RealisticOracle.CheckSampleKeys(found, parameters.Select(static parameter => parameter.Name));
         var sql = RealisticRun.RequestOf(found).Sql;
-        var types = description
-            .Parameters.Where(static parameter => parameter.Type is not null)
+        var types = parameters
+            .Where(static parameter => parameter.Type is not null)
             .ToDictionary(static parameter => parameter.Name, static parameter => parameter.Type!.Name);
 
         var sawNull = new bool[columns.Count];
@@ -99,19 +91,20 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
         for (var index = 0; index < sawNull.Length; index++)
         {
             var truth = found.Columns[index];
-            var column = $"{found} column {columns[index].Ordinal} {truth.Name}";
-            if (columns[index].Nullable == false)
+            var column = ColumnOf(found, index);
+            if (columns[index].Nullable == false && sawNull[index])
             {
-                sawNull[index].ShouldBeFalse($"{column} is recorded not null, and held a NULL");
+                Assert.Fail($"{column} is described not null, and held a NULL over the seed");
             }
 
-            if (!truth.Nullable)
+            if (!truth.Nullable && sawNull[index])
             {
-                sawNull[index].ShouldBeFalse($"{column} is true not null, and held a NULL: the truth is wrong");
+                Assert.Fail($"{column} is not null in truth, and held a NULL over the seed: the truth is wrong");
             }
-            else if (truth.Exempt is null)
+
+            if (truth.Nullable && truth.Exempt is null && !sawNull[index])
             {
-                sawNull[index].ShouldBeTrue($"{column} can be NULL, and the seed shows none: {truth.Why}");
+                Assert.Fail($"{column} can be NULL, and the seed shows none: {truth.Why}");
             }
         }
     }
@@ -122,15 +115,15 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
     {
         var (found, major) = await StartAsync(name);
         var path = found.ExpectedPath(major);
-        var expectation = ExpectationOn(Recording, major);
+        var expectation = RealisticRun.ExpectationOn(Recording, major);
         if (expectation == Expectation.Skip)
         {
-            Assert.Skip(SkipMessage);
+            Assert.Skip(RealisticRun.SkipMessage);
         }
 
         if (expectation == Expectation.Refuse)
         {
-            Assert.Fail(RefuseMessage);
+            Assert.Fail(RealisticRun.RefuseMessage);
         }
 
         var rendered = RealisticRun.Render(await RealisticRun.DescribeAsync(found, postgres.RealisticConnectionString));
@@ -147,57 +140,28 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
         );
     }
 
-    // What the expectation theory does with a run: record or compare on a recorded major, skip or refuse on another.
-    public enum Expectation
-    {
-        Compare,
-        Record,
-        Skip,
-        Refuse,
-    }
+    // How a failure names a column: the case, the position and the truth's name.
+    private static string ColumnOf(RealisticCase found, int index) =>
+        $"{found} column {index} {found.Columns[index].Name}";
 
-    internal const string SkipMessage = "The expectations are recorded on PostgreSQL 14 and 18 alone.";
-
-    internal const string RefuseMessage = "Record on PostgreSQL 14 or 18.";
-
-    internal static Expectation ExpectationOn(bool recording, int major) =>
-        (recording, Recorded.Contains(major)) switch
-        {
-            (true, true) => Expectation.Record,
-            (true, false) => Expectation.Refuse,
-            (false, true) => Expectation.Compare,
-            (false, false) => Expectation.Skip,
-        };
-
-    [Theory]
-    [InlineData(true, 14, Expectation.Record)]
-    [InlineData(true, 18, Expectation.Record)]
-    [InlineData(true, 16, Expectation.Refuse)]
-    [InlineData(false, 14, Expectation.Compare)]
-    [InlineData(false, 18, Expectation.Compare)]
-    [InlineData(false, 17, Expectation.Skip)]
-    public void ExpectationOn_RecordingAndMajor_IsWhatTheTheoryDoes(bool recording, int major, Expectation expected) =>
-        ExpectationOn(recording, major).ShouldBe(expected);
-
-    // The case and the server's major, once the server runs the case.
+    // The case, read from its own folder, and the server's major, once the server runs the case.
     private async Task<(RealisticCase Found, int Major)> StartAsync(string name)
     {
-        var found = RealisticCases.All.Single(candidate => candidate.Name == name);
+        var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, name));
         var major = await RealisticRun.ServerMajorAsync(postgres.RealisticConnectionString);
-        SkipUnlessTheServerRunsIt(found, major);
+        if (!RealisticRun.RunsOn(found, major))
+        {
+            Assert.Skip($"The case needs PostgreSQL {found.MinimumMajor} or later.");
+        }
+
         return (found, major);
     }
 
-    private static void SkipUnlessTheServerRunsIt(RealisticCase found, int major)
-    {
-        if (found.MinimumMajor is { } minimum && minimum > major)
-        {
-            Assert.Skip($"The case needs PostgreSQL {minimum} or later.");
-        }
-    }
-
-    // The description of a case that is not refused, which it must be able to give.
-    private async Task<QueryDescription> DescribedAsync(RealisticCase found)
+    // The columns and the parameters of a case that is not refused, which must be described with its truth's columns.
+    private async Task<(
+        IReadOnlyList<SidecarColumn> Columns,
+        IReadOnlyList<DescribedParameter> Parameters
+    )> DescribedAsync(RealisticCase found)
     {
         if (found.Refusal is not null)
         {
@@ -205,7 +169,7 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
         }
 
         var described = await RealisticRun.DescribeAsync(found, postgres.RealisticConnectionString);
-        described.Succeeded.ShouldBeTrue($"{found} was refused:\n{RealisticRun.Render(described)}");
-        return described.Value;
+        var columns = RealisticRun.ColumnsOf(found, described);
+        return (columns, described.Value!.Parameters);
     }
 }

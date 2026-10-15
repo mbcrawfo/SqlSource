@@ -35,6 +35,9 @@ internal sealed record RealisticCase(
     // The case as FixtureReplay plans one.
     public FixtureCase AsFixture => new("postgres", Name, Folder);
 
-    // How a failure names the case.
-    public override string ToString() => $"realistic/{Name}";
+    // How a failure names a case, by the name of its folder: the one spelling, which the reader uses before it has
+    // a case.
+    public static string Named(string name) => $"realistic/{name}";
+
+    public override string ToString() => Named(Name);
 }

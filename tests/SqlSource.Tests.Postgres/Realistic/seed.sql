@@ -8,8 +8,10 @@
 --   carol (3)  closed, with closed_at; an order with no invoice; events in 2025 alone
 --   dave (4)   no orders, no events, no reservations
 --   erin (5)   no email, no settings, a NULL among her tags; no orders, no events, no reservations
--- Product 14 is in no order.  Event 7 has an array of items, one with no sku and one whose sku is no product; event
--- 8 is of an account 99 that is not in accounts, which events has no foreign key to.
+-- Order 1 has every optional column set, order 2 none, and order 3 no lines.  Order 4, carol's, is shipped with a
+-- note set and its coupon NULL, and has no invoice.  Product 14 is in no order.  Event 7 has an array of items, one
+-- with no sku and one whose sku is no product; event 8 is of an account 99 that is not in accounts, which events has
+-- no foreign key to.
 -- Invoice 4, a second and unpaid one of order 3, has a NULL amount: the NOT NULL of the domain positive_amount is
 -- not checked again for a NULL already typed as the domain, which the empty scalar subquery gives.
 

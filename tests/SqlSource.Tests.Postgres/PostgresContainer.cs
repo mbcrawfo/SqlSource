@@ -12,7 +12,8 @@ namespace SqlSource.Tests.Postgres;
 // the process is killed.
 public sealed class PostgresContainer : IAsyncLifetime
 {
-    // The one place that names the image.  tools/record-fixtures.sh reads it from this line.
+    // The one place that names the image.  tools/record-fixtures.sh and tools/record-realistic.sh read it from this
+    // line, by its shape.
     public const string DefaultImage = "postgres:18";
 
     // Names another image: CI runs the tests again on the oldest PostgreSQL that is supported.

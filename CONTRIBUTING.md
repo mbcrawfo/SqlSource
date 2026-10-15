@@ -69,7 +69,7 @@ tools/record-realistic.sh
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14 tools/record-realistic.sh
 ```
 
-To add a case, add its folder with a `query.sql`, a `case.json` and the truth written from the SQL and `schema.sql`, and run both.  The noise budget is lowered in the change that lowers the noise, the test says to, and raised only in a change that adds cases.
+To add a case, add its folder with a `query.sql` and a `case.json`, which holds the truth, written from the SQL and `schema.sql` and never from what the describer answers, and run both.  When a column of the truth can be `NULL` and no row of `seed.sql` makes it so, add such a row to `seed.sql`, which never removes one; `exempt` is for a `NULL` no seed can show.  The noise budget is lowered in the change that lowers the noise, the test says to, and raised only in a change that adds cases.
 
 To run the tool from its source:
 

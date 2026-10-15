@@ -35,7 +35,7 @@ internal static class RealisticCases
     public static RealisticCase Read(string folder)
     {
         var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(folder));
-        var named = $"realistic/{name}";
+        var named = RealisticCase.Named(name);
         if (!File.Exists(Path.Combine(folder, RealisticCase.QueryFile)))
         {
             throw new InvalidOperationException($"The case {named} has no {RealisticCase.QueryFile}.");
@@ -97,9 +97,20 @@ internal static class RealisticCases
                 throw Fault(named, $"has a column {ordinal} {columnName} that says not whether it is nullable");
             }
 
-            if (nullable && column.Why is not { Length: > 0 })
+            if (nullable && string.IsNullOrWhiteSpace(column.Why))
             {
                 throw Fault(named, $"has a column {ordinal} {columnName} that is nullable with no why");
+            }
+
+            // An exempt is a reason the seed cannot show a NULL, so it is said, and only of a column that can be NULL.
+            if (column.Exempt is { } exempt && string.IsNullOrWhiteSpace(exempt))
+            {
+                throw Fault(named, $"has a column {ordinal} {columnName} whose exempt gives no reason");
+            }
+
+            if (!nullable && column.Exempt is not null)
+            {
+                throw Fault(named, $"has a column {ordinal} {columnName} that is not nullable and has an exempt");
             }
 
             columns.Add(new TruthColumn(columnName, nullable, column.Why, column.Exempt));

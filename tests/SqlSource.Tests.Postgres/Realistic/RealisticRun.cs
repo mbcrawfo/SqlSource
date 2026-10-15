@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using Npgsql;
@@ -14,12 +17,75 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic;
 
+// What the expectation theory does with a run: record or compare on a recorded major, skip or refuse on another.
+// Public, since a public theory takes it as an argument.
+public enum Expectation
+{
+    Compare,
+    Record,
+    Skip,
+    Refuse,
+}
+
 // Describes a realistic case as a run does, in a session of its own on the database "realistic", and renders what
-// it gave as the text an expected-pg{major}.txt holds.
+// it gave as the text an expected-pg{major}.txt holds.  The rules every check of a case shares are here too: which
+// majors a case runs and is recorded on, and that a description has the columns of the truth.
 internal static class RealisticRun
 {
+    public const string SkipMessage = "The expectations are recorded on PostgreSQL 14 and 18 alone.";
+
+    public const string RefuseMessage = "Record on PostgreSQL 14 or 18.";
+
     // What is not there, in a rendered line.
     private const string None = "-";
+
+    // The majors that an expectation and the noise budget are held for, as CI runs them.
+    public static IReadOnlyList<int> RecordedMajors { get; } = [14, 18];
+
+    public static Expectation ExpectationOn(bool recording, int major) =>
+        (recording, RecordedMajors.Contains(major)) switch
+        {
+            (true, true) => Expectation.Record,
+            (true, false) => Expectation.Refuse,
+            (false, true) => Expectation.Compare,
+            (false, false) => Expectation.Skip,
+        };
+
+    // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
+    public static bool RunsOn(RealisticCase found, int major) =>
+        found.MinimumMajor is not { } minimum || minimum <= major;
+
+    // The columns of a case that is not refused, which must be described, with as many columns as its truth and
+    // each of the truth's name at its position.  A failure names the case on its first line.
+    public static IReadOnlyList<SidecarColumn> ColumnsOf(
+        RealisticCase found,
+        Outcome<QueryDescription, DescribeFailure> described
+    )
+    {
+        if (!described.Succeeded)
+        {
+            Assert.Fail($"{found} was refused:\n{RenderFailure(described.Failure)}");
+        }
+
+        IReadOnlyList<SidecarColumn> columns = described.Value.Columns ?? [];
+        if (columns.Count != found.Columns.Count)
+        {
+            Assert.Fail($"{found} is described with {columns.Count} columns, and its truth has {found.Columns.Count}");
+        }
+
+        for (var index = 0; index < columns.Count; index++)
+        {
+            if (columns[index].Name != found.Columns[index].Name)
+            {
+                Assert.Fail(
+                    $"{found} column {index} is described as {columns[index].Name}, and its truth names it "
+                        + found.Columns[index].Name
+                );
+            }
+        }
+
+        return columns;
+    }
 
     // The request of the case's one query as a run plans it.
     public static DescribeRequest RequestOf(RealisticCase found)
@@ -46,13 +112,14 @@ internal static class RealisticRun
             NullRunLog.Instance,
             token
         );
-        if (opened.Value is not { } session)
+        if (!opened.Succeeded)
         {
             throw new InvalidOperationException(
-                $"No session was opened for the case {found}: {opened.Failure?.Descriptor.Id}."
+                $"No session was opened for the case {found}:\n{RenderFailure(opened.Failure)}"
             );
         }
 
+        var session = opened.Value;
         await using (session)
         {
             return await session.DescribeAsync(request, token);
@@ -63,29 +130,12 @@ internal static class RealisticRun
     // sidecar spells them.
     public static string Render(Outcome<QueryDescription, DescribeFailure> described)
     {
-        var text = new StringBuilder();
         if (!described.Succeeded)
         {
-            var failure = described.Failure;
-            Line(text, $"failure: {failure.Descriptor.Id}");
-            foreach (var argument in failure.Arguments)
-            {
-                Line(text, $"argument: {argument}");
-            }
-
-            if (failure.Help is { } help)
-            {
-                Line(text, $"help: {help}");
-            }
-
-            foreach (var line in failure.ServerLines)
-            {
-                Line(text, $"server: {line}");
-            }
-
-            return text.ToString();
+            return RenderFailure(described.Failure);
         }
 
+        var text = new StringBuilder();
         var description = described.Value;
         var kind =
             description.ResultKind == SidecarResultKind.Rows
@@ -113,11 +163,47 @@ internal static class RealisticRun
         return text.ToString();
     }
 
+    // The id, each argument, the help and each line of the server, as a failure's expectation holds them.
+    public static string RenderFailure(DescribeFailure failure)
+    {
+        var text = new StringBuilder();
+        Line(text, $"failure: {failure.Descriptor.Id}");
+        foreach (var argument in failure.Arguments)
+        {
+            Line(text, $"argument: {argument}");
+        }
+
+        if (failure.Help is { } help)
+        {
+            Line(text, $"help: {help}");
+        }
+
+        foreach (var line in failure.ServerLines)
+        {
+            Line(text, $"server: {line}");
+        }
+
+        return text.ToString();
+    }
+
     public static async Task<int> ServerMajorAsync(string connection)
     {
         await using var source = NpgsqlDataSource.Create(connection);
         await using var opened = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
         return opened.PostgreSqlVersion.Major;
+    }
+
+    // The one value of a query, on a connection of its own.
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "The SQL is a test's own query of the database it set up."
+    )]
+    public static async Task<object?> ScalarAsync(string connection, string sql)
+    {
+        await using var source = NpgsqlDataSource.Create(connection);
+        await using var command = source.CreateCommand(sql);
+        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
     }
 
     private static void Line(StringBuilder text, FormattableString line) =>

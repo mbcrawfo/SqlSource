@@ -1,6 +1,5 @@
 using System.Linq;
 using System.Threading.Tasks;
-using Shouldly;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic;
@@ -21,30 +20,22 @@ public sealed class RealisticNoiseBudgetTests(PostgresContainer postgres)
     public async Task Noise_OverTheCorpus_IsTheBudget()
     {
         var major = await RealisticRun.ServerMajorAsync(postgres.RealisticConnectionString);
-        var budget = major switch
-        {
-            14 => Budget14,
-            18 => Budget18,
-            _ => (int?)null,
-        };
-        if (budget is not { } held)
+        if (!RealisticRun.RecordedMajors.Contains(major))
         {
             Assert.Skip("The budget is held for PostgreSQL 14 and 18 alone.");
-            return;
         }
 
+        var held = major == 14 ? Budget14 : Budget18;
         var count = 0;
         foreach (var found in RealisticCases.All.Where(candidate => candidate.Refusal is null))
         {
-            if (found.MinimumMajor is { } minimum && minimum > major)
+            if (!RealisticRun.RunsOn(found, major))
             {
                 continue;
             }
 
             var described = await RealisticRun.DescribeAsync(found, postgres.RealisticConnectionString);
-            described.Succeeded.ShouldBeTrue($"{found} was refused:\n{RealisticRun.Render(described)}");
-            var columns = described.Value.Columns ?? [];
-            columns.Count.ShouldBe(found.Columns.Count, $"{found} has a column count other than its truth's");
+            var columns = RealisticRun.ColumnsOf(found, described);
             count += found.Columns.Where((truth, index) => !truth.Nullable && columns[index].Nullable != false).Count();
         }
 
@@ -52,8 +43,9 @@ public sealed class RealisticNoiseBudgetTests(PostgresContainer postgres)
         {
             Assert.Fail(
                 $"The noise is {count}, over the budget of {held}: a change made the describer answer nullable or "
-                    + "unknown where it answered not null; the cases that changed are in their "
-                    + $"expected-pg{major}.txt."
+                    + "unknown where it answered not null, and the cases that changed are in their "
+                    + $"expected-pg{major}.txt; or, in a change that adds cases, raise Budget{major} to {count} and "
+                    + "say why in the commit."
             );
         }
 

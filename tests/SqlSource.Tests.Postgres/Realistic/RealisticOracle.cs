@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using Npgsql;
 using SqlSource.Parsing;
@@ -28,7 +29,7 @@ internal static class RealisticOracle
         var lexed = SqlLexer.Lex(sql, SqlDialectRules.PostgreSql);
         if (lexed.Error is { } error)
         {
-            throw new InvalidOperationException($"The SQL cannot be lexed: {error.Kind}.");
+            throw new InvalidOperationException($"The SQL cannot be lexed, {error.Kind}:\n{sql}");
         }
 
         var text = new StringBuilder(sql);
@@ -49,6 +50,22 @@ internal static class RealisticOracle
         }
 
         return text.ToString();
+    }
+
+    // Fails naming the case and the key when a sample of the case names no parameter of its query, as a key that is
+    // misspelt does: its value would be used nowhere.  A key is compared ignoring case, as Substitute finds it.
+    public static void CheckSampleKeys(RealisticCase found, IEnumerable<string> parameters)
+    {
+        var named = parameters.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in found.Samples.SelectMany(static sample => sample.Keys))
+        {
+            if (!named.Contains(key))
+            {
+                throw new InvalidOperationException(
+                    $"A sample of the case {found} names @{key}, which is no parameter of its query."
+                );
+            }
+        }
     }
 
     // Reads every row, in a transaction that is rolled back, so that a query that writes leaves the seed as it was.
@@ -83,7 +100,8 @@ internal static class RealisticOracle
         }
         finally
         {
-            await transaction.RollbackAsync(token);
+            // Not the test's token: a cancelled test still rolls back what its query wrote.
+            await transaction.RollbackAsync(CancellationToken.None);
         }
     }
 

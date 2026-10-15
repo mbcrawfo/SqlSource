@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Threading.Tasks;
-using Npgsql;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
@@ -9,6 +9,7 @@ using SqlSource.Tool;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Tests;
 using Xunit;
+using Xunit.Sdk;
 
 namespace SqlSource.Tests.Postgres.Realistic;
 
@@ -62,6 +63,111 @@ public sealed class RealisticHarnessTests(PostgresContainer postgres)
     }
 
     [Fact]
+    public void Read_FolderWithoutQuerySql_ThrowsNamingTheCase()
+    {
+        using var temp = new TempFolder();
+        _ = temp.WriteFile(
+            "queryless/case.json", /*lang=json,strict*/
+            "{ \"columns\": [] }"
+        );
+
+        var thrown = Should.Throw<InvalidOperationException>(() => RealisticCases.Read(temp.PathOf("queryless")));
+
+        thrown.Message.ShouldContain("realistic/queryless");
+        thrown.Message.ShouldContain(RealisticCase.QueryFile);
+    }
+
+    [Fact]
+    public void Read_SampleKeys_AreComparedIgnoringCase()
+    {
+        using var temp = new TempFolder();
+        _ = temp.WriteFile("cased/query.sql", Query);
+        _ = temp.WriteFile(
+            "cased/case.json", /*lang=json,strict*/
+            "{ \"columns\": [], \"samples\": [ { \"Limit\": \"10\" } ] }"
+        );
+
+        var found = RealisticCases.Read(temp.PathOf("cased"));
+
+        found.Samples[0]["limit"].ShouldBe("10");
+        found.Samples[0]["LIMIT"].ShouldBe("10");
+    }
+
+    [Fact]
+    public void Read_SampleThatNamesAParameterTwiceIgnoringCase_ThrowsNamingIt()
+    {
+        using var temp = new TempFolder();
+        _ = temp.WriteFile("twice/query.sql", Query);
+        _ = temp.WriteFile(
+            "twice/case.json", /*lang=json,strict*/
+            "{ \"columns\": [], \"samples\": [ { \"limit\": \"10\", \"LIMIT\": \"20\" } ] }"
+        );
+
+        var thrown = Should.Throw<InvalidOperationException>(() => RealisticCases.Read(temp.PathOf("twice")));
+
+        thrown.Message.ShouldContain("realistic/twice");
+        thrown.Message.ShouldContain("@LIMIT twice");
+    }
+
+    [Fact]
+    public void CheckSampleKeys_KeyThatNamesNoParameter_ThrowsNamingTheCaseAndTheKey()
+    {
+        var found = Case(Values(("from", "'2024-01-01'"), ("tto", "'2025-01-01'")));
+
+        var thrown = Should.Throw<InvalidOperationException>(() =>
+            RealisticOracle.CheckSampleKeys(found, ["from", "to"])
+        );
+
+        thrown.Message.ShouldContain("realistic/keyed");
+        thrown.Message.ShouldContain("@tto");
+    }
+
+    [Fact]
+    public void CheckSampleKeys_KeyThatDiffersInCaseAlone_DoesNotThrow() =>
+        Should.NotThrow(() => RealisticOracle.CheckSampleKeys(Case(Values(("From", "'2024-01-01'"))), ["from", "to"]));
+
+    [Theory]
+    [InlineData(true, 14, Expectation.Record)]
+    [InlineData(true, 18, Expectation.Record)]
+    [InlineData(true, 16, Expectation.Refuse)]
+    [InlineData(false, 14, Expectation.Compare)]
+    [InlineData(false, 18, Expectation.Compare)]
+    [InlineData(false, 17, Expectation.Skip)]
+    public void ExpectationOn_RecordingAndMajor_IsWhatTheTheoryDoes(bool recording, int major, Expectation expected) =>
+        RealisticRun.ExpectationOn(recording, major).ShouldBe(expected);
+
+    [Theory]
+    [InlineData(null, 14, true)]
+    [InlineData(17, 14, false)]
+    [InlineData(17, 17, true)]
+    [InlineData(17, 18, true)]
+    public void RunsOn_MinimumMajorAndServer_IsWhetherTheCaseRuns(int? minimum, int major, bool runs) =>
+        RealisticRun.RunsOn(Case(Values()) with { MinimumMajor = minimum }, major).ShouldBe(runs);
+
+    [Fact]
+    public void ColumnsOf_ColumnNamedOtherwiseThanItsTruth_FailsNamingTheCaseAndThePosition()
+    {
+        var found = Case(Values()) with
+        {
+            Columns = [new TruthColumn("id", false, null, null), new TruthColumn("id", false, null, null)],
+        };
+        var described = Outcome<QueryDescription, DescribeFailure>.Of(
+            new QueryDescription(
+                SidecarResultKind.Rows,
+                new EquatableArray<DescribedParameter>([]),
+                new EquatableArray<SidecarColumn>([Column(0, "id"), Column(1, "account_id")]),
+                null,
+                null,
+                null
+            )
+        );
+
+        var thrown = Should.Throw<FailException>(() => RealisticRun.ColumnsOf(found, described));
+
+        thrown.Message.ShouldStartWith("realistic/keyed column 1 is described as account_id");
+    }
+
+    [Fact]
     public void Read_CaseJsonThatDoesNotParse_ThrowsNamingTheCase()
     {
         using var temp = new TempFolder();
@@ -94,6 +200,14 @@ public sealed class RealisticHarnessTests(PostgresContainer postgres)
     [InlineData( /*lang=json,strict*/
         "{ \"columns\": [ { \"name\": \"id\", \"nullabel\": false } ] }",
         "nullabel"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [ { \"name\": \"email\", \"nullable\": true, \"why\": \"w\", \"exempt\": \" \" } ] }",
+        "exempt gives no reason"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [ { \"name\": \"id\", \"nullable\": false, \"exempt\": \"no row\" } ] }",
+        "not nullable and has an exempt"
     )]
     public void Read_CaseJsonThatIsWrong_ThrowsNamingTheCaseAndTheFault(string json, string fault)
     {
@@ -133,13 +247,13 @@ public sealed class RealisticHarnessTests(PostgresContainer postgres)
             "INSERT INTO reservations (account_id, during) SELECT id, '[2024-01-01,2024-01-02)' FROM accounts "
             + "RETURNING id";
         var connection = postgres.RealisticConnectionString;
-        var before = await CountAsync(connection, "SELECT count(*) FROM reservations");
-        var accounts = await CountAsync(connection, "SELECT count(*) FROM accounts");
+        var before = (long)(await RealisticRun.ScalarAsync(connection, "SELECT count(*) FROM reservations"))!;
+        var accounts = (long)(await RealisticRun.ScalarAsync(connection, "SELECT count(*) FROM accounts"))!;
 
         var first = await RealisticOracle.RunAsync(connection, Insert);
         var second = await RealisticOracle.RunAsync(connection, Insert);
 
-        (await CountAsync(connection, "SELECT count(*) FROM reservations")).ShouldBe(before);
+        ((long)(await RealisticRun.ScalarAsync(connection, "SELECT count(*) FROM reservations"))!).ShouldBe(before);
         first.Rows.ShouldBe((int)accounts);
         second.Rows.ShouldBe((int)accounts);
         first.Names.ShouldBe(["id"]);
@@ -161,7 +275,7 @@ public sealed class RealisticHarnessTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_FirstCase_IsDescribedAndRendered()
     {
-        var found = RealisticCases.Read(System.IO.Path.Combine(RepositoryPaths.RealisticCases, FirstCase));
+        var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, FirstCase));
 
         var described = await RealisticRun.DescribeAsync(found, postgres.RealisticConnectionString);
 
@@ -248,11 +362,16 @@ public sealed class RealisticHarnessTests(PostgresContainer postgres)
     private static PostgresType Type(string name, string internalName) =>
         new(name, SidecarValues.Kind.Base, "pg_catalog", internalName, null, null, null, null, null, null, null);
 
-    private static async Task<long> CountAsync(string connection, string sql)
-    {
-        var token = TestContext.Current.CancellationToken;
-        await using var source = NpgsqlDataSource.Create(connection);
-        await using var command = source.CreateCommand(sql);
-        return (long)(await command.ExecuteScalarAsync(token))!;
-    }
+    private static RealisticCase Case(Dictionary<string, string> sample) =>
+        new(
+            "keyed",
+            "keyed",
+            null,
+            null,
+            [],
+            [new Dictionary<string, string>(sample, StringComparer.OrdinalIgnoreCase)]
+        );
+
+    private static SidecarColumn Column(int ordinal, string name) =>
+        new(ordinal, name, Type("integer", "int4"), null, null, null, null, null);
 }
