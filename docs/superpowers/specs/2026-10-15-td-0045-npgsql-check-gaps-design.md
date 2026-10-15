@@ -117,11 +117,11 @@ Npgsql 10.0.3 holds the rewritten text in the internal `NpgsqlBatchCommand.Final
 
 The member is read by reflection, resolved once per process.  If it is missing, or its value is null after a describe that succeeded, throw `InvalidOperationException` naming the member and the version of Npgsql: a bug of the tool, `SQLSRC200`.  A unit test resolves the member without a server, so a bump of Npgsql in `Directory.Packages.props` fails before any container runs.  This is the pattern TD-0044 used for `NpgsqlDataReader.RowDescription`; reuse its helper if one fits.
 
-`PostgresCheckAnswer` gains Npgsql's text as a new member after the ones it has.  `NpgsqlCheck.Read` compares it before the columns, and a difference is `differ`, with text that says where they first part, such as "at offset 41, Npgsql placed @id and SqlSource nothing".  A recorded answer that lacks the member, an old capture, compares columns alone.  The new member holds the user's SQL, so it is redacted as the capture's other text is.
+`PostgresCheckAnswer` gains Npgsql's text as a new member after the ones it has.  `NpgsqlCheck.Read` compares it before the columns, and a difference is `differ`, with text that says where they first part, such as "at offset 41, Npgsql placed @id and SqlSource nothing".  A recorded answer that lacks the member, an old capture, compares columns alone.  The new member holds no more of the user's SQL than the request already does, so nothing about redaction changes.
 
 ## Gap 3: an array of a domain
 
-When `NpgsqlCheck` finds that a column's type differs, and a parameter of the query is an array whose element is a domain, `SQLSRC231` gets a second help line: such a parameter is sent by Npgsql as an array of the domain's base type, and a cast of the column, `@p::varchar[]`, is the fix.  The prose that `docs/diagnostics.md` already has stays, and points at the line.
+When `NpgsqlCheck` finds that a column's type differs, and a parameter of the query is an array whose element is a domain, `SQLSRC231`'s help says that such a parameter is sent by Npgsql as an array of the domain's base type, and a cast of the column, `@p::varchar[]`, is the fix.  A failure has one help line, and the help about a `@` is wrong for this case, so this help replaces it.  The prose that `docs/diagnostics.md` already has stays, and points at the line.
 
 ## Gap 4: an error of `check` that is no disagreement
 
