@@ -1,0 +1,23 @@
+{
+  "columns": [
+    { "name": "account_id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "order_id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "orders.shipped_at is nullable; alice's latest order 2 is unshipped"
+    },
+    {
+      "name": "amount",
+      "nullable": true,
+      "why": "no invoice of carol's order 4 on the left join; the domain's NOT NULL lets bob's invoice 4 be NULL"
+    },
+    {
+      "name": "paid_on",
+      "nullable": true,
+      "why": "billing.invoices.paid_on is nullable, and carol's order 4 has no invoice"
+    }
+  ]
+}

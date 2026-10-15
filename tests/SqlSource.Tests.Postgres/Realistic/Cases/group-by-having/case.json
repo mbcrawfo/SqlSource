@@ -1,0 +1,17 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "order_count", "nullable": false },
+    { "name": "revenue", "nullable": false },
+    { "name": "last_placed_at", "nullable": false },
+    {
+      "name": "coupon",
+      "nullable": true,
+      "why": "max ignores NULLs, and orders.coupon is NULL on every order of a group; carol's order 4 has none"
+    }
+  ],
+  "samples": [
+    { "min_revenue": "20" }
+  ]
+}

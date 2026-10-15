@@ -1,0 +1,17 @@
+{
+  "columns": [
+    { "name": "status", "nullable": true, "why": "ROLLUP's grand total row has NULL for every grouping column" },
+    {
+      "name": "month",
+      "nullable": true,
+      "why": "ROLLUP's subtotal row of each status, and its grand total row, have NULL for the month"
+    },
+    { "name": "orders", "nullable": false },
+    {
+      "name": "revenue",
+      "nullable": true,
+      "why": "an order with no lines gets NULL lines, and sum of NULLs is NULL; bob's only order 3 has none"
+    },
+    { "name": "level", "nullable": false }
+  ]
+}
