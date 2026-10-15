@@ -8,6 +8,7 @@ using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Tests;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
@@ -81,6 +82,30 @@ public sealed class SessionTests(PostgresContainer postgres)
         var failure = await ShouldNotOpenAsync("Host=127.0.0.1;Port=1;Timeout=5;Username=app;Password=" + Marker);
 
         failure.ServerLines.ShouldBe(["Failed to connect to 127.0.0.1:1"]);
+    }
+
+    // The driver takes PGPASSWORD before it reads a password file, so with the variable set it never reads one.
+    private const string PasswordSetSkip = "PGPASSWORD is set, and the driver takes it before a password file.";
+
+    // The server asks for a password and the string names a password file instead of a password: the driver reads
+    // the file then, and for one that is not there it throws what is no NpgsqlException and quotes the path.  The
+    // line is the tool's own.
+    [Fact]
+    public async Task OpenAsync_PasswordFileThatIsNotThere_IsSqlsrc224WithTheFixedLine()
+    {
+        Assert.SkipWhen(Environment.GetEnvironmentVariable("PGPASSWORD") is not null, PasswordSetSkip);
+        using var folder = new TempFolder();
+        var path = folder.PathOf("passfile-that-is-not-there");
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
+        {
+            Password = null,
+            Passfile = path,
+        };
+
+        var failure = await ShouldNotOpenAsync(connection.ConnectionString);
+
+        failure.ServerLines.ShouldBe([PostgresConnection.UnreadableFile]);
+        Sessions.TextsOf(failure).ShouldAllBe(text => !text.Contains(path, StringComparison.Ordinal));
     }
 
     // The exchange asks the server, so that the session's connection is open, and then fails.  The caller of the
@@ -202,6 +227,30 @@ public sealed class SessionTests(PostgresContainer postgres)
         (await Sessions.PreparedStatementsAsync(session)).ShouldBe(0);
     }
 
+    // The read of "prepare" matches the statement's name and its text, so that a statement of the same name that an
+    // earlier run left on another backend is not taken for this one.  The server lists the text of a PREPARE exactly
+    // as the driver sent it: the type list's line break, a CRLF, white space at either end, a trailing ";" and a
+    // comment after it, and a character outside the basic plane are each kept as they are.
+    [Theory]
+    [InlineData("SELECT 1 AS one")]
+    [InlineData("SELECT id FROM users WHERE id = @id AND name = @name")]
+    [InlineData("\r\n  SELECT id\r\nFROM users\r\nWHERE id = @id  \r\n")]
+    [InlineData("DELETE FROM samples WHERE flag; -- all of them\n")]
+    [InlineData("SELECT '\U0001F600 é' AS face WHERE @n::int = 1 /* trailing */  ")]
+    public async Task Describe_StatementPrepared_IsListedWithTheTextAsSentAndDescribed(string sql)
+    {
+        var exchange = new ReadsTheListedText();
+        var opened = await Sessions.OpenAsync(postgres.ConnectionString, exchange);
+        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        exchange.Session = session;
+
+        var described = await session.DescribeAsync(Requests.Of(sql), TestContext.Current.CancellationToken);
+
+        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
+        var sent = exchange.Sent.ShouldNotBeNull();
+        exchange.Listed.ShouldBe(ParameterPlaceholders.PrepareText(sent.Statement, sent.Types, sent.Sql));
+    }
+
     private async Task ExecuteAsync(string sql)
     {
         await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
@@ -237,6 +286,39 @@ public sealed class SessionTests(PostgresContainer postgres)
             if (method == "prepare" && Session is { } session)
             {
                 await Sessions.EndBackendAsync(session, connection);
+            }
+
+            return answer;
+        }
+    }
+
+    // Asks the server, and when "prepare" has answered keeps what was sent and the text the server lists for the
+    // statement's name, read on the session's connection.
+    private sealed class ReadsTheListedText : IDescribeExchange
+    {
+        public PostgresSession? Session { get; set; }
+
+        public PostgresPrepareRequest? Sent { get; private set; }
+
+        public string? Listed { get; private set; }
+
+        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
+            string method,
+            TRequest request,
+            Func<TRequest, CancellationToken, Task<TAnswer>> live,
+            CancellationToken cancellationToken
+        )
+        {
+            var answer = await LiveExchange.Instance.AskAsync(method, request, live, cancellationToken);
+            if (request is PostgresPrepareRequest prepare && Session is { } session)
+            {
+                Sent = prepare;
+                await using var read = await session.Connection.CommandAsync(
+                    "SELECT statement FROM pg_catalog.pg_prepared_statements WHERE name = @name",
+                    cancellationToken
+                );
+                _ = read.Parameters.AddWithValue("name", prepare.Statement);
+                Listed = (string?)await read.ExecuteScalarAsync(cancellationToken);
             }
 
             return answer;

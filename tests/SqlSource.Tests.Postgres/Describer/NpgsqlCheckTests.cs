@@ -121,12 +121,6 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     public async Task Describe_ParameterOfEachKindOfType_IsBoundByItsSpelledName(string type) =>
         await ShouldPassAsync("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", ("p", type));
 
-    // What the check does not see, which docs/tech-debt/TD-0043 records: Npgsql sends $1 for @id and leaves the
-    // "$2" of the SQL alone, the server types it, and the two describes agree.  Nothing would bind it at run time.
-    [Fact]
-    public async Task Describe_SqlWithAPlaceholderOfItsOwn_PassesTheCheck() =>
-        await ShouldPassAsync("SELECT 1 FROM users WHERE id = @id AND name = $2");
-
     // Types whose spelled names Npgsql refuses: one in a schema whose name needs quotes, the "char" of the system
     // catalogs, a domain over a domain, a bit string type, which the describer spells "bit" for a parameter, a
     // composite type, and an array of a type whose name is so long that the spelling with its schema is too long

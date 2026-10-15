@@ -19,6 +19,13 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </remarks>
 internal sealed class PostgresLive(PostgresConnection connection)
 {
+    /// <summary>
+    /// What <c>prepare</c> answers when <c>pg_prepared_statements</c> does not list the statement that was just
+    /// prepared, by its name and its text: the read ran on another backend than the <c>PREPARE</c>, which a pooler in
+    /// transaction mode does.
+    /// </summary>
+    public const string StatementNotListed = "the server does not list the statement it prepared";
+
     // The settings of a session that change a description, in the order "open" answers them.
     private static readonly string[] SettingNames = ["search_path", "plan_cache_mode", "standard_conforming_strings"];
 
@@ -27,7 +34,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
         + "pg_catalog.current_setting('plan_cache_mode'), pg_catalog.current_setting('standard_conforming_strings')";
 
     private const string ParameterTypesSql =
-        "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = @name";
+        "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements "
+        + "WHERE name = @name AND statement = @statement";
 
     // Every relation asked for with its columns, in one query.  The relations are read first, so that what is said of
     // a relation as a whole is computed once for each relation and not once for each of its columns: whether a
@@ -155,19 +163,35 @@ internal sealed class PostgresLive(PostgresConnection connection)
     }
 
     /// <summary>Asks <c>prepare</c>.</summary>
+    /// <remarks>
+    /// The one known cause of a read that fails is a connection that the server ended between the <c>PREPARE</c> and
+    /// the read, and a lost connection has no position, so nothing is counted against the <c>PREPARE</c>'s text.  If
+    /// a call is ever added between the two, this needs revisiting.  The read matches the statement's name and the
+    /// text of the <c>PREPARE</c>, which the server lists exactly as it was sent: behind a pooler the read can reach
+    /// another backend, which may hold a statement of the same name that an earlier run left there, whose
+    /// parameter types are not this query's.  A read that finds no row is <see cref="StatementNotListed" />, an
+    /// answer and not a fault: it is a backend that is not the one prepared on.
+    /// </remarks>
     public async Task<PostgresPrepareAnswer> PrepareAsync(PostgresPrepareRequest asked, CancellationToken token)
     {
         try
         {
-            // The one text that holds a user's SQL: the driver is given it as one statement and may not split it.
+            // The one text that holds a user's SQL: the driver is given it as one statement and may not split it.  The
+            // read gives it again as a parameter's value, which is never parsed.
             var text = ParameterPlaceholders.PrepareText(asked.Statement, asked.Types, asked.Sql);
             await connection.ExecuteAsOneStatementAsync(text, token);
 
             await using var read = await connection.CommandAsync(ParameterTypesSql, token);
             _ = read.Parameters.AddWithValue("name", asked.Statement);
-            var types =
-                await read.ExecuteScalarAsync(token) as uint[]
-                ?? throw new InvalidOperationException($"The server lists no prepared statement '{asked.Statement}'.");
+            _ = read.Parameters.AddWithValue("statement", text);
+            if (await read.ExecuteScalarAsync(token) is not uint[] types)
+            {
+                return new PostgresPrepareAnswer(
+                    null,
+                    new PostgresServerError(null, StatementNotListed, null, null, null)
+                );
+            }
+
             return new PostgresPrepareAnswer([.. types.Select(static oid => (long)oid)], null);
         }
         catch (NpgsqlException exception)

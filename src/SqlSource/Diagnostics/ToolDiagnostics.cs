@@ -378,6 +378,50 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor StatementCannotBeDescribed = new(
+        id: "SQLSRC233",
+        title: "Statement cannot be described",
+        messageFormat: "The query '{0}' is a {1} statement, which the tool cannot describe",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc233",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor PositionalParameterWritten = new(
+        id: "SQLSRC234",
+        title: "Query writes a positional parameter",
+        messageFormat: "The query '{0}' writes the parameter '{1}' itself",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc234",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ServerVersionNotSupported = new(
+        id: "SQLSRC235",
+        title: "Server version is not supported",
+        messageFormat: "The database '{0}' runs PostgreSQL {1}, and the tool supports {2} and later",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc235",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SessionNotKept = new(
+        id: "SQLSRC236",
+        title: "Connection does not keep a session",
+        messageFormat: "The connection to the database '{0}' does not keep one session",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc236",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -415,6 +459,10 @@ internal static class ToolDiagnostics
             ColumnTypeNotSupported,
             QueryHasSeveralStatements,
             ParametersReadDifferently,
-            TypeCannotBeBound
+            TypeCannotBeBound,
+            StatementCannotBeDescribed,
+            PositionalParameterWritten,
+            ServerVersionNotSupported,
+            SessionNotKept
         );
 }

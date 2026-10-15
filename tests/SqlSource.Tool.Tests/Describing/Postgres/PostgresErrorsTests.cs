@@ -35,6 +35,22 @@ public class PostgresErrorsTests
             .Open(new PostgresServerError(null, "Failed to connect to 127.0.0.1:1", null, null, null), "app")
             .ServerLines.ShouldBe(["Failed to connect to 127.0.0.1:1"]);
 
+    // The refusal is the tool's own message and no server said it: the line is that message alone.
+    [Fact]
+    public void Open_MultiplexingRefused_IsSqlsrc236()
+    {
+        var failure = PostgresErrors.Open(
+            new PostgresServerError(null, PostgresConnection.MultiplexingRefused, null, null, null),
+            "app"
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.Arguments.ShouldBe(["app"]);
+        failure.Step.ShouldBeNull();
+        failure.ServerLines.ShouldBe([PostgresConnection.MultiplexingRefused]);
+        failure.Help.ShouldBe(PostgresErrors.SessionNotKeptHelp);
+    }
+
     // Each line the server gave, in the order the epic fixes, and a position counted from where the SQL starts.
     [Fact]
     public void ServerLines_ErrorWithEveryPart_GivesEachInOrder() =>
@@ -70,6 +86,18 @@ public class PostgresErrorsTests
         failure.Help.ShouldBe(PostgresErrors.SeveralStatementsHelp);
     }
 
+    [Fact]
+    public void NotDescribable_Kind_IsSqlsrc233WithItsHelp()
+    {
+        var failure = PostgresErrors.NotDescribable(Query(), "CALL");
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC233");
+        failure.Arguments.ShouldBe(["Q", "CALL"]);
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.NotDescribableHelp);
+    }
+
     // The type as the marker wrote it, and the parameter as the SQL writes one, with its prefix.
     [Fact]
     public void TypeRefused_Parameter_IsSqlsrc228ThatSaysItIsNoTypeName()
@@ -91,6 +119,79 @@ public class PostgresErrorsTests
     private static PostgresServerError Error(string state, string message, int? position = null, string? hint = null) =>
         new(state, message, null, hint, position);
 
+    // The backstop for what the tool's own check misses: the kind is the word "utility", never a word of a statement.
+    [Fact]
+    public void Prepare_UtilityStatementsCannotBePrepared_IsSqlsrc233()
+    {
+        var failure = PostgresErrors.Prepare(
+            new PostgresServerError("42P14", "utility statements cannot be prepared", null, null, null),
+            Query(),
+            Prepared("sqlsource_1"),
+            "app"
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC233");
+        failure.Arguments.ShouldBe(["Q", "utility"]);
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        failure.ServerLines.ShouldBe(["42P14: utility statements cannot be prepared"]);
+        failure.Help.ShouldBe(PostgresErrors.NotDescribableHelp);
+    }
+
+    // A statement that is not listed after PREPARE, and one that already exists: both are a backend that is not the
+    // one the tool prepared on.  The first carries no SQLSTATE and the second is matched by its SQLSTATE alone, so
+    // the message may be translated.
+    [Theory]
+    [InlineData(null, PostgresLive.StatementNotListed)]
+    [InlineData("42P05", "prepared statement \"sqlsource_1\" already exists")]
+    [InlineData("42P05", "la sentencia preparada \"sqlsource_1\" ya existe")]
+    public void Prepare_StatementNotListedOrAlreadyExists_IsSqlsrc236(string? state, string message)
+    {
+        var failure = PostgresErrors.Prepare(
+            new PostgresServerError(state, message, null, null, 40),
+            Query(),
+            Prepared("sqlsource_1"),
+            "app"
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.Arguments.ShouldBe(["app"]);
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        failure.ServerLines.ShouldBe([state is null ? message : $"{state}: {message}"]);
+        failure.Help.ShouldBe(PostgresErrors.SessionNotKeptHelp);
+    }
+
+    // The message of the not-listed answer is the tool's own; the same words from the server with a SQLSTATE are
+    // the server rejecting the query.
+    [Fact]
+    public void Prepare_NotListedMessageWithASqlState_IsSqlsrc225() =>
+        PostgresErrors
+            .Prepare(Error("42601", PostgresLive.StatementNotListed), Query(), Prepared("sqlsource_1"), "app")
+            .Descriptor.Id.ShouldBe("SQLSRC225");
+
+    // 26000 is matched by its SQLSTATE alone.
+    [Theory]
+    [InlineData("prepared statement \"sqlsource_1\" does not exist")]
+    [InlineData("la sentencia preparada \"sqlsource_1\" no existe")]
+    public void Columns_PreparedStatementDoesNotExist_IsSqlsrc236(string message)
+    {
+        var failure = PostgresErrors.Columns(Error("26000", message, position: 9), Query(), "app");
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.Arguments.ShouldBe(["app"]);
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.ShouldBe([$"26000: {message}"]);
+        failure.Help.ShouldBe(PostgresErrors.SessionNotKeptHelp);
+    }
+
+    [Fact]
+    public void Columns_AnyOtherError_IsSqlsrc225AtDescribeColumns()
+    {
+        var failure = PostgresErrors.Columns(Error("42P01", "relation \"nope\" does not exist"), Query(), "app");
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+    }
+
     // 42P18 has no position.  The server names the parameter $2, and the user wrote @b.
     [Fact]
     public void Prepare_42P18_IsSqlsrc226NamingTheParameterOfTheMessage()
@@ -98,7 +199,8 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42P18", "could not determine data type of parameter $2"),
             Query(Inferred("a"), Inferred("b")),
-            Prepared("sqlsource_1", "unknown", "unknown")
+            Prepared("sqlsource_1", "unknown", "unknown"),
+            "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC226");
@@ -117,7 +219,8 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42P08", "could not determine data type of parameter $1", 62),
             Query(Inferred("name")),
-            Prepared("sqlsource_7", "unknown")
+            Prepared("sqlsource_7", "unknown"),
+            "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC227");
@@ -131,7 +234,7 @@ public class PostgresErrorsTests
     [InlineData("42P08", "could not determine data type of a parameter")]
     public void Prepare_ParameterErrorThatNamesNoParameterOfTheList_IsSqlsrc225(string state, string message) =>
         PostgresErrors
-            .Prepare(Error(state, message), Query(Inferred("a")), Prepared("sqlsource_1", "unknown"))
+            .Prepare(Error(state, message), Query(Inferred("a")), Prepared("sqlsource_1", "unknown"), "app")
             .Descriptor.Id.ShouldBe("SQLSRC225");
 
     // The character 32 of "PREPARE sqlsource_10 (unknown, nope_t" is the n of nope_t.
@@ -141,7 +244,8 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42704", "type \"nope_t\" does not exist", 32),
             Query(Inferred("id"), Declared("tenant", "nope_t")),
-            Prepared("sqlsource_10", "unknown", "nope_t")
+            Prepared("sqlsource_10", "unknown", "nope_t"),
+            "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
@@ -158,7 +262,8 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42704", "type \"nope_t\" does not exist", 47),
             Query(Inferred("p")),
-            Prepared("sqlsource_11", "unknown")
+            Prepared("sqlsource_11", "unknown"),
+            "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
@@ -174,7 +279,8 @@ public class PostgresErrorsTests
             .Prepare(
                 Error("42704", "type \"nope_t\" does not exist"),
                 Query(Declared("p", "nope_t")),
-                Prepared("sqlsource_1", "nope_t")
+                Prepared("sqlsource_1", "nope_t"),
+                "app"
             )
             .Descriptor.Id.ShouldBe("SQLSRC225");
 
@@ -188,7 +294,8 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error(state, message, 23),
             Query(Declared("p", "numeric(2,-3)")),
-            Prepared("sqlsource_35", "numeric(2,-3)")
+            Prepared("sqlsource_35", "numeric(2,-3)"),
+            "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC228");
@@ -201,7 +308,12 @@ public class PostgresErrorsTests
     [Fact]
     public void Prepare_ErrorInsideTheTypeListAtAnInferredParameter_IsSqlsrc225() =>
         PostgresErrors
-            .Prepare(Error("42601", "syntax error", 23), Query(Inferred("p")), Prepared("sqlsource_1", "unknown"))
+            .Prepare(
+                Error("42601", "syntax error", 23),
+                Query(Inferred("p")),
+                Prepared("sqlsource_1", "unknown"),
+                "app"
+            )
             .Descriptor.Id.ShouldBe("SQLSRC225");
 
     [Fact]
@@ -210,7 +322,8 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42883", "operator does not exist: character varying = integer", 63, "You might need to add casts."),
             Query(Declared("p", "int")),
-            Prepared("sqlsource_12", "int")
+            Prepared("sqlsource_12", "int"),
+            "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
@@ -230,7 +343,8 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             new PostgresServerError(null, "Exception while reading from stream", null, null, null),
             Query(),
-            Prepared("sqlsource_1")
+            Prepared("sqlsource_1"),
+            "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
@@ -248,7 +362,8 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42601", "syntax error", head + 5),
             Query(Declared("p", "\"\U0001F600\"")),
-            prepare
+            prepare,
+            "app"
         );
 
         failure.ServerLines.ShouldBe(["42601: syntax error", "at character 5"]);

@@ -49,6 +49,21 @@ public class PostgresTypesTests
                 )
             );
 
+    // They have the category A and an element, but they are no arrays: the protocol has them as base types.
+    [Theory]
+    [InlineData(22, "int2vector", 21)]
+    [InlineData(30, "oidvector", 26)]
+    public void Build_Int2vectorAndOidvector_AreBaseTypes(long oid, string name, long elementOid)
+    {
+        var vector = PostgresRows.BaseOf(oid, name, name, "A") with { Typelem = elementOid };
+
+        var built = PostgresTypes.Build(oid, PostgresRows.Of(vector), PostgresFacets.None);
+
+        built.ShouldBe(TestSidecars.Postgres(name, internalName: name));
+        built.Kind.ShouldBe(SidecarValues.Kind.Base);
+        built.Element.ShouldBeNull();
+    }
+
     [Fact]
     public void Build_Domain_HasItsBase() =>
         PostgresTypes

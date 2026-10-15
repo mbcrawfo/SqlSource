@@ -15,12 +15,30 @@ internal static class PostgresErrors
 {
     public const string OpenHelp = "check that the database is running and that the connection string names it";
 
+    /// <summary>
+    /// Built from <see cref="PostgresSession.MinimumMajorVersion" />, so that the floor is one constant.
+    /// </summary>
+    public static readonly string VersionNotSupportedHelp =
+        "upgrade the server, or describe against a database of PostgreSQL "
+        + PostgresSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture)
+        + " or later";
+
+    public const string SessionNotKeptHelp =
+        "connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true";
+
     public const string NotATypeName = "it is not written as a type name";
 
     public const string NotATypeNameHelp =
         "write the type as a column definition would: a name, a modifier in parentheses, []";
 
     public const string SeveralStatementsHelp = "one statement for each query; a ; is allowed at the end alone";
+
+    public const string NotDescribableHelp =
+        "give the query -- output: sql; the tool describes SELECT without INTO, INSERT, UPDATE, DELETE, MERGE, VALUES "
+        + "and TABLE";
+
+    public const string PositionalParameterHelp =
+        "write the parameter as @name; generated code binds parameters by name";
 
     public const string NoSuchType = "the database has no such type";
 
@@ -54,20 +72,66 @@ internal static class PostgresErrors
         "the database's schema changed while the query was described; run the tool again";
 
     private const string UndefinedObject = "42704";
+    private const string UtilityStatement = "42P14";
+    private const string DuplicatePreparedStatement = "42P05";
+    public const string InvalidSqlStatementName = "26000";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
 
     /// <summary>
     /// <c>SQLSRC224</c>: no session.  Every failure of <c>open</c> is this one, whatever its SQLSTATE: a wrong
-    /// password and a missing database are not the server rejecting a query.
+    /// password and a missing database are not the server rejecting a query.  The one exception is the tool's own
+    /// refusal of <c>Multiplexing=true</c>, <c>SQLSRC236</c>.
     /// </summary>
     public static DescribeFailure Open(PostgresServerError error, string database) =>
+        error.SqlState is null && error.Message == PostgresConnection.MultiplexingRefused
+            ? SessionNotKept(database, null, ServerLines(error, 0))
+            : new(
+                ToolDiagnostics.DatabaseCannotBeOpened,
+                new EquatableArray<string>([database]),
+                null,
+                ServerLines(error, 0),
+                OpenHelp
+            );
+
+    /// <summary>
+    /// <c>SQLSRC236</c>: the connection does not keep one session, so the statement the tool prepared is not there
+    /// for a later call.  At <c>open</c> it is a connection string that sets <c>Multiplexing=true</c>; at a query it
+    /// is a pooler in transaction mode.
+    /// </summary>
+    /// <param name="database">The database.</param>
+    /// <param name="step">The step whose call found out, or null at <c>open</c>.</param>
+    /// <param name="serverLines">What the server or the tool said, verbatim.</param>
+    public static DescribeFailure SessionNotKept(
+        string database,
+        DescribeStep? step,
+        EquatableArray<string> serverLines
+    ) =>
         new(
-            ToolDiagnostics.DatabaseCannotBeOpened,
+            ToolDiagnostics.SessionNotKept,
             new EquatableArray<string>([database]),
+            step,
+            serverLines,
+            SessionNotKeptHelp
+        );
+
+    /// <summary>
+    /// <c>SQLSRC235</c>: the server is older than <see cref="PostgresSession.MinimumMajorVersion" />.  Nothing of a
+    /// query is sent, and the failure holds no server line: the server said nothing.
+    /// </summary>
+    /// <param name="database">The database.</param>
+    /// <param name="version">The server's version, as it is recorded.</param>
+    public static DescribeFailure VersionNotSupported(string database, string version) =>
+        new(
+            ToolDiagnostics.ServerVersionNotSupported,
+            new EquatableArray<string>([
+                database,
+                version,
+                PostgresSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture),
+            ]),
             null,
-            ServerLines(error, 0),
-            OpenHelp
+            EquatableArray<string>.Empty,
+            VersionNotSupportedHelp
         );
 
     /// <summary>
@@ -111,6 +175,34 @@ internal static class PostgresErrors
         );
 
     /// <summary>
+    /// <c>SQLSRC233</c>: the statement is of a kind that <c>PREPARE</c> does not take.  Nothing of it is sent.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="kind">The kind, in upper case, as <see cref="StatementShape.RefusedKind" /> gives it.</param>
+    public static DescribeFailure NotDescribable(DescribeRequest query, string kind) =>
+        new(
+            ToolDiagnostics.StatementCannotBeDescribed,
+            new EquatableArray<string>([query.Name, kind]),
+            DescribeStep.DescribeParameters,
+            EquatableArray<string>.Empty,
+            NotDescribableHelp
+        );
+
+    /// <summary>
+    /// <c>SQLSRC234</c>: the SQL writes a positional parameter itself.  Nothing of it is sent.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="written">The parameter as written, such as <c>$2</c>.</param>
+    public static DescribeFailure PositionalParameter(DescribeRequest query, string written) =>
+        new(
+            ToolDiagnostics.PositionalParameterWritten,
+            new EquatableArray<string>([query.Name, written]),
+            DescribeStep.DescribeParameters,
+            EquatableArray<string>.Empty,
+            PositionalParameterHelp
+        );
+
+    /// <summary>
     /// <c>SQLSRC228</c> for a type that <see cref="DeclaredTypeText" /> refuses.  Nothing of the query is sent.
     /// </summary>
     public static DescribeFailure TypeRefused(DescribeRequest query, SqlQueryParameter parameter) =>
@@ -124,18 +216,42 @@ internal static class PostgresErrors
         );
 
     /// <summary>
-    /// What a failed <c>prepare</c> is reported as.  An error the server positions inside the type list is the
-    /// declared type's, <c>SQLSRC228</c>; <c>42P18</c> and <c>42P08</c> name a parameter, <c>SQLSRC226</c> and
-    /// <c>SQLSRC227</c>; anything else is the server rejecting the query, <c>SQLSRC225</c>.
+    /// What a failed <c>prepare</c> is reported as.  A statement that is not listed after it, and <c>42P05</c>, a
+    /// statement that already exists, are a connection that does not keep a session, <c>SQLSRC236</c>, whichever
+    /// the position; <c>42P14</c>, a utility statement, is <c>SQLSRC233</c>, as a backstop for what
+    /// <see cref="StatementShape" /> misses; an error the server positions inside the type list is the declared
+    /// type's, <c>SQLSRC228</c>; <c>42P18</c> and <c>42P08</c> name a parameter, <c>SQLSRC226</c> and
+    /// <c>SQLSRC227</c>; anything else is the server rejecting the query, <c>SQLSRC225</c>.  <c>42P05</c> is
+    /// matched by its SQLSTATE alone: the message may be translated.
     /// </summary>
     public static DescribeFailure Prepare(
         PostgresServerError error,
         DescribeRequest query,
-        PostgresPrepareRequest prepare
+        PostgresPrepareRequest prepare,
+        string database
     )
     {
+        // Before anything is counted against the PREPARE's text: neither is a fault of it.
+        if (
+            error.SqlState == DuplicatePreparedStatement
+            || (error.SqlState is null && error.Message == PostgresLive.StatementNotListed)
+        )
+        {
+            return SessionNotKept(
+                database,
+                DescribeStep.DescribeParameters,
+                ServerLines(error with { Position = null }, 0)
+            );
+        }
+
         var head = ParameterPlaceholders.HeadLength(prepare.Statement, prepare.Types);
         var lines = ServerLines(error, head);
+        if (error.SqlState == UtilityStatement)
+        {
+            // The server did not say which statement it was, so the kind is no word of one.
+            return NotDescribable(query, "utility") with { ServerLines = lines };
+        }
+
         if (DeclaredAt(error, query, prepare, head) is { } declared)
         {
             return error.SqlState == UndefinedObject
@@ -182,10 +298,17 @@ internal static class PostgresErrors
 
     /// <summary>
     /// <c>SQLSRC225</c> at the step <c>describe columns</c>: the prepared statement could not be described.  There
-    /// is no position line: a position the server gives is in the tool's own <c>EXECUTE</c>.
+    /// is no position line: a position the server gives is in the tool's own <c>EXECUTE</c>.  <c>26000</c>, a
+    /// statement that does not exist, is <c>SQLSRC236</c>: the tool's text holds only its own statement's name, and
+    /// the SQLSTATE alone is matched, since the message may be translated.
     /// </summary>
-    public static DescribeFailure Columns(PostgresServerError error, DescribeRequest query) =>
-        Rejected(error, query, DescribeStep.DescribeColumns, ServerLines(error with { Position = null }, 0));
+    public static DescribeFailure Columns(PostgresServerError error, DescribeRequest query, string database)
+    {
+        var lines = ServerLines(error with { Position = null }, 0);
+        return error.SqlState == InvalidSqlStatementName
+            ? SessionNotKept(database, DescribeStep.DescribeColumns, lines)
+            : Rejected(error, query, DescribeStep.DescribeColumns, lines);
+    }
 
     /// <summary>
     /// <c>SQLSRC225</c> at the step <c>catalog</c>: the tables of the columns could not be read.  There is no
