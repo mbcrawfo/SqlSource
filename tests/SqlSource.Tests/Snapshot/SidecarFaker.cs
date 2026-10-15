@@ -78,6 +78,7 @@ internal sealed class SidecarFaker(int seed, bool lenient)
         SidecarValues.NullableSource.Catalog,
         SidecarValues.NullableSource.OuterJoin,
         SidecarValues.NullableSource.View,
+        SidecarValues.NullableSource.ForeignTable,
         SidecarValues.NullableSource.NoOrigin,
         SidecarValues.NullableSource.Heuristic,
     ];

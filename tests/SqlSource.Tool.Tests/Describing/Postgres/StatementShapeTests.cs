@@ -130,13 +130,16 @@ public class StatementShapeTests
     [InlineData("SELECT $12", "$12")]
     [InlineData("SELECT 1 WHERE (a=$3)", "$3")]
     [InlineData("SELECT a$1, $2 FROM t", "$2")]
+    [InlineData("SELECT 1 FROM t WHERE a = $1", "$1")]
     public void PositionalParameter_DollarAndDigits_IsItAsWritten(string sql, string written) =>
         StatementShape.PositionalParameter(sql).ShouldBe(written);
 
     // A "$" that continues a name, or that is inside a string, a quoted identifier, a dollar-quoted string or a
-    // comment, is no parameter.
+    // comment, is no parameter.  PostgreSQL reads a character above U+007F as part of a name, so "€$1" is one.
     [Theory]
     [InlineData("SELECT a$1 FROM t")]
+    [InlineData("SELECT 1 AS €$1 FROM t")]
+    [InlineData("SELECT 1 AS §$1 FROM t")]
     [InlineData("SELECT '$1'")]
     [InlineData("SELECT E'cost $1'")]
     [InlineData("SELECT U&'$1'")]

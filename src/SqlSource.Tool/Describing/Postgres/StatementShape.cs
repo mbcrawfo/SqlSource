@@ -219,7 +219,8 @@ internal static class StatementShape
                     continue;
                 }
 
-                if (index > 0 && IsWordCharacter(text[index - 1]))
+                // PostgreSQL reads a character above U+007F as part of a name, as the lexer does, so "€$1" is one name.
+                if (index > 0 && (IsWordCharacter(text[index - 1]) || text[index - 1] > '\u007F'))
                 {
                     continue;
                 }

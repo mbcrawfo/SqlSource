@@ -57,21 +57,23 @@
             "ordinal": 0,
             "name": "id",
             "typeOid": 20,
-            "tableOid": 16415,
+            "tableOid": 16421,
             "attributeNumber": 1,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
             "name": "placed_at",
             "typeOid": 1184,
-            "tableOid": 16415,
+            "tableOid": 16421,
             "attributeNumber": 4,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           }
         ],
         "error": null
@@ -81,13 +83,13 @@
       "method": "tables",
       "request": {
         "oids": [
-          16415
+          16421
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16415,
+            "oid": 16421,
             "relkind": "r",
             "schema": "public",
             "name": "orders",
@@ -170,7 +172,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bigint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 23,
@@ -183,7 +186,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 25,
@@ -196,7 +200,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "text",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1184,
@@ -209,7 +214,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "timestamp with time zone",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1700,
@@ -222,7 +228,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "numeric",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           }
         ],
         "error": null

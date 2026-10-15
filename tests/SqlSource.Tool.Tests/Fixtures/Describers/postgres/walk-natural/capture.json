@@ -53,7 +53,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
@@ -63,27 +64,30 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 2,
             "name": "total",
             "typeOid": 1700,
-            "tableOid": 16415,
+            "tableOid": 16421,
             "attributeNumber": 3,
             "length": null,
             "precision": 18,
-            "scale": 2
+            "scale": 2,
+            "typeModifier": 1179654
           },
           {
             "ordinal": 3,
             "name": "during",
             "typeOid": 3910,
-            "tableOid": 16433,
+            "tableOid": 16439,
             "attributeNumber": 3,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           }
         ],
         "error": null
@@ -93,14 +97,14 @@
       "method": "tables",
       "request": {
         "oids": [
-          16415,
-          16433
+          16421,
+          16439
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16415,
+            "oid": 16421,
             "relkind": "r",
             "schema": "public",
             "name": "orders",
@@ -156,7 +160,7 @@
             "hasInsteadRule": false
           },
           {
-            "oid": 16433,
+            "oid": 16439,
             "relkind": "r",
             "schema": "public",
             "name": "bookings",
@@ -238,7 +242,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bigint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 23,
@@ -251,7 +256,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1184,
@@ -264,7 +270,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "timestamp with time zone",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1700,
@@ -277,7 +284,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "numeric",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 3910,
@@ -290,7 +298,29 @@
             "rngsubtype": 1184,
             "multirangeRngsubtype": null,
             "formatType": "tstzrange",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1700,
+            "modifier": 1179654
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1700,
+            "modifier": 1179654,
+            "formatType": "numeric(18,2)"
           }
         ],
         "error": null

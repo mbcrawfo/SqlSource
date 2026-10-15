@@ -49,21 +49,23 @@
             "ordinal": 0,
             "name": "id",
             "typeOid": 20,
-            "tableOid": 16415,
+            "tableOid": 16421,
             "attributeNumber": 1,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
             "name": "name",
             "typeOid": 1043,
-            "tableOid": 16468,
+            "tableOid": 16479,
             "attributeNumber": 2,
             "length": 100,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": 104
           }
         ],
         "error": null
@@ -73,14 +75,14 @@
       "method": "tables",
       "request": {
         "oids": [
-          16415,
-          16468
+          16421,
+          16479
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16415,
+            "oid": 16421,
             "relkind": "r",
             "schema": "public",
             "name": "orders",
@@ -136,7 +138,7 @@
             "hasInsteadRule": false
           },
           {
-            "oid": 16468,
+            "oid": 16479,
             "relkind": "v",
             "schema": "public",
             "name": "active_users",
@@ -174,7 +176,7 @@
                 "notNull": false,
                 "identity": "",
                 "generated": "",
-                "typeOid": 16390,
+                "typeOid": 16392,
                 "notNullValidated": null
               }
             ],
@@ -207,7 +209,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bigint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1043,
@@ -220,7 +223,29 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "character varying",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1043,
+            "modifier": 104
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "modifier": 104,
+            "formatType": "character varying(100)"
           }
         ],
         "error": null

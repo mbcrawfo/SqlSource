@@ -88,6 +88,13 @@ internal sealed class PostgresLive(PostgresConnection connection)
         ORDER BY r.oid, a.attnum
         """;
 
+    // The server's spelling of each pair of a type and a modifier, in one query.
+    private const string SpellingsSql = """
+        SELECT p.oid, p.typmod, pg_catalog.format_type(p.oid, p.typmod)
+        FROM unnest($1::oid[], $2::int4[]) AS p (oid, typmod)
+        ORDER BY 1, 2
+        """;
+
     // The closure of the types asked for, in one query: a recursive term that follows the element of an array, the
     // base of a domain, the subtype of a range and the range of a multirange.  A domain has the category of its
     // base, so an array is a base type of the category A.
@@ -124,7 +131,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
                 SELECT pg_catalog.array_agg(e.enumlabel::text ORDER BY e.enumsortorder)
                 FROM pg_catalog.pg_enum AS e
                 WHERE e.enumtypid = t.oid
-            )
+            ),
+            t.typtypmod
         FROM closure AS c
         JOIN pg_catalog.pg_type AS t ON t.oid = c.oid
         JOIN pg_catalog.pg_namespace AS n ON n.oid = t.typnamespace
@@ -215,6 +223,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
             await using var command = await connection.CommandAsync(ExecuteText(asked), token);
             await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SchemaOnly, token);
             var columns = new List<PostgresColumnRow>(reader.FieldCount);
+            var modifiers = RowDescriptions.ModifiersOf(reader);
 
             // The async method is the base class's and gives the base type; each item is the driver's own.
             foreach (var column in (await reader.GetColumnSchemaAsync(token)).Cast<NpgsqlDbColumn>())
@@ -228,7 +237,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
                         column.ColumnAttributeNumber ?? 0,
                         column.ColumnSize,
                         column.NumericPrecision,
-                        column.NumericScale
+                        column.NumericScale,
+                        modifiers[columns.Count]
                     )
                 );
             }
@@ -343,7 +353,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
                         reader.GetString(9),
                         await reader.IsDBNullAsync(10, token)
                             ? null
-                            : await reader.GetFieldValueAsync<string[]>(10, token)
+                            : await reader.GetFieldValueAsync<string[]>(10, token),
+                        reader.GetInt32(11)
                     )
                 );
             }
@@ -353,6 +364,47 @@ internal sealed class PostgresLive(PostgresConnection connection)
         catch (NpgsqlException exception)
         {
             return new PostgresTypesAnswer(null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
+    /// <summary>Asks <c>spellings</c>: the server's own spelling of each type with each modifier.</summary>
+    public async Task<PostgresSpellingsAnswer> SpellingsAsync(PostgresSpellingsRequest asked, CancellationToken token)
+    {
+        try
+        {
+            await using var command = await connection.CommandAsync(SpellingsSql, token);
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = asked.Pairs.Select(static pair => (uint)pair.Oid).ToArray(),
+                    DataTypeName = "oid[]",
+                }
+            );
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = asked.Pairs.Select(static pair => pair.Modifier).ToArray(),
+                    DataTypeName = "int4[]",
+                }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            var rows = new List<PostgresSpellingRow>();
+            while (await reader.ReadAsync(token))
+            {
+                rows.Add(
+                    new PostgresSpellingRow(
+                        await reader.GetFieldValueAsync<uint>(0, token),
+                        reader.GetInt32(1),
+                        reader.GetString(2)
+                    )
+                );
+            }
+
+            return new PostgresSpellingsAnswer(rows, null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresSpellingsAnswer(null, PostgresConnection.ErrorOf(exception));
         }
     }
 

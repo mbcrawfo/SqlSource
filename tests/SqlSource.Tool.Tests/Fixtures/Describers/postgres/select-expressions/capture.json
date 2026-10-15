@@ -49,11 +49,12 @@
             "ordinal": 0,
             "name": "user_id",
             "typeOid": 23,
-            "tableOid": 16415,
+            "tableOid": 16421,
             "attributeNumber": 2,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
@@ -63,7 +64,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 2,
@@ -73,7 +75,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 3,
@@ -83,7 +86,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": 20,
-            "scale": 4
+            "scale": 4,
+            "typeModifier": 1310728
           },
           {
             "ordinal": 4,
@@ -93,7 +97,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 5,
@@ -103,7 +108,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 6,
@@ -113,7 +119,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           }
         ],
         "error": null
@@ -123,13 +130,13 @@
       "method": "tables",
       "request": {
         "oids": [
-          16415
+          16421
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16415,
+            "oid": 16421,
             "relkind": "r",
             "schema": "public",
             "name": "orders",
@@ -211,7 +218,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bigint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 23,
@@ -224,7 +232,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 25,
@@ -237,7 +246,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "text",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1700,
@@ -250,7 +260,29 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "numeric",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1700,
+            "modifier": 1310728
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1700,
+            "modifier": 1310728,
+            "formatType": "numeric(20,4)"
           }
         ],
         "error": null

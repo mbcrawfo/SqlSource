@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0050`
+Next id: `TD-0051`
 
 ## Active items
 
@@ -33,12 +33,12 @@ Next id: `TD-0050`
 | [TD-0039](TD-0039-duplicated-and-uneven-patterns-in-the-tests.md) | Open | 2026-10-10 | Low | Duplicated and uneven patterns in `tests/`: test classes that cover several subjects, theories that dispatch on a string, and small duplicates among the helpers of `tests/SqlSource.Tests` |
 | [TD-0041](TD-0041-ca2000-is-suppressed-on-the-opener-of-the-log.md) | Open | 2026-10-11 | Low | `RunLogFile.Open` suppresses `CA2000`, since the analyzer does not follow a disposable that is returned in an `Outcome`, so a log that a later edit leaks there is not reported; the describer of the tests has the same on its `OpenAsync`, and so has `PostgresSession.OpenAsync` of the PostgreSQL describer |
 | [TD-0042](TD-0042-allocations-of-a-parse-that-no-budget-sees.md) | Open | 2026-10-11 | Low | A query's marker scope is under no allocation budget, a summary of one line makes a list and, on .NET Framework, a copy, and a scope holds the name of its input model twice |
-| [TD-0044](TD-0044-small-gaps-of-the-postgresql-describers-columns.md) | Open | 2026-10-13 | Low | The PostgreSQL describer records no modifier for a type of an extension, for an array's element or for the fields of an interval, says `view` for a foreign table, gives a parameter of a domain no length from the domain's modifier, and has a gate that a text the tool's lexer and the server read differently can get past |
 | [TD-0045](TD-0045-the-check-against-npgsql-is-best-effort.md) | Open | 2026-10-13 | Low | The check of the lexer against Npgsql compares columns alone, so a disagreement in a predicate passes, an error of `check` that is no disagreement is `SQLSRC231`, and a type with a quoted name, `"char"`, a domain over a domain, a composite type, a table's row type, `regclass`, a type of the system catalogs, an array of a type whose name is 63 characters long and a bit type spelled `"bit"` cannot be bound, `SQLSRC232`; and a name that holds a modifier is no name to bind by |
 | [TD-0046](TD-0046-the-walk-leaves-some-columns-to-the-heuristic.md) | Open | 2026-10-13 | Low | The nullability walk leaves a column to the heuristic when it comes through a subquery or a CTE the planner kept, from a partitioned or inherited table, or from a foreign table, or when the root of a query of one relation is not its scan, a `Limit` or a `Sort` for two, and asks for a plan that it has no use for |
 | [TD-0047](TD-0047-explain-evaluates-immutable-functions.md) | Open | 2026-10-14 | Low | The `EXPLAIN` that plans a gated query of the PostgreSQL describer runs a function the database wrongly marks `IMMUTABLE`, when it is called with constant arguments, and an effect of it outside the transaction, a sequence's for one, survives the rollback |
 | [TD-0048](TD-0048-driver-levels-trust-npgsqls-messages.md) | Open | 2026-10-14 | Low | The run log forwards Npgsql's messages at levels, Debug for commands and transactions and Warning for every other category, that trust the driver not to name the host, the user or the database, and the tool removes only the connection's whole value |
 | [TD-0049](TD-0049-describe-behind-a-pooler-can-reach-another-backend.md) | Open | 2026-10-14 | Low | Behind a pooler in transaction mode, the `columns` and `explain` calls of the PostgreSQL describer can reach a backend that lacks the prepared statement, which `check` then reports as `SQLSRC231` and not `SQLSRC236`, or one that holds a statement of the same name from an earlier run, whose columns or plan are read for the query |
+| [TD-0050](TD-0050-a-catalog-types-name-depends-on-the-search-path.md) | Open | 2026-10-14 | Low | The name of a type of `pg_catalog` that has no modifier is `format_type(oid, -1)`, which qualifies it when a user type of the same name stands before `pg_catalog` on the session's `search_path`, so such a name depends on the session |
 
 ## Columns
 

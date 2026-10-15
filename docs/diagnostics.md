@@ -1017,7 +1017,7 @@ A query is one statement.  The tool prepares it on the server to describe it, an
 
 Give each statement a `-- name:` of its own.  A `;` at the end of the statement is allowed, with white space and comments after it; a `;` inside a string, a dollar-quoted string or a comment does not count.  A `;` inside parentheses counts as the end of a statement, since the tool does not read the structure of the SQL; no statement that can be prepared holds one.
 
-This check is a help and not what keeps a second statement from being run.  The tool hands the query to the server as one statement that the driver cannot split, and the server refuses a text of several before it runs anything.  So a text that the tool reads as one statement and the server as two, which takes a `$` straight after a character such as `§`, is [SQLSRC225](#sqlsrc225) with the server's `42601: cannot insert multiple commands into a prepared statement`, and nothing of it is run.
+This check is a help and not what keeps a second statement from being run.  The tool hands the query to the server as one statement that the driver cannot split, and the server refuses a text of several before it runs anything.  So a text that the tool reads as one statement and the server as two is [SQLSRC225](#sqlsrc225) with the server's `42601: cannot insert multiple commands into a prepared statement`, and nothing of it is run.
 
 ## SQLSRC231
 

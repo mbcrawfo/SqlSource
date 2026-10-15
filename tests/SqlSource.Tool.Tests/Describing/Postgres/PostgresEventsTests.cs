@@ -89,7 +89,8 @@ public class PostgresEventsTests
                         new("rngsubtype", LogValue.Null),
                         new("multirangeRngsubtype", LogValue.Null),
                         new("formatType", "integer"),
-                        new("enumLabels", LogValue.Null)
+                        new("enumLabels", LogValue.Null),
+                        new("typtypmod", LogValue.Null)
                     ),
                 ])
             );
@@ -121,6 +122,120 @@ public class PostgresEventsTests
                     new("detail", "a detail"),
                     new("hint", LogValue.Null),
                     new("position", 49L)
+                )
+            );
+    }
+
+    // A column holds the modifier of the row description, or null for a capture recorded before it was read.
+    [Fact]
+    public void Columns_ColumnsWithAndWithoutAModifier_WritesTheModifierOrNull()
+    {
+        var log = new RecordingLog();
+        var answer = new PostgresColumnsAnswer(
+            [
+                new PostgresColumnRow(0, "name", 1043, 0, 0, 32, null, null, 36),
+                new PostgresColumnRow(1, "n", 20, 0, 0, null, null, null),
+            ],
+            null
+        );
+
+        PostgresEvents.Columns(log, "GetUser", Columns, answer, 1);
+
+        Member(log.Events.ShouldHaveSingleItem().Members, "columns")
+            .ShouldBe(
+                LogValue.ListOf([
+                    LogValue.MapOf(
+                        new("ordinal", 0L),
+                        new("name", "name"),
+                        new("typeOid", 1043L),
+                        new("tableOid", 0L),
+                        new("attributeNumber", 0L),
+                        new("length", 32L),
+                        new("precision", LogValue.Null),
+                        new("scale", LogValue.Null),
+                        new("typeModifier", 36L)
+                    ),
+                    LogValue.MapOf(
+                        new("ordinal", 1L),
+                        new("name", "n"),
+                        new("typeOid", 20L),
+                        new("tableOid", 0L),
+                        new("attributeNumber", 0L),
+                        new("length", LogValue.Null),
+                        new("precision", LogValue.Null),
+                        new("scale", LogValue.Null),
+                        new("typeModifier", LogValue.Null)
+                    ),
+                ])
+            );
+    }
+
+    // The event of "spellings" is built from what it is given; the tests of the session say when it is asked.
+    [Fact]
+    public void Spellings_RowsOfTheServer_WritesThePairsAndTheRows()
+    {
+        var log = new RecordingLog();
+        var request = new PostgresSpellingsRequest([
+            new PostgresTypmodPair(1043, 36),
+            new PostgresTypmodPair(1700, -1),
+        ]);
+        var answer = new PostgresSpellingsAnswer(
+            [new PostgresSpellingRow(1043, 36, "character varying(32)"), new PostgresSpellingRow(1700, -1, "numeric")],
+            null
+        );
+
+        PostgresEvents.Spellings(log, request, answer, 3);
+
+        var (name, members) = log.Events.ShouldHaveSingleItem();
+        name.ShouldBe("spellings");
+        NamesOf(members).ShouldBe(["pairs", "rows", "durationMs"]);
+        Member(members, "pairs")
+            .ShouldBe(
+                LogValue.ListOf([
+                    LogValue.MapOf(new("oid", 1043L), new("modifier", 36L)),
+                    LogValue.MapOf(new("oid", 1700L), new("modifier", -1L)),
+                ])
+            );
+        Member(members, "rows")
+            .ShouldBe(
+                LogValue.ListOf([
+                    LogValue.MapOf(new("oid", 1043L), new("modifier", 36L), new("formatType", "character varying(32)")),
+                    LogValue.MapOf(new("oid", 1700L), new("modifier", -1L), new("formatType", "numeric")),
+                ])
+            );
+        Member(members, "durationMs").ShouldBe((LogValue)3L);
+    }
+
+    // A spellings call that failed has its error in the place of the rows.
+    [Fact]
+    public void Spellings_ErrorOfTheServer_WritesItInThePlaceOfTheRows()
+    {
+        var log = new RecordingLog();
+        var refused = new PostgresServerError(
+            "57014",
+            "canceling statement due to statement timeout",
+            null,
+            null,
+            null
+        );
+
+        PostgresEvents.Spellings(
+            log,
+            new PostgresSpellingsRequest([new PostgresTypmodPair(1043, 36)]),
+            new PostgresSpellingsAnswer(null, refused),
+            0
+        );
+
+        var members = log.Events.ShouldHaveSingleItem().Members;
+        NamesOf(members).ShouldBe(["pairs", "error", "durationMs"]);
+        Member(members, "error")
+            .ShouldBe(
+                LogValue.MapOf(
+                    new("sqlState", "57014"),
+                    new("message", "canceling statement due to statement timeout"),
+                    new("detail", LogValue.Null),
+                    new("hint", LogValue.Null),
+                    new("position", LogValue.Null)
                 )
             );
     }
@@ -296,7 +411,8 @@ public class PostgresEventsTests
                     new("attributeNumber", 1L),
                     new("length", LogValue.Null),
                     new("precision", LogValue.Null),
-                    new("scale", LogValue.Null)
+                    new("scale", LogValue.Null),
+                    new("typeModifier", LogValue.Null)
                 )
             );
 

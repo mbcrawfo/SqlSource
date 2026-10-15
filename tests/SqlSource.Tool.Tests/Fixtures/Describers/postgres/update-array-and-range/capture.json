@@ -78,7 +78,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bigint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 25,
@@ -91,7 +92,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "text",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1009,
@@ -104,7 +106,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "text[]",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1184,
@@ -117,7 +120,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "timestamp with time zone",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 3910,
@@ -130,7 +134,8 @@
             "rngsubtype": 1184,
             "multirangeRngsubtype": null,
             "formatType": "tstzrange",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           }
         ],
         "error": null

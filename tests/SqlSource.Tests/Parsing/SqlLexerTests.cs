@@ -78,6 +78,51 @@ public class SqlLexerTests
     public void Lex_DollarThatOpensNoQuote_IsText(string text, string expectedText) =>
         Lex(text).ShouldBe([expectedText, "LineComment:-- c"]);
 
+    // PostgreSQL and MySQL read any character above U+007F as part of a name, and a dollar sign inside a name opens
+    // no quote.  The dash comment has a space after it so that MySQL reads it as one.
+    [Theory]
+    [InlineData("SELECT 1 AS §$x$ FROM t -- $x$", "Text:SELECT 1 AS §$x$ FROM t  | LineComment:-- $x$")]
+    [InlineData("SELECT €$1 -- c", "Text:SELECT €$1  | LineComment:-- c")]
+    public void Lex_DollarAfterANonAsciiCharacter_IsText(string text, string expected)
+    {
+        foreach (var dialect in new[] { "Ansi", "PostgreSql", "CockroachDb", "MySql" })
+        {
+            var lexemes = Lex(text, Rules(dialect));
+
+            lexemes.Any(lexeme => lexeme.StartsWith("Quoted:", StringComparison.Ordinal)).ShouldBeFalse(dialect);
+            lexemes[^1].ShouldStartWith("LineComment:", Case.Sensitive, dialect);
+            string.Join(" | ", lexemes).ShouldBe(expected, dialect);
+        }
+    }
+
+    [Theory]
+    [InlineData("SELECT $§$a$§$", "Quoted:$§$a$§$")]
+    [InlineData("SELECT $a§$b$a§$", "Quoted:$a§$b$a§$")]
+    public void Lex_DollarTagWithANonAsciiCharacter_IsAQuote(string text, string quoted)
+    {
+        foreach (var dialect in new[] { "Ansi", "PostgreSql", "CockroachDb", "MySql" })
+        {
+            var lexemes = Lex(text, Rules(dialect));
+
+            lexemes.Where(lexeme => lexeme.StartsWith("Quoted:", StringComparison.Ordinal)).ShouldBe([quoted], dialect);
+        }
+    }
+
+    // On the server the E after the non-ASCII character is part of a name, so the string is a plain one: its
+    // backslash escapes nothing, and it ends at the quote that follows it.
+    [Fact]
+    public void Lex_EscapePrefixAfterANonAsciiCharacter_IsAPlainString()
+    {
+        foreach (var dialect in new[] { "PostgreSql", "CockroachDb", "Ansi" })
+        {
+            var lexemes = Lex("SELECT §E'\\' AS a, 'b'", Rules(dialect));
+
+            lexemes
+                .Where(lexeme => lexeme.StartsWith("Quoted:", StringComparison.Ordinal))
+                .ShouldBe(["Quoted:'\\'", "Quoted:'b'"], dialect);
+        }
+    }
+
     [Theory]
     [InlineData("/* a */ x", "BlockComment:/* a */")]
     [InlineData("/**/ x", "BlockComment:/**/")]

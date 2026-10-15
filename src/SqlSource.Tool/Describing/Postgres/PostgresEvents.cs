@@ -12,9 +12,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// The names are written without the engine: the log a describer is given puts <c>postgres.</c> before each, and
 /// removes the connection's value from every string.  A member is added and never renamed.  <c>open</c> has no
 /// event of its own: the run's <c>database.open</c> records what the session knows of its server.  A describe
-/// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, one <c>column</c> for each column,
-/// <c>check</c>, <c>table-match</c> and <c>deallocate</c>, in that order, each only when its call was
-/// made, and <c>table-match</c> only for a statement with rows whose check agreed.  A gated query with rows
+/// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, <c>spellings</c>, one <c>column</c> for each
+/// column, <c>check</c>, <c>table-match</c> and <c>deallocate</c>, in that order, each only when its call was made,
+/// and <c>table-match</c> only for a statement with rows whose check agreed.  A gated query with rows
 /// writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>, one <c>walk.node</c> for each node the
 /// walk visited, one <c>walk.column</c> for each column, and <c>walk</c>.
 /// </remarks>
@@ -56,6 +56,42 @@ internal static class PostgresEvents
             answer.Error is { } error
                 ? new LogMember(Error, ErrorOf(error))
                 : new LogMember("rows", LogValue.ListOf((answer.Rows ?? []).Select(RowOf))),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
+    /// <c>postgres.spellings</c>: each type and modifier asked for, and the server's spelling of each, or the error.
+    /// </summary>
+    public static void Spellings(
+        IRunLog log,
+        PostgresSpellingsRequest request,
+        PostgresSpellingsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            "spellings",
+            new(
+                "pairs",
+                LogValue.ListOf(
+                    request.Pairs.Select(static pair =>
+                        LogValue.MapOf(new("oid", pair.Oid), new("modifier", pair.Modifier))
+                    )
+                )
+            ),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember(
+                    "rows",
+                    LogValue.ListOf(
+                        (answer.Rows ?? []).Select(static row =>
+                            LogValue.MapOf(
+                                new("oid", row.Oid),
+                                new("modifier", row.Modifier),
+                                new("formatType", row.FormatType)
+                            )
+                        )
+                    )
+                ),
             new(Duration, durationMs)
         );
 
@@ -267,7 +303,8 @@ internal static class PostgresEvents
             new("attributeNumber", column.AttributeNumber),
             new("length", LogValue.Of(column.Length)),
             new("precision", LogValue.Of(column.Precision)),
-            new("scale", LogValue.Of(column.Scale))
+            new("scale", LogValue.Of(column.Scale)),
+            new("typeModifier", LogValue.Of(column.TypeModifier))
         );
 
     private static LogValue TableOf(PostgresTableRow table) =>
@@ -305,6 +342,7 @@ internal static class PostgresEvents
             new("rngsubtype", LogValue.Of(row.Rngsubtype)),
             new("multirangeRngsubtype", LogValue.Of(row.MultirangeRngsubtype)),
             new("formatType", row.FormatType),
-            new("enumLabels", row.EnumLabels is { } labels ? LogValue.ListOfTexts(labels) : LogValue.Null)
+            new("enumLabels", row.EnumLabels is { } labels ? LogValue.ListOfTexts(labels) : LogValue.Null),
+            new("typtypmod", LogValue.Of(row.Typtypmod))
         );
 }

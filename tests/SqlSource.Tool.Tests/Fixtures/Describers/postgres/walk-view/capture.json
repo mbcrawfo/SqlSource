@@ -49,51 +49,56 @@
             "ordinal": 0,
             "name": "user_id",
             "typeOid": 23,
-            "tableOid": 16472,
+            "tableOid": 16483,
             "attributeNumber": 1,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
             "name": "name",
             "typeOid": 1043,
-            "tableOid": 16472,
+            "tableOid": 16483,
             "attributeNumber": 2,
             "length": 100,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": 104
           },
           {
             "ordinal": 2,
             "name": "order_id",
             "typeOid": 20,
-            "tableOid": 16472,
+            "tableOid": 16483,
             "attributeNumber": 3,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 3,
             "name": "total",
             "typeOid": 1700,
-            "tableOid": 16472,
+            "tableOid": 16483,
             "attributeNumber": 4,
             "length": null,
             "precision": 18,
-            "scale": 2
+            "scale": 2,
+            "typeModifier": 1179654
           },
           {
             "ordinal": 4,
             "name": "amount",
             "typeOid": 1700,
-            "tableOid": 16459,
+            "tableOid": 16470,
             "attributeNumber": 3,
             "length": null,
             "precision": 18,
-            "scale": 2
+            "scale": 2,
+            "typeModifier": 1179654
           }
         ],
         "error": null
@@ -103,14 +108,14 @@
       "method": "tables",
       "request": {
         "oids": [
-          16459,
-          16472
+          16470,
+          16483
         ]
       },
       "answer": {
         "tables": [
           {
-            "oid": 16459,
+            "oid": 16470,
             "relkind": "r",
             "schema": "billing",
             "name": "invoices",
@@ -157,7 +162,7 @@
             "hasInsteadRule": false
           },
           {
-            "oid": 16472,
+            "oid": 16483,
             "relkind": "v",
             "schema": "public",
             "name": "user_orders",
@@ -230,7 +235,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bigint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 23,
@@ -243,7 +249,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1043,
@@ -256,7 +263,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "character varying",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1700,
@@ -269,7 +277,38 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "numeric",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1043,
+            "modifier": 104
+          },
+          {
+            "oid": 1700,
+            "modifier": 1179654
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "modifier": 104,
+            "formatType": "character varying(100)"
+          },
+          {
+            "oid": 1700,
+            "modifier": 1179654,
+            "formatType": "numeric(18,2)"
           }
         ],
         "error": null

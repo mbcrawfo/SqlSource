@@ -13,14 +13,16 @@ internal static class PostgresColumns
     /// <param name="column">The row of <c>columns</c>.</param>
     /// <param name="origin">Where the column comes from, or null.</param>
     /// <param name="rows">The rows of the closure, by OID.</param>
+    /// <param name="spellings">The server's spelling of each pair of a type and a modifier the column needs.</param>
     /// <param name="gated">Whether the query is gated.</param>
     /// <exception cref="InvalidOperationException">
-    /// The rows lack a type of the column, or the type is a pseudo-type.
+    /// The rows lack a type of the column, the spellings lack a pair, or the type is a pseudo-type.
     /// </exception>
     public static SidecarColumn Build(
         PostgresColumnRow column,
         ColumnOrigin? origin,
         IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        TypeSpellings spellings,
         bool gated
     )
     {
@@ -28,13 +30,28 @@ internal static class PostgresColumns
         return new SidecarColumn(
             column.Ordinal,
             column.Name,
-            PostgresTypes.Build(ColumnTypes.OidOf(column, origin, rows), rows, FacetsOf(column, rows)),
+            TypeOf(column, origin, rows, spellings),
             nullable,
             source,
             origin is null ? null : new SidecarOrigin(origin.Table.Schema, origin.Table.Name, origin.Attribute.Name),
             origin is null ? null : origin.Attribute.Identity.Length > 0,
             origin is null ? null : origin.Attribute.Generated.Length > 0
         );
+    }
+
+    // The type with the modifier of the row description.  A capture recorded before the modifier was read has none,
+    // and its column is built as it was then, with the facets of Npgsql's three numbers.
+    private static PostgresType TypeOf(
+        PostgresColumnRow column,
+        ColumnOrigin? origin,
+        IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        TypeSpellings spellings
+    )
+    {
+        var oid = ColumnTypes.OidOf(column, origin, rows);
+        return column.TypeModifier is { } modifier
+            ? PostgresTypes.Build(oid, rows, modifier, spellings)
+            : PostgresTypes.Build(oid, rows, FacetsOf(column, rows));
     }
 
     // The facets are read by the type the protocol reported, which is the one whose modifier they decode.

@@ -22,7 +22,13 @@ public class NullabilityWalkTests
 
     private static readonly PostgresTableRow View = Table with { Oid = 16701, Name = "v", Relkind = "v" };
 
-    private static readonly IReadOnlyDictionary<long, PostgresTableRow> Tables = PostgresTables.Of(Table, View);
+    private static readonly PostgresTableRow Foreign = Table with { Oid = 16703, Name = "ft", Relkind = "f" };
+
+    private static readonly IReadOnlyDictionary<long, PostgresTableRow> Tables = PostgresTables.Of(
+        Table,
+        View,
+        Foreign
+    );
 
     // A column of the table, of the view, or of an expression when the table is null.
     private sealed record Asked(PostgresTableRow? Of, int Attnum);
@@ -30,6 +36,7 @@ public class NullabilityWalkTests
     private static readonly Asked NotNull = new(Table, 1);
     private static readonly Asked Optional = new(Table, 2);
     private static readonly Asked OfView = new(View, 1);
+    private static readonly Asked OfForeign = new(Foreign, 1);
     private static readonly Asked Expression = new(null, 0);
 
     // The columns as the session builds them for a gated query, with the heuristic's answer, and their origins.
@@ -47,6 +54,7 @@ public class NullabilityWalkTests
                 row,
                 origins[index],
                 PostgresRows.Of(PostgresRows.Int4),
+                TypeSpellings.None,
                 gated: true
             );
         }
@@ -102,6 +110,13 @@ public class NullabilityWalkTests
         AnswersOf(Run(LeftJoin("a.id", "b.id", "a.id + 1"), OfView, OfView, OfView))
             .ShouldBe([(null, "view"), (true, "outer-join"), (null, "view")]);
 
+    // The walk's rule over a foreign relkind, through a plain scan: a real Foreign Scan is mapped to no instance
+    // (TD-0046).
+    [Fact]
+    public void Run_ColumnOfAForeignTable_SaysForeignTableUnlessAJoinExtendsIt() =>
+        AnswersOf(Run(LeftJoin("a.id", "b.id", "a.id + 1"), OfForeign, OfForeign, OfForeign))
+            .ShouldBe([(null, "foreign-table"), (true, "outer-join"), (null, "foreign-table")]);
+
     // Nothing of the plan can make it non-nullable, so it is not looked up, whatever its entry is.
     [Fact]
     public void Run_ColumnWithoutAnOrigin_IsUnknownAndIsNotLookedUp()
@@ -124,7 +139,13 @@ public class NullabilityWalkTests
         );
         var row = PostgresTables.ColumnOf(0, "id", 23, table, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(table));
-        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+        var column = PostgresColumns.Build(
+            row,
+            origin,
+            PostgresRows.Of(PostgresRows.Int4),
+            TypeSpellings.None,
+            gated: true
+        );
 
         var outcome = NullabilityWalk.Run(Scan("n", "id"), [column], [origin], oldAndNewMayBeNamed: false);
 
@@ -145,7 +166,13 @@ public class NullabilityWalkTests
         };
         var row = PostgresTables.ColumnOf(0, "id", 23, parent, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(parent));
-        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+        var column = PostgresColumns.Build(
+            row,
+            origin,
+            PostgresRows.Of(PostgresRows.Int4),
+            TypeSpellings.None,
+            gated: true
+        );
 
         var outcome = NullabilityWalk.Run(Scan("p", "id"), [column], [origin], oldAndNewMayBeNamed: false);
 
@@ -168,7 +195,13 @@ public class NullabilityWalkTests
         };
         var row = PostgresTables.ColumnOf(0, "id", 23, parted, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(parted));
-        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+        var column = PostgresColumns.Build(
+            row,
+            origin,
+            PostgresRows.Of(PostgresRows.Int4),
+            TypeSpellings.None,
+            gated: true
+        );
 
         var outcome = NullabilityWalk.Run(Scan("pt", "id"), [column], [origin], oldAndNewMayBeNamed: false);
 
@@ -191,7 +224,13 @@ public class NullabilityWalkTests
         };
         var row = PostgresTables.ColumnOf(0, "id", 23, ruled, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(ruled));
-        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+        var column = PostgresColumns.Build(
+            row,
+            origin,
+            PostgresRows.Of(PostgresRows.Int4),
+            TypeSpellings.None,
+            gated: true
+        );
         var plan = Over("ModifyTable", Scan("x") with { NodeType = "Result", Alias = null }) with
         {
             Alias = "t3",

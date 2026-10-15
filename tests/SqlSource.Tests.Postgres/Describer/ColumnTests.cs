@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tests.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using Xunit;
@@ -81,15 +82,96 @@ public sealed class ColumnTests(PostgresContainer postgres)
     public async Task Describe_CastWithAModifier_IsSpelledAsFormatTypeSpellsIt(string type, string expected) =>
         (await ColumnsOfAsync($"SELECT NULL::{type} AS c")).ShouldHaveSingleItem().Type.Name.ShouldBe(expected);
 
-    // What the describer does not keep, and docs/tech-debt records: the fields of an interval, and the modifier of
-    // an array's element.
+    // The fields of an interval and the modifier of an array's element, which only the server's spelling of the
+    // modifier holds.  The facets are decoded from the modifier: an array's are its element's.
     [Theory]
-    [InlineData("interval year to month", "interval")]
-    [InlineData("interval day to second(3)", "interval(3)")]
-    [InlineData("varchar(10)[]", "character varying[]")]
-    [InlineData("numeric(6,2)[]", "numeric[]")]
-    public async Task Describe_CastWhoseModifierIsNotKept_IsSpelledWithoutIt(string type, string expected) =>
-        (await ColumnsOfAsync($"SELECT NULL::{type} AS c")).ShouldHaveSingleItem().Type.Name.ShouldBe(expected);
+    [InlineData("interval year to month", "interval year to month", null, null, null)]
+    [InlineData("interval day to second(3)", "interval day to second(3)", null, 3, null)]
+    [InlineData("varchar(10)[]", "character varying(10)[]", 10, null, null)]
+    [InlineData("numeric(6,2)[]", "numeric(6,2)[]", null, 6, 2)]
+    public async Task Describe_CastWithFieldsOrAnArrayOfAModifier_IsSpelledWithTheModifier(
+        string type,
+        string expected,
+        int? length,
+        int? precision,
+        int? scale
+    )
+    {
+        var column = (await ColumnsOfAsync($"SELECT NULL::{type} AS c")).ShouldHaveSingleItem();
+
+        var described = column.Type.ShouldBeOfType<PostgresType>();
+        described.Name.ShouldBe(expected);
+        var faceted = described.Element ?? described;
+        (faceted.Length, faceted.Precision, faceted.Scale).ShouldBe((length, precision, scale));
+    }
+
+    // An expression has no origin: its modifier is the row description's alone.
+    [Fact]
+    public async Task Describe_ExpressionOfAnIntervalWithFields_KeepsTheFields()
+    {
+        var column = (await ColumnsOfAsync("SELECT '1 day'::interval day to second(3) AS span")).ShouldHaveSingleItem();
+
+        column.Origin.ShouldBeNull();
+        var type = column.Type.ShouldBeOfType<PostgresType>();
+        type.Name.ShouldBe("interval day to second(3)");
+        type.Precision.ShouldBe(3);
+    }
+
+    // The fixture schema's tagged is made over varchar's functions in public, as an extension's type would be: its
+    // name is the tool's schema.name and the tail of the server's spelling, and it has no facets, which the tool
+    // decodes for the types of pg_catalog alone.  An array of it is its element's name and [].
+    [Fact]
+    public async Task Describe_ColumnOfATypeWithItsOwnModifier_IsTheSchemaNameAndTheTail()
+    {
+        var columns = await ColumnsOfAsync("SELECT tag, tags FROM modifiers");
+
+        var tagged = TestSidecars.Postgres("public.tagged(7)", schema: "public", internalName: "tagged");
+        columns
+            .Select(static column => column.Type)
+            .ShouldBe([
+                tagged,
+                TestSidecars.Postgres(
+                    "public.tagged(7)[]",
+                    SidecarValues.Kind.Array,
+                    "public",
+                    "_tagged",
+                    element: tagged
+                ),
+            ]);
+    }
+
+    // A domain named numeric in public, first on the search_path of the describe's connection, hides pg_catalog's
+    // numeric.  A column of pg_catalog's numeric(10,2) is still numeric(10,2), with the facets of its modifier: the
+    // tool takes the server's spelling of a type of pg_catalog as it is, and puts no schema before it.
+    [Fact]
+    public async Task Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpelling()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using (var create = own.CreateCommand("CREATE DOMAIN public.\"numeric\" AS text"))
+        {
+            _ = await create.ExecuteNonQueryAsync(token);
+        }
+
+        try
+        {
+            var described = await Sessions.DescribeAsync(
+                $"{postgres.ConnectionString};Search Path=public,pg_catalog",
+                Requests.Of("SELECT NULL::pg_catalog.numeric(10,2) AS n")
+            );
+
+            described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
+            var column = described.Value.ShouldNotBeNull().Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+            column.Type.ShouldBe(
+                TestSidecars.Postgres("numeric(10,2)", internalName: "numeric", precision: 10, scale: 2)
+            );
+        }
+        finally
+        {
+            await using var drop = own.CreateCommand("DROP DOMAIN IF EXISTS public.\"numeric\"");
+            _ = await drop.ExecuteNonQueryAsync(token);
+        }
+    }
 
     [Fact]
     public async Task Describe_NumericWithANegativeScale_HasIt()
@@ -243,6 +325,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [InlineData("billing.invoices")]
     [InlineData("active_users")]
     [InlineData("user_orders")]
+    [InlineData("modifiers")]
     [InlineData("column_types")]
     public async Task Describe_EveryColumnOfATable_IsSpelledAsFormatTypeSpellsIt(string table)
     {
@@ -433,11 +516,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // again.  Its remote row holds NULL in v, which the parent says is NOT NULL.
     private static string ForeignPartitionTables(NpgsqlConnectionStringBuilder connection) =>
         $$"""
-            CREATE EXTENSION IF NOT EXISTS postgres_fdw;
-            CREATE SERVER IF NOT EXISTS fp_loop FOREIGN DATA WRAPPER postgres_fdw
-                OPTIONS (dbname {{Literal(connection.Database)}}, host 'localhost', port '5432');
-            CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER SERVER fp_loop
-                OPTIONS (user {{Literal(connection.Username)}}, password {{Literal(connection.Password)}});
+            {{ForeignServer(connection)}}
             CREATE TABLE IF NOT EXISTS fp_remote (id integer NOT NULL, kind integer NOT NULL, v text);
             INSERT INTO fp_remote SELECT 1, 2, NULL WHERE NOT EXISTS (SELECT 1 FROM fp_remote);
             CREATE TABLE IF NOT EXISTS fp_parted (id integer NOT NULL, kind integer NOT NULL, v text NOT NULL)
@@ -445,6 +524,16 @@ public sealed class ColumnTests(PostgresContainer postgres)
             CREATE TABLE IF NOT EXISTS fp_parted_1 PARTITION OF fp_parted FOR VALUES IN (1);
             CREATE FOREIGN TABLE IF NOT EXISTS fp_parted_2 PARTITION OF fp_parted FOR VALUES IN (2)
                 SERVER fp_loop OPTIONS (table_name 'fp_remote');
+            """;
+
+    // The loopback server the foreign tables of these tests share, made by SQL that can be run again.
+    private static string ForeignServer(NpgsqlConnectionStringBuilder connection) =>
+        $$"""
+            CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+            CREATE SERVER IF NOT EXISTS fp_loop FOREIGN DATA WRAPPER postgres_fdw
+                OPTIONS (dbname {{Literal(connection.Database)}}, host 'localhost', port '5432');
+            CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER SERVER fp_loop
+                OPTIONS (user {{Literal(connection.Username)}}, password {{Literal(connection.Password)}});
             """;
 
     private static string Literal(string? value) =>
@@ -470,6 +559,41 @@ public sealed class ColumnTests(PostgresContainer postgres)
         var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM fp_parted p");
 
         NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
+    }
+
+    // A foreign table of this test alone, through the same loopback server, whose remote row holds NULL in v, which
+    // the foreign table says is NOT NULL and PostgreSQL does not enforce.  Made by SQL that can be run again.
+    private static string ForeignTable(NpgsqlConnectionStringBuilder connection) =>
+        $$"""
+            {{ForeignServer(connection)}}
+            CREATE TABLE IF NOT EXISTS ft_remote (id integer NOT NULL, v text);
+            INSERT INTO ft_remote SELECT 1, NULL WHERE NOT EXISTS (SELECT 1 FROM ft_remote);
+            CREATE FOREIGN TABLE IF NOT EXISTS ft_foreign (id integer NOT NULL, v text NOT NULL)
+                SERVER fp_loop OPTIONS (table_name 'ft_remote');
+            """;
+
+    // PostgreSQL does not enforce a foreign table's NOT NULL on the remote rows, and a query reads them: the column
+    // is unknown, and the source says why, in a gated query too, where only a join that extends it makes it nullable.
+    [Fact]
+    public async Task Describe_ColumnOfAForeignTable_IsUnknownFromTheForeignTable()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        {
+            await using var made = source.CreateCommand(
+                ForeignTable(new NpgsqlConnectionStringBuilder(postgres.ConnectionString))
+            );
+            _ = await made.ExecuteNonQueryAsync(token);
+        }
+
+        // The premise: a query of the foreign table returns the remote row's NULL.
+        (await ScalarAsync("SELECT f.v IS NULL FROM ft_foreign f WHERE f.id = 1")).ShouldBe(true);
+
+        var plain = await ColumnsOfAsync("SELECT f.id, f.v FROM ft_foreign f");
+        var gated = await ColumnsOfAsync("SELECT f.id, j.id AS jid FROM ft_foreign f LEFT JOIN users j ON j.id = f.id");
+
+        NullabilityOf(plain).ShouldBe([(null, "foreign-table"), (null, "foreign-table")]);
+        NullabilityOf(gated).ShouldBe([(null, "foreign-table"), (true, "outer-join")]);
     }
 
     // A table with a DO INSTEAD rule on INSERT, and the table the rule writes to instead, of this test alone, made by

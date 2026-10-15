@@ -6,7 +6,22 @@ CREATE SCHEMA billing;
 
 CREATE DOMAIN email_t AS varchar(254) CHECK (VALUE LIKE '%@%');
 
+CREATE DOMAIN money_t AS numeric(10, 2);
+
 CREATE TYPE user_status AS ENUM ('active', 'disabled');
+
+-- A base type outside pg_catalog with a modifier of its own, as an extension's type has: varchar's functions under
+-- another name, so that the server spells tagged(7) by varchar's typmodout.
+CREATE TYPE tagged;
+CREATE FUNCTION tagged_in(cstring, oid, integer) RETURNS tagged AS 'varcharin' LANGUAGE internal IMMUTABLE STRICT;
+CREATE FUNCTION tagged_out(tagged) RETURNS cstring AS 'varcharout' LANGUAGE internal IMMUTABLE STRICT;
+CREATE TYPE tagged (
+    INPUT = tagged_in,
+    OUTPUT = tagged_out,
+    TYPMOD_IN = varchartypmodin,
+    TYPMOD_OUT = varchartypmodout,
+    LIKE = varchar
+);
 
 CREATE TABLE users (
     id integer GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -53,6 +68,17 @@ CREATE TABLE samples (
     token uuid,
     payload bytea,
     document jsonb
+);
+
+-- One column for each modifier that only the server's spelling holds: the fields of an interval, the modifier of an
+-- array's element and the modifier of a type outside pg_catalog; and a domain whose base has more than a length.
+CREATE TABLE modifiers (
+    ym interval year to month,
+    ds interval day to second(3),
+    names varchar(10)[],
+    tag tagged(7),
+    tags tagged(7)[],
+    amount money_t
 );
 
 CREATE TABLE billing.invoices (

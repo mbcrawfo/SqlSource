@@ -20,9 +20,18 @@ internal static class PostgresRows
 
     public static PostgresTypeRow Timestamptz { get; } = BaseOf(1184, "timestamptz", "timestamp with time zone", "D");
 
+    public static PostgresTypeRow Interval { get; } = BaseOf(1186, "interval", "interval", "T");
+
+    // A base type of another schema with a modifier of its own, made over varcharin and varchartypmodin.
+    public static PostgresTypeRow Tagged { get; } = BaseOf(16700, "tagged", "tagged", "U", "public");
+
     public static PostgresTypeRow TextArray { get; } = ArrayOf(1009, "_text", Text);
 
     public static PostgresTypeRow VarcharArray { get; } = ArrayOf(1015, "_varchar", Varchar);
+
+    public static PostgresTypeRow NumericArray { get; } = ArrayOf(1231, "_numeric", Numeric);
+
+    public static PostgresTypeRow TaggedArray { get; } = ArrayOf(16699, "_tagged", Tagged);
 
     public static PostgresTypeRow EmailT { get; } = DomainOf(16387, "email_t", Varchar);
 

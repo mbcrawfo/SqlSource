@@ -92,6 +92,10 @@ internal sealed record PostgresTypesAnswer(IReadOnlyList<PostgresTypeRow>? Rows,
 /// <param name="MultirangeRngsubtype">The subtype of a multirange's range, or null for a type that is none.</param>
 /// <param name="FormatType"><c>format_type(oid, -1)</c>: the SQL spelling without a modifier.</param>
 /// <param name="EnumLabels">The labels of an enum in their sort order, or null for a type that is none.</param>
+/// <param name="Typtypmod">
+/// <c>typtypmod</c>: the modifier a domain fixes for its base type, <c>-1</c> for none and for a type that is no
+/// domain.  Null in an answer recorded before the member existed.
+/// </param>
 internal sealed record PostgresTypeRow(
     long Oid,
     string Typname,
@@ -103,8 +107,29 @@ internal sealed record PostgresTypeRow(
     long? Rngsubtype,
     long? MultirangeRngsubtype,
     string FormatType,
-    IReadOnlyList<string>? EnumLabels
+    IReadOnlyList<string>? EnumLabels,
+    int? Typtypmod = null
 );
+
+/// <summary>The request of <c>spellings</c>.</summary>
+/// <param name="Pairs">The types and modifiers to spell, sorted and each once.</param>
+internal sealed record PostgresSpellingsRequest(IReadOnlyList<PostgresTypmodPair> Pairs);
+
+/// <summary>A type and a modifier of it, as <c>format_type</c> takes them.</summary>
+/// <param name="Oid">The type.</param>
+/// <param name="Modifier">The modifier, <c>-1</c> for none.</param>
+internal sealed record PostgresTypmodPair(long Oid, int Modifier);
+
+/// <summary>The spellings the server gave, or why it gave none.</summary>
+/// <param name="Rows">One for each pair asked for, in <c>oid</c> and modifier order.</param>
+/// <param name="Error">What the server said, or null.</param>
+internal sealed record PostgresSpellingsAnswer(IReadOnlyList<PostgresSpellingRow>? Rows, PostgresServerError? Error);
+
+/// <summary>The server's spelling of one type with one modifier.</summary>
+/// <param name="Oid">The type.</param>
+/// <param name="Modifier">The modifier, <c>-1</c> for none.</param>
+/// <param name="FormatType"><c>format_type(oid, modifier)</c>: the SQL spelling.</param>
+internal sealed record PostgresSpellingRow(long Oid, int Modifier, string FormatType);
 
 /// <summary>Everything that decides the answer of <c>columns</c>.</summary>
 /// <param name="Statement">The prepared statement to describe.</param>
@@ -127,6 +152,9 @@ internal sealed record PostgresColumnsAnswer(IReadOnlyList<PostgresColumnRow>? C
 /// <param name="Length">Npgsql's <c>ColumnSize</c>, or null.</param>
 /// <param name="Precision">Npgsql's <c>NumericPrecision</c>, or null.</param>
 /// <param name="Scale">Npgsql's <c>NumericScale</c>, or null.</param>
+/// <param name="TypeModifier">
+/// The modifier the row description gave, <c>-1</c> for none; null in a capture recorded before it was read.
+/// </param>
 internal sealed record PostgresColumnRow(
     int Ordinal,
     string Name,
@@ -135,7 +163,8 @@ internal sealed record PostgresColumnRow(
     int AttributeNumber,
     int? Length,
     int? Precision,
-    int? Scale
+    int? Scale,
+    int? TypeModifier = null
 );
 
 /// <summary>The request of <c>tables</c>.</summary>

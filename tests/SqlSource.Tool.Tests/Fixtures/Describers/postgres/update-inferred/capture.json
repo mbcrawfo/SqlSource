@@ -75,7 +75,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1043,
@@ -88,7 +89,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "character varying",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           }
         ],
         "error": null

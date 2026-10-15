@@ -37,7 +37,7 @@
       },
       "answer": {
         "parameterTypes": [
-          16390,
+          16392,
           23
         ],
         "error": null
@@ -59,7 +59,7 @@
       "request": {
         "oids": [
           23,
-          16390
+          16392
         ]
       },
       "answer": {
@@ -75,10 +75,11 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
-            "oid": 16390,
+            "oid": 16392,
             "typname": "user_status",
             "nspname": "public",
             "typtype": "e",
@@ -91,7 +92,8 @@
             "enumLabels": [
               "active",
               "disabled"
-            ]
+            ],
+            "typtypmod": -1
           }
         ],
         "error": null

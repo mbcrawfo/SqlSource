@@ -1,3 +1,4 @@
+using System;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
@@ -74,4 +75,39 @@ public class PostgresTypeNamesTests
     [Fact]
     public void ArrayOf_ElementName_IsTheNameAndTheMark() =>
         PostgresTypeNames.ArrayOf("public.email_t").ShouldBe("public.email_t[]");
+
+    // format_type(oid, typmod) of a type of the catalog is the name already.
+    [Fact]
+    public void WithModifier_TypeOfTheCatalog_IsTheServersTextAsItIs() =>
+        PostgresTypeNames.WithModifier(PostgresRows.Varchar, "character varying(10)").ShouldBe("character varying(10)");
+
+    // The tail is what format_type holds after format_type(oid, -1), behind the tool's own schema and name.
+    [Fact]
+    public void WithModifier_TypeOfAnotherSchema_IsItsSchemaAndNameAndTheTail() =>
+        PostgresTypeNames
+            .WithModifier(PostgresRows.BaseOf(1, "geometry", "geometry", "U", "public"), "geometry(Point,4326)")
+            .ShouldBe("public.geometry(Point,4326)");
+
+    [Fact]
+    public void WithModifier_SchemaThatNeedsQuotes_IsQuoted() =>
+        PostgresTypeNames
+            .WithModifier(PostgresRows.BaseOf(1, "tagged", "tagged", "U", "My Schema"), "tagged(7)")
+            .ShouldBe("\"My Schema\".tagged(7)");
+
+    [Fact]
+    public void WithModifier_FormattedTextWithoutATail_IsTheSchemaAndName() =>
+        PostgresTypeNames
+            .WithModifier(PostgresRows.BaseOf(1, "tagged", "tagged", "U", "public"), "tagged")
+            .ShouldBe("public.tagged");
+
+    [Fact]
+    public void WithModifier_FormattedTextWithAnotherPrefix_Throws() =>
+        Should
+            .Throw<InvalidOperationException>(() =>
+                PostgresTypeNames.WithModifier(PostgresRows.BaseOf(1, "tagged", "tagged", "U", "public"), "other(7)")
+            )
+            .Message.ShouldSatisfyAllConditions(
+                message => message.ShouldContain("tagged"),
+                message => message.ShouldContain("other(7)")
+            );
 }
