@@ -1,0 +1,26 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "contact", "nullable": false },
+    {
+      "name": "raw_email",
+      "nullable": true,
+      "why": "accounts.email is nullable, and a cast keeps a NULL; bob has none"
+    },
+    { "name": "state", "nullable": false },
+    {
+      "name": "status_label",
+      "nullable": true,
+      "why": "the CASE has no ELSE, and no branch matches a closed account; carol is closed"
+    },
+    { "name": "last_change", "nullable": false },
+    { "name": "settings_missing", "nullable": false },
+    { "name": "theme", "nullable": false },
+    {
+      "name": "daily_limit",
+      "nullable": true,
+      "why": "accounts.settings is nullable and need not hold the path; bob has no settings and carol no limits"
+    },
+    { "name": "profile_version", "nullable": false }
+  ]
+}

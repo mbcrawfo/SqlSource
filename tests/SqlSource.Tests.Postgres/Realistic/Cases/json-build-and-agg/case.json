@@ -1,0 +1,13 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "account", "nullable": false },
+    { "name": "orders", "nullable": false },
+    {
+      "name": "coupons",
+      "nullable": true,
+      "why": "json_agg of no row is NULL, when the filter keeps none; only alice's order 1 has a coupon"
+    },
+    { "name": "order_count", "nullable": false }
+  ]
+}
