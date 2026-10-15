@@ -319,6 +319,67 @@ public class PostgresErrorsTests
             )
             .Descriptor.Id.ShouldBe("SQLSRC225");
 
+    // A parameter with no declared type takes the type of its first use, which a type error may be the fault of.
+    [Theory]
+    [InlineData("42883", "operator does not exist: timestamp with time zone > interval")]
+    [InlineData("42804", "argument of WHERE must be type boolean, not type integer")]
+    [InlineData("42725", "operator is not unique: unknown || unknown")]
+    public void Prepare_TypeErrorWithAParameterOfNoDeclaredType_IsSqlsrc225WithTheFirstUseHelp(
+        string state,
+        string message
+    )
+    {
+        var failure = PostgresErrors.Prepare(
+            Error(state, message, 47),
+            Query(Inferred("age"), Declared("n", "int"), Inferred("q")),
+            Prepared("sqlsource_1", "unknown", "int", "unknown"),
+            "app"
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe(["Q", message]);
+        failure.Help.ShouldBe(
+            "the server gave each of @age, @q the type of its first use, which may not be the type meant: cast the "
+                + "parameter where it is used, @age::int, or declare its type with -- param: @age int"
+        );
+    }
+
+    [Fact]
+    public void Prepare_TypeErrorWithOneParameterOfNoDeclaredType_NamesItAlone() =>
+        PostgresErrors
+            .Prepare(
+                Error("42883", "operator does not exist: integer = text", 40),
+                Query(Inferred("x")),
+                Prepared("sqlsource_1", "unknown"),
+                "app"
+            )
+            .Help.ShouldBe(
+                "the server gave @x the type of its first use, which may not be the type meant: cast the parameter "
+                    + "where it is used, @x::int, or declare its type with -- param: @x int"
+            );
+
+    [Fact]
+    public void Prepare_TypeErrorWithEveryParameterDeclared_IsSqlsrc225WithNoHelp() =>
+        PostgresErrors
+            .Prepare(
+                Error("42883", "operator does not exist: integer = text", 40),
+                Query(Declared("x", "text")),
+                Prepared("sqlsource_1", "text"),
+                "app"
+            )
+            .Help.ShouldBeNull();
+
+    [Fact]
+    public void Prepare_OtherErrorWithAParameterOfNoDeclaredType_IsSqlsrc225WithNoHelp() =>
+        PostgresErrors
+            .Prepare(
+                Error("42P01", "relation \"nope\" does not exist", 40),
+                Query(Inferred("x")),
+                Prepared("sqlsource_1", "unknown"),
+                "app"
+            )
+            .Help.ShouldBeNull();
+
     [Fact]
     public void Prepare_AnyOtherError_IsSqlsrc225WithEveryLineOfTheServer()
     {

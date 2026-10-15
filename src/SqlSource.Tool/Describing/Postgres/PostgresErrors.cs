@@ -88,6 +88,9 @@ internal static class PostgresErrors
     public const string InvalidSqlStatementName = "26000";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
+    private const string UndefinedFunction = "42883";
+    private const string DatatypeMismatch = "42804";
+    private const string AmbiguousFunction = "42725";
 
     /// <summary>
     /// <c>SQLSRC224</c>: no session.  Every failure of <c>open</c> is this one, whatever its SQLSTATE: a wrong
@@ -291,7 +294,30 @@ internal static class PostgresErrors
                 );
         }
 
-        return Rejected(error, query, DescribeStep.DescribeParameters, lines);
+        // A parameter with no declared type takes the type of its first use, and a type error may be the fault of that.
+        var undeclared = query.Parameters.Where(p => p.Type is null).ToList();
+        return Rejected(
+            error,
+            query,
+            DescribeStep.DescribeParameters,
+            lines,
+            error.SqlState is UndefinedFunction or DatatypeMismatch or AmbiguousFunction && undeclared.Count > 0
+                ? InferredParameterHelp(undeclared)
+                : null
+        );
+    }
+
+    /// <summary>
+    /// The help of <c>SQLSRC225</c> for a type error in a query that has parameters of no declared type: the server
+    /// gave each the type of its first use.  The example is the first of them, as an <c>int</c>.
+    /// </summary>
+    /// <param name="undeclared">The parameters whose type no marker declares, in the order of the query.</param>
+    public static string InferredParameterHelp(IReadOnlyList<SqlQueryParameter> undeclared)
+    {
+        var first = Written(undeclared[0]);
+        var names = undeclared.Count == 1 ? first : "each of " + string.Join(", ", undeclared.Select(Written));
+        return $"the server gave {names} the type of its first use, which may not be the type meant: cast the "
+            + $"parameter where it is used, {first}::int, or declare its type with -- param: {first} int";
     }
 
     /// <summary>
@@ -305,7 +331,7 @@ internal static class PostgresErrors
     /// a position the server gives is in the tool's own query of the catalog, and not in the user's SQL.
     /// </summary>
     public static DescribeFailure Types(PostgresServerError error, DescribeRequest query) =>
-        Rejected(error, query, DescribeStep.ResolveType, ServerLines(error with { Position = null }, 0));
+        Rejected(error, query, DescribeStep.ResolveType, ServerLines(error with { Position = null }, 0), null);
 
     /// <summary>
     /// <c>SQLSRC225</c> at the step <c>describe columns</c>: the prepared statement could not be described.  There
@@ -318,7 +344,7 @@ internal static class PostgresErrors
         var lines = ServerLines(error with { Position = null }, 0);
         return error.SqlState == InvalidSqlStatementName
             ? SessionNotKept(database, DescribeStep.DescribeColumns, lines)
-            : Rejected(error, query, DescribeStep.DescribeColumns, lines);
+            : Rejected(error, query, DescribeStep.DescribeColumns, lines, null);
     }
 
     /// <summary>
@@ -326,7 +352,7 @@ internal static class PostgresErrors
     /// position line: a position the server gives is in the tool's own query of the catalog.
     /// </summary>
     public static DescribeFailure Tables(PostgresServerError error, DescribeRequest query) =>
-        Rejected(error, query, DescribeStep.Catalog, ServerLines(error with { Position = null }, 0));
+        Rejected(error, query, DescribeStep.Catalog, ServerLines(error with { Position = null }, 0), null);
 
     /// <summary>
     /// A parameter whose type is a pseudo-type.  The server accepts one and says nothing, so there is no server
@@ -412,7 +438,7 @@ internal static class PostgresErrors
             : EquatableArray<string>.Empty;
         if (verdict.Result == NpgsqlCheck.Error && answer.Error is { } failed)
         {
-            return Rejected(failed, query, DescribeStep.CheckParameters, lines);
+            return Rejected(failed, query, DescribeStep.CheckParameters, lines, null);
         }
 
         return new DescribeFailure(
@@ -519,19 +545,20 @@ internal static class PostgresErrors
             SchemaChangedHelp
         );
 
-    // SQLSRC225.  The server's lines say what is wrong, so there is no help.
+    // SQLSRC225.  The server's lines say what is wrong, so there is no help unless the caller knows more.
     private static DescribeFailure Rejected(
         PostgresServerError error,
         DescribeRequest query,
         DescribeStep step,
-        EquatableArray<string> serverLines
+        EquatableArray<string> serverLines,
+        string? help
     ) =>
         new(
             ToolDiagnostics.ServerRejectedQuery,
             new EquatableArray<string>([query.Name, error.Message]),
             step,
             serverLines,
-            null
+            help
         );
 
     // The parameter whose declared type the server's position falls in, or null: for no position, one in the SQL,
