@@ -1,0 +1,8 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "label", "nullable": true, "why": "orders.note is nullable; the unshipped orders 2 and 3 have none" },
+    { "name": "since", "nullable": false },
+    { "name": "kind", "nullable": false }
+  ]
+}

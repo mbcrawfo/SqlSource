@@ -1,0 +1,8 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "slug", "nullable": true, "why": "the literal branch's slug is NULL" },
+    { "name": "sort_group", "nullable": false }
+  ]
+}

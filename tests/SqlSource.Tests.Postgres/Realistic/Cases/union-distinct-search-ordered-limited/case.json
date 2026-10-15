@@ -1,0 +1,11 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "label", "nullable": false },
+    { "name": "kind", "nullable": false }
+  ],
+  "samples": [
+    { "pattern": "'%'" },
+    { "pattern": "'%o%'" }
+  ]
+}

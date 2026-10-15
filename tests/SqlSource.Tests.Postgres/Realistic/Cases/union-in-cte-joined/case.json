@@ -1,0 +1,25 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "email", "nullable": true, "why": "accounts.email is nullable; bob and erin have none" },
+    {
+      "name": "at",
+      "nullable": true,
+      "why": "an account with no activity has no row of the CTE on the left join; dave and erin have none"
+    },
+    {
+      "name": "kind",
+      "nullable": true,
+      "why": "an account with no activity has no row of the CTE on the left join; dave and erin have none"
+    },
+    {
+      "name": "ref_id",
+      "nullable": true,
+      "why": "an account with no activity has no row of the CTE on the left join; dave and erin have none"
+    }
+  ],
+  "samples": [
+    { "since": "'2024-01-01'" }
+  ]
+}
