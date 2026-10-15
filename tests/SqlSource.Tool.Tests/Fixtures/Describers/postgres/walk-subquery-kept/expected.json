@@ -19,6 +19,7 @@
           "ordinal": 0,
           "type": {
             "name": "bigint",
+            "bindName": "bigint",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int8"

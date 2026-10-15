@@ -243,7 +243,12 @@ internal sealed record PostgresCheckRequest(string Sql, IReadOnlyList<PostgresCh
 
 /// <summary>A parameter as generated code will bind it.</summary>
 /// <param name="Name">The name, as the query's list has it.</param>
-/// <param name="DataTypeName">The <c>name</c> of the type the describer gave the parameter.</param>
+/// <param name="DataTypeName">
+/// The <c>bindName</c> of the type the describer gave the parameter (<see cref="PostgresBindNames" />).  A capture
+/// recorded before the sidecar had one holds the type's <c>name</c>, which is the same for every type that Npgsql
+/// bound by its <c>name</c> but a type of <c>pg_catalog</c> that a user type hides on the <c>search_path</c>, whose
+/// <c>name</c> has the schema and whose <c>bindName</c> does not.
+/// </param>
 internal sealed record PostgresCheckParameter(string Name, string DataTypeName);
 
 /// <summary>What Npgsql's own describe of the SQL gave.  One of the three members is not null.</summary>

@@ -293,11 +293,12 @@ public sealed class ParameterTests(PostgresContainer postgres)
         return described.Value.ShouldNotBeNull().Parameters;
     }
 
+    // Each parameter's type of these tests binds by its name: NpgsqlCheckTests has the types that bind by another.
     private static DescribedParameter Inferred(string name, PostgresType type) =>
-        new(name, type, SidecarValues.TypeSource.Inferred);
+        new(name, type with { BindName = type.Name }, SidecarValues.TypeSource.Inferred);
 
     private static DescribedParameter Declared(string name, PostgresType type) =>
-        new(name, type, SidecarValues.TypeSource.Declared);
+        new(name, type with { BindName = type.Name }, SidecarValues.TypeSource.Declared);
 
     // The server gives a parameter the type of the column it is compared with.
     [Fact]
@@ -463,8 +464,8 @@ public sealed class ParameterTests(PostgresContainer postgres)
             Inferred(name, TestSidecars.Postgres(type, internalName: type)),
         ]);
 
-    // The name is the one Npgsql binds, and Npgsql takes user.status bare and refuses it quoted.  The describe
-    // succeeds only when Npgsql binds the name, so the bare spelling is the one to keep.
+    // The name is spelled bare, and so is the name it binds by: Npgsql takes user.status bare and refuses it quoted.
+    // The describe succeeds only when Npgsql binds the name.
     [Fact]
     public async Task Describe_TypeOfASchemaNamedByAReservedWord_IsSpelledBare()
     {

@@ -16,6 +16,7 @@
           "ordinal": 0,
           "type": {
             "name": "character varying",
+            "bindName": "character varying",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "varchar"
@@ -28,6 +29,7 @@
           "ordinal": 1,
           "type": {
             "name": "public.email_t",
+            "bindName": "public.email_t",
             "kind": "domain",
             "schema": "public",
             "internalName": "email_t",
@@ -47,6 +49,7 @@
           "ordinal": 2,
           "type": {
             "name": "public.user_status",
+            "bindName": "public.user_status",
             "kind": "enum",
             "schema": "public",
             "internalName": "user_status",

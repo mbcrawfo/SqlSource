@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Snapshot;
+using SqlSource.Tests.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
@@ -454,6 +457,15 @@ public class PostgresErrorsTests
         new EquatableArray<SqlQueryParameter>([new SqlQueryParameter("status", null, null, false)])
     );
 
+    private static IReadOnlyList<DescribedParameter> DescribedWith(string name, string bindName) =>
+        [
+            new DescribedParameter(
+                "status",
+                TestSidecars.Postgres(name, bindName: bindName),
+                SidecarValues.TypeSource.Inferred
+            ),
+        ];
+
     private static PostgresCheckRequest AskedWith(string type) =>
         new("SELECT id FROM users WHERE status = @status", [new PostgresCheckParameter("status", type)]);
 
@@ -462,6 +474,7 @@ public class PostgresErrorsTests
         PostgresErrors
             .Check(
                 Checked,
+                DescribedWith("text", "text"),
                 AskedWith("text"),
                 new PostgresCheckAnswer([], null, null),
                 new CheckVerdict(NpgsqlCheck.Same, null)
@@ -474,6 +487,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors
             .Check(
                 Checked,
+                DescribedWith("text", "text"),
                 AskedWith("text"),
                 new PostgresCheckAnswer([], null, null),
                 new CheckVerdict(NpgsqlCheck.Differ, "the result has 0 columns for Npgsql and 1 for SqlSource")
@@ -496,6 +510,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors
             .Check(
                 Checked,
+                DescribedWith("text", "text"),
                 AskedWith("text"),
                 new PostgresCheckAnswer(null, error, null),
                 new CheckVerdict(NpgsqlCheck.Differ, error.Message)
@@ -507,25 +522,42 @@ public class PostgresErrorsTests
         failure.ServerLines.ShouldBe(["42601: syntax error at or near \"@\"", "hint: a hint"]);
     }
 
+    // The type is named by its name, as the SQL would spell it, and not by the name it was bound by.
     [Theory]
-    [InlineData("public.d2", false)]
-    [InlineData("\"My Schema\".\"Status\"", true)]
-    [InlineData("\"char\"", true)]
-    public void Check_DriverError_IsSqlsrc232NamingTheTypeAndTheParameterAsWritten(string type, bool quoted)
+    [InlineData("public.check_pair", "public.check_pair")]
+    [InlineData("\"My Schema\".\"Pair\"", "My Schema.Pair")]
+    [InlineData("\"char\"", "\"char\"")]
+    public void Check_DriverError_IsSqlsrc232NamingTheTypeByItsNameAndTheParameterAsWritten(
+        string name,
+        string bindName
+    )
     {
         var failure = PostgresErrors
             .Check(
                 Checked,
-                AskedWith(type),
+                DescribedWith(name, bindName),
+                AskedWith(bindName),
                 new PostgresCheckAnswer(null, null, new PostgresBindError("status", "Npgsql's own words")),
                 new CheckVerdict(NpgsqlCheck.Unbound, "Npgsql's own words")
             )
             .ShouldNotBeNull();
 
         failure.Descriptor.Id.ShouldBe("SQLSRC232");
-        failure.Arguments.ShouldBe([type, "@status", "ListUsers"]);
+        failure.Arguments.ShouldBe([name, "@status", "ListUsers"]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldBe(["Npgsql's own words"]);
-        failure.Help.ShouldBe(quoted ? PostgresErrors.BindQuotedHelp : PostgresErrors.BindHelp);
+        failure.Help.ShouldBe(PostgresErrors.BindHelp);
+    }
+
+    [Fact]
+    public void Unnamed_ParameterOfATypeWithoutABindName_IsSqlsrc232SayingThereIsNoName()
+    {
+        var failure = PostgresErrors.Unnamed(Checked, 0, "public.\"x.y\"");
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC232");
+        failure.Arguments.ShouldBe(["public.\"x.y\"", "@status", "ListUsers"]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBe([PostgresBindNames.NoName]);
+        failure.Help.ShouldBe(PostgresErrors.BindHelp);
     }
 }

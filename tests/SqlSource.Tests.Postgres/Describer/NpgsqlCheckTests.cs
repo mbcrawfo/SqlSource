@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
@@ -15,6 +16,9 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
 {
     // The longest name a type can have: PostgreSQL keeps 63 bytes of a name.
     private const string LongTypeName = "check_enum_with_a_name_of_exactly_sixty_three_characters_long00";
+
+    // The name the server gives its array: "_" and the type's name, cut to 63 bytes.
+    private const string LongArrayName = "_check_enum_with_a_name_of_exactly_sixty_three_characters_long0";
 
     // What these tests need and the fixture schema lacks: a type in a schema whose name needs quotes, a domain
     // over a domain, a composite type, an enum whose name is as long as a name can be, and a table that a
@@ -89,65 +93,76 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     public async Task Describe_DeclaredOnlyParameter_PassesTheCheck(string sql) =>
         await ShouldPassAsync(sql, ("tenant", "int"));
 
-    // The name the describer spells for each kind of type is one Npgsql binds: an alias, a modifier that is
-    // dropped, a domain, an enum, arrays, a range and a multirange.
+    // The name the describer gives each kind of type to bind by is one Npgsql binds: an alias, a modifier that is
+    // dropped, a domain, an enum, arrays, a range and a multirange; a schema and a type whose names need quotes, and
+    // an array of it; plain bit, which the server spells "bit"; a domain over a domain, bound by its innermost base;
+    // "char"; and an array of a type whose name is as long as a name can be.
+    //
+    // The last two were tried against Npgsql 10.0.3 on PostgreSQL 14 and 18, with SELECT @p AS p, to see the type the
+    // server was sent, with the default search_path and with public."char", other.<long name> and public."numeric"
+    // standing before pg_catalog on it.  "char" and pg_catalog."char" are refused: the data type name "could not be
+    // found in the types that were loaded by Npgsql", and so is internalchar.  char, which is Npgsql's own
+    // DataTypeName for NpgsqlDbType.InternalChar, and pg_catalog.char bind "char" in every session.  The array's
+    // public.<long name>[] and the unqualified <long name>[] are refused: "Name is too long and would be truncated".
+    // public.<array's name> binds the array in every session; the unqualified <array's name> binds it too, but is
+    // refused as ambiguous once another schema holds a type of the same name.  numeric binds pg_catalog's numeric
+    // in every session.
     [Theory]
-    [InlineData("int")]
-    [InlineData("bigint")]
-    [InlineData("smallint")]
-    [InlineData("boolean")]
-    [InlineData("real")]
-    [InlineData("double precision")]
-    [InlineData("numeric(18,2)")]
-    [InlineData("varchar(50)")]
-    [InlineData("char(2)")]
-    [InlineData("text")]
-    [InlineData("bytea")]
-    [InlineData("uuid")]
-    [InlineData("jsonb")]
-    [InlineData("date")]
-    [InlineData("time")]
-    [InlineData("timestamp(3)")]
-    [InlineData("timestamptz")]
-    [InlineData("interval")]
-    [InlineData("email_t")]
-    [InlineData("user_status")]
-    [InlineData("text[]")]
-    [InlineData("user_status[]")]
-    [InlineData("email_t[]")]
-    [InlineData("tstzrange")]
-    [InlineData("int4multirange")]
-    [InlineData("varbit(5)")]
-    public async Task Describe_ParameterOfEachKindOfType_IsBoundByItsSpelledName(string type) =>
-        await ShouldPassAsync("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", ("p", type));
+    [InlineData("int", "integer")]
+    [InlineData("bigint", "bigint")]
+    [InlineData("smallint", "smallint")]
+    [InlineData("boolean", "boolean")]
+    [InlineData("real", "real")]
+    [InlineData("double precision", "double precision")]
+    [InlineData("numeric(18,2)", "numeric")]
+    [InlineData("varchar(50)", "character varying")]
+    [InlineData("char(2)", "bpchar")]
+    [InlineData("text", "text")]
+    [InlineData("bytea", "bytea")]
+    [InlineData("uuid", "uuid")]
+    [InlineData("jsonb", "jsonb")]
+    [InlineData("date", "date")]
+    [InlineData("time", "time without time zone")]
+    [InlineData("timestamp(3)", "timestamp without time zone")]
+    [InlineData("timestamptz", "timestamp with time zone")]
+    [InlineData("interval", "interval")]
+    [InlineData("email_t", "public.email_t")]
+    [InlineData("user_status", "public.user_status")]
+    [InlineData("text[]", "text[]")]
+    [InlineData("user_status[]", "public.user_status[]")]
+    [InlineData("email_t[]", "public.email_t[]")]
+    [InlineData("tstzrange", "tstzrange")]
+    [InlineData("int4multirange", "int4multirange")]
+    [InlineData("varbit(5)", "bit varying")]
+    [InlineData("\"My Schema\".\"Status\"", "My Schema.Status")]
+    [InlineData("\"My Schema\".\"Status\"[]", "My Schema.Status[]")]
+    [InlineData("bit(3)", "bit")]
+    [InlineData("check_d2", "character varying")]
+    [InlineData("\"char\"", "char")]
+    [InlineData(LongTypeName + "[]", "public." + LongArrayName)]
+    public async Task Describe_ParameterOfEachKindOfType_IsBoundByItsBindName(string type, string bindName)
+    {
+        _ = await ScalarAsync(OwnObjects);
 
-    // Types whose spelled names Npgsql refuses: one in a schema whose name needs quotes, the "char" of the system
-    // catalogs, a domain over a domain, a bit string type, which the describer spells "bit" for a parameter, a
-    // composite type, and an array of a type whose name is so long that the spelling with its schema is too long
-    // for Npgsql, which refuses it with an ArgumentException.
+        var described = await DescribeAsync("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", ("p", type));
+
+        described.Failure.ShouldBeNull(
+            described.Failure is { } failure ? $"{failure.Descriptor.Id}: {string.Join("; ", failure.Arguments)}" : null
+        );
+        described
+            .Value.ShouldNotBeNull()
+            .Parameters.ShouldHaveSingleItem()
+            .Type.ShouldNotBeNull()
+            .BindName.ShouldBe(bindName);
+    }
+
+    // Types Npgsql cannot send a value of: a composite type, a table's row type and a type of the system catalogs
+    // that Npgsql does not load.
     [Theory]
-    [InlineData(
-        "SELECT 1 AS one FROM users WHERE @p IS NOT NULL",
-        "\"My Schema\".\"Status\"",
-        "\"My Schema\".\"Status\"",
-        true
-    )]
-    [InlineData("SELECT relname FROM pg_catalog.pg_class WHERE relkind = @p", null, "\"char\"", true)]
-    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "check_d2", "public.check_d2", false)]
-    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "bit(3)", "\"bit\"", true)]
-    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "check_pair", "public.check_pair", false)]
-    [InlineData(
-        "SELECT 1 AS one FROM users WHERE @p IS NOT NULL",
-        LongTypeName + "[]",
-        "public." + LongTypeName + "[]",
-        false
-    )]
-    public async Task Describe_ParameterNpgsqlCannotBind_IsSqlsrc232NamingIt(
-        string sql,
-        string? declared,
-        string spelled,
-        bool quoted
-    )
+    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "check_pair", "public.check_pair")]
+    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "users", "public.users")]
+    [InlineData("SELECT c.relname FROM pg_catalog.pg_class AS c WHERE c.oid = @t::regclass", null, "regclass")]
+    public async Task Describe_ParameterNpgsqlCannotBind_IsSqlsrc232NamingIt(string sql, string? declared, string name)
     {
         _ = await ScalarAsync(OwnObjects);
 
@@ -156,10 +171,10 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         described.Value.ShouldBeNull();
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC232");
-        failure.Arguments.ShouldBe([spelled, "@p", Requests.Query]);
+        failure.Arguments.ShouldBe([name, sql.Contains("@t", StringComparison.Ordinal) ? "@t" : "@p", Requests.Query]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldHaveSingleItem().ShouldNotBeNullOrWhiteSpace();
-        failure.Help.ShouldBe(quoted ? PostgresErrors.BindQuotedHelp : PostgresErrors.BindHelp);
+        failure.Help.ShouldBe(PostgresErrors.BindHelp);
     }
 
     // Npgsql resolves the type of a parameter it will not send.
@@ -168,11 +183,11 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     {
         _ = await ScalarAsync(OwnObjects);
 
-        var described = await DescribeAsync("SELECT id FROM users WHERE id = @id", ("unused", "check_d2"));
+        var described = await DescribeAsync("SELECT id FROM users WHERE id = @id", ("unused", "check_pair"));
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC232");
-        failure.Arguments.ShouldBe(["public.check_d2", "@unused", Requests.Query]);
+        failure.Arguments.ShouldBe(["public.check_pair", "@unused", Requests.Query]);
     }
 
     // Npgsql sends an array of a domain as an array of its base, and the server keeps the domain: the column the

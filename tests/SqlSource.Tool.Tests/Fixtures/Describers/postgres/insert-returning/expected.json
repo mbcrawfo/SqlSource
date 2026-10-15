@@ -19,6 +19,7 @@
           "ordinal": 0,
           "type": {
             "name": "integer",
+            "bindName": "integer",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int4"
@@ -31,6 +32,7 @@
           "ordinal": 1,
           "type": {
             "name": "numeric",
+            "bindName": "numeric",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "numeric"
@@ -43,6 +45,7 @@
           "ordinal": 2,
           "type": {
             "name": "text",
+            "bindName": "text",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "text"

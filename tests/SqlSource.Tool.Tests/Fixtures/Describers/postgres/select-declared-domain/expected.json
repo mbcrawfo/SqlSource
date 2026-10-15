@@ -19,6 +19,7 @@
           "ordinal": 0,
           "type": {
             "name": "public.email_t",
+            "bindName": "public.email_t",
             "kind": "domain",
             "schema": "public",
             "internalName": "email_t",

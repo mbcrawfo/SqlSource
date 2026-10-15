@@ -19,6 +19,7 @@
           "ordinal": 0,
           "type": {
             "name": "character varying",
+            "bindName": "character varying",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "varchar"

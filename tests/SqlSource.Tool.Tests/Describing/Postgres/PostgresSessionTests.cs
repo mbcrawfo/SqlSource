@@ -540,10 +540,18 @@ public class PostgresSessionTests
                 new QueryDescription(
                     SidecarResultKind.None,
                     TestSidecars.Of(
-                        new DescribedParameter("id", TestSidecars.Postgres(), SidecarValues.TypeSource.Inferred),
+                        new DescribedParameter(
+                            "id",
+                            TestSidecars.Postgres(bindName: "integer"),
+                            SidecarValues.TypeSource.Inferred
+                        ),
                         new DescribedParameter(
                             "name",
-                            TestSidecars.Postgres("character varying", internalName: "varchar"),
+                            TestSidecars.Postgres(
+                                "character varying",
+                                internalName: "varchar",
+                                bindName: "character varying"
+                            ),
                             SidecarValues.TypeSource.Declared
                         )
                     ),
@@ -591,7 +599,7 @@ public class PostgresSessionTests
         var parameters = described.Value.ShouldNotBeNull().Parameters;
         parameters.Select(parameter => parameter.Name).ShouldBe(["name", "id", "tenant"]);
         parameters.Select(parameter => parameter.TypeSource).ShouldBe(["inferred", "inferred", "declared"]);
-        parameters[2].Type.ShouldBe(TestSidecars.Postgres());
+        parameters[2].Type.ShouldBe(TestSidecars.Postgres(bindName: "integer"));
         exchange.Unused.ShouldBeEmpty();
     }
 
@@ -799,7 +807,7 @@ public class PostgresSessionTests
         var description = described.Value.ShouldNotBeNull();
         description
             .Parameters.ShouldHaveSingleItem()
-            .Type.ShouldBe(TestSidecars.Postgres("text", internalName: "text"));
+            .Type.ShouldBe(TestSidecars.Postgres("text", internalName: "text", bindName: "text"));
         description
             .Columns.ShouldNotBeNull()
             .Select(column => column.Type.Name)
@@ -1501,24 +1509,15 @@ public class PostgresSessionTests
             script,
             1,
             "DELETE FROM t WHERE a = $1 AND b = $2",
-            ["unknown", "d2"],
-            new([23, PostgresRows.D2.Oid], null)
+            ["unknown", "check_pair"],
+            new([23, PostgresRows.CheckPair.Oid], null)
         );
-
-        // The request names the two types of the parameters; the closure holds the bases of the domain too.
-        _ = Resolves(
-            script,
-            [23, PostgresRows.D2.Oid],
-            PostgresRows.Int4,
-            PostgresRows.Varchar,
-            PostgresRows.EmailT,
-            PostgresRows.D2
-        );
+        _ = Resolves(script, [23, PostgresRows.CheckPair.Oid], PostgresRows.Int4, PostgresRows.CheckPair);
         _ = script.Answer(
             "check",
             new PostgresCheckRequest(
                 "DELETE FROM t WHERE a = @a AND b = @b",
-                [new("a", "integer"), new("b", "public.d2")]
+                [new("a", "integer"), new("b", "public.check_pair")]
             ),
             new PostgresCheckAnswer(null, null, new PostgresBindError("b", "Writing is not supported"))
         );
@@ -1526,15 +1525,68 @@ public class PostgresSessionTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Request("DELETE FROM t WHERE a = @a AND b = @b", Inferred("a"), Declared("b", "d2")),
+            Request("DELETE FROM t WHERE a = @a AND b = @b", Inferred("a"), Declared("b", "check_pair")),
             TestContext.Current.CancellationToken
         );
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC232");
-        failure.Arguments.ShouldBe(["public.d2", "@b", "Q"]);
+        failure.Arguments.ShouldBe(["public.check_pair", "@b", "Q"]);
         failure.ServerLines.ShouldBe(["Writing is not supported"]);
         failure.Help.ShouldBe(PostgresErrors.BindHelp);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The parameter's type keeps the server's quoted name and binds by the unquoted one; the column of the same type
+    // has no name to bind by.
+    [Fact]
+    public async Task DescribeAsync_ParameterOfAQuotedType_HasItsBindNameAndChecksByIt()
+    {
+        const string Sql = "SELECT @s::\"My Schema\".\"Status\" AS s";
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(
+            script,
+            1,
+            "SELECT $1::\"My Schema\".\"Status\" AS s",
+            ["unknown"],
+            new([PostgresRows.MySchemaStatus.Oid], null)
+        );
+        _ = Columns(script, 1, 1, Expression(0, "s", PostgresRows.MySchemaStatus.Oid));
+        _ = Resolves(script, [PostgresRows.MySchemaStatus.Oid], PostgresRows.MySchemaStatus);
+        _ = Checks(script, Sql, [("s", "My Schema.Status")], Expression(0, "s", PostgresRows.MySchemaStatus.Oid));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(Sql, Inferred("s")), TestContext.Current.CancellationToken);
+
+        var description = described.Value.ShouldNotBeNull();
+        var type = description.Parameters[0].Type.ShouldNotBeNull();
+        type.Name.ShouldBe("\"My Schema\".\"Status\"");
+        type.BindName.ShouldBe("My Schema.Status");
+        description.Columns.ShouldNotBeNull()[0].Type.BindName.ShouldBeNull();
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // The type has no name that Npgsql could be given, so nothing is asked of "check".
+    [Fact]
+    public async Task DescribeAsync_ParameterTypeWithADotInItsName_IsSqlsrc232AndAsksNoCheck()
+    {
+        var script = new PostgresScript().Open();
+        _ = Prepares(
+            script,
+            1,
+            "DELETE FROM t WHERE a = $1 AND s = $2",
+            ["unknown", "unknown"],
+            new([23, PostgresRows.WithDottedName.Oid], null)
+        );
+        _ = Resolves(script, [23, PostgresRows.WithDottedName.Oid], PostgresRows.Int4, PostgresRows.WithDottedName);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+        var request = Request("DELETE FROM t WHERE a = @a AND s = @s", Inferred("a"), Inferred("s"));
+
+        var described = await session.DescribeAsync(request, TestContext.Current.CancellationToken);
+
+        described.Failure.ShouldBe(PostgresErrors.Unnamed(request, 1, "public.\"x.y\""));
         exchange.Unused.ShouldBeEmpty();
     }
 

@@ -12,7 +12,11 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// recorded.  It never depends on the session's <c>search_path</c> and never holds a modifier, since a parameter's
 /// type has none.  The rules, in order:
 /// <list type="number">
-/// <item>An array is its element's name and <c>[]</c>.</item>
+/// <item>
+/// An array is its element's name and <c>[]</c>.  An array whose name the server cut, since <c>_</c> and its element's
+/// name is longer than a name can be, is its own schema, a <c>.</c> and its own name, as for rule 6: Npgsql refuses
+/// the element's name and <c>[]</c> as too long, and binds the array's own name.
+/// </item>
 /// <item>
 /// A domain over a domain is the name of the first base, going down, that is no domain: Npgsql sends a domain as its
 /// base type and refuses only the nesting.
@@ -22,7 +26,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <c>bit</c> means <c>bit(1)</c>, and Npgsql refuses a quote.
 /// </item>
 /// <item>
-/// The single-byte <c>"char"</c> is the server's spelling for now, quotes and all, which Npgsql may refuse.
+/// The single-byte <c>"char"</c> is <c>char</c>, Npgsql's own name for it.  Npgsql refuses <c>"char"</c> and
+/// <c>pg_catalog."char"</c>, and binds <c>char</c> to <c>"char"</c> and not to <c>character</c>, whatever the
+/// <c>search_path</c> and whatever type of the same name another schema holds.
 /// </item>
 /// <item>
 /// Any other type of <c>pg_catalog</c> is its <c>format_type(oid, -1)</c> without a leading <c>pg_catalog.</c>.  The
@@ -58,6 +64,11 @@ internal static class PostgresBindNames
 
         if (PostgresTypes.IsArray(row))
         {
+            if (IsCut(row, PostgresTypes.Row(row.Typelem, rows)))
+            {
+                return Qualified(row);
+            }
+
             return Of(row.Typelem, rows) is { } element ? PostgresTypeNames.ArrayOf(element) : null;
         }
 
@@ -69,12 +80,24 @@ internal static class PostgresBindNames
         return row switch
         {
             { Nspname: Catalog, Typname: "bit" } => "bit",
-            { Nspname: Catalog, Typname: "char" } => row.FormatType,
+            { Nspname: Catalog, Typname: "char" } => "char",
             { Nspname: Catalog } => WithoutCatalog(row.FormatType),
-            _ when row.Nspname.Contains('.', StringComparison.Ordinal)
-                    || row.Typname.Contains('.', StringComparison.Ordinal) => null,
-            _ => $"{row.Nspname}.{row.Typname}",
+            _ => Qualified(row),
         };
+    }
+
+    // The schema and the name, neither quoted, or null when either holds a '.'.
+    private static string? Qualified(PostgresTypeRow row) =>
+        row.Nspname.Contains('.', StringComparison.Ordinal) || row.Typname.Contains('.', StringComparison.Ordinal)
+            ? null
+            : $"{row.Nspname}.{row.Typname}";
+
+    // Whether the server cut the array's name: it is "_" and the element's name, cut to a name's length.  An array
+    // named otherwise, as "__name" when "_name" was taken, is not cut.
+    private static bool IsCut(PostgresTypeRow array, PostgresTypeRow element)
+    {
+        var whole = "_" + element.Typname;
+        return array.Typname.Length < whole.Length && whole.StartsWith(array.Typname, StringComparison.Ordinal);
     }
 
     private static PostgresTypeRow InnermostBaseOf(
