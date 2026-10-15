@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Xunit;
@@ -25,7 +26,14 @@ public sealed class RealisticNoiseBudgetTests(PostgresContainer postgres)
             Assert.Skip("The budget is held for PostgreSQL 14 and 18 alone.");
         }
 
-        var held = major == 14 ? Budget14 : Budget18;
+        var held = major switch
+        {
+            14 => Budget14,
+            18 => Budget18,
+            _ => throw new InvalidOperationException(
+                $"PostgreSQL {major} is a recorded major with no budget: add Budget{major} to this file."
+            ),
+        };
         var count = 0;
         foreach (var found in RealisticCases.All.Where(candidate => candidate.Refusal is null))
         {
