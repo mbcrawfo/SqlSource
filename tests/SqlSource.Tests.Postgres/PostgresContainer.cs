@@ -20,6 +20,10 @@ public sealed class PostgresContainer : IAsyncLifetime
 
     public const string Database = "fixtures";
 
+    // The second database, for the corpus of realistic queries: its own schema and seed, so that the fixture schema
+    // and the rows that tests count in it stay as they are.
+    public const string RealisticDatabase = "realistic";
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(Image).WithDatabase(Database).Build();
 
     public static string Image =>
@@ -27,6 +31,10 @@ public sealed class PostgresContainer : IAsyncLifetime
 
     // Of the database "fixtures".
     public string ConnectionString => _container.GetConnectionString();
+
+    // Of the database "realistic".
+    public string RealisticConnectionString =>
+        new NpgsqlConnectionStringBuilder(ConnectionString) { Database = RealisticDatabase }.ConnectionString;
 
     public async ValueTask InitializeAsync()
     {
@@ -39,6 +47,18 @@ public sealed class PostgresContainer : IAsyncLifetime
                 await File.ReadAllTextAsync(RepositoryPaths.PostgresSchema, token)
             );
             _ = await command.ExecuteNonQueryAsync(token);
+
+            await using (var create = source.CreateCommand($"CREATE DATABASE {RealisticDatabase}"))
+            {
+                _ = await create.ExecuteNonQueryAsync(token);
+            }
+
+            await using var realistic = NpgsqlDataSource.Create(RealisticConnectionString);
+            foreach (var path in new[] { RepositoryPaths.RealisticSchema, RepositoryPaths.RealisticSeed })
+            {
+                await using var script = realistic.CreateCommand(await File.ReadAllTextAsync(path, token));
+                _ = await script.ExecuteNonQueryAsync(token);
+            }
         }
         catch
         {

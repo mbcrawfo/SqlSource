@@ -17,6 +17,15 @@ internal static class RepositoryPaths
 
     public static string PostgresSchema { get; } = Path.Combine(DescriberFixtures, "postgres", "schema.sql");
 
+    // The database "realistic" of the corpus of realistic queries: its schema, its seed, and the folder of its cases.
+    public static string Realistic { get; } = Path.Combine(Root, "tests", "SqlSource.Tests.Postgres", "Realistic");
+
+    public static string RealisticSchema { get; } = Path.Combine(Realistic, "schema.sql");
+
+    public static string RealisticSeed { get; } = Path.Combine(Realistic, "seed.sql");
+
+    public static string RealisticCases { get; } = Path.Combine(Realistic, "Cases");
+
     private static string FindRoot()
     {
         for (var folder = new DirectoryInfo(AppContext.BaseDirectory); folder is not null; folder = folder.Parent)
