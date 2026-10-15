@@ -1,0 +1,15 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "slug", "nullable": false },
+    { "name": "parent_id", "nullable": true, "why": "a root has no parent on the left join; 1 and 4" },
+    { "name": "parent_name", "nullable": true, "why": "a root has no parent on the left join; 1 and 4" },
+    {
+      "name": "grandparent_name",
+      "nullable": true,
+      "why": "a root or a child of a root has no grandparent; 1, 2 and 4"
+    },
+    { "name": "product_count", "nullable": false }
+  ]
+}

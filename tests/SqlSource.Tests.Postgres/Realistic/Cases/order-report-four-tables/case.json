@@ -1,0 +1,18 @@
+{
+  "columns": [
+    { "name": "order_id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "note", "nullable": true, "why": "orders.note is nullable; order 2 has none" },
+    { "name": "account_name", "nullable": false },
+    { "name": "line_no", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "product_name", "nullable": false },
+    { "name": "category", "nullable": true, "why": "products.category_id is nullable; product 13 on order 4 has none" },
+    { "name": "line_total", "nullable": false },
+    { "name": "invoiced", "nullable": true, "why": "the left join finds no invoice for order 4" },
+    { "name": "paid_on", "nullable": true, "why": "billing.invoices.paid_on is nullable, and order 4 has no invoice" }
+  ],
+  "samples": [
+    { "from": "'2024-01-01'", "to": "'2025-01-01'" }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "columns": [
+    { "name": "account_id", "nullable": false },
+    { "name": "name", "nullable": true, "why": "the full join finds no active account for bob's reservation 2" },
+    {
+      "name": "email",
+      "nullable": true,
+      "why": "accounts.email is nullable, and bob's reservation has no active account"
+    },
+    { "name": "reservation_id", "nullable": true, "why": "the full join finds no reservation for dave and erin" },
+    { "name": "during", "nullable": true, "why": "the full join finds no reservation for dave and erin" },
+    { "name": "duration", "nullable": true, "why": "the full join finds no reservation for dave and erin" }
+  ]
+}

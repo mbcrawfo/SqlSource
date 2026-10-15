@@ -1,0 +1,10 @@
+kind: rows
+plan: walked
+table-match: no-origin
+parameter @from: timestamp with time zone (inferred)
+column 0 id: bigint | nullable true | heuristic | public.events.id
+column 1 at: timestamp with time zone | nullable true | heuristic | public.events.at
+column 2 kind: text | nullable true | heuristic | public.events.kind
+column 3 device: text | nullable null | no-origin | -
+column 4 account_name: character varying(100) | nullable true | outer-join | public.accounts.name
+column 5 closed_at: timestamp with time zone | nullable true | outer-join | public.accounts.closed_at
