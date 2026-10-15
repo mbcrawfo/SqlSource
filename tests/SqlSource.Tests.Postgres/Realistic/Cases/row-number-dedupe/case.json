@@ -1,0 +1,21 @@
+{
+  "columns": [
+    { "name": "account_id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "order_id",
+      "nullable": true,
+      "why": "an account with no order has no order on the left join; dave and erin have none"
+    },
+    {
+      "name": "placed_at",
+      "nullable": true,
+      "why": "an account with no order has no order on the left join; dave and erin have none"
+    },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "orders.shipped_at is nullable, and the left join may find none; alice's latest is unshipped"
+    }
+  ]
+}

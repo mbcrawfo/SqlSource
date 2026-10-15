@@ -1,0 +1,14 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "status", "nullable": false },
+    { "name": "last_placed_at", "nullable": true, "why": "max over no order is NULL; dave and erin have no orders" },
+    {
+      "name": "first_note",
+      "nullable": true,
+      "why": "a scalar subquery with no row is NULL, and so is a NULL note; bob's order has none"
+    },
+    { "name": "order_count", "nullable": false }
+  ]
+}

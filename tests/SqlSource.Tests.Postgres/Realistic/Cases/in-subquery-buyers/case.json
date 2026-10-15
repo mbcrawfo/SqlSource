@@ -1,0 +1,15 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "email", "nullable": true, "why": "accounts.email is nullable; bob, who has an invoice, has none" },
+    {
+      "name": "theme",
+      "nullable": true,
+      "why": "accounts.settings is nullable and need not hold the key; bob has no settings"
+    }
+  ],
+  "samples": [
+    { "min_amount": "5", "limit": "10" }
+  ]
+}
