@@ -184,7 +184,12 @@ internal static class NpgsqlCheck
     )
     {
         var where = Invariant($"the SQL with $n parts at character {at + 1}");
-        if (NumberAt(theirs, at) is { } number && number <= order.Count && !parameters.Contains(order[number - 1]))
+        if (
+            NumberAt(theirs, at) is { } number
+            && number >= 1
+            && number <= order.Count
+            && !parameters.Contains(order[number - 1])
+        )
         {
             var placed = order[number - 1].Name;
             return $"{where}: Npgsql placed @{placed} there, which SqlSource does not read as a parameter";

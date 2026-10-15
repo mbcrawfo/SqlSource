@@ -130,8 +130,10 @@ internal static class PostgresEvents
         );
 
     /// <summary>
-    /// <c>postgres.check</c>: the name and the type name of each parameter, whether the two describes agree, and
-    /// what differs.  The SQL is in <c>postgres.prepare</c>.
+    /// <c>postgres.check</c>: the name and the type name of each parameter, the <c>result</c>, which is
+    /// <c>same</c>, <c>differ</c>, <c>unbound</c> or <c>error</c> (<see cref="NpgsqlCheck" />), and <c>differs</c>:
+    /// what differs, Npgsql's message of a type it cannot bind, or the message of an <c>error</c> result.  The SQL is
+    /// in <c>postgres.prepare</c>.
     /// </summary>
     public static void Check(
         IRunLog log,
