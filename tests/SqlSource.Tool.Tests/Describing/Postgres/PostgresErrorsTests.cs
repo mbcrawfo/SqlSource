@@ -649,9 +649,33 @@ public class PostgresErrorsTests
         failure.Help.ShouldBe(PostgresErrors.CheckHelp);
     }
 
-    // The help is for a difference of a column's type: a difference of the texts is a @.
+    // A difference of the texts has no lines of the server: the message says where the two part.
     [Fact]
-    public void Check_ArrayOfADomainButOnlyTheTextDiffers_HasTheCheckHelp()
+    public void Check_PlacementDiffers_IsSqlsrc231WithThePlacementHelpAndNoServerLine()
+    {
+        const string Differs =
+            "the SQL with $n parts at character 45: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource";
+
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                DescribedWith("text", "text"),
+                AskedWith("text"),
+                new PostgresCheckAnswer([], null, null),
+                new CheckVerdict(NpgsqlCheck.Differ, Differs, PlacementDiffers: true)
+            )
+            .ShouldNotBeNull();
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.Arguments.ShouldBe(["ListUsers", Differs]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.PlacementHelp);
+    }
+
+    // The help of an array of a domain is for a difference of a column's type, not of the texts.
+    [Fact]
+    public void Check_ArrayOfADomainButOnlyTheTextDiffers_HasThePlacementHelp()
     {
         var domain = TestSidecars.Postgres("email_t", SidecarValues.Kind.Domain, "public", "email_t");
         var array = TestSidecars.Postgres("email_t[]", SidecarValues.Kind.Array, "public", "_email_t", element: domain);
@@ -666,11 +690,11 @@ public class PostgresErrorsTests
                 parameters,
                 AskedWith("public.email_t[]"),
                 new PostgresCheckAnswer([], null, null),
-                new CheckVerdict(NpgsqlCheck.Differ, "the SQL with $n parts at character 3")
+                new CheckVerdict(NpgsqlCheck.Differ, "the SQL with $n parts at character 3", PlacementDiffers: true)
             )
             .ShouldNotBeNull();
 
-        failure.Help.ShouldBe(PostgresErrors.CheckHelp);
+        failure.Help.ShouldBe(PostgresErrors.PlacementHelp);
     }
 
     // The type is named by its name, as the SQL would spell it, and not by the name it was bound by.

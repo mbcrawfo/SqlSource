@@ -15,7 +15,16 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// True when what differs is the type of a column.  A difference of where the parameters stand is no difference of
 /// a type.
 /// </param>
-internal sealed record CheckVerdict(string Result, string? Differs, bool TypeDiffers = false);
+/// <param name="PlacementDiffers">
+/// True when what differs is where the parameters stand: Npgsql's text and the tool's own rewrite part, with no error
+/// of the server.
+/// </param>
+internal sealed record CheckVerdict(
+    string Result,
+    string? Differs,
+    bool TypeDiffers = false,
+    bool PlacementDiffers = false
+);
 
 /// <summary>
 /// The check of the tool's lexer against Npgsql.  The describer prepares a query with <c>$n</c> where its lexer
@@ -75,7 +84,7 @@ internal static class NpgsqlCheck
             ?? throw new InvalidOperationException("The answer to 'check' holds no columns and no error.");
         if (answer.Sent is { } sent && Placement(sent, sql, parameters) is { } placed)
         {
-            return new CheckVerdict(Differ, placed);
+            return new CheckVerdict(Differ, placed, PlacementDiffers: true);
         }
 
         var (differs, isType) = Difference(seen, described, rows);

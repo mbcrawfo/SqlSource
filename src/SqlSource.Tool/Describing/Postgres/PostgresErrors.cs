@@ -63,6 +63,10 @@ internal static class PostgresErrors
         "a @ that one of the two reads as a parameter and the other as text; the server's lines say where; a table, a "
         + "column or a type that another session changed during the run shows the same way, so run describe again";
 
+    public const string PlacementHelp =
+        "a @ or a : that one of the two reads as a parameter and the other as text; the message says where the two "
+        + "texts part";
+
     public const string ArrayOfDomainHelp =
         "Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column "
         + "it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar";
@@ -416,8 +420,20 @@ internal static class PostgresErrors
             new EquatableArray<string>([query.Name, verdict.Differs ?? string.Empty]),
             DescribeStep.CheckParameters,
             lines,
-            verdict.TypeDiffers && HasArrayOfDomain(parameters) ? ArrayOfDomainHelp : CheckHelp
+            HelpOf(verdict, parameters)
         );
+    }
+
+    // A difference of the texts has no server lines, and the message says where; a column that is an array of a
+    // domain has another type for Npgsql, which a cast settles.
+    private static string HelpOf(CheckVerdict verdict, IReadOnlyList<DescribedParameter> parameters)
+    {
+        if (verdict.PlacementDiffers)
+        {
+            return PlacementHelp;
+        }
+
+        return verdict.TypeDiffers && HasArrayOfDomain(parameters) ? ArrayOfDomainHelp : CheckHelp;
     }
 
     // Whether an error of the server is what a misread @ gives: a syntax error or an access rule violation, class 42.

@@ -125,7 +125,8 @@ public class CheckVerdictTests
             .ShouldBe(
                 new CheckVerdict(
                     NpgsqlCheck.Differ,
-                    "the SQL with $n parts at character 51: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource"
+                    "the SQL with $n parts at character 51: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource",
+                    PlacementDiffers: true
                 )
             );
 
@@ -133,20 +134,28 @@ public class CheckVerdictTests
     [Fact]
     public void Read_ParametersInEachOthersPlace_DiffersQuotingFromTheDollar() =>
         Read(
-            Sent("SELECT id, name FROM users WHERE id = $2 AND name = $1", "id", "name"),
-            "SELECT id, name FROM users WHERE id = @id AND name = @name",
-            ["id", "name"],
-            Described
-        )
-            .Differs.ShouldBe(
-                "the SQL with $n parts at character 39: '$2 AND nam' for Npgsql and '$1 AND nam' for SqlSource"
+                Sent("SELECT id, name FROM users WHERE id = $2 AND name = $1", "id", "name"),
+                "SELECT id, name FROM users WHERE id = @id AND name = @name",
+                ["id", "name"],
+                Described
+            )
+            .ShouldBe(
+                new CheckVerdict(
+                    NpgsqlCheck.Differ,
+                    "the SQL with $n parts at character 39: '$2 AND nam' for Npgsql and '$1 AND nam' for SqlSource",
+                    PlacementDiffers: true
+                )
             );
 
     [Fact]
     public void Read_NpgsqlNamesAParameterTheQueryLacks_IsDiffer() =>
         Read(Sent("SELECT id, name FROM users WHERE id = $1 AND $2", "id", "x"), Described)
             .ShouldBe(
-                new CheckVerdict(NpgsqlCheck.Differ, "Npgsql placed @x, which SqlSource does not read as a parameter")
+                new CheckVerdict(
+                    NpgsqlCheck.Differ,
+                    "Npgsql placed @x, which SqlSource does not read as a parameter",
+                    PlacementDiffers: true
+                )
             );
 
     // Npgsql numbers by the order of the command's parameters, and the lexer by the order of the query's list; a

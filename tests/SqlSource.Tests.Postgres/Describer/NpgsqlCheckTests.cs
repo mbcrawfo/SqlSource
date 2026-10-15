@@ -97,7 +97,11 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     // The name the describer gives each kind of type to bind by is one Npgsql binds: an alias, a modifier that is
     // dropped, a domain, an enum, arrays, a range and a multirange; a schema and a type whose names need quotes, and
     // an array of it; plain bit, which the server spells "bit"; a domain over a domain, bound by its innermost base;
-    // "char"; and an array of a type whose name is as long as a name can be.
+    // "char"; and an array of a type whose name is as long as a name can be.  The parameter is returned as a column,
+    // so the check's comparison of the columns' types proves that the name binds the type the tool read, and not
+    // only one Npgsql accepts.  An array of a domain, email_t[], is bound by public.email_t[] but sent as an array of
+    // its base, so returned as a column it differs: the two tests of an array of a domain below assert its name and
+    // that difference.
     //
     // The last two were tried against Npgsql 10.0.3 on PostgreSQL 14 and 18, with SELECT @p AS p, to see the type the
     // server was sent, with the default search_path and with public."char", other.<long name> and public."numeric"
@@ -131,7 +135,6 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData("user_status", "public.user_status")]
     [InlineData("text[]", "text[]")]
     [InlineData("user_status[]", "public.user_status[]")]
-    [InlineData("email_t[]", "public.email_t[]")]
     [InlineData("tstzrange", "tstzrange")]
     [InlineData("int4multirange", "int4multirange")]
     [InlineData("varbit(5)", "bit varying")]
@@ -145,7 +148,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     {
         _ = await ScalarAsync(OwnObjects);
 
-        var described = await DescribeAsync("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", ("p", type));
+        var described = await DescribeAsync("SELECT @p AS p", ("p", type));
 
         described.Failure.ShouldBeNull(
             described.Failure is { } failure ? $"{failure.Descriptor.Id}: {string.Join("; ", failure.Arguments)}" : null
@@ -191,6 +194,19 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         failure.Arguments.ShouldBe(["public.check_pair", "@unused", Requests.Query]);
     }
 
+    // Where it is not returned, an array of a domain is bound by its element's name and [], which Npgsql takes.
+    [Fact]
+    public async Task Describe_ArrayOfADomainNotReturned_IsBoundByItsElementsNameAndBrackets()
+    {
+        var described = await DescribeAsync("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", ("p", "email_t[]"));
+
+        described
+            .Value.ShouldNotBeNull()
+            .Parameters.ShouldHaveSingleItem()
+            .Type.ShouldNotBeNull()
+            .BindName.ShouldBe("public.email_t[]");
+    }
+
     // Npgsql sends an array of a domain as an array of its base, and the server keeps the domain: the column the
     // parameter is returned as has two types.  The help is the cast of the column, not the help of a @.
     [Fact]
@@ -211,14 +227,19 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     // A parameter written twice, as @id and as :id in a slice that reads the column id.  Npgsql places it in both
     // and drops the ":".  In "tags[1:id]" that leaves "tags[1$1]", which the server refuses.  In a slice without a
     // lower bound, "tags[:id]", it leaves a subscript, "tags[$1]", which the server accepts, and in a predicate the
-    // columns are the same: only the texts differ.
+    // columns are the same: only the texts differ, and the help says the message says where.
     [Theory]
-    [InlineData("SELECT tags[1:id] AS t FROM users WHERE id = @id", "syntax error at or near \"$1\"")]
+    [InlineData(
+        "SELECT tags[1:id] AS t FROM users WHERE id = @id",
+        "syntax error at or near \"$1\"",
+        PostgresErrors.CheckHelp
+    )]
     [InlineData(
         "SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL",
-        "the SQL with $n parts at character 45: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource"
+        "the SQL with $n parts at character 45: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource",
+        PostgresErrors.PlacementHelp
     )]
-    public async Task Describe_ColonParameterNpgsqlReadsInASlice_IsSqlsrc231(string sql, string differs)
+    public async Task Describe_ColonParameterNpgsqlReadsInASlice_IsSqlsrc231(string sql, string differs, string help)
     {
         var described = await DescribeAsync(sql);
 
@@ -226,6 +247,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
         failure.Arguments.ShouldBe([Requests.Query, differs]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.Help.ShouldBe(help);
     }
 
     // What Npgsql sent: its rewrite of the SQL, and the name of the parameter each $n stands for.

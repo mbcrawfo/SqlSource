@@ -1500,6 +1500,8 @@ public class PostgresSessionTests
             "the SQL with $n parts at character 22: '$2 AS b' for Npgsql and '$1 AS b' for SqlSource",
         ]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.PlacementHelp);
         exchange.Unused.ShouldBeEmpty();
     }
 
