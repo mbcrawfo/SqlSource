@@ -59,6 +59,42 @@ internal static class PostgresEvents
             new(Duration, durationMs)
         );
 
+    /// <summary>
+    /// <c>postgres.spellings</c>: each type and modifier asked for, and the server's spelling of each, or the error.
+    /// </summary>
+    public static void Spellings(
+        IRunLog log,
+        PostgresSpellingsRequest request,
+        PostgresSpellingsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            "spellings",
+            new(
+                "pairs",
+                LogValue.ListOf(
+                    request.Pairs.Select(static pair =>
+                        LogValue.MapOf(new("oid", pair.Oid), new("modifier", pair.Modifier))
+                    )
+                )
+            ),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember(
+                    "rows",
+                    LogValue.ListOf(
+                        (answer.Rows ?? []).Select(static row =>
+                            LogValue.MapOf(
+                                new("oid", row.Oid),
+                                new("modifier", row.Modifier),
+                                new("formatType", row.FormatType)
+                            )
+                        )
+                    )
+                ),
+            new(Duration, durationMs)
+        );
+
     /// <summary><c>postgres.columns</c>: each column as the answer holds it, or the error.</summary>
     public static void Columns(
         IRunLog log,
@@ -267,7 +303,8 @@ internal static class PostgresEvents
             new("attributeNumber", column.AttributeNumber),
             new("length", LogValue.Of(column.Length)),
             new("precision", LogValue.Of(column.Precision)),
-            new("scale", LogValue.Of(column.Scale))
+            new("scale", LogValue.Of(column.Scale)),
+            new("typeModifier", LogValue.Of(column.TypeModifier))
         );
 
     private static LogValue TableOf(PostgresTableRow table) =>
@@ -305,6 +342,7 @@ internal static class PostgresEvents
             new("rngsubtype", LogValue.Of(row.Rngsubtype)),
             new("multirangeRngsubtype", LogValue.Of(row.MultirangeRngsubtype)),
             new("formatType", row.FormatType),
-            new("enumLabels", row.EnumLabels is { } labels ? LogValue.ListOfTexts(labels) : LogValue.Null)
+            new("enumLabels", row.EnumLabels is { } labels ? LogValue.ListOfTexts(labels) : LogValue.Null),
+            new("typtypmod", LogValue.Of(row.Typtypmod))
         );
 }
