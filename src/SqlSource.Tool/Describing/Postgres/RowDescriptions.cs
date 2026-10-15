@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
+using System.Threading;
 using Npgsql;
 using Npgsql.BackendMessages;
 
@@ -21,8 +22,10 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// one version; <c>RowDescriptionsTests</c> fails on a bump that moves one, before a session depends on it.
 /// </para>
 /// <para>
-/// A member that is not found is a bug of the tool's pin, and not a condition of a server: <see cref="Resolve" />
-/// throws, and so does the first use.
+/// A member that is not found, and a row description that is missing or does not fit the reader's columns, are a bug
+/// of the tool's pin and not a condition of a server: <see cref="Resolve" /> and the first use throw an
+/// <see cref="InvalidOperationException" /> that names <c>NpgsqlDataReader.RowDescription</c> and the version of
+/// Npgsql.
 /// </para>
 /// </remarks>
 internal static class RowDescriptions
@@ -35,30 +38,46 @@ internal static class RowDescriptions
     )]
     private const BindingFlags Instance = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
-    private static readonly Members Found = Find();
+    // Once for the process; a failure is kept and thrown again, as itself.
+    private static readonly Lazy<Members> Found = new(Find, LazyThreadSafetyMode.ExecutionAndPublication);
 
     /// <summary>
-    /// Finds every member this class reads, or throws.  The search runs once, from the static initializer, so a
-    /// call after the first only touches its result.
+    /// Finds every member this class reads, or throws an <see cref="InvalidOperationException" />.  The search runs
+    /// once, so a call after the first only reads its result.
     /// </summary>
-    public static void Resolve() => _ = Found;
+    public static void Resolve() => _ = Found.Value;
 
     /// <summary>
     /// The type modifier of each column of the reader's current row description, in column order, <c>-1</c> for a
-    /// column without one.  A reader that has no row description has no columns.
+    /// column without one.  A reader with no columns has no row description and gives none.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The reader has columns and the row description is null or does not count them.
+    /// </exception>
     public static IReadOnlyList<int> ModifiersOf(NpgsqlDataReader reader)
     {
-        if (Found.RowDescription.GetValue(reader) is not { } description)
+        var members = Found.Value;
+        var columns = reader.FieldCount;
+        var description = members.RowDescription.GetValue(reader);
+        if (description is null)
         {
-            return [];
+            return columns == 0
+                ? []
+                : throw Problem(
+                    $"NpgsqlDataReader.RowDescription is null after a describe that gave {columns} columns"
+                );
         }
 
-        var count = (int)Found.Count.GetValue(description)!;
+        var count = (int)members.Count.GetValue(description)!;
+        if (count != columns)
+        {
+            throw Problem($"NpgsqlDataReader.RowDescription holds {count} fields for {columns} columns");
+        }
+
         var modifiers = new int[count];
         for (var ordinal = 0; ordinal < count; ordinal++)
         {
-            modifiers[ordinal] = ((FieldDescription)Found.Item.GetValue(description, [ordinal])!).TypeModifier;
+            modifiers[ordinal] = ((FieldDescription)members.Item.GetValue(description, [ordinal])!).TypeModifier;
         }
 
         return modifiers;
@@ -68,26 +87,30 @@ internal static class RowDescriptions
     {
         var field =
             typeof(NpgsqlDataReader).GetField("RowDescription", Instance)
-            ?? throw Missing("the field NpgsqlDataReader.RowDescription");
+            ?? throw Problem("there is no field NpgsqlDataReader.RowDescription");
         var count =
             field.FieldType.GetProperty("Count", Instance)
-            ?? throw Missing($"the property {field.FieldType.Name}.Count");
+            ?? throw Problem($"there is no property {field.FieldType.Name}.Count");
         var item =
             field.FieldType.GetProperty("Item", Instance, null, typeof(FieldDescription), [typeof(int)], null)
-            ?? throw Missing($"the indexer of {field.FieldType.Name}");
+            ?? throw Problem($"there is no indexer of {field.FieldType.Name}");
         if (count.PropertyType != typeof(int))
         {
-            throw Missing($"an integer {field.FieldType.Name}.Count");
+            throw Problem($"{field.FieldType.Name}.Count is not an integer");
         }
 
         return new Members(field, count, item);
     }
 
-    private static InvalidOperationException Missing(string member) =>
-        new(
-            $"Npgsql {typeof(NpgsqlDataReader).Assembly.GetName().Version!.ToString(3)} has no {member}, "
-                + "which the describer reads the type modifiers from"
-        );
+    private static InvalidOperationException Problem(string what) => new(MessageOf(what));
+
+    /// <summary>
+    /// The message of a failure to read the row description: what is wrong, then where the describer reads the
+    /// type modifiers from and the version of Npgsql that it is.
+    /// </summary>
+    internal static string MessageOf(string what) =>
+        $"{what}; the describer reads the type modifiers from NpgsqlDataReader.RowDescription, "
+        + $"and Npgsql is {typeof(NpgsqlDataReader).Assembly.GetName().Version!.ToString(3)}";
 
     private sealed record Members(FieldInfo RowDescription, PropertyInfo Count, PropertyInfo Item);
 }
