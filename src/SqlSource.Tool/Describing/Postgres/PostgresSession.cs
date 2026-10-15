@@ -200,8 +200,9 @@ internal sealed class PostgresSession : IDescribeSession
         }
         finally
         {
-            // With the describe's own token: a cancelled describe leaves the statement to die with its session.
-            // The error of the call is never reported.
+            // With the describe's own token: a cancelled describe leaves the statement to die with its session,
+            // because a cancelled run must not wait on a server, and the run closes the session next.  The error of
+            // the call is never reported.
             await DeallocateAsync(new PostgresDeallocateRequest(prepare.Statement), cancellationToken);
         }
     }

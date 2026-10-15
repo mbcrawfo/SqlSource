@@ -1033,7 +1033,7 @@ SqlSource finds the parameters of a query with its own reading of the SQL, and d
     help: a @ that one of the two reads as a parameter and the other as text; the server's lines say where
 ```
 
-Look for a `@` that stands where only one of the two would read a parameter: inside an unusual string or an identifier, or directly after another character of a name.  Put a space before the parameter, or write the text so that the `@` is plainly inside a string.  One difference has no `@` in it: a parameter that is an array of a domain, `-- param: @p email_t[]`, and is returned as a column.  Npgsql sends it as an array of the domain's base type, so the column is `character varying[]` for Npgsql and `email_t[]` for SqlSource; cast the column to the type you want, `@p::varchar[]`.  If the SQL is plain and the two still differ, report it.
+Look for a `@` that stands where only one of the two would read a parameter: inside an unusual string or an identifier, or directly after another character of a name.  Put a space before the parameter, or write the text so that the `@` is plainly inside a string.  One difference has no `@` in it: a parameter that is an array of a domain, `-- param: @p email_t[]`, and is returned as a column.  Npgsql sends it as an array of the domain's base type, so the column is `character varying[]` for Npgsql and `email_t[]` for SqlSource; cast the column to the type you want, `@p::varchar[]`.  A pooler in transaction mode, such as PgBouncer, can also show as this error: the describe of a statement that is missing on another backend can answer no columns and no error, so the message ends "... columns for Npgsql and 0 for SqlSource", and a statement that an earlier run left on a pooled backend can give the wrong column names.  The fix is a direct connection to the server, as [SQLSRC236](#sqlsrc236) says.  If the SQL is plain and the two still differ, report it.
 
 ## SQLSRC232
 
@@ -1068,7 +1068,7 @@ Give the query `-- output: sql`, which keeps the SQL as it is and generates a me
 
 `SELECT ... INTO` is refused as `SELECT INTO` on every version of the server.  PostgreSQL 15 and later prepare it and 14 does not, but it creates a table, as `CREATE TABLE AS` does, and a sidecar must not depend on the server it was described against.  Write `CREATE TABLE ... AS` with `-- output: sql`, or select the rows and insert them in a second query.  A statement that the tool's check misses and that the server names as one it cannot prepare, `42P14: utility statements cannot be prepared`, is this error too, and the message then reads "is a utility statement".
 
-A word that the tool does not know stays [SQLSRC225](#sqlsrc225): `SELEC 1` is a typo and the server says so.  Describing `CALL` and data definition is tracked as D-0002.
+A word that the tool does not know stays [SQLSRC225](#sqlsrc225): `SELEC 1` is a typo and the server says so.  Describing `CALL` and data definition is tracked as [D-0002](deferred/D-0002-describing-call-and-data-definition.md).
 
 ## SQLSRC234
 
@@ -1106,7 +1106,7 @@ Upgrade the server, or point the tool at a database of PostgreSQL 14 or later, a
 The tool prepares a statement on the server and asks about it in later steps, which only works when every step reaches the same session.  This connection does not keep one.  There are two causes:
 
 - The connection string sets `Multiplexing=true`, which shares physical connections between commands.  It is found when the database is opened, before the tool connects.
-- A pooler in transaction mode, such as PgBouncer, sits between the tool and the server.  It hands each transaction to a backend of its own, so the statement the tool prepared is not found: the tool finds out at a query, when the statement is missing from the session, or when the server answers `26000` (the statement does not exist) or `42P05` (it already exists).
+- A pooler in transaction mode, such as PgBouncer, sits between the tool and the server.  It hands each transaction to a backend of its own, so the statement the tool prepared is not found: the tool finds out at a query, when the statement is missing from the session, or when the server answers `26000` (the statement does not exist) or `42P05` (it already exists).  A pooler can also hide itself: the describe of a statement that is missing on another backend can answer no columns and no error, and the run then reports [SQLSRC231](#sqlsrc231), so a pooler in transaction mode can show as that error, and the fix is the same, a direct connection.
 
 For `Multiplexing=true` the tool refuses before it connects, so no query has been sent and the server is not yet known; the `server:` line is the tool's own text:
 
