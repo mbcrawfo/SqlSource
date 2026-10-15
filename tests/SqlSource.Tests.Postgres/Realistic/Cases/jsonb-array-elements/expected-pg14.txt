@@ -1,0 +1,10 @@
+kind: rows
+plan: walked
+table-match: no-origin
+column 0 event_id: bigint | nullable true | heuristic | public.events.id
+column 1 account_id: integer | nullable true | heuristic | public.events.account_id
+column 2 at: timestamp with time zone | nullable true | heuristic | public.events.at
+column 3 sku: text | nullable null | no-origin | -
+column 4 quantity: integer | nullable null | no-origin | -
+column 5 product_name: text | nullable true | outer-join | public.products.name
+column 6 price: numeric(12,2) | nullable true | outer-join | public.products.price

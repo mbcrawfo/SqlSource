@@ -1,0 +1,9 @@
+kind: rows
+plan: not-needed
+table-match: no-origin
+column 0 id: integer | nullable false | catalog | public.accounts.id
+column 1 name: character varying(100) | nullable false | catalog | public.accounts.name
+column 2 order_id: bigint | nullable false | catalog | public.orders.id
+column 3 placed_at: timestamp with time zone | nullable false | catalog | public.orders.placed_at
+column 4 note: text | nullable true | catalog | public.orders.note
+column 5 line_count: bigint | nullable null | no-origin | -

@@ -1,0 +1,9 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "tag", "nullable": true, "why": "an element of tags can be NULL though the array cannot; erin has one" },
+    { "name": "ordinal", "nullable": false },
+    { "name": "accounts_with_tag", "nullable": false }
+  ]
+}

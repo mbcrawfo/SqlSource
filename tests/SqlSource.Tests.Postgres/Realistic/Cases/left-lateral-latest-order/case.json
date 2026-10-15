@@ -1,0 +1,26 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "order_id",
+      "nullable": true,
+      "why": "an account with no order has no row of the lateral subquery; dave and erin have none"
+    },
+    {
+      "name": "placed_at",
+      "nullable": true,
+      "why": "an account with no order has no row of the lateral subquery; dave and erin have none"
+    },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "orders.shipped_at is nullable; alice's latest order is unshipped"
+    },
+    {
+      "name": "amount",
+      "nullable": true,
+      "why": "the inner left join finds no invoice for carol's order 4, and dave has no order"
+    }
+  ]
+}

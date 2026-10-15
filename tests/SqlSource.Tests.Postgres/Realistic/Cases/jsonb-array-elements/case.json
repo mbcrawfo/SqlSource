@@ -1,0 +1,23 @@
+{
+  "columns": [
+    { "name": "event_id", "nullable": false },
+    { "name": "account_id", "nullable": false },
+    { "name": "at", "nullable": false },
+    { "name": "sku", "nullable": true, "why": "an item need not hold the key; the gift wrap of event 7 has no sku" },
+    {
+      "name": "quantity",
+      "nullable": true,
+      "why": "an item need not hold the key; the gift wrap of event 7 has no qty"
+    },
+    {
+      "name": "product_name",
+      "nullable": true,
+      "why": "the left join finds no product for a missing or unknown sku; event 7 has both"
+    },
+    {
+      "name": "price",
+      "nullable": true,
+      "why": "the left join finds no product for a missing or unknown sku; event 7 has both"
+    }
+  ]
+}
