@@ -20,13 +20,13 @@ It depends on [the suite of realistic queries](2026-10-15-postgresql-realistic-q
 
 - A column recorded `false` for each shape in parts A, B and C below that the server can never return `NULL` for, on PostgreSQL 14 and 18, the versions CI runs.  On 15 to 17 a form that prints differently is not recognised and stays as it is; nothing is claimed for them beyond that (my call, after the builder check).
 - The suite's noise budget lowered by each part, and every one of its safety checks passing on 14 and 18 after each part.
-- TD-0046 closed for what part B covers, and a new tech-debt item for what this design leaves.
+- TD-0046 closed for what part B covers, and [TD-0051](../../tech-debt/TD-0051-columns-that-cannot-be-null-are-answered-nullable.md), which the suite opened for the noise it measures, updated to hold what this design leaves.
 
 ## Non-goals
 
 - A parser of SQL.  Every answer here is read from what the server already gives: the row description, the catalog, and the generic plan of `EXPLAIN (VERBOSE, FORMAT JSON)`, as the walk reads it today.  A parser such as libpg_query was weighed and not chosen: it is a native dependency for one platform each, and the plan already holds the planner's view of each output, after the rewrites a parser would have to imitate.
-- Strict functions and operators over non-null arguments, `upper(name)`, `a + b`, `name || '!'`.  The deparsed text does not say which overload was chosen, so whether it is strict needs the function's OID, which `EXPLAIN` does not print.  It goes into the new tech-debt item.
-- `EXISTS (...)` as a column.  On 14 the planner prints both an `EXISTS` and an `x IN (subquery)` as `(hashed SubPlan 2)`, and on 18 it can print an `EXISTS` as `(ANY (u.id = (hashed SubPlan 2).col1))`.  The text cannot tell them apart, and `IN` can return `NULL`.  It goes into the new tech-debt item.
+- Strict functions and operators over non-null arguments, `upper(name)`, `a + b`, `name || '!'`.  The deparsed text does not say which overload was chosen, so whether it is strict needs the function's OID, which `EXPLAIN` does not print.  It stays in TD-0051.
+- `EXISTS (...)` as a column.  On 14 the planner prints both an `EXISTS` and an `x IN (subquery)` as `(hashed SubPlan 2)`, and on 18 it can print an `EXISTS` as `(ANY (u.id = (hashed SubPlan 2).col1))`.  The text cannot tell them apart, and `IN` can return `NULL`.  It stays in TD-0051.
 - Aggregates other than `count`: `sum`, `max`, `array_agg`, `json_agg`, `string_agg` return `NULL` over no rows, and the plan does not say whether a group can be empty or a `FILTER` excludes every row.
 - `VALUES`, whose plan does not print its rows.
 - The `OLD` and `NEW` rows of PostgreSQL 18's `RETURNING`, and an extension's `Custom Scan`, TD-0046's seventh and fourth bullets, which stay in TD-0046.
@@ -150,7 +150,7 @@ A column of a set operation is answered from its branches instead.  Each member 
 
 Otherwise the column stays unknown.  The answers have `nullableSource: "set-operation"`, another new value, with the same changes as part A's.  How each node and its members print, the flag column a `SetOp`'s members add, and whether the members' outputs are in the order of the result are established by tests on 14 and 18 before anything trusts them.
 
-A recursive CTE, a `Recursive Union` over its two terms with a `WorkTable Scan` in the second, is answered by induction: column `n` is `false` when it is `false` in the first term, and in the second term when the `WorkTable Scan`'s column `n` is taken as `false`.  This is the last step of part C and may be split off into the new tech-debt item if it proves large; the builder says so in the plan.
+A recursive CTE, a `Recursive Union` over its two terms with a `WorkTable Scan` in the second, is answered by induction: column `n` is `false` when it is `false` in the first term, and in the second term when the `WorkTable Scan`'s column `n` is taken as `false`.  This is the last step of part C and may be left in TD-0051 if it proves large; the builder says so in the plan.
 
 ## Shape of the work
 
@@ -161,11 +161,11 @@ Three pull requests, in the order A, B, C, each with its own plan, after the sui
 - re-records the fixture cases with `tools/record-fixtures.sh` where an answer of theirs changes;
 - updates `docs/tech-debt/` for what it closes and what it finds.
 
-The new tech-debt item, opened by part A and added to by B and C, lists what stays noise: strict functions and operators, `EXISTS` as a column, aggregates other than `count`, `VALUES`, and anything a part leaves unproved.  It names the spike's queries that show each.
+TD-0051, opened by the suite for the noise it measures, is updated by each of parts A, B and C to hold what stays noise: strict functions and operators, `EXISTS` as a column, aggregates other than `count`, `VALUES`, and anything a part leaves unproved.  It names the suite's cases that show each.
 
 ## Success
 
-- The suite's noise budget is lower after each part, and every remaining noise column of the corpus is of a kind the new tech-debt item names.
+- The suite's noise budget is lower after each part, and every remaining noise column of the corpus is of a kind TD-0051 names.
 - No safety check of the suite fails, on 14 or 18, after any part.
 - TD-0046 holds only its bullets of `Custom Scan` and of `OLD` and `NEW`.
 - `./pre-commit-validation.sh` passes.
@@ -176,7 +176,7 @@ The new tech-debt item, opened by part A and added to by B and C, lists what sta
 |----|----|
 | Read answers from the plan's text, no parser of SQL | Mine |
 | Plan a query when any column has no origin, widening TD-0047 | Mine |
-| Parts A, B and C in scope; strict functions, `EXISTS`, other aggregates and `VALUES` left as tech debt | Mine |
+| Parts A, B and C in scope; strict functions, `EXISTS`, other aggregates and `VALUES` left in TD-0051 | Mine |
 | New `nullableSource` values `expression` and `set-operation` | Mine |
 | Three pull requests, A then B then C, each planned after the suite has landed | Mine |
 | Part A only in a plan where no join null-extends; part B lifts that where it can trace a value to where it is computed | Mine, after the builder check |
