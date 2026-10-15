@@ -22,7 +22,8 @@ internal static class TestSidecars
         PostgresType? element = null,
         PostgresType? baseType = null,
         string[]? labels = null,
-        PostgresType? subtype = null
+        PostgresType? subtype = null,
+        string? bindName = null
     ) =>
         new(
             name,
@@ -36,15 +37,19 @@ internal static class TestSidecars
             baseType,
             labels is null ? null : Of(labels),
             subtype
-        );
+        )
+        {
+            BindName = bindName,
+        };
 
     public static SqlServerType SqlServer(
         string name = "int",
         int maxLength = 4,
         int precision = 10,
         int scale = 0,
-        SqlServerUserType? userType = null
-    ) => new(name, maxLength, precision, scale, userType);
+        SqlServerUserType? userType = null,
+        string? bindName = null
+    ) => new(name, maxLength, precision, scale, userType) { BindName = bindName };
 
     public static SidecarParameter Parameter(
         int ordinal,

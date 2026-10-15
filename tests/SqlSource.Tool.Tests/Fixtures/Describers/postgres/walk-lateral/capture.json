@@ -316,7 +316,12 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT u.id, l.total\nFROM users u\nLEFT JOIN LATERAL (SELECT o.total FROM orders o WHERE o.user_id = u.id) l ON true",
+          "parameters": []
+        },
+        "textRefused": null
       }
     },
     {

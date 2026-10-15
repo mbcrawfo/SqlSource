@@ -118,13 +118,17 @@ internal static class SidecarComparer
             return Presence(SidecarKeys.Type, committed is not null, described is not null, AnObject, Null);
         }
 
-        // Two entries of one engine hold types of one shape.  Two shapes can only be told apart by their names.
-        var difference = (committed, described) switch
-        {
-            (PostgresType left, PostgresType right) => Postgres(left, right),
-            (SqlServerType left, SqlServerType right) => SqlServer(left, right),
-            _ => Text(SidecarKeys.Name, committed.Name, described.Name),
-        };
+        // Two entries of one engine hold types of one shape.  Two shapes can only be told apart by their names.  The
+        // bind name is the second key of every shape, and a nested type has none, so it is compared here.
+        var difference =
+            Text(SidecarKeys.Name, committed.Name, described.Name)
+            ?? Text(SidecarKeys.BindName, committed.BindName, described.BindName)
+            ?? (committed, described) switch
+            {
+                (PostgresType left, PostgresType right) => Postgres(left, right),
+                (SqlServerType left, SqlServerType right) => SqlServer(left, right),
+                _ => null,
+            };
         return Under(SidecarKeys.Type, difference);
     }
 

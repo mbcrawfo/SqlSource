@@ -150,6 +150,54 @@ public class SidecarComparerTests
     }
 
     [Fact]
+    public void FindDifference_BindNamesDiffer_IsADifferenceOfTheParameter()
+    {
+        ShouldDiffer(
+            entry => WithParameter(entry, 1, parameter => parameter with { Type = Status with { BindName = "s" } }),
+            "parameters[1].type.bindName",
+            "null",
+            "\"s\""
+        );
+        var committed = WithParameter(Sample(), 1, WithBindName("a"));
+
+        SidecarComparer
+            .FindDifference(committed, WithParameter(committed, 1, WithBindName("b")))
+            .ShouldBe(new SidecarDifference("parameters[1].type.bindName", "\"a\"", "\"b\""));
+        SidecarComparer
+            .FindDifference(committed, WithParameter(committed, 1, WithBindName(null)))
+            .ShouldBe(new SidecarDifference("parameters[1].type.bindName", "\"a\"", "null"));
+    }
+
+    [Fact]
+    public void FindDifference_BindNameAndNameDiffer_IsTheName() =>
+        SidecarComparer
+            .FindDifference(
+                Entry(parameters: [Parameter(0, "id", Postgres(bindName: "a"))]),
+                Entry(parameters: [Parameter(0, "id", Postgres(name: "int", bindName: "b"))])
+            )
+            .ShouldBe(new SidecarDifference("parameters[0].type.name", "\"integer\"", "\"int\""));
+
+    [Fact]
+    public void FindDifference_BindNamesOfAnotherEngineDiffer_IsADifferenceOfTheParameter()
+    {
+        var sqlServer = Entry(
+            engine: SidecarValues.Engine.SqlServer,
+            parameters: [Parameter(0, "ids", SqlServer(bindName: "dbo.Ids"))]
+        );
+        var other = Entry(
+            engine: "sqlite",
+            parameters: [Parameter(0, "id", new OtherEngineType("INTEGER") { BindName = "INT" })]
+        );
+
+        SidecarComparer
+            .FindDifference(sqlServer, WithParameter(sqlServer, 0, WithBindName("dbo.Keys")))
+            .ShouldBe(new SidecarDifference("parameters[0].type.bindName", "\"dbo.Ids\"", "\"dbo.Keys\""));
+        SidecarComparer
+            .FindDifference(other, WithParameter(other, 0, WithBindName(null)))
+            .ShouldBe(new SidecarDifference("parameters[0].type.bindName", "\"INT\"", "null"));
+    }
+
+    [Fact]
     public void FindDifference_NestedType_IsDescendedInto()
     {
         var other = Tags with { Element = Tags.Element! with { Base = Text with { InternalName = "varchar" } } };
@@ -398,6 +446,9 @@ public class SidecarComparerTests
             Columns = Of(columns),
         };
     }
+
+    private static Func<SidecarParameter, SidecarParameter> WithBindName(string? bindName) =>
+        parameter => parameter with { Type = parameter.Type! with { BindName = bindName } };
 
     private static void ShouldDiffer(
         Func<SidecarEntry, SidecarEntry> change,

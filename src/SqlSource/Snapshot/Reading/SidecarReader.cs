@@ -481,7 +481,7 @@ internal static class SidecarReader
                     ReadOrdinal(cursor, index);
                     break;
                 case SidecarKeys.Type:
-                    type = SidecarTypeReader.Read(cursor, engine, orNull: true);
+                    type = SidecarTypeReader.Read(cursor, engine, orNull: true, isParameter: true);
                     break;
                 case SidecarKeys.Nullable:
                     nullable = cursor.ReadBoolean(key);
@@ -550,7 +550,7 @@ internal static class SidecarReader
                     name = cursor.ReadString(key, orNull: false);
                     break;
                 case SidecarKeys.Type:
-                    type = SidecarTypeReader.Read(cursor, engine, orNull: false);
+                    type = SidecarTypeReader.Read(cursor, engine, orNull: false, isParameter: false);
                     break;
                 case SidecarKeys.Nullable:
                     nullable = cursor.ReadBoolean(key);

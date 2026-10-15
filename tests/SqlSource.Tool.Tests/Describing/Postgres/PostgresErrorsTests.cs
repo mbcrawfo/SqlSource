@@ -1,5 +1,8 @@
+using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Snapshot;
+using SqlSource.Tests.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
@@ -454,6 +457,15 @@ public class PostgresErrorsTests
         new EquatableArray<SqlQueryParameter>([new SqlQueryParameter("status", null, null, false)])
     );
 
+    private static IReadOnlyList<DescribedParameter> DescribedWith(string name, string bindName) =>
+        [
+            new DescribedParameter(
+                "status",
+                TestSidecars.Postgres(name, bindName: bindName),
+                SidecarValues.TypeSource.Inferred
+            ),
+        ];
+
     private static PostgresCheckRequest AskedWith(string type) =>
         new("SELECT id FROM users WHERE status = @status", [new PostgresCheckParameter("status", type)]);
 
@@ -462,6 +474,7 @@ public class PostgresErrorsTests
         PostgresErrors
             .Check(
                 Checked,
+                DescribedWith("text", "text"),
                 AskedWith("text"),
                 new PostgresCheckAnswer([], null, null),
                 new CheckVerdict(NpgsqlCheck.Same, null)
@@ -474,6 +487,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors
             .Check(
                 Checked,
+                DescribedWith("text", "text"),
                 AskedWith("text"),
                 new PostgresCheckAnswer([], null, null),
                 new CheckVerdict(NpgsqlCheck.Differ, "the result has 0 columns for Npgsql and 1 for SqlSource")
@@ -489,15 +503,16 @@ public class PostgresErrorsTests
 
     // The position is in Npgsql's own rewrite of the SQL, which the user never sees, so it has no line.
     [Fact]
-    public void Check_ErrorOfTheServer_IsSqlsrc231WithItsLinesAndNoPosition()
+    public void Check_ServerErrorOfClass42_IsSqlsrc231()
     {
         var error = new PostgresServerError("42601", "syntax error at or near \"@\"", null, "a hint", 31);
 
         var failure = PostgresErrors
             .Check(
                 Checked,
+                DescribedWith("text", "text"),
                 AskedWith("text"),
-                new PostgresCheckAnswer(null, error, null),
+                new PostgresCheckAnswer(null, error, null, null, false),
                 new CheckVerdict(NpgsqlCheck.Differ, error.Message)
             )
             .ShouldNotBeNull();
@@ -507,25 +522,199 @@ public class PostgresErrorsTests
         failure.ServerLines.ShouldBe(["42601: syntax error at or near \"@\"", "hint: a hint"]);
     }
 
-    [Theory]
-    [InlineData("public.d2", false)]
-    [InlineData("\"My Schema\".\"Status\"", true)]
-    [InlineData("\"char\"", true)]
-    public void Check_DriverError_IsSqlsrc232NamingTheTypeAndTheParameterAsWritten(string type, bool quoted)
+    // A timeout or a failing server says nothing of how Npgsql reads the text, and the verdict says so
+    // (CheckVerdictTests holds the rule): it is the server rejecting the query at the step, with the lines of the
+    // error and no help.
+    [Fact]
+    public void Check_VerdictErrorOutsideClass42_IsSqlsrc225AtCheckParameters()
+    {
+        var error = new PostgresServerError("57014", "canceling statement due to user request", null, null, 31);
+
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                DescribedWith("text", "text"),
+                AskedWith("text"),
+                new PostgresCheckAnswer(null, error, null, null, false),
+                new CheckVerdict(NpgsqlCheck.Error, error.Message)
+            )
+            .ShouldNotBeNull();
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe(["ListUsers", "canceling statement due to user request"]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBe(["57014: canceling statement due to user request"]);
+        failure.Help.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Check_VerdictErrorOfALostConnection_IsSqlsrc225WithItsText()
+    {
+        var error = new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null);
+
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                DescribedWith("text", "text"),
+                AskedWith("text"),
+                new PostgresCheckAnswer(null, error, null, null, false),
+                new CheckVerdict(NpgsqlCheck.Error, error.Message)
+            )
+            .ShouldNotBeNull();
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe(["ListUsers", PostgresConnection.LostConnection]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBe([PostgresConnection.LostConnection]);
+    }
+
+    [Fact]
+    public void Check_TextRefusedByNpgsql_IsSqlsrc231()
+    {
+        var error = new PostgresServerError(null, "please remove all semicolons", null, null, null);
+
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                DescribedWith("text", "text"),
+                AskedWith("text"),
+                new PostgresCheckAnswer(null, error, null, null, true),
+                new CheckVerdict(NpgsqlCheck.Differ, error.Message)
+            )
+            .ShouldNotBeNull();
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.ServerLines.ShouldBe(["please remove all semicolons"]);
+    }
+
+    [Fact]
+    public void Check_TypeDiffersAndAParameterIsAnArrayOfADomain_HelpsWithTheCast()
+    {
+        var domain = TestSidecars.Postgres("email_t", SidecarValues.Kind.Domain, "public", "email_t");
+        var array = TestSidecars.Postgres("email_t[]", SidecarValues.Kind.Array, "public", "_email_t", element: domain);
+        IReadOnlyList<DescribedParameter> parameters =
+        [
+            new DescribedParameter("status", array, SidecarValues.TypeSource.Inferred),
+        ];
+
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                parameters,
+                AskedWith("public.email_t[]"),
+                new PostgresCheckAnswer([], null, null),
+                new CheckVerdict(
+                    NpgsqlCheck.Differ,
+                    "column 1 is character varying[] for Npgsql and email_t[] for SqlSource",
+                    true
+                )
+            )
+            .ShouldNotBeNull();
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.Help.ShouldBe(PostgresErrors.ArrayOfDomainHelp);
+    }
+
+    [Fact]
+    public void Check_TypeDiffersWithoutSuchAParameter_HasTheCheckHelp()
     {
         var failure = PostgresErrors
             .Check(
                 Checked,
-                AskedWith(type),
+                DescribedWith("text", "text"),
+                AskedWith("text"),
+                new PostgresCheckAnswer([], null, null),
+                new CheckVerdict(NpgsqlCheck.Differ, "column 1 is text for Npgsql and integer for SqlSource", true)
+            )
+            .ShouldNotBeNull();
+
+        failure.Help.ShouldBe(PostgresErrors.CheckHelp);
+    }
+
+    // A difference of the texts has no lines of the server: the message says where the two part.
+    [Fact]
+    public void Check_PlacementDiffers_IsSqlsrc231WithThePlacementHelpAndNoServerLine()
+    {
+        const string Differs =
+            "the SQL with $n parts at character 45: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource";
+
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                DescribedWith("text", "text"),
+                AskedWith("text"),
+                new PostgresCheckAnswer([], null, null),
+                new CheckVerdict(NpgsqlCheck.Differ, Differs, PlacementDiffers: true)
+            )
+            .ShouldNotBeNull();
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC231");
+        failure.Arguments.ShouldBe(["ListUsers", Differs]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe(PostgresErrors.PlacementHelp);
+    }
+
+    // The help of an array of a domain is for a difference of a column's type, not of the texts.
+    [Fact]
+    public void Check_ArrayOfADomainButOnlyTheTextDiffers_HasThePlacementHelp()
+    {
+        var domain = TestSidecars.Postgres("email_t", SidecarValues.Kind.Domain, "public", "email_t");
+        var array = TestSidecars.Postgres("email_t[]", SidecarValues.Kind.Array, "public", "_email_t", element: domain);
+        IReadOnlyList<DescribedParameter> parameters =
+        [
+            new DescribedParameter("status", array, SidecarValues.TypeSource.Inferred),
+        ];
+
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                parameters,
+                AskedWith("public.email_t[]"),
+                new PostgresCheckAnswer([], null, null),
+                new CheckVerdict(NpgsqlCheck.Differ, "the SQL with $n parts at character 3", PlacementDiffers: true)
+            )
+            .ShouldNotBeNull();
+
+        failure.Help.ShouldBe(PostgresErrors.PlacementHelp);
+    }
+
+    // The type is named by its name, as the SQL would spell it, and not by the name it was bound by.
+    [Theory]
+    [InlineData("public.check_pair", "public.check_pair")]
+    [InlineData("\"My Schema\".\"Pair\"", "My Schema.Pair")]
+    [InlineData("\"char\"", "char")]
+    public void Check_DriverError_IsSqlsrc232NamingTheTypeByItsNameAndTheParameterAsWritten(
+        string name,
+        string bindName
+    )
+    {
+        var failure = PostgresErrors
+            .Check(
+                Checked,
+                DescribedWith(name, bindName),
+                AskedWith(bindName),
                 new PostgresCheckAnswer(null, null, new PostgresBindError("status", "Npgsql's own words")),
                 new CheckVerdict(NpgsqlCheck.Unbound, "Npgsql's own words")
             )
             .ShouldNotBeNull();
 
         failure.Descriptor.Id.ShouldBe("SQLSRC232");
-        failure.Arguments.ShouldBe([type, "@status", "ListUsers"]);
+        failure.Arguments.ShouldBe([name, "@status", "ListUsers"]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldBe(["Npgsql's own words"]);
-        failure.Help.ShouldBe(quoted ? PostgresErrors.BindQuotedHelp : PostgresErrors.BindHelp);
+        failure.Help.ShouldBe(PostgresErrors.BindHelp);
+    }
+
+    [Fact]
+    public void Unnamed_ParameterOfATypeWithoutABindName_IsSqlsrc232SayingThereIsNoName()
+    {
+        var failure = PostgresErrors.Unnamed(Checked, 0, "public.\"x.y\"");
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC232");
+        failure.Arguments.ShouldBe(["public.\"x.y\"", "@status", "ListUsers"]);
+        failure.Step.ShouldBe(DescribeStep.CheckParameters);
+        failure.ServerLines.ShouldBe([PostgresBindNames.NoName]);
+        failure.Help.ShouldBe(PostgresErrors.UnnamedHelp);
     }
 }

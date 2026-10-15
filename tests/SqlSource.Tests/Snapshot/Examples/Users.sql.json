@@ -19,6 +19,7 @@
           "ordinal": 0,
           "type": {
             "name": "integer",
+            "bindName": "integer",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int4"
@@ -148,6 +149,7 @@
           "ordinal": 0,
           "type": {
             "name": "character varying(100)",
+            "bindName": "character varying",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "varchar",
@@ -161,6 +163,7 @@
           "ordinal": 1,
           "type": {
             "name": "public.email",
+            "bindName": "public.email",
             "kind": "domain",
             "schema": "public",
             "internalName": "email",
@@ -180,6 +183,7 @@
           "ordinal": 2,
           "type": {
             "name": "public.user_status",
+            "bindName": "public.user_status",
             "kind": "enum",
             "schema": "public",
             "internalName": "user_status",
@@ -246,6 +250,7 @@
           "ordinal": 0,
           "type": {
             "name": "integer",
+            "bindName": "integer",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int4"
@@ -270,6 +275,7 @@
           "ordinal": 0,
           "type": {
             "name": "public.user_status[]",
+            "bindName": "public.user_status[]",
             "kind": "array",
             "schema": "public",
             "internalName": "_user_status",
@@ -293,6 +299,7 @@
           "ordinal": 1,
           "type": {
             "name": "integer",
+            "bindName": "integer",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int4"

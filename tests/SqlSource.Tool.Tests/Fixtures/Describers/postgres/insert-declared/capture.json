@@ -159,7 +159,16 @@
       "answer": {
         "columns": [],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "INSERT INTO users (name, email, status) VALUES ($1, $2, $3)",
+          "parameters": [
+            "name",
+            "email",
+            "status"
+          ]
+        },
+        "textRefused": null
       }
     },
     {

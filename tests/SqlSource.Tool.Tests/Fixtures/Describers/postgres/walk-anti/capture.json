@@ -347,7 +347,12 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT u.id, o.id AS order_id, o.total\nFROM users u LEFT JOIN orders o ON o.user_id = u.id\nWHERE o.user_id IS NULL",
+          "parameters": []
+        },
+        "textRefused": null
       }
     },
     {

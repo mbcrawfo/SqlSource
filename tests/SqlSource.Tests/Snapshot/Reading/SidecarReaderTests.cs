@@ -129,7 +129,7 @@ public class SidecarReaderTests
                 null,
                 null,
                 null,
-                Of(Parameter(0, "id", Postgres())),
+                Of(Parameter(0, "id", Postgres(bindName: "integer"))),
                 null
             )
         );
@@ -184,7 +184,14 @@ public class SidecarReaderTests
                 Parameter(
                     0,
                     "statuses",
-                    Postgres("public.user_status[]", "array", "public", "_user_status", element: status)
+                    Postgres(
+                        "public.user_status[]",
+                        "array",
+                        "public",
+                        "_user_status",
+                        element: status,
+                        bindName: "public.user_status[]"
+                    )
                 )
             );
         listUsers.Parameters[1].TypeSource.ShouldBe(SidecarValues.TypeSource.Declared);
@@ -574,6 +581,13 @@ public class SidecarReaderTests
     [InlineData("'name': 'integer'", "'name': 'integer', 'name': 'int'", "'name': 'int',", 6, "name")]
     [InlineData("'column': 'tags'", "'column': 'tags', 'column': 'x'", "'column': 'x'", 8, "column")]
     [InlineData("'computed': false", "'computed': false, 'computed': null", "'computed': null", 10, "computed")]
+    [InlineData(
+        "'name': 'integer'",
+        "'name': 'integer', 'bindName': 'a', 'bindName': 'b'",
+        "'bindName': 'b'",
+        10,
+        "bindName"
+    )]
     public void Read_KeyWrittenTwice_IsDuplicateKeyAtTheSecond(
         string old,
         string replacement,
@@ -1005,6 +1019,97 @@ public class SidecarReaderTests
         )
             .Queries.Count.ShouldBe(0);
 
+    // The bind name is the driver's name for the type of a parameter, and a key of that type alone.
+    [Theory]
+    [InlineData(
+        "postgres", /*lang=json*/
+        "{'name': 'integer', 'bindName': 'integer', 'kind': 'base', 'schema': 'pg_catalog', 'internalName': 'int4'}",
+        "integer"
+    )]
+    [InlineData(
+        "mssql", /*lang=json*/
+        "{'name': 'int', 'bindName': 'dbo.Ids', 'maxLength': 4, 'precision': 10, 'scale': 0}",
+        "dbo.Ids"
+    )]
+    [InlineData(
+        "sqlite", /*lang=json*/
+        "{'name': 'INTEGER', 'bindName': 'INT'}",
+        "INT"
+    )]
+    public void Read_BindNameOnAParameterType_IsRead(string engine, string type, string bindName)
+    {
+        var read = ShouldBeRead(ParameterFileOf(engine, type)).Queries[0].Parameters[0].Type;
+
+        read.ShouldNotBeNull().BindName.ShouldBe(bindName);
+    }
+
+    [Theory]
+    [InlineData(
+        "postgres", /*lang=json*/
+        "{'name': 'integer', 'kind': 'base', 'schema': 'pg_catalog', 'internalName': 'int4', 'bindName': 'integer'}"
+    )]
+    [InlineData(
+        "mssql", /*lang=json*/
+        "{'name': 'int', 'bindName': 'int', 'maxLength': 4, 'precision': 10, 'scale': 0}"
+    )]
+    [InlineData(
+        "sqlite", /*lang=json*/
+        "{'name': 'INTEGER', 'bindName': 'INT'}"
+    )]
+    public void Read_BindNameOnAColumnType_IsIgnored(string engine, string type)
+    {
+        var read = ShouldBeRead(FileOf(engine, type)).Queries[0].Columns.ShouldNotBeNull()[0].Type;
+
+        read.ShouldNotBeNull().BindName.ShouldBeNull();
+    }
+
+    [Theory]
+    [InlineData("array", "element")]
+    [InlineData("domain", "base")]
+    [InlineData("range", "subtype")]
+    public void Read_BindNameOnATypeNestedInAParameterType_IsIgnored(string kind, string key)
+    {
+        const string Nested =
+            /*lang=json*/
+            "{'name': 'integer', 'kind': 'base', 'schema': 'pg_catalog', 'internalName': 'int4', 'bindName': 'i'}";
+        var type =
+            "{'name': 'n', 'bindName': 'n', 'kind': '"
+            + kind
+            + "', 'schema': 'public', 'internalName': 'n', '"
+            + key
+            + "': "
+            + Nested
+            + "}";
+
+        var read = ShouldBeRead(ParameterFileOf("postgres", type)).Queries[0].Parameters[0].Type;
+
+        read.ShouldBe(
+            Postgres(
+                "n",
+                kind,
+                "public",
+                "n",
+                element: kind == "array" ? Postgres() : null,
+                baseType: kind == "domain" ? Postgres() : null,
+                subtype: kind == "range" ? Postgres() : null,
+                bindName: "n"
+            )
+        );
+    }
+
+    [Fact]
+    public void Read_BindNameThatIsNotAString_IsWrongTypeAtTheValue() =>
+        ShouldBeMalformed(
+            ParameterFileOf(
+                "postgres", /*lang=json*/
+                "{'name': 'integer', 'bindName': 3, 'kind': 'base', 'schema': 'pg_catalog', 'internalName': 'int4'}"
+            ),
+            SidecarErrorKind.WrongType,
+            "3,",
+            1,
+            "bindName"
+        );
+
     // A file with one column of one type, under an engine.
     private static string FileOf(string engine, string type) =>
         Q(
@@ -1013,6 +1118,16 @@ public class SidecarReaderTests
                 + "', 'resultKind': 'rows', 'parameters': [], 'columns': [{'ordinal': 0, 'name': 'c', 'type': "
                 + type
                 + ", 'nullable': null}]}}}"
+        );
+
+    // A file with one parameter of one type, under an engine.
+    private static string ParameterFileOf(string engine, string type) =>
+        Q(
+            "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': {'hash': 'h', 'engine': '"
+                + engine
+                + "', 'resultKind': 'none', 'parameters': [{'name': 'p', 'ordinal': 0, 'type': "
+                + type
+                + ", 'nullable': null, 'typeSource': 'inferred'}]}}}"
         );
 
     private static string Q(string json) => json.Replace('\'', '"');

@@ -124,7 +124,7 @@ internal static class PostgresTypes
     private const long Oidvector = 30;
 
     // A domain has the category of its base, so an array is a base type of the category A.
-    private static bool IsArray(PostgresTypeRow row) =>
+    internal static bool IsArray(PostgresTypeRow row) =>
         row is { Typtype: "b", Typcategory: "A" } && row.Oid is not (Int2vector or Oidvector);
 
     // The modifier a domain gives its base: its own typtypmod, which a null of an old capture reads as -1, or else
@@ -201,7 +201,7 @@ internal static class PostgresTypes
     private static InvalidOperationException Unknown(PostgresTypeRow row) =>
         new($"The type '{row.FormatType}' has the typtype '{row.Typtype}', which cannot be described.");
 
-    private static PostgresTypeRow Row(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>
+    internal static PostgresTypeRow Row(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>
         rows.TryGetValue(oid, out var row)
             ? row
             : throw new InvalidOperationException($"The answer to 'types' holds no row for the type {oid}.");

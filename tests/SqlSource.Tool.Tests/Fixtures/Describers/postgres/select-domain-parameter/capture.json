@@ -292,7 +292,14 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT id, name FROM users WHERE email = $1::email_t",
+          "parameters": [
+            "email"
+          ]
+        },
+        "textRefused": null
       }
     },
     {

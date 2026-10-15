@@ -356,7 +356,14 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT s.id, s.total, s.n\nFROM (\n    SELECT u.id, o.total, row_number() OVER (ORDER BY u.id) AS n\n    FROM users u LEFT JOIN orders o ON o.user_id = u.id\n) s\nWHERE s.n > $1",
+          "parameters": [
+            "n"
+          ]
+        },
+        "textRefused": null
       }
     },
     {

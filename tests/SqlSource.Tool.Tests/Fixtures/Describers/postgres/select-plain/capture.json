@@ -1208,7 +1208,14 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT\n    u.id, u.name, u.email, u.status, u.tags, u.balance, u.created_at, u.deleted_at, u.name_upper,\n    s.flag, s.small, s.big, s.ratio, s.amount, s.code, s.label, s.born, s.at_time, s.at_local, s.span, s.token,\n    s.payload, s.document,\n    b.during, b.slots\nFROM users AS u\nCROSS JOIN samples AS s\nCROSS JOIN bookings AS b\nWHERE u.id = $1",
+          "parameters": [
+            "id"
+          ]
+        },
+        "textRefused": null
       }
     },
     {

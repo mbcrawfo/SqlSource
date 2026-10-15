@@ -533,6 +533,27 @@ public class PostgresEventsTests
         Member(check, "differs").ShouldBe((LogValue)"no such type");
     }
 
+    // An error of check that says nothing of how Npgsql reads the SQL is no disagreement.
+    [Fact]
+    public async Task Describe_CheckThatTheServerCancels_SaysErrorWithItsMessage()
+    {
+        var log = new RecordingLog();
+        var canceled = new PostgresServerError("57014", "canceling statement due to user request", null, null, null);
+        var script = new PostgresScript()
+            .Open()
+            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
+            .Answer("columns", Columns, PostgresScript.NoColumns)
+            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
+            .Answer("check", Check, new PostgresCheckAnswer(null, canceled, null, null, false))
+            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+
+        await DescribeAsync(script, log);
+
+        var check = log.Events.Single(written => written.Name == "check").Members;
+        Member(check, "result").ShouldBe((LogValue)"error");
+        Member(check, "differs").ShouldBe((LogValue)"canceling statement due to user request");
+    }
+
     // A columns call that failed has its error in the place of the columns.
     [Fact]
     public async Task Describe_ColumnsThatFails_WritesItsErrorInThePlaceOfTheColumns()

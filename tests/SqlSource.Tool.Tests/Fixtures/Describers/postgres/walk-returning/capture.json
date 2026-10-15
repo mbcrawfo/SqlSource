@@ -404,7 +404,14 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "UPDATE users u SET name = $1\nFROM orders o LEFT JOIN billing.invoices i ON i.order_id = o.id\nWHERE o.user_id = u.id\nRETURNING u.id, o.total, i.amount",
+          "parameters": [
+            "name"
+          ]
+        },
+        "textRefused": null
       }
     },
     {

@@ -243,7 +243,12 @@ internal sealed record PostgresCheckRequest(string Sql, IReadOnlyList<PostgresCh
 
 /// <summary>A parameter as generated code will bind it.</summary>
 /// <param name="Name">The name, as the query's list has it.</param>
-/// <param name="DataTypeName">The <c>name</c> of the type the describer gave the parameter.</param>
+/// <param name="DataTypeName">
+/// The <c>bindName</c> of the type the describer gave the parameter (<see cref="PostgresBindNames" />).  A capture
+/// recorded before the sidecar had one holds the type's <c>name</c>, which is the same for every type that Npgsql
+/// bound by its <c>name</c> but a type of <c>pg_catalog</c> that a user type hides on the <c>search_path</c>, whose
+/// <c>name</c> has the schema and whose <c>bindName</c> does not.
+/// </param>
 internal sealed record PostgresCheckParameter(string Name, string DataTypeName);
 
 /// <summary>What Npgsql's own describe of the SQL gave.  One of the three members is not null.</summary>
@@ -252,11 +257,30 @@ internal sealed record PostgresCheckParameter(string Name, string DataTypeName);
 /// What the server said, or what Npgsql said of a text it would not send: it has no SQLSTATE then.
 /// </param>
 /// <param name="DriverError">The parameter whose type Npgsql cannot bind.</param>
+/// <param name="Sent">
+/// What Npgsql sent for the SQL, set with <paramref name="Columns" />.  Null in an answer recorded before the member
+/// existed, whose check compares the columns alone.
+/// </param>
+/// <param name="TextRefused">
+/// True when <paramref name="Error" /> is Npgsql's refusal of the text, and false for any other error: one of the
+/// server, or a connection that was lost.  Null in an answer recorded before the member existed, which reads as
+/// true: an error of such an answer without a SQLSTATE was the refusal of the text.
+/// </param>
 internal sealed record PostgresCheckAnswer(
     IReadOnlyList<PostgresCheckColumn>? Columns,
     PostgresServerError? Error,
-    PostgresBindError? DriverError
+    PostgresBindError? DriverError,
+    PostgresCheckSent? Sent = null,
+    bool? TextRefused = null
 );
+
+/// <summary>What Npgsql sent for the SQL of <c>check</c> (<see cref="BatchRewrites" />).</summary>
+/// <param name="Text">Npgsql's rewrite of the SQL, with <c>$n</c> in the place of each parameter it found.</param>
+/// <param name="Parameters">
+/// The <c>ParameterName</c> of the parameter each <c>$n</c> stands for, in the order of the numbers.  A parameter that
+/// the SQL does not reference is not among them.
+/// </param>
+internal sealed record PostgresCheckSent(string Text, IReadOnlyList<string> Parameters);
 
 /// <summary>A column as Npgsql's describe of the original SQL reports it.</summary>
 /// <param name="Name">The name.</param>

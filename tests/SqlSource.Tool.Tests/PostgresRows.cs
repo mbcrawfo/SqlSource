@@ -18,6 +18,14 @@ internal static class PostgresRows
 
     public static PostgresTypeRow Numeric { get; } = BaseOf(1700, "numeric", "numeric", "N");
 
+    // format_type(1560, -1) quotes bit, since plain bit means bit(1).
+    public static PostgresTypeRow Bit { get; } = BaseOf(1560, "bit", "\"bit\"", "V");
+
+    public static PostgresTypeRow Varbit { get; } = BaseOf(1562, "varbit", "bit varying", "V");
+
+    // The single-byte "char", whose typname is char and which format_type quotes.
+    public static PostgresTypeRow QuotedChar { get; } = BaseOf(18, "char", "\"char\"", "Z");
+
     public static PostgresTypeRow Timestamptz { get; } = BaseOf(1184, "timestamptz", "timestamp with time zone", "D");
 
     public static PostgresTypeRow Interval { get; } = BaseOf(1186, "interval", "interval", "T");
@@ -37,6 +45,24 @@ internal static class PostgresRows
 
     // A domain over a domain.
     public static PostgresTypeRow D2 { get; } = DomainOf(16500, "d2", EmailT);
+
+    public static PostgresTypeRow CheckPair { get; } = CompositeOf(16600, "check_pair");
+
+    // A schema and a type that need quotes, and a schema that is a reserved word.
+    public static PostgresTypeRow MySchemaStatus { get; } = EnumIn(16610, "My Schema", "Status", "on", "off");
+
+    public static PostgresTypeRow MySchemaStatusArray { get; } = ArrayOf(16611, "_Status", MySchemaStatus);
+
+    public static PostgresTypeRow UserStatusInReservedSchema { get; } = EnumIn(16620, "user", "status", "on", "off");
+
+    // A schema or a type whose name holds a dot.
+    public static PostgresTypeRow InDottedSchema { get; } = EnumIn(16630, "a.b", "t", "on", "off");
+
+    public static PostgresTypeRow InDottedSchemaArray { get; } = ArrayOf(16631, "_t", InDottedSchema);
+
+    public static PostgresTypeRow WithDottedName { get; } = EnumIn(16640, "public", "x.y", "on", "off");
+
+    public static PostgresTypeRow WithDottedNameArray { get; } = ArrayOf(16641, "_x.y", WithDottedName);
 
     public static PostgresTypeRow Tid { get; } = BaseOf(27, "tid", "tid", "U");
 
@@ -72,7 +98,13 @@ internal static class PostgresRows
     ) => new(oid, typname, schema, "d", baseType.Typcategory, 0, baseType.Oid, null, null, typname, null);
 
     public static PostgresTypeRow EnumOf(long oid, string typname, params string[] labels) =>
-        new(oid, typname, "public", "e", "E", 0, 0, null, null, typname, labels);
+        EnumIn(oid, "public", typname, labels);
+
+    public static PostgresTypeRow EnumIn(long oid, string schema, string typname, params string[] labels) =>
+        new(oid, typname, schema, "e", "E", 0, 0, null, null, typname, labels);
+
+    public static PostgresTypeRow CompositeOf(long oid, string typname, string schema = "public") =>
+        new(oid, typname, schema, "c", "C", 0, 0, null, null, typname, null);
 
     public static PostgresTypeRow RangeOf(long oid, string typname, PostgresTypeRow subtype) =>
         new(oid, typname, "pg_catalog", "r", "R", 0, 0, subtype.Oid, null, typname, null);

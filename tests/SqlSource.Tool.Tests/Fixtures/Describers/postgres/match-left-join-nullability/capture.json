@@ -482,7 +482,12 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT u.* FROM orders AS o LEFT JOIN users AS u ON u.id = o.user_id",
+          "parameters": []
+        },
+        "textRefused": null
       }
     },
     {

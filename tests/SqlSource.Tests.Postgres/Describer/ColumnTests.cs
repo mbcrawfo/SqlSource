@@ -142,9 +142,11 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     // A domain named numeric in public, first on the search_path of the describe's connection, hides pg_catalog's
     // numeric.  A column of pg_catalog's numeric(10,2) is still numeric(10,2), with the facets of its modifier: the
-    // tool takes the server's spelling of a type of pg_catalog as it is, and puts no schema before it.
+    // tool takes the server's spelling of a type of pg_catalog as it is, and puts no schema before it.  A parameter
+    // of pg_catalog's numeric binds by numeric, which does not depend on the session: it is returned as a column, so
+    // a check that bound the domain, sent as text, would see a column of text.
     [Fact]
-    public async Task Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpelling()
+    public async Task Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpellingAndBindsByTheBareName()
     {
         var token = TestContext.Current.CancellationToken;
         await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
@@ -157,14 +159,17 @@ public sealed class ColumnTests(PostgresContainer postgres)
         {
             var described = await Sessions.DescribeAsync(
                 $"{postgres.ConnectionString};Search Path=public,pg_catalog",
-                Requests.Of("SELECT NULL::pg_catalog.numeric(10,2) AS n")
+                Requests.Of("SELECT NULL::pg_catalog.numeric(10,2) AS n, @p AS p", ("p", "pg_catalog.numeric"))
             );
 
             described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-            var column = described.Value.ShouldNotBeNull().Columns.ShouldNotBeNull().ShouldHaveSingleItem();
-            column.Type.ShouldBe(
-                TestSidecars.Postgres("numeric(10,2)", internalName: "numeric", precision: 10, scale: 2)
-            );
+            var description = described.Value.ShouldNotBeNull();
+            description
+                .Columns.ShouldNotBeNull()[0]
+                .Type.ShouldBe(
+                    TestSidecars.Postgres("numeric(10,2)", internalName: "numeric", precision: 10, scale: 2)
+                );
+            description.Parameters.ShouldHaveSingleItem().Type.ShouldNotBeNull().BindName.ShouldBe("numeric");
         }
         finally
         {

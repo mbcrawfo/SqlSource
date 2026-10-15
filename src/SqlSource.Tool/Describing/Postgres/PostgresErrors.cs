@@ -1,8 +1,10 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.Postgres;
@@ -58,15 +60,24 @@ internal static class PostgresErrors
         "cast the column to a concrete type, or give the expression an alias and a cast";
 
     public const string CheckHelp =
-        "a @ that one of the two reads as a parameter and the other as text; the server's lines say where";
+        "a @ that one of the two reads as a parameter and the other as text; the server's lines say where; a table, a "
+        + "column or a type that another session changed during the run shows the same way, so run describe again";
+
+    public const string PlacementHelp =
+        "a @ or a : that one of the two reads as a parameter and the other as text; the message says where the two "
+        + "texts part";
+
+    public const string ArrayOfDomainHelp =
+        "Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column "
+        + "it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar";
 
     public const string BindHelp =
-        "declare the parameter as a type Npgsql binds, text for one, with -- param: and cast it where it is used; "
-        + "and report it: the sidecar's spelling of a type is what generated code binds with";
+        "Npgsql cannot send a value of this type; declare the parameter as text with -- param: and cast it to the "
+        + "type where it is used; a later version may let a project declare a conversion for the type";
 
-    public const string BindQuotedHelp =
-        "Npgsql takes no type name that is written with quotes; declare the parameter as text with -- param: and "
-        + "cast it to the type where it is used";
+    public const string UnnamedHelp =
+        "the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare "
+        + "the parameter as text with -- param: and cast it to the type where it is used";
 
     public const string SchemaChangedHelp =
         "the database's schema changed while the query was described; run the tool again";
@@ -367,13 +378,20 @@ internal static class PostgresErrors
         );
 
     /// <summary>
-    /// What <c>check</c> is reported as, or null when the two describes agree.  A type Npgsql cannot bind is
-    /// <c>SQLSRC232</c>, with Npgsql's message as its one line; anything else that differs is <c>SQLSRC231</c>,
-    /// with the lines of the error when there is one.  There is no position line: a position the server gives
-    /// is in Npgsql's own rewrite of the SQL.
+    /// What <c>check</c> is reported as, from the verdict, or null when the two describes agree.  A type Npgsql
+    /// cannot bind is <c>SQLSRC232</c>, with Npgsql's message as its one line; an error that is no disagreement,
+    /// <see cref="NpgsqlCheck.Error" />, is the server rejecting the query, <c>SQLSRC225</c>; anything else that
+    /// differs is <c>SQLSRC231</c>, with the lines of the error when there is one.  There is no position line: a
+    /// position the server gives is in Npgsql's own rewrite of the SQL.
     /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="parameters">The parameters as the describer typed them, in the order of the query's list.</param>
+    /// <param name="asked">The request of <c>check</c>.</param>
+    /// <param name="answer">Its answer.</param>
+    /// <param name="verdict">What <see cref="NpgsqlCheck.Read" /> made of the answer.</param>
     public static DescribeFailure? Check(
         DescribeRequest query,
+        IReadOnlyList<DescribedParameter> parameters,
         PostgresCheckRequest asked,
         PostgresCheckAnswer answer,
         CheckVerdict verdict
@@ -386,21 +404,70 @@ internal static class PostgresErrors
 
         if (answer.DriverError is { } unbound)
         {
-            return CannotBind(query, asked, unbound);
+            return CannotBind(query, parameters, asked, unbound);
+        }
+
+        var lines = answer.Error is { } error
+            ? ServerLines(error with { Position = null }, 0)
+            : EquatableArray<string>.Empty;
+        if (verdict.Result == NpgsqlCheck.Error && answer.Error is { } failed)
+        {
+            return Rejected(failed, query, DescribeStep.CheckParameters, lines);
         }
 
         return new DescribeFailure(
             ToolDiagnostics.ParametersReadDifferently,
             new EquatableArray<string>([query.Name, verdict.Differs ?? string.Empty]),
             DescribeStep.CheckParameters,
-            answer.Error is { } error ? ServerLines(error with { Position = null }, 0) : EquatableArray<string>.Empty,
-            CheckHelp
+            lines,
+            HelpOf(verdict, parameters)
         );
     }
 
-    // SQLSRC232.  The type is the name that was asked with, and the parameter is written as the SQL writes one.
+    // A difference of the texts has no server lines, and the message says where; a column that is an array of a
+    // domain has another type for Npgsql, which a cast settles.
+    private static string HelpOf(CheckVerdict verdict, IReadOnlyList<DescribedParameter> parameters)
+    {
+        if (verdict.PlacementDiffers)
+        {
+            return PlacementHelp;
+        }
+
+        return verdict.TypeDiffers && HasArrayOfDomain(parameters) ? ArrayOfDomainHelp : CheckHelp;
+    }
+
+    // Npgsql sends such a parameter as an array of the domain's base, and the server keeps the domain.
+    private static bool HasArrayOfDomain(IReadOnlyList<DescribedParameter> parameters) =>
+        parameters.Any(parameter =>
+            parameter.Type is PostgresType { Element: { } element } array
+            && array.TryGetKind(out var kind)
+            && kind == PostgresTypeKind.Array
+            && element.TryGetKind(out var elementKind)
+            && elementKind == PostgresTypeKind.Domain
+        );
+
+    /// <summary>
+    /// <c>SQLSRC232</c> at the step <c>check parameters</c>, for a parameter whose type has no name that Npgsql could
+    /// be given (<see cref="PostgresBindNames.Of" />).  It is found before <c>check</c> is asked, so its one line is
+    /// <see cref="PostgresBindNames.NoName" /> and not Npgsql's.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="parameter">The parameter's index in the query's list.</param>
+    /// <param name="typeName">The type's <c>name</c>.</param>
+    public static DescribeFailure Unnamed(DescribeRequest query, int parameter, string typeName) =>
+        new(
+            ToolDiagnostics.TypeCannotBeBound,
+            new EquatableArray<string>([typeName, Written(query.Parameters[parameter]), query.Name]),
+            DescribeStep.CheckParameters,
+            new EquatableArray<string>([PostgresBindNames.NoName]),
+            UnnamedHelp
+        );
+
+    // SQLSRC232.  The type is named by its name, as the SQL would spell it, and not by the name it was bound by; the
+    // parameter is written as the SQL writes one.
     private static DescribeFailure CannotBind(
         DescribeRequest query,
+        IReadOnlyList<DescribedParameter> parameters,
         PostgresCheckRequest asked,
         PostgresBindError unbound
     )
@@ -421,13 +488,15 @@ internal static class PostgresErrors
             );
         }
 
-        var type = asked.Parameters[index].DataTypeName;
+        var type =
+            parameters[index].Type?.Name
+            ?? throw new InvalidOperationException($"The parameter '{unbound.Parameter}' was given no type.");
         return new DescribeFailure(
             ToolDiagnostics.TypeCannotBeBound,
             new EquatableArray<string>([type, Written(query.Parameters[index]), query.Name]),
             DescribeStep.CheckParameters,
             new EquatableArray<string>([unbound.Message]),
-            type.Contains('"', StringComparison.Ordinal) ? BindQuotedHelp : BindHelp
+            BindHelp
         );
     }
 

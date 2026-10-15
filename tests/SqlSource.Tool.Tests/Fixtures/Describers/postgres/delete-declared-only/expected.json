@@ -16,6 +16,7 @@
           "ordinal": 0,
           "type": {
             "name": "public.user_status",
+            "bindName": "public.user_status",
             "kind": "enum",
             "schema": "public",
             "internalName": "user_status",
@@ -32,6 +33,7 @@
           "ordinal": 1,
           "type": {
             "name": "integer",
+            "bindName": "integer",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int4"

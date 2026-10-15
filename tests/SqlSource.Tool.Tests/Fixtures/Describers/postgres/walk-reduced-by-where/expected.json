@@ -19,6 +19,7 @@
           "ordinal": 0,
           "type": {
             "name": "numeric",
+            "bindName": "numeric",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "numeric"

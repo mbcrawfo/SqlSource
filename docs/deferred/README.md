@@ -2,7 +2,7 @@
 
 Planned work that has not been delivered as planned.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `D-0003`
+Next id: `D-0004`
 
 ## Active items
 
@@ -10,6 +10,7 @@ Next id: `D-0003`
 |----|----|----|----|----|
 | [D-0001](D-0001-dialects-not-delivered.md) | Open | 2026-10-06 | [SQL dialects design](../superpowers/specs/2026-10-06-sql-dialects-design.md) | Dialects for Redshift, Snowflake, BigQuery, ClickHouse, Spark and Trino, and names of their own for DuckDB, Firebird and Db2 |
 | [D-0002](D-0002-describing-call-and-data-definition.md) | Open | 2026-10-14 | [Query generation epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) | Describing `CALL` and data definition statements |
+| [D-0003](D-0003-custom-type-conversion.md) | Open | 2026-10-15 | [Query generation epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) | A conversion a project declares for a database type, for parameters, models and generated query code, so that a type the driver cannot write can be used |
 
 ## Columns
 

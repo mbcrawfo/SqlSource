@@ -163,7 +163,16 @@
       "answer": {
         "columns": [],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "UPDATE bookings SET during = $1, tags = $2 WHERE id = $3",
+          "parameters": [
+            "during",
+            "tags",
+            "id"
+          ]
+        },
+        "textRefused": null
       }
     },
     {

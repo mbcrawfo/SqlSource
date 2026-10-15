@@ -34,6 +34,7 @@ internal static class SidecarKeys
     public const string Table = "table";
     public const string Column = "column";
 
+    public const string BindName = "bindName";
     public const string Kind = "kind";
     public const string InternalName = "internalName";
     public const string Length = "length";

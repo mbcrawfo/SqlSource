@@ -19,6 +19,7 @@
           "ordinal": 0,
           "type": {
             "name": "text",
+            "bindName": "text",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "text"

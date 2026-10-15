@@ -578,11 +578,15 @@ internal sealed class PostgresSession : IDescribeSession
             }
 
             // The protocol gives a parameter an OID and no modifier, so its own type has none: the base of a domain
-            // has the domain's.
+            // has the domain's.  The name it binds by is on its own type alone, and null when no name can say the
+            // type, which "check" refuses before it asks.
             parameters.Add(
                 new DescribedParameter(
                     parameter.Name,
-                    PostgresTypes.Build(oids[index], rows, TypeModifiers.NoModifier, spellings),
+                    PostgresTypes.Build(oids[index], rows, TypeModifiers.NoModifier, spellings) with
+                    {
+                        BindName = PostgresBindNames.Of(oids[index], rows),
+                    },
                     parameter.Type is null ? SidecarValues.TypeSource.Inferred : SidecarValues.TypeSource.Declared
                 )
             );
@@ -623,7 +627,8 @@ internal sealed class PostgresSession : IDescribeSession
 
     // Asks Npgsql to describe the SQL as generated code will send it, and says what it saw otherwise than the
     // prepared statement's columns, or null.  It is asked for a query without parameters too: one Parse, which
-    // still proves the two describes saw one query.
+    // still proves the two describes saw one query.  A parameter whose type has no name to bind by is refused
+    // before anything is asked.
     private async Task<DescribeFailure?> CheckAsync(
         DescribeRequest request,
         IReadOnlyList<DescribedParameter> parameters,
@@ -632,6 +637,14 @@ internal sealed class PostgresSession : IDescribeSession
         CancellationToken cancellationToken
     )
     {
+        for (var index = 0; index < parameters.Count; index++)
+        {
+            if (parameters[index].Type is { BindName: null } unnamed)
+            {
+                return PostgresErrors.Unnamed(request, index, unnamed.Name);
+            }
+        }
+
         var asked = new PostgresCheckRequest(
             ParameterPlaceholders.AsWritten(request.Sql)
                 ?? throw new InvalidOperationException(
@@ -641,17 +654,19 @@ internal sealed class PostgresSession : IDescribeSession
         );
         var started = _time.GetTimestamp();
         var answer = await _exchange.AskAsync("check", asked, _live.CheckAsync, cancellationToken);
-        var verdict = NpgsqlCheck.Read(answer, columns, rows);
+        var verdict = NpgsqlCheck.Read(answer, columns, rows, request.Sql, request.Parameters);
         PostgresEvents.Check(_log, request.Name, asked, verdict, ElapsedSince(started));
-        return PostgresErrors.Check(request, asked, answer, verdict);
+        return PostgresErrors.Check(request, parameters, asked, answer, verdict);
     }
 
-    // A parameter as generated code will bind it: by the name of its type, as the sidecar will record it.
+    // A parameter as generated code will bind it: by the name its type binds by, as the sidecar will record it.
     private static PostgresCheckParameter CheckParameterOf(DescribedParameter parameter) =>
         new(
             parameter.Name,
-            parameter.Type?.Name
-                ?? throw new InvalidOperationException($"The parameter '{parameter.Name}' was given no type.")
+            parameter.Type?.BindName
+                ?? throw new InvalidOperationException(
+                    $"The parameter '{parameter.Name}' was given no name to bind by."
+                )
         );
 
     // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.  One

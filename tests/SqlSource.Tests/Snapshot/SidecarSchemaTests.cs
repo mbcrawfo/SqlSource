@@ -68,6 +68,9 @@ public class SidecarSchemaTests
     [InlineData("\"engine\": \"postgres\"", "\"engine\": \"sqlite\"")]
     [InlineData("\"toolVersion\": \"0.4.0\"", "\"toolVersion\": \"0.4.0-dev\"")]
     [InlineData("\"formatVersion\": 1", "\"formatVersion\": 2")]
+    [InlineData("\"bindName\": \"integer\"", "\"bindName\": 3")]
+    [InlineData("\"bindName\": \"integer\"", "\"bindName\": \"\"")]
+    [InlineData("\"bindName\": \"integer\"", "\"bindName\": null")]
     public void Schema_FileThatBreaksACondition_IsNotValid(string old, string replacement)
     {
         var text = SidecarExamples.Read(SidecarExamples.Users);

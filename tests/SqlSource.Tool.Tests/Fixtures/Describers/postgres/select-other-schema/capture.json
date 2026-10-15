@@ -285,7 +285,14 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT id, order_id, amount, issued_on FROM billing.invoices WHERE order_id = $1",
+          "parameters": [
+            "order_id"
+          ]
+        },
+        "textRefused": null
       }
     },
     {

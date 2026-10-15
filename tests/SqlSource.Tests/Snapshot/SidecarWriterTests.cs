@@ -255,6 +255,66 @@ public class SidecarWriterTests
     }
 
     [Fact]
+    public void Write_ParameterTypeWithABindName_WritesItAfterTheName()
+    {
+        var status = Postgres("public.status", "enum", "public", "status", labels: ["a"], bindName: "public.status");
+        var sidecar = SidecarOf(
+            Entry(resultKind: SidecarResultKind.None, parameters: [Parameter(0, "status", status)])
+        );
+
+        SidecarWriter
+            .Write(sidecar)
+            .ShouldContain(
+                string.Join(
+                    "\n",
+                    "          \"type\": {",
+                    "            \"name\": \"public.status\",",
+                    "            \"bindName\": \"public.status\",",
+                    "            \"kind\": \"enum\","
+                )
+            );
+    }
+
+    [Fact]
+    public void Write_SqlServerAndOtherParameterTypesWithABindName_WriteItAfterTheName()
+    {
+        var sqlServer = SidecarOf(
+            Entry(
+                engine: SidecarValues.Engine.SqlServer,
+                resultKind: SidecarResultKind.None,
+                parameters: [Parameter(0, "ids", SqlServer("int", bindName: "dbo.Ids"))]
+            )
+        );
+        var other = SidecarOf(
+            Entry(
+                engine: "sqlite",
+                resultKind: SidecarResultKind.None,
+                parameters: [Parameter(0, "id", new OtherEngineType("INTEGER") { BindName = "INT" })]
+            )
+        );
+
+        SidecarWriter
+            .Write(sqlServer)
+            .ShouldContain(
+                "            \"name\": \"int\",\n            \"bindName\": \"dbo.Ids\",\n            \"maxLength\""
+            );
+        SidecarWriter
+            .Write(other)
+            .ShouldContain("            \"name\": \"INTEGER\",\n            \"bindName\": \"INT\"\n          },");
+    }
+
+    [Fact]
+    public void Write_TypeWithoutABindName_WritesNoKey()
+    {
+        var sidecar = SidecarOf(Entry(parameters: [Parameter(0, "id", Postgres()), Parameter(1, "untyped", null)]));
+
+        SidecarWriter.Write(sidecar).ShouldNotContain("bindName");
+        WriteColumnOf(Postgres()).ShouldNotContain("bindName");
+        WriteColumnOf(SqlServer()).ShouldNotContain("bindName");
+        WriteColumnOf(new OtherEngineType("INTEGER"), "sqlite").ShouldNotContain("bindName");
+    }
+
+    [Fact]
     public void Write_PostgresType_WritesAFacetOnlyWhenItHasAValue()
     {
         var text = WriteColumnOf(Postgres("numeric(18,-2)", internalName: "numeric", precision: 18, scale: -2));

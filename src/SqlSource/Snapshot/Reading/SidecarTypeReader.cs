@@ -23,6 +23,10 @@ internal static class SidecarTypeReader
         SidecarKeys.Subtype,
     ];
 
+    // The keys of a parameter's own type: a type has a bind name only there.  It is last, so that the keys it shares
+    // with the arrays above keep their bits, and so that Require and Has work with either array.
+    private static readonly string[] PostgresParameterKeys = [.. PostgresKeys, SidecarKeys.BindName];
+
     private static readonly string[] SqlServerKeys =
     [
         SidecarKeys.Name,
@@ -31,6 +35,8 @@ internal static class SidecarTypeReader
         SidecarKeys.Scale,
         SidecarKeys.UserType,
     ];
+
+    private static readonly string[] SqlServerParameterKeys = [.. SqlServerKeys, SidecarKeys.BindName];
 
     private static readonly string[] UserTypeKeys =
     [
@@ -41,11 +47,15 @@ internal static class SidecarTypeReader
 
     private static readonly string[] OtherKeys = [SidecarKeys.Name];
 
+    private static readonly string[] OtherParameterKeys = [SidecarKeys.Name, SidecarKeys.BindName];
+
     /// <summary>
     /// Reads the value of a <c>type</c> key under <paramref name="engine" />.  Null for <c>null</c> where
-    /// <paramref name="orNull" /> allows it, and after an error.
+    /// <paramref name="orNull" /> allows it, and after an error.  <paramref name="isParameter" /> says that the type
+    /// is a parameter's own, the only place where <c>bindName</c> is a key: anywhere else it is an unknown key, which
+    /// is skipped with its value.
     /// </summary>
-    public static SidecarType? Read(SidecarCursor cursor, string engine, bool orNull)
+    public static SidecarType? Read(SidecarCursor cursor, string engine, bool orNull, bool isParameter)
     {
         if (!cursor.BeginObject(SidecarKeys.Type, orNull, out var brace))
         {
@@ -54,17 +64,19 @@ internal static class SidecarTypeReader
 
         return engine switch
         {
-            SidecarValues.Engine.Postgres => ReadPostgres(cursor, brace),
-            SidecarValues.Engine.SqlServer => ReadSqlServer(cursor, brace),
-            _ => ReadOther(cursor, brace),
+            SidecarValues.Engine.Postgres => ReadPostgres(cursor, brace, isParameter),
+            SidecarValues.Engine.SqlServer => ReadSqlServer(cursor, brace, isParameter),
+            _ => ReadOther(cursor, brace, isParameter),
         };
     }
 
     // A type inside a type is as deep as the text nests, and the text nests 64 levels at most.
-    private static PostgresType? ReadPostgres(SidecarCursor cursor, TextSpan brace)
+    private static PostgresType? ReadPostgres(SidecarCursor cursor, TextSpan brace, bool isParameter)
     {
+        var keys = isParameter ? PostgresParameterKeys : PostgresKeys;
         var seen = 0;
         string? name = null;
+        string? bindName = null;
         string? kind = null;
         string? schema = null;
         string? internalName = null;
@@ -75,16 +87,15 @@ internal static class SidecarTypeReader
         PostgresType? baseType = null;
         EquatableArray<string>? labels = null;
         PostgresType? subtype = null;
-        for (
-            var key = cursor.NextKey(PostgresKeys, ref seen);
-            key is not null;
-            key = cursor.NextKey(PostgresKeys, ref seen)
-        )
+        for (var key = cursor.NextKey(keys, ref seen); key is not null; key = cursor.NextKey(keys, ref seen))
         {
             switch (key)
             {
                 case SidecarKeys.Name:
                     name = cursor.ReadString(key, orNull: false);
+                    break;
+                case SidecarKeys.BindName:
+                    bindName = cursor.ReadString(key, orNull: false);
                     break;
                 case SidecarKeys.Kind:
                     kind = cursor.ReadString(key, orNull: false);
@@ -146,7 +157,10 @@ internal static class SidecarTypeReader
             baseType,
             labels,
             subtype
-        );
+        )
+        {
+            BindName = bindName,
+        };
     }
 
     // The key of the nested type that a kind names and the object lacks.  What a kind names is known only once the
@@ -168,7 +182,7 @@ internal static class SidecarTypeReader
         };
 
     private static PostgresType? ReadNested(SidecarCursor cursor, string key) =>
-        cursor.BeginObject(key, orNull: true, out var brace) ? ReadPostgres(cursor, brace) : null;
+        cursor.BeginObject(key, orNull: true, out var brace) ? ReadPostgres(cursor, brace, isParameter: false) : null;
 
     private static EquatableArray<string>? ReadLabels(SidecarCursor cursor)
     {
@@ -193,24 +207,25 @@ internal static class SidecarTypeReader
         return new EquatableArray<string>(labels.ToImmutable());
     }
 
-    private static SqlServerType? ReadSqlServer(SidecarCursor cursor, TextSpan brace)
+    private static SqlServerType? ReadSqlServer(SidecarCursor cursor, TextSpan brace, bool isParameter)
     {
+        var keys = isParameter ? SqlServerParameterKeys : SqlServerKeys;
         var seen = 0;
         string? name = null;
+        string? bindName = null;
         int? maxLength = null;
         int? precision = null;
         int? scale = null;
         SqlServerUserType? userType = null;
-        for (
-            var key = cursor.NextKey(SqlServerKeys, ref seen);
-            key is not null;
-            key = cursor.NextKey(SqlServerKeys, ref seen)
-        )
+        for (var key = cursor.NextKey(keys, ref seen); key is not null; key = cursor.NextKey(keys, ref seen))
         {
             switch (key)
             {
                 case SidecarKeys.Name:
                     name = cursor.ReadString(key, orNull: false);
+                    break;
+                case SidecarKeys.BindName:
+                    bindName = cursor.ReadString(key, orNull: false);
                     break;
                 case SidecarKeys.MaxLength:
                     maxLength = cursor.ReadInt32(key, orNull: false);
@@ -239,6 +254,9 @@ internal static class SidecarTypeReader
                 scale.GetValueOrDefault(),
                 userType
             )
+            {
+                BindName = bindName,
+            }
             : null;
     }
 
@@ -276,16 +294,29 @@ internal static class SidecarTypeReader
         return new SqlServerUserType(schema, name, assemblyQualifiedName);
     }
 
-    private static OtherEngineType? ReadOther(SidecarCursor cursor, TextSpan brace)
+    private static OtherEngineType? ReadOther(SidecarCursor cursor, TextSpan brace, bool isParameter)
     {
+        var keys = isParameter ? OtherParameterKeys : OtherKeys;
         var seen = 0;
         string? name = null;
-        while (cursor.NextKey(OtherKeys, ref seen) is not null)
+        string? bindName = null;
+        for (var key = cursor.NextKey(keys, ref seen); key is not null; key = cursor.NextKey(keys, ref seen))
         {
-            name = cursor.ReadString(SidecarKeys.Name, orNull: false);
+            switch (key)
+            {
+                case SidecarKeys.Name:
+                    name = cursor.ReadString(key, orNull: false);
+                    break;
+                case SidecarKeys.BindName:
+                    bindName = cursor.ReadString(key, orNull: false);
+                    break;
+                default:
+                    // NextKey gives no key that is not in the array.
+                    break;
+            }
         }
 
-        cursor.Require(OtherKeys, seen, brace, SidecarKeys.Name);
-        return cursor.Error is null && name is not null ? new OtherEngineType(name) : null;
+        cursor.Require(keys, seen, brace, SidecarKeys.Name);
+        return cursor.Error is null && name is not null ? new OtherEngineType(name) { BindName = bindName } : null;
     }
 }

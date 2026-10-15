@@ -144,6 +144,15 @@ internal sealed class SidecarFaker(int seed, bool lenient)
     {
         var name = Text();
         var type = _random.Bool(0.9f) ? Type(engine) : null;
+        if (type is not null && _random.Bool())
+        {
+            // Only a parameter's own type has one.
+            type = type with
+            {
+                BindName = Text(),
+            };
+        }
+
         var nullable = Pick<bool?>(true, false, null);
         return new SidecarParameter(name, index, type, nullable, type is null ? null : Provenance(TypeSources));
     }

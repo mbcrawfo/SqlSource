@@ -111,11 +111,20 @@ B looks like the forward-compatible one, but the core is where the trouble lives
 
 **Recommendation: A, with one shared convention.**  Every engine's type object has a required `name`: the type as that engine spells it, facets included, deterministic, so that a reader that knows nothing about the engine, the tool's own `--check` diff, a documentation generator, a reviewer, can show it.  Everything else in the object is the engine's own vocabulary.  A new engine adds a new `engine` value and a new object shape under section 3's additive rule; the old generator rejects the engine by name and is otherwise untouched.  The JSON Schema selects the shape with `if`/`then` on `engine`.
 
+The convention gains a second shared key, optional, which an engine's section may write:
+
+| Key | Type | Written | Meaning |
+|----|----|----|----|
+| `bindName` | string | on a parameter's top-level type, when the engine's driver binds a parameter by a type name | The name by which the engine's .NET driver binds a parameter of this type, as that driver takes it.  It never holds a modifier.  It is never written on a column's type, nor on a type nested in another (`element`, `base`, `subtype`). |
+
+Each engine's section says when the key is written and what it holds.  An engine whose driver binds every type by an enum, and never by name, writes none.  The key follows `name` in the object.
+
 ### 2.2 PostgreSQL (`postgres`)
 
 | Key | Type | Written | Meaning |
 |----|----|----|----|
 | `name` | string | always | The spelled type with facets: `"numeric(18,2)"`, `"character varying(100)"`, `"timestamp with time zone"`, `"text[]"`.  A type outside `pg_catalog` is schema-qualified, `"public.user_status"`, whatever the search path was, so the value does not depend on the session. |
+| `bindName` | string | always on a parameter's top-level type | The `NpgsqlParameter.DataTypeName` that `check` bound the parameter by, without a modifier.  The rules, in order (`PostgresBindNames`): an array is its element's and `[]`, except an array whose name the server cut to a name's 63 bytes, which is its own schema, a `.` and its own `typname` (`"public._<the cut name>"`), since Npgsql refuses the element's name and `[]` as too long; a domain over a domain is the innermost base's, since Npgsql refuses the nesting; plain `bit` is `bit`, which `format_type` quotes; the single-byte `"char"` is `char`, Npgsql's own name for it; any other type of `pg_catalog` is its `format_type(oid, -1)` without a leading `pg_catalog.` (`"integer"`, `"character varying"`, `"timestamp with time zone"`, and `"bpchar"` for `char(2)`); a type of another schema is `schema.name` with neither part quoted (`"public.user_status"`), and there is no name when either part holds a `.`.  It does not depend on the session's `search_path`.  A type that has no name, or whose name Npgsql refuses, is not described (`SQLSRC232`). |
 | `kind` | `"base"`, `"array"`, `"domain"`, `"enum"`, `"range"`, `"multirange"`, `"composite"` | always | The `pg_type.typtype` family, with arrays split out. |
 | `schema` | string | always | `pg_namespace.nspname`. |
 | `internalName` | string | always | `pg_type.typname`: `"int4"`, `"varchar"`, `"timestamptz"`, `"_text"`, `"user_status"`.  The stable catalog identity and the key of the generator's map and of the user's override (`timestamptz`, `public.user_status`). |
@@ -134,6 +143,7 @@ A composite carries no fields in this epic; `fields` is the obvious additive key
 | Key | Type | Written | Meaning |
 |----|----|----|----|
 | `name` | string | always | `system_type_name` verbatim: `"nvarchar(50)"`, `"decimal(18,2)"`, `"varchar(max)"`, `"datetime2(7)"`, `"int"`.  `rowversion` is reported, and stored, as `"timestamp"`, and `json` as `"varchar(max)"` or `"nvarchar(max)"` depending on the connection's TDS version, because that is what the server says. |
+| `bindName` | string | phase 6 decides | Not yet settled.  The expected shape is `SqlParameter.TypeName` for a table type and `UdtTypeName` for a CLR type, and no `bindName` for a type that `SqlDbType` names.  Phase 6 states when it writes the key. |
 | `maxLength` | integer | always | `max_length` verbatim: bytes, `-1` for `max`. |
 | `precision` | integer | always | `precision` verbatim. |
 | `scale` | integer | always | `scale` verbatim. |
@@ -143,7 +153,7 @@ The three facets are written verbatim for every column, even `int`'s `10, 0`, be
 
 ### 2.4 Future engines
 
-MySQL: `{ "name": "int unsigned", "unsigned": true }`, parameters with `type: null` unless declared.  SQLite: `{ "name": "INTEGER" }` from the declared type, or `null`; `nullable: null`.  DuckDB: its own `kind` for `LIST`, `STRUCT`, `MAP`.  Oracle: `origin: null`.  Each is a new shape with the `name` convention, and each is additive.
+MySQL: `{ "name": "int unsigned", "unsigned": true }`, parameters with `type: null` unless declared.  SQLite: `{ "name": "INTEGER" }` from the declared type, or `null`; `nullable: null`.  DuckDB: its own `kind` for `LIST`, `STRUCT`, `MAP`.  Oracle: `origin: null`.  Each is a new shape with the `name` convention, and each is additive.  Each states when it writes `bindName`, if its driver binds a parameter by a type name.
 
 ## 3. Compatibility
 
@@ -152,6 +162,7 @@ The test for every change: **can a reader of the previous format, following sect
 **Additive, no bump:**
 
 - A new key anywhere: on the top level, an entry, a parameter, a column, an origin, or a type object.  Old readers ignore it.
+- `bindName` on a parameter's type object, made in this version without a bump.  Old readers ignore it.
 - A new `engine` value with its own type shape.  Old readers reject the engine by name.
 - A new `kind` inside an engine's type object, with any keys it needs.  Old readers report an unsupported type at the column.
 - A new `typeSource` value.
@@ -179,7 +190,7 @@ A bump is a whole-file matter: a file is one `formatVersion`, never mixed entrie
 | Missing or not an integer | Malformed file. |
 | `toolVersion` different from its own, `formatVersion` equal | One warning at the sidecar; the file is read.  The packages share a version, so a difference means the tool manifest and the package reference are out of step, not that the file is unreadable. |
 
-**What `--check` compares**, per the epic: the set of entries and, per entry, `hash`, `engine`, `database`, `resultKind`, `matchesTable`, and each parameter's and column's `name`, `ordinal`, `type` and `nullable`.  It ignores `_WARNING`, `$schema`, `formatVersion`, `toolVersion`, `serverVersion`, `typeSource`, `nullableSource`, `plan`, `tableMatch`, `origin`, `identity` and `computed`: the versions and the server differ between a developer's machine and CI by design, and provenance and origin are informational.
+**What `--check` compares**, per the epic: the set of entries and, per entry, `hash`, `engine`, `database`, `resultKind`, `matchesTable`, and each parameter's and column's `name`, `ordinal`, `type` and `nullable`.  A `type` is compared as a whole, `bindName` included, since it changes what generated code does.  It ignores `_WARNING`, `$schema`, `formatVersion`, `toolVersion`, `serverVersion`, `typeSource`, `nullableSource`, `plan`, `tableMatch`, `origin`, `identity` and `computed`: the versions and the server differ between a developer's machine and CI by design, and provenance and origin are informational.
 
 **What the tool does:** it skips a query whose `hash` and `database` match and whose file has its own `formatVersion` and `toolVersion`; any other state re-describes, and `--check` re-describes everything.  Since both versions are per file, updating the tool re-describes every query of every file on the next `describe`, which is the epic's intent without `--force`.
 
@@ -241,6 +252,7 @@ LIMIT @limit;
           "ordinal": 0,
           "type": {
             "name": "integer",
+            "bindName": "integer",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int4"
@@ -370,6 +382,7 @@ LIMIT @limit;
           "ordinal": 0,
           "type": {
             "name": "character varying(100)",
+            "bindName": "character varying",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "varchar",
@@ -383,6 +396,7 @@ LIMIT @limit;
           "ordinal": 1,
           "type": {
             "name": "public.email",
+            "bindName": "public.email",
             "kind": "domain",
             "schema": "public",
             "internalName": "email",
@@ -402,6 +416,7 @@ LIMIT @limit;
           "ordinal": 2,
           "type": {
             "name": "public.user_status",
+            "bindName": "public.user_status",
             "kind": "enum",
             "schema": "public",
             "internalName": "user_status",
@@ -468,6 +483,7 @@ LIMIT @limit;
           "ordinal": 0,
           "type": {
             "name": "integer",
+            "bindName": "integer",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int4"
@@ -492,6 +508,7 @@ LIMIT @limit;
           "ordinal": 0,
           "type": {
             "name": "public.user_status[]",
+            "bindName": "public.user_status[]",
             "kind": "array",
             "schema": "public",
             "internalName": "_user_status",
@@ -515,6 +532,7 @@ LIMIT @limit;
           "ordinal": 1,
           "type": {
             "name": "integer",
+            "bindName": "integer",
             "kind": "base",
             "schema": "pg_catalog",
             "internalName": "int4"
@@ -1163,6 +1181,7 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string", "minLength": 1 },
+        "bindName": { "type": "string", "minLength": 1 },
         "kind": { "type": "string", "enum": ["base", "array", "domain", "enum", "range", "multirange", "composite"] },
         "schema": { "type": "string", "minLength": 1 },
         "internalName": { "type": "string", "minLength": 1 },
@@ -1187,6 +1206,7 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
       "additionalProperties": false,
       "properties": {
         "name": { "type": "string", "minLength": 1 },
+        "bindName": { "type": "string", "minLength": 1 },
         "maxLength": { "type": "integer", "minimum": -1 },
         "precision": { "type": "integer", "minimum": 0 },
         "scale": { "type": "integer", "minimum": 0 },

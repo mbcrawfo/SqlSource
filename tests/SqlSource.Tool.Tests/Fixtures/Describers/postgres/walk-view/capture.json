@@ -349,7 +349,12 @@
           }
         ],
         "error": null,
-        "driverError": null
+        "driverError": null,
+        "sent": {
+          "text": "SELECT v.user_id, v.name, v.order_id, v.total, i.amount\nFROM user_orders v LEFT JOIN billing.invoices i ON i.order_id = v.order_id",
+          "parameters": []
+        },
+        "textRefused": null
       }
     },
     {

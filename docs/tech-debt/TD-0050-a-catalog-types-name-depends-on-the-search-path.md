@@ -6,7 +6,9 @@ The PostgreSQL describer names a type of `pg_catalog` that has no modifier by `f
 
 So such a name depends on the session, against the remark of `PostgresTypeNames` that the name of a type does not, and the sidecar of one query differs between two databases, or two connection strings, that differ only in a user's type named like a built-in.
 
-A type of `pg_catalog` that takes a modifier is not affected: `format_type` special-cases every built-in one and never qualifies them.  The container test `Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpelling` in [`ColumnTests`](../../tests/SqlSource.Tests.Postgres/Describer/ColumnTests.cs) guards `numeric(10,2)` under a domain named `numeric`.
+The `bindName` of such a type, the name `check` binds a parameter by and the sidecar records beside `name`, is not affected: [`PostgresBindNames`](../../src/SqlSource.Tool/Describing/Postgres/PostgresBindNames.cs) takes `format_type(oid, -1)` without a leading `pg_catalog.`, so it is `text` in either session.  Only `name` has the problem.
+
+A type of `pg_catalog` that takes a modifier is not affected: `format_type` special-cases every built-in one and never qualifies them.  The container test `Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpellingAndBindsByTheBareName` in [`ColumnTests`](../../tests/SqlSource.Tests.Postgres/Describer/ColumnTests.cs) guards `numeric(10,2)` under a domain named `numeric`.
 
 ## Why it exists
 
