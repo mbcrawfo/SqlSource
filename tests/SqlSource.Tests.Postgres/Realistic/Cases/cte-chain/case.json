@@ -1,0 +1,10 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "order_count", "nullable": false },
+    { "name": "lifetime", "nullable": false },
+    { "name": "last_placed_at", "nullable": false },
+    { "name": "closed_at", "nullable": true, "why": "accounts.closed_at is nullable; alice and bob are open" }
+  ]
+}

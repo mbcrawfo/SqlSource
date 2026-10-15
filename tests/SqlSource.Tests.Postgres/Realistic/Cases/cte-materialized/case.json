@@ -1,0 +1,14 @@
+{
+  "columns": [
+    { "name": "order_id", "nullable": false },
+    { "name": "account_id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "amount", "nullable": false },
+    { "name": "issued_on", "nullable": false },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "orders.shipped_at is nullable; orders 2 and 3, whose invoices are unpaid, are unshipped"
+    }
+  ]
+}

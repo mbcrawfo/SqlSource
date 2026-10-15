@@ -1,0 +1,17 @@
+{
+  "columns": [
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "price", "nullable": false },
+    {
+      "name": "category",
+      "nullable": true,
+      "why": "products.category_id is nullable, and the left join finds no category; 13 has none"
+    },
+    {
+      "name": "units_sold",
+      "nullable": true,
+      "why": "the sum over no line of the left join is NULL; product 14 is in no order"
+    }
+  ]
+}

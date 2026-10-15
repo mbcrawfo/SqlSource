@@ -1,0 +1,12 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "month_start", "nullable": false },
+    { "name": "total", "nullable": false },
+    { "name": "change", "nullable": true, "why": "lag is NULL on an account's first month" }
+  ],
+  "samples": [
+    { "from": "'2024-01-01'" }
+  ]
+}
