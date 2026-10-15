@@ -23,6 +23,32 @@ internal static class PostgresTypeNames
     public static string Spell(PostgresTypeRow row, PostgresFacets facets) =>
         row.Nspname == Catalog ? InCatalog(row, facets) : $"{Identifier(row.Nspname)}.{Identifier(row.Typname)}";
 
+    /// <summary>
+    /// The name of a type that is no array, from the text that <c>format_type(oid, modifier)</c> gave.  A type of
+    /// <c>pg_catalog</c> is the server's text.  A type of any other schema is the tool's <c>schema.name</c> and the
+    /// tail, what the server's text holds after <c>format_type(oid, -1)</c>, which is the row's
+    /// <see cref="PostgresTypeRow.FormatType" />.
+    /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The server's text does not start with the row's <see cref="PostgresTypeRow.FormatType" />.  The rule of the
+    /// tail was verified for PostGIS and for a type made over <c>varcharin</c>; a type that breaks it is a bug to
+    /// see, not a name to guess.
+    /// </exception>
+    public static string WithModifier(PostgresTypeRow row, string formatted)
+    {
+        if (row.Nspname == Catalog)
+        {
+            return formatted;
+        }
+
+        return formatted.StartsWith(row.FormatType, StringComparison.Ordinal)
+            ? Spell(row, PostgresFacets.None) + formatted[row.FormatType.Length..]
+            : throw new InvalidOperationException(
+                $"format_type for type {row.Nspname}.{row.Typname} gave '{formatted}', which does not start with "
+                    + $"'{row.FormatType}', the text without a modifier: the tool cannot find the modifier's text."
+            );
+    }
+
     /// <summary>The name of an array: its element's and <c>[]</c>.</summary>
     public static string ArrayOf(string element) => element + "[]";
 
