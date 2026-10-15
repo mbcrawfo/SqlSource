@@ -23,10 +23,11 @@
             "schema": "public",
             "internalName": "email_t",
             "base": {
-              "name": "character varying",
+              "name": "character varying(254)",
               "kind": "base",
               "schema": "pg_catalog",
-              "internalName": "varchar"
+              "internalName": "varchar",
+              "length": 254
             }
           },
           "nullable": null,

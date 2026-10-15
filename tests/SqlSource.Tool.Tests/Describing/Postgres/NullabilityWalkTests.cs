@@ -54,6 +54,7 @@ public class NullabilityWalkTests
                 row,
                 origins[index],
                 PostgresRows.Of(PostgresRows.Int4),
+                TypeSpellings.None,
                 gated: true
             );
         }
@@ -138,7 +139,13 @@ public class NullabilityWalkTests
         );
         var row = PostgresTables.ColumnOf(0, "id", 23, table, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(table));
-        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+        var column = PostgresColumns.Build(
+            row,
+            origin,
+            PostgresRows.Of(PostgresRows.Int4),
+            TypeSpellings.None,
+            gated: true
+        );
 
         var outcome = NullabilityWalk.Run(Scan("n", "id"), [column], [origin], oldAndNewMayBeNamed: false);
 
@@ -159,7 +166,13 @@ public class NullabilityWalkTests
         };
         var row = PostgresTables.ColumnOf(0, "id", 23, parent, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(parent));
-        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+        var column = PostgresColumns.Build(
+            row,
+            origin,
+            PostgresRows.Of(PostgresRows.Int4),
+            TypeSpellings.None,
+            gated: true
+        );
 
         var outcome = NullabilityWalk.Run(Scan("p", "id"), [column], [origin], oldAndNewMayBeNamed: false);
 
@@ -182,7 +195,13 @@ public class NullabilityWalkTests
         };
         var row = PostgresTables.ColumnOf(0, "id", 23, parted, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(parted));
-        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+        var column = PostgresColumns.Build(
+            row,
+            origin,
+            PostgresRows.Of(PostgresRows.Int4),
+            TypeSpellings.None,
+            gated: true
+        );
 
         var outcome = NullabilityWalk.Run(Scan("pt", "id"), [column], [origin], oldAndNewMayBeNamed: false);
 
@@ -205,7 +224,13 @@ public class NullabilityWalkTests
         };
         var row = PostgresTables.ColumnOf(0, "id", 23, ruled, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(ruled));
-        var column = PostgresColumns.Build(row, origin, PostgresRows.Of(PostgresRows.Int4), gated: true);
+        var column = PostgresColumns.Build(
+            row,
+            origin,
+            PostgresRows.Of(PostgresRows.Int4),
+            TypeSpellings.None,
+            gated: true
+        );
         var plan = Over("ModifyTable", Scan("x") with { NodeType = "Result", Alias = null }) with
         {
             Alias = "t3",

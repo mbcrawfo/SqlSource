@@ -78,7 +78,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "character varying",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 16387,
@@ -91,7 +92,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "email_t",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": 258
           },
           {
             "oid": 16390,
@@ -107,7 +109,29 @@
             "enumLabels": [
               "active",
               "disabled"
-            ]
+            ],
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1043,
+            "modifier": 258
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "modifier": 258,
+            "formatType": "character varying(254)"
           }
         ],
         "error": null

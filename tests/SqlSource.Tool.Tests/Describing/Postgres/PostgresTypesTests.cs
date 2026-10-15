@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tests.Snapshot;
@@ -240,4 +241,210 @@ public class PostgresTypesTests
             )
             .Message.ShouldContain("25");
     }
+
+    // A type with a modifier, as a column gives it: the server spells the pair, and the facets are decoded from the
+    // number.  Every number below is one that a server gave, in TypeModifiersTests.
+    private const int Varchar10 = 14;
+    private const int Varchar254 = 258;
+    private const int Tagged7 = 11;
+    private const int IntervalYearToMonth = 458751;
+
+    private static readonly PostgresTypeRow EmailT254 = PostgresRows.EmailT with { Typtypmod = Varchar254 };
+
+    private static readonly PostgresType CharacterVarying254 = TestSidecars.Postgres(
+        "character varying(254)",
+        internalName: "varchar",
+        length: 254
+    );
+
+    private static readonly PostgresType EmailTOf254 = EmailT with { Base = CharacterVarying254 };
+
+    private static TypeSpellings Spelled(params (long Oid, int Modifier, string FormatType)[] rows) =>
+        TypeSpellings.From([
+            .. rows.Select(static row => new PostgresSpellingRow(row.Oid, row.Modifier, row.FormatType)),
+        ]);
+
+    // varchar(10)[]: the row description gives the array the modifier of its element.
+    [Fact]
+    public void Build_ArrayWithAModifier_GivesItsElementTheFacetsAndTheName() =>
+        PostgresTypes
+            .Build(
+                1015,
+                PostgresRows.Of(PostgresRows.Varchar, PostgresRows.VarcharArray),
+                Varchar10,
+                Spelled((1043, Varchar10, "character varying(10)"))
+            )
+            .ShouldBe(
+                TestSidecars.Postgres(
+                    "character varying(10)[]",
+                    SidecarValues.Kind.Array,
+                    internalName: "_varchar",
+                    element: TestSidecars.Postgres("character varying(10)", internalName: "varchar", length: 10)
+                )
+            );
+
+    // The server's text is "tagged(7)" on a search_path with public, and the tool keeps its own "public.tagged".
+    [Fact]
+    public void Build_TypeOfAnotherSchemaWithAModifier_IsTheSchemaNameAndTheTail()
+    {
+        var rows = PostgresRows.Of(PostgresRows.Tagged, PostgresRows.TaggedArray);
+        var spellings = Spelled((PostgresRows.Tagged.Oid, Tagged7, "tagged(7)"));
+
+        var tagged = PostgresTypes.Build(PostgresRows.Tagged.Oid, rows, Tagged7, spellings);
+        var tags = PostgresTypes.Build(PostgresRows.TaggedArray.Oid, rows, Tagged7, spellings);
+
+        tagged.ShouldBe(TestSidecars.Postgres("public.tagged(7)", schema: "public", internalName: "tagged"));
+        tags.Name.ShouldBe("public.tagged(7)[]");
+        tags.Element.ShouldBe(tagged);
+    }
+
+    // The fields are the server's text alone: a precision of 0xFFFF is none.
+    [Fact]
+    public void Build_IntervalWithFields_IsTheServersSpelling() =>
+        PostgresTypes
+            .Build(
+                1186,
+                PostgresRows.Of(PostgresRows.Interval),
+                IntervalYearToMonth,
+                Spelled((1186, IntervalYearToMonth, "interval year to month"))
+            )
+            .ShouldBe(TestSidecars.Postgres("interval year to month", internalName: "interval"));
+
+    // A parameter has no modifier, so the domain's typtypmod is the one its base takes.  The domain's own name has
+    // none.
+    [Fact]
+    public void Build_ParameterOfADomain_GivesItsBaseTheDomainsModifier()
+    {
+        var built = PostgresTypes.Build(
+            EmailT254.Oid,
+            PostgresRows.Of(PostgresRows.Varchar, EmailT254),
+            -1,
+            Spelled((1043, Varchar254, "character varying(254)"))
+        );
+
+        built.Name.ShouldBe("public.email_t");
+        built.Length.ShouldBeNull();
+        var baseType = built.Base.ShouldNotBeNull();
+        baseType.Name.ShouldBe("character varying(254)");
+        baseType.Length.ShouldBe(254);
+    }
+
+    // A domain over a domain over varchar(254): the outer domain fixes no modifier, so its base takes the one it was
+    // built with, -1 for a parameter and 258 for a column, as the row description gives a column of it.  Either way
+    // the inner domain's own typtypmod reaches varchar.
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(Varchar254)]
+    public void Build_DomainOverADomain_GivesEachBaseItsModifier(int modifier)
+    {
+        var work = PostgresRows.DomainOf(16400, "work_email", EmailT254, "billing") with { Typtypmod = -1 };
+
+        PostgresTypes
+            .Build(
+                work.Oid,
+                PostgresRows.Of(PostgresRows.Varchar, EmailT254, work),
+                modifier,
+                Spelled((1043, Varchar254, "character varying(254)"))
+            )
+            .ShouldBe(
+                TestSidecars.Postgres(
+                    "billing.work_email",
+                    SidecarValues.Kind.Domain,
+                    "billing",
+                    "work_email",
+                    baseType: EmailTOf254
+                )
+            );
+    }
+
+    // email_t[]: the array's name is its element's, the domain's, and the domain's base has the domain's modifier.
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(Varchar254)]
+    public void Build_ArrayOfADomain_GivesTheDomainsBaseTheModifier(int modifier)
+    {
+        var emails = PostgresRows.ArrayOf(16386, "_email_t", EmailT254);
+
+        var built = PostgresTypes.Build(
+            emails.Oid,
+            PostgresRows.Of(PostgresRows.Varchar, EmailT254, emails),
+            modifier,
+            Spelled((1043, Varchar254, "character varying(254)"))
+        );
+
+        built.Name.ShouldBe("public.email_t[]");
+        built.Kind.ShouldBe(SidecarValues.Kind.Array);
+        built.Element.ShouldBe(EmailTOf254);
+    }
+
+    // Each case gives the pairs it names and no others, and Build of it asks for no pair beyond them.
+    [Fact]
+    public void PairsOf_EachCaseAbove_IsExactlyWhatBuildLooksUp()
+    {
+        var work = PostgresRows.DomainOf(16400, "work_email", EmailT254, "billing") with { Typtypmod = -1 };
+        var emails = PostgresRows.ArrayOf(16386, "_email_t", EmailT254);
+        var emailRange = PostgresRows.RangeOf(16410, "email_range", EmailT254);
+        var rows = PostgresRows.Of(
+            PostgresRows.Int4,
+            PostgresRows.Varchar,
+            PostgresRows.VarcharArray,
+            PostgresRows.Numeric,
+            PostgresRows.NumericArray,
+            PostgresRows.Interval,
+            PostgresRows.Tagged,
+            PostgresRows.TaggedArray,
+            PostgresRows.UserStatus,
+            PostgresRows.Int4range,
+            EmailT254,
+            work,
+            emails,
+            emailRange
+        );
+        (long Oid, int Modifier, PostgresTypmodPair[] Pairs)[] cases =
+        [
+            (1015, Varchar10, [new(1043, Varchar10)]),
+            (1231, 393222, [new(1700, 393222)]),
+            (1186, IntervalYearToMonth, [new(1186, IntervalYearToMonth)]),
+            (PostgresRows.Tagged.Oid, Tagged7, [new(PostgresRows.Tagged.Oid, Tagged7)]),
+            (PostgresRows.TaggedArray.Oid, Tagged7, [new(PostgresRows.Tagged.Oid, Tagged7)]),
+            (EmailT254.Oid, -1, [new(1043, Varchar254)]),
+            (EmailT254.Oid, Varchar254, [new(1043, Varchar254)]),
+            (work.Oid, -1, [new(1043, Varchar254)]),
+            (emails.Oid, Varchar254, [new(1043, Varchar254)]),
+            (emailRange.Oid, -1, [new(1043, Varchar254)]),
+            (23, -1, []),
+            (1043, -1, []),
+            (1015, -1, []),
+            (PostgresRows.UserStatus.Oid, -1, []),
+            (PostgresRows.Int4range.Oid, -1, []),
+        ];
+
+        foreach (var (oid, modifier, pairs) in cases)
+        {
+            var found = PostgresTypes.PairsOf(oid, rows, modifier).ToList();
+            found.ShouldBe(pairs);
+            var spellings = TypeSpellings.From([
+                .. found.Select(pair => new PostgresSpellingRow(
+                    pair.Oid,
+                    pair.Modifier,
+                    rows[pair.Oid].FormatType + "(1)"
+                )),
+            ]);
+            _ = PostgresTypes.Build(oid, rows, modifier, spellings);
+        }
+    }
+
+    // The session asks every pair PairsOf gives, so a pair the spellings lack is a bug.
+    [Fact]
+    public void Build_PairNotSpelled_Throws() =>
+        Should
+            .Throw<InvalidOperationException>(() =>
+                PostgresTypes.Build(
+                    1015,
+                    PostgresRows.Of(PostgresRows.Varchar, PostgresRows.VarcharArray),
+                    Varchar10,
+                    TypeSpellings.None
+                )
+            )
+            .Message.ShouldContain("character varying");
 }

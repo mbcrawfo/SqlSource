@@ -260,12 +260,13 @@ public sealed class ParameterTests(PostgresContainer postgres)
         internalName: "varchar"
     );
 
+    // The domain's own type has no modifier, as a parameter's never has: its base has the domain's, varchar(254).
     private static readonly PostgresType EmailT = TestSidecars.Postgres(
         "public.email_t",
         SidecarValues.Kind.Domain,
         "public",
         "email_t",
-        baseType: CharacterVarying
+        baseType: TestSidecars.Postgres("character varying(254)", internalName: "varchar", length: 254)
     );
 
     private static readonly PostgresType UserStatus = TestSidecars.Postgres(

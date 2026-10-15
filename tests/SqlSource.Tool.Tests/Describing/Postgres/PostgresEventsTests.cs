@@ -170,7 +170,7 @@ public class PostgresEventsTests
             );
     }
 
-    // The call of "spellings" has no place in a describe yet; its event is built from what it is given.
+    // The event of "spellings" is built from what it is given; the tests of the session say when it is asked.
     [Fact]
     public void Spellings_RowsOfTheServer_WritesThePairsAndTheRows()
     {

@@ -208,9 +208,9 @@ internal sealed class PostgresSession : IDescribeSession
     }
 
     // What is asked of a statement that was prepared, in this order: its columns, the tables they name, and every
-    // type that the parameters, the columns and their origins have, once; Npgsql's own reading of the SQL; and, for
-    // a gated query with rows, its generic plan.  The table match is made last and asks nothing: it reads the
-    // nullability the walk set.
+    // type that the parameters, the columns and their origins have, once; the server's spelling of each type with
+    // each modifier the built types need, once; Npgsql's own reading of the SQL; and, for a gated query with rows,
+    // its generic plan.  The table match is made last and asks nothing: it reads the nullability the walk set.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
         string statement,
@@ -278,7 +278,13 @@ internal sealed class PostgresSession : IDescribeSession
             return Failed(PostgresErrors.SchemaChanged(request, DescribeStep.ResolveType, lost));
         }
 
-        var parameters = TypeParameters(request, parameterOids, rows.Value);
+        var spellings = await SpellingsOfAsync(parameterOids, columns, origins, rows.Value, cancellationToken);
+        if (!spellings.Succeeded)
+        {
+            return Failed(PostgresErrors.Types(spellings.Failure, request));
+        }
+
+        var parameters = TypeParameters(request, parameterOids, rows.Value, spellings.Value);
         if (!parameters.Succeeded)
         {
             return Failed(parameters.Failure);
@@ -286,7 +292,7 @@ internal sealed class PostgresSession : IDescribeSession
 
         // A statement without rows has nothing a join could null-extend.
         var gated = columns.Count > 0 && OuterJoinGate.IsGated(request.Sql);
-        var built = BuildColumns(request, columns, origins, rows.Value, gated);
+        var built = BuildColumns(request, columns, origins, rows.Value, spellings.Value, gated);
         if (!built.Succeeded)
         {
             return Failed(built.Failure);
@@ -507,11 +513,56 @@ internal sealed class PostgresSession : IDescribeSession
             );
     }
 
+    // The server's spelling of every pair of a type and a modifier that the parameters and the columns will be built
+    // with: a parameter's domain base, and each column's type with the modifier of the row description.  The request
+    // is sorted and holds each pair once.  Nothing is asked when there is no pair, as for a capture recorded before
+    // the modifier was read, whose columns hold none.
+    private async Task<Outcome<TypeSpellings, PostgresServerError>> SpellingsOfAsync(
+        IReadOnlyList<long> parameterOids,
+        IReadOnlyList<PostgresColumnRow> columns,
+        ColumnOrigin?[] origins,
+        IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        CancellationToken cancellationToken
+    )
+    {
+        PostgresTypmodPair[] pairs =
+        [
+            .. parameterOids
+                .SelectMany(oid => PostgresTypes.PairsOf(oid, rows, TypeModifiers.NoModifier))
+                .Concat(
+                    columns.SelectMany(
+                        (column, index) =>
+                            column.TypeModifier is { } modifier
+                                ? PostgresTypes.PairsOf(ColumnTypes.OidOf(column, origins[index], rows), rows, modifier)
+                                : []
+                    )
+                )
+                .Distinct()
+                .OrderBy(static pair => pair.Oid)
+                .ThenBy(static pair => pair.Modifier),
+        ];
+        if (pairs.Length == 0)
+        {
+            return Outcome<TypeSpellings, PostgresServerError>.Of(TypeSpellings.None);
+        }
+
+        var answer = await SpellingsAsync(new PostgresSpellingsRequest(pairs), cancellationToken);
+        return answer.Error is { } error
+            ? Outcome<TypeSpellings, PostgresServerError>.Failed(error)
+            : Outcome<TypeSpellings, PostgresServerError>.Of(
+                TypeSpellings.From(
+                    answer.Rows
+                        ?? throw new InvalidOperationException("The answer to 'spellings' holds no rows and no error.")
+                )
+            );
+    }
+
     // Each parameter of the query's list gets the type the server resolved for it.
     private static Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure> TypeParameters(
         DescribeRequest request,
         IReadOnlyList<long> oids,
-        IReadOnlyDictionary<long, PostgresTypeRow> rows
+        IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        TypeSpellings spellings
     )
     {
         var parameters = new List<DescribedParameter>(oids.Count);
@@ -526,11 +577,12 @@ internal sealed class PostgresSession : IDescribeSession
                 );
             }
 
-            // A parameter has no facets: the protocol gives it an OID and no modifier.
+            // The protocol gives a parameter an OID and no modifier, so its own type has none: the base of a domain
+            // has the domain's.
             parameters.Add(
                 new DescribedParameter(
                     parameter.Name,
-                    PostgresTypes.Build(oids[index], rows, PostgresFacets.None),
+                    PostgresTypes.Build(oids[index], rows, TypeModifiers.NoModifier, spellings),
                     parameter.Type is null ? SidecarValues.TypeSource.Inferred : SidecarValues.TypeSource.Declared
                 )
             );
@@ -546,6 +598,7 @@ internal sealed class PostgresSession : IDescribeSession
         IReadOnlyList<PostgresColumnRow> columns,
         ColumnOrigin?[] origins,
         IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        TypeSpellings spellings,
         bool gated
     )
     {
@@ -560,7 +613,7 @@ internal sealed class PostgresSession : IDescribeSession
                 );
             }
 
-            var recorded = PostgresColumns.Build(column, origins[index], rows, gated);
+            var recorded = PostgresColumns.Build(column, origins[index], rows, spellings, gated);
             PostgresEvents.Column(_log, request.Name, recorded, gated);
             built.Add(recorded);
         }
@@ -687,6 +740,17 @@ internal sealed class PostgresSession : IDescribeSession
         var started = _time.GetTimestamp();
         var answer = await _exchange.AskAsync("types", request, _live.TypesAsync, cancellationToken);
         PostgresEvents.Types(_log, request, answer, ElapsedSince(started));
+        return answer;
+    }
+
+    private async Task<PostgresSpellingsAnswer> SpellingsAsync(
+        PostgresSpellingsRequest request,
+        CancellationToken cancellationToken
+    )
+    {
+        var started = _time.GetTimestamp();
+        var answer = await _exchange.AskAsync("spellings", request, _live.SpellingsAsync, cancellationToken);
+        PostgresEvents.Spellings(_log, request, answer, ElapsedSince(started));
         return answer;
     }
 

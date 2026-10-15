@@ -1537,4 +1537,181 @@ public class PostgresSessionTests
         failure.Help.ShouldBe(PostgresErrors.BindHelp);
         exchange.Unused.ShouldBeEmpty();
     }
+
+    // "spellings" answering the server's text for each pair the test gives, in the order it gives them.
+    private static PostgresScript Spells(
+        PostgresScript script,
+        params (long Oid, int Modifier, string FormatType)[] rows
+    ) =>
+        script.Answer(
+            "spellings",
+            new PostgresSpellingsRequest([.. rows.Select(static row => new PostgresTypmodPair(row.Oid, row.Modifier))]),
+            new PostgresSpellingsAnswer(
+                [.. rows.Select(static row => new PostgresSpellingRow(row.Oid, row.Modifier, row.FormatType))],
+                null
+            )
+        );
+
+    private static readonly PostgresTypeRow EmailT254 = PostgresRows.EmailT with { Typtypmod = 258 };
+
+    // The pairs of the parameter's domain base and of the columns are asked in one request, after "types", sorted
+    // and each once: two columns of varchar(10), one of them an array, give one pair.  A column without a modifier
+    // gives none.
+    [Fact]
+    public async Task DescribeAsync_ColumnsWithModifiers_AsksSpellingsOnceAfterTypes()
+    {
+        const string Sql = "SELECT names, v, amount, n FROM t WHERE email = $1";
+        PostgresColumnRow[] columns =
+        [
+            Expression(0, "names", 1015, length: 10) with
+            {
+                TypeModifier = 14,
+            },
+            Expression(1, "v", 1043, length: 10) with
+            {
+                TypeModifier = 14,
+            },
+            Expression(2, "amount", 1700, precision: 6, scale: 2) with
+            {
+                TypeModifier = 393222,
+            },
+            Expression(3, "n", 23) with
+            {
+                TypeModifier = -1,
+            },
+        ];
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, Sql, ["unknown"], new([EmailT254.Oid], null));
+        _ = Columns(script, 1, 1, columns);
+        _ = Resolves(
+            script,
+            [23, 1015, 1043, 1700, EmailT254.Oid],
+            PostgresRows.Int4,
+            PostgresRows.Varchar,
+            PostgresRows.VarcharArray,
+            PostgresRows.Numeric,
+            EmailT254
+        );
+        _ = Spells(
+            script,
+            (1043, 14, "character varying(10)"),
+            (1043, 258, "character varying(254)"),
+            (1700, 393222, "numeric(6,2)")
+        );
+        _ = Checks(
+            script,
+            "SELECT names, v, amount, n FROM t WHERE email = @email",
+            [("email", "public.email_t")],
+            columns
+        );
+        var exchange = Frees(script, 1).Play();
+        var log = new RecordingLog();
+        await using var session = await PostgresScript.SessionAsync(exchange, log);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT names, v, amount, n FROM t WHERE email = @email", Inferred("email")),
+            TestContext.Current.CancellationToken
+        );
+
+        var description = described.Value.ShouldNotBeNull();
+        var parameter = description.Parameters.ShouldHaveSingleItem().Type.ShouldBeOfType<PostgresType>();
+        parameter.Name.ShouldBe("public.email_t");
+        parameter.Base.ShouldNotBeNull().Name.ShouldBe("character varying(254)");
+        description
+            .Columns.ShouldNotBeNull()
+            .Select(column => column.Type.Name)
+            .ShouldBe(["character varying(10)[]", "character varying(10)", "numeric(6,2)", "integer"]);
+        log.Events.Select(written => written.Name)
+            .Where(name => name is "types" or "spellings" or "column")
+            .ShouldBe(["types", "spellings", "column", "column", "column", "column"]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // Columns and parameters whose types carry no modifier: "spellings" is not in the script, and asking it would
+    // be a CaptureMissException.
+    [Fact]
+    public async Task DescribeAsync_NoModifierToSpell_AsksNoSpellings()
+    {
+        PostgresColumnRow[] columns = [Expression(0, "a", 25) with { TypeModifier = -1 }];
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT $1::text AS a", ["unknown"], new([25], null));
+        _ = Columns(script, 1, 1, columns);
+        _ = Resolves(script, [25], PostgresRows.Text);
+        _ = Checks(script, "SELECT @p::text AS a", [("p", "text")], columns);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT @p::text AS a", Inferred("p")),
+            TestContext.Current.CancellationToken
+        );
+
+        described.Value.ShouldNotBeNull().Columns.ShouldNotBeNull().ShouldHaveSingleItem().Type.Name.ShouldBe("text");
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // A capture recorded before the modifier was read: no TypeModifier, so Npgsql's numbers spell the columns as
+    // they did, the array without its element's length, and nothing is spelled by the server.
+    [Fact]
+    public async Task DescribeAsync_OldCaptureWithoutModifiers_IsDescribedAsBefore()
+    {
+        PostgresColumnRow[] columns =
+        [
+            Expression(0, "names", 1015, length: 10),
+            Expression(1, "d", 1186, precision: 3),
+        ];
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT names, d FROM t", [], new([], null));
+        _ = Columns(script, 1, 0, columns);
+        _ = Resolves(script, [1015, 1186], PostgresRows.Varchar, PostgresRows.VarcharArray, PostgresRows.Interval);
+        _ = Checks(script, "SELECT names, d FROM t", [], columns);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(
+            Request("SELECT names, d FROM t"),
+            TestContext.Current.CancellationToken
+        );
+
+        var built = described.Value.ShouldNotBeNull().Columns.ShouldNotBeNull();
+        built.Select(column => column.Type.Name).ShouldBe(["character varying[]", "interval(3)"]);
+        built[0]
+            .Type.ShouldBeOfType<PostgresType>()
+            .Element.ShouldBe(TestSidecars.Postgres("character varying", internalName: "varchar"));
+        built[1].Type.ShouldBeOfType<PostgresType>().Precision.ShouldBe(3);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // An error of "spellings" is one of "types": the types could not be resolved.  The statement is still freed.
+    [Fact]
+    public async Task DescribeAsync_SpellingsRefused_IsSqlsrc225AtResolveType()
+    {
+        var dropped = new PostgresServerError(
+            "57P01",
+            "terminating connection due to administrator command",
+            null,
+            null,
+            null
+        );
+        PostgresColumnRow[] columns = [Expression(0, "v", 1043, length: 10) with { TypeModifier = 14 }];
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, "SELECT v FROM t", [], new([], null));
+        _ = Columns(script, 1, 0, columns);
+        _ = Resolves(script, [1043], PostgresRows.Varchar);
+        _ = script.Answer(
+            "spellings",
+            new PostgresSpellingsRequest([new PostgresTypmodPair(1043, 14)]),
+            new PostgresSpellingsAnswer(null, dropped)
+        );
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request("SELECT v FROM t"), TestContext.Current.CancellationToken);
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.ServerLines.ShouldBe(["57P01: terminating connection due to administrator command"]);
+        exchange.Unused.ShouldBeEmpty();
+    }
 }

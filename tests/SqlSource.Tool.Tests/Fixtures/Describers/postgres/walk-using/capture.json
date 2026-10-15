@@ -53,7 +53,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
@@ -63,7 +64,8 @@
             "attributeNumber": 3,
             "length": null,
             "precision": 18,
-            "scale": 2
+            "scale": 2,
+            "typeModifier": 1179654
           },
           {
             "ordinal": 2,
@@ -73,7 +75,8 @@
             "attributeNumber": 3,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           }
         ],
         "error": null
@@ -227,7 +230,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1184,
@@ -240,7 +244,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "timestamp with time zone",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1700,
@@ -253,7 +258,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "numeric",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 3910,
@@ -266,7 +272,29 @@
             "rngsubtype": 1184,
             "multirangeRngsubtype": null,
             "formatType": "tstzrange",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1700,
+            "modifier": 1179654
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1700,
+            "modifier": 1179654,
+            "formatType": "numeric(18,2)"
           }
         ],
         "error": null

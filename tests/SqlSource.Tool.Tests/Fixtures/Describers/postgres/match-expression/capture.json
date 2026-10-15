@@ -53,7 +53,8 @@
             "attributeNumber": 1,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
@@ -63,7 +64,8 @@
             "attributeNumber": 2,
             "length": 100,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": 104
           },
           {
             "ordinal": 2,
@@ -73,7 +75,8 @@
             "attributeNumber": 3,
             "length": 254,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": 258
           },
           {
             "ordinal": 3,
@@ -83,7 +86,8 @@
             "attributeNumber": 4,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 4,
@@ -93,7 +97,8 @@
             "attributeNumber": 5,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 5,
@@ -103,7 +108,8 @@
             "attributeNumber": 6,
             "length": null,
             "precision": 18,
-            "scale": 2
+            "scale": 2,
+            "typeModifier": 1179654
           },
           {
             "ordinal": 6,
@@ -113,7 +119,8 @@
             "attributeNumber": 7,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 7,
@@ -123,7 +130,8 @@
             "attributeNumber": 8,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 8,
@@ -133,7 +141,8 @@
             "attributeNumber": 9,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 9,
@@ -143,7 +152,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           }
         ],
         "error": null
@@ -281,7 +291,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 25,
@@ -294,7 +305,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "text",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1009,
@@ -307,7 +319,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "text[]",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1043,
@@ -320,7 +333,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "character varying",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1184,
@@ -333,7 +347,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "timestamp with time zone",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1700,
@@ -346,7 +361,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "numeric",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 16387,
@@ -359,7 +375,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "email_t",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": 258
           },
           {
             "oid": 16390,
@@ -375,7 +392,47 @@
             "enumLabels": [
               "active",
               "disabled"
-            ]
+            ],
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1043,
+            "modifier": 104
+          },
+          {
+            "oid": 1043,
+            "modifier": 258
+          },
+          {
+            "oid": 1700,
+            "modifier": 1179654
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "modifier": 104,
+            "formatType": "character varying(100)"
+          },
+          {
+            "oid": 1043,
+            "modifier": 258,
+            "formatType": "character varying(254)"
+          },
+          {
+            "oid": 1700,
+            "modifier": 1179654,
+            "formatType": "numeric(18,2)"
           }
         ],
         "error": null

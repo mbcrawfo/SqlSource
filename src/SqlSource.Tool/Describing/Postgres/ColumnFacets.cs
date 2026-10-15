@@ -1,8 +1,9 @@
 namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
-/// A column's facets.  Npgsql does not give a column's type modifier: it gives three numbers that are the modifier
-/// decoded, and each is taken only for the types that carry it.
+/// A column's facets, for a capture recorded before the row description's modifier was read: Npgsql gives three
+/// numbers that are the modifier decoded, and each is taken only for the types that carry it.  A column whose capture
+/// holds the modifier has its facets from <see cref="TypeModifiers" />, and none of what follows applies to it.
 /// </summary>
 /// <remarks>
 /// Three of Npgsql's answers are not the server's.  It gives no scale for a <c>numeric</c> whose scale is zero.  It

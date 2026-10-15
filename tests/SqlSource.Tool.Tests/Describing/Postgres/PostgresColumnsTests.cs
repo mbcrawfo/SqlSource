@@ -17,6 +17,7 @@ public class PostgresColumnsTests
                 new PostgresColumnRow(2, "balance", 1700, 0, 0, null, 18, 2),
                 null,
                 PostgresRows.Of(PostgresRows.Numeric),
+                TypeSpellings.None,
                 false
             )
             .ShouldBe(
@@ -40,6 +41,7 @@ public class PostgresColumnsTests
             new PostgresColumnRow(0, "names", 1015, 0, 0, 10, null, null),
             null,
             PostgresRows.Of(PostgresRows.VarcharArray, PostgresRows.Varchar),
+            TypeSpellings.None,
             false
         );
 
@@ -61,6 +63,7 @@ public class PostgresColumnsTests
                     new PostgresColumnRow(0, "c", 23, 0, 0, null, null, null),
                     null,
                     PostgresRows.Of(),
+                    TypeSpellings.None,
                     false
                 )
             )
@@ -102,6 +105,7 @@ public class PostgresColumnsTests
             new PostgresColumnRow(0, "n", 23, 0, 0, null, null, null),
             null,
             PostgresRows.Of(PostgresRows.Int4),
+            TypeSpellings.None,
             false
         );
 
@@ -133,10 +137,68 @@ public class PostgresColumnsTests
         );
     }
 
+    // A column whose capture holds the row description's modifier: the server spells the type with it, and the
+    // facets are decoded from it, the element's of an array included.  Npgsql's numbers are not read.
+    [Fact]
+    public void Build_ColumnWithATypeModifier_IsTheServersSpellingWithTheDecodedFacets()
+    {
+        var column = PostgresColumns.Build(
+            new PostgresColumnRow(0, "names", 1015, 0, 0, 99, null, null, 14),
+            null,
+            PostgresRows.Of(PostgresRows.VarcharArray, PostgresRows.Varchar),
+            TypeSpellings.From([new PostgresSpellingRow(1043, 14, "character varying(10)")]),
+            false
+        );
+
+        column.Type.ShouldBe(
+            TestSidecars.Postgres(
+                "character varying(10)[]",
+                SidecarValues.Kind.Array,
+                internalName: "_varchar",
+                element: TestSidecars.Postgres("character varying(10)", internalName: "varchar", length: 10)
+            )
+        );
+    }
+
+    // The row description gives a column of a domain its base and the domain's modifier.
+    [Fact]
+    public void Build_ColumnOfADomainWithATypeModifier_IsTheDomainWithItsBaseSpelled()
+    {
+        var users = PostgresTables.Users;
+
+        var column = Build(
+            PostgresTables.ColumnOf(0, "email", 1043, users, 3) with
+            {
+                TypeModifier = 258,
+            },
+            users,
+            PostgresRows.Of(PostgresRows.EmailT, PostgresRows.Varchar),
+            TypeSpellings.From([new PostgresSpellingRow(1043, 258, "character varying(254)")])
+        );
+
+        column.Type.ShouldBe(
+            TestSidecars.Postgres(
+                "public.email_t",
+                SidecarValues.Kind.Domain,
+                "public",
+                "email_t",
+                baseType: TestSidecars.Postgres("character varying(254)", internalName: "varchar", length: 254)
+            )
+        );
+    }
+
     private static SidecarColumn Build(
         PostgresColumnRow column,
         PostgresTableRow table,
         System.Collections.Generic.IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        TypeSpellings? spellings = null,
         bool gated = false
-    ) => PostgresColumns.Build(column, ColumnOrigin.Find(column, PostgresTables.Of(table)), rows, gated);
+    ) =>
+        PostgresColumns.Build(
+            column,
+            ColumnOrigin.Find(column, PostgresTables.Of(table)),
+            rows,
+            spellings ?? TypeSpellings.None,
+            gated
+        );
 }

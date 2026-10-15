@@ -57,7 +57,8 @@
             "attributeNumber": 1,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
@@ -67,7 +68,8 @@
             "attributeNumber": 3,
             "length": 254,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": 258
           },
           {
             "ordinal": 2,
@@ -77,7 +79,8 @@
             "attributeNumber": 3,
             "length": null,
             "precision": 18,
-            "scale": 2
+            "scale": 2,
+            "typeModifier": 1179654
           },
           {
             "ordinal": 3,
@@ -87,7 +90,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           }
         ],
         "error": null
@@ -279,7 +283,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bigint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 23,
@@ -292,7 +297,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1043,
@@ -305,7 +311,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "character varying",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1700,
@@ -318,7 +325,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "numeric",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 16387,
@@ -331,7 +339,38 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "email_t",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": 258
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1043,
+            "modifier": 258
+          },
+          {
+            "oid": 1700,
+            "modifier": 1179654
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "modifier": 258,
+            "formatType": "character varying(254)"
+          },
+          {
+            "oid": 1700,
+            "modifier": 1179654,
+            "formatType": "numeric(18,2)"
           }
         ],
         "error": null

@@ -53,7 +53,8 @@
             "attributeNumber": 4,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
@@ -63,7 +64,8 @@
             "attributeNumber": 2,
             "length": 100,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": 104
           },
           {
             "ordinal": 2,
@@ -73,7 +75,8 @@
             "attributeNumber": 0,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           }
         ],
         "error": null
@@ -206,7 +209,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bigint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1043,
@@ -219,7 +223,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "character varying",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 16390,
@@ -235,7 +240,29 @@
             "enumLabels": [
               "active",
               "disabled"
-            ]
+            ],
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1043,
+            "modifier": 104
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1043,
+            "modifier": 104,
+            "formatType": "character varying(100)"
           }
         ],
         "error": null

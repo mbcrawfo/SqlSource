@@ -75,7 +75,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 16390,
@@ -91,7 +92,8 @@
             "enumLabels": [
               "active",
               "disabled"
-            ]
+            ],
+            "typtypmod": -1
           }
         ],
         "error": null

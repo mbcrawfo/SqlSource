@@ -81,15 +81,28 @@ public sealed class ColumnTests(PostgresContainer postgres)
     public async Task Describe_CastWithAModifier_IsSpelledAsFormatTypeSpellsIt(string type, string expected) =>
         (await ColumnsOfAsync($"SELECT NULL::{type} AS c")).ShouldHaveSingleItem().Type.Name.ShouldBe(expected);
 
-    // What the describer does not keep, and docs/tech-debt records: the fields of an interval, and the modifier of
-    // an array's element.
+    // The fields of an interval and the modifier of an array's element, which only the server's spelling of the
+    // modifier holds.  The facets are decoded from the modifier: an array's are its element's.
     [Theory]
-    [InlineData("interval year to month", "interval")]
-    [InlineData("interval day to second(3)", "interval(3)")]
-    [InlineData("varchar(10)[]", "character varying[]")]
-    [InlineData("numeric(6,2)[]", "numeric[]")]
-    public async Task Describe_CastWhoseModifierIsNotKept_IsSpelledWithoutIt(string type, string expected) =>
-        (await ColumnsOfAsync($"SELECT NULL::{type} AS c")).ShouldHaveSingleItem().Type.Name.ShouldBe(expected);
+    [InlineData("interval year to month", "interval year to month", null, null, null)]
+    [InlineData("interval day to second(3)", "interval day to second(3)", null, 3, null)]
+    [InlineData("varchar(10)[]", "character varying(10)[]", 10, null, null)]
+    [InlineData("numeric(6,2)[]", "numeric(6,2)[]", null, 6, 2)]
+    public async Task Describe_CastWithFieldsOrAnArrayOfAModifier_IsSpelledWithTheModifier(
+        string type,
+        string expected,
+        int? length,
+        int? precision,
+        int? scale
+    )
+    {
+        var column = (await ColumnsOfAsync($"SELECT NULL::{type} AS c")).ShouldHaveSingleItem();
+
+        var described = column.Type.ShouldBeOfType<PostgresType>();
+        described.Name.ShouldBe(expected);
+        var faceted = described.Element ?? described;
+        (faceted.Length, faceted.Precision, faceted.Scale).ShouldBe((length, precision, scale));
+    }
 
     [Fact]
     public async Task Describe_NumericWithANegativeScale_HasIt()

@@ -11,7 +11,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </remarks>
 internal static class TypeModifiers
 {
-    private const int NoModifier = -1;
+    /// <summary>The modifier of a type that has none, as the protocol and the catalog write it.</summary>
+    public const int NoModifier = -1;
 
     // varchar and bpchar store the length and VARHDRSZ.
     private const int HeaderSize = 4;

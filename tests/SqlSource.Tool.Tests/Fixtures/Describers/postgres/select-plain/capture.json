@@ -57,7 +57,8 @@
             "attributeNumber": 1,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 1,
@@ -67,7 +68,8 @@
             "attributeNumber": 2,
             "length": 100,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": 104
           },
           {
             "ordinal": 2,
@@ -77,7 +79,8 @@
             "attributeNumber": 3,
             "length": 254,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": 258
           },
           {
             "ordinal": 3,
@@ -87,7 +90,8 @@
             "attributeNumber": 4,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 4,
@@ -97,7 +101,8 @@
             "attributeNumber": 5,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 5,
@@ -107,7 +112,8 @@
             "attributeNumber": 6,
             "length": null,
             "precision": 18,
-            "scale": 2
+            "scale": 2,
+            "typeModifier": 1179654
           },
           {
             "ordinal": 6,
@@ -117,7 +123,8 @@
             "attributeNumber": 7,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 7,
@@ -127,7 +134,8 @@
             "attributeNumber": 8,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 8,
@@ -137,7 +145,8 @@
             "attributeNumber": 9,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 9,
@@ -147,7 +156,8 @@
             "attributeNumber": 2,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 10,
@@ -157,7 +167,8 @@
             "attributeNumber": 3,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 11,
@@ -167,7 +178,8 @@
             "attributeNumber": 4,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 12,
@@ -177,7 +189,8 @@
             "attributeNumber": 5,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 13,
@@ -187,7 +200,8 @@
             "attributeNumber": 6,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 14,
@@ -197,7 +211,8 @@
             "attributeNumber": 7,
             "length": 2,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": 6
           },
           {
             "ordinal": 15,
@@ -207,7 +222,8 @@
             "attributeNumber": 8,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 16,
@@ -217,7 +233,8 @@
             "attributeNumber": 9,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 17,
@@ -227,7 +244,8 @@
             "attributeNumber": 10,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 18,
@@ -237,7 +255,8 @@
             "attributeNumber": 11,
             "length": null,
             "precision": 3,
-            "scale": null
+            "scale": null,
+            "typeModifier": 3
           },
           {
             "ordinal": 19,
@@ -247,7 +266,8 @@
             "attributeNumber": 12,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 20,
@@ -257,7 +277,8 @@
             "attributeNumber": 13,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 21,
@@ -267,7 +288,8 @@
             "attributeNumber": 14,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 22,
@@ -277,7 +299,8 @@
             "attributeNumber": 15,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 23,
@@ -287,7 +310,8 @@
             "attributeNumber": 3,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           },
           {
             "ordinal": 24,
@@ -297,7 +321,8 @@
             "attributeNumber": 4,
             "length": null,
             "precision": null,
-            "scale": null
+            "scale": null,
+            "typeModifier": -1
           }
         ],
         "error": null
@@ -654,7 +679,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "boolean",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 17,
@@ -667,7 +693,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bytea",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 20,
@@ -680,7 +707,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bigint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 21,
@@ -693,7 +721,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "smallint",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 23,
@@ -706,7 +735,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "integer",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 25,
@@ -719,7 +749,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "text",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 700,
@@ -732,7 +763,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "real",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 701,
@@ -745,7 +777,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "double precision",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1009,
@@ -758,7 +791,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "text[]",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1042,
@@ -771,7 +805,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "bpchar",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1043,
@@ -784,7 +819,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "character varying",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1082,
@@ -797,7 +833,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "date",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1083,
@@ -810,7 +847,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "time without time zone",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1114,
@@ -823,7 +861,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "timestamp without time zone",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1184,
@@ -836,7 +875,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "timestamp with time zone",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1186,
@@ -849,7 +889,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "interval",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 1700,
@@ -862,7 +903,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "numeric",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 2950,
@@ -875,7 +917,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "uuid",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 3802,
@@ -888,7 +931,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "jsonb",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 3904,
@@ -901,7 +945,8 @@
             "rngsubtype": 23,
             "multirangeRngsubtype": null,
             "formatType": "int4range",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 3910,
@@ -914,7 +959,8 @@
             "rngsubtype": 1184,
             "multirangeRngsubtype": null,
             "formatType": "tstzrange",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 4451,
@@ -927,7 +973,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": 23,
             "formatType": "int4multirange",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": -1
           },
           {
             "oid": 16387,
@@ -940,7 +987,8 @@
             "rngsubtype": null,
             "multirangeRngsubtype": null,
             "formatType": "email_t",
-            "enumLabels": null
+            "enumLabels": null,
+            "typtypmod": 258
           },
           {
             "oid": 16390,
@@ -956,7 +1004,65 @@
             "enumLabels": [
               "active",
               "disabled"
-            ]
+            ],
+            "typtypmod": -1
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "spellings",
+      "request": {
+        "pairs": [
+          {
+            "oid": 1042,
+            "modifier": 6
+          },
+          {
+            "oid": 1043,
+            "modifier": 104
+          },
+          {
+            "oid": 1043,
+            "modifier": 258
+          },
+          {
+            "oid": 1114,
+            "modifier": 3
+          },
+          {
+            "oid": 1700,
+            "modifier": 1179654
+          }
+        ]
+      },
+      "answer": {
+        "rows": [
+          {
+            "oid": 1042,
+            "modifier": 6,
+            "formatType": "character(2)"
+          },
+          {
+            "oid": 1043,
+            "modifier": 104,
+            "formatType": "character varying(100)"
+          },
+          {
+            "oid": 1043,
+            "modifier": 258,
+            "formatType": "character varying(254)"
+          },
+          {
+            "oid": 1114,
+            "modifier": 3,
+            "formatType": "timestamp(3) without time zone"
+          },
+          {
+            "oid": 1700,
+            "modifier": 1179654,
+            "formatType": "numeric(18,2)"
           }
         ],
         "error": null
