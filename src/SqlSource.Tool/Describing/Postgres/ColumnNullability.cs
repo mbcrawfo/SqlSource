@@ -37,8 +37,10 @@ internal static class ColumnNullability
         {
             null => (null, SidecarValues.NullableSource.NoOrigin),
 
-            // PostgreSQL records no NOT NULL for a view's column and does not enforce a foreign table's.
-            { Table.Relkind: "v" or "m" or "f" } => (null, SidecarValues.NullableSource.View),
+            // PostgreSQL records no NOT NULL for a view's column, and does not enforce a foreign table's on its remote
+            // rows: both are unknown, and the source says which.
+            { Table.Relkind: "v" or "m" } => (null, SidecarValues.NullableSource.View),
+            { Table.Relkind: "f" } => (null, SidecarValues.NullableSource.ForeignTable),
             _ when gated => (true, SidecarValues.NullableSource.Heuristic),
 
             // A child of an inheritance parent may have dropped the NOT NULL it inherited, nothing enforces it on the

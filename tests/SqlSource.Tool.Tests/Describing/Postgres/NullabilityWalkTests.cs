@@ -22,7 +22,13 @@ public class NullabilityWalkTests
 
     private static readonly PostgresTableRow View = Table with { Oid = 16701, Name = "v", Relkind = "v" };
 
-    private static readonly IReadOnlyDictionary<long, PostgresTableRow> Tables = PostgresTables.Of(Table, View);
+    private static readonly PostgresTableRow Foreign = Table with { Oid = 16703, Name = "ft", Relkind = "f" };
+
+    private static readonly IReadOnlyDictionary<long, PostgresTableRow> Tables = PostgresTables.Of(
+        Table,
+        View,
+        Foreign
+    );
 
     // A column of the table, of the view, or of an expression when the table is null.
     private sealed record Asked(PostgresTableRow? Of, int Attnum);
@@ -30,6 +36,7 @@ public class NullabilityWalkTests
     private static readonly Asked NotNull = new(Table, 1);
     private static readonly Asked Optional = new(Table, 2);
     private static readonly Asked OfView = new(View, 1);
+    private static readonly Asked OfForeign = new(Foreign, 1);
     private static readonly Asked Expression = new(null, 0);
 
     // The columns as the session builds them for a gated query, with the heuristic's answer, and their origins.
@@ -101,6 +108,11 @@ public class NullabilityWalkTests
     public void Run_ColumnOfAView_SaysViewUnlessAJoinExtendsIt() =>
         AnswersOf(Run(LeftJoin("a.id", "b.id", "a.id + 1"), OfView, OfView, OfView))
             .ShouldBe([(null, "view"), (true, "outer-join"), (null, "view")]);
+
+    [Fact]
+    public void Run_ColumnOfAForeignTable_SaysForeignTableUnlessAJoinExtendsIt() =>
+        AnswersOf(Run(LeftJoin("a.id", "b.id", "a.id + 1"), OfForeign, OfForeign, OfForeign))
+            .ShouldBe([(null, "foreign-table"), (true, "outer-join"), (null, "foreign-table")]);
 
     // Nothing of the plan can make it non-nullable, so it is not looked up, whatever its entry is.
     [Fact]

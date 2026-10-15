@@ -34,13 +34,12 @@ public class ColumnNullabilityTests
     public void Of_ColumnWithoutAnOrigin_IsUnknownAndSaysNoOrigin(bool gated) =>
         ColumnNullability.Of(null, gated).ShouldBe((null, SidecarValues.NullableSource.NoOrigin));
 
-    // PostgreSQL does not record NOT NULL for a view's column, and does not enforce a foreign table's.  The answer
-    // is the same whether the query is gated or not, and whatever the catalog says.
+    // PostgreSQL does not record NOT NULL for a view's column.  The answer is the same whether the query is gated or
+    // not, and whatever the catalog says.
     [Theory]
     [InlineData("v")]
     [InlineData("m")]
-    [InlineData("f")]
-    public void Of_OriginInAViewAMaterializedViewOrAForeignTable_IsUnknownAndSaysView(string relkind)
+    public void Of_OriginInAViewOrAMaterializedView_IsUnknownAndSaysView(string relkind)
     {
         foreach (var gated in new[] { false, true })
         {
@@ -49,6 +48,22 @@ public class ColumnNullabilityTests
                 ColumnNullability
                     .Of(Origin(relkind, notNull), gated)
                     .ShouldBe((null, SidecarValues.NullableSource.View));
+            }
+        }
+    }
+
+    // PostgreSQL does not enforce a foreign table's constraints on its remote rows, so what the catalog says is no
+    // answer.  It is the same whether the query is gated or not, and whatever the catalog says.
+    [Fact]
+    public void Of_OriginInAForeignTable_IsUnknownAndSaysForeignTable()
+    {
+        foreach (var gated in new[] { false, true })
+        {
+            foreach (var notNull in new[] { false, true })
+            {
+                ColumnNullability
+                    .Of(Origin("f", notNull), gated)
+                    .ShouldBe((null, SidecarValues.NullableSource.ForeignTable));
             }
         }
     }

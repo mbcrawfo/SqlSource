@@ -82,7 +82,7 @@ Not stored, deliberately: the SQL text (the `.sql` file is beside the sidecar an
 | `name` | string | always | Exactly as the server returned it, override suffix included: `"deleted_at?"`.  The sidecar records the description; the generator strips the suffix and applies the override. |
 | `type` | object | always | The engine's type object (section 2).  Never `null`: a column whose type the server cannot name is a tool error, not an entry. |
 | `nullable` | boolean or `null` | always | What the server and the tool's inference established; `null` is unknown.  The policy that makes unknown nullable stays out of the file so a reader can tell "the server said nullable" from "nobody knows". |
-| `nullableSource` | string | always | Which layer decided `nullable`: `"server"`, the engine reports it (every SQL Server column); `"catalog"`, the origin's `NOT NULL` flag, and on PostgreSQL the walk found the origin on no null-extending side; `"outer-join"`, the walk found it on one; `"view"`, the origin is a view; `"no-origin"`, which always comes with `nullable: null`; `"heuristic"`, the plan was unavailable or the origin was not found in it and an outer-join keyword made the column nullable.  Inside the walk `outer-join` beats `view` beats `catalog`.  The `!`/`?` override is never a source: the generator applies it.  Provenance. |
+| `nullableSource` | string | always | Which layer decided `nullable`: `"server"`, the engine reports it (every SQL Server column); `"catalog"`, the origin's `NOT NULL` flag, and on PostgreSQL the walk found the origin on no null-extending side; `"outer-join"`, the walk found it on one; `"view"`, the origin is a view; `"foreign-table"`, the origin is a foreign table, whose constraints PostgreSQL does not enforce; `"no-origin"`, which always comes with `nullable: null`; `"heuristic"`, the plan was unavailable or the origin was not found in it and an outer-join keyword made the column nullable.  Inside the walk `outer-join` beats `view` and `foreign-table`, which beat `catalog`.  The `!`/`?` override is never a source: the generator applies it.  Provenance. |
 | `origin` | object or `null` | always | `{ "schema", "table", "column" }` of the base column, or `null` for an expression, aggregate, cast, set operation or `USING` column.  `schema` may be `null` for an engine without schemas; `table` and `column` are strings. |
 | `identity` | boolean or `null` | always | Identity column (`attidentity`, `is_identity_column`).  `null` when the engine cannot say. |
 | `computed` | boolean or `null` | always | Generated or computed column (`attgenerated`, `is_computed_column`).  `null` when the engine cannot say. |
@@ -1132,7 +1132,7 @@ Proposed path: `schemas/sidecar-v1.schema.json`, referenced by `$schema` in ever
         "name": { "type": "string" },
         "type": { "type": "object" },
         "nullable": { "$ref": "#/$defs/triState" },
-        "nullableSource": { "type": "string", "enum": ["server", "catalog", "outer-join", "view", "no-origin", "heuristic"] },
+        "nullableSource": { "type": "string", "enum": ["server", "catalog", "outer-join", "view", "foreign-table", "no-origin", "heuristic"] },
         "origin": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/origin" }] },
         "identity": { "$ref": "#/$defs/triState" },
         "computed": { "$ref": "#/$defs/triState" }

@@ -433,11 +433,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // again.  Its remote row holds NULL in v, which the parent says is NOT NULL.
     private static string ForeignPartitionTables(NpgsqlConnectionStringBuilder connection) =>
         $$"""
-            CREATE EXTENSION IF NOT EXISTS postgres_fdw;
-            CREATE SERVER IF NOT EXISTS fp_loop FOREIGN DATA WRAPPER postgres_fdw
-                OPTIONS (dbname {{Literal(connection.Database)}}, host 'localhost', port '5432');
-            CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER SERVER fp_loop
-                OPTIONS (user {{Literal(connection.Username)}}, password {{Literal(connection.Password)}});
+            {{ForeignServer(connection)}}
             CREATE TABLE IF NOT EXISTS fp_remote (id integer NOT NULL, kind integer NOT NULL, v text);
             INSERT INTO fp_remote SELECT 1, 2, NULL WHERE NOT EXISTS (SELECT 1 FROM fp_remote);
             CREATE TABLE IF NOT EXISTS fp_parted (id integer NOT NULL, kind integer NOT NULL, v text NOT NULL)
@@ -445,6 +441,16 @@ public sealed class ColumnTests(PostgresContainer postgres)
             CREATE TABLE IF NOT EXISTS fp_parted_1 PARTITION OF fp_parted FOR VALUES IN (1);
             CREATE FOREIGN TABLE IF NOT EXISTS fp_parted_2 PARTITION OF fp_parted FOR VALUES IN (2)
                 SERVER fp_loop OPTIONS (table_name 'fp_remote');
+            """;
+
+    // The loopback server the foreign tables of these tests share, made by SQL that can be run again.
+    private static string ForeignServer(NpgsqlConnectionStringBuilder connection) =>
+        $$"""
+            CREATE EXTENSION IF NOT EXISTS postgres_fdw;
+            CREATE SERVER IF NOT EXISTS fp_loop FOREIGN DATA WRAPPER postgres_fdw
+                OPTIONS (dbname {{Literal(connection.Database)}}, host 'localhost', port '5432');
+            CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER SERVER fp_loop
+                OPTIONS (user {{Literal(connection.Username)}}, password {{Literal(connection.Password)}});
             """;
 
     private static string Literal(string? value) =>
@@ -470,6 +476,41 @@ public sealed class ColumnTests(PostgresContainer postgres)
         var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM fp_parted p");
 
         NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
+    }
+
+    // A foreign table of this test alone, through the same loopback server, whose remote row holds NULL in v, which
+    // the foreign table says is NOT NULL and PostgreSQL does not enforce.  Made by SQL that can be run again.
+    private static string ForeignTable(NpgsqlConnectionStringBuilder connection) =>
+        $$"""
+            {{ForeignServer(connection)}}
+            CREATE TABLE IF NOT EXISTS ft_remote (id integer NOT NULL, v text);
+            INSERT INTO ft_remote SELECT 1, NULL WHERE NOT EXISTS (SELECT 1 FROM ft_remote);
+            CREATE FOREIGN TABLE IF NOT EXISTS ft_foreign (id integer NOT NULL, v text NOT NULL)
+                SERVER fp_loop OPTIONS (table_name 'ft_remote');
+            """;
+
+    // PostgreSQL does not enforce a foreign table's NOT NULL on the remote rows, and a query reads them: the column
+    // is unknown, and the source says why, in a gated query too, where only a join that extends it makes it nullable.
+    [Fact]
+    public async Task Describe_ColumnOfAForeignTable_IsUnknownFromTheForeignTable()
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
+        {
+            await using var made = source.CreateCommand(
+                ForeignTable(new NpgsqlConnectionStringBuilder(postgres.ConnectionString))
+            );
+            _ = await made.ExecuteNonQueryAsync(token);
+        }
+
+        // The premise: a query of the foreign table returns the remote row's NULL.
+        (await ScalarAsync("SELECT f.v IS NULL FROM ft_foreign f WHERE f.id = 1")).ShouldBe(true);
+
+        var plain = await ColumnsOfAsync("SELECT f.id, f.v FROM ft_foreign f");
+        var gated = await ColumnsOfAsync("SELECT f.id, j.id AS jid FROM ft_foreign f LEFT JOIN users j ON j.id = f.id");
+
+        NullabilityOf(plain).ShouldBe([(null, "foreign-table"), (null, "foreign-table")]);
+        NullabilityOf(gated).ShouldBe([(null, "foreign-table"), (true, "outer-join")]);
     }
 
     // A table with a DO INSTEAD rule on INSERT, and the table the rule writes to instead, of this test alone, made by
