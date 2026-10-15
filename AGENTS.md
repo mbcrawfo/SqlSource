@@ -27,6 +27,7 @@ Every commit must pass `./pre-commit-validation.sh`.  Nothing enforces this: no 
 
 1. **Reply to every CodeRabbit finding.**  When you act on a comment, reply in its thread with what you changed.  When you do not act on one, reply in its thread with the reason: the rule or decision it conflicts with, or why the finding does not apply.  Never leave a finding unanswered or skip one silently.
 2. **Check the version before you open a pull request.**  Run `git fetch --tags origin`, then compare `VersionPrefix` in `Directory.Build.props` with the highest release tag, `git tag --list 'v*' --sort=-v:refname | head -n 1`.  If `VersionPrefix` is not greater than that tag, ask the user what the new version should be and set it in the same pull request.  When the repository has no `v*` tags there is nothing to compare.
+3. **Keep a pull request to 150 files or fewer.**  CodeRabbit skips the review of a pull request that changes more than 150 files.  When a piece of work would go over, split it into pull requests that each stay under the limit and land in order, such as the design, the code, then bulk test data, whenever the parts can be reviewed on their own.  Plan the split before the work starts, not after the pull request is open.
 
 ## Reviewing maintainability
 
