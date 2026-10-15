@@ -12,7 +12,7 @@ Success is:
 
 - Every parameter's type in a PostgreSQL sidecar carries `bindName`, the name Npgsql binds it by, and `check` binds by it.
 - A query whose parameter is of a type with a quoted name or schema, of plain `bit`, or of a domain over a domain is described, where today it is `SQLSRC232`.  So is `"char"` and an array of a type whose name is 63 characters long, if Npgsql takes some name for them (see Gap 5).
-- A query in which Npgsql places a parameter anywhere SqlSource does not, or the other way round, and whose columns are the same, fails with `SQLSRC231`.  That includes a second occurrence: `@id` and, later, `arr[1:id]` where `id` is a column.
+- A query in which Npgsql places a parameter anywhere SqlSource does not, or the other way round, and whose columns are the same, fails with `SQLSRC231`.  That includes a second occurrence: `@id` and, later, `tags[:id]` where `id` is a column. *(Correction found in implementation: this document first wrote `arr[1:id]`.  Npgsql drops the `:` and sends `arr[1$1]`, which the server refuses with `42601`; only a slice without a lower bound, `tags[:id]`, is sent as `tags[$1]`, which the server accepts.  The example is now `tags[:id]` throughout.)*
 - An error of `check` that is no disagreement, a lost connection or a server error outside class `42`, is reported as what it is and not as `SQLSRC231`.  A table dropped between two calls gives a class-`42` error and stays `SQLSRC231`, whose help says that a schema changed during the run shows the same way (see Gap 4).
 - `SQLSRC231` says, in its help, when a parameter that is an array of a domain is the likely cause.
 - `docs/deferred/D-0003-*.md` exists and is in `docs/deferred/README.md`.
@@ -111,7 +111,7 @@ What the item calls the round trip per parameter (gap 6) stays.  It is how `SQLS
 
 ## Gap 1: compare the parameters
 
-After the check's describe, read the text Npgsql sent, its rewrite of the SQL with `$n` in place of each parameter it found, and compare it with the text the tool prepared, which `ParameterPlaceholders` made the same way from the lexer's parameters.  The two agree when every place one put a parameter the other did too, and the parameter there is the same.  Comparing distinct names would miss a second occurrence that only Npgsql reads: `@id` and, later, `arr[1:id]` where `id` is a column, which Npgsql rewrites to `arr[1:$1]` when the command has a parameter `id`, which the server accepts, and which gives the same columns.  A count of the server's `ParameterDescription` misses it too, and is no fallback.
+After the check's describe, read the text Npgsql sent, its rewrite of the SQL with `$n` in place of each parameter it found, and compare it with the text the tool prepared, which `ParameterPlaceholders` made the same way from the lexer's parameters.  The two agree when every place one put a parameter the other did too, and the parameter there is the same.  Comparing distinct names would miss a second occurrence that only Npgsql reads: `@id` and, later, `tags[:id]` in a predicate where `id` is a column, which Npgsql rewrites to `tags[$1]` when the command has a parameter `id`, which the server accepts, and which gives the same columns.  A count of the server's `ParameterDescription` misses it too, and is no fallback.
 
 Npgsql 10.0.3 holds the rewritten text in the internal `NpgsqlBatchCommand.FinalCommandText`.  The two texts may number the parameters differently, the tool's by the lexer's order and Npgsql's by the order of the command's parameters, and Npgsql may change the text in other ways (a trailing `;`).  The builder normalises both so that only the places and identities of the parameters are compared: for example, by mapping each `$n` of Npgsql's text through the parameter list `check` sent, and each of the tool's through the lexer's list, to names.  A parameter that only a `-- param:` marker declares is in neither text.
 
@@ -138,7 +138,7 @@ A table, column or type dropped by another session between `columns` and `check`
 
 ## Gaps 2 and 6: no code
 
-- Gap 2: a query that writes both `@id` and `:id` for one parameter is prepared by SqlSource with `:id` left as text.  Where that is no valid SQL the server refuses it, `SQLSRC225`.  Where it is, `arr[1:id]` with a column `id`, gap 1's comparison of the two texts sees that Npgsql placed a parameter there and SqlSource did not, `SQLSRC231`.
+- Gap 2: a query that writes both `@id` and `:id` for one parameter is prepared by SqlSource with `:id` left as text.  Where that is no valid SQL the server refuses it, `SQLSRC225`.  Where it is, `tags[:id]` in a predicate with a column `id`, gap 1's comparison of the two texts sees that Npgsql placed a parameter there and SqlSource did not, `SQLSRC231`.  *(Correction found in implementation: where Npgsql's reading is no valid SQL, `tags[1:id]` sent as `tags[1$1]`, it is the server's `42601` on Npgsql's text, which is also `SQLSRC231`, since the error is of class `42`.)*
 - Gap 6: the extra round trips happen only after Npgsql has refused, and they are how `SQLSRC232` names the parameter.
 
 Both are removed with the item.
@@ -188,5 +188,5 @@ Its row: status `Open`, added `2026-10-15`, planned in the epic design, descript
 
 - That Npgsql 10.0.3 takes `My Schema.Status`.  The item says it does; the container test proves it.
 - That `FinalCommandText` is set after a `SchemaOnly` describe of a batch, and holds the whole rewrite.
-- That Npgsql rewrites `:id` in `arr[1:id]` when the command has a parameter `id`.  Npgsql's documentation says it takes `:name`; the container test proves this case.
+- That Npgsql rewrites `:id` in `tags[:id]` when the command has a parameter `id`.  Npgsql's documentation says it takes `:name`; the container test proves this case.
 - That binding a domain over a domain by its innermost base gives the server the same parameter type as `PREPARE` with the declared domain.  If it does not, the type differs in the comparison of columns, and the builder reports back before going further.
