@@ -1,0 +1,12 @@
+kind: rows
+plan: not-needed
+table-match: columns-differ
+parameter @q: text (inferred)
+parameter @status: public.account_status (declared)
+parameter @limit: bigint (inferred)
+parameter @offset: bigint (inferred)
+column 0 id: integer | nullable false | catalog | public.accounts.id
+column 1 name: character varying(100) | nullable false | catalog | public.accounts.name
+column 2 email: public.email_t | nullable true | catalog | public.accounts.email
+column 3 status: public.account_status | nullable false | catalog | public.accounts.status
+column 4 closed_at: timestamp with time zone | nullable true | catalog | public.accounts.closed_at

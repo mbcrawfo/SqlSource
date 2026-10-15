@@ -1,0 +1,16 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "account_name", "nullable": false },
+    { "name": "during", "nullable": false },
+    {
+      "name": "ends_at",
+      "nullable": true,
+      "why": "upper of a range with no upper bound is NULL; alice's standing reservation 3 has none"
+    },
+    { "name": "overlap", "nullable": false }
+  ],
+  "samples": [
+    { "from": "'2024-06-01'", "to": "'2024-12-31'" }
+  ]
+}

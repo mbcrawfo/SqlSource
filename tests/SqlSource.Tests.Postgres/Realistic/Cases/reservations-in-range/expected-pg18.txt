@@ -1,0 +1,10 @@
+kind: rows
+plan: not-needed
+table-match: no-origin
+parameter @from: timestamp with time zone (inferred)
+parameter @to: timestamp with time zone (inferred)
+column 0 id: bigint | nullable false | catalog | public.reservations.id
+column 1 account_name: character varying(100) | nullable false | catalog | public.accounts.name
+column 2 during: tstzrange | nullable false | catalog | public.reservations.during
+column 3 ends_at: timestamp with time zone | nullable null | no-origin | -
+column 4 overlap: tstzrange | nullable null | no-origin | -

@@ -3,7 +3,7 @@
 -- out, 1 up in the order written here.  A case may add rows; it removes none of these.
 --
 -- Each nullable path of the schema is held by a row:
---   alice (1)  email, settings, orders, events in both partitions, a reservation
+--   alice (1)  email, settings, orders, events in both partitions, a reservation and a standing one with no end
 --   bob (2)    email and settings NULL; an order with no lines; events in 2024 alone; a reservation
 --   carol (3)  closed, with closed_at; an order with no invoice; events in 2025 alone
 --   dave (4)   no orders, no events, no reservations
@@ -85,6 +85,10 @@ INSERT INTO events (id, account_id, at, kind, payload) VALUES
 INSERT INTO reservations (id, account_id, during) VALUES
     (1, 1, '[2024-06-01 09:00+00, 2024-06-01 10:00+00)'),
     (2, 2, '[2024-06-01 09:30+00, 2024-06-01 11:00+00)');
+
+-- Alice's standing reservation has no upper bound, so upper(during) is NULL.
+INSERT INTO reservations (id, account_id, during) VALUES
+    (3, 1, '[2024-07-01 09:00+00,)');
 
 -- The ids above are given, so the sequences are brought to them.
 SELECT setval(pg_get_serial_sequence('orders', 'id'), (SELECT max(id) FROM orders));

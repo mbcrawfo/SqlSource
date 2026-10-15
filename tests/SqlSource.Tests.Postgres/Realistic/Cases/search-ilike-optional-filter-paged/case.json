@@ -1,0 +1,13 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "email", "nullable": true, "why": "accounts.email is nullable; bob and erin have none" },
+    { "name": "status", "nullable": false },
+    { "name": "closed_at", "nullable": true, "why": "accounts.closed_at is nullable; every account but carol is open" }
+  ],
+  "samples": [
+    { "q": "''", "status": "NULL", "limit": "10", "offset": "0" },
+    { "q": "'a'", "status": "'active'", "limit": "2", "offset": "1" }
+  ]
+}
