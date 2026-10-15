@@ -140,28 +140,35 @@ public sealed class ColumnTests(PostgresContainer postgres)
             ]);
     }
 
-    // A domain named interval in public hides nothing of the keyword's type, and format_type spells pg_catalog's
-    // interval without its schema whatever the search_path holds.
+    // A domain named numeric in public, first on the search_path of the describe's connection, hides pg_catalog's
+    // numeric.  A column of pg_catalog's numeric(10,2) is still numeric(10,2), with the facets of its modifier: the
+    // tool takes the server's spelling of a type of pg_catalog as it is, and puts no schema before it.
     [Fact]
     public async Task Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpelling()
     {
-        await MakeOwnTablesAsync();
         var token = TestContext.Current.CancellationToken;
         await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using (var create = own.CreateCommand("CREATE DOMAIN public.\"interval\" AS text"))
+        await using (var create = own.CreateCommand("CREATE DOMAIN public.\"numeric\" AS text"))
         {
             _ = await create.ExecuteNonQueryAsync(token);
         }
 
         try
         {
-            var columns = await ColumnsOfAsync("SELECT c.i3, m.ds FROM column_types AS c, modifiers AS m");
+            var described = await Sessions.DescribeAsync(
+                $"{postgres.ConnectionString};Search Path=public,pg_catalog",
+                Requests.Of("SELECT NULL::pg_catalog.numeric(10,2) AS n")
+            );
 
-            TypeNamesOf(columns).ShouldBe(["interval(3)", "interval day to second(3)"]);
+            described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
+            var column = described.Value.ShouldNotBeNull().Columns.ShouldNotBeNull().ShouldHaveSingleItem();
+            column.Type.ShouldBe(
+                TestSidecars.Postgres("numeric(10,2)", internalName: "numeric", precision: 10, scale: 2)
+            );
         }
         finally
         {
-            await using var drop = own.CreateCommand("DROP DOMAIN IF EXISTS public.\"interval\"");
+            await using var drop = own.CreateCommand("DROP DOMAIN IF EXISTS public.\"numeric\"");
             _ = await drop.ExecuteNonQueryAsync(token);
         }
     }
