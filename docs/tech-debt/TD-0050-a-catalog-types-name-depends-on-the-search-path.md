@@ -14,7 +14,7 @@ The rule that a type of `pg_catalog` is the server's text, and that one of any o
 
 ## Impact
 
-Low.  It needs a user type named like a built-in, `text`, `int4`, `date`, and placed before `pg_catalog` on the `search_path` of the describe's connection.  A schema that does so is rare, and the name then reads `pg_catalog.text`, which is correct but not the spelling of another database.
+Low.  The names that `format_type` special-cases, `int2`, `int4`, `int8`, `bool`, `float4`, `float8`, `varchar`, `bpchar` and others, are never qualified and so never affected.  It needs a user type named like a built-in, `text`, `uuid`, `jsonb`, and placed before `pg_catalog` on the `search_path` of the describe's connection.  A schema that does so is rare, and the name then reads `pg_catalog.text`, which is correct but not the spelling of another database.
 
 ## Proposed fix
 
