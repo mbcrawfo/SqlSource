@@ -49,6 +49,14 @@ public class OuterJoinGateTests
     [InlineData("MERGE INTO t USING s ON t.id = s.id WHEN MATCHED THEN DELETE RETURNING s.id")]
     public void IsGated_QueryThatHoldsAWord_IsGated(string sql) => OuterJoinGate.IsGated(sql).ShouldBeTrue();
 
+    // PostgreSQL reads § as part of the alias, so the $x$ opens no quote and the LEFT is a word of the query.  Read
+    // as a quote, the $x$ would hide the join in a string that runs to the comment.
+    [Fact]
+    public void IsGated_AliasThatEndsLikeADollarQuote_IsGated() =>
+        OuterJoinGate
+            .IsGated("SELECT o.total AS §$x$ FROM users u LEFT JOIN orders o ON o.user_id = u.id --$x$")
+            .ShouldBeTrue();
+
     [Theory]
     [InlineData("SELECT id FROM users")]
     [InlineData("SELECT 1 FROM a JOIN b ON true")]

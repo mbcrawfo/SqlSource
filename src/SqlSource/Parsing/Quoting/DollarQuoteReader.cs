@@ -7,21 +7,25 @@ namespace SqlSource.Parsing.Quoting;
 /// </summary>
 /// <remarks>
 /// A dollar sign has other meanings: a parameter such as <c>$1</c>, a money literal, a character of an identifier.
-/// So one that follows an identifier character, or that opens a quote which is never closed, is plain text.
+/// So one that follows an identifier character, or that opens a quote which is never closed, is plain text.  As in
+/// PostgreSQL, a character above U+007F counts as an identifier character, and may be part of a tag.
 /// </remarks>
 internal sealed class DollarQuoteReader : QuoteReader
 {
     public override int FindEnd(string text, int start)
     {
-        if (start > 0 && IsIdentifierCharacter(text[start - 1]))
+        if (start > 0 && IsNameCharacterOfPostgreSql(text[start - 1]))
         {
             return NotAQuote;
         }
 
         var tagEnd = start + 1;
-        if (tagEnd < text.Length && (char.IsLetter(text[tagEnd]) || text[tagEnd] == '_'))
+        if (tagEnd < text.Length && (char.IsLetter(text[tagEnd]) || text[tagEnd] > '\u007F' || text[tagEnd] == '_'))
         {
-            while (tagEnd < text.Length && (char.IsLetterOrDigit(text[tagEnd]) || text[tagEnd] == '_'))
+            while (
+                tagEnd < text.Length
+                && (char.IsLetterOrDigit(text[tagEnd]) || text[tagEnd] > '\u007F' || text[tagEnd] == '_')
+            )
             {
                 tagEnd++;
             }

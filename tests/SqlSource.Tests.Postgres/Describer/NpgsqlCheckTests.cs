@@ -191,10 +191,10 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         failure.ServerLines.ShouldBeEmpty();
     }
 
-    // The live function itself, with a text no describe can bring it: "prepare" refuses such a text first.  The
-    // tool's lexer reads "$x$" after a "§" as the start of a dollar-quoted string; Npgsql and the server read two
-    // statements.  With a named parameter Npgsql refuses and sends nothing; without one the server refuses the
-    // whole text.  Either way the answer is an error and the table of the second statement is still there.
+    // The live function itself, with a text no describe can bring it: "prepare" refuses such a text first.  Npgsql
+    // and the server read two statements.  With a named parameter Npgsql refuses and sends nothing; without one the
+    // server refuses the whole text.  Either way the answer is an error and the table of the second statement is
+    // still there.
     [Theory]
     [InlineData(true)]
     [InlineData(false)]

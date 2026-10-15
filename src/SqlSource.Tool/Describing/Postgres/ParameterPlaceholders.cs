@@ -19,12 +19,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// wrong.
 /// </para>
 /// <para>
-/// That refusal is the first one and no guarantee, since the lexer and the server do not always split a text alike.
-/// A setting of the session, <c>standard_conforming_strings</c>, also changes what the server reads as a string.  For
-/// the first kind of disagreement,
-/// <c>SELECT 1 AS §$x$; DROP TABLE t; --$x$</c> is one statement to the lexer, which reads <c>$x$</c> after a
-/// <c>§</c> as the start of a dollar-quoted string, and two to the server, which reads <c>§$x$</c> as an
-/// identifier.  What keeps a second statement from being run is how the text is sent:
+/// That refusal is the first one and no guarantee, since the lexer and the server may split a text differently.  A
+/// setting of the session, <c>standard_conforming_strings</c>, changes what the server reads as a string.  What keeps
+/// a second statement from being run is how the text is sent:
 /// <see cref="PostgresConnection.ExecuteAsOneStatementAsync" /> gives it to the driver as a batch of one command,
 /// which the driver does not split, and the server refuses a text of two statements whole.
 /// </para>

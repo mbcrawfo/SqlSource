@@ -84,14 +84,11 @@ public sealed class ParameterTests(PostgresContainer postgres)
         MethodsOf(capture).ShouldBe(["open"]);
     }
 
-    // The tool's lexer reads "$x$" after a "§" as the start of a dollar-quoted string, since "§" is no letter to it,
-    // and so ParameterPlaceholders.Rewrite finds one statement.  The server reads "§$x$" as one identifier: to it
-    // the text is two statements and a comment.  The PREPARE is sent as one command that the driver does not split,
-    // so the server refuses the whole of it and the table of the second statement is still there.
-    [Theory]
-    [InlineData('§')]
-    [InlineData('£')]
-    public async Task Describe_TextTheLexerAndTheServerSplitDifferently_IsAFailureAndRunsNothing(char symbol)
+    // The live call itself, with a text no describe can bring it: ParameterPlaceholders.Rewrite refuses such a text
+    // first, SQLSRC230.  The PREPARE is sent as one command that the driver does not split, so the server refuses the
+    // whole of it and the table of the second statement is still there.
+    [Fact]
+    public async Task PrepareAsync_TextOfTwoStatements_AnswersTheServersErrorAndRunsNothing()
     {
         var token = TestContext.Current.CancellationToken;
         await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
@@ -102,14 +99,21 @@ public sealed class ParameterTests(PostgresContainer postgres)
 
         try
         {
-            var described = await DescribeAsync(Requests.Of($"SELECT 1 AS {symbol}$x$; DROP TABLE {Canary}; --$x$"));
+            var opened = await Sessions.OpenAsync(postgres.ConnectionString);
+            await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+            var live = new PostgresLive(session.Connection);
+
+            var answer = await live.PrepareAsync(
+                new PostgresPrepareRequest("sqlsource_canary", $"SELECT 1; DROP TABLE {Canary}", []),
+                token
+            );
 
             await using var find = own.CreateCommand($"SELECT pg_catalog.to_regclass('{Canary}') IS NOT NULL");
-            (await find.ExecuteScalarAsync(token)).ShouldBe(true, "the describe ran the second statement");
-            var failure = described.Failure.ShouldNotBeNull();
-            failure.Descriptor.Id.ShouldBe("SQLSRC225");
-            failure.Step.ShouldBe(DescribeStep.DescribeParameters);
-            failure.ServerLines.ShouldBe(["42601: cannot insert multiple commands into a prepared statement"]);
+            (await find.ExecuteScalarAsync(token)).ShouldBe(true, "the call ran the second statement");
+            answer.ParameterTypes.ShouldBeNull();
+            var error = answer.Error.ShouldNotBeNull();
+            error.SqlState.ShouldBe("42601");
+            error.Message.ShouldBe("cannot insert multiple commands into a prepared statement");
         }
         finally
         {

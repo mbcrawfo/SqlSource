@@ -59,16 +59,13 @@ public class ParameterPlaceholdersTests
     [InlineData("SELECT 1; -- one\nDROP TABLE users")]
     public void Rewrite_SecondStatement_IsNull(string sql) => ParameterPlaceholders.Rewrite(sql, List()).ShouldBeNull();
 
-    // The lexer reads "$x$" after a "§" or a "£" as the start of a dollar-quoted string, since neither is a letter
-    // to it, and so the ";" is in a string and the text is one statement.  The server reads "§$x$" as one
-    // identifier, and the text as two statements and a comment.  That the two disagree is safe: the PREPARE goes to
-    // the driver as a batch of one command, which the driver does not split, and the server refuses a text of two
-    // statements whole.  tests/SqlSource.Tests.Postgres holds that nothing of it runs.
+    // PostgreSQL reads any character above U+007F as part of a name, so "§$x$" is one identifier and the lexer finds
+    // the text two statements and a comment, as the server does.
     [Theory]
     [InlineData("SELECT 1 AS §$x$; DROP TABLE users; --$x$")]
     [InlineData("SELECT 1 AS £$x$; DROP TABLE users; --$x$")]
-    public void Rewrite_DollarQuoteThatTheServerReadsAsAnIdentifier_IsReturnedWhole(string sql) =>
-        ParameterPlaceholders.Rewrite(sql, List()).ShouldBe(sql);
+    public void Rewrite_DollarSignAfterANonAsciiCharacter_OpensNoQuoteSoTheSecondStatementIsFound(string sql) =>
+        ParameterPlaceholders.Rewrite(sql, List()).ShouldBeNull();
 
     // The plan's parser made the list from the same SQL, so a parameter outside it is a bug of the plan.
     [Fact]

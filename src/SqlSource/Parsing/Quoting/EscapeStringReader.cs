@@ -2,7 +2,8 @@ namespace SqlSource.Parsing.Quoting;
 
 /// <summary>
 /// A <c>'...'</c> string that takes backslash escapes only after a prefix, as in PostgreSQL's <c>E'it\'s'</c>.  The
-/// prefix stays in the text before the region.
+/// prefix stays in the text before the region.  As in PostgreSQL, a letter after a character above U+007F is part of
+/// a name, not a prefix.
 /// </summary>
 /// <param name="prefixes">
 /// The characters that are a prefix, each in the case it is accepted in: <c>Ee</c> for PostgreSQL.
@@ -19,5 +20,7 @@ internal sealed class EscapeStringReader(string prefixes) : QuoteReader
 
     // A prefix is one character that does not end an identifier: the E of typeE'a' is not one.
     private bool HasPrefix(string text, int quote) =>
-        quote > 0 && prefixes.IndexOf(text[quote - 1]) >= 0 && (quote < 2 || !IsIdentifierCharacter(text[quote - 2]));
+        quote > 0
+        && prefixes.IndexOf(text[quote - 1]) >= 0
+        && (quote < 2 || !IsNameCharacterOfPostgreSql(text[quote - 2]));
 }
