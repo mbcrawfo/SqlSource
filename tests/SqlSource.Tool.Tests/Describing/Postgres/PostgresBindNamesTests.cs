@@ -115,8 +115,4 @@ public class PostgresBindNamesTests
     [Fact]
     public void Of_CharHiddenOnTheSearchPath_IsChar() =>
         PostgresBindNames.Of(HiddenQuotedChar.Oid, PostgresRows.Of(HiddenQuotedChar)).ShouldBe("char");
-
-    [Fact]
-    public void NoName_Always_SaysThatAnAmbiguousNameCannotBeGivenToNpgsql() =>
-        PostgresBindNames.NoName.ShouldContain("'.'");
 }

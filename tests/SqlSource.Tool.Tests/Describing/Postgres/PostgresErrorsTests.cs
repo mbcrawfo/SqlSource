@@ -522,10 +522,11 @@ public class PostgresErrorsTests
         failure.ServerLines.ShouldBe(["42601: syntax error at or near \"@\"", "hint: a hint"]);
     }
 
-    // A timeout or a failing server says nothing of how Npgsql reads the text, so it is the server rejecting the
-    // query at the step, with the lines of the error and no help.
+    // A timeout or a failing server says nothing of how Npgsql reads the text, and the verdict says so
+    // (CheckVerdictTests holds the rule): it is the server rejecting the query at the step, with the lines of the
+    // error and no help.
     [Fact]
-    public void Check_ServerErrorOutsideClass42_IsSqlsrc225AtCheckParameters()
+    public void Check_VerdictErrorOutsideClass42_IsSqlsrc225AtCheckParameters()
     {
         var error = new PostgresServerError("57014", "canceling statement due to user request", null, null, 31);
 
@@ -535,7 +536,7 @@ public class PostgresErrorsTests
                 DescribedWith("text", "text"),
                 AskedWith("text"),
                 new PostgresCheckAnswer(null, error, null, null, false),
-                new CheckVerdict(NpgsqlCheck.Differ, error.Message)
+                new CheckVerdict(NpgsqlCheck.Error, error.Message)
             )
             .ShouldNotBeNull();
 
@@ -547,7 +548,7 @@ public class PostgresErrorsTests
     }
 
     [Fact]
-    public void Check_LostConnection_IsSqlsrc225WithItsText()
+    public void Check_VerdictErrorOfALostConnection_IsSqlsrc225WithItsText()
     {
         var error = new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null);
 
@@ -557,7 +558,7 @@ public class PostgresErrorsTests
                 DescribedWith("text", "text"),
                 AskedWith("text"),
                 new PostgresCheckAnswer(null, error, null, null, false),
-                new CheckVerdict(NpgsqlCheck.Differ, error.Message)
+                new CheckVerdict(NpgsqlCheck.Error, error.Message)
             )
             .ShouldNotBeNull();
 
@@ -584,25 +585,6 @@ public class PostgresErrorsTests
 
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
         failure.ServerLines.ShouldBe(["please remove all semicolons"]);
-    }
-
-    // An answer recorded before TextRefused existed has no SQLSTATE only where Npgsql refused the text.
-    [Fact]
-    public void Check_ErrorWithoutSqlStateInAnOldCapture_IsSqlsrc231()
-    {
-        var error = new PostgresServerError(null, "please remove all semicolons", null, null, null);
-
-        var failure = PostgresErrors
-            .Check(
-                Checked,
-                DescribedWith("text", "text"),
-                AskedWith("text"),
-                new PostgresCheckAnswer(null, error, null),
-                new CheckVerdict(NpgsqlCheck.Differ, error.Message)
-            )
-            .ShouldNotBeNull();
-
-        failure.Descriptor.Id.ShouldBe("SQLSRC231");
     }
 
     [Fact]
@@ -701,7 +683,7 @@ public class PostgresErrorsTests
     [Theory]
     [InlineData("public.check_pair", "public.check_pair")]
     [InlineData("\"My Schema\".\"Pair\"", "My Schema.Pair")]
-    [InlineData("\"char\"", "\"char\"")]
+    [InlineData("\"char\"", "char")]
     public void Check_DriverError_IsSqlsrc232NamingTheTypeByItsNameAndTheParameterAsWritten(
         string name,
         string bindName

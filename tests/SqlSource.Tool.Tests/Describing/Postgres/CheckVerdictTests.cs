@@ -98,6 +98,35 @@ public class CheckVerdictTests
             )
             .ShouldBe(new CheckVerdict(NpgsqlCheck.Differ, "syntax error at or near \"@\""));
 
+    // What a misread @ gives is a disagreement: an error of class 42, or Npgsql's refusal of the text, which has no
+    // SQLSTATE; an answer recorded before textRefused existed has no SQLSTATE only where Npgsql refused the text.
+    // Anything else, a cancel or a lost connection, says nothing of how Npgsql reads the SQL, whatever the answer
+    // says of the text.
+    [Theory]
+    [InlineData("42601", false, NpgsqlCheck.Differ)]
+    [InlineData("42P01", null, NpgsqlCheck.Differ)]
+    [InlineData(null, true, NpgsqlCheck.Differ)]
+    [InlineData(null, null, NpgsqlCheck.Differ)]
+    [InlineData("57014", false, NpgsqlCheck.Error)]
+    [InlineData("57014", null, NpgsqlCheck.Error)]
+    [InlineData(null, false, NpgsqlCheck.Error)]
+    public void Read_ErrorOfTheServer_IsADisagreementOnlyWhereAMisreadAtCouldGiveIt(
+        string? sqlState,
+        bool? textRefused,
+        string result
+    ) =>
+        Read(
+                new PostgresCheckAnswer(
+                    null,
+                    new PostgresServerError(sqlState, "the server's words", null, null, null),
+                    null,
+                    null,
+                    textRefused
+                ),
+                Described
+            )
+            .ShouldBe(new CheckVerdict(result, "the server's words"));
+
     [Fact]
     public void Read_DriverError_IsUnboundWithItsMessage() =>
         Read(new PostgresCheckAnswer(null, null, new PostgresBindError("p", "no such type")), Described)
@@ -147,13 +176,27 @@ public class CheckVerdictTests
                 )
             );
 
-    [Fact]
-    public void Read_NpgsqlNamesAParameterTheQueryLacks_IsDiffer() =>
-        Read(Sent("SELECT id, name FROM users WHERE id = $1 AND $2", "id", "x"), Described)
+    // The message says where, as for any other difference of the texts: the parameter the query lacks keeps the
+    // number Npgsql gave it, so that the parameters after it keep theirs.
+    [Theory]
+    [InlineData("SELECT id, name FROM users WHERE id = $1 AND tags[$2] IS NOT NULL", "id", "x")]
+    [InlineData("SELECT id, name FROM users WHERE id = $2 AND tags[$1] IS NOT NULL", "x", "id")]
+    public void Read_NpgsqlNamesAParameterTheQueryLacks_DiffersSayingWhereItPlacedIt(
+        string text,
+        string first,
+        string second
+    ) =>
+        Read(
+                new PostgresCheckAnswer(Seen, null, null, new PostgresCheckSent(text, [first, second])),
+                "SELECT id, name FROM users WHERE id = @id AND tags[:x] IS NOT NULL",
+                ["id"],
+                Described
+            )
             .ShouldBe(
                 new CheckVerdict(
                     NpgsqlCheck.Differ,
-                    "Npgsql placed @x, which SqlSource does not read as a parameter",
+                    "the SQL with $n parts at character 51: Npgsql placed @x there, which SqlSource does not read as a "
+                        + "parameter",
                     PlacementDiffers: true
                 )
             );
@@ -191,6 +234,20 @@ public class CheckVerdictTests
                 Described
             )
             .ShouldBe(new CheckVerdict(NpgsqlCheck.Same, null));
+
+    // Texts that agree leave the columns to decide.
+    [Fact]
+    public void Read_SameTextsButOtherColumns_DiffersByTheColumns() =>
+        Read(
+                new PostgresCheckAnswer(
+                    [new PostgresCheckColumn("id", 23, "integer")],
+                    null,
+                    null,
+                    new PostgresCheckSent("SELECT id, name FROM users WHERE id = $1", ["id"])
+                ),
+                Described
+            )
+            .ShouldBe(new CheckVerdict(NpgsqlCheck.Differ, "the result has 1 columns for Npgsql and 2 for SqlSource"));
 
     // An answer recorded before Npgsql's text was: whatever the text, the columns decide.
     [Fact]

@@ -8,7 +8,7 @@ So such a name depends on the session, against the remark of `PostgresTypeNames`
 
 The `bindName` of such a type, the name `check` binds a parameter by and the sidecar records beside `name`, is not affected: [`PostgresBindNames`](../../src/SqlSource.Tool/Describing/Postgres/PostgresBindNames.cs) takes `format_type(oid, -1)` without a leading `pg_catalog.`, so it is `text` in either session.  Only `name` has the problem.
 
-A type of `pg_catalog` that takes a modifier is not affected: `format_type` special-cases every built-in one and never qualifies them.  The container test `Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpelling` in [`ColumnTests`](../../tests/SqlSource.Tests.Postgres/Describer/ColumnTests.cs) guards `numeric(10,2)` under a domain named `numeric`.
+A type of `pg_catalog` that takes a modifier is not affected: `format_type` special-cases every built-in one and never qualifies them.  The container test `Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpellingAndBindsByTheBareName` in [`ColumnTests`](../../tests/SqlSource.Tests.Postgres/Describer/ColumnTests.cs) guards `numeric(10,2)` under a domain named `numeric`.
 
 ## Why it exists
 

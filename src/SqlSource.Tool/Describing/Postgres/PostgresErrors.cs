@@ -82,7 +82,6 @@ internal static class PostgresErrors
     public const string SchemaChangedHelp =
         "the database's schema changed while the query was described; run the tool again";
 
-    private const string SyntaxOrAccessClass = "42";
     private const string UndefinedObject = "42704";
     private const string UtilityStatement = "42P14";
     private const string DuplicatePreparedStatement = "42P05";
@@ -379,10 +378,11 @@ internal static class PostgresErrors
         );
 
     /// <summary>
-    /// What <c>check</c> is reported as, or null when the two describes agree.  A type Npgsql cannot bind is
-    /// <c>SQLSRC232</c>, with Npgsql's message as its one line; anything else that differs is <c>SQLSRC231</c>,
-    /// with the lines of the error when there is one.  There is no position line: a position the server gives
-    /// is in Npgsql's own rewrite of the SQL.
+    /// What <c>check</c> is reported as, from the verdict, or null when the two describes agree.  A type Npgsql
+    /// cannot bind is <c>SQLSRC232</c>, with Npgsql's message as its one line; an error that is no disagreement,
+    /// <see cref="NpgsqlCheck.Error" />, is the server rejecting the query, <c>SQLSRC225</c>; anything else that
+    /// differs is <c>SQLSRC231</c>, with the lines of the error when there is one.  There is no position line: a
+    /// position the server gives is in Npgsql's own rewrite of the SQL.
     /// </summary>
     /// <param name="query">The query.</param>
     /// <param name="parameters">The parameters as the describer typed them, in the order of the query's list.</param>
@@ -410,7 +410,7 @@ internal static class PostgresErrors
         var lines = answer.Error is { } error
             ? ServerLines(error with { Position = null }, 0)
             : EquatableArray<string>.Empty;
-        if (answer.Error is { } failed && !ReadsDifferently(failed, answer))
+        if (verdict.Result == NpgsqlCheck.Error && answer.Error is { } failed)
         {
             return Rejected(failed, query, DescribeStep.CheckParameters, lines);
         }
@@ -435,14 +435,6 @@ internal static class PostgresErrors
 
         return verdict.TypeDiffers && HasArrayOfDomain(parameters) ? ArrayOfDomainHelp : CheckHelp;
     }
-
-    // Whether an error of the server is what a misread @ gives: a syntax error or an access rule violation, class 42.
-    // An error without a SQLSTATE is either Npgsql's refusal of the text, which a misread @ can give, or a lost
-    // connection; the answer says which, and one recorded before it did is the refusal.
-    private static bool ReadsDifferently(PostgresServerError error, PostgresCheckAnswer answer) =>
-        error.SqlState is { } state
-            ? state.StartsWith(SyntaxOrAccessClass, StringComparison.Ordinal)
-            : answer.TextRefused ?? true;
 
     // Npgsql sends such a parameter as an array of the domain's base, and the server keeps the domain.
     private static bool HasArrayOfDomain(IReadOnlyList<DescribedParameter> parameters) =>

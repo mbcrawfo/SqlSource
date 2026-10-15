@@ -58,23 +58,26 @@ internal static class PostgresBindNames
     /// holds a <c>.</c>.
     /// </summary>
     /// <exception cref="InvalidOperationException">The rows hold no row for a type that is reached.</exception>
-    public static string? Of(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows)
-    {
-        var row = PostgresTypes.Row(oid, rows);
+    public static string? Of(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>
+        OfRow(PostgresTypes.Row(oid, rows), rows);
 
+    // Each row is looked up once: a row that is reached is passed down, and not its OID.
+    private static string? OfRow(PostgresTypeRow row, IReadOnlyDictionary<long, PostgresTypeRow> rows)
+    {
         if (PostgresTypes.IsArray(row))
         {
-            if (IsCut(row, PostgresTypes.Row(row.Typelem, rows)))
+            var element = PostgresTypes.Row(row.Typelem, rows);
+            if (IsCut(row, element))
             {
                 return Qualified(row);
             }
 
-            return Of(row.Typelem, rows) is { } element ? PostgresTypeNames.ArrayOf(element) : null;
+            return OfRow(element, rows) is { } name ? PostgresTypeNames.ArrayOf(name) : null;
         }
 
-        if (row.Typtype == "d" && PostgresTypes.Row(row.Typbasetype, rows).Typtype == "d")
+        if (row.Typtype == "d" && PostgresTypes.Row(row.Typbasetype, rows) is { Typtype: "d" } baseDomain)
         {
-            return Of(InnermostBaseOf(row, rows).Oid, rows);
+            return OfRow(InnermostBaseOf(baseDomain, rows), rows);
         }
 
         return row switch

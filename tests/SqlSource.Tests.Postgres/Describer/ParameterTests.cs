@@ -293,12 +293,12 @@ public sealed class ParameterTests(PostgresContainer postgres)
         return described.Value.ShouldNotBeNull().Parameters;
     }
 
-    // Each parameter's type of these tests binds by its name: NpgsqlCheckTests has the types that bind by another.
-    private static DescribedParameter Inferred(string name, PostgresType type) =>
-        new(name, type with { BindName = type.Name }, SidecarValues.TypeSource.Inferred);
+    // A parameter's type binds by its name unless the row gives another: NpgsqlCheckTests has the types that do.
+    private static DescribedParameter Inferred(string name, PostgresType type, string? bindName = null) =>
+        new(name, type with { BindName = bindName ?? type.Name }, SidecarValues.TypeSource.Inferred);
 
-    private static DescribedParameter Declared(string name, PostgresType type) =>
-        new(name, type with { BindName = type.Name }, SidecarValues.TypeSource.Declared);
+    private static DescribedParameter Declared(string name, PostgresType type, string? bindName = null) =>
+        new(name, type with { BindName = bindName ?? type.Name }, SidecarValues.TypeSource.Declared);
 
     // The server gives a parameter the type of the column it is compared with.
     [Fact]

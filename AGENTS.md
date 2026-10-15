@@ -6,7 +6,7 @@ These apply to all development in this project.
 
 1. **Document deferred work.**  Any work that is not implemented as planned must be documented in `docs/deferred`, in the same PR that defers it.
 2. **Document tech debt.**  Any problem identified and not resolved, or any intentional choice that is known to be sub-optimal, must be documented in `docs/tech-debt`, in the same PR that discovers or introduces it.
-3. **Deferred minor feedback is not allowed.**. When a review gives valid but minor feedback you should not skip it.  If the fix is large enough that you hesitate to add it, ask for user input about making the change or recording it as tech debt.
+3. **Deferred minor feedback is not allowed.**  When a review gives valid but minor feedback you should not skip it.  If the fix is large enough that you hesitate to add it, ask for user input about making the change or recording it as tech debt.
 4. **Keep the docs current, each in its own place.**  A change that makes one of these documents wrong updates it in the same PR.
    - `README.md` is for people who use the library: what it does, what it supports, how to install it and how to use it.  A change to behaviour a user can see, or to the supported environments, updates it.  Nothing about developing or releasing the project belongs there; link to the other two documents.  It is also packed as the package readme shown on nuget.org, so its links must be absolute URLs.
    - `CONTRIBUTING.md` is for people who work on the project: the tools a developer must install, how to build, test, check and pack locally, and what CI runs.  A change that adds, removes or re-pins a required tool, or that changes how the project is built, tested, checked or packed, updates it.

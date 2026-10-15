@@ -1539,9 +1539,12 @@ public class PostgresSessionTests
         exchange.Unused.ShouldBeEmpty();
     }
 
-    // The server did not answer, which says nothing of how Npgsql reads the text: it is the server rejecting the query.
-    [Fact]
-    public async Task DescribeAsync_CheckThatTheServerCancels_IsSqlsrc225AtCheckParameters()
+    // The server did not answer, which says nothing of how Npgsql reads the text: it is the server rejecting the query,
+    // and the check event says error.  An answer recorded before textRefused existed is the same.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(null)]
+    public async Task DescribeAsync_CheckThatTheServerCancels_IsSqlsrc225AtCheckParameters(bool? textRefused)
     {
         var canceled = new PostgresServerError(
             "57014",
@@ -1556,10 +1559,11 @@ public class PostgresSessionTests
         _ = script.Answer(
             "check",
             new PostgresCheckRequest("DELETE FROM samples WHERE id = @id", [new("id", "integer")]),
-            new PostgresCheckAnswer(null, canceled, null, null, false)
+            new PostgresCheckAnswer(null, canceled, null, null, textRefused)
         );
         var exchange = Frees(script, 1).Play();
-        await using var session = await PostgresScript.SessionAsync(exchange);
+        var log = new RecordingLog();
+        await using var session = await PostgresScript.SessionAsync(exchange, log);
 
         var described = await session.DescribeAsync(
             Request("DELETE FROM samples WHERE id = @id", Inferred("id")),
@@ -1571,6 +1575,8 @@ public class PostgresSessionTests
         failure.Arguments.ShouldBe(["Q", canceled.Message]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldBe(["57014: canceling statement due to statement timeout"]);
+        var (_, check) = log.Events.Single(written => written.Name == "check");
+        check.Single(member => member.Name == "result").Value.ShouldBe((LogValue)NpgsqlCheck.Error);
         exchange.Unused.ShouldBeEmpty();
     }
 

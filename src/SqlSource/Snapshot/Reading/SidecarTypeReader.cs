@@ -302,13 +302,17 @@ internal static class SidecarTypeReader
         string? bindName = null;
         for (var key = cursor.NextKey(keys, ref seen); key is not null; key = cursor.NextKey(keys, ref seen))
         {
-            if (key == SidecarKeys.Name)
+            switch (key)
             {
-                name = cursor.ReadString(key, orNull: false);
-            }
-            else
-            {
-                bindName = cursor.ReadString(key, orNull: false);
+                case SidecarKeys.Name:
+                    name = cursor.ReadString(key, orNull: false);
+                    break;
+                case SidecarKeys.BindName:
+                    bindName = cursor.ReadString(key, orNull: false);
+                    break;
+                default:
+                    // NextKey gives no key that is not in the array.
+                    break;
             }
         }
 

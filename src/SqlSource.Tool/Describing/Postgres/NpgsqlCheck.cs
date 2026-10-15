@@ -8,9 +8,13 @@ namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>What <c>check</c> found.</summary>
 /// <param name="Result">
-/// <see cref="NpgsqlCheck.Same" />, <see cref="NpgsqlCheck.Differ" /> or <see cref="NpgsqlCheck.Unbound" />.
+/// <see cref="NpgsqlCheck.Same" />, <see cref="NpgsqlCheck.Differ" />, <see cref="NpgsqlCheck.Unbound" /> or
+/// <see cref="NpgsqlCheck.Error" />.
 /// </param>
-/// <param name="Differs">What differs, or Npgsql's message of a type it cannot bind.  Null when nothing does.</param>
+/// <param name="Differs">
+/// What differs, Npgsql's message of a type it cannot bind, or the message of an error that is no disagreement.  Null
+/// when nothing does.
+/// </param>
 /// <param name="TypeDiffers">
 /// True when what differs is the type of a column.  A difference of where the parameters stand is no difference of
 /// a type.
@@ -42,10 +46,17 @@ internal sealed record CheckVerdict(
 /// </remarks>
 internal static class NpgsqlCheck
 {
-    /// <summary>The values of the <c>result</c> member of the <c>check</c> event.</summary>
+    /// <summary>
+    /// The values of the <c>result</c> member of the <c>check</c> event: the two describes agree; they differ, which
+    /// an error of the server can say; Npgsql cannot bind a parameter's type; or <c>check</c> failed with an error
+    /// that says nothing of how Npgsql reads the SQL, such as a lost connection or a cancel.
+    /// </summary>
     public const string Same = "same";
     public const string Differ = "differ";
     public const string Unbound = "unbound";
+    public const string Error = "error";
+
+    private const string SyntaxOrAccessClass = "42";
 
     // How many characters of each text a difference quotes, from where the two part.
     private const int Quoted = 10;
@@ -76,7 +87,7 @@ internal static class NpgsqlCheck
 
         if (answer.Error is { } error)
         {
-            return new CheckVerdict(Differ, error.Message);
+            return new CheckVerdict(ReadsDifferently(error, answer.TextRefused) ? Differ : Error, error.Message);
         }
 
         var seen =
@@ -87,27 +98,47 @@ internal static class NpgsqlCheck
             return new CheckVerdict(Differ, placed, PlacementDiffers: true);
         }
 
-        var (differs, isType) = Difference(seen, described, rows);
-        return differs is null ? new CheckVerdict(Same, null) : new CheckVerdict(Differ, differs, isType);
+        return OfColumns(seen, described, rows);
     }
 
-    // Where the two texts first part, or null.  The tool's rewrite numbers a parameter by its place in the list it is
-    // given, so it is given the query's parameters in Npgsql's order: those Npgsql numbered, then the others, which
-    // neither text holds.
+    // Whether an error of the server is what a misread @ gives: a syntax error or an access rule violation, class 42.
+    // An error without a SQLSTATE is either Npgsql's refusal of the text, which a misread @ can give, or a lost
+    // connection; textRefused says which, and is null in an answer recorded before it existed, whose error without a
+    // SQLSTATE was the refusal.
+    private static bool ReadsDifferently(PostgresServerError error, bool? textRefused) =>
+        error.SqlState is { } state
+            ? state.StartsWith(SyntaxOrAccessClass, StringComparison.Ordinal)
+            : textRefused ?? true;
+
+    // Where the two texts first part, or null.
     private static string? Placement(PostgresCheckSent sent, string sql, EquatableArray<SqlQueryParameter> parameters)
+    {
+        var order = OrderOf(sent, parameters);
+        var ours = (
+            ParameterPlaceholders.Rewrite(sql, order)
+            ?? throw new InvalidOperationException("The SQL of a query was prepared and holds more than one statement.")
+        ).TrimEnd();
+        var theirs = sent.Text.TrimEnd();
+        return PartAt(ours, theirs) is { } at ? Parting(ours, theirs, at, order, parameters) : null;
+    }
+
+    // The tool's rewrite numbers a parameter by its place in the list it is given, so it is given the query's
+    // parameters in Npgsql's order: those Npgsql numbered, then the others, which neither text holds.  A name Npgsql
+    // numbered that the query lacks keeps its number with a parameter of its own, which the tool's rewrite never
+    // places, so that the parameters after it keep theirs.
+    private static EquatableArray<SqlQueryParameter> OrderOf(
+        PostgresCheckSent sent,
+        EquatableArray<SqlQueryParameter> parameters
+    )
     {
         var order = new List<SqlQueryParameter>(parameters.Count);
         foreach (var placed in sent.Parameters)
         {
             var name = placed.StartsWith('@') || placed.StartsWith(':') ? placed[1..] : placed;
-            var parameter = parameters.FirstOrDefault(parameter =>
-                string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
-            );
-            if (parameter is null)
-            {
-                return $"Npgsql placed @{name}, which SqlSource does not read as a parameter";
-            }
-
+            var parameter =
+                parameters.FirstOrDefault(parameter =>
+                    string.Equals(parameter.Name, name, StringComparison.OrdinalIgnoreCase)
+                ) ?? new SqlQueryParameter(name, null, null, false);
             if (!order.Contains(parameter))
             {
                 order.Add(parameter);
@@ -115,11 +146,13 @@ internal static class NpgsqlCheck
         }
 
         order.AddRange(parameters.Where(parameter => !order.Contains(parameter)));
-        var ours = (
-            ParameterPlaceholders.Rewrite(sql, new EquatableArray<SqlQueryParameter>([.. order]))
-            ?? throw new InvalidOperationException("The SQL of a query was prepared and holds more than one statement.")
-        ).TrimEnd();
-        var theirs = sent.Text.TrimEnd();
+        return new EquatableArray<SqlQueryParameter>([.. order]);
+    }
+
+    // The index of the first character where the two texts part, or null when they are equal.  Two numbers that
+    // differ part at their "$".
+    private static int? PartAt(string ours, string theirs)
+    {
         var at = 0;
         while (at < ours.Length && at < theirs.Length && ours[at] == theirs[at])
         {
@@ -131,29 +164,64 @@ internal static class NpgsqlCheck
             return null;
         }
 
-        // Two numbers that differ are quoted from their "$".
         var digits = at;
         while (digits > 0 && char.IsAsciiDigit(ours[digits - 1]))
         {
             digits--;
         }
 
-        if (digits > 0 && ours[digits - 1] == '$')
+        return digits > 0 && ours[digits - 1] == '$' ? digits - 1 : at;
+    }
+
+    // Where the two texts part, and what each holds there; or, where Npgsql placed a parameter the query lacks, its
+    // name.
+    private static string Parting(
+        string ours,
+        string theirs,
+        int at,
+        EquatableArray<SqlQueryParameter> order,
+        EquatableArray<SqlQueryParameter> parameters
+    )
+    {
+        var where = Invariant($"the SQL with $n parts at character {at + 1}");
+        if (NumberAt(theirs, at) is { } number && number <= order.Count && !parameters.Contains(order[number - 1]))
         {
-            at = digits - 1;
+            var placed = order[number - 1].Name;
+            return $"{where}: Npgsql placed @{placed} there, which SqlSource does not read as a parameter";
         }
 
-        var (npgsql, sqlSource) = (Quote(theirs, at), Quote(ours, at));
-        return Invariant(
-            $"the SQL with $n parts at character {at + 1}: '{npgsql}' for Npgsql and '{sqlSource}' for SqlSource"
-        );
+        return $"{where}: '{Quote(theirs, at)}' for Npgsql and '{Quote(ours, at)}' for SqlSource";
+    }
+
+    // The n of a "$n" that starts at the index, or null.
+    private static int? NumberAt(string text, int at)
+    {
+        if (at >= text.Length || text[at] != '$')
+        {
+            return null;
+        }
+
+        var end = at + 1;
+        while (end < text.Length && char.IsAsciiDigit(text[end]))
+        {
+            end++;
+        }
+
+        return int.TryParse(
+            text.AsSpan(at + 1, end - at - 1),
+            NumberStyles.None,
+            CultureInfo.InvariantCulture,
+            out var number
+        )
+            ? number
+            : null;
     }
 
     private static string Quote(string text, int from) => text.Substring(from, Math.Min(Quoted, text.Length - from));
 
-    // The first thing that differs, and whether it is a type.  A type is compared as the protocol reported it, which
-    // both describes see: for a column of a domain that is the base.
-    private static (string? Differs, bool IsType) Difference(
+    // The verdict of the columns: the first thing that differs, or the same.  A type is compared as the protocol
+    // reported it, which both describes see: for a column of a domain that is the base.
+    private static CheckVerdict OfColumns(
         IReadOnlyList<PostgresCheckColumn> seen,
         IReadOnlyList<PostgresColumnRow> described,
         IReadOnlyDictionary<long, PostgresTypeRow> rows
@@ -161,9 +229,9 @@ internal static class NpgsqlCheck
     {
         if (seen.Count != described.Count)
         {
-            return (
-                Invariant($"the result has {seen.Count} columns for Npgsql and {described.Count} for SqlSource"),
-                false
+            return new CheckVerdict(
+                Differ,
+                Invariant($"the result has {seen.Count} columns for Npgsql and {described.Count} for SqlSource")
             );
         }
 
@@ -172,25 +240,24 @@ internal static class NpgsqlCheck
             var (theirs, ours) = (seen[index], described[index]);
             if (!string.Equals(theirs.Name, ours.Name, StringComparison.Ordinal))
             {
-                return (
-                    Invariant(
-                        $"column {index + 1} is named '{theirs.Name}' for Npgsql and '{ours.Name}' for SqlSource"
-                    ),
-                    false
+                return new CheckVerdict(
+                    Differ,
+                    Invariant($"column {index + 1} is named '{theirs.Name}' for Npgsql and '{ours.Name}' for SqlSource")
                 );
             }
 
             if (theirs.TypeOid != ours.TypeOid)
             {
                 var oursNamed = NameOf(ours.TypeOid, rows);
-                return (
+                return new CheckVerdict(
+                    Differ,
                     Invariant($"column {index + 1} is {theirs.DataTypeName} for Npgsql and {oursNamed} for SqlSource"),
-                    true
+                    TypeDiffers: true
                 );
             }
         }
 
-        return (null, false);
+        return new CheckVerdict(Same, null);
     }
 
     private static string NameOf(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>

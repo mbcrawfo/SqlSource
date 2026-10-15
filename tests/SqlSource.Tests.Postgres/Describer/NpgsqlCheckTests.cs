@@ -1,4 +1,3 @@
-using System;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
@@ -73,6 +72,8 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         );
     }
 
+    // Both readers skip a @name in a string, '@id'.  A @name in a comment has no row: a run describes the query's SQL
+    // without its comments (SampleSql.Build), so check never reads one.
     [Theory]
     [InlineData("SELECT id, name FROM users WHERE id = @id")]
     [InlineData("SELECT id FROM users WHERE id = @ID OR id = @id")]
@@ -85,6 +86,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData("INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING id")]
     [InlineData("SELECT id FROM users WHERE id = @id; -- the end")]
     [InlineData("SELECT '$1' AS a, id FROM users WHERE id = @id")]
+    [InlineData("SELECT '@id' AS a, id FROM users WHERE id = @id")]
     public async Task Describe_QueryNpgsqlReadsAsTheLexerDoes_PassesTheCheck(string sql) => await ShouldPassAsync(sql);
 
     // Npgsql ignores a parameter that the SQL does not reference, and still resolves its type.
@@ -163,10 +165,15 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     // Types Npgsql cannot send a value of: a composite type, a table's row type and a type of the system catalogs
     // that Npgsql does not load.
     [Theory]
-    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "check_pair", "public.check_pair")]
-    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "users", "public.users")]
-    [InlineData("SELECT c.relname FROM pg_catalog.pg_class AS c WHERE c.oid = @t::regclass", null, "regclass")]
-    public async Task Describe_ParameterNpgsqlCannotBind_IsSqlsrc232NamingIt(string sql, string? declared, string name)
+    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "check_pair", "public.check_pair", "@p")]
+    [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "users", "public.users", "@p")]
+    [InlineData("SELECT c.relname FROM pg_catalog.pg_class AS c WHERE c.oid = @t::regclass", null, "regclass", "@t")]
+    public async Task Describe_ParameterNpgsqlCannotBind_IsSqlsrc232NamingIt(
+        string sql,
+        string? declared,
+        string name,
+        string written
+    )
     {
         _ = await ScalarAsync(OwnObjects);
 
@@ -175,7 +182,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         described.Value.ShouldBeNull();
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC232");
-        failure.Arguments.ShouldBe([name, sql.Contains("@t", StringComparison.Ordinal) ? "@t" : "@p", Requests.Query]);
+        failure.Arguments.ShouldBe([name, written, Requests.Query]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldHaveSingleItem().ShouldNotBeNullOrWhiteSpace();
         failure.Help.ShouldBe(PostgresErrors.BindHelp);

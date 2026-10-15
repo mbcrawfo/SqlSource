@@ -146,7 +146,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // of pg_catalog's numeric binds by numeric, which does not depend on the session: it is returned as a column, so
     // a check that bound the domain, sent as text, would see a column of text.
     [Fact]
-    public async Task Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpelling()
+    public async Task Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpellingAndBindsByTheBareName()
     {
         var token = TestContext.Current.CancellationToken;
         await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
