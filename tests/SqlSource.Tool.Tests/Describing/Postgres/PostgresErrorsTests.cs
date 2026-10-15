@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Parsing;
@@ -340,7 +341,8 @@ public class PostgresErrorsTests
         failure.Arguments.ShouldBe(["Q", message]);
         failure.Help.ShouldBe(
             "the server gave each of @age, @q the type of its first use, which may not be the type meant: cast the "
-                + "parameter where it is used, @age::int, or declare its type with -- param: @age int"
+                + "parameter where it is used to the type meant, @age::<type>, or declare its type with "
+                + "-- param: @age <type>"
         );
     }
 
@@ -355,8 +357,14 @@ public class PostgresErrorsTests
             )
             .Help.ShouldBe(
                 "the server gave @x the type of its first use, which may not be the type meant: cast the parameter "
-                    + "where it is used, @x::int, or declare its type with -- param: @x int"
+                    + "where it is used to the type meant, @x::<type>, or declare its type with -- param: @x <type>"
             );
+
+    [Fact]
+    public void InferredParameterHelp_NoParameter_ThrowsArgumentException() =>
+        Should
+            .Throw<ArgumentException>(() => PostgresErrors.InferredParameterHelp([]))
+            .ParamName.ShouldBe("undeclared");
 
     [Fact]
     public void Prepare_TypeErrorWithEveryParameterDeclared_IsSqlsrc225WithNoHelp() =>

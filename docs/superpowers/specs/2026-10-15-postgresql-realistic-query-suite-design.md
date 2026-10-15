@@ -104,7 +104,7 @@ A tool in the shape of `tools/record-fixtures.sh` writes every case's expectatio
 
 ## The help of SQLSRC225 for an inferred parameter
 
-When the server rejects a query at the step `describe parameters` with `42883` (no such operator or function), `42804` (a datatype mismatch) or `42725` (an ambiguous operator or function), and the query has at least one parameter without a declared type, the failure's help says that the server gave each such parameter the type of its first use, which may not be the one meant, and to cast it where it is used, `@age::interval`, or declare its type with `-- param: @age interval`.  It names the undeclared parameters, as written, in the order of the query's list.  It does not claim to know which one is at fault.
+When the server rejects a query at the step `describe parameters` with `42883` (no such operator or function), `42804` (a datatype mismatch) or `42725` (an ambiguous operator or function), and the query has at least one parameter without a declared type, the failure's help says that the server gave each such parameter the type of its first use, which may not be the one meant, and to cast it where it is used to the type meant, `@age::<type>`, or declare its type with `-- param: @age <type>`: the tool cannot know the type meant, so the help writes `<type>` and not a guess, which here would be `interval`.  It names the undeclared parameters, as written, in the order of the query's list.  It does not claim to know which one is at fault.
 
 The id stays SQLSRC225 and the message stays the server's.  `docs/diagnostics.md` says it in SQLSRC225's section, and a test in `tests/SqlSource.Tool.Tests/Describing/Postgres/PostgresErrorsTests.cs` and a case of the corpus pin it.
 

@@ -928,7 +928,19 @@ The tool asked the server to prepare the query, and the server refused it: a syn
 
 Mend the query, or bring the database to the schema the query was written for.  `at character` counts from the start of the query's SQL as the tool sent it: without its comments, with each token's default in the token's place and `$1` in the place of each parameter, so it is close to the place in the file and not always the same.  Run with `--log` for the SQL as it was sent.  An error at the step `resolve type` has no `at character` line: there the server refused the tool's own question about a type, and not the query.  A type that a `-- param:` marker declares is checked against every use of the parameter, so a declared `int` compared with a text column is this error too.
 
-A parameter with no declared type takes the type of its first use, so `placed_at > now() - @age` makes `@age` a `timestamp with time zone`, and the server then reports `operator does not exist: timestamp with time zone > interval`, an operator that the SQL does not hold.  For `42883`, `42804` and `42725` with such a parameter, the help names each one and says to cast it where it is used, `@age::interval`, or to declare its type, `-- param: @age interval`.
+A parameter with no declared type takes the type of its first use, so `placed_at > now() - @age` makes `@age` a `timestamp with time zone`, and the server then reports `operator does not exist: timestamp with time zone > interval`, an operator that the SQL does not hold.  For `42883`, `42804` and `42725` at the step `describe parameters`, when the query has such a parameter, the help is `the server gave @age the type of its first use, which may not be the type meant: cast the parameter where it is used to the type meant, @age::<type>, or declare its type with -- param: @age <type>`.  With several such parameters it names each of them in the order of the query, `the server gave each of @a, @b the type of its first use, ...`, and its example is the first; it does not say which of them is at fault.
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC225: The server rejected the query 'ListRecentOrders': operator does not exist: timestamp with time zone > interval
+    query: ListRecentOrders, database app, postgres 18.4, Npgsql 10.0.3
+    step: describe parameters
+    server: 42883: operator does not exist: timestamp with time zone > interval
+    server: hint: No operator matches the given name and argument types. You might need to add explicit type casts.
+    server: at character 86
+    help: the server gave @age the type of its first use, which may not be the type meant: cast the parameter where it is used to the type meant, @age::<type>, or declare its type with -- param: @age <type>
+```
+
+Write the type meant in the place of `<type>`: here `@age::interval`, or `-- param: @age interval`.
 
 A statement that the server cannot prepare, though its SQL is valid, such as `CALL` or `CREATE TABLE`, is [SQLSRC233](#sqlsrc233) and not this error.
 

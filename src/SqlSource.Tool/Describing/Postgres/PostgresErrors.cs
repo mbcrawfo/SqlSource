@@ -309,15 +309,25 @@ internal static class PostgresErrors
 
     /// <summary>
     /// The help of <c>SQLSRC225</c> for a type error in a query that has parameters of no declared type: the server
-    /// gave each the type of its first use.  The example is the first of them, as an <c>int</c>.
+    /// gave each the type of its first use.  The example is the first of them, with <c>&lt;type&gt;</c> in the place of
+    /// a type: the tool cannot know the type meant, and a guess such as <c>int</c> can be what gave the error.
     /// </summary>
-    /// <param name="undeclared">The parameters whose type no marker declares, in the order of the query.</param>
+    /// <param name="undeclared">
+    /// The parameters whose type no marker declares, in the order of the query: one at least.
+    /// </param>
+    /// <exception cref="ArgumentException"><paramref name="undeclared"/> is empty.</exception>
     public static string InferredParameterHelp(IReadOnlyList<SqlQueryParameter> undeclared)
     {
+        if (undeclared.Count == 0)
+        {
+            throw new ArgumentException("The help names one parameter at least.", nameof(undeclared));
+        }
+
         var first = Written(undeclared[0]);
         var names = undeclared.Count == 1 ? first : "each of " + string.Join(", ", undeclared.Select(Written));
         return $"the server gave {names} the type of its first use, which may not be the type meant: cast the "
-            + $"parameter where it is used, {first}::int, or declare its type with -- param: {first} int";
+            + $"parameter where it is used to the type meant, {first}::<type>, or declare its type with "
+            + $"-- param: {first} <type>";
     }
 
     /// <summary>
