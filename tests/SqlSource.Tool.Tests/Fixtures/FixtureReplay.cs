@@ -89,7 +89,7 @@ internal static class FixtureReplay
 
     // The one query of query.sql as the plan of a run holds it: read by the engine's dialect, with the hash of its
     // SQL, for the database its markers name or else the one named as the dialect.
-    private static (PlannedQuery Query, SqlDialect Dialect) Plan(FixtureCase fixture, CancellationToken token)
+    public static (PlannedQuery Query, SqlDialect Dialect) Plan(FixtureCase fixture, CancellationToken token)
     {
         if (!SqlDialectName.TryParse(fixture.Engine, out var engine))
         {
