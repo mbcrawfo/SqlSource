@@ -94,7 +94,7 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
             var column = ColumnOf(found, index);
             if (columns[index].Nullable == false && sawNull[index])
             {
-                Assert.Fail($"{column} is described not null, and held a NULL over the seed");
+                Assert.Fail($"{column} is not null, and can be NULL: it held a NULL over the seed");
             }
 
             if (!truth.Nullable && sawNull[index])
