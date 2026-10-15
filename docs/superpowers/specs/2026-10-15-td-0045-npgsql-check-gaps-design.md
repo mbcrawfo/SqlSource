@@ -147,7 +147,7 @@ Both are removed with the item.
 
 A new deferred item, `D-0003-custom-type-conversion.md`, with the sections of `docs/deferred/AGENTS.md`:
 
-- **Planned**: the [epic design](2026-10-07-query-generation-epic-design.md) plans a project-level type override (phase 5), map rows that convert a value with a read and a write expression (phase 7), and binding by the sidecar's type name (phase 8).  It says a type the driver cannot read is a diagnostic that names the type and the override.  It plans nothing for a type the driver cannot *write*, nor a conversion a user declares for one.
+- **Planned**: the [epic design](2026-10-07-query-generation-epic-design.md) plans a project-level type override (phase 5), map rows that convert a value with a read and a write expression (phase 7), and binding by the sidecar's `bindName` (phase 8).  It says a type the driver cannot read is a diagnostic that names the type and the override.  It plans nothing for a type the driver cannot *write*, nor a conversion a user declares for one.
 - **Delivered instead**: `SQLSRC232` for a parameter whose type Npgsql cannot bind, linking `PostgresErrors` and the diagnostic.  The workaround is a `text` parameter with a cast in the SQL.
 - **Why deferred**: a general mechanism is a design of its own across three parts of the epic, larger than closing TD-0045.
 - **Remaining work**: a way for a project to declare a conversion for a database type, applied consistently in three places:

@@ -2,7 +2,7 @@
 
 ## Planned
 
-The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) plans a project-level type override (phase 5), map rows that convert a value with a read and a write expression (phase 7), and binding a parameter by the type's name from the sidecar (phase 8).  It says a type the driver cannot read is a diagnostic that names the type and the override.  It plans nothing for a type the driver cannot *write*, nor a conversion that a user declares for one.
+The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) plans a project-level type override (phase 5), map rows that convert a value with a read and a write expression (phase 7), and binding a parameter by its type's `bindName` from the sidecar (phase 8).  It says a type the driver cannot read is a diagnostic that names the type and the override.  It plans nothing for a type the driver cannot *write*, nor a conversion that a user declares for one.
 
 ## Delivered instead
 

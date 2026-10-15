@@ -31,7 +31,7 @@
 These are the inputs most likely to reach a user that no task naturally tests. Each line names the task that adds its test.
 
 1. **A built-in type hidden by a user type of the same name on the `search_path`**: the existing test that puts a `numeric` domain first. The parameter's `name` is `pg_catalog.numeric` (TD-0050), and its `bindName` must still bind the built-in, not the domain. *(Task 3)*
-2. **A parameter written twice, once as `@id` and once as `:id` in a slice, `tags[1:id]`, with a column `id`.** The columns match, so only the comparison of the texts catches it. *(Task 4)*
+2. **A parameter written twice, once as `@id` and once as `:id` in a slice, `tags[:id]`, with a column `id`.** The columns match, so only the comparison of the texts catches it. *(Task 4)*
 3. **A string literal that holds `$1`**, `SELECT '$1' AS a WHERE id = @id`. Both texts hold the same `$1` in the string, and the check must pass. *(Task 4)*
 4. **A parameter whose name differs from its other occurrence only in case**, `@ID OR @id`. Npgsql places one positional parameter, and the renumbering matches names ignoring case. *(Task 4)*
 5. **A connection lost between `columns` and `check`.** It is `SQLSRC225` at `check parameters` with the lost connection's text, not `SQLSRC231`, and a replay of an old capture whose error has no SQLSTATE stays `SQLSRC231`. *(Task 5)*
@@ -174,7 +174,7 @@ ours and theirs, each with trailing white space trimmed, differ -> differ at the
   - `BatchRewritesTests.Resolve_PinnedNpgsql_FindsTheMembers`, which needs no server.
   - In `CheckVerdictTests`:
     - `Read_SameTextsAndColumns_IsSame`.
-    - `Read_NpgsqlPlacedAParameterSqlSourceDidNot_IsDiffer`: `SELECT tags[1:$1] …` against the tool's `tags[1:id]`.
+    - `Read_NpgsqlPlacedAParameterSqlSourceDidNot_IsDiffer`: `… tags[$1] …` against the tool's `tags[:id]`.
     - `Read_NpgsqlNamesAParameterTheQueryLacks_IsDiffer`.
     - `Read_NpgsqlNumbersInAnotherOrder_IsSame`.
     - `Read_LiteralDollarOneInAString_IsSame` (Review Focus 3).
@@ -187,7 +187,7 @@ ours and theirs, each with trailing white space trimmed, differ -> differ at the
   - The capture holds no more of the user's SQL than its request does, so no redaction changes.
   - Update the `<remarks>` of `NpgsqlCheck`: it compares the places of the parameters and the columns. What it still cannot see is a `$n` the SQL writes itself, which `SQLSRC234` refuses before.
 - [ ] **Step 4: Write the container tests.**
-  - `Describe_ColonParameterNpgsqlReadsInASlice_IsSqlsrc231` (Review Focus 2): `SELECT tags[1:id] AS t FROM users WHERE id = @id`, where `users.id` is the integer column the slice reads. The arguments say where the two texts part.
+  - `Describe_ColonParameterNpgsqlReadsInASlice_IsSqlsrc231` (Review Focus 2): `SELECT id FROM users WHERE id = @id AND tags[:id] IS NOT NULL`, where `users.id` is the integer column the subscript reads (Npgsql sends `tags[$1]`; `tags[1:id]` becomes `tags[1$1]`, a 42601, and does not exercise the comparison). The arguments say where the two texts part.
   - Add `SELECT '$1' AS a, id FROM users WHERE id = @id` to `Describe_QueryNpgsqlReadsAsTheLexerDoes_PassesTheCheck`.
   - `CheckAsync_QueryWithParameters_AnswersNpgsqlsText`: the live answer's `Sent` holds `$1` where `@id` was, and the parameter list `["id"]`.
 - [ ] **Step 5: Re-record the fixtures**, since every `check` answer gains `sent`. Read the diff: only `sent`.
