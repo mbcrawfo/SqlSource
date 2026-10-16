@@ -15,27 +15,6 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class PlanOutputTests(PostgresContainer postgres)
 {
-    /// <summary>
-    /// Aggregates <c>shadow.count(*)</c> and <c>shadow.count(integer)</c> that always return <c>NULL</c>, made by SQL
-    /// that can be run again.  On a path that names <c>shadow</c> before <c>pg_catalog</c> the plan prints the first
-    /// as <c>count(*)</c>; on any path that names <c>shadow</c>, the second beats <c>pg_catalog.count("any")</c> for an
-    /// integer by its exact type and prints as <c>count(id)</c>.
-    /// </summary>
-    internal const string ShadowCount = """
-        CREATE SCHEMA IF NOT EXISTS shadow;
-        CREATE OR REPLACE FUNCTION shadow.nulls(int8) RETURNS int8 LANGUAGE sql AS 'SELECT NULL::int8';
-        CREATE OR REPLACE AGGREGATE shadow.count(*) (sfunc = shadow.nulls, stype = int8);
-        CREATE OR REPLACE FUNCTION shadow.nulls(int8, integer) RETURNS int8 LANGUAGE sql AS 'SELECT NULL::int8';
-        CREATE OR REPLACE AGGREGATE shadow.count(integer) (sfunc = shadow.nulls, stype = int8);
-        """;
-
-    // A partitioned table of these tests alone, made by SQL that can be run again.
-    private const string Partitioned = """
-        CREATE TABLE IF NOT EXISTS plan_parts (id integer NOT NULL, kind integer NOT NULL) PARTITION BY LIST (kind);
-        CREATE TABLE IF NOT EXISTS plan_parts_1 PARTITION OF plan_parts FOR VALUES IN (1);
-        CREATE TABLE IF NOT EXISTS plan_parts_2 PARTITION OF plan_parts FOR VALUES IN (2);
-        """;
-
     private const string OneTable =
         "SELECT deleted_at IS NULL, greatest(created_at, deleted_at), coalesce(email, 'x') FROM users a ORDER BY id";
 
@@ -379,7 +358,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     [Fact]
     public async Task Explain_CountShadowedOnTheSearchPath_PrintsUnqualified()
     {
-        await RunAsync(ShadowCount);
+        await RunAsync(ScratchSchema.ShadowCount);
         var connection = $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public";
 
         var root = await ExplainAsync("SELECT count(*) FROM users", connection);
@@ -430,8 +409,8 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     [Fact]
     public async Task Explain_PartitionedTableWithoutPruning_PrintsEveryMember()
     {
-        await RunAsync(Partitioned);
-        const string Sql = "SELECT p.id, p.kind FROM plan_parts p WHERE p.kind = $1 ORDER BY p.id";
+        await RunAsync(ScratchSchema.Partitioned);
+        const string Sql = "SELECT p.id, p.kind FROM scratch_parts p WHERE p.kind = $1 ORDER BY p.id";
 
         var pruned = await ExplainExecuteAsync(Sql, "integer", pruning: true);
         var unpruned = await ExplainExecuteAsync(Sql, "integer", pruning: false);
@@ -442,7 +421,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         append.Output.ShouldBeNull();
         append
             .Plans.Select(static member => (member.ParentRelationship, member.Alias, member.RelationName))
-            .ShouldBe([("Member", "p_1", "plan_parts_1"), ("Member", "p_2", "plan_parts_2")]);
+            .ShouldBe([("Member", "p_1", "scratch_parts_1"), ("Member", "p_2", "scratch_parts_2")]);
         append.Plans[0].Output.ShouldBe(["p_1.id", "p_1.kind"]);
         append.Plans[1].Output.ShouldBe(["p_2.id", "p_2.kind"]);
     }

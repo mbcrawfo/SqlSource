@@ -42,7 +42,6 @@ Next id: `TD-0056`
 | [TD-0052](TD-0052-explain-plans-every-partition.md) | Open | 2026-10-15 | Low | The PostgreSQL describer asks for a query's plan with partition pruning off, so that the members of a partitioned table's `Append` show for the `NULL`s of its parameters, and a query over a table of many partitions is planned, and logged, with every partition |
 | [TD-0053](TD-0053-duplicated-and-uneven-patterns-in-the-postgresql-describer.md) | Open | 2026-10-16 | Low | Duplicated and uneven patterns in the PostgreSQL describer: six readers of quoted names, five rules for a word character of the SQL, the SQL lexed six times a describe, a plan's node types as literals in four files, hand-kept type tables, and the call pattern of `PostgresSession` written ten times |
 | [TD-0054](TD-0054-duplicated-and-uneven-patterns-in-the-postgresql-tests.md) | Open | 2026-10-16 | Low | Duplicated and uneven patterns in the tests of the PostgreSQL describer: the session's script and a column's nullability spelled by hand in many classes, helpers of the container tests copied per class, test classes of over a thousand lines, and uneven names |
-| [TD-0055](TD-0055-two-container-test-classes-create-one-table.md) | Open | 2026-10-16 | Low | `WalkTests` and `ExpressionTests` each create `walk_parts` with `IF NOT EXISTS` on the one server, so an edit to one copy is used or not by the order the classes run in |
 
 ## Columns
 
