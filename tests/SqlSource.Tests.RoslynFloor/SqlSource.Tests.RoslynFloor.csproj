@@ -14,7 +14,10 @@
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
-        <!-- The generator driver tests of SqlSource.Tests, compiled a second time against the older Roslyn. -->
+        <!--
+            The generator driver tests of SqlSource.Tests, compiled a second time against the older Roslyn: the one
+            place where a test project compiles files of another.  tests/SqlSource.Tests/Generator/AGENTS.md says why.
+        -->
         <Compile Include="../SqlSource.Tests/Generator/**/*.cs" LinkBase="Generator" />
     </ItemGroup>
     <ItemGroup>
