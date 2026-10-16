@@ -27,7 +27,7 @@ public class PostgresEventsTests
     // The parameter of Query as "check" is sent it.
     private static readonly (string Name, string Type)[] CheckedParameters = [("id", "integer")];
 
-    private static readonly PostgresColumnsRequest Columns = new(PostgresScript.Statement(1), 1);
+    private static readonly PostgresColumnsRequest ColumnsOfQuery = new(PostgresScript.Statement(1), 1);
 
     private static readonly PostgresCheckRequest Check = new(
         Query.Sql,
@@ -139,7 +139,7 @@ public class PostgresEventsTests
             null
         );
 
-        PostgresEvents.Columns(log, "GetUser", Columns, answer, 1);
+        PostgresEvents.Columns(log, "GetUser", ColumnsOfQuery, answer, 1);
 
         Member(log.Events.ShouldHaveSingleItem().Members, "columns")
             .ShouldBe(
@@ -541,7 +541,7 @@ public class PostgresEventsTests
         var script = new PostgresScript()
             .Open()
             .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
-            .Answer("columns", Columns, new PostgresColumnsAnswer(null, lost))
+            .Answer("columns", ColumnsOfQuery, new PostgresColumnsAnswer(null, lost))
             .Frees(1);
 
         await DescribeAsync(script, log);

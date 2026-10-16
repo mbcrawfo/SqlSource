@@ -53,6 +53,7 @@ internal sealed class PostgresScript
     // The name the session gives the statement of its describe of that number in the session.
     public static string Statement(int number) => $"sqlsource_{number}";
 
+    // What "deallocate" answers for a statement that was freed.
     public static PostgresDeallocateAnswer Freed { get; } = new(null);
 
     // What "explain" answers for a statement whose column of no origin makes the describe ask for the plan, in a
