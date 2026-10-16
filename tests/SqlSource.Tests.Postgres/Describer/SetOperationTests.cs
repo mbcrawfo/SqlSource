@@ -193,7 +193,9 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // Result member over the inner SetOp.  The row description's type is the outer operation's, and the inner one is
     // of the common type of its own inputs, which may be the type of an input that proves nothing: below another set
     // operation each input must prove the column, and the leftmost branch alone does not.  That is unknown where the
-    // server cannot return NULL, never the other way.
+    // server cannot return NULL, never the other way.  So (created INTERSECT deleted) EXCEPT deleted is unknown while
+    // (created INTERSECT created) EXCEPT deleted is answered: the nested INTERSECT's own type is unknown, and it proves
+    // the column only when each of its inputs does.
     [Theory]
     [InlineData(
         "SELECT u.created_at FROM users u EXCEPT SELECT x.created_at FROM users x"
@@ -276,26 +278,73 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         (await ReturnsNullAsync(Rows, sql, 1)).ShouldBeTrue();
     }
 
-    // A subquery in FROM that the result reads in another order than its columns: the root is the subquery's scan, a
-    // user's alias that the walk does not follow, so nothing is answered, and no column is read as another.  The
-    // first column is created_at, which the server never returns NULL in, and the second is deleted_at, which it does.
+    // UNION ALL of branches whose names cross the union's: the first names the columns label and note, the second
+    // scan "*SELECT* 2" prints its own note and label, in the branch's place order.  It is an Append whose second
+    // member is that scan, which the walk follows by place only as a flagged member of 14's SetOp: here it follows
+    // nothing, on either major, and no column is read by its name.  The third query would read column 1 (note) as
+    // the NOT NULL name if the names were followed; the server returns NULL there.
     [Theory]
     [InlineData(
-        "SELECT s.b, s.a FROM (SELECT u.deleted_at AS a, u.created_at AS b FROM users u "
-            + "EXCEPT SELECT x.created_at, x.deleted_at FROM users x) s"
+        "SELECT o.note AS label, o.note AS note FROM orders o "
+            + "UNION ALL SELECT u.name AS note, u.email AS label FROM users u",
+        0
     )]
     [InlineData(
-        "SELECT s.b, s.a FROM (SELECT u.deleted_at AS a, u.created_at AS b FROM users u "
-            + "UNION ALL SELECT x.created_at, x.deleted_at FROM users x) s"
+        "SELECT o.note AS label, o.note AS note FROM orders o "
+            + "UNION ALL SELECT u.name AS note, u.email AS label FROM users u",
+        1
     )]
-    public async Task Describe_SetOperationInASubqueryReadInAnotherOrder_StaysUnknown(string sql)
+    [InlineData(
+        "SELECT x.name AS label, x.name AS note FROM users x "
+            + "UNION ALL SELECT u.name AS note, u.email AS label FROM users u",
+        1
+    )]
+    public async Task Describe_UnionAllWhoseBranchNamesCrossThePlaces_StaysUnknown(string sql, int column)
     {
+        (await WalkedAsync(sql)).ShouldBe([Unknown, Unknown]);
+        (await ReturnsNullAsync(Rows, sql, column)).ShouldBeTrue();
+    }
+
+    // A subquery in FROM over an EXCEPT, read in another order than its columns: the root is the user's Subquery Scan
+    // s over the SetOp, which the walk does not enter, so nothing is answered and no column is read as another.  The
+    // server never returns NULL in the first column (created_at) and does in the second (deleted_at).
+    [Fact]
+    public async Task Describe_ExceptInASubqueryReadInAnotherOrder_StaysUnknown()
+    {
+        var sql =
+            "SELECT s.b, s.a FROM (SELECT u.deleted_at AS a, u.created_at AS b FROM users u "
+            + "EXCEPT SELECT x.created_at, x.deleted_at FROM users x) s";
+
         (await WalkedAsync(sql)).ShouldBe([Unknown, Unknown]);
         (await ReturnsNullAsync(Rows, sql, 1)).ShouldBeTrue();
     }
 
-    // A user who writes the planner's alias in a branch gets a scan that prints its columns in the order its query
-    // needs, not the branch's: the text makes the walk follow no alias by place.  Column 0 is deleted_at here.
+    // The same over a UNION ALL, which the planner pulls up: the root is an Append whose members print the columns in
+    // the order the query reads them, b then a, with no scan between.  Each column is answered by its own members: b
+    // is created_at in both branches and a is deleted_at in one.  Where the second branch puts deleted_at into b, b
+    // can be NULL, and is.
+    [Fact]
+    public async Task Describe_UnionAllInASubqueryReadInAnotherOrder_IsAnsweredByItsMembersPlaces()
+    {
+        (
+            await WalkedAsync(
+                "SELECT s.b, s.a FROM (SELECT u.deleted_at AS a, u.created_at AS b FROM users u "
+                    + "UNION ALL SELECT x.created_at, x.created_at FROM users x) s"
+            )
+        ).ShouldBe([Proven, Unknown]);
+
+        var crossed =
+            "SELECT s.b, s.a FROM (SELECT u.deleted_at AS a, u.created_at AS b FROM users u "
+            + "UNION ALL SELECT x.created_at, x.deleted_at FROM users x) s";
+        (await WalkedAsync(crossed)).ShouldBe([Unknown, Unknown]);
+        (await ReturnsNullAsync(Rows, crossed, 0)).ShouldBeTrue();
+        (await ReturnsNullAsync(Rows, crossed, 1)).ShouldBeTrue();
+    }
+
+    // A user who writes the planner's alias in a branch: 14 keeps it as "*SELECT* 1_1" under its own flagged
+    // "*SELECT* 1", which prints the user's columns in the order the query reads them, b then a; 18 drops its own
+    // scan and the user's "*SELECT* 1" is the SetOp's input.  Either way the user's scan is no leaf scan of the
+    // planner's, and the SQL's text holds the alias, so no alias is followed by place.  Column 0 is deleted_at here.
     [Fact]
     public async Task Describe_BranchThatWritesTheLeafScansAlias_StaysUnknown()
     {
@@ -308,8 +357,10 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
     }
 
-    // The same through a view, where the SQL of the query holds no *SELECT* at all: b is NULLIF(name, 'x') and a the
-    // name, in the opposite order of the view's subquery, and the row of the user named x has a NULL b.
+    // The same through a view, where the SQL of the query holds no *SELECT* at all: the view's "*SELECT* 9" is a user's
+    // scan that prints b before a, the opposite of its subquery.  14 plans it under its own flagged "*SELECT* 1"
+    // (which would map the user's scan by place) and 18 as the SetOp's input; neither is followed.  b is
+    // NULLIF(name, 'x') and a the name, and the row of the user named x has a NULL b.
     [Fact]
     public async Task Describe_ViewWhoseSubqueryIsNamedLikeALeafScan_StaysUnknown()
     {
@@ -325,21 +376,22 @@ public sealed class SetOperationTests(PostgresContainer postgres)
 
     // GROUP BY over a UNION ALL: the aggregate is computed above the set operation and stays unknown, and the key is
     // the Aggregate's entry that is the Append's printed one at its place, so it is answered like the union's column.
+    // The plan is a HashAggregate straight over the Append (the subquery is pulled up).
     [Fact]
     public async Task Describe_GroupByOverAUnionAll_AnswersTheKeyAndNotTheAggregate()
     {
+        var nullable =
+            "SELECT s.k, count(*) AS n FROM (SELECT u.deleted_at AS k FROM users u "
+            + "UNION ALL SELECT x.created_at FROM users x) s GROUP BY s.k";
+
         (
             await WalkedAsync(
                 "SELECT s.k, count(*) AS n FROM (SELECT u.created_at AS k FROM users u "
                     + "UNION ALL SELECT x.created_at FROM users x) s GROUP BY s.k"
             )
         ).ShouldBe([Proven, Unknown]);
-        (
-            await WalkedAsync(
-                "SELECT s.k, count(*) AS n FROM (SELECT u.deleted_at AS k FROM users u "
-                    + "UNION ALL SELECT x.created_at FROM users x) s GROUP BY s.k"
-            )
-        ).ShouldBe([Unknown, Unknown]);
+        (await WalkedAsync(nullable)).ShouldBe([Unknown, Unknown]);
+        (await ReturnsNullAsync(Rows, nullable, 0)).ShouldBeTrue();
     }
 
     // A recursive CTE is a Recursive Union read through a CTE Scan: it proves nothing.
@@ -351,9 +403,10 @@ public sealed class SetOperationTests(PostgresContainer postgres)
             )
         ).ShouldBe([Unknown]);
 
-    // A branch with a LIMIT is a scan of its own that prints the columns the query above needs, in its order: read
-    // in another order than the union's, it prints "*SELECT* 2"."nullif" first, and "*SELECT* 2" under an Append is
-    // no leaf scan the walk follows by place.  Neither column is answered; the first is the one that is NULL.
+    // A branch with a LIMIT is a scan of its own that prints the columns the query above needs, in its order: the plan
+    // is the user's Subquery Scan s over an Append whose second member, "*SELECT* 2", prints "nullif" before name.
+    // The root is a scan the walk does not enter, and "*SELECT* 2" under an Append is no leaf scan it follows by
+    // place.  Neither column is answered; the first is the one that is NULL.
     [Fact]
     public async Task Describe_UnionAllWithALimitBranchReadInAnotherOrder_StaysUnknown()
     {
@@ -365,7 +418,8 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
     }
 
-    // The same through an inlined SQL function: the planner pulls its union up into the query.
+    // The same through an inlined SQL function: the root is a Subquery Scan aliased "*SELECT*" (the function's body
+    // as a subquery) over the same Append, with "*SELECT* 2" printing "nullif" before name.
     [Fact]
     public async Task Describe_UnionAllOfAnInlinedFunctionWithALimitBranch_StaysUnknown()
     {
