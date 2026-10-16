@@ -89,7 +89,7 @@
         "name": { "type": "string" },
         "type": { "type": "object" },
         "nullable": { "$ref": "#/$defs/triState" },
-        "nullableSource": { "type": "string", "enum": ["server", "catalog", "outer-join", "view", "foreign-table", "expression", "no-origin", "heuristic"] },
+        "nullableSource": { "type": "string", "enum": ["server", "catalog", "outer-join", "view", "foreign-table", "expression", "set-operation", "no-origin", "heuristic"] },
         "origin": { "anyOf": [{ "type": "null" }, { "$ref": "#/$defs/origin" }] },
         "identity": { "$ref": "#/$defs/triState" },
         "computed": { "$ref": "#/$defs/triState" }

@@ -15,13 +15,27 @@ internal static class PostgresPlans
 
     // A scan of the table of the alias's name in public, with the alias.
     public static PlanNode Scan(string alias, params string[] output) =>
-        new("Seq Scan", null, null, output.Length == 0 ? null : output, alias, alias, "public", null, null, false, []);
+        new(
+            "Seq Scan",
+            null,
+            null,
+            output.Length == 0 ? null : output,
+            alias,
+            alias,
+            "public",
+            null,
+            null,
+            null,
+            false,
+            []
+        );
 
     // A join whose first child is its outer side and whose second is its inner one.
     public static PlanNode Join(string joinType, PlanNode outer, PlanNode inner) =>
         new(
             "Hash Join",
             joinType,
+            null,
             null,
             null,
             null,
@@ -37,6 +51,7 @@ internal static class PostgresPlans
     public static PlanNode Over(string nodeType, PlanNode child, string relationship = Outer) =>
         new(
             nodeType,
+            null,
             null,
             null,
             null,
@@ -62,6 +77,7 @@ internal static class PostgresPlans
         Add(map, "Alias", node.Alias);
         Add(map, "Subplan Name", node.SubplanName);
         Add(map, "CTE Name", node.CteName);
+        Add(map, "Command", node.Command);
         Add(map, "Output", node.Output);
         if (node.HasGroupingSets)
         {

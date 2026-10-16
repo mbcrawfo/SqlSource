@@ -79,6 +79,19 @@ public class PlanNodeTests
         cte.Output.ShouldBeNull();
     }
 
+    [Theory]
+    [InlineData("Intersect")]
+    [InlineData("Except All")]
+    public void Read_SetOp_KeepsItsCommand(string command)
+    {
+        var text = $$$"""[{"Plan": {"Node Type": "SetOp", "Command": "{{{command}}}", "Plans": []}}]""";
+
+        PlanNode.Read(text).ShouldNotBeNull().Command.ShouldBe(command);
+    }
+
+    [Fact]
+    public void Read_NodeWithoutACommand_HasNone() => PlanNode.Read(Swapped).ShouldNotBeNull().Command.ShouldBeNull();
+
     // The key is read as present or absent: what it holds is the planner's own.
     [Theory]
     [InlineData( /*lang=json,strict*/
@@ -121,6 +134,9 @@ public class PlanNodeTests
     )]
     [InlineData( /*lang=json,strict*/
         """[{"Plan": {"Node Type": "Result", "Alias": 1}}]"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "SetOp", "Command": 1}}]"""
     )]
     [InlineData( /*lang=json,strict*/
         """[{"Plan": {"Node Type": "Result", "Plans": {}}}]"""

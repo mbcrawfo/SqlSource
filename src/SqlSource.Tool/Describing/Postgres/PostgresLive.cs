@@ -37,13 +37,15 @@ internal sealed class PostgresLive(PostgresConnection connection)
         "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements "
         + "WHERE name = @name AND statement = @statement";
 
-    // Every relation asked for with its columns, in one query.  The relations are read first, so that what is said of
-    // a relation as a whole is computed once for each relation and not once for each of its columns: whether a
-    // partitioned table has a foreign table anywhere in its partition tree, which costs a walk of the catalog and is
-    // false and never null for any other, and whether the relation has an INSTEAD rule on INSERT, UPDATE or DELETE
-    // (an ev_type of '1' is SELECT), never null.  The join to the attributes is a left one, so that a table without
-    // a column of its own is answered too, with one row that holds no attribute.
-    private const string TablesSql = """
+    // Every relation asked for with its columns, in one query: by OID for "tables", and by schema and name for
+    // "relations", whose text is the same but for the FROM and the WHERE of the first CTE, which are in TablesSql and
+    // RelationsSql.  The relations are read first, so that what is said of a relation as a whole is computed once for
+    // each relation and not once for each of its columns: whether a partitioned table has a foreign table anywhere in
+    // its partition tree, which costs a walk of the catalog and is false and never null for any other, and whether
+    // the relation has an INSTEAD rule on INSERT, UPDATE or DELETE (an ev_type of '1' is SELECT), never null.  The
+    // join to the attributes is a left one, so that a table without a column of its own is answered too, with one row
+    // that holds no attribute.
+    private const string TableRowsHead = """
         WITH relations AS MATERIALIZED (
             SELECT
                 c.oid,
@@ -62,8 +64,9 @@ internal sealed class PostgresLive(PostgresConnection connection)
                     FROM pg_catalog.pg_rewrite AS w
                     WHERE w.ev_class = c.oid AND w.ev_type <> '1' AND w.is_instead
                 ) AS has_instead_rule
-            FROM pg_catalog.pg_class AS c
-            WHERE c.oid = ANY (@oids)
+        """;
+
+    private const string TableRowsTail = """
         )
         SELECT
             r.oid,
@@ -86,6 +89,23 @@ internal sealed class PostgresLive(PostgresConnection connection)
         LEFT JOIN pg_catalog.pg_constraint AS k
             ON k.conrelid = r.oid AND k.contype = 'n' AND k.conkey = ARRAY[a.attnum]
         ORDER BY r.oid, a.attnum
+        """;
+
+    private const string TablesSql = $"""
+        {TableRowsHead}
+            FROM pg_catalog.pg_class AS c
+            WHERE c.oid = ANY (@oids)
+        {TableRowsTail}
+        """;
+
+    // The same rows for the relations a plan scans, found by schema and name: unnest pairs the two arrays, as it does
+    // in PartitionsSql.
+    private const string RelationsSql = $"""
+        {TableRowsHead}
+            FROM unnest($1::text[], $2::text[]) AS p (schema, name)
+            JOIN pg_catalog.pg_namespace AS s ON s.nspname = p.schema
+            JOIN pg_catalog.pg_class AS c ON c.relnamespace = s.oid AND c.relname = p.name
+        {TableRowsTail}
         """;
 
     // The ancestors of each relation asked for, nearest first, in one query.  pg_partition_ancestors gives the
@@ -281,52 +301,89 @@ internal sealed class PostgresLive(PostgresConnection connection)
                     DataTypeName = "oid[]",
                 }
             );
-            await using var reader = await command.ExecuteReaderAsync(token);
-            var tables = new List<PostgresTableRow>();
-            List<PostgresAttributeRow> columns = [];
-            while (await reader.ReadAsync(token))
-            {
-                long oid = await reader.GetFieldValueAsync<uint>(0, token);
-                if (tables.Count == 0 || tables[^1].Oid != oid)
-                {
-                    columns = [];
-                    tables.Add(
-                        new PostgresTableRow(
-                            oid,
-                            reader.GetString(1),
-                            reader.GetString(2),
-                            reader.GetString(3),
-                            columns,
-                            reader.GetBoolean(11),
-                            reader.GetBoolean(12),
-                            reader.GetBoolean(13)
-                        )
-                    );
-                }
-
-                // The one row of a table without a column of its own holds no attribute.
-                if (!await reader.IsDBNullAsync(4, token))
-                {
-                    columns.Add(
-                        new PostgresAttributeRow(
-                            reader.GetInt16(4),
-                            reader.GetString(5),
-                            reader.GetBoolean(6),
-                            reader.GetString(7),
-                            reader.GetString(8),
-                            await reader.GetFieldValueAsync<uint>(9, token),
-                            await reader.IsDBNullAsync(10, token) ? null : reader.GetBoolean(10)
-                        )
-                    );
-                }
-            }
-
-            return new PostgresTablesAnswer(tables, null);
+            return new PostgresTablesAnswer(await TableRowsAsync(command, token), null);
         }
         catch (NpgsqlException exception)
         {
             return new PostgresTablesAnswer(null, PostgresConnection.ErrorOf(exception));
         }
+    }
+
+    /// <summary>
+    /// Asks <c>relations</c>: one query of the catalog for the relations a plan scans, by schema and name, answered
+    /// as <c>tables</c> answers.  A relation that does not exist has no row.
+    /// </summary>
+    public async Task<PostgresTablesAnswer> RelationsAsync(PostgresRelationsRequest asked, CancellationToken token)
+    {
+        try
+        {
+            await using var command = await connection.CommandAsync(RelationsSql, token);
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = asked.Relations.Select(static relation => relation.Schema).ToArray(),
+                    DataTypeName = "text[]",
+                }
+            );
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = asked.Relations.Select(static relation => relation.Name).ToArray(),
+                    DataTypeName = "text[]",
+                }
+            );
+            return new PostgresTablesAnswer(await TableRowsAsync(command, token), null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresTablesAnswer(null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
+    // The rows of TablesSql and of RelationsSql: a table for each run of rows of one OID, with its columns.
+    private static async Task<List<PostgresTableRow>> TableRowsAsync(NpgsqlCommand command, CancellationToken token)
+    {
+        await using var reader = await command.ExecuteReaderAsync(token);
+        var tables = new List<PostgresTableRow>();
+        List<PostgresAttributeRow> columns = [];
+        while (await reader.ReadAsync(token))
+        {
+            long oid = await reader.GetFieldValueAsync<uint>(0, token);
+            if (tables.Count == 0 || tables[^1].Oid != oid)
+            {
+                columns = [];
+                tables.Add(
+                    new PostgresTableRow(
+                        oid,
+                        reader.GetString(1),
+                        reader.GetString(2),
+                        reader.GetString(3),
+                        columns,
+                        reader.GetBoolean(11),
+                        reader.GetBoolean(12),
+                        reader.GetBoolean(13)
+                    )
+                );
+            }
+
+            // The one row of a table without a column of its own holds no attribute.
+            if (!await reader.IsDBNullAsync(4, token))
+            {
+                columns.Add(
+                    new PostgresAttributeRow(
+                        reader.GetInt16(4),
+                        reader.GetString(5),
+                        reader.GetBoolean(6),
+                        reader.GetString(7),
+                        reader.GetString(8),
+                        await reader.GetFieldValueAsync<uint>(9, token),
+                        await reader.IsDBNullAsync(10, token) ? null : reader.GetBoolean(10)
+                    )
+                );
+            }
+        }
+
+        return tables;
     }
 
     /// <summary>Asks <c>partitions</c>: one query of the catalog for the ancestors of each relation.</summary>

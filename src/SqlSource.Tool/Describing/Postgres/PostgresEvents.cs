@@ -243,6 +243,27 @@ internal static class PostgresEvents
         );
 
     /// <summary>
+    /// <c>postgres.relations</c>: the relations a plan scans, and the rows of those that exist, as <c>tables</c> holds
+    /// them, or the error.
+    /// </summary>
+    public static void Relations(
+        IRunLog log,
+        string query,
+        PostgresRelationsRequest request,
+        PostgresTablesAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            "relations",
+            new("query", query),
+            new("relations", LogValue.ListOf(request.Relations.Select(RelationOf))),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember("rows", LogValue.ListOf((answer.Tables ?? []).Select(TableOf))),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
     /// The events of a walk, in this order: <c>postgres.walk.node</c> for each node that was visited,
     /// <c>postgres.walk.column</c> for each column, and <c>postgres.walk</c> with the plan's value and, when it is
     /// <c>unavailable</c>, the reason.  It is the one place that tells a failed <c>EXPLAIN</c> from a plan the

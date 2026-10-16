@@ -22,6 +22,10 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <param name="Schema"><c>Schema</c>.</param>
 /// <param name="SubplanName"><c>Subplan Name</c>.</param>
 /// <param name="CteName"><c>CTE Name</c>.</param>
+/// <param name="Command">
+/// <c>Command</c>, which a <c>SetOp</c> alone has: <c>Intersect</c>, <c>Intersect All</c>, <c>Except</c>,
+/// <c>Except All</c>.
+/// </param>
 /// <param name="HasGroupingSets">Whether the node has a <c>Grouping Sets</c> key, whatever it holds.</param>
 /// <param name="Plans"><c>Plans</c>: the children, empty when the node has none.</param>
 internal sealed record PlanNode(
@@ -34,6 +38,7 @@ internal sealed record PlanNode(
     string? Schema,
     string? SubplanName,
     string? CteName,
+    string? Command,
     bool HasGroupingSets,
     IReadOnlyList<PlanNode> Plans
 )
@@ -79,6 +84,7 @@ internal sealed record PlanNode(
             || !TryText(element, "Schema", out var schema)
             || !TryText(element, "Subplan Name", out var subplan)
             || !TryText(element, "CTE Name", out var cte)
+            || !TryText(element, nameof(Command), out var command)
             || !TryNodes(element, out var plans)
         )
         {
@@ -95,6 +101,7 @@ internal sealed record PlanNode(
             schema,
             subplan,
             cte,
+            command,
             element.TryGetProperty("Grouping Sets", out _),
             plans
         );
