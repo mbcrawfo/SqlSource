@@ -18,19 +18,26 @@ internal static class RealisticCases
         UnmappedMemberHandling = JsonUnmappedMemberHandling.Disallow,
     };
 
-    // Every folder of Cases that holds a query.sql, in the order of their names.  Read afresh each time, so that a
-    // fault is the fault and not a failed type initializer.
-    public static IReadOnlyList<RealisticCase> All =>
-        Directory.Exists(RepositoryPaths.RealisticCases)
+    // The name of every folder of Cases, in order: each is a case, and a folder that is no case fails when it is
+    // read.  Listing them reads no case.json, so that a broken one fails its own case and not every one.
+    public static IReadOnlyList<string> Names => NamesIn(RepositoryPaths.RealisticCases);
+
+    // Every case of Cases, read afresh each time, so that a fault is the fault and not a failed type initializer.
+    public static IReadOnlyList<RealisticCase> All => AllIn(RepositoryPaths.RealisticCases);
+
+    public static IReadOnlyList<string> NamesIn(string root) =>
+        Directory.Exists(root)
             ?
             [
                 .. Directory
-                    .GetDirectories(RepositoryPaths.RealisticCases)
-                    .Where(static folder => File.Exists(Path.Combine(folder, RealisticCase.QueryFile)))
-                    .OrderBy(static folder => Path.GetFileName(folder), StringComparer.Ordinal)
-                    .Select(Read),
+                    .GetDirectories(root)
+                    .Select(static folder => Path.GetFileName(folder))
+                    .Order(StringComparer.Ordinal),
             ]
             : [];
+
+    public static IReadOnlyList<RealisticCase> AllIn(string root) =>
+        [.. NamesIn(root).Select(name => Read(Path.Combine(root, name)))];
 
     public static RealisticCase Read(string folder)
     {

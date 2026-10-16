@@ -68,6 +68,28 @@ internal static class RealisticOracle
         }
     }
 
+    // Fails naming the case and the parameter when a sample gives NULL to a parameter whose -- param: marker does
+    // not say null: generated code never sends one, so the oracle would run what no caller can.  The literal NULL
+    // alone is read, ignoring case and white space around it.
+    public static void CheckSampleNulls(RealisticCase found, IReadOnlyList<SqlQueryParameter> parameters)
+    {
+        foreach (var (key, value) in found.Samples.SelectMany(static sample => sample))
+        {
+            if (
+                string.Equals(value.Trim(), "NULL", StringComparison.OrdinalIgnoreCase)
+                && parameters.FirstOrDefault(parameter =>
+                    string.Equals(parameter.Name, key, StringComparison.OrdinalIgnoreCase)
+                )
+                    is { Nullable: not true }
+            )
+            {
+                throw new InvalidOperationException(
+                    $"A sample of the case {found} gives @{key} NULL, and no -- param: marker says it is null."
+                );
+            }
+        }
+    }
+
     // Reads every row, in a transaction that is rolled back, so that a query that writes leaves the seed as it was.
     [SuppressMessage(
         "Security",
@@ -80,6 +102,7 @@ internal static class RealisticOracle
         await using var opened = new NpgsqlConnection(connection);
         await opened.OpenAsync(token);
         await using var transaction = await opened.BeginTransactionAsync(token);
+        OracleRun run;
         try
         {
             await using var command = new NpgsqlCommand(sql, opened, transaction);
@@ -96,12 +119,30 @@ internal static class RealisticOracle
                 }
             }
 
-            return new OracleRun(names, sawNull, rows);
+            run = new OracleRun(names, sawNull, rows);
         }
-        finally
+        catch
         {
-            // Not the test's token: a cancelled test still rolls back what its query wrote.
+            await RollBackAfterAsync(transaction);
+            throw;
+        }
+
+        // Not the test's token: a cancelled test still rolls back what its query wrote.
+        await transaction.RollbackAsync(CancellationToken.None);
+        return run;
+    }
+
+    // The rollback of a query that failed, which fails too when the connection broke.
+    private static async Task RollBackAfterAsync(NpgsqlTransaction transaction)
+    {
+        try
+        {
             await transaction.RollbackAsync(CancellationToken.None);
+        }
+        catch (Exception rollback) when (rollback is NpgsqlException or InvalidOperationException)
+        {
+            // The query's own error is the one that says why, and the server rolls back what a broken connection
+            // wrote.
         }
     }
 

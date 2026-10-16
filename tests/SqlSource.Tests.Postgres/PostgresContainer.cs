@@ -27,6 +27,9 @@ public sealed class PostgresContainer : IAsyncLifetime
 
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(Image).WithDatabase(Database).Build();
 
+    // The server's major version, read once when the container has started.
+    public int Major { get; private set; }
+
     public static string Image =>
         Environment.GetEnvironmentVariable(ImageVariable) is { Length: > 0 } image ? image : DefaultImage;
 
@@ -54,12 +57,19 @@ public sealed class PostgresContainer : IAsyncLifetime
                 _ = await create.ExecuteNonQueryAsync(token);
             }
 
+            // The seed relies on a hole of PostgreSQL: the NOT NULL of a domain is not checked again for a NULL that
+            // is already of the domain, which gives invoice 4 its NULL amount.  A major that closes it fails the seed
+            // here, and so the start of the container, and the truths of table-statement, cte-materialized,
+            // distinct-on-latest-per-account and view-joined-left, which count on that NULL, are to be read again.
             await using var realistic = NpgsqlDataSource.Create(RealisticConnectionString);
             foreach (var path in new[] { RepositoryPaths.RealisticSchema, RepositoryPaths.RealisticSeed })
             {
                 await using var script = realistic.CreateCommand(await File.ReadAllTextAsync(path, token));
                 _ = await script.ExecuteNonQueryAsync(token);
             }
+
+            await using var opened = await source.OpenConnectionAsync(token);
+            Major = opened.PostgreSqlVersion.Major;
         }
         catch
         {

@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -39,6 +41,12 @@ internal static class RealisticRun
     // What is not there, in a rendered line.
     private const string None = "-";
 
+    // The description of each case by its name, once in a run: every check describes against the one container of
+    // the run, and a case's folder does not change during it.  A describe that throws is not kept.
+    private static readonly ConcurrentDictionary<string, Outcome<QueryDescription, DescribeFailure>> Described = new(
+        StringComparer.Ordinal
+    );
+
     // The majors that an expectation and the noise budget are held for, as CI runs them.
     public static IReadOnlyList<int> RecordedMajors { get; } = [14, 18];
 
@@ -54,6 +62,16 @@ internal static class RealisticRun
     // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
     public static bool RunsOn(RealisticCase found, int major) =>
         found.MinimumMajor is not { } minimum || minimum <= major;
+
+    // The files of a case's folder: its query, its truth, and the expectation of each recorded major it runs on.
+    public static IReadOnlyList<string> FilesOf(RealisticCase found) =>
+        [
+            RealisticCase.QueryFile,
+            RealisticCase.CaseFile,
+            .. RecordedMajors
+                .Where(major => RunsOn(found, major))
+                .Select(major => Path.GetFileName(found.ExpectedPath(major))),
+        ];
 
     // The columns of a case that is not refused, which must be described, with as many columns as its truth and
     // each of the truth's name at its position.  A failure names the case on its first line.
@@ -93,6 +111,21 @@ internal static class RealisticRun
         var (planned, _) = FixtureReplay.Plan(found.AsFixture, TestContext.Current.CancellationToken);
         var query = planned.Query;
         return new DescribeRequest(query.Name, SampleSql.Build(query), query.Parameters);
+    }
+
+    // The case's description, described once in a run and kept by the case's name: each check of a case and the
+    // noise budget ask for it.
+    public static async Task<Outcome<QueryDescription, DescribeFailure>> DescribeOnceAsync(
+        RealisticCase found,
+        string connection
+    )
+    {
+        if (Described.TryGetValue(found.Name, out var kept))
+        {
+            return kept;
+        }
+
+        return Described.GetOrAdd(found.Name, await DescribeAsync(found, connection));
     }
 
     public static async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
@@ -184,13 +217,6 @@ internal static class RealisticRun
         }
 
         return text.ToString();
-    }
-
-    public static async Task<int> ServerMajorAsync(string connection)
-    {
-        await using var source = NpgsqlDataSource.Create(connection);
-        await using var opened = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
-        return opened.PostgreSqlVersion.Major;
     }
 
     // The one value of a query, on a connection of its own.

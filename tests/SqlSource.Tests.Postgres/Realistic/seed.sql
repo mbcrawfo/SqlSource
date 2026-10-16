@@ -64,7 +64,9 @@ INSERT INTO billing.invoices (id, order_id, amount, issued_on, paid_on) VALUES
     (2, 2, 29.00, '2024-06-02', NULL),
     (3, 3, 10.00, '2024-07-02', NULL);
 
--- The domain's NOT NULL bypassed: amount is NULL.
+-- The domain's NOT NULL bypassed: amount is NULL.  The seed relies on that hole of PostgreSQL; a major that closes it
+-- fails this INSERT, and so the start of the container, and the truths of table-statement, cte-materialized,
+-- distinct-on-latest-per-account and view-joined-left, which count on this NULL, are to be read again.
 INSERT INTO billing.invoices (id, order_id, amount, issued_on, paid_on) VALUES
     (4, 3, (SELECT i.amount FROM billing.invoices i WHERE false), '2024-07-15', NULL);
 

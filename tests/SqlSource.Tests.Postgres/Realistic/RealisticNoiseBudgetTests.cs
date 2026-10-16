@@ -1,6 +1,7 @@
-using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Shouldly;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic;
@@ -11,29 +12,23 @@ namespace SqlSource.Tests.Postgres.Realistic;
 [Collection(UsesPostgres.Name)]
 public sealed class RealisticNoiseBudgetTests(PostgresContainer postgres)
 {
-    // The budget of each major version that holds one.  It is lowered in the change that lowers the noise, as the
+    // The budget of each recorded major, by the major.  One is lowered in the change that lowers the noise, as the
     // test below demands, and raised only in a change that adds cases, by how much and why in that commit.
-    private const int Budget14 = 94;
+    private static readonly Dictionary<int, int> Budgets = new() { [14] = 94, [18] = 95 };
 
-    private const int Budget18 = 95;
+    [Fact]
+    public void Budgets_RecordedMajors_EachHoldOneAndNoOtherDoes() =>
+        Budgets.Keys.Order().ShouldBe(RealisticRun.RecordedMajors.Order(), "a recorded major and a budget differ");
 
     [Fact]
     public async Task Noise_OverTheCorpus_IsTheBudget()
     {
-        var major = await RealisticRun.ServerMajorAsync(postgres.RealisticConnectionString);
-        if (!RealisticRun.RecordedMajors.Contains(major))
+        var major = postgres.Major;
+        if (!Budgets.TryGetValue(major, out var held))
         {
             Assert.Skip("The budget is held for PostgreSQL 14 and 18 alone.");
         }
 
-        var held = major switch
-        {
-            14 => Budget14,
-            18 => Budget18,
-            _ => throw new InvalidOperationException(
-                $"PostgreSQL {major} is a recorded major with no budget: add Budget{major} to this file."
-            ),
-        };
         var count = 0;
         foreach (var found in RealisticCases.All.Where(candidate => candidate.Refusal is null))
         {
@@ -42,7 +37,7 @@ public sealed class RealisticNoiseBudgetTests(PostgresContainer postgres)
                 continue;
             }
 
-            var described = await RealisticRun.DescribeAsync(found, postgres.RealisticConnectionString);
+            var described = await RealisticRun.DescribeOnceAsync(found, postgres.RealisticConnectionString);
             var columns = RealisticRun.ColumnsOf(found, described);
             count += found.Columns.Where((truth, index) => !truth.Nullable && columns[index].Nullable != false).Count();
         }
@@ -52,16 +47,16 @@ public sealed class RealisticNoiseBudgetTests(PostgresContainer postgres)
             Assert.Fail(
                 $"The noise is {count}, over the budget of {held}: a change made the describer answer nullable or "
                     + "unknown where it answered not null, and the cases that changed are in their "
-                    + $"expected-pg{major}.txt; or, in a change that adds cases, raise Budget{major} to {count} and "
-                    + "say why in the commit."
+                    + $"expected-pg{major}.txt; or, in a change that adds cases, raise the budget of {major} in "
+                    + $"Budgets to {count} and say why in the commit."
             );
         }
 
         if (count < held)
         {
             Assert.Fail(
-                $"The noise is {count}, under the budget of {held}: lower Budget{major} to {count} in this change, "
-                    + "so the improvement is kept."
+                $"The noise is {count}, under the budget of {held}: lower the budget of {major} in Budgets to "
+                    + $"{count} in this change, so the improvement is kept."
             );
         }
     }

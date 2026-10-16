@@ -12,9 +12,10 @@ namespace SqlSource.Tests.Postgres.Realistic;
 
 // The checks of the realistic cases against a real server, each its own theory so that a failure says which check
 // failed: the refusal, the safety of the description against the truth, the oracle that executes the query over the
-// seed, and the recorded expectation.  Each describes the case afresh.  With SQLSOURCE_RECORD_REALISTIC set the
-// expectation theory writes the case's expected-pg{major}.txt and compares nothing: tools/record-realistic.sh runs
-// it so.  The cases are in Realistic/Cases.
+// seed, and the recorded expectation.  A case is described once in a run, and each theory reads the one description.
+// With SQLSOURCE_RECORD_REALISTIC set the expectation theory writes the case's expected-pg{major}.txt and compares
+// nothing: tools/record-realistic.sh runs it so.  The cases are the folders of Realistic/Cases, listed by name alone,
+// so that a case.json that is wrong fails the rows of its own case.
 [Collection(UsesPostgres.Name)]
 public sealed class RealisticQueryTests(PostgresContainer postgres)
 {
@@ -22,7 +23,7 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
 
     private const string RecordScript = "tools/record-realistic.sh";
 
-    public static TheoryData<string> Cases => [with(RealisticCases.All.Select(static found => found.Name))];
+    public static TheoryData<string> Cases => [with(RealisticCases.Names)];
 
     private static bool Recording => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(RecordVariable));
 
@@ -30,9 +31,9 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
     [MemberData(nameof(Cases))]
     public async Task Describe_Case_IsRefusedOnlyAsItsCaseSays(string name)
     {
-        var (found, _) = await StartAsync(name);
+        var found = Start(name);
 
-        var described = await RealisticRun.DescribeAsync(found, postgres.RealisticConnectionString);
+        var described = await RealisticRun.DescribeOnceAsync(found, postgres.RealisticConnectionString);
 
         if (found.Refusal is { } refusal)
         {
@@ -48,7 +49,7 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
     [MemberData(nameof(Cases))]
     public async Task Describe_Case_IsNotNullOnlyWhereTheTruthIs(string name)
     {
-        var (found, _) = await StartAsync(name);
+        var found = Start(name);
         var (columns, _) = await DescribedAsync(found);
 
         for (var index = 0; index < columns.Count; index++)
@@ -65,10 +66,12 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
     [MemberData(nameof(Cases))]
     public async Task Execute_Case_ReturnsNoNullWhereEitherSaysNotNull(string name)
     {
-        var (found, _) = await StartAsync(name);
+        var found = Start(name);
         var (columns, parameters) = await DescribedAsync(found);
+        var request = RealisticRun.RequestOf(found);
         RealisticOracle.CheckSampleKeys(found, parameters.Select(static parameter => parameter.Name));
-        var sql = RealisticRun.RequestOf(found).Sql;
+        RealisticOracle.CheckSampleNulls(found, request.Parameters);
+        var sql = request.Sql;
         var types = parameters
             .Where(static parameter => parameter.Type is not null)
             .ToDictionary(static parameter => parameter.Name, static parameter => parameter.Type!.Name);
@@ -113,9 +116,9 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
     [MemberData(nameof(Cases))]
     public async Task Describe_Case_IsItsExpectation(string name)
     {
-        var (found, major) = await StartAsync(name);
-        var path = found.ExpectedPath(major);
-        var expectation = RealisticRun.ExpectationOn(Recording, major);
+        var found = Start(name);
+        var path = found.ExpectedPath(postgres.Major);
+        var expectation = RealisticRun.ExpectationOn(Recording, postgres.Major);
         if (expectation == Expectation.Skip)
         {
             Assert.Skip(RealisticRun.SkipMessage);
@@ -126,7 +129,9 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
             Assert.Fail(RealisticRun.RefuseMessage);
         }
 
-        var rendered = RealisticRun.Render(await RealisticRun.DescribeAsync(found, postgres.RealisticConnectionString));
+        var rendered = RealisticRun.Render(
+            await RealisticRun.DescribeOnceAsync(found, postgres.RealisticConnectionString)
+        );
         if (expectation == Expectation.Record)
         {
             await File.WriteAllTextAsync(path, rendered, TestContext.Current.CancellationToken);
@@ -144,17 +149,16 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
     private static string ColumnOf(RealisticCase found, int index) =>
         $"{found} column {index} {found.Columns[index].Name}";
 
-    // The case, read from its own folder, and the server's major, once the server runs the case.
-    private async Task<(RealisticCase Found, int Major)> StartAsync(string name)
+    // The case, read from its own folder, once the server runs it.
+    private RealisticCase Start(string name)
     {
         var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, name));
-        var major = await RealisticRun.ServerMajorAsync(postgres.RealisticConnectionString);
-        if (!RealisticRun.RunsOn(found, major))
+        if (!RealisticRun.RunsOn(found, postgres.Major))
         {
             Assert.Skip($"The case needs PostgreSQL {found.MinimumMajor} or later.");
         }
 
-        return (found, major);
+        return found;
     }
 
     // The columns and the parameters of a case that is not refused, which must be described with its truth's columns.
@@ -168,7 +172,7 @@ public sealed class RealisticQueryTests(PostgresContainer postgres)
             Assert.Skip($"{found} is refused as {found.Refusal}, so it has no columns to check.");
         }
 
-        var described = await RealisticRun.DescribeAsync(found, postgres.RealisticConnectionString);
+        var described = await RealisticRun.DescribeOnceAsync(found, postgres.RealisticConnectionString);
         var columns = RealisticRun.ColumnsOf(found, described);
         return (columns, described.Value!.Parameters);
     }
