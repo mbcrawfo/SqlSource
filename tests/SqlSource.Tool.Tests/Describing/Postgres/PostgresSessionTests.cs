@@ -1163,7 +1163,41 @@ public class PostgresSessionTests
         var description = await DescribeUsersIdAsync(UngatedUsersId, PlanOf(plan));
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        AnswersOf(description).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        AnswersOf(description).ShouldBe([(false, "catalog"), (false, "expression")]);
+    }
+
+    // A count the session's path may find in another schema than pg_catalog is no count the walk knows.
+    [Fact]
+    public async Task DescribeAsync_SearchPathThatPutsTheCatalogLast_LeavesAFunctionUnknown()
+    {
+        var users = PostgresTables.Users;
+        var plan = Over("WindowAgg", Scan("users")) with { Output = ["users.id", "count(*) OVER w1"] };
+        var script = new PostgresScript().Answer(
+            "open",
+            PostgresOpenRequest.Instance,
+            PostgresScript.Opened with
+            {
+                Settings =
+                [
+                    new PostgresSetting("search_path", "public, pg_catalog"),
+                    new PostgresSetting("plan_cache_mode", "auto"),
+                    new PostgresSetting("standard_conforming_strings", "on"),
+                ],
+            }
+        );
+        _ = PreparesOnly(script, 1, UngatedUsersId, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        _ = Checks(script, UngatedUsersId, [], Expression(0, "id", 23), Expression(1, "n", 20));
+        _ = Explains(script, 1, 0, PlanOf(plan));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(UngatedUsersId), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([(false, "catalog"), (null, "no-origin")]);
     }
 
     [Fact]

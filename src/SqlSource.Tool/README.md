@@ -64,7 +64,9 @@ A column's `nullable` is what the tool could prove, and its `nullableSource` say
 | `true` | `heuristic` | A column of a table in a query with one of the words above, for which the plan gave no answer |
 | `null` | `view` | A column of a view or a materialized view, whose `NOT NULL` PostgreSQL does not record |
 | `null` | `foreign-table` | A column of a foreign table, whose `NOT NULL` PostgreSQL does not enforce on the remote rows |
-| `null` | `no-origin` | A column that comes from no table: an expression, a column of a `UNION`, a system column |
+| `false` | `expression` | A column that comes from no table and that the plan shows can never be `NULL`: a `count`, a window ranking such as `row_number()`, a constant, an `IS NULL` or `IS DISTINCT FROM` test, or a `COALESCE`, `GREATEST`, `LEAST` or `CASE` with an `ELSE` whose values cannot be `NULL`, in a query whose plan has no outer join that fills a side with `NULL` and no set operation |
+| `true` | `expression` | A `NULL` constant |
+| `null` | `no-origin` | A column that comes from no table and that the plan does not answer: another expression, a column of a `UNION`, a system column |
 
 So `null` is unknown, and the tool cannot prove a column `NOT NULL` when it is of a view or a foreign table.  Nor can it in a query with one of the words above when the column comes through a grouping set, `ROLLUP`, `CUBE` or `GROUPING SETS`, or through a subquery or a `WITH` query that the planner keeps apart, which are `true` with `heuristic`, as are [a few other shapes](https://github.com/mbcrawfo/SqlSource/blob/main/docs/tech-debt/TD-0046-the-walk-leaves-some-columns-to-the-heuristic.md).  An entry's `plan` is `not-needed` for a query with rows, none of the words and no column that comes from no table, `walked` when the tool used the plan, and `unavailable` when it had no plan it could use: the server would not plan the query, or the plan holds a grouping set or a shape the tool does not read, a `UNION ALL` for one.  Every column then keeps the heuristic's answer, `true` for a column of a table, and the `postgres.walk` event of the log says why.
 

@@ -40,11 +40,25 @@ internal sealed record WalkOutcome(
 /// Whether the query's SQL names <c>OLD</c> or <c>NEW</c>, so that a reference at a root <c>ModifyTable</c> may be
 /// PostgreSQL 18's old or new row.
 /// </param>
-internal sealed record WalkScope(bool Gated, bool OldAndNewMayBeNamed);
+/// <param name="CatalogFunctionsFirst">
+/// Whether the session finds <c>pg_catalog</c>'s functions first (<see cref="PostgresSearchPath" />), so that a
+/// function the plan prints bare is the catalog's.
+/// </param>
+/// <param name="Tables">
+/// The answer of <c>tables</c>, by OID, where the column of a reference inside an expression is looked up.  A
+/// relation it does not hold leaves the reference unproved.
+/// </param>
+internal sealed record WalkScope(
+    bool Gated,
+    bool OldAndNewMayBeNamed,
+    bool CatalogFunctionsFirst,
+    IReadOnlyDictionary<long, PostgresTableRow> Tables
+);
 
 /// <summary>
 /// The third layer of nullability: a column of a gated query is not nullable when its origin is <c>NOT NULL</c>
-/// and the plan proves that no outer join null-extends its relation instance.
+/// and the plan proves that no outer join null-extends its relation instance, and a column of no origin is not
+/// nullable when its entry of the plan is an expression that can never be <c>NULL</c> (<see cref="PlanExpression" />).
 /// </summary>
 /// <remarks>
 /// <para>
@@ -108,13 +122,26 @@ internal static class NullabilityWalk
         // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
         var onlyAlias = scope.OldAndNewMayBeNamed && root.NodeType == "ModifyTable" ? root.Alias ?? string.Empty : null;
 
+        var expressions = AnswersExpressions(instances, scope.Gated)
+            ? new Expressions(scope, instances, onlyAlias)
+            : null;
+
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
         {
             walked.Add(
-                scope.Gated
-                    ? ColumnOf(columns[index], origins[index], entries[index], instances, onlyAlias)
-                    : Kept(columns[index], entries[index])
+                origins[index] switch
+                {
+                    null => ExpressionOf(columns[index], entries[index], expressions),
+                    { } origin when scope.Gated => ColumnOf(
+                        columns[index],
+                        origin,
+                        entries[index],
+                        instances,
+                        onlyAlias
+                    ),
+                    _ => Kept(columns[index], entries[index]),
+                }
             );
         }
 
@@ -147,6 +174,32 @@ internal static class NullabilityWalk
 
     private static WalkedColumn Kept(SidecarColumn column, string? entry) => new(column, entry, null, false, false);
 
+    // Whether an entry of the root may be read as an expression the root computes.  A set operation prints its first
+    // branch at the root, and a node under a join that null-extends prints a value it computed by its expression, a
+    // pulled-up constant or a LATERAL count, which is NULL for a row the join did not match.  An anti join returns
+    // nothing of its other side, but in a gated query it may be a LEFT JOIN ... IS NULL, which returns that side NULL.
+    private static bool AnswersExpressions(PlanInstances instances, bool gated) =>
+        !instances.HasSetOperation
+        && instances.Nodes.All(visited =>
+            visited.NullExtends == "none" || (!gated && visited.Node.JoinType is "Anti" or "Right Anti")
+        );
+
+    // A column of no origin: the answer of its entry as an expression, or what it was built with.
+    private static WalkedColumn ExpressionOf(SidecarColumn column, string entry, Expressions? expressions) =>
+        expressions?.NullableOf(entry) is { } nullable
+            ? new WalkedColumn(
+                column with
+                {
+                    Nullable = nullable,
+                    NullableSource = SidecarValues.NullableSource.Expression,
+                },
+                entry,
+                null,
+                false,
+                false
+            )
+            : Kept(column, entry);
+
     // Whether every reference the walk can map names the column the row description gives as its origin.  A plan of
     // another statement, which a pooler can give for this one's name (TD-0049), names other columns.  A view's column
     // prints as the column of the table under it, under that column's name, so only a table's origin is compared, and
@@ -178,18 +231,12 @@ internal static class NullabilityWalk
 
     private static WalkedColumn ColumnOf(
         SidecarColumn column,
-        ColumnOrigin? origin,
+        ColumnOrigin origin,
         string entry,
         PlanInstances instances,
         string? onlyAlias
     )
     {
-        // Nothing of the plan can make a column without an origin non-nullable: it is not looked up.
-        if (origin is null)
-        {
-            return Kept(column, entry);
-        }
-
         var reference = OutputReference.Parse(entry);
         var extended = false;
         var mapped = reference switch
@@ -222,5 +269,41 @@ internal static class NullabilityWalk
             mapped,
             mapped && extended
         );
+    }
+
+    // The entries of a plan read as expressions, with a reference inside one answered as the walk answers a column:
+    // through an instance that no join extends, to a column of a relation that "tables" answered, by the catalog's
+    // rule.  A bare name is the plan's one relation's, since a plan of several prints every name with its alias, and
+    // at a ModifyTable that may return the old or the new row only the target's alias is a relation.
+    private sealed class Expressions(WalkScope scope, PlanInstances instances, string? onlyAlias)
+    {
+        public bool? NullableOf(string entry) =>
+            PlanExpression.NullableOf(entry, scope.CatalogFunctionsFirst, ProvedNotNull);
+
+        private bool ProvedNotNull(OutputReference reference)
+        {
+            var alias = reference.Alias ?? (scope.OldAndNewMayBeNamed ? null : instances.SoleAlias);
+            if (
+                alias is null
+                || (onlyAlias is not null && !string.Equals(alias, onlyAlias, StringComparison.Ordinal))
+                || !instances.TryFind(alias, out var extended)
+                || extended
+                || !instances.TryFindRelation(alias, out var schema, out var name)
+            )
+            {
+                return false;
+            }
+
+            var table = scope.Tables.Values.FirstOrDefault(row =>
+                string.Equals(row.Schema, schema, StringComparison.Ordinal)
+                && string.Equals(row.Name, name, StringComparison.Ordinal)
+            );
+            var attribute = table?.Columns.FirstOrDefault(column =>
+                string.Equals(column.Name, reference.Column, StringComparison.Ordinal)
+            );
+            return table is not null
+                && attribute is not null
+                && ColumnNullability.Of(new ColumnOrigin(table, attribute), gated: false).Nullable == false;
+        }
     }
 }

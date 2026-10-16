@@ -60,12 +60,12 @@ internal static class Sessions
         ];
 
     // How many prepared statements the session holds.  The view shows those of its own session alone, so this asks
-    // on the session's connection.
+    // on the session's connection, whose search path a test may give a count of another schema.
     public static async Task<long> PreparedStatementsAsync(PostgresSession session)
     {
         var token = TestContext.Current.CancellationToken;
         await using var command = await session.Connection.CommandAsync(
-            "SELECT count(*) FROM pg_catalog.pg_prepared_statements",
+            "SELECT pg_catalog.count(*) FROM pg_catalog.pg_prepared_statements",
             token
         );
         return (long)(await command.ExecuteScalarAsync(token) ?? 0L);

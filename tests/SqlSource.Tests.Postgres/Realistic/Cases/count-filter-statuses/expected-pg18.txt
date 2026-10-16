@@ -2,9 +2,9 @@ kind: rows
 plan: walked
 table-match: no-origin
 parameter @since: timestamp with time zone (inferred)
-column 0 total: bigint | nullable null | no-origin | -
-column 1 active: bigint | nullable null | no-origin | -
-column 2 inactive: bigint | nullable null | no-origin | -
-column 3 with_email: bigint | nullable null | no-origin | -
+column 0 total: bigint | nullable false | expression | -
+column 1 active: bigint | nullable false | expression | -
+column 2 inactive: bigint | nullable false | expression | -
+column 3 with_email: bigint | nullable false | expression | -
 column 4 newest_created_at: timestamp with time zone | nullable null | no-origin | -
 column 5 avg_active_tags: numeric | nullable null | no-origin | -

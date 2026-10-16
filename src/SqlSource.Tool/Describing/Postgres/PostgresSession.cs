@@ -315,7 +315,12 @@ internal sealed class PostgresSession : IDescribeSession
                 ArgumentCount(prepared),
                 built.Value,
                 origins,
-                new WalkScope(gated, OuterJoinGate.NamesOldOrNew(request.Sql)),
+                new WalkScope(
+                    gated,
+                    OuterJoinGate.NamesOldOrNew(request.Sql),
+                    PostgresSearchPath.PutsCatalogFirst(SettingOf("search_path")),
+                    tables.Value
+                ),
                 cancellationToken
             );
             if (!walk.Succeeded)
@@ -332,6 +337,10 @@ internal sealed class PostgresSession : IDescribeSession
         var match = MatchOf(request, recorded, origins);
         return Described(parameters.Value, recorded, walked?.Plan ?? SidecarValues.Plan.NotNeeded, match);
     }
+
+    // A setting as "open" read it, or null.
+    private string? SettingOf(string name) =>
+        Server.Settings.FirstOrDefault(setting => string.Equals(setting.Name, name, StringComparison.Ordinal))?.Value;
 
     // The columns as they are recorded: the walk's when there was one, and else as they were built.
     private static IReadOnlyList<SidecarColumn> RecordedColumns(

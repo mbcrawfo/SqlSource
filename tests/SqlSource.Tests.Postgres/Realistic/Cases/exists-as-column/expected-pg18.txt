@@ -6,4 +6,4 @@ column 1 name: character varying(100) | nullable false | catalog | public.accoun
 column 2 email: public.email_t | nullable true | catalog | public.accounts.email
 column 3 has_orders: boolean | nullable null | no-origin | -
 column 4 has_uninvoiced_orders: boolean | nullable null | no-origin | -
-column 5 is_closed: boolean | nullable null | no-origin | -
+column 5 is_closed: boolean | nullable false | expression | -
