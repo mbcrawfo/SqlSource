@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using Xunit;
+using static SqlSource.Tool.Testing.NullabilityAnswers;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
@@ -10,22 +11,11 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class ExpressionTests(PostgresContainer postgres)
 {
-    private static readonly (bool?, string?) NotNull = (false, "expression");
-
-    private static readonly (bool?, string?) Unknown = (null, "no-origin");
-
     private async Task<(bool? Nullable, string? Source)[]> AnswersAsync(string sql, string? connection = null)
     {
-        var described = await Sessions.DescribeAsync(connection ?? postgres.ConnectionString, Requests.Of(sql));
+        var description = await Sessions.ShouldDescribeAsync(connection ?? postgres.ConnectionString, sql);
 
-        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-        return
-        [
-            .. described
-                .Value.ShouldNotBeNull()
-                .Columns.ShouldNotBeNull()
-                .Select(static column => (column.Nullable, column.NullableSource)),
-        ];
+        return Of(description.Columns.ShouldNotBeNull());
     }
 
     [Fact]
@@ -39,15 +29,15 @@ public sealed class ExpressionTests(PostgresContainer postgres)
                     + "'v1' AS version, NULL::text AS nothing, a.email::text AS raw FROM users a ORDER BY a.id"
             )
         ).ShouldBe([
-            (false, "catalog"),
-            NotNull,
-            NotNull,
-            Unknown,
-            NotNull,
-            NotNull,
-            NotNull,
-            (true, "expression"),
-            Unknown,
+            NotNullCatalog,
+            NotNullExpression,
+            NotNullExpression,
+            UnknownNoOrigin,
+            NotNullExpression,
+            NotNullExpression,
+            NotNullExpression,
+            NullableExpression,
+            UnknownNoOrigin,
         ]);
 
     [Fact]
@@ -59,7 +49,15 @@ public sealed class ExpressionTests(PostgresContainer postgres)
                     + "row_number() OVER (ORDER BY id) AS position, rank() OVER (ORDER BY id) AS place "
                     + "FROM users GROUP BY id"
             )
-        ).ShouldBe([(false, "catalog"), NotNull, NotNull, Unknown, NotNull, NotNull, NotNull]);
+        ).ShouldBe([
+            NotNullCatalog,
+            NotNullExpression,
+            NotNullExpression,
+            UnknownNoOrigin,
+            NotNullExpression,
+            NotNullExpression,
+            NotNullExpression,
+        ]);
 
     // An aggregate of another schema whose argument's type is exact beats pg_catalog.count("any") whatever the path's
     // order, and the plan prints it bare: only count(*) is the catalog's by its text.
@@ -73,7 +71,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
                 "SELECT count(u.id) AS n, count(*) AS m FROM users u",
                 $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public"
             )
-        ).ShouldBe([Unknown, NotNull]);
+        ).ShouldBe([UnknownNoOrigin, NotNullExpression]);
     }
 
     // The root of a set operation prints its first branch: a constant there says nothing of the NULL of the other.
@@ -85,7 +83,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
             + "SELECT k, n FROM r"
     )]
     public async Task Describe_ConstantFirstBranchOfASetOperation_StaysUnknown(string sql) =>
-        (await AnswersAsync(sql))[0].ShouldBe(Unknown);
+        (await AnswersAsync(sql))[0].ShouldBe(UnknownNoOrigin);
 
     // An INTERSECT returns rows that both inputs hold, and an EXCEPT rows of its left input: the constant of the
     // first branch proves the column whatever the other holds.
@@ -93,7 +91,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [InlineData("SELECT 'a'::text AS k FROM users INTERSECT SELECT note FROM orders")]
     [InlineData("SELECT 'a'::text AS k FROM users EXCEPT SELECT note FROM orders")]
     public async Task Describe_ConstantFirstBranchOfAnIntersectOrAnExcept_IsAnsweredFromIt(string sql) =>
-        (await AnswersAsync(sql))[0].ShouldBe((false, "set-operation"));
+        (await AnswersAsync(sql))[0].ShouldBe(NotNullSetOperation);
 
     // A value computed on the side a LEFT JOIN extends prints at the root as the same text, and is NULL for a row the
     // join did not match.
@@ -107,7 +105,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
             + "LEFT JOIN LATERAL (SELECT count(*) AS n FROM orders o WHERE o.user_id = u.id) c ON true"
     )]
     public async Task Describe_ExpressionFromTheSideALeftJoinExtends_StaysUnknown(string sql) =>
-        (await AnswersAsync(sql)).Skip(1).ShouldBe([Unknown, Unknown]);
+        (await AnswersAsync(sql)).Skip(1).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
 
     // A view brings a LEFT JOIN ... IS NULL into a query without a word of the gate, and the anti join it plans as
     // returns the pulled-up constant NULL.
@@ -125,7 +123,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
                 "SELECT CASE WHEN l.id > 0 THEN l.k ELSE 'y' END AS k2, coalesce(l.k, NULL) AS k3 "
                     + "FROM expression_lonely l"
             )
-        ).ShouldBe([Unknown, Unknown]);
+        ).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
     }
 
     // A NOT EXISTS plans as an anti join too, which the text cannot tell from the view's.
@@ -136,7 +134,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
             await AnswersAsync(
                 "SELECT u.id, 'k' AS k FROM users u WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)"
             )
-        ).ShouldBe([(false, "catalog"), NotNull]);
+        ).ShouldBe([NotNullCatalog, NotNullExpression]);
 
     // A partitioned table plans as an Append, which "partitions" tells from a UNION's.
     [Fact]
@@ -144,7 +142,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     {
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
-        (await AnswersAsync("SELECT count(*) AS n FROM scratch_parts")).ShouldBe([NotNull]);
+        (await AnswersAsync("SELECT count(*) AS n FROM scratch_parts")).ShouldBe([NotNullExpression]);
     }
 
     // A count the path finds before pg_catalog's may be another schema's, which can return NULL.
@@ -158,12 +156,12 @@ public sealed class ExpressionTests(PostgresContainer postgres)
                 "SELECT count(*) AS n FROM users",
                 $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public"
             )
-        ).ShouldBe([Unknown]);
+        ).ShouldBe([UnknownNoOrigin]);
         (
             await AnswersAsync(
                 "SELECT count(*) AS n FROM users",
                 $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public"
             )
-        ).ShouldBe([NotNull]);
+        ).ShouldBe([NotNullExpression]);
     }
 }

@@ -253,8 +253,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [Fact]
     public async Task CheckAsync_QueryWithParameters_AnswersNpgsqlsText()
     {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var live = new PostgresLive(session.Connection);
 
         var answer = await live.CheckAsync(
@@ -281,8 +280,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     public async Task CheckAsync_TextNpgsqlWouldSplit_AnswersAnErrorAndRunsNothing(bool withAParameter)
     {
         await postgres.ExecuteAsync(OwnObjects);
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var live = new PostgresLive(session.Connection);
 
         var answer = await live.CheckAsync(
@@ -308,8 +306,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [Fact]
     public async Task CheckAsync_SecondParameterCannotBeBound_AnswersItAsTheDriverError()
     {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var live = new PostgresLive(session.Connection);
 
         var answer = await live.CheckAsync(
@@ -329,8 +326,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [Fact]
     public async Task CheckAsync_SqlTheServerRejects_AnswersItsError()
     {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var live = new PostgresLive(session.Connection);
 
         var answer = await live.CheckAsync(

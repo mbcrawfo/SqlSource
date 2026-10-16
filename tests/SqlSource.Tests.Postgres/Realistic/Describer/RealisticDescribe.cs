@@ -7,11 +7,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SqlSource.Snapshot;
+using SqlSource.Tests.Postgres.Describer;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Describing.Postgres;
-using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -143,16 +142,7 @@ internal static class RealisticDescribe
     {
         var token = TestContext.Current.CancellationToken;
         var request = RequestOf(found);
-        var opened = await new PostgresDescriber().OpenAsync(
-            new OpenRequest(
-                PostgresContainer.RealisticDatabase,
-                connection,
-                LiveExchange.Instance,
-                TimeProvider.System
-            ),
-            NullRunLog.Instance,
-            token
-        );
+        var opened = await Sessions.OpenAsync(connection, database: PostgresContainer.RealisticDatabase);
         if (!opened.Succeeded)
         {
             throw new InvalidOperationException(

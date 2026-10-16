@@ -19,10 +19,8 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class ParameterTests(PostgresContainer postgres)
 {
-    private Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
-        DescribeRequest request,
-        IDescribeExchange? exchange = null
-    ) => Sessions.DescribeAsync(postgres.ConnectionString, request, exchange);
+    private Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(DescribeRequest request) =>
+        Sessions.DescribeAsync(postgres.ConnectionString, request);
 
     // A table of these tests alone, which a describe must leave as it is.  The fixture schema has none of the name.
     private const string Canary = "describer_canary";
@@ -32,11 +30,9 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_TwoStatements_IsSqlsrc230AndSendsNothing()
     {
-        var capture = new DescribeCapture("postgres");
-
-        var described = await DescribeAsync(
-            Requests.Of("DELETE FROM orders WHERE user_id = @id; DELETE FROM users WHERE id = @id"),
-            new CapturingExchange(LiveExchange.Instance, capture)
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
+            postgres.ConnectionString,
+            Requests.Of("DELETE FROM orders WHERE user_id = @id; DELETE FROM users WHERE id = @id")
         );
 
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC230");
@@ -53,9 +49,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [InlineData("(SELECT 1 INTO TEMP t)", "SELECT INTO")]
     public async Task Describe_StatementPrepareDoesNotTake_IsSqlsrc233AndSendsNothing(string sql, string kind)
     {
-        var capture = new DescribeCapture("postgres");
-
-        var described = await DescribeAsync(Requests.Of(sql), new CapturingExchange(LiveExchange.Instance, capture));
+        var (described, capture) = await Sessions.DescribeCapturedAsync(postgres.ConnectionString, Requests.Of(sql));
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC233");
@@ -66,11 +60,9 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_DeclaredTypeThatIsNoTypeName_IsSqlsrc228AndSendsNothing()
     {
-        var capture = new DescribeCapture("postgres");
-
-        var described = await DescribeAsync(
-            Requests.Of("SELECT 1 FROM users WHERE id = @id", ("id", "int) AS SELECT 1; DROP TABLE users; --")),
-            new CapturingExchange(LiveExchange.Instance, capture)
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
+            postgres.ConnectionString,
+            Requests.Of("SELECT 1 FROM users WHERE id = @id", ("id", "int) AS SELECT 1; DROP TABLE users; --"))
         );
 
         var failure = described.Failure.ShouldNotBeNull();
@@ -99,8 +91,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
 
         try
         {
-            var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-            await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+            await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
             var live = new PostgresLive(session.Connection);
 
             var answer = await live.PrepareAsync(
@@ -217,12 +208,8 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_AfterAQueryTheServerRejected_DescribesTheNextOne()
     {
-        var capture = new DescribeCapture("postgres");
-        var opened = await Sessions.OpenAsync(
-            postgres.ConnectionString,
-            new CapturingExchange(LiveExchange.Instance, capture)
-        );
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString);
+        await using var session = opened;
         var token = TestContext.Current.CancellationToken;
 
         var first = await session.DescribeAsync(Requests.Of("DELETE FROM nope WHERE id = @id"), token);
@@ -241,8 +228,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_CancelledToken_ThrowsAndIsNoFailure()
     {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldNotBeNull();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         using var cancelled = new CancellationTokenSource();
         await cancelled.CancelAsync();
 
@@ -285,13 +271,8 @@ public sealed class ParameterTests(PostgresContainer postgres)
     );
 
     // The parameters of a query that is described.  Its columns are ColumnTests' business.
-    private async Task<EquatableArray<DescribedParameter>> ShouldDescribeAsync(DescribeRequest request)
-    {
-        var described = await DescribeAsync(request);
-
-        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-        return described.Value.ShouldNotBeNull().Parameters;
-    }
+    private async Task<EquatableArray<DescribedParameter>> ShouldDescribeAsync(DescribeRequest request) =>
+        (await Sessions.ShouldDescribeAsync(postgres.ConnectionString, request)).Parameters;
 
     // A parameter's type binds by its name unless the row gives another: NpgsqlCheckTests has the types that do.
     private static DescribedParameter Inferred(string name, PostgresType type, string? bindName = null) =>
@@ -524,11 +505,9 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_SqlWithAPlaceholderOfItsOwn_IsSqlsrc234AndSendsNothing()
     {
-        var capture = new DescribeCapture("postgres");
-
-        var described = await DescribeAsync(
-            Requests.Of("SELECT 1 FROM users WHERE id = @id AND name = $2"),
-            new CapturingExchange(LiveExchange.Instance, capture)
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
+            postgres.ConnectionString,
+            Requests.Of("SELECT 1 FROM users WHERE id = @id AND name = $2")
         );
 
         var failure = described.Failure.ShouldNotBeNull();

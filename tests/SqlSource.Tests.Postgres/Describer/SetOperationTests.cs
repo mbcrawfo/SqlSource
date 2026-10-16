@@ -1,10 +1,10 @@
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
 using SqlSource.Snapshot;
 using Xunit;
+using static SqlSource.Tool.Testing.NullabilityAnswers;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
@@ -24,23 +24,14 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         INSERT INTO orders (user_id, total) SELECT id, 1 FROM users WHERE name = 'x';
         """;
 
-    private static readonly (bool?, string?) Proven = (false, "set-operation");
-
-    private static readonly (bool?, string?) Unknown = (null, "no-origin");
-
     private async Task<(bool? Nullable, string? Source)[]> WalkedAsync(string sql)
     {
         postgres.SkipUnlessRecordedMajor("The set operations");
 
-        var described = await Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql));
+        var description = await Sessions.ShouldDescribeAsync(postgres.ConnectionString, sql);
 
-        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-        var description = described.Value.ShouldNotBeNull();
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        return
-        [
-            .. description.Columns.ShouldNotBeNull().Select(static column => (column.Nullable, column.NullableSource)),
-        ];
+        return Of(description.Columns.ShouldNotBeNull());
     }
 
     // Whether the query returns a NULL in the column over the rows of the setup, which are rolled back.
@@ -85,7 +76,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
             + "UNION ALL SELECT y.id, y.name FROM users y"
     )]
     public async Task Describe_UnionOfNotNullColumns_IsAnswered(string sql) =>
-        (await WalkedAsync(sql)).ShouldBe([Proven, Proven]);
+        (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
 
     // The planner casts the int4 branch to the result's int8 and the plan does not print the cast; under UNION and
     // UNION ALL the cast branch is a scan the walk does not follow, on either major.
@@ -94,7 +85,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [InlineData("SELECT o.id FROM orders o UNION ALL SELECT u.id FROM users u")]
     [InlineData("SELECT u.id FROM users u UNION SELECT o.id FROM orders o")]
     public async Task Describe_UnionOfInt4AndInt8_StaysUnknown(string sql) =>
-        (await WalkedAsync(sql)).ShouldBe([Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin]);
 
     // Under INTERSECT and EXCEPT 14's flagged member is the planner's own leaf scan, followed by place; 18 prints the
     // cast branch's scan as an input like any other, and it stays unknown.  The INTERSECT's other input, an int8
@@ -103,12 +94,14 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [InlineData("SELECT u.id FROM users u INTERSECT SELECT s.big FROM samples s")]
     [InlineData("SELECT u.id FROM users u EXCEPT SELECT o.id FROM orders o")]
     public async Task Describe_IntersectAndExceptOfACastBranch_AreAnsweredOn14AndUnknownOn18(string sql) =>
-        (await WalkedAsync(sql)).ShouldBe([postgres.Major == 14 ? Proven : Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([postgres.Major == 14 ? NotNullSetOperation : UnknownNoOrigin]);
 
     // An INTERSECT is proven by either input: the int8 side needs no cast.
     [Fact]
     public async Task Describe_IntersectWhoseInt8InputIsNotNull_IsAnswered() =>
-        (await WalkedAsync("SELECT u.id FROM users u INTERSECT SELECT o.id FROM orders o")).ShouldBe([Proven]);
+        (await WalkedAsync("SELECT u.id FROM users u INTERSECT SELECT o.id FROM orders o")).ShouldBe([
+            NotNullSetOperation,
+        ]);
 
     // A branch's NULL, a nullable column of a branch, and the extended side of a LEFT JOIN in a branch: the column
     // may be NULL, and is.
@@ -120,7 +113,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [InlineData("SELECT x.deleted_at FROM users x UNION ALL SELECT u.created_at FROM users u", 0)]
     public async Task Describe_UnionWithABranchThatMayBeNull_StaysUnknown(string sql, int column)
     {
-        (await WalkedAsync(sql)).ShouldBe([Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, column)).ShouldBeTrue();
     }
 
@@ -132,7 +125,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
             "SELECT u.id, o.id FROM users u LEFT JOIN orders o ON o.user_id = u.id "
             + "UNION ALL SELECT i.id, i.order_id FROM billing.invoices i";
 
-        (await WalkedAsync(sql)).ShouldBe([Proven, Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 1)).ShouldBeTrue();
     }
 
@@ -142,7 +135,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [InlineData("SELECT u.created_at FROM users u INTERSECT SELECT x.deleted_at FROM users x")]
     [InlineData("SELECT u.deleted_at FROM users u INTERSECT ALL SELECT x.created_at FROM users x")]
     public async Task Describe_IntersectWithOneNotNullInput_IsAnswered(string sql) =>
-        (await WalkedAsync(sql)).ShouldBe([Proven]);
+        (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation]);
 
     // Both inputs may be NULL, and NULL equals NULL in an INTERSECT: the row is returned.
     [Fact]
@@ -150,7 +143,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     {
         var sql = "SELECT u.deleted_at FROM users u INTERSECT SELECT x.deleted_at FROM users x";
 
-        (await WalkedAsync(sql)).ShouldBe([Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
     }
 
@@ -159,14 +152,14 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [InlineData("SELECT u.created_at FROM users u EXCEPT SELECT x.deleted_at FROM users x")]
     [InlineData("SELECT u.created_at FROM users u EXCEPT ALL SELECT x.deleted_at FROM users x")]
     public async Task Describe_ExceptWithANotNullLeft_IsAnswered(string sql) =>
-        (await WalkedAsync(sql)).ShouldBe([Proven]);
+        (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation]);
 
     [Theory]
     [InlineData("SELECT u.deleted_at FROM users u EXCEPT SELECT x.created_at FROM users x")]
     [InlineData("SELECT u.deleted_at FROM users u EXCEPT ALL SELECT x.created_at FROM users x")]
     public async Task Describe_ExceptWithANullableLeft_StaysUnknown(string sql)
     {
-        (await WalkedAsync(sql)).ShouldBe([Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
     }
 
@@ -214,7 +207,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         false
     )]
     public async Task Describe_NestedSetOperations_AreAnsweredByWhatEachLevelProves(string sql, bool proven) =>
-        (await WalkedAsync(sql)).ShouldBe([proven ? Proven : Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([proven ? NotNullSetOperation : UnknownNoOrigin]);
 
     // The nested shapes whose column the server does return NULL in.
     [Theory]
@@ -236,7 +229,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
         var sql = "SELECT p.id, p.note FROM scratch_parts p UNION ALL SELECT o.user_id, o.note FROM orders o";
 
-        (await WalkedAsync(sql)).ShouldBe([Proven, Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation, UnknownNoOrigin]);
         (
             await ReturnsNullAsync(Rows + "INSERT INTO scratch_parts (id, kind) VALUES (1, 1), (2, 2);", sql, 1)
         ).ShouldBeTrue();
@@ -250,9 +243,9 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
         (await WalkedAsync("SELECT p.id, 'x'::text AS k, 1 AS one FROM scratch_parts p")).ShouldBe([
-            (false, "catalog"),
-            (false, "expression"),
-            (false, "expression"),
+            NotNullCatalog,
+            NotNullExpression,
+            NotNullExpression,
         ]);
     }
 
@@ -269,7 +262,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     )]
     public async Task Describe_BranchWithTwoColumnsOfOneName_IsReadByPlace(string sql)
     {
-        (await WalkedAsync(sql)).ShouldBe([Proven, Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 1)).ShouldBeTrue();
     }
 
@@ -296,7 +289,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     )]
     public async Task Describe_UnionAllWhoseBranchNamesCrossThePlaces_StaysUnknown(string sql, int column)
     {
-        (await WalkedAsync(sql)).ShouldBe([Unknown, Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, column)).ShouldBeTrue();
     }
 
@@ -310,7 +303,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
             "SELECT s.b, s.a FROM (SELECT u.deleted_at AS a, u.created_at AS b FROM users u "
             + "EXCEPT SELECT x.created_at, x.deleted_at FROM users x) s";
 
-        (await WalkedAsync(sql)).ShouldBe([Unknown, Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 1)).ShouldBeTrue();
     }
 
@@ -326,12 +319,12 @@ public sealed class SetOperationTests(PostgresContainer postgres)
                 "SELECT s.b, s.a FROM (SELECT u.deleted_at AS a, u.created_at AS b FROM users u "
                     + "UNION ALL SELECT x.created_at, x.created_at FROM users x) s"
             )
-        ).ShouldBe([Proven, Unknown]);
+        ).ShouldBe([NotNullSetOperation, UnknownNoOrigin]);
 
         var crossed =
             "SELECT s.b, s.a FROM (SELECT u.deleted_at AS a, u.created_at AS b FROM users u "
             + "UNION ALL SELECT x.created_at, x.deleted_at FROM users x) s";
-        (await WalkedAsync(crossed)).ShouldBe([Unknown, Unknown]);
+        (await WalkedAsync(crossed)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, crossed, 0)).ShouldBeTrue();
         (await ReturnsNullAsync(Rows, crossed, 1)).ShouldBeTrue();
     }
@@ -348,7 +341,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
             + "(SELECT u.created_at AS a, u.deleted_at AS b FROM users u OFFSET 0) AS \"*SELECT* 1\" "
             + "EXCEPT SELECT x.created_at, x.created_at FROM users x";
 
-        (await WalkedAsync(sql)).ShouldBe([Unknown, Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
     }
 
@@ -365,7 +358,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         );
         var sql = "SELECT b, a FROM setop_leaf_alias EXCEPT SELECT 'zz', 'zz'";
 
-        (await WalkedAsync(sql)).ShouldBe([Unknown, Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
     }
 
@@ -384,8 +377,8 @@ public sealed class SetOperationTests(PostgresContainer postgres)
                 "SELECT s.k, count(*) AS n FROM (SELECT u.created_at AS k FROM users u "
                     + "UNION ALL SELECT x.created_at FROM users x) s GROUP BY s.k"
             )
-        ).ShouldBe([Proven, Unknown]);
-        (await WalkedAsync(nullable)).ShouldBe([Unknown, Unknown]);
+        ).ShouldBe([NotNullSetOperation, UnknownNoOrigin]);
+        (await WalkedAsync(nullable)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, nullable, 0)).ShouldBeTrue();
     }
 
@@ -396,7 +389,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
             await WalkedAsync(
                 "WITH RECURSIVE r (n) AS (SELECT 1 UNION ALL SELECT r.n + 1 FROM r WHERE r.n < 5) SELECT r.n FROM r"
             )
-        ).ShouldBe([Unknown]);
+        ).ShouldBe([UnknownNoOrigin]);
 
     // A branch with a LIMIT is a scan of its own that prints the columns the query above needs, in its order: the plan
     // is the user's Subquery Scan s over an Append whose second member, "*SELECT* 2", prints "nullif" before name.
@@ -409,7 +402,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
             "SELECT s.b, s.a FROM (SELECT u.name AS a, u.name AS b FROM users u "
             + "UNION ALL (SELECT x.name, NULLIF(x.name, 'x') FROM users x LIMIT 5)) s";
 
-        (await WalkedAsync(sql)).ShouldBe([Unknown, Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
     }
 
@@ -425,7 +418,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         );
         var sql = "SELECT b, a FROM setop_pairs()";
 
-        (await WalkedAsync(sql)).ShouldBe([Unknown, Unknown]);
+        (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
     }
 
@@ -438,5 +431,5 @@ public sealed class SetOperationTests(PostgresContainer postgres)
                 "SELECT s.id FROM (SELECT u.id FROM users u UNION ALL SELECT i.id FROM billing.invoices i) s "
                     + "ORDER BY s.id LIMIT 5"
             )
-        ).ShouldBe([Proven]);
+        ).ShouldBe([NotNullSetOperation]);
 }

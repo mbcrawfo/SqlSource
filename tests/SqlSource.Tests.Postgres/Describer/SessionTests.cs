@@ -23,9 +23,8 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task OpenAsync_Container_GivesTheVersionTheDriverAndTheThreeSettings()
     {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
 
-        await using var session = opened.Value.ShouldNotBeNull();
         var server = session.Server;
         server.Version.ShouldNotContain(" ");
         char.IsAsciiDigit(server.Version[0]).ShouldBeTrue(server.Version);
@@ -41,14 +40,9 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task OpenAsync_ThroughACapturingExchange_KeepsAnEmptyRequestAndNothingOfTheConnection()
     {
-        var capture = new DescribeCapture("postgres");
+        var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString);
 
-        var opened = await Sessions.OpenAsync(
-            postgres.ConnectionString,
-            new CapturingExchange(LiveExchange.Instance, capture)
-        );
-
-        await using var session = opened.Value.ShouldNotBeNull();
+        await using var session = opened;
         var call = capture.Calls.ShouldHaveSingleItem();
         call.Method.ShouldBe("open");
         CaptureJson.TextOf(call.Request).ShouldBe("{}");
@@ -166,8 +160,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     public async Task Describe_AfterTheServerEndedTheSession_IsSqlsrc225EachTimeAndNoThrow()
     {
         var token = TestContext.Current.CancellationToken;
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         _ = (await session.DescribeAsync(Requests.Of(Sql), token)).Value.ShouldNotBeNull();
 
         await Sessions.EndBackendAsync(session, postgres.ConnectionString);
@@ -185,10 +178,9 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ServerEndsTheSessionBetweenPrepareAndColumns_IsSqlsrc225AndNoThrow()
     {
-        var capture = new DescribeCapture("postgres");
         var exchange = new EndsTheBackendAfterPrepare(postgres.ConnectionString);
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString, new CapturingExchange(exchange, capture));
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString, exchange);
+        await using var session = opened;
         exchange.Session = session;
 
         var described = await session.DescribeAsync(Requests.Of(Sql), TestContext.Current.CancellationToken);
@@ -205,10 +197,9 @@ public sealed class SessionTests(PostgresContainer postgres)
     public async Task Describe_TableDroppedBetweenColumnsAndTables_IsSqlsrc225AtCatalogAndNoThrow()
     {
         await postgres.ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
-        var capture = new DescribeCapture("postgres");
         var exchange = new DropsTheTableAfterColumns(postgres.ConnectionString);
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString, new CapturingExchange(exchange, capture));
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString, exchange);
+        await using var session = opened;
         var token = TestContext.Current.CancellationToken;
 
         var described = await session.DescribeAsync(Requests.Of("SELECT id FROM session_gone"), token);
@@ -240,8 +231,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     public async Task Describe_StatementPrepared_IsListedWithTheTextAsSentAndDescribed(string sql)
     {
         var exchange = new ReadsTheListedText();
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString, exchange);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString, exchange);
         exchange.Session = session;
 
         var described = await session.DescribeAsync(Requests.Of(sql), TestContext.Current.CancellationToken);
