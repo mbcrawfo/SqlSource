@@ -11,12 +11,6 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class ExpressionTests(PostgresContainer postgres)
 {
-    private const string Partitioned = """
-        CREATE TABLE IF NOT EXISTS walk_parts (id integer NOT NULL, kind integer NOT NULL) PARTITION BY LIST (kind);
-        CREATE TABLE IF NOT EXISTS walk_parts_1 PARTITION OF walk_parts FOR VALUES IN (1);
-        CREATE TABLE IF NOT EXISTS walk_parts_2 PARTITION OF walk_parts FOR VALUES IN (2);
-        """;
-
     private static readonly (bool?, string?) NotNull = (false, "expression");
 
     private static readonly (bool?, string?) Unknown = (null, "no-origin");
@@ -80,7 +74,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_CountOfAnArgumentThatAnotherSchemaTakes_StaysUnknown()
     {
-        await RunAsync(PlanOutputTests.ShadowCount);
+        await RunAsync(ScratchSchema.ShadowCount);
 
         (
             await AnswersAsync(
@@ -156,16 +150,16 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_PartitionedTableAggregate_IsAnswered()
     {
-        await RunAsync(Partitioned);
+        await RunAsync(ScratchSchema.Partitioned);
 
-        (await AnswersAsync("SELECT count(*) AS n FROM walk_parts")).ShouldBe([NotNull]);
+        (await AnswersAsync("SELECT count(*) AS n FROM scratch_parts")).ShouldBe([NotNull]);
     }
 
     // A count the path finds before pg_catalog's may be another schema's, which can return NULL.
     [Fact]
     public async Task Describe_CountShadowedOnTheSearchPath_StaysUnknown()
     {
-        await RunAsync(PlanOutputTests.ShadowCount);
+        await RunAsync(ScratchSchema.ShadowCount);
 
         (
             await AnswersAsync(
