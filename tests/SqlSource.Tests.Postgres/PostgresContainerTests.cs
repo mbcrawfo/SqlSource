@@ -56,8 +56,11 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
             .Message.ShouldEndWith("a reason");
 
     [Fact]
-    public void SkipBelow_OfTheContainer_AsksTheServersMajor() =>
+    public void SkipBelow_OfTheContainer_AsksTheServersMajor()
+    {
         Should.NotThrow(() => postgres.SkipBelow(postgres.Major, "a reason"));
+        _ = Should.Throw<SkipException>(() => postgres.SkipBelow(postgres.Major + 1, "a reason"));
+    }
 
     [Theory]
     [InlineData(14)]

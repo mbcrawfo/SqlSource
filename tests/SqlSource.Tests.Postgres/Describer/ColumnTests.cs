@@ -140,13 +140,11 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         try
         {
-            var described = await Sessions.DescribeAsync(
+            var description = await Sessions.ShouldDescribeAsync(
                 $"{postgres.ConnectionString};Search Path=public,pg_catalog",
                 Requests.Of("SELECT NULL::pg_catalog.numeric(10,2) AS n, @p AS p", ("p", "pg_catalog.numeric"))
             );
 
-            described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-            var description = described.Value.ShouldNotBeNull();
             description
                 .Columns.ShouldNotBeNull()[0]
                 .Type.ShouldBe(
@@ -616,7 +614,6 @@ public sealed class ColumnTests(PostgresContainer postgres)
         );
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-
         Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NullableCatalog, NotNullExpression]);
     }
 
@@ -635,7 +632,6 @@ public sealed class ColumnTests(PostgresContainer postgres)
         description.MatchesTable.ShouldBeNull();
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
         TypeNamesOf(columns).ShouldBe(["integer", "public.email_t", "numeric(18,2)", "bigint"]);
-
         Of(columns).ShouldBe([NotNullCatalog, NullableCatalog, NullableOuterJoin, NotNullExpression]);
         columns
             .Select(column => column.Origin)
@@ -729,7 +725,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
             "SELECT v.id, o.total FROM active_users v LEFT JOIN orders o ON o.user_id = v.id"
         );
 
-        Of(view).ShouldAllBe(found => found.Nullable == null && found.Source == "view");
+        Of(view).ShouldBe([UnknownView, UnknownView, UnknownView, UnknownView]);
         Of(materialized).ShouldBe([UnknownView]);
         Of(gated).ShouldBe([UnknownView, NullableOuterJoin]);
     }

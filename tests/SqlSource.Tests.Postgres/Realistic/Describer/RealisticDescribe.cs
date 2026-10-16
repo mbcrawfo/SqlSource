@@ -32,7 +32,11 @@ public enum Expectation
 // are here too: that the server runs the case, and that a description has the columns of the truth.
 internal static class RealisticDescribe
 {
-    public const string RefuseMessage = "Record on PostgreSQL 14 or 18.";
+    public static string RefuseMessage { get; } =
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"Record on PostgreSQL {string.Join(" or ", PostgresContainer.RecordedMajors)}."
+        );
 
     // What is not there, in a rendered line.
     private const string None = "-";

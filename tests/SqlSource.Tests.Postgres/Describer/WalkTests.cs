@@ -191,7 +191,7 @@ public sealed class WalkTests(PostgresContainer postgres)
             "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id AND o.id IS NULL"
         );
 
-        columns.ShouldBe([NotNullCatalog, (true, proved ? "heuristic" : "outer-join")]);
+        columns.ShouldBe([NotNullCatalog, proved ? NullableHeuristic : NullableOuterJoin]);
     }
 
     // A relation the planner proved empty under an outer join is a Result, and a RETURNING list prints its column
