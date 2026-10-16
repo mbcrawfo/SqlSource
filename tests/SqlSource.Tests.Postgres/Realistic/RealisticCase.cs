@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using SqlSource.Tool.Tests.Fixtures;
 
 namespace SqlSource.Tests.Postgres.Realistic;
@@ -28,7 +29,17 @@ internal sealed record RealisticCase(
     // The truth and the sample values, written by hand.  Recording never writes it.
     public const string CaseFile = "case.json";
 
-    // The description as RealisticRun renders it, recorded on the server of that major version.
+    // The majors that a case's description and the noise budget are recorded on, as CI runs them.
+    public static IReadOnlyList<int> RecordedMajors { get; } = [14, 18];
+
+    // The files of the case's folder: its query, its truth, and the description of each recorded major it runs on.
+    public IReadOnlyList<string> Files =>
+        [QueryFile, CaseFile, .. RecordedMajors.Where(RunsOn).Select(major => Path.GetFileName(ExpectedPath(major)))];
+
+    // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
+    public bool RunsOn(int major) => MinimumMajor is not { } minimum || minimum <= major;
+
+    // The description as RealisticDescribe renders it, recorded on the server of that major version.
     public string ExpectedPath(int major) =>
         Path.Combine(Folder, string.Create(CultureInfo.InvariantCulture, $"expected-pg{major}.txt"));
 

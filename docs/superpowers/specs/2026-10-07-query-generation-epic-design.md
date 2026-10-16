@@ -395,6 +395,19 @@ Decided, the projects:
 - The tool runs in process through a public `Cli.Run(args)` entry, for speed and debuggability, with one test per project that runs the packed command as a subprocess to prove the command line.  The container is a collection fixture shared by the project's tests and cleaned up by Testcontainers' reaper.
 - No Roslyn-floor variant: the existing floor project recompiles the generator tests, which is where model and method emission are unit-tested.
 
+Decided, the realistic corpus (2026-10-15).  `tests/SqlSource.Tests.Postgres/Realistic/` holds about 60 hand-written application queries over a schema and a seed of their own, from [the suite of realistic queries](2026-10-15-postgresql-realistic-query-suite-design.md).  Each case holds a truth, written by hand from the SQL and the schema, of which columns can be `NULL`, and sample parameter values.  An oracle executes each query over the seed and fails on a `NULL` in a column that the describer or the truth calls not null, and a noise budget counts the not-null columns that the describer answers nullable or unknown.  It checks the describer alone: nothing of a run from the plan to the sidecar, and nothing of the generator.  The PostgreSQL end-to-end project is built on it and does not replace it:
+
+- The corpus's queries are the end-to-end project's realistic queries: phase 5 does not write a second set.  Each case that is not refused is a `Models` query of the project, with a committed sidecar written by `tools/describe-end-to-end.sh`, and stays one `query.sql` in one place, the case's folder.  The describer's checks over the corpus are in `Realistic/Describer/`; the end-to-end project's go in a folder of their own beside it, `Realistic/Generation/`, and the corpus's root keeps only the cases and what reads them.  The files that cover the combinations of settings, under the projects above, are apart from it.
+- The truth, the oracle and the noise budget stay, and none of the end-to-end tests stands in for them.  A wrong `false` recorded in a committed sidecar is what `--check` expects, so only a truth that the tool never wrote can catch it.  A model read through Dapper cannot show it either, since Dapper leaves a member at its default when the column is `NULL`.
+- The end-to-end tests check what the corpus cannot reach against the same truth.  Each property of a generated output type is as nullable as the case's truth says or wider, read from the compiled model.  Each query is run over the seed with each of the case's sample values, through Dapper into its generated model until phase 8 and through its generated method after it, and reads every row without an error.  So the type map is proven on the corpus's domains, enums, arrays, ranges, `json`, `jsonb` and `numeric` facets, which the fixture schema does not have.
+- A refused case, SQLSRC225 or SQLSRC229, stays the describer's alone: it is no `Models` query, since its file would only fail to build.  It may serve as the third kind of test's undescribable query.
+
+Recommended, the realistic corpus:
+
+- The corpus is its own logical database of the end-to-end project, `realistic`, beside `app` and `billing`, as it is today one of its own beside `fixtures`.  Its queries name it with `-- database:`.
+- One set of committed sidecars is checked on PostgreSQL 14 and 18.  On 2026-10-15 every case that runs on both is described the same on both, and `merge-returning`, which needs 17, is the one case recorded on 18 alone.  Phase 5 decides how a case that needs a later major, or one that a later planner describes otherwise, keeps its sidecar out of the run on the earlier major.
+- `expected-pg14.txt` and `expected-pg18.txt` are retired once the committed sidecars hold every fact they render: the kind, the plan, the table match, each parameter's type and its source, and each column's type, nullability, source and origin.  `--check` on both majors then does their work, and a refused case keeps its expectation of the failure.  Until then both are kept, and the change that retires them says which sidecar field took each line.
+
 Recommended:
 
 - The hash, the parameter lexeme, the markers and the type map are generator code and are tested in `tests/SqlSource.Tests`.  The container tests prove the live describer implementations and record the fixtures that `SqlSource.Tool.Tests` replays.
@@ -707,7 +720,7 @@ The existing suites pass unchanged in behaviour; the only edits are settings.
 3. The PostgreSQL type map, every type Npgsql reads; the driver probe with its feature flags and floor diagnostics; the project-level mapping override; and the two date and time options.
 4. Emission of the input and output types with documentation, once per full name from the collected set; table models; the override suffix stripped from names.
 5. The `DependentUpon` nesting in the targets, with its spike.
-6. The end-to-end `.sql` files, schemas and committed sidecars in `tests/SqlSource.Tests.Postgres`, which phase 3 created, and `tools/describe-end-to-end.sh`.
+6. The end-to-end `.sql` files, schemas and committed sidecars in `tests/SqlSource.Tests.Postgres`, which phase 3 created, and `tools/describe-end-to-end.sh`.  The realistic corpus under `Realistic/` is the project's realistic queries, by the decisions on it under Testing: its cases that are not refused become `Models` queries with committed sidecars, and its truth, oracle and noise budget stay as they are.
 7. The README's installation section and its section on models.
 
 ### Decided
@@ -729,7 +742,7 @@ The items under Models and Types in C#.  Two more:
 
 ### Testing
 
-Generator tests over sidecars: every row of the state table, the type map, naming, the override suffix, two types claiming one file, two namespaces matching one table.  The PostgreSQL end-to-end project, with the three kinds of test under Testing.
+Generator tests over sidecars: every row of the state table, the type map, naming, the override suffix, two types claiming one file, two namespaces matching one table.  The PostgreSQL end-to-end project, with the three kinds of test under Testing.  Over the realistic corpus besides: each property of each generated output type is as nullable as the case's truth or wider, read from the compiled model, and each query run through Dapper into its model over the seed, with each of the case's samples, reads every row without an error.
 
 ## Phase 6 - SQL Server
 
@@ -823,7 +836,7 @@ Each map in both end-to-end projects with the library referenced, and the detect
 
 ### Testing
 
-The end-to-end projects run every query through its generated method and assert rows, counts, nulls, each shape's success and failure, each collection type, the transaction and timeout arguments, cancellation, and that a closed connection is closed again and an open one left open.  Generator tests cover the method shapes, the locations and the parameter binding code for every row of the type map.
+The end-to-end projects run every query through its generated method and assert rows, counts, nulls, each shape's success and failure, each collection type, the transaction and timeout arguments, cancellation, and that a closed connection is closed again and an open one left open.  The realistic corpus's queries run through their generated methods over the seed, with each case's samples, beside the Dapper run of phase 5, which stays: a reader that reads a column with `GetFieldValue<T>` and no `IsDBNull` throws on a `NULL` (unverified for every reference type on Npgsql, which this phase checks first), so a column the sidecar wrongly calls not null fails the run where the seed has a `NULL` in it, an oracle the generated code gives beside the corpus's own.  Generator tests cover the method shapes, the locations and the parameter binding code for every row of the type map.
 
 ## Phase 9 - build integration
 
