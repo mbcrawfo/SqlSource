@@ -7,7 +7,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlModelTests
+public sealed class SqlModelTests
 {
     [Fact]
     public void SqlParseError_Create_HoldsItsArguments()

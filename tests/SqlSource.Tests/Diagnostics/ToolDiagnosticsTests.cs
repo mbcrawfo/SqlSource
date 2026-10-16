@@ -9,7 +9,7 @@ using Xunit;
 namespace SqlSource.Tests.Diagnostics;
 
 // The errors of the sqlsource tool are descriptors of the generator assembly, held to the rules of the generator's.
-public class ToolDiagnosticsTests
+public sealed class ToolDiagnosticsTests
 {
     [Fact]
     public void All_EveryDescriptor_IsAnErrorThatCannotBeConfigured()

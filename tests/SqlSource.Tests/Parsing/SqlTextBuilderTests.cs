@@ -7,7 +7,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlTextBuilderTests
+public sealed class SqlTextBuilderTests
 {
     [Theory]
     [InlineData("SELECT 1 -- c", "SELECT 1")]

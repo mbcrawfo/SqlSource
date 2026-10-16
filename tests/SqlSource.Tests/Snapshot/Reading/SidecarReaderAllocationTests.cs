@@ -5,7 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Snapshot.Reading;
 
-public class SidecarReaderAllocationTests
+public sealed class SidecarReaderAllocationTests
 {
     // From phase 5 the generator reads a sidecar again each time the file changes, so what a read allocates is
     // tracked here.  A read of the first example allocated 1.4 bytes for each character when the budget was set, the

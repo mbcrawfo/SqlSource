@@ -10,7 +10,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-public class GeneratedSourceTests
+public sealed class GeneratedSourceTests
 {
     private static readonly SqlFile Users = new("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
 

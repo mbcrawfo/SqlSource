@@ -8,7 +8,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.MSBuild;
 
-public class MSBuildSettingsTests
+public sealed class MSBuildSettingsTests
 {
     private const string Path = "/app/Repo/Users.sql";
 

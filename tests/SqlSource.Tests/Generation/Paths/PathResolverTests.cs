@@ -5,7 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
 
-public class PathResolverTests
+public sealed class PathResolverTests
 {
     // Normalised and in order, as the pipeline supplies them.
     private static readonly EquatableArray<string> SqlPaths = TestModels.Array(

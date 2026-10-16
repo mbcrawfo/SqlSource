@@ -9,7 +9,7 @@ using static SqlSource.Testing.Snapshot.TestSidecars;
 
 namespace SqlSource.Tests.Snapshot.Reading;
 
-public class SidecarReaderTests
+public sealed class SidecarReaderTests
 {
     private const string IntType = /*lang=json*/
         "{'name': 'integer', 'kind': 'base', 'schema': 'pg_catalog', 'internalName': 'int4'}";

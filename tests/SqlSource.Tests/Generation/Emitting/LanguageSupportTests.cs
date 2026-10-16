@@ -5,7 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
 
-public class LanguageSupportTests
+public sealed class LanguageSupportTests
 {
     [Theory]
     [InlineData(LanguageVersion.CSharp7_3, "7.3")]

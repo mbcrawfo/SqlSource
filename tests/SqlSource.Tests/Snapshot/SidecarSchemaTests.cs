@@ -12,7 +12,7 @@ using Xunit;
 namespace SqlSource.Tests.Snapshot;
 
 // The schema is strict and the writer is written by hand.  These tests are what keeps the two in step.
-public class SidecarSchemaTests
+public sealed class SidecarSchemaTests
 {
     private static readonly string SchemaText = File.ReadAllText(
         Path.Combine(AppContext.BaseDirectory, "schemas", "sidecar-v1.schema.json")

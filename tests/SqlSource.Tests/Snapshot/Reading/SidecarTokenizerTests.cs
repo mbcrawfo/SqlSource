@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Snapshot.Reading;
 
-public class SidecarTokenizerTests
+public sealed class SidecarTokenizerTests
 {
     [Fact]
     public void Next_EachToken_HasItsKindAndItsSpan() =>

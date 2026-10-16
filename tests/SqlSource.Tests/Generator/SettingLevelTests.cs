@@ -9,7 +9,7 @@ namespace SqlSource.Tests.Generator;
 
 // The settings that have no effect yet are accepted at every level they have, and a value none of them takes is
 // reported where it was written.
-public class SettingLevelTests
+public sealed class SettingLevelTests
 {
     private const string Sql = "-- name: Q\nSELECT 1;\n";
 

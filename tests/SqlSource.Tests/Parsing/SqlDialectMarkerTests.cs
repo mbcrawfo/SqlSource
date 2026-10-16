@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlDialectMarkerTests
+public sealed class SqlDialectMarkerTests
 {
     [Theory]
     [InlineData("-- dialect: mysql\n-- name: A\nSELECT 1")]

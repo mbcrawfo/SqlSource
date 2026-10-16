@@ -3,7 +3,7 @@ using Xunit;
 
 namespace SqlSource.Tests;
 
-public class PackageVersionTests
+public sealed class PackageVersionTests
 {
     [Fact]
     public void Prefix_IsThreeNumbers() => PackageVersion.Prefix.ShouldMatch(@"^[0-9]+\.[0-9]+\.[0-9]+$");

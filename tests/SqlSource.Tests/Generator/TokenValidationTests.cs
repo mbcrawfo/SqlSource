@@ -9,7 +9,7 @@ namespace SqlSource.Tests.Generator;
 // Whether a generated method checks its arguments: a list of generator parameters decides whole, the query's before
 // the file's, and the project's SqlSourceGeneratorParameters property decides for a query that has neither.  Without
 // any of them it checks.  GeneratorParameterLevelTests has the levels between the file and the project.
-public class TokenValidationTests
+public sealed class TokenValidationTests
 {
     private const string Source = """
         using SqlSource;

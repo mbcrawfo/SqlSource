@@ -11,7 +11,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
 
-public class TypeEmitterTests
+public sealed class TypeEmitterTests
 {
     [Fact]
     public void Emit_NestedPlacement_PutsTheConstantsInAPrivateSqlClass()

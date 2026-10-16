@@ -7,7 +7,7 @@ using Xunit;
 namespace SqlSource.Tests.Generator;
 
 // The problems of a type's .sql files, and of its queries taken together.
-public class FileDiagnosticsTests
+public sealed class FileDiagnosticsTests
 {
     private const string Source = """
         using SqlSource;

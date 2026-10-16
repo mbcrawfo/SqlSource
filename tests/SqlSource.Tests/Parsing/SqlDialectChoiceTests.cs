@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlDialectChoiceTests
+public sealed class SqlDialectChoiceTests
 {
     [Fact]
     public void Default_IsAnsiWithNoOptions() =>

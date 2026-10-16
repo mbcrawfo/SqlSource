@@ -5,7 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlTextTests
+public sealed class SqlTextTests
 {
     [Theory]
     [InlineData("  a b  ", 0, 7, 2, 5)]

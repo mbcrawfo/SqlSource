@@ -8,7 +8,7 @@ using static SqlSource.Testing.Snapshot.TestSidecars;
 
 namespace SqlSource.Tests.Snapshot;
 
-public class SidecarRoundTripTests
+public sealed class SidecarRoundTripTests
 {
     private const int Seed = 20261009;
 

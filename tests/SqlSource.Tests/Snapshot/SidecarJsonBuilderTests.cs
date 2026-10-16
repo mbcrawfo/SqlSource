@@ -5,7 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Snapshot;
 
-public class SidecarJsonBuilderTests
+public sealed class SidecarJsonBuilderTests
 {
     [Theory]
     [InlineData(0, "0")]
