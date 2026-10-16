@@ -88,6 +88,24 @@ internal sealed class PostgresLive(PostgresConnection connection)
         ORDER BY r.oid, a.attnum
         """;
 
+    // The ancestors of each relation asked for, nearest first, in one query.  pg_partition_ancestors gives the
+    // relation itself first, and nothing for a relation that is no partition.
+    private const string PartitionsSql = """
+        SELECT
+            n.nspname::text,
+            c.relname::text,
+            ARRAY(
+                SELECT a.relid::oid
+                FROM pg_catalog.pg_partition_ancestors(c.oid) WITH ORDINALITY AS a (relid, position)
+                WHERE a.relid <> c.oid
+                ORDER BY a.position
+            )
+        FROM unnest($1::text[], $2::text[]) AS p (schema, name)
+        JOIN pg_catalog.pg_namespace AS n ON n.nspname = p.schema
+        JOIN pg_catalog.pg_class AS c ON c.relnamespace = n.oid AND c.relname = p.name
+        ORDER BY 1, 2
+        """;
+
     // The server's spelling of each pair of a type and a modifier, in one query.
     private const string SpellingsSql = """
         SELECT p.oid, p.typmod, pg_catalog.format_type(p.oid, p.typmod)
@@ -311,6 +329,51 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
     }
 
+    /// <summary>Asks <c>partitions</c>: one query of the catalog for the ancestors of each relation.</summary>
+    public async Task<PostgresPartitionsAnswer> PartitionsAsync(
+        PostgresPartitionsRequest asked,
+        CancellationToken token
+    )
+    {
+        try
+        {
+            await using var command = await connection.CommandAsync(PartitionsSql, token);
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = asked.Relations.Select(static relation => relation.Schema).ToArray(),
+                    DataTypeName = "text[]",
+                }
+            );
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = asked.Relations.Select(static relation => relation.Name).ToArray(),
+                    DataTypeName = "text[]",
+                }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            var rows = new List<PostgresPartitionRow>();
+            while (await reader.ReadAsync(token))
+            {
+                var ancestors = await reader.GetFieldValueAsync<uint[]>(2, token);
+                rows.Add(
+                    new PostgresPartitionRow(
+                        reader.GetString(0),
+                        reader.GetString(1),
+                        [.. ancestors.Select(static oid => (long)oid)]
+                    )
+                );
+            }
+
+            return new PostgresPartitionsAnswer(rows, null);
+        }
+        catch (NpgsqlException exception)
+        {
+            return new PostgresPartitionsAnswer(null, PostgresConnection.ErrorOf(exception));
+        }
+    }
+
     /// <summary>
     /// The text <c>columns</c> sends: the statement with a <c>NULL</c> for each parameter.  The server describes an
     /// <c>EXECUTE</c> whatever the number of its arguments, so a statement with a <c>$n</c> of its own is described
@@ -530,6 +593,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
 
     private const string ForceGenericPlanSql = "SET LOCAL plan_cache_mode = force_generic_plan";
 
+    private const string NoPartitionPruningSql = "SET LOCAL enable_partition_pruning = off";
+
     /// <summary>
     /// Asks <c>explain</c>: the generic plan of the prepared statement, in a transaction that is rolled back.
     /// </summary>
@@ -538,9 +603,11 @@ internal sealed class PostgresLive(PostgresConnection connection)
     /// immutable function whose arguments are constants, inside the transaction that is rolled back: a function
     /// wrongly marked immutable runs, and an effect outside the transaction, a sequence's for one, remains
     /// (TD-0047).  Under <c>force_generic_plan</c> the <c>NULL</c> of a parameter is not folded into the plan, so
-    /// <c>id = $1</c> stays a condition.  Disposing a transaction that was not ended rolls it back, so a failure at
-    /// any step leaves no setting behind.  The texts hold a name the tool made, settings of a closed list and
-    /// nothing of a user's.
+    /// <c>id = $1</c> stays a condition.  Partition pruning is off: the executor would prune every partition for the
+    /// <c>NULL</c> of a parameter when it starts, and the plan would show an <c>Append</c> with no member, from
+    /// which the walk cannot tell a partitioned table from a set operation (TD-0052).  Disposing a transaction that
+    /// was not ended rolls it back, so a failure at any step leaves no setting behind.  The texts hold a name the tool
+    /// made, settings of a closed list and nothing of a user's.
     /// </remarks>
     public async Task<PostgresExplainAnswer> ExplainAsync(PostgresExplainRequest asked, CancellationToken token)
     {
@@ -570,10 +637,13 @@ internal sealed class PostgresLive(PostgresConnection connection)
     public static string ExplainText(PostgresExplainRequest asked) =>
         "EXPLAIN (VERBOSE, FORMAT JSON) " + ExecuteText(asked.Statement, asked.Parameters);
 
-    /// <summary>What <c>explain</c> sets for its transaction, in order: the generic plan, then each setting.</summary>
+    /// <summary>
+    /// What <c>explain</c> sets for its transaction, in order: the generic plan, no partition pruning, then each
+    /// setting.
+    /// </summary>
     /// <exception cref="ArgumentException">A setting is not of <see cref="PlannerSettings" />.</exception>
     public static IReadOnlyList<string> SetTexts(PostgresExplainRequest asked) =>
-        [ForceGenericPlanSql, .. asked.Settings.Select(PlannerSettings.SetText)];
+        [ForceGenericPlanSql, NoPartitionPruningSql, .. asked.Settings.Select(PlannerSettings.SetText)];
 
     /// <summary>Asks <c>deallocate</c>.</summary>
     public async Task<PostgresDeallocateAnswer> DeallocateAsync(

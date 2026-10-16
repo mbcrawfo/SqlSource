@@ -37,6 +37,7 @@ Probed on 2026-10-15, `EXPLAIN (VERBOSE)` of `EXECUTE` under `force_generic_plan
 - `partitions` is a call of its own, as the spec says, asked only when the plan has an `Append` whose members are all relation scans under aliases `<p>_<n>`.  It answers the ancestors of each member, by `pg_partition_ancestors`.
 - `explain` sets `enable_partition_pruning = off` for its transaction, a fixed setting and no member of the request, so no capture's request changes.  The cost, a plan of every partition, is TD-0052.
 - The expression trace answers only where today's rule does not: today's answers stay as they are.
+- Found while building Task 4: the node that computes an entry may take a value in parentheses from a child under the extended side, `CASE ... THEN ('x'::text) ...` over an anti join, so a span in parentheses that a child computes where a join extends is read as unknown (`PlanExpression.NullableOf`'s `groupPreserved`); a `COALESCE` with a constant beside it is still `false`.
 
 ## Files
 

@@ -136,15 +136,14 @@ public class NullabilityWalkTests
         AnswersOf(Run(LeftJoin("a.id", "b.id", "a.id + 1"), OfView, OfView, OfView))
             .ShouldBe([(null, "view"), (true, "outer-join"), (null, "view")]);
 
-    // The walk's rule over a foreign relkind, through a plain scan: a real Foreign Scan is mapped to no instance
-    // (TD-0046).
+    // The walk's rule over a foreign relkind, through a plain scan, as through a Foreign Scan.
     [Fact]
     public void Run_ColumnOfAForeignTable_SaysForeignTableUnlessAJoinExtendsIt() =>
         AnswersOf(Run(LeftJoin("a.id", "b.id", "a.id + 1"), OfForeign, OfForeign, OfForeign))
             .ShouldBe([(null, "foreign-table"), (true, "outer-join"), (null, "foreign-table")]);
 
-    // Under a join that null-extends, an expression is not answered: the text cannot tell one the root computes from
-    // one a node under the join computed.  A column without an origin is never mapped.
+    // Under a join that null-extends, an expression is answered only where the walk finds the node that computes it:
+    // here the scans print no Output, and may compute anything.  A column without an origin is never mapped.
     [Fact]
     public void Run_ColumnWithoutAnOrigin_IsUnknownAndIsNotLookedUp()
     {
@@ -676,5 +675,363 @@ public class NullabilityWalkTests
             .Column;
 
         walked.ShouldBe(columns[0] with { Nullable = false, NullableSource = "catalog" });
+    }
+
+    private static readonly Asked OfB = new(TableB, 1);
+
+    private static readonly Asked OfA = new(TableA, 1);
+
+    // A Subquery Scan aliased "s" over the child plan, with its own Output.
+    private static PlanNode Subquery(PlanNode child, params string[] output) =>
+        Over("Subquery Scan", child, "Subquery") with
+        {
+            Alias = "s",
+            Output = output,
+        };
+
+    // The row-number dedupe: the subquery keeps a LEFT JOIN, which the planner swapped into a Right join with b, the
+    // side it extends, as its outer child.  The scan prints the columns in its own order, and they are found by their
+    // origins.
+    [Fact]
+    public void Run_ColumnThroughASubqueryScan_IsAnsweredByItsOrigin()
+    {
+        var child = Over(
+            "WindowAgg",
+            Join("Right", Scan("b"), Over("Hash", Scan("t"), Inner)) with
+            {
+                Output = ["t.id", "t.opt", "b.id"],
+            }
+        ) with
+        {
+            Output = ["t.id", "t.opt", "b.id", "row_number() OVER w1"],
+        };
+        var plan = Over("Sort", Subquery(child, "s.y", "s.x", "s.z")) with { Output = ["s.x", "s.y", "s.z"] };
+
+        var outcome = Run(plan, NotNull, Optional, OfB);
+
+        AnswersOf(outcome).ShouldBe([(false, "catalog"), (true, "catalog"), (true, "outer-join")]);
+        outcome.Columns.Select(static walked => walked.Mapped).ShouldBe([true, true, true]);
+    }
+
+    // SELECT s.id, s.opt FROM (SELECT t.opt AS id, t.id AS opt FROM t) s: matched by name, the columns would be read
+    // crossed; by their origins they are not.
+    [Fact]
+    public void Run_SubqueryColumnsRenamedToEachOthersNames_AreNotReadCrossed()
+    {
+        var plan = Subquery(Scan("t", "t.opt", "t.id"), "s.id", "s.opt") with { Output = ["s.id", "s.opt"] };
+
+        AnswersOf(Run(plan, Optional, NotNull)).ShouldBe([(true, "catalog"), (false, "catalog")]);
+    }
+
+    // a.id and a2.id are both a column of a: which one the subquery's column is cannot be told, and a2 is extended.
+    [Fact]
+    public void Run_SubqueryColumnThatTwoInstancesOfItsTableMayBe_KeepsTheHeuristic()
+    {
+        var child = Join("Left", Scan("a"), Scan("a2") with { RelationName = "a" }) with { Output = ["a.id", "a2.id"] };
+
+        AnswersOf(Run(Subquery(child, "s.x") with { Output = ["s.x"] }, OfA)).ShouldBe([(true, "heuristic")]);
+    }
+
+    // When every entry the column can be is of an extended instance, the column is the join's.
+    [Fact]
+    public void Run_SubqueryColumnOfAnExtendedInstance_IsTheOuterJoins()
+    {
+        var child = Join("Left", Scan("t"), Scan("b")) with { Output = ["t.id", "b.id", "b.opt"] };
+
+        AnswersOf(Run(Subquery(child, "s.x") with { Output = ["s.x"] }, OfB)).ShouldBe([(true, "outer-join")]);
+    }
+
+    // A scan that a join above it extends extends every column of it.
+    [Fact]
+    public void Run_SubqueryScanThatAJoinExtends_IsTheOuterJoins()
+    {
+        var plan = Join("Left", Scan("a"), Subquery(Scan("t", "t.id"), "s.id")) with { Output = ["a.id", "s.id"] };
+
+        AnswersOf(Run(plan, OfA, NotNull)).ShouldBe([(false, "catalog"), (true, "outer-join")]);
+    }
+
+    public static TheoryData<string> UnresolvableChildren =>
+        [
+            // A LATERAL subquery's Output may name the query above, which is no instance of its plan.
+            Text(Scan("t", "t.id", "u.id")),
+            // A bare name says nothing of which instance.
+            Text(Join("Inner", Scan("t"), Scan("b")) with { Output = ["t.id", "id"] }),
+            // A set operation prints its first branch.
+            Text(Over("Sort", Over("Append", Scan("t"), "Member")) with { Output = ["t.id"] }),
+            // No entry is of the origin's table.
+            Text(Scan("b", "b.id")),
+            // No Output at all.
+            Text(Scan("t")),
+        ];
+
+    [Theory]
+    [MemberData(nameof(UnresolvableChildren))]
+    public void Run_SubqueryColumnThatCannotBeResolved_KeepsTheHeuristic(string child) =>
+        AnswersOf(Run(Subquery(PlanNode.Read(child).ShouldNotBeNull(), "s.x") with { Output = ["s.x"] }, NotNull))
+            .ShouldBe([(true, "heuristic")]);
+
+    // A subquery inside a subquery is resolved in turn.
+    [Fact]
+    public void Run_ColumnThroughNestedSubqueryScans_IsAnsweredByItsOrigin()
+    {
+        var inner = Over(
+            "Subquery Scan",
+            Join("Left", Scan("t"), Scan("b")) with
+            {
+                Output = ["t.id", "b.id"],
+            },
+            "Subquery"
+        ) with
+        {
+            Alias = "s2",
+            Output = ["s2.x", "s2.y"],
+        };
+        var plan = Subquery(Over("Limit", inner) with { Output = ["s2.x", "s2.y"] }, "s.x", "s.y") with
+        {
+            Output = ["s.x", "s.y"],
+        };
+
+        AnswersOf(Run(plan, NotNull, OfB)).ShouldBe([(false, "catalog"), (true, "outer-join")]);
+    }
+
+    // A CTE used twice: one plan, two scans, each with its own path.
+    [Fact]
+    public void Run_ColumnsOfACteScannedTwice_AreAnsweredForEachScan()
+    {
+        var cte = Scan("t", "t.id", "t.opt") with { ParentRelationship = "InitPlan", SubplanName = "CTE recent" };
+        var join = Join(
+            "Left",
+            Scan("r") with
+            {
+                NodeType = "CTE Scan",
+                CteName = "recent",
+                RelationName = null,
+            },
+            Scan("n") with
+            {
+                NodeType = "CTE Scan",
+                CteName = "recent",
+                RelationName = null,
+            }
+        );
+        var plan = Over("Sort", join) with
+        {
+            Plans = [cte, .. Over("Sort", join).Plans],
+            Output = ["r.id", "r.opt", "n.id"],
+        };
+
+        AnswersOf(Run(plan, NotNull, Optional, NotNull))
+            .ShouldBe([(false, "catalog"), (true, "catalog"), (true, "outer-join")]);
+    }
+
+    // The relations scanned here, as "partitions" answers: p_1 and p_2 are partitions of t.
+    private static readonly Dictionary<PostgresRelationName, IReadOnlyList<long>> Partitions = new()
+    {
+        [new PostgresRelationName("public", "t_1")] = [Table.Oid],
+        [new PostgresRelationName("public", "t_2")] = [Table.Oid],
+    };
+
+    private static PlanNode PartitionsOfT() =>
+        Over("Append", Scan("x")) with
+        {
+            Plans =
+            [
+                Scan("p_1", "p_1.id", "p_1.opt") with
+                {
+                    RelationName = "t_1",
+                    ParentRelationship = "Member",
+                },
+                Scan("p_2", "p_2.id", "p_2.opt") with
+                {
+                    RelationName = "t_2",
+                    ParentRelationship = "Member",
+                },
+            ],
+        };
+
+    private static WalkOutcome RunWithPartitions(PlanNode root, params Asked[] asked)
+    {
+        var (columns, origins) = Built(asked);
+        return NullabilityWalk.Run(root, columns, origins, Scope(true) with { Partitions = Partitions });
+    }
+
+    [Fact]
+    public void Run_ColumnOfAPartitionedTable_IsAnsweredByItsSide()
+    {
+        var preserved = Join("Left", PartitionsOfT(), Scan("b")) with { Output = ["p.id", "p.opt", "b.id"] };
+        var extended = Join("Left", Scan("b"), PartitionsOfT()) with { Output = ["p.id", "b.id"] };
+
+        AnswersOf(RunWithPartitions(preserved, NotNull, Optional, OfB))
+            .ShouldBe([(false, "catalog"), (true, "catalog"), (true, "outer-join")]);
+        AnswersOf(RunWithPartitions(extended, NotNull, OfB)).ShouldBe([(true, "outer-join"), (false, "catalog")]);
+    }
+
+    // Without the answer of "partitions" the Append is a set operation, as it always was.
+    [Fact]
+    public void Run_PartitionedTableWithoutPartitions_KeepsTheHeuristic() =>
+        AnswersOf(Run(Join("Left", PartitionsOfT(), Scan("b")) with { Output = ["p.id"] }, NotNull))
+            .ShouldBe([(true, "heuristic")]);
+
+    // A partitioned table is no set operation: its expressions are read, and a reference to it is the table's.
+    [Fact]
+    public void Run_ExpressionOverAPartitionedTable_IsAnswered()
+    {
+        var plan = Over("Aggregate", PartitionsOfT()) with { Output = ["count(*)", "GREATEST(p.opt, p.id)"] };
+
+        AnswersOf(RunWithPartitions(plan, Expression, Expression))
+            .ShouldBe([(false, "expression"), (false, "expression")]);
+    }
+
+    // A foreign table's scan is an instance: unknown when nothing extends it, and the join's when one does.
+    [Fact]
+    public void Run_ColumnOfAForeignScan_IsForeignTableOrTheOuterJoins()
+    {
+        var foreign = Scan("ft") with { NodeType = "Foreign Scan" };
+
+        AnswersOf(Run(Join("Left", foreign, Scan("b")) with { Output = ["ft.id"] }, OfForeign))
+            .ShouldBe([(null, "foreign-table")]);
+        AnswersOf(Run(Join("Left", Scan("b"), foreign) with { Output = ["ft.id"] }, OfForeign))
+            .ShouldBe([(true, "outer-join")]);
+    }
+
+    // A plan of one relation prints bare names at every node, here a Limit over a Sort over the scan.
+    [Fact]
+    public void Run_BareNameAtARootOverOneScan_IsThatRelationsColumn() =>
+        AnswersOf(Run(Over("Limit", Over("Sort", Scan("t"))) with { Output = ["id", "opt"] }, NotNull, Optional))
+            .ShouldBe([(false, "catalog"), (true, "catalog")]);
+
+    // A value the root computes over a join that extends is answered; one a node under the extended side computes,
+    // printed in parentheses at the root and as itself there, is not.
+    [Fact]
+    public void Run_ExpressionTheRootComputesOverAJoinThatExtends_IsAnswered()
+    {
+        var plan = Join(
+            "Right",
+            Scan("b", "b.opt", "b.id", "'x'::text"),
+            Over("Hash", Scan("a", "a.id"), Inner) with
+            {
+                Output = ["a.id"],
+            }
+        ) with
+        {
+            Output =
+            [
+                "('x'::text)",
+                "'k'::text",
+                "COALESCE(b.opt, 'z'::text)",
+                "COALESCE(b.opt, a.id)",
+                "COALESCE(b.opt, b.id)",
+            ],
+        };
+
+        AnswersOf(RunUngated(plan, Expression, Expression, Expression, Expression, Expression))
+            .ShouldBe([
+                (null, "no-origin"),
+                (false, "expression"),
+                (false, "expression"),
+                (false, "expression"),
+                (null, "no-origin"),
+            ]);
+    }
+
+    // The value is followed through every node that prints it, to the node that computes it.
+    [Fact]
+    public void Run_ExpressionPrintedThroughSeveralNodes_IsFollowedToWhereItIsComputed()
+    {
+        var join = Join(
+            "Right",
+            Scan("b", "b.id", "'x'::text"),
+            Over("Hash", Scan("a", "a.id"), Inner) with
+            {
+                Output = ["a.id"],
+            }
+        ) with
+        {
+            Output = ["('x'::text)", "'k'::text"],
+        };
+        var plan = Over("Limit", Over("Sort", join) with { Output = ["('x'::text)", "'k'::text"] }) with
+        {
+            Output = ["('x'::text)", "'k'::text"],
+        };
+
+        AnswersOf(RunUngated(plan, Expression, Expression)).ShouldBe([(null, "no-origin"), (false, "expression")]);
+    }
+
+    // A LEFT JOIN LATERAL count whose Subquery Scan the planner removed: the Aggregate on the extended side computes
+    // it, and the root prints it in parentheses.
+    [Fact]
+    public void Run_CountComputedOnTheExtendedSide_KeepsNoOrigin()
+    {
+        var plan = Join(
+            "Left",
+            Scan("a", "a.id"),
+            Over("Aggregate", Scan("b", "b.id")) with
+            {
+                Output = ["count(*)"],
+            }
+        ) with
+        {
+            Output = ["a.id", "(count(*))"],
+        };
+
+        AnswersOf(RunUngated(plan, OfA, Expression)).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+    }
+
+    // A node that prints no Output may compute any value, so it must be preserved.
+    [Fact]
+    public void Run_ExpressionBesideAChildWithoutOutputThatIsExtended_KeepsNoOrigin() =>
+        AnswersOf(RunUngated(Join("Left", Scan("a", "a.id"), Scan("b")) with { Output = ["'k'::text"] }, Expression))
+            .ShouldBe([(null, "no-origin")]);
+
+    // A constant the root computes over an anti join is never NULL, whatever the anti join returns.
+    [Fact]
+    public void Run_ExpressionTheRootComputesOverAnAntiJoin_IsAnswered() =>
+        AnswersOf(
+                RunAs(
+                    Scope(true),
+                    Join("Anti", Scan("a", "a.id"), Scan("b", "b.id")) with
+                    {
+                        Output = ["'k'::text", "(b.id IS NULL)"],
+                    },
+                    Expression,
+                    Expression
+                )
+            )
+            .ShouldBe([(false, "expression"), (false, "expression")]);
+
+    // The root computes the CASE, but takes ('x'::text) from the anti join's inner side, where a pulled-up constant
+    // is computed and which the anti join returns NULL: every value an expression takes from below is followed too.
+    [Fact]
+    public void Run_ExpressionTheRootComputesFromAValueOfTheExtendedSide_KeepsNoOrigin()
+    {
+        var hash = Over("Hash", Scan("b", "b.user_id", "'x'::text"), Inner) with
+        {
+            Output = ["b.user_id", "('x'::text)"],
+        };
+        var plan = Join("Anti", Scan("a", "a.id"), hash) with
+        {
+            Output = ["CASE WHEN (a.id > 0) THEN ('x'::text) ELSE 'y'::text END", "COALESCE(('x'::text))", "'k'::text"],
+        };
+
+        AnswersOf(RunUngated(plan, Expression, Expression, Expression))
+            .ShouldBe([(null, "no-origin"), (null, "no-origin"), (false, "expression")]);
+    }
+
+    // The join computes the COALESCE from a sum of the side it extends, which it prints in parentheses: the sum may be
+    // NULL, and the constant still proves the COALESCE; a CASE whose one result is the sum proves nothing.
+    [Fact]
+    public void Run_ExpressionWithAConstantBesideAValueOfTheExtendedSide_IsAnsweredByTheConstant()
+    {
+        var aggregate = Over("HashAggregate", Scan("b", "b.id", "b.opt")) with { Output = ["b.id", "sum(b.opt)"] };
+        var plan = Join("Right", aggregate, Over("Hash", Scan("a", "a.id"), Inner) with { Output = ["a.id"] }) with
+        {
+            Output =
+            [
+                "COALESCE((sum(b.opt)), '0'::numeric)",
+                "CASE WHEN (a.id > 0) THEN (sum(b.opt)) ELSE '0'::numeric END",
+            ],
+        };
+
+        AnswersOf(RunUngated(plan, Expression, Expression)).ShouldBe([(false, "expression"), (null, "no-origin")]);
     }
 }

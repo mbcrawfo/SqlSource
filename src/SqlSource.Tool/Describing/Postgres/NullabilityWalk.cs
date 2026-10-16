@@ -51,17 +51,23 @@ internal sealed record WalkOutcome(
 /// The answer of <c>tables</c>, by OID, where the column of a reference inside an expression is looked up.  A
 /// relation it does not hold leaves the reference unproved.
 /// </param>
+/// <param name="Partitions">
+/// The answer of <c>partitions</c>, the ancestors of each relation the members of the plan's <c>Append</c>s scan, or
+/// null when it was not asked: every <c>Append</c> is then read as a set operation.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
     bool CatalogFunctionsFirst,
-    IReadOnlyDictionary<long, PostgresTableRow> Tables
+    IReadOnlyDictionary<long, PostgresTableRow> Tables,
+    IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? Partitions = null
 );
 
 /// <summary>
 /// The third layer of nullability: a column of a gated query is not nullable when its origin is <c>NOT NULL</c>
 /// and the plan proves that no outer join null-extends its relation instance, and a column of no origin is not
-/// nullable when its entry of the plan is an expression that can never be <c>NULL</c> (<see cref="PlanExpression" />).
+/// nullable when its entry of the plan is an expression that can never be <c>NULL</c> (<see cref="PlanExpression" />)
+/// computed where no outer join null-extends it.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -72,17 +78,18 @@ internal sealed record WalkScope(
 /// </para>
 /// <para>
 /// Whatever the walk does not understand keeps the heuristic and is never a wrong <c>false</c>.  An entry that is
-/// no plain reference, or that names what is no relation instance, a <c>Subquery Scan</c> or a <c>CTE Scan</c>,
-/// degrades its column alone; a plan that cannot be used degrades every column.  A reference through a
-/// <c>Subquery Scan</c> is not matched to the subquery's own plan by name: a column renamed to another's name
-/// would be read as the other.
+/// no plain reference, or that names no instance, degrades its column alone; a plan that cannot be used degrades every
+/// column.  A reference through a <c>Subquery Scan</c> or a <c>CTE Scan</c> is resolved in the plan it scans by the
+/// column's origin, and never by its place or its name: the scan prints the subquery's columns in the order the query
+/// above needs them, and a column renamed to another's name would be read as the other.
 /// </para>
 /// <para>
 /// At a root <c>ModifyTable</c> PostgreSQL 18 prints the old and the new row of a <c>RETURNING</c> list as
 /// <c>old.column</c> and <c>new.column</c>, or under the names <c>WITH (OLD AS ..., NEW AS ...)</c> gives them, and
 /// a table of an inner scope, the <c>SELECT</c> of an <c>INSERT</c> or a subquery in <c>FROM</c>, can have the same
 /// alias in the plan.  In a statement that names <c>OLD</c> or <c>NEW</c> a qualified reference there maps only to the
-/// target's own alias, which the server never lets the old or the new row take.
+/// target's own alias, which the server never lets the old or the new row take; so does one at the root of a plan a
+/// scan scans, a data-modifying CTE's.
 /// </para>
 /// </remarks>
 internal static class NullabilityWalk
@@ -102,7 +109,8 @@ internal static class NullabilityWalk
         WalkScope scope
     )
     {
-        var instances = PlanInstances.Find(root);
+        var plans = new Plans(root, scope);
+        var instances = plans.InstancesOf(root);
 
         // PostgreSQL prints the target list first and what a sort or a group added after it, so the entry of a
         // column is the one at its ordinal.  A UNION ALL's Append has no Output at all.
@@ -125,11 +133,9 @@ internal static class NullabilityWalk
             return Unusable(WalkReasons.OutputDiffers, root, instances, columns);
         }
 
-        // The one alias a qualified reference may name at a ModifyTable that may return the old or the new row, or
-        // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
-        var onlyAlias = scope.OldAndNewMayBeNamed && root.NodeType == "ModifyTable" ? root.Alias ?? string.Empty : null;
-
-        var expressions = fits && AnswersExpressions(instances) ? new Expressions(scope, instances, onlyAlias) : null;
+        var onlyAlias = plans.OnlyAliasOf(root);
+        var expressions =
+            fits && !instances.HasSetOperation ? new Expressions(scope, root, instances, onlyAlias) : null;
 
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
@@ -143,7 +149,8 @@ internal static class NullabilityWalk
                         origin,
                         entries[index],
                         instances,
-                        onlyAlias
+                        onlyAlias,
+                        plans
                     ),
                     _ => Kept(columns[index], entries[index]),
                 }
@@ -184,14 +191,6 @@ internal static class NullabilityWalk
 
     private static WalkedColumn Kept(SidecarColumn column, string? entry) => new(column, entry, null, false, false);
 
-    // Whether an entry of the root may be read as an expression the root computes.  A set operation prints its first
-    // branch at the root, and a node under a join that null-extends prints a value it computed by its expression, a
-    // pulled-up constant or a LATERAL count, which is NULL for a row the join did not match.  An anti join may be a
-    // LEFT JOIN ... IS NULL, which returns that side NULL, and a view brings one into a query without a word of the
-    // gate.
-    private static bool AnswersExpressions(PlanInstances instances) =>
-        !instances.HasSetOperation && instances.Nodes.All(static visited => visited.NullExtends == "none");
-
     // A column of no origin: the answer of its entry as an expression, or what it was built with.
     private static WalkedColumn ExpressionOf(SidecarColumn column, string entry, Expressions? expressions) =>
         expressions?.NullableOf(entry) is { } nullable
@@ -211,7 +210,8 @@ internal static class NullabilityWalk
     // Whether every reference the walk can map names the column the row description gives as its origin.  A plan of
     // another statement, which a pooler can give for this one's name (TD-0049), names other columns.  A view's column
     // prints as the column of the table under it, under that column's name, so only a table's origin is compared, and
-    // only by name: a partition prints under its own alias and a child under its parent's columns' names.
+    // only by name: a partition prints under its own alias and a child under its parent's columns' names.  A scan of
+    // another plan prints the subquery's names for its columns, which are no table's.
     private static bool OutputFits(
         IReadOnlyList<string> entries,
         IReadOnlyList<ColumnOrigin?> origins,
@@ -223,7 +223,11 @@ internal static class NullabilityWalk
             if (
                 origins[index] is { Table.Relkind: "r" or "p" } origin
                 && OutputReference.Parse(entries[index]) is { } reference
-                && (reference.Alias is { } alias ? instances.TryFind(alias, out _) : instances.RootNamesAnInstance)
+                && (
+                    reference.Alias is { } alias
+                        ? instances.TryFind(alias, out var instance) && instance.Kind != InstanceKind.Plan
+                        : instances.BareAlias is not null
+                )
                 && !string.Equals(reference.Column, origin.Attribute.Name, StringComparison.Ordinal)
             )
             {
@@ -242,30 +246,42 @@ internal static class NullabilityWalk
         ColumnOrigin origin,
         string entry,
         PlanInstances instances,
-        string? onlyAlias
+        string? onlyAlias,
+        Plans plans
     )
     {
         var reference = OutputReference.Parse(entry);
-        var extended = false;
-        var mapped = reference switch
+        var instance = reference switch
         {
-            null => false,
+            null => null,
             { Alias: { } alias } => (onlyAlias is null || string.Equals(alias, onlyAlias, StringComparison.Ordinal))
-                && instances.TryFind(alias, out extended),
+            && instances.TryFind(alias, out var named)
+                ? named
+                : null,
 
-            // A bare name is a column of the root's own relation, which no join extends: the root has no join under it.
-            _ => instances.RootNamesAnInstance,
+            // A bare name is a column of the plan's one relation, which no join extends.
+            _ => instances.BareAlias is { } bare && instances.TryFind(bare, out var only) ? only : null,
         };
 
-        var (nullable, source) = (mapped, extended) switch
+        var resolved = instance switch
         {
-            (true, true) => (true, SidecarValues.NullableSource.OuterJoin),
+            null => Resolution.Unknown,
+            { NullExtended: true } => Resolution.Extended,
+            { Kind: InstanceKind.Plan, Child: var child } => plans.Resolve(child, origin, 1),
+            _ => Resolution.Preserved,
+        };
+
+        var (nullable, source) = resolved switch
+        {
+            Resolution.Extended => (true, SidecarValues.NullableSource.OuterJoin),
 
             // The catalog's answer: NOT NULL for a table, and unknown with "view" for a view.
-            (true, false) => ColumnNullability.Of(origin, gated: false),
-            _ => ColumnNullability.Of(origin, gated: true),
+            Resolution.Preserved => ColumnNullability.Of(origin, gated: false),
+            Resolution.Unknown or Resolution.NoCandidate => ColumnNullability.Of(origin, gated: true),
+            _ => throw new InvalidOperationException($"Unknown resolution {resolved}."),
         };
 
+        var mapped = resolved is Resolution.Preserved or Resolution.Extended;
         return new WalkedColumn(
             column with
             {
@@ -275,18 +291,135 @@ internal static class NullabilityWalk
             entry,
             reference,
             mapped,
-            mapped && extended
+            resolved == Resolution.Extended
         );
     }
 
     // The entries of a plan read as expressions, with a reference inside one answered as the walk answers a column:
     // through an instance that no join extends, to a column of a relation that "tables" answered, by the catalog's
     // rule.  A bare name is the plan's one relation's, since a plan of several prints every name with its alias, and
-    // at a ModifyTable that may return the old or the new row only the target's alias is a relation.
-    private sealed class Expressions(WalkScope scope, PlanInstances instances, string? onlyAlias)
+    // at a ModifyTable that may return the old or the new row only the target's alias is a relation.  An entry is read
+    // in a plan where no join null-extends a side, or where the walk follows it to the node that computes it and no
+    // join null-extends that node: a node prints a value computed under it in one pair of parentheses, at every node
+    // up to the root.
+    private sealed class Expressions(WalkScope scope, PlanNode root, PlanInstances instances, string? onlyAlias)
     {
+        private const int MaxDepth = 256;
+
+        private readonly bool _nothingExtends = instances.Nodes.All(static visited => visited.NullExtends == "none");
+
         public bool? NullableOf(string entry) =>
-            PlanExpression.NullableOf(entry, scope.CatalogFunctionsFirst, ProvedNotNull);
+            _nothingExtends
+                ? PlanExpression.NullableOf(entry, scope.CatalogFunctionsFirst, ProvedNotNull)
+                : NullableAt(root, entry, 0);
+
+        // What the entry of the node's Output says, read where it is computed: a child that prints the entry, or the
+        // entry without the parentheses that wrap it whole, is where it comes from, and the walk goes on there; and an
+        // entry that no child prints is the node's own, unknown if a join null-extends the node.  A child that prints
+        // no Output, an Append or a Bitmap Index Scan, may compute any value, so it and every node under it must be
+        // preserved.  Where the entry is computed, a value it takes from a child that computed it is in parentheses:
+        // one that is not preserved is read as unknown, so that a pulled-up constant of the side a join extends,
+        // ('x'::text) inside a CASE the root computes, proves nothing, while a COALESCE with a constant still does.
+        private bool? NullableAt(PlanNode node, string entry, int depth)
+        {
+            if (depth > MaxDepth)
+            {
+                return null;
+            }
+
+            var children = node.Plans.Where(static child => child.ParentRelationship is "Outer" or "Inner").ToArray();
+            if (children.Any(OpaqueAndNotPreserved))
+            {
+                return null;
+            }
+
+            bool? answer = null;
+            foreach (var (child, printed) in Printing(children, entry))
+            {
+                var passed = NullableAt(child, printed, depth + 1);
+                if (passed is null)
+                {
+                    return null;
+                }
+
+                answer = answer is null or false ? passed : answer;
+            }
+
+            if (answer is not null)
+            {
+                return answer;
+            }
+
+            return instances.IsExtended(node)
+                ? null
+                : PlanExpression.NullableOf(
+                    entry,
+                    scope.CatalogFunctionsFirst,
+                    ProvedNotNull,
+                    group => Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1))
+                );
+        }
+
+        // Whether the entry of the node's Output is computed where no join null-extends, and so is every value it is
+        // computed from, followed as NullableAt follows it.
+        private bool Preserved(PlanNode node, string entry, int depth)
+        {
+            if (depth > MaxDepth)
+            {
+                return false;
+            }
+
+            var children = node.Plans.Where(static child => child.ParentRelationship is "Outer" or "Inner").ToArray();
+            if (children.Any(OpaqueAndNotPreserved))
+            {
+                return false;
+            }
+
+            var printing = Printing(children, entry).ToArray();
+            if (printing.Length > 0)
+            {
+                return printing.All(found => Preserved(found.Child, found.Printed, depth + 1));
+            }
+
+            return !instances.IsExtended(node)
+                && PlanExpression
+                    .Groups(entry)
+                    .All(group =>
+                        Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1))
+                    );
+        }
+
+        // A child that prints no Output, and is extended or has a join under it that extends.
+        private bool OpaqueAndNotPreserved(PlanNode child) =>
+            child.Output is null && (instances.IsExtended(child) || PlanInstances.ExtendsUnder(child));
+
+        // Each child that prints the value, and how: as it is, wrapped whole in parentheses, or without the
+        // parentheses that wrap it whole.
+        private static IEnumerable<(PlanNode Child, string Printed)> Printing(PlanNode[] children, string value)
+        {
+            var inner = PlanExpression.Unwrapped(value);
+            var wrapped = "(" + value + ")";
+            foreach (var child in children)
+            {
+                if (child.Output is not { } output)
+                {
+                    continue;
+                }
+
+                if (output.Contains(value, StringComparer.Ordinal))
+                {
+                    yield return (child, value);
+                }
+                else if (output.Contains(wrapped, StringComparer.Ordinal))
+                {
+                    yield return (child, wrapped);
+                }
+                else if (inner is not null && output.Contains(inner, StringComparer.Ordinal))
+                {
+                    yield return (child, inner);
+                }
+            }
+        }
 
         private bool ProvedNotNull(OutputReference reference)
         {
@@ -294,24 +427,165 @@ internal static class NullabilityWalk
             if (
                 alias is null
                 || (onlyAlias is not null && !string.Equals(alias, onlyAlias, StringComparison.Ordinal))
-                || !instances.TryFind(alias, out var extended)
-                || extended
-                || !instances.TryFindRelation(alias, out var schema, out var name)
+                || !instances.TryFind(alias, out var instance)
+                || instance.NullExtended
+                || TableOf(instance) is not { } table
             )
             {
                 return false;
             }
 
-            var table = scope.Tables.Values.FirstOrDefault(row =>
-                string.Equals(row.Schema, schema, StringComparison.Ordinal)
-                && string.Equals(row.Name, name, StringComparison.Ordinal)
-            );
-            var attribute = table?.Columns.FirstOrDefault(column =>
+            var attribute = table.Columns.FirstOrDefault(column =>
                 string.Equals(column.Name, reference.Column, StringComparison.Ordinal)
             );
-            return table is not null
-                && attribute is not null
+            return attribute is not null
                 && ColumnNullability.Of(new ColumnOrigin(table, attribute), gated: false).Nullable == false;
+        }
+
+        // The table "tables" answered of an instance: a relation's by its schema and its name, and a partitioned
+        // table's by the nearest of the tables its partitions are partitions of, whose NOT NULL every partition keeps.
+        // A scan of another plan has none.
+        private PostgresTableRow? TableOf(PlanInstance instance) =>
+            instance.Kind switch
+            {
+                InstanceKind.Relation => scope.Tables.Values.FirstOrDefault(row =>
+                    string.Equals(row.Schema, instance.Schema, StringComparison.Ordinal)
+                    && string.Equals(row.Name, instance.Relation, StringComparison.Ordinal)
+                ),
+                InstanceKind.Partitioned => instance
+                    .Parents.Select(oid => scope.Tables.GetValueOrDefault(oid))
+                    .FirstOrDefault(static row => row is not null),
+                InstanceKind.Plan => null,
+                _ => throw new InvalidOperationException($"Unknown kind {instance.Kind}."),
+            };
+    }
+
+    // What a reference through a scan of another plan resolves to.
+    private enum Resolution
+    {
+        // Nothing can be said: the column keeps the heuristic.
+        Unknown,
+
+        // The plan has no entry the column can be.
+        NoCandidate,
+
+        // Every entry the column can be is of an instance that no join extends.
+        Preserved,
+
+        // Every entry the column can be is of an instance that a join extends.
+        Extended,
+    }
+
+    // The plans of a walk: the root's, and the plan of each scan of another plan, each walked as a plan of its own.
+    // A column through a scan is resolved by its origin and never by its place or its name: a Subquery Scan prints the
+    // subquery's columns in the order the query above needs them, and the plan prints no name of the subquery's
+    // columns.  A column with an origin is a plain reference to that column in the subquery, so its entry of the
+    // child plan's Output is among the references to a relation instance of the origin's table and column; when
+    // every such reference agrees, the column is what they are.
+    private sealed class Plans(PlanNode tree, WalkScope scope)
+    {
+        private const int MaxDepth = 16;
+
+        private static readonly IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> NoPartitions =
+            new Dictionary<PostgresRelationName, IReadOnlyList<long>>();
+
+        private readonly Dictionary<PlanNode, PlanInstances> _instances = [with(ReferenceEqualityComparer.Instance)];
+
+        public PlanInstances InstancesOf(PlanNode root)
+        {
+            if (!_instances.TryGetValue(root, out var found))
+            {
+                found = PlanInstances.Find(root, tree, scope.Partitions ?? NoPartitions);
+                _instances[root] = found;
+            }
+
+            return found;
+        }
+
+        // The one alias a qualified reference may name at a ModifyTable that may return the old or the new row, or
+        // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
+        public string? OnlyAliasOf(PlanNode root) =>
+            scope.OldAndNewMayBeNamed && root.NodeType == "ModifyTable" ? root.Alias ?? string.Empty : null;
+
+        // The column of the origin in the plan of the child, as the entries of its root's Output that it can be say.
+        public Resolution Resolve(PlanNode? child, ColumnOrigin origin, int depth)
+        {
+            if (child is null || depth > MaxDepth || child.Output is not { } entries)
+            {
+                return Resolution.Unknown;
+            }
+
+            var instances = InstancesOf(child);
+            if (instances.Reason is not null || instances.HasSetOperation)
+            {
+                return Resolution.Unknown;
+            }
+
+            var onlyAlias = OnlyAliasOf(child);
+            var found = Resolution.NoCandidate;
+            foreach (var entry in entries)
+            {
+                // An expression is never the column, which is a plain reference.  A bare name, or an alias that is no
+                // instance of this plan, a LATERAL reference to the query above for one, may be: nothing can be said.
+                if (OutputReference.Parse(entry) is not { } reference)
+                {
+                    continue;
+                }
+
+                if (
+                    reference.Alias is not { } alias
+                    || (onlyAlias is not null && !string.Equals(alias, onlyAlias, StringComparison.Ordinal))
+                    || !instances.TryFind(alias, out var instance)
+                )
+                {
+                    return Resolution.Unknown;
+                }
+
+                found = Combine(found, Candidate(instance, reference, origin, depth));
+                if (found == Resolution.Unknown)
+                {
+                    return found;
+                }
+            }
+
+            return found;
+        }
+
+        private static Resolution Combine(Resolution found, Resolution next) =>
+            (found, next) switch
+            {
+                (Resolution.NoCandidate, _) => next,
+                (_, Resolution.NoCandidate) => found,
+                _ when found == next => found,
+                _ => Resolution.Unknown,
+            };
+
+        // What one reference of the child's Output says of the column.  A scan of a plan inside is resolved in turn,
+        // for every one of its references, since which of its columns this one is cannot be told either.
+        private Resolution Candidate(PlanInstance instance, OutputReference reference, ColumnOrigin origin, int depth)
+        {
+            var named = instance.Kind switch
+            {
+                InstanceKind.Relation => string.Equals(instance.Schema, origin.Table.Schema, StringComparison.Ordinal)
+                    && string.Equals(instance.Relation, origin.Table.Name, StringComparison.Ordinal),
+                InstanceKind.Partitioned => instance.Parents.Contains(origin.Table.Oid),
+                InstanceKind.Plan => true,
+                _ => throw new InvalidOperationException($"Unknown kind {instance.Kind}."),
+            };
+            if (
+                !named
+                || (
+                    instance.Kind != InstanceKind.Plan
+                    && !string.Equals(reference.Column, origin.Attribute.Name, StringComparison.Ordinal)
+                )
+            )
+            {
+                return Resolution.NoCandidate;
+            }
+
+            var resolved =
+                instance.Kind == InstanceKind.Plan ? Resolve(instance.Child, origin, depth + 1) : Resolution.Preserved;
+            return resolved == Resolution.Preserved && instance.NullExtended ? Resolution.Extended : resolved;
         }
     }
 }

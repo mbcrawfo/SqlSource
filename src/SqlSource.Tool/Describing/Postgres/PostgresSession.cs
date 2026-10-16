@@ -385,19 +385,48 @@ internal sealed class PostgresSession : IDescribeSession
             );
         }
 
-        var outcome = answer switch
+        WalkOutcome outcome;
+        if (answer.Error is not null)
         {
-            { Error: not null } => NullabilityWalk.Unavailable(WalkReasons.ExplainFailed, columns),
-            { Plan: { } text } when PlanNode.Read(text) is { } root => NullabilityWalk.Run(
-                root,
-                columns,
-                origins,
-                scope
-            ),
-            _ => NullabilityWalk.Unavailable(WalkReasons.Unreadable, columns),
-        };
+            outcome = NullabilityWalk.Unavailable(WalkReasons.ExplainFailed, columns);
+        }
+        else if (answer.Plan is { } text && PlanNode.Read(text) is { } root)
+        {
+            var partitions = await PartitionsOfAsync(request, root, cancellationToken);
+            outcome = NullabilityWalk.Run(root, columns, origins, scope with { Partitions = partitions });
+        }
+        else
+        {
+            outcome = NullabilityWalk.Unavailable(WalkReasons.Unreadable, columns);
+        }
+
         PostgresEvents.Walk(_log, request.Name, outcome);
         return Outcome<WalkOutcome, DescribeFailure>.Of(outcome);
+    }
+
+    // The ancestors of each relation the members of the plan's Appends scan, for the walk to tell a partitioned table
+    // from a set operation, or null when the plan has no Append of that shape and nothing is asked.  An error is
+    // logged and never reported: every Append is then read as a set operation, as it was before the call.
+    private async Task<IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>?> PartitionsOfAsync(
+        DescribeRequest request,
+        PlanNode root,
+        CancellationToken cancellationToken
+    )
+    {
+        var members = PlanPartitions.MembersOf(root);
+        if (members.Count == 0)
+        {
+            return null;
+        }
+
+        var asked = new PostgresPartitionsRequest(members);
+        var started = _time.GetTimestamp();
+        var answer = await _exchange.AskAsync("partitions", asked, _live.PartitionsAsync, cancellationToken);
+        PostgresEvents.Partitions(_log, request.Name, asked, answer, ElapsedSince(started));
+        return (answer.Rows ?? []).ToDictionary(
+            static row => new PostgresRelationName(row.Schema, row.Name),
+            static row => row.Ancestors
+        );
     }
 
     // A statement without rows has no match, and no event of one.

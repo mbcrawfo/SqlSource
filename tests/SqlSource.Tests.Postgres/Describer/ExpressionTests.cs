@@ -137,21 +137,22 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     }
 
     // A NOT EXISTS plans as an anti join too, which the text cannot tell from the view's.
+    // The root computes the constant over the anti join, which no join above it extends.
     [Fact]
-    public async Task Describe_ExpressionBesideNotExists_StaysUnknown() =>
+    public async Task Describe_ExpressionBesideNotExists_IsAnswered() =>
         (
             await AnswersAsync(
                 "SELECT u.id, 'k' AS k FROM users u WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)"
             )
-        ).ShouldBe([(false, "catalog"), Unknown]);
+        ).ShouldBe([(false, "catalog"), NotNull]);
 
-    // A partitioned table plans as an Append, which the text cannot tell from a UNION's.
+    // A partitioned table plans as an Append, which "partitions" tells from a UNION's.
     [Fact]
-    public async Task Describe_PartitionedTableAggregate_StaysUnknown()
+    public async Task Describe_PartitionedTableAggregate_IsAnswered()
     {
         await RunAsync(Partitioned);
 
-        (await AnswersAsync("SELECT count(*) AS n FROM walk_parts")).ShouldBe([Unknown]);
+        (await AnswersAsync("SELECT count(*) AS n FROM walk_parts")).ShouldBe([NotNull]);
     }
 
     // A count the path finds before pg_catalog's may be another schema's, which can return NULL.

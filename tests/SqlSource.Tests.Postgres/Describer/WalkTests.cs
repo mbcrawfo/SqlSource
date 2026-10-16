@@ -238,10 +238,10 @@ public sealed class WalkTests(PostgresContainer postgres)
         columns[1].ShouldBe((false, "catalog"));
     }
 
-    // A partitioned table scans as an Append of its partitions, whose aliases are not the table's: its columns
-    // keep the heuristic and are never false.
+    // A partitioned table scans as an Append of its partitions, whose aliases are the table's and a number: the walk
+    // reads it as the table, by the partitions' ancestors.
     [Fact]
-    public async Task Describe_PartitionedTable_KeepsTheHeuristic()
+    public async Task Describe_PartitionedTable_IsAnsweredByItsSide()
     {
         await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
         await using (var create = source.CreateCommand(Partitioned))
@@ -250,7 +250,7 @@ public sealed class WalkTests(PostgresContainer postgres)
         }
 
         (await WalkedAsync("SELECT p.id, u.name FROM walk_parts p LEFT JOIN users u ON u.id = p.id")).ShouldBe([
-            (true, "heuristic"),
+            (false, "catalog"),
             (true, "outer-join"),
         ]);
     }

@@ -3,9 +3,9 @@ plan: walked
 table-match: no-origin
 parameter @filter: jsonb (inferred)
 parameter @key: text (inferred)
-column 0 id: bigint | nullable true | heuristic | public.events.id
-column 1 at: timestamp with time zone | nullable true | heuristic | public.events.at
-column 2 kind: text | nullable true | heuristic | public.events.kind
+column 0 id: bigint | nullable false | catalog | public.events.id
+column 1 at: timestamp with time zone | nullable false | catalog | public.events.at
+column 2 kind: text | nullable false | catalog | public.events.kind
 column 3 account_name: character varying(100) | nullable true | outer-join | public.accounts.name
 column 4 device: text | nullable null | no-origin | -
 column 5 item_count: integer | nullable null | no-origin | -
