@@ -17,16 +17,16 @@ This page has two parts: [the workflow](#install-the-tool), from installing the 
 
 ## Install the tool
 
-Install it as a local tool of your repository, from the folder at its root:
+Install it as a local tool of your repository, from the folder at its root.  Until the first release the package is a preview, so the command includes `--prerelease`:
 
 ```console
 $ dotnet new tool-manifest
-$ dotnet tool install SqlSource.Tool
+$ dotnet tool install SqlSource.Tool --prerelease
 ```
 
 The first command creates the tool manifest, a `dotnet-tools.json` file, which records the tool and its version.  Commit that file.  Anyone who clones the repository, and a build server, then gets the same version with `dotnet tool restore`.  To run the tool, give it a connection to your database: see [connections](#connections).
 
-Keep the tool at the version of the `SqlSource` package your projects use: the two are released together under one version number.  When you update the package, update the tool with `dotnet tool update SqlSource.Tool`.  A package and a tool of different versions can stop the tool from reading your project ([SQLSRC206](diagnostics.md#sqlsrc206)).  What else the tool needs is under [requirements](#requirements).
+Keep the tool at the version of the `SqlSource` package your projects use: the two are released together under one version number.  When you update the package, update the tool with `dotnet tool update SqlSource.Tool --prerelease`.  A package and a tool of different versions can stop the tool from reading your project ([SQLSRC206](diagnostics.md#sqlsrc206)).  What else the tool needs is under [requirements](#requirements).
 
 <a id="which-queries"></a>
 

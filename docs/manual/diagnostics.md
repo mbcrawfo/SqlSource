@@ -706,7 +706,7 @@ $ dotnet sqlsource describe src/Tools/Tools.csproj
     help: add the SqlSource package to the project
 ```
 
-Add the package with `dotnet add package SqlSource` and restore, or run the command on the project that has the queries.  A project with several target frameworks is read by the first of them: one that references SqlSource for a later framework alone is this error.
+Add the package with `dotnet add package SqlSource --prerelease` and restore, or run the command on the project that has the queries.  A project with several target frameworks is read by the first of them: one that references SqlSource for a later framework alone is this error.
 
 See: [Arguments](tool.md#arguments)
 
@@ -738,7 +738,7 @@ $ dotnet sqlsource describe
 /work/App/App.csproj : error SQLSRC206: The project manifest of '/work/App/App.csproj' cannot be read: it has version '2' of the format and this tool reads version 1.  The SqlSource package and the sqlsource tool are out of step: update the older one
 ```
 
-The SqlSource package of the project and the `sqlsource` tool are of different versions.  Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool`.  The two are released together under one version number.
+The SqlSource package of the project and the `sqlsource` tool are of different versions.  Update the older of the two: the package in the project file, or the tool with `dotnet tool update SqlSource.Tool --prerelease`.  The two are released together under one version number.
 
 Any other reason, one that names a line for one, means that the target wrote a file the tool does not expect of its own version.  That is a bug in SqlSource: [report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
@@ -897,7 +897,7 @@ The query must be described, its dialect is one whose databases can be asked, an
 /work/App/Queries/Users.sql(1,10): error SQLSRC216: This version of sqlsource cannot describe 'mssql'
 ```
 
-Update the tool, with `dotnet tool update SqlSource.Tool`, to a version that describes the dialect; this version describes `postgres` alone.  Until then, set the output of the queries to `sql`, with `SqlSourceOutput` or an `-- output: sql` marker, to use their constants and methods without types.  The error is reported at each query that the run would have described, and each counts as failed.
+Update the tool, with `dotnet tool update SqlSource.Tool --prerelease`, to a version that describes the dialect; this version describes `postgres` alone.  Until then, set the output of the queries to `sql`, with `SqlSourceOutput` or an `-- output: sql` marker, to use their constants and methods without types.  The error is reported at each query that the run would have described, and each counts as failed.
 
 See: [SQL Server](sqlserver.md)
 
@@ -988,7 +988,7 @@ A sidecar, the `.sql.json` file beside a `.sql` file, says which version of the 
     help: update the SqlSource.Tool package
 ```
 
-Update the tool, with `dotnet tool update SqlSource.Tool`, to the version of the SqlSource package the project uses.  The file is left as it is, and every query of its `.sql` file that the run was asked to describe counts as failed.  A sidecar of a lower format version, of another version of the tool, or one that cannot be read, a merge conflict for one, is no error: the tool describes its queries and writes it again.  A run that may delete a sidecar, because a file needs no entry any more, does not delete one of a higher format version either.
+Update the tool, with `dotnet tool update SqlSource.Tool --prerelease`, to the version of the SqlSource package the project uses.  The file is left as it is, and every query of its `.sql` file that the run was asked to describe counts as failed.  A sidecar of a lower format version, of another version of the tool, or one that cannot be read, a merge conflict for one, is no error: the tool describes its queries and writes it again.  A run that may delete a sidecar, because a file needs no entry any more, does not delete one of a higher format version either.
 
 ## SQLSRC222
 

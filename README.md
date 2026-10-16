@@ -1,6 +1,6 @@
 # SqlSource
 
-[![CI](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml?query=branch%3Amain) [![NuGet](https://img.shields.io/nuget/v/SqlSource.svg)](https://www.nuget.org/packages/SqlSource/)
+[![CI](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml?query=branch%3Amain) [![NuGet](https://img.shields.io/nuget/vpre/SqlSource.svg)](https://www.nuget.org/packages/SqlSource/)
 
 SqlSource keeps the SQL of a C# project in `.sql` files, out of your code files, and generates the C# that uses it.  Each query in a `.sql` file becomes a constant that holds its SQL, and SqlSource is growing to generate, from the same file, a typed model for each query's parameters and rows and a method that runs the query.
 
@@ -81,12 +81,14 @@ Databases disagree about where a comment or a string ends, and SqlSource takes t
 
 ### 4. Use the queries
 
-Fill in the type from step 2:
+The constants are plain strings, so any library can run them: Dapper here (`dotnet add package Dapper`), or your own ADO.NET code.  Fill in the type from step 2, and write the row type yourself until models arrive:
 
 ```csharp
 using System.Data.Common;
 using Dapper;
 using SqlSource;
+
+public sealed record User(int Id, string Name, string Email);
 
 [SqlSourceGenerate]
 public partial class UserRepository(DbConnection connection)
@@ -98,8 +100,6 @@ public partial class UserRepository(DbConnection connection)
         connection.QueryAsync<User>(Sql.FindUsers, new { name });
 }
 ```
-
-The constants are plain strings, so any library can run them: Dapper here, which is a package of its own, or your own ADO.NET code.  Hover over `Sql.GetUser` to see its summary and its SQL.
 
 > **Coming in a later release.**  SqlSource will generate the `User` type from the query's columns and a method that runs each query, so that `Get` and `Find` are written for you.  See [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
 
@@ -159,11 +159,7 @@ The setting is accepted today: `<SqlSourceModelNamespace>App.Models</SqlSourceMo
 
 ### My project uses several databases
 
-Name the database of each file with a `-- database: billing` line at its top, and give the tool a connection for each name.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).
-
-### Some of my files are for another database
-
-Give their folder its own dialect with item metadata in the project file, or one file with a `-- dialect:` line at its top.  See [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#folder-with-another-dialect).
+For several databases of one kind, name the database of each file with a `-- database: billing` line at its top, and give the tool a connection for each name: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).  For files written for another kind of database, give their folder its own dialect with item metadata in the project file, or one file a `-- dialect:` line at its top: see [the recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#folder-with-another-dialect).
 
 ### How do I keep migration scripts out?
 
