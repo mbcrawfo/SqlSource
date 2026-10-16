@@ -13,15 +13,6 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class ScanTests(PostgresContainer postgres)
 {
-    // A partitioned table of these tests alone, made by SQL that can be run again, and left: the container is thrown
-    // away.
-    private const string Partitioned = """
-        CREATE TABLE IF NOT EXISTS scan_parts (id integer NOT NULL, kind integer NOT NULL, note text)
-            PARTITION BY LIST (kind);
-        CREATE TABLE IF NOT EXISTS scan_parts_1 PARTITION OF scan_parts FOR VALUES IN (1);
-        CREATE TABLE IF NOT EXISTS scan_parts_2 PARTITION OF scan_parts FOR VALUES IN (2);
-        """;
-
     private static readonly (bool?, string?) Catalog = (false, "catalog");
 
     private static readonly (bool?, string?) Nullable = (true, "catalog");
@@ -108,15 +99,17 @@ public sealed class ScanTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_PartitionedTableOnEachSideOfALeftJoin_IsAnsweredByItsSide()
     {
-        await RunAsync(Partitioned);
+        await RunAsync(ScratchSchema.Partitioned);
 
         (
             await WalkedAsync(
-                "SELECT p.id, p.note, u.name FROM scan_parts p LEFT JOIN users u ON u.id = p.id WHERE p.kind = @kind"
+                "SELECT p.id, p.note, u.name FROM scratch_parts p LEFT JOIN users u ON u.id = p.id WHERE p.kind = @kind"
             )
         ).ShouldBe([Catalog, Nullable, OuterJoin]);
         (
-            await WalkedAsync("SELECT u.id, p.id FROM users u LEFT JOIN scan_parts p ON p.id = u.id AND p.kind = @kind")
+            await WalkedAsync(
+                "SELECT u.id, p.id FROM users u LEFT JOIN scratch_parts p ON p.id = u.id AND p.kind = @kind"
+            )
         ).ShouldBe([Catalog, OuterJoin]);
     }
 
@@ -124,9 +117,9 @@ public sealed class ScanTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_AggregateOverAPartitionedTable_IsAnswered()
     {
-        await RunAsync(Partitioned);
+        await RunAsync(ScratchSchema.Partitioned);
 
-        (await WalkedAsync("SELECT count(*) AS n, 'p' AS k FROM scan_parts p WHERE p.kind = @kind")).ShouldBe([
+        (await WalkedAsync("SELECT count(*) AS n, 'p' AS k FROM scratch_parts p WHERE p.kind = @kind")).ShouldBe([
             Expression,
             Expression,
         ]);
@@ -136,15 +129,16 @@ public sealed class ScanTests(PostgresContainer postgres)
     // first branch: NULL in the second branch, the column stays unknown, whatever the plan.
     [Theory]
     [InlineData(
-        "SELECT y.v FROM (SELECT x.kind AS v FROM scan_parts_1 x UNION ALL SELECT NULL::integer FROM scan_parts_2 x) y"
+        "SELECT y.v FROM (SELECT x.kind AS v FROM scratch_parts_1 x "
+            + "UNION ALL SELECT NULL::integer FROM scratch_parts_2 x) y"
     )]
     [InlineData(
-        "SELECT greatest(y.v, y.w) FROM (SELECT x.kind AS v, x.id AS w FROM scan_parts_1 x "
-            + "UNION ALL SELECT NULL::integer, NULL::integer FROM scan_parts_2 x) y"
+        "SELECT greatest(y.v, y.w) FROM (SELECT x.kind AS v, x.id AS w FROM scratch_parts_1 x "
+            + "UNION ALL SELECT NULL::integer, NULL::integer FROM scratch_parts_2 x) y"
     )]
     public async Task Describe_UnionAllOfTwoPartitionsWithOtherBranches_StaysUnknown(string sql)
     {
-        await RunAsync(Partitioned);
+        await RunAsync(ScratchSchema.Partitioned);
 
         (await DescribedAsync(sql)).Answers.ShouldBe([Unknown]);
     }

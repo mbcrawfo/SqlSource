@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Text.Json;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using Xunit;
 
@@ -42,15 +43,13 @@ public class CaptureJsonTests
         + "  ]\n"
         + "}\n";
 
-    private const string Awkward = "SELECT '<é>' AS \"a\"\r\nFROM t";
-
     private static readonly string[] Unknown = ["unknown"];
 
     private static readonly int[] Int4 = [23];
 
     private static DescribeCapture TwoCalls()
     {
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         capture.Add(
             new CaptureCall(
                 "open",
@@ -70,11 +69,11 @@ public class CaptureJsonTests
 
     private static DescribeCapture WithAwkwardText()
     {
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         capture.Add(
             new CaptureCall(
                 "prepare",
-                CaptureJson.ToElement(new { Sql = Awkward }),
+                CaptureJson.ToElement(new { Sql = CaptureInputs.AwkwardSql }),
                 CaptureJson.ToElement(new { Error = (string?)null })
             )
         );
@@ -178,7 +177,7 @@ public class CaptureJsonTests
     [Fact]
     public void KeyOf_ElementReadFromAnIndentedFile_IsTheKeyOfTheRequestItWasWrittenFrom()
     {
-        var request = new { Sql = Awkward, Types = new[] { "unknown", "int4" } };
+        var request = new { Sql = CaptureInputs.AwkwardSql, Types = new[] { "unknown", "int4" } };
 
         var read = CaptureJson.Read(CaptureJson.Write(WithRequest(request))).Value.ShouldNotBeNull();
 
@@ -234,7 +233,7 @@ public class CaptureJsonTests
 
     private static DescribeCapture WithRequest<T>(T request)
     {
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         capture.Add(new CaptureCall("prepare", CaptureJson.ToElement(request), CaptureJson.ToElement(new { })));
         return capture;
     }
@@ -248,6 +247,6 @@ public class CaptureJsonTests
         text.ShouldContain("\"sql\": \"SELECT '<é>' AS \\\"a\\\"\\r\\nFROM t\"");
         text.ShouldNotContain("\r");
         var read = CaptureJson.Read(text).Value.ShouldNotBeNull();
-        read.Calls[0].Request.GetProperty("sql").GetString().ShouldBe(Awkward);
+        read.Calls[0].Request.GetProperty("sql").GetString().ShouldBe(CaptureInputs.AwkwardSql);
     }
 }

@@ -1,12 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -19,7 +22,7 @@ internal sealed class PostgresScript
     public const string Database = "app";
 
     // No connection string: under a replay nothing reads it.
-    public const string Connection = "replay";
+    public const string Connection = FixtureReplay.Connection;
 
     private readonly DescribeCapture _capture = new(SidecarValues.Engine.Postgres);
 
@@ -46,6 +49,98 @@ internal sealed class PostgresScript
     }
 
     public PostgresScript Open() => Answer("open", PostgresOpenRequest.Instance, Opened);
+
+    // The name the session gives the statement of its describe of that number in the session.
+    public static string Statement(int number) => $"sqlsource_{number}";
+
+    // What "deallocate" answers for a statement that was freed.
+    public static PostgresDeallocateAnswer Freed { get; } = new(null);
+
+    // What "explain" answers for a statement whose column of no origin makes the describe ask for the plan, in a
+    // test of something else: the server gives none, and every column keeps what it was built with.
+    public static PostgresExplainAnswer NoPlan { get; } =
+        new(null, new PostgresServerError("XX000", "no plan in this test", null, null, null));
+
+    public static PostgresExplainAnswer PlanOf(PlanNode root) => new(PostgresPlans.Text(root), null);
+
+    // What "check" answers when it sees the columns the test gives, each with the type "columns" answered: the two
+    // describes agree.
+    public static PostgresCheckAnswer Agreeing(params PostgresColumnRow[] columns) =>
+        new(
+            [.. columns.Select(static column => new PostgresCheckColumn(column.Name, column.TypeOid, "a type"))],
+            null,
+            null
+        );
+
+    // "prepare" alone: for a describe that ends there, and for one whose columns the test writes.
+    public PostgresScript Prepares(int number, string sql, string[] types, PostgresPrepareAnswer answer) =>
+        Answer("prepare", new PostgresPrepareRequest(Statement(number), sql, types), answer);
+
+    // "prepare", and "columns" answering no column when the statement was prepared with a type for each parameter
+    // of the list: most of the tests that use it are about the parameters.
+    public PostgresScript PreparesWithNoColumns(int number, string sql, string[] types, PostgresPrepareAnswer answer)
+    {
+        _ = Prepares(number, sql, types, answer);
+        return answer.ParameterTypes is { } resolved && resolved.Count >= types.Length
+            ? Columns(number, types.Length)
+            : this;
+    }
+
+    public PostgresScript Columns(int number, int parameters, params PostgresColumnRow[] columns) =>
+        Answer(
+            "columns",
+            new PostgresColumnsRequest(Statement(number), parameters),
+            new PostgresColumnsAnswer(columns, null)
+        );
+
+    public PostgresScript Frees(int number, PostgresDeallocateAnswer? answer = null) =>
+        Answer("deallocate", new PostgresDeallocateRequest(Statement(number)), answer ?? Freed);
+
+    // "check" answering the columns the test gives: see Agreeing.
+    public PostgresScript Checks(
+        string sql,
+        (string Name, string Type)[] parameters,
+        params PostgresColumnRow[] columns
+    ) =>
+        Answer(
+            "check",
+            new PostgresCheckRequest(
+                sql,
+                [.. parameters.Select(static parameter => new PostgresCheckParameter(parameter.Name, parameter.Type))]
+            ),
+            Agreeing(columns)
+        );
+
+    // "explain" for the statement, with no setting, answering what the test gives.
+    public PostgresScript Explains(int number, int parameters, PostgresExplainAnswer answer) =>
+        Answer("explain", new PostgresExplainRequest(Statement(number), parameters, []), answer);
+
+    // "explain" answering NoPlan.
+    public PostgresScript PlansNothing(int number, int parameters) => Explains(number, parameters, NoPlan);
+
+    public PostgresScript Resolves(long[] oids, params PostgresTypeRow[] rows) =>
+        Answer("types", new PostgresTypesRequest(oids), new PostgresTypesAnswer(rows, null));
+
+    public PostgresScript Tables(long[] oids, params PostgresTableRow[] tables) =>
+        Answer("tables", new PostgresTablesRequest(oids), new PostgresTablesAnswer(tables, null));
+
+    // "spellings" answering the server's text for each pair the test gives, in the order it gives them.
+    public PostgresScript Spells(params (long Oid, int Modifier, string FormatType)[] rows) =>
+        Answer(
+            "spellings",
+            new PostgresSpellingsRequest([.. rows.Select(static row => new PostgresTypmodPair(row.Oid, row.Modifier))]),
+            new PostgresSpellingsAnswer(
+                [.. rows.Select(static row => new PostgresSpellingRow(row.Oid, row.Modifier, row.FormatType))],
+                null
+            )
+        );
+
+    public PostgresScript Partitions(PostgresPartitionsRequest request, PostgresPartitionsAnswer answer) =>
+        Answer("partitions", request, answer);
+
+    // "relations" answers tables, as "tables" does.
+    public PostgresScript Relations(PostgresRelationsRequest request, PostgresTablesAnswer answer) =>
+        Answer("relations", request, answer);
 
     // Made when the script is whole.
     public ReplayingExchange Play() => new(_capture);

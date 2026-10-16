@@ -14,7 +14,7 @@ public class ColumnOriginTests
     public void Find_ColumnOfATable_IsItsTableAndItsAttribute()
     {
         var origin = ColumnOrigin
-            .Find(PostgresTables.ColumnOf(0, "mail", 1043, Users, 3), PostgresTables.Of(Users))
+            .Find(PostgresTables.ColumnOf(0, "mail", PostgresRows.Varchar.Oid, Users, 3), PostgresTables.Of(Users))
             .ShouldNotBeNull();
 
         origin.Table.ShouldBeSameAs(Users);
@@ -24,7 +24,7 @@ public class ColumnOriginTests
     [Fact]
     public void Find_ColumnOfNoTable_IsNoOrigin() =>
         ColumnOrigin
-            .Find(new PostgresColumnRow(0, "n", 20, 0, 0, null, null, null), PostgresTables.Of(Users))
+            .Find(PostgresTables.ExpressionOf(0, "n", PostgresRows.Int8.Oid), PostgresTables.Of(Users))
             .ShouldBeNull();
 
     // ctid and xmin report their table and an attribute number below zero.  Zero is no column either.  The table
@@ -46,7 +46,10 @@ public class ColumnOriginTests
     public void Find_TableTheAnswerLacks_ThrowsNamingTheColumn() =>
         Should
             .Throw<InvalidOperationException>(() =>
-                ColumnOrigin.Find(PostgresTables.ColumnOf(0, "mail", 1043, Users, 3), PostgresTables.Of())
+                ColumnOrigin.Find(
+                    PostgresTables.ColumnOf(0, "mail", PostgresRows.Varchar.Oid, Users, 3),
+                    PostgresTables.Of()
+                )
             )
             .Message.ShouldContain("'mail'");
 
@@ -54,7 +57,10 @@ public class ColumnOriginTests
     public void Find_AttributeTheAnswerLacks_ThrowsNamingTheTable() =>
         Should
             .Throw<InvalidOperationException>(() =>
-                ColumnOrigin.Find(PostgresTables.ColumnOf(0, "x", 23, Users, 42), PostgresTables.Of(Users))
+                ColumnOrigin.Find(
+                    PostgresTables.ColumnOf(0, "x", PostgresRows.Int4.Oid, Users, 42),
+                    PostgresTables.Of(Users)
+                )
             )
             .Message.ShouldContain("'users'");
 
@@ -62,13 +68,16 @@ public class ColumnOriginTests
     [Fact]
     public void MissingFrom_ColumnOfATable_IsNull() =>
         ColumnOrigin
-            .MissingFrom(PostgresTables.ColumnOf(0, "mail", 1043, Users, 3), PostgresTables.Of(Users))
+            .MissingFrom(
+                PostgresTables.ColumnOf(0, "mail", PostgresRows.Varchar.Oid, Users, 3),
+                PostgresTables.Of(Users)
+            )
             .ShouldBeNull();
 
     [Fact]
     public void MissingFrom_ColumnOfNoTable_IsNull() =>
         ColumnOrigin
-            .MissingFrom(new PostgresColumnRow(0, "n", 20, 0, 0, null, null, null), PostgresTables.Of())
+            .MissingFrom(PostgresTables.ExpressionOf(0, "n", PostgresRows.Int8.Oid), PostgresTables.Of())
             .ShouldBeNull();
 
     [Theory]
@@ -86,12 +95,12 @@ public class ColumnOriginTests
     [Fact]
     public void MissingFrom_TableTheAnswerLacks_NamesTheColumn() =>
         ColumnOrigin
-            .MissingFrom(PostgresTables.ColumnOf(0, "mail", 1043, Users, 3), PostgresTables.Of())
+            .MissingFrom(PostgresTables.ColumnOf(0, "mail", PostgresRows.Varchar.Oid, Users, 3), PostgresTables.Of())
             .ShouldBe("the table of the column 'mail' no longer exists");
 
     [Fact]
     public void MissingFrom_AttributeTheAnswerLacks_NamesTheColumnAndTheTable() =>
         ColumnOrigin
-            .MissingFrom(PostgresTables.ColumnOf(0, "x", 23, Users, 42), PostgresTables.Of(Users))
+            .MissingFrom(PostgresTables.ColumnOf(0, "x", PostgresRows.Int4.Oid, Users, 42), PostgresTables.Of(Users))
             .ShouldBe("the column 'x' no longer exists in its table 'public.users'");
 }

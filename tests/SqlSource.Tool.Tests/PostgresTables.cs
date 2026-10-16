@@ -18,6 +18,9 @@ internal static class PostgresTables
             Attribute(9, "name_upper", PostgresRows.Text.Oid, generated: "s")
         );
 
+    // users.id as "columns" answers it for a query that selects it first.  Declared after Users, which it reads.
+    public static PostgresColumnRow UsersId { get; } = ColumnOf(0, "id", PostgresRows.Int4.Oid, Users, 1);
+
     public static PostgresTableRow Orders { get; } =
         TableOf(
             16415,
@@ -53,4 +56,15 @@ internal static class PostgresTables
         int? precision = null,
         int? scale = null
     ) => new(ordinal, name, typeOid, table.Oid, attnum, length, precision, scale);
+
+    // A column of "columns" that comes from an expression: it names no table.
+    public static PostgresColumnRow ExpressionOf(
+        int ordinal,
+        string name,
+        long typeOid,
+        int? length = null,
+        int? precision = null,
+        int? scale = null,
+        int? typeModifier = null
+    ) => new(ordinal, name, typeOid, 0, 0, length, precision, scale, typeModifier);
 }

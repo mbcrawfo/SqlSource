@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Planning;
@@ -32,7 +33,7 @@ internal sealed class CliRun : IDisposable
     }
 
     // What every describer of the run asked and was answered.  The engine is a name only: a run may have several.
-    public DescribeCapture Capture { get; } = new("postgres");
+    public DescribeCapture Capture { get; } = new(SidecarValues.Engine.Postgres);
 
     // Every database of the run calls through this one, which asks the describer and keeps the call.
     public CapturingExchange Exchange { get; }

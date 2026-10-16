@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Parsing;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
@@ -15,13 +15,7 @@ namespace SqlSource.Tool.Tests.Describing.Capture;
 // The exchange that records: every call of a describer is in the capture, in order, as it was asked and answered.
 public class CapturingExchangeTests
 {
-    private static readonly DescribeRequest GetUser = new(
-        "GetUser",
-        "SELECT 1;",
-        EquatableArray<SqlQueryParameter>.Empty
-    );
-
-    private readonly DescribeCapture _capture = new("postgres");
+    private readonly DescribeCapture _capture = new(SidecarValues.Engine.Postgres);
     private readonly FakeDescriber _describer = new();
 
     private Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync() =>
@@ -41,7 +35,7 @@ public class CapturingExchangeTests
     {
         var opened = await OpenAsync();
         await using var session = opened.Value.ShouldNotBeNull();
-        _ = await session.DescribeAsync(GetUser, TestContext.Current.CancellationToken);
+        _ = await session.DescribeAsync(CaptureInputs.GetUser, TestContext.Current.CancellationToken);
 
         _capture
             .Calls.Select(call => $"{call.Method} {CaptureJson.TextOf(call.Request)} {CaptureJson.TextOf(call.Answer)}")

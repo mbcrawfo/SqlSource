@@ -16,15 +16,6 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class SetOperationTests(PostgresContainer postgres)
 {
-    // A partitioned table of these tests alone, made by SQL that can be run again, and left: the container is thrown
-    // away.  Its note is the one column that may be NULL.
-    private const string Partitioned = """
-        CREATE TABLE IF NOT EXISTS setop_parts (id integer NOT NULL, kind integer NOT NULL, note text)
-            PARTITION BY LIST (kind);
-        CREATE TABLE IF NOT EXISTS setop_parts_1 PARTITION OF setop_parts FOR VALUES IN (1);
-        CREATE TABLE IF NOT EXISTS setop_parts_2 PARTITION OF setop_parts FOR VALUES IN (2);
-        """;
-
     // Two users, one of whom has an order: x has no email and no deleted_at, its order has no note, and y has no
     // order, so a LEFT JOIN of users to orders extends y with NULL.  The name x is the one that NULLIF(name, 'x')
     // makes NULL.
@@ -252,12 +243,12 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_UnionAllOfAPartitionedTable_IsAnsweredByItsColumns()
     {
-        await RunAsync(Partitioned);
-        var sql = "SELECT p.id, p.note FROM setop_parts p UNION ALL SELECT o.user_id, o.note FROM orders o";
+        await RunAsync(ScratchSchema.Partitioned);
+        var sql = "SELECT p.id, p.note FROM scratch_parts p UNION ALL SELECT o.user_id, o.note FROM orders o";
 
         (await WalkedAsync(sql)).ShouldBe([Proven, Unknown]);
         (
-            await ReturnsNullAsync(Rows + "INSERT INTO setop_parts (id, kind) VALUES (1, 1), (2, 2);", sql, 1)
+            await ReturnsNullAsync(Rows + "INSERT INTO scratch_parts (id, kind) VALUES (1, 1), (2, 2);", sql, 1)
         ).ShouldBeTrue();
     }
 
@@ -266,9 +257,9 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ConstantOverAPartitionedTablesRootAppend_IsAnExpression()
     {
-        await RunAsync(Partitioned);
+        await RunAsync(ScratchSchema.Partitioned);
 
-        (await WalkedAsync("SELECT p.id, 'x'::text AS k, 1 AS one FROM setop_parts p")).ShouldBe([
+        (await WalkedAsync("SELECT p.id, 'x'::text AS k, 1 AS one FROM scratch_parts p")).ShouldBe([
             (false, "catalog"),
             (false, "expression"),
             (false, "expression"),

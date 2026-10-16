@@ -16,14 +16,6 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class WalkTests(PostgresContainer postgres)
 {
-    // A partitioned table of these tests alone, made by SQL that can be run again, and left: the container is
-    // thrown away, and the fixtures are recorded in one of their own.
-    private const string Partitioned = """
-        CREATE TABLE IF NOT EXISTS walk_parts (id integer NOT NULL, kind integer NOT NULL) PARTITION BY LIST (kind);
-        CREATE TABLE IF NOT EXISTS walk_parts_1 PARTITION OF walk_parts FOR VALUES IN (1);
-        CREATE TABLE IF NOT EXISTS walk_parts_2 PARTITION OF walk_parts FOR VALUES IN (2);
-        """;
-
     private async Task<QueryDescription> ShouldDescribeAsync(string sql)
     {
         var described = await Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql));
@@ -244,12 +236,12 @@ public sealed class WalkTests(PostgresContainer postgres)
     public async Task Describe_PartitionedTable_IsAnsweredByItsSide()
     {
         await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        await using (var create = source.CreateCommand(Partitioned))
+        await using (var create = source.CreateCommand(ScratchSchema.Partitioned))
         {
             _ = await create.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
         }
 
-        (await WalkedAsync("SELECT p.id, u.name FROM walk_parts p LEFT JOIN users u ON u.id = p.id")).ShouldBe([
+        (await WalkedAsync("SELECT p.id, u.name FROM scratch_parts p LEFT JOIN users u ON u.id = p.id")).ShouldBe([
             (false, "catalog"),
             (true, "outer-join"),
         ]);

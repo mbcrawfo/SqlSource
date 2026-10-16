@@ -13,8 +13,8 @@ public class CheckVerdictTests
 {
     private static readonly PostgresColumnRow[] Described =
     [
-        new(0, "id", 23, 16396, 1, null, null, null),
-        new(1, "name", 1043, 16396, 2, 100, null, null),
+        new(0, "id", 23, PostgresTables.Users.Oid, 1, null, null, null),
+        new(1, "name", 1043, PostgresTables.Users.Oid, 2, 100, null, null),
     ];
 
     private static readonly PostgresCheckColumn[] Seen =
