@@ -186,6 +186,8 @@ A comment of yours that happens to start with one of the words and a colon, such
 
 An error in a `.sql` file is reported at its line and column in that file, and the file produces no members until it is fixed.
 
+<a id="known-issues"></a>
+
 ## Known issues
 
 - **A file that is not saved as UTF-8.**  Save your `.sql` files as UTF-8, which current editors write.  A file in another encoding, such as Windows-1252, that has a character outside ASCII in its SQL (comments do not count), is read one way by the tool and another by the compiler.  The query then has two different texts.  Nothing compares them today; when the generator starts to read sidecars, it will always find the sidecar of such a query out of date.  Saving the file as UTF-8 fixes it.

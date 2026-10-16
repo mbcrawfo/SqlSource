@@ -447,6 +447,8 @@ A line break inside one word puts a space there.  `App.` and `Models` on two lin
 
 **Do not use `;` or `#` in a value.**  The compiler hands a generator only the part of a value before the first `;` or `#`, and nothing reports the rest.  `keep-comments;no-token-validation` is read as `keep-comments`.  Separate words with spaces or line breaks.
 
+<a id="known-issues"></a>
+
 ## Known issues
 
 - **A `.sql` file that one of your own build targets adds is not fully seen.**  This is about a target in your project that adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as one that writes a file or copies it in.  The build compiles the file, and nothing is reported, but two things go wrong.  `sqlsource` leaves out the file's queries, so it describes none of them.  And the settings you gave the file as item metadata, its dialect for one, are dropped when the target runs late in the build, so the file is read with the project's settings.  To make both work, tell your target to run before the package reads its settings, wherever the target is declared:

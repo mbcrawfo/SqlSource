@@ -22,10 +22,9 @@ Install it as a local tool of your repository, from the folder at its root:
 ```console
 $ dotnet new tool-manifest
 $ dotnet tool install SqlSource.Tool
-$ dotnet sqlsource describe
 ```
 
-The first command creates the tool manifest, a `dotnet-tools.json` file, which records the tool and its version.  Commit that file.  Anyone who clones the repository, and a build server, then gets the same version with `dotnet tool restore`.
+The first command creates the tool manifest, a `dotnet-tools.json` file, which records the tool and its version.  Commit that file.  Anyone who clones the repository, and a build server, then gets the same version with `dotnet tool restore`.  To run the tool, give it a connection to your database: see [connections](#connections).
 
 Keep the tool at the version of the `SqlSource` package your projects use: the two are released together under one version number.  When you update the package, update the tool with `dotnet tool update SqlSource.Tool`.  A package and a tool of different versions can stop the tool from reading your project ([SQLSRC206](diagnostics.md#sqlsrc206)).  What else the tool needs is under [requirements](#requirements).
 
@@ -49,7 +48,7 @@ A query is described through its [dialect](concepts.md#dialect).  The tool can a
 - A file of a dialect that no version of the tool can describe, such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](diagnostics.md#sqlsrc209).  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.
 - A file of `mssql` passes that check, since SQL Server queries will be described, and each of its queries that must be described is [SQLSRC216](diagnostics.md#sqlsrc216) until then.  See [SQL Server](sqlserver.md).
 
-Either way, set the output of those queries to `sql`, or set the dialect, as [the output setting](settings.md#setting-output) says.
+Either way, set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says.  For SQLSRC209 you can instead set the dialect, when the files are PostgreSQL.
 
 The tool reads `[SqlSourceGenerate]` from your C# source without compiling it, so `Path` and `Output` must be written out where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  See [SQLSRC208](diagnostics.md#sqlsrc208) and [the generator's known issues](generator.md#known-issues).
 
@@ -72,7 +71,7 @@ A connection is given in one of three ways.  The first that gives one wins:
 |----|----|----|
 | 1 | `--connection <name>=<connection string>` on the command line | `--connection billing="Host=localhost;Database=billing"` |
 | 2 | The environment variable of the name | `SQLSOURCE_CONNECTION_BILLING` |
-| 3 | `SQLSOURCE_CONNECTION` | Used only when the run has exactly one database to describe |
+| 3 | `SQLSOURCE_CONNECTION` | Used only when the run has exactly one database |
 
 - **The variable of a name** is `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`: `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  Two names that give one variable, such as `app-v2` and `app_v2`, are [SQLSRC214](diagnostics.md#sqlsrc214): give both on the command line, or rename one.
 - **`SQLSOURCE_CONNECTION`** is for a project with one database.  With more than one in the run it is used for none of them ([SQLSRC215](diagnostics.md#sqlsrc215)): set the variable of each name instead.
@@ -151,8 +150,8 @@ To describe again only the queries of one database, add `--database billing`.
 $ dotnet tool restore
 $ dotnet restore
 $ SQLSOURCE_CONNECTION_BILLING="$BILLING_CONNECTION" dotnet sqlsource describe --check
-/work/App/Queries/Users.sql(3,10): error SQLSRC219: The sidecar is out of date for 'GetUser': columns[2].nullable is true, and the database says false
-    help: run 'dotnet sqlsource describe --force' and commit the sidecars
+/work/App/Queries/Users.sql(3,10): error SQLSRC219: The sidecar is out of date for 'GetUser': the query has changed since it was described
+    help: run 'dotnet sqlsource describe' and commit the sidecars
     see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc219
 billing (postgres): 15 same, 1 differ, 0 failed
 ```
@@ -233,7 +232,7 @@ A run with `--project`, `--database` or a `.sql` path writes only the sidecars o
 | Variable | What it does |
 |----|----|
 | `SQLSOURCE_CONNECTION_<NAME>` | The connection of the database `<name>`: see [connections](#connections) |
-| `SQLSOURCE_CONNECTION` | The connection of a run with exactly one database to describe |
+| `SQLSOURCE_CONNECTION` | The connection of a run with exactly one database |
 | `SQLSOURCE_LOG` | The path of the log, when `--log` is not given |
 | `SQLSOURCE_DEBUG` | Any value adds the stack trace to [SQLSRC200](diagnostics.md#sqlsrc200), for a bug report |
 
@@ -280,7 +279,7 @@ $ dotnet sqlsource describe --log sqlsource.log
 `--log <path>`, or the variable `SQLSOURCE_LOG`, writes a record of the run to a file, one JSON object on each line.  It is what to attach to an issue when the tool does something you did not expect.
 
 - **The file is overwritten by each run.**  The tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip on the command line never empties a file of your project ([SQLSRC218](diagnostics.md#sqlsrc218)).
-- **A run that fails and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.
+- **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it.
 
 **Read a log before you share it.**  It holds no connection string: the value of each `--connection` is written as `***`, and so is that value wherever the database driver repeats it in a message.  But it does hold:
 
