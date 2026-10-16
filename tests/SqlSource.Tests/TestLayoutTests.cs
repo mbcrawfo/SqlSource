@@ -15,6 +15,11 @@ public class TestLayoutTests
     private static readonly string Tests = Path.Combine(RepositoryRoot.Folder, "tests");
     private static readonly string GeneratorTests = Path.Combine(Tests, "SqlSource.Tests", "Generator");
 
+    // The first line of each file of Generator/, so that a reader of one sees that RoslynFloor compiles it too.
+    private const string SharedHeader =
+        "// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  "
+        + "See AGENTS.md beside it.";
+
     // tests/SqlSource.Tests.RoslynFloor compiles every file of Generator/; a helper there would be compiled twice.
     [Fact]
     public void GeneratorFolder_HoldsOnlyTestClasses() =>
@@ -40,4 +45,12 @@ public class TestLayoutTests
                     .Select(include => $"{Path.GetFileName(project)}: {include}")
             )
             .ShouldBe(["SqlSource.Tests.RoslynFloor.csproj: ../SqlSource.Tests/Generator/**/*.cs"]);
+
+    [Fact]
+    public void GeneratorTests_SayTheyAreShared() =>
+        Directory
+            .EnumerateFiles(GeneratorTests, "*.cs", SearchOption.AllDirectories)
+            .Where(file => File.ReadLines(file).FirstOrDefault() != SharedHeader)
+            .Select(Path.GetFileName)
+            .ShouldBeEmpty();
 }

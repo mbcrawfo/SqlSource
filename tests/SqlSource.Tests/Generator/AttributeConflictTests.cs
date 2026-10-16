@@ -1,3 +1,5 @@
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
