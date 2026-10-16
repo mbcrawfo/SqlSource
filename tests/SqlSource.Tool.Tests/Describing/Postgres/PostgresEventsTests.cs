@@ -769,6 +769,12 @@ public class PostgresEventsTests
                     null,
                     new PostgresServerError("42501", "permission denied", null, null, null)
                 )
+            )
+            // The Append is then read as a set operation, whose branch's relation is asked for.
+            .Answer(
+                "relations",
+                new PostgresRelationsRequest([new PostgresRelationName("public", "users_1")]),
+                new PostgresTablesAnswer([], null)
             );
 
         await DescribeAsync(script, log, Listing);

@@ -11,7 +11,7 @@
       "serverVersion": "18.4",
       "resultKind": "rows",
       "matchesTable": null,
-      "plan": "unavailable",
+      "plan": "walked",
       "tableMatch": "no-origin",
       "parameters": [],
       "columns": [

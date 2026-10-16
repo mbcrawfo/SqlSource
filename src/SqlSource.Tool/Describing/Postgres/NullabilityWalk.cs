@@ -55,19 +55,30 @@ internal sealed record WalkOutcome(
 /// The answer of <c>partitions</c>, the ancestors of each relation the members of the plan's <c>Append</c>s scan, or
 /// null when it was not asked: every <c>Append</c> is then read as a set operation.
 /// </param>
+/// <param name="ColumnTypes">
+/// The type of each column as the row description gives it, by OID, in the order of the columns; null when the walk is
+/// to answer no column of a set operation from its branches.
+/// </param>
+/// <param name="SetOperationAliasMayBeWritten">
+/// Whether the query's SQL holds the text <c>*SELECT*</c>, so that a user may have written a set operation's alias
+/// for a subquery of their own, and no scan of that name is mapped by position.
+/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
     bool CatalogFunctionsFirst,
     IReadOnlyDictionary<long, PostgresTableRow> Tables,
-    IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? Partitions = null
+    IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? Partitions = null,
+    IReadOnlyList<long>? ColumnTypes = null,
+    bool SetOperationAliasMayBeWritten = false
 );
 
 /// <summary>
 /// The third layer of nullability: a column of a gated query is not nullable when its origin is <c>NOT NULL</c>
 /// and the plan proves that no outer join null-extends its relation instance, and a column of no origin is not
 /// nullable when its entry of the plan is an expression that can never be <c>NULL</c> (<see cref="PlanExpression" />)
-/// computed where no outer join null-extends it.
+/// computed where no outer join null-extends it, or when the root reaches a set operation whose inputs that it returns
+/// rows of each prove it, as <c>NullabilityWalk.SetOperations.cs</c> says.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -92,7 +103,7 @@ internal sealed record WalkScope(
 /// scan scans, a data-modifying CTE's.
 /// </para>
 /// </remarks>
-internal static class NullabilityWalk
+internal static partial class NullabilityWalk
 {
     /// <summary>Walks a plan that was read.</summary>
     /// <param name="root">The root of the plan.</param>
@@ -112,8 +123,15 @@ internal static class NullabilityWalk
         var plans = new Plans(root, scope);
         var instances = plans.InstancesOf(root);
 
+        // A column of no origin of a set operation that the root reaches is answered from the operation's inputs.
+        if (SetOperationTypesOf(root, columns, origins, scope, instances) is { } types)
+        {
+            return RunSetOperation(root, columns, origins, scope, plans, instances, types);
+        }
+
         // PostgreSQL prints the target list first and what a sort or a group added after it, so the entry of a
-        // column is the one at its ordinal.  A UNION ALL's Append has no Output at all.
+        // column is the one at its ordinal.  A UNION ALL's Append has no Output at all, and a column of one is not
+        // walked here.
         if (root.Output is not { } entries || entries.Count < columns.Count)
         {
             return Unusable(WalkReasons.NoOutput, root, instances, columns);
@@ -422,7 +440,13 @@ internal static class NullabilityWalk
             }
         }
 
-        private bool ProvedNotNull(OutputReference reference)
+        private bool ProvedNotNull(OutputReference reference) => ProvedTypeOf(reference) is not null;
+
+        /// <summary>
+        /// The declared type of the column a reference names, a domain where the column is one, when the walk proves
+        /// that it is not <c>NULL</c>; or null.
+        /// </summary>
+        public long? ProvedTypeOf(OutputReference reference)
         {
             var alias = reference.Alias ?? (scope.OldAndNewMayBeNamed ? null : instances.BareAlias);
             if (
@@ -433,14 +457,17 @@ internal static class NullabilityWalk
                 || TableOf(instance) is not { } table
             )
             {
-                return false;
+                return null;
             }
 
             var attribute = table.Columns.FirstOrDefault(column =>
                 string.Equals(column.Name, reference.Column, StringComparison.Ordinal)
             );
-            return attribute is not null
-                && ColumnNullability.Of(new ColumnOrigin(table, attribute), gated: false).Nullable == false;
+            return
+                attribute is not null
+                && ColumnNullability.Of(new ColumnOrigin(table, attribute), gated: false).Nullable == false
+                ? attribute.TypeOid
+                : null;
         }
 
         // The table "tables" answered of an instance: a relation's by its schema and its name, and a partitioned
@@ -485,7 +512,10 @@ internal static class NullabilityWalk
     // every such reference agrees, the column is what they are.
     private sealed class Plans(PlanNode tree, WalkScope scope)
     {
-        private const int MaxDepth = 16;
+        /// <summary>
+        /// How many plans deep the walk follows a column: a scan of another plan, or a set operation's input.
+        /// </summary>
+        public const int MaxDepth = 16;
 
         private static readonly IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> NoPartitions =
             new Dictionary<PostgresRelationName, IReadOnlyList<long>>();

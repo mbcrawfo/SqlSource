@@ -233,6 +233,40 @@ public class PlanExpressionTests
     public void TypeOf_FunctionOfAnySchema_IsNull(string entry) =>
         PlanExpression.TypeOf(entry, catalogFunctions: false).ShouldBeNull();
 
+    // The plan prints a type's name through a visibility check, so a type of that name earlier on the path than
+    // pg_catalog would print as the built-in one.
+    [Theory]
+    [InlineData("'x'::text")]
+    [InlineData("'2024-01-01'::date")]
+    [InlineData("'5'::bigint")]
+    [InlineData("('x'::character varying)")]
+    public void TypeOf_LiteralWhenTheCatalogIsNotFirst_IsNull(string entry) =>
+        PlanExpression.TypeOf(entry, catalogFunctions: false).ShouldBeNull();
+
+    [Theory]
+    [InlineData("1", 23)]
+    [InlineData("true", 16)]
+    [InlineData("(u.deleted_at IS NULL)", 16)]
+    public void TypeOf_FormWithoutATypeName_IsItsTypeWhateverThePath(string entry, long expected) =>
+        PlanExpression.TypeOf(entry, catalogFunctions: false).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("(\"*SELECT* 1\".id)::bigint", "\"*SELECT* 1\".id")]
+    [InlineData("(u.id)::numeric(10,2)", "u.id")]
+    [InlineData("((u.id + 1))::double precision", "(u.id + 1)")]
+    public void CastOperand_CastOfAGroup_IsTheTextInside(string entry, string expected) =>
+        PlanExpression.CastOperand(entry).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("u.id")]
+    [InlineData("(u.id)")]
+    [InlineData("u.id::bigint")]
+    [InlineData("(u.id)::bigint + 1")]
+    [InlineData("(u.id)::bigint COLLATE \"C\"")]
+    [InlineData("(u.id)::")]
+    [InlineData("(u.id")]
+    public void CastOperand_AnythingElse_IsNull(string entry) => PlanExpression.CastOperand(entry).ShouldBeNull();
+
     [Theory]
     [InlineData("NULL::text")]
     [InlineData("COALESCE(max((email)::text), 'x'::text)")]

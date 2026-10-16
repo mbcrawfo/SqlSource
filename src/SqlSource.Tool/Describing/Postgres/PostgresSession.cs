@@ -210,8 +210,9 @@ internal sealed class PostgresSession : IDescribeSession
     // What is asked of a statement that was prepared, in this order: its columns, the tables they name, and every
     // type that the parameters, the columns and their origins have, once; the server's spelling of each type with
     // each modifier the built types need, once; Npgsql's own reading of the SQL; and, for a query with rows that is
-    // gated or has a column of no origin, its generic plan.  The table match is made last and asks nothing: it reads
-    // the nullability the walk set.
+    // gated or has a column of no origin, its generic plan, then the ancestors of the relations an Append of the plan
+    // may scan as partitions, and for a set operation the relations its branches scan that "tables" did not answer.
+    // The table match is made last and asks nothing: it reads the nullability the walk set.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
         string statement,
@@ -319,7 +320,9 @@ internal sealed class PostgresSession : IDescribeSession
                     gated,
                     OuterJoinGate.NamesOldOrNew(request.Sql),
                     PostgresSearchPath.PutsCatalogFirst(SettingOf("search_path")),
-                    tables.Value
+                    tables.Value,
+                    ColumnTypes: [.. columns.Select(static column => column.TypeOid)],
+                    SetOperationAliasMayBeWritten: request.Sql.Contains("*SELECT*", StringComparison.Ordinal)
                 ),
                 cancellationToken
             );
@@ -393,7 +396,17 @@ internal sealed class PostgresSession : IDescribeSession
         else if (answer.Plan is { } text && PlanNode.Read(text) is { } root)
         {
             var partitions = await PartitionsOfAsync(request, root, cancellationToken);
-            outcome = NullabilityWalk.Run(root, columns, origins, scope with { Partitions = partitions });
+            var relations = await RelationsOfAsync(request, root, partitions, origins, scope.Tables, cancellationToken);
+            outcome = NullabilityWalk.Run(
+                root,
+                columns,
+                origins,
+                scope with
+                {
+                    Partitions = partitions,
+                    Tables = relations,
+                }
+            );
         }
         else
         {
@@ -427,6 +440,44 @@ internal sealed class PostgresSession : IDescribeSession
             static row => new PostgresRelationName(row.Schema, row.Name),
             static row => row.Ancestors
         );
+    }
+
+    // The tables of "tables" with a row of "relations" for each relation the plan scans that "tables" did not
+    // answer, for the walk to read a set operation's branches.  It is asked only when a column has no origin and the
+    // walk may answer it from the branches (NullabilityWalk.MayAnswerFromBranches), and a relation is left to ask for.
+    // An error is logged and never reported: the walk goes on with the rows of "tables" alone.
+    private async Task<IReadOnlyDictionary<long, PostgresTableRow>> RelationsOfAsync(
+        DescribeRequest request,
+        PlanNode root,
+        IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? partitions,
+        ColumnOrigin?[] origins,
+        IReadOnlyDictionary<long, PostgresTableRow> tables,
+        CancellationToken cancellationToken
+    )
+    {
+        if (!origins.Any(static origin => origin is null) || !NullabilityWalk.MayAnswerFromBranches(root, partitions))
+        {
+            return tables;
+        }
+
+        var answered = tables.Values.Select(static row => new PostgresRelationName(row.Schema, row.Name)).ToHashSet();
+        PostgresRelationName[] missing = [.. PlanRelations.Of(root).Where(relation => !answered.Contains(relation))];
+        if (missing.Length == 0)
+        {
+            return tables;
+        }
+
+        var asked = new PostgresRelationsRequest(missing);
+        var started = _time.GetTimestamp();
+        var answer = await _exchange.AskAsync("relations", asked, _live.RelationsAsync, cancellationToken);
+        PostgresEvents.Relations(_log, request.Name, asked, answer, ElapsedSince(started));
+        var merged = new Dictionary<long, PostgresTableRow>(tables);
+        foreach (var row in answer.Tables ?? [])
+        {
+            _ = merged.TryAdd(row.Oid, row);
+        }
+
+        return merged;
     }
 
     // A statement without rows has no match, and no event of one.

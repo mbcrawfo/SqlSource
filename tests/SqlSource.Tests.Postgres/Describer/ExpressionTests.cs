@@ -93,8 +93,6 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     // The root of a set operation prints its first branch: a constant there says nothing of the NULL of the other.
     [Theory]
     [InlineData("SELECT 'a'::text AS k FROM users UNION SELECT NULL FROM orders")]
-    [InlineData("SELECT 'a'::text AS k FROM users INTERSECT SELECT note FROM orders")]
-    [InlineData("SELECT 'a'::text AS k FROM users EXCEPT SELECT note FROM orders")]
     [InlineData("SELECT 'a'::text AS k UNION ALL SELECT NULL ORDER BY 1")]
     [InlineData(
         "WITH RECURSIVE r(k, n) AS (SELECT 'a'::text, 1 UNION ALL SELECT NULL, n + 1 FROM r WHERE n < 3) "
@@ -102,6 +100,14 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     )]
     public async Task Describe_ConstantFirstBranchOfASetOperation_StaysUnknown(string sql) =>
         (await AnswersAsync(sql))[0].ShouldBe(Unknown);
+
+    // An INTERSECT returns rows that both inputs hold, and an EXCEPT rows of its left input: the constant of the
+    // first branch proves the column whatever the other holds.
+    [Theory]
+    [InlineData("SELECT 'a'::text AS k FROM users INTERSECT SELECT note FROM orders")]
+    [InlineData("SELECT 'a'::text AS k FROM users EXCEPT SELECT note FROM orders")]
+    public async Task Describe_ConstantFirstBranchOfAnIntersectOrAnExcept_IsAnsweredFromIt(string sql) =>
+        (await AnswersAsync(sql))[0].ShouldBe((false, "set-operation"));
 
     // A value computed on the side a LEFT JOIN extends prints at the root as the same text, and is NULL for a row the
     // join did not match.

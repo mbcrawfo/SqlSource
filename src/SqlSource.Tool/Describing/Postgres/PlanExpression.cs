@@ -104,15 +104,35 @@ internal static class PlanExpression
     /// are those of <see cref="NullableOf" /> with a type that does not depend on its arguments: a quoted literal with
     /// a cast to a built-in type, a number, <c>true</c> or <c>false</c>, a test, <c>count</c> and the rankings.
     /// <c>NULL::type</c>, <c>COALESCE</c>, <c>CASE</c>, a reference and a cast of anything else have none, and neither
-    /// has a text that merely starts with a form.
+    /// has a text that merely starts with a form.  A literal's type, and a function's, is known only when the
+    /// session finds <c>pg_catalog</c> first, since the plan prints a type's name and a function's bare whenever the
+    /// path finds them.  The <c>bigint</c> of <c>count</c> with an argument is an assumption about which
+    /// <c>count</c> the server chose, and never by itself a proof that the entry is not <c>NULL</c>: that is
+    /// <see cref="NullableOf" />'s to say.
     /// </summary>
     /// <param name="entry">The entry as the plan prints it.</param>
-    /// <param name="catalogFunctions">Whether an unqualified function name is <c>pg_catalog</c>'s.</param>
+    /// <param name="catalogFunctions">Whether an unqualified function or type name is <c>pg_catalog</c>'s.</param>
     /// <returns>The OID of the type, or null when the entry as a whole is no form that has one.</returns>
     public static long? TypeOf(string entry, bool catalogFunctions) =>
         Tokens.Read(entry) is { Count: > 0 } tokens
             ? new Reader(entry, tokens, catalogFunctions, static _ => false, null).TypeOid(0, tokens.Count)
             : null;
+
+    /// <summary>
+    /// The text inside the parentheses of an entry that is, as a whole, a group with its cast, <c>(E)::T</c>, or null:
+    /// how a node prints its cast of a value, and how a node above a set operation prints the cast of a branch's value
+    /// to the result's type, <c>(("*SELECT* 1".id)::bigint)</c>, once the parentheses that wrap it whole are taken off.
+    /// </summary>
+    public static string? CastOperand(string entry)
+    {
+        if (Tokens.Read(entry) is not [{ Kind: Kind.Open, Start: 0 }, ..] tokens)
+        {
+            return null;
+        }
+
+        var reader = new Reader(entry, tokens, false, static _ => false, null);
+        return reader.CastOf() is { } close ? entry[tokens[0].End..tokens[close].Start] : null;
+    }
 
     /// <summary>
     /// The text inside the one pair of parentheses that wraps the whole entry, with its quotes and its parentheses
@@ -487,7 +507,9 @@ internal static class PlanExpression
                 return TypesByName[Text(from).Contains('.', StringComparison.Ordinal) ? "numeric" : "integer"];
             }
 
-            if (Is(from, Kind.String) && Is(from + 1, Kind.Cast) && IsTypeName(from + 2, to))
+            // The plan prints a type's name bare whenever the search path finds it, text and date as any other: a
+            // user's type of that name in a schema ahead of pg_catalog prints the same.
+            if (_catalogFunctions && Is(from, Kind.String) && Is(from + 1, Kind.Cast) && IsTypeName(from + 2, to))
             {
                 return BuiltInType(from + 2, to);
             }
@@ -528,6 +550,20 @@ internal static class PlanExpression
 
         // Whether the first token is a parenthesis that the last closes.
         public bool WrapsWhole(int count) => IsGroup(0, count);
+
+        // The index of the parenthesis that closes the first token, when what follows it to the end is a cast to a
+        // type name; or null.
+        public int? CastOf()
+        {
+            var close = _closes[0];
+            return
+                close >= 0
+                && close + 2 < _tokens.Count
+                && Is(close + 1, Kind.Cast)
+                && IsTypeName(close + 2, _tokens.Count)
+                ? close
+                : null;
+        }
 
         // Whether the span is one parenthesis and the one that closes it.
         private bool IsGroup(int from, int to) => Is(from, Kind.Open) && _closes[from] == to - 1;

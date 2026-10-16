@@ -4,4 +4,4 @@ table-match: no-origin
 column 0 id: bigint | nullable null | no-origin | -
 column 1 label: character varying | nullable null | no-origin | -
 column 2 since: timestamp with time zone | nullable null | no-origin | -
-column 3 kind: text | nullable null | no-origin | -
+column 3 kind: text | nullable false | set-operation | -

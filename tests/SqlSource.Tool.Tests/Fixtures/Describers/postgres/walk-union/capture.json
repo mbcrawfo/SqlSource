@@ -175,6 +175,174 @@
       }
     },
     {
+      "method": "relations",
+      "request": {
+        "relations": [
+          {
+            "schema": "public",
+            "name": "orders"
+          },
+          {
+            "schema": "public",
+            "name": "users"
+          }
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16402,
+            "relkind": "r",
+            "schema": "public",
+            "name": "users",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "a",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "name",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1043,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "email",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16387,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 4,
+                "name": "status",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16392,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1009,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 6,
+                "name": "balance",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 7,
+                "name": "created_at",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 8,
+                "name": "deleted_at",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 9,
+                "name": "name_upper",
+                "notNull": false,
+                "identity": "",
+                "generated": "s",
+                "typeOid": 25,
+                "notNullValidated": null
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          },
+          {
+            "oid": 16421,
+            "relkind": "r",
+            "schema": "public",
+            "name": "orders",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "d",
+                "generated": "",
+                "typeOid": 20,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "user_id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "total",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 4,
+                "name": "placed_at",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 5,
+                "name": "note",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 25,
+                "notNullValidated": null
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          }
+        ],
+        "error": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"

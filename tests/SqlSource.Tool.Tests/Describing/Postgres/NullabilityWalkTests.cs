@@ -1075,4 +1075,536 @@ public class NullabilityWalkTests
         AnswersOf(RunUngated(plan, NotNull, Expression, Expression))
             .ShouldBe([(false, "catalog"), (null, "no-origin"), (null, "no-origin")]);
     }
+
+    // The set operations: every column is of no origin, and its type is the row description's.  "u" and "o" are two
+    // tables whose columns are of the types the type rule reads; "u_1" and "u_2" are partitions of a table like "u".
+    private const long Int4 = 23;
+    private const long Int8 = 20;
+    private const long Text = 25;
+    private const long Domain = 16800;
+
+    private static readonly PostgresTableRow SetU = PostgresTables.TableOf(
+        16810,
+        "u",
+        PostgresTables.Attribute(1, "id", Int4, notNull: true),
+        PostgresTables.Attribute(2, "name", Text, notNull: true),
+        PostgresTables.Attribute(3, "email", Text),
+        PostgresTables.Attribute(4, "dom", Domain, notNull: true)
+    );
+
+    private static readonly PostgresTableRow SetO = PostgresTables.TableOf(
+        16811,
+        "o",
+        PostgresTables.Attribute(1, "id", Int8, notNull: true),
+        PostgresTables.Attribute(2, "note", Text),
+        PostgresTables.Attribute(3, "user_id", Int4, notNull: true),
+        PostgresTables.Attribute(4, "label", Text, notNull: true),
+        PostgresTables.Attribute(5, "ref", Int4)
+    );
+
+    private static readonly IReadOnlyDictionary<long, PostgresTableRow> SetTables = PostgresTables.Of(
+        SetU,
+        SetO,
+        SetU with
+        {
+            Oid = 16812,
+            Name = "u_1",
+        },
+        SetU with
+        {
+            Oid = 16813,
+            Name = "u_2",
+        }
+    );
+
+    private static readonly (bool?, string?) FromBranches = (false, "set-operation");
+
+    private static readonly (bool?, string?) NoOrigin = (null, "no-origin");
+
+    private static WalkOutcome RunSet(PlanNode root, params long[] types) => RunSet(root, false, types);
+
+    private static WalkOutcome RunSet(PlanNode root, bool aliasMayBeWritten, params long[] types)
+    {
+        var (columns, origins) = Built(false, [.. types.Select(static _ => Expression)]);
+        return NullabilityWalk.Run(
+            root,
+            columns,
+            origins,
+            new WalkScope(false, false, true, SetTables)
+            {
+                ColumnTypes = types,
+                SetOperationAliasMayBeWritten = aliasMayBeWritten,
+            }
+        );
+    }
+
+    private static PlanNode AppendOf(params PlanNode[] members) =>
+        Over("Append", Scan("x")) with
+        {
+            Plans = [.. members.Select(static member => member with { ParentRelationship = "Member" })],
+        };
+
+    // A set operation's leaf scan, "*SELECT* <k>", over the branch's plan.
+    private static PlanNode Select(int k, PlanNode branch, params string[] output) =>
+        Over("Subquery Scan", branch, "Subquery") with
+        {
+            Alias = $"*SELECT* {k}",
+            Output = output,
+        };
+
+    // PostgreSQL 18's SetOp, with the left input first: or 14's, with one child, the flagged Append.
+    private static PlanNode SetOp(string command, PlanNode outer, PlanNode? inner = null) =>
+        (
+            inner is null
+                ? Over("SetOp", outer)
+                : Join("Inner", outer, inner) with
+                {
+                    NodeType = "SetOp",
+                    JoinType = null,
+                }
+        ) with
+        {
+            Command = command,
+        };
+
+    [Fact]
+    public void Run_UnionAllOfNotNullColumnsOfTheResultsType_IsFalseFromTheBranches()
+    {
+        var outcome = RunSet(AppendOf(Scan("u", "u.name", "u.id"), Scan("o", "o.label", "o.user_id")), Text, Int4);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        outcome.Reason.ShouldBeNull();
+        AnswersOf(outcome).ShouldBe([FromBranches, FromBranches]);
+    }
+
+    public static TheoryData<string> BranchesThatMayBeNull =>
+        [
+            Text(Scan("x", "NULL::text") with { NodeType = "Result", Alias = null, RelationName = null }),
+            Text(Scan("o", "o.note")),
+            Text(Join("Left", Scan("u", "u.id"), Scan("o", "o.label")) with { Output = ["o.label"] }),
+            Text(Scan("w", "w.name")),
+            Text(Over("Subquery Scan", Scan("u", "u.name"), "Subquery") with { Alias = "s", Output = ["s.name"] }),
+        ];
+
+    // A NULL, a nullable column, the side a LEFT JOIN extends, a relation that "tables" and "relations" did not
+    // answer, and a user subquery's scan, which is mapped by no position.
+    [Theory]
+    [MemberData(nameof(BranchesThatMayBeNull))]
+    public void Run_UnionAllWithABranchThatMayBeNull_KeepsNoOrigin(string branch) =>
+        AnswersOf(RunSet(AppendOf(Scan("u", "u.name"), PlanNode.Read(branch).ShouldNotBeNull()), Text))
+            .ShouldBe([NoOrigin]);
+
+    // The branch's cast to the result's type is not printed: an integer under a bigint is in the family, an integer
+    // under a text and a domain under its base are not.
+    [Theory]
+    [InlineData("u.id", "o.id", Int8, true)]
+    [InlineData("u.id", "o.label", Text, false)]
+    [InlineData("u.dom", "o.label", Text, false)]
+    [InlineData("u.dom", "u_1.dom", Domain, true)]
+    public void Run_BranchOfAnotherTypeThanTheResult_CountsWithinAFamily(
+        string first,
+        string second,
+        long type,
+        bool answered
+    ) =>
+        AnswersOf(RunSet(AppendOf(Scan("u", first), Scan(second.Split('.')[0], second)), type))
+            .ShouldBe([answered ? FromBranches : NoOrigin]);
+
+    // A constant the planner put in the leaf scan's place is a constant at any position.
+    [Fact]
+    public void Run_ConstantOfALeafScanUnderAnAppend_IsAnswered() =>
+        AnswersOf(
+                RunSet(
+                    AppendOf(
+                        Scan("u", "'a'::text", "u.name"),
+                        Select(2, Scan("o", "o.label"), "'b'::text", "\"*SELECT* 2\".label")
+                    ),
+                    Text,
+                    Text
+                )
+            )
+            .ShouldBe([FromBranches, NoOrigin]);
+
+    // An appendrel, a UNION ALL that a FROM subquery, a CTE or an inlined SQL function holds, prints a branch that the
+    // planner keeps as a "*SELECT* <k>" scan in the order the outer query needs: SELECT s.b, s.a FROM (SELECT
+    // p.sku AS a, p.name AS b ... UNION ALL (SELECT ..., NULLIF(...) ... LIMIT 5)) s.  Its column 0 is NULLIF's, and by
+    // position it would be p2.sku.
+    public static TheoryData<string> Appendrels =>
+        [
+            Text(
+                AppendOf(
+                    Scan("u", "u.name", "u.name"),
+                    Select(
+                        2,
+                        Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, 'x'::text)")) with
+                        {
+                            Output = ["u_1.name", "(NULLIF(u_1.name, 'x'::text))"],
+                        },
+                        "\"*SELECT* 2\".\"nullif\"",
+                        "\"*SELECT* 2\".name"
+                    )
+                )
+            ),
+            Text(
+                Over(
+                    "Sort",
+                    AppendOf(
+                        Scan("u", "u.name", "u.name"),
+                        Select(
+                            2,
+                            Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, u_1.name)")) with
+                            {
+                                Output = ["u_1.name", "(NULLIF(u_1.name, u_1.name))"],
+                            },
+                            "\"*SELECT* 2\".\"nullif\"",
+                            "\"*SELECT* 2\".name"
+                        )
+                    )
+                ) with
+                {
+                    Output = ["u.name", "u.name"],
+                }
+            ),
+        ];
+
+    [Theory]
+    [MemberData(nameof(Appendrels))]
+    public void Run_LeafScanUnderAnAppend_IsNotMappedByPosition(string plan) =>
+        AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
+
+    // A SetOp's own leaf scan is mapped by position: SELECT o.note AS label, o.note AS note ... EXCEPT SELECT u.name AS
+    // note, u.email AS label ... prints the crossed names, and column 0 is u.email.
+    private static PlanNode CrossedExcept(string alias) =>
+        SetOp(
+            "Except",
+            Over("Subquery Scan", Scan("u", "u.email", "u.name"), "Subquery") with
+            {
+                Alias = alias,
+                Output = [$"\"{alias}\".name", $"\"{alias}\".email"],
+            },
+            Scan("o", "o.label", "o.label")
+        ) with
+        {
+            Output = [$"\"{alias}\".name", $"\"{alias}\".email"],
+        };
+
+    [Fact]
+    public void Run_SetOpsLeafScan_IsMappedByPosition() =>
+        AnswersOf(RunSet(CrossedExcept("*SELECT* 1"), Text, Text)).ShouldBe([NoOrigin, FromBranches]);
+
+    [Fact]
+    public void Run_SubqueryScanOfAnotherAlias_IsNotMappedByPosition() =>
+        AnswersOf(RunSet(CrossedExcept("s"), Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
+
+    [Fact]
+    public void Run_LeafScanWhenTheSqlMayWriteItsAlias_IsNotMapped() =>
+        AnswersOf(RunSet(CrossedExcept("*SELECT* 1"), true, Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
+
+    // UNION on 14 is a HashAggregate over the Append, which prints a value the branch computed in parentheses and its
+    // cast to the result's type; on 18 a Unique over a Sort.
+    [Fact]
+    public void Run_UnionUnderAHashAggregate_IsFollowedThroughWhatItPrints()
+    {
+        var plan = Over("HashAggregate", AppendOf(Scan("u", "u.id", "'k'::text"), Scan("o", "o.id", "'j'::text"))) with
+        {
+            Output = ["((u.id)::bigint)", "('k'::text)"],
+        };
+
+        AnswersOf(RunSet(plan, Int8, Text)).ShouldBe([FromBranches, FromBranches]);
+    }
+
+    [Fact]
+    public void Run_UnionUnderAUniqueOverASort_IsAnswered()
+    {
+        var append = AppendOf(Scan("u", "u.name"), Scan("o", "o.label"));
+        var plan = Over("Unique", Over("Sort", append) with { Output = ["u.name"] }) with { Output = ["u.name"] };
+
+        AnswersOf(RunSet(plan, Text)).ShouldBe([FromBranches]);
+    }
+
+    // A node that computes over the set operation passes on only an entry that is the child's at the same ordinal:
+    // crossed entries, an aggregate, and a text the first branch prints twice are not.
+    [Theory]
+    [InlineData(new[] { "u.email", "u.name" }, new[] { "u.name", "u.email" }, false, false)]
+    [InlineData(new[] { "u.name", "count(*)" }, new[] { "u.name", "u.email" }, true, false)]
+    [InlineData(new[] { "('k'::text)", "('k'::text)" }, new[] { "'k'::text", "'k'::text" }, false, false)]
+    [InlineData(new[] { "u.name", "('k'::text)" }, new[] { "u.name", "'k'::text" }, true, true)]
+    public void Run_NodeThatComputesOverTheSetOperation_PassesOnTheChildsEntryAlone(
+        string[] printed,
+        string[] first,
+        bool firstAnswered,
+        bool secondAnswered
+    )
+    {
+        var plan = Over("HashAggregate", AppendOf(Scan("u", first), Scan("o", "o.label", "'k'::text"))) with
+        {
+            Output = printed,
+        };
+
+        AnswersOf(RunSet(plan, Text, Text))
+            .ShouldBe([firstAnswered ? FromBranches : NoOrigin, secondAnswered ? FromBranches : NoOrigin]);
+    }
+
+    // INTERSECT returns rows of both inputs: one that is never NULL proves the column.  On 14 the right branch may
+    // be the first member, flagged 1; on 18 the inputs may be swapped.
+    private static PlanNode Flagged14(string command, PlanNode left, PlanNode right, bool rightFirst = false)
+    {
+        var first = Select(1, left, "\"*SELECT* 1\".c", "0");
+        var second = Select(2, right, "\"*SELECT* 2\".c", "1");
+        return SetOp(command, AppendOf(rightFirst ? [second, first] : [first, second])) with
+        {
+            Output = rightFirst ? ["\"*SELECT* 2\".c", "(1)"] : ["\"*SELECT* 1\".c", "(0)"],
+        };
+    }
+
+    private static PlanNode Inputs18(string command, PlanNode outer, PlanNode inner) =>
+        SetOp(command, outer, inner) with
+        {
+            Output = outer.Output,
+        };
+
+    public static TheoryData<string, bool> Intersects =>
+        new()
+        {
+            { Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)), true },
+            { Text(Flagged14("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true },
+            { Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))), false },
+            { Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.name"))), true },
+            { Text(Inputs18("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true },
+            { Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))), false },
+        };
+
+    [Theory]
+    [MemberData(nameof(Intersects))]
+    public void Run_Intersect_IsFalseWhenEitherInputIs(string plan, bool answered) =>
+        AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), Text)).ShouldBe([answered ? FromBranches : NoOrigin]);
+
+    // EXCEPT returns rows of its left input alone: on 14 the member flagged 0, on 18 the Outer child.
+    public static TheoryData<string, bool> Excepts =>
+        new()
+        {
+            { Text(Flagged14("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true },
+            { Text(Flagged14("Except All", Scan("u", "u.name"), Scan("o", "o.note"), rightFirst: true)), true },
+            { Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"))), false },
+            { Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)), false },
+            { Text(Inputs18("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true },
+            { Text(Inputs18("Except All", Scan("o", "o.note"), Scan("u", "u.name"))), false },
+        };
+
+    [Theory]
+    [MemberData(nameof(Excepts))]
+    public void Run_Except_IsItsLeftInputs(string plan, bool answered) =>
+        AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), Text)).ShouldBe([answered ? FromBranches : NoOrigin]);
+
+    public static TheoryData<string> SetOpsOfAnotherShape =>
+        [
+            // Two members flagged 0, and none flagged.
+            Text(
+                SetOp(
+                    "Except",
+                    AppendOf(
+                        Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
+                        Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "0")
+                    )
+                ) with
+                {
+                    Output = ["\"*SELECT* 1\".c", "(0)"],
+                }
+            ),
+            Text(
+                SetOp(
+                    "Except",
+                    AppendOf(Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c"), Scan("u_1", "u_1.name"))
+                ) with
+                {
+                    Output = ["\"*SELECT* 1\".c"],
+                }
+            ),
+            // A command the walk does not know, and none.
+            Text(Inputs18("Merge", Scan("u", "u.name"), Scan("u_1", "u_1.name"))),
+            Text(Inputs18("Intersect", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with { Command = null }),
+            // A recursive CTE's union.
+            Text(
+                Over(
+                    "Sort",
+                    AppendOf(
+                        Join("Inner", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with
+                        {
+                            NodeType = "Recursive Union",
+                            JoinType = null,
+                            Output = ["u.name"],
+                        },
+                        Scan("u_2", "u_2.name")
+                    )
+                ) with
+                {
+                    Output = ["u.name"],
+                }
+            ),
+        ];
+
+    [Theory]
+    [MemberData(nameof(SetOpsOfAnotherShape))]
+    public void Run_SetOperationOfAnotherShape_KeepsNoOrigin(string plan) =>
+        AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), Text)).ShouldBe([NoOrigin]);
+
+    // a EXCEPT b EXCEPT c: on 14 the inner SetOp is a Result member that prints its entries and a flag of its own, on
+    // 18 the Outer input.  The inner one's type is the common type of its own inputs, which the row description does
+    // not give, so it is false only when each of its inputs is: then each is of the result's family.
+    private static PlanNode NestedExcept14(string innerRight)
+    {
+        var inner = SetOp(
+            "Except",
+            AppendOf(
+                Select(1, Scan("u", "u.id"), "\"*SELECT* 1\".id", "0"),
+                Select(2, Scan("o", innerRight), "\"*SELECT* 2\".c", "1")
+            )
+        ) with
+        {
+            Output = ["\"*SELECT* 1\".id", "(0)"],
+        };
+        var result = Over("Result", inner) with { Output = ["\"*SELECT* 1\".id", "0"] };
+        return SetOp("Except", AppendOf(result, Select(3, Scan("u_1", "u_1.id"), "\"*SELECT* 3\".id", "1"))) with
+        {
+            Output = ["\"*SELECT* 1\".id", "(0)"],
+        };
+    }
+
+    private static PlanNode NestedExcept18(string innerRight) =>
+        Inputs18("Except", Inputs18("Except", Scan("u", "u.id"), Scan("o", innerRight)), Scan("u_1", "u_1.id"));
+
+    [Theory]
+    [InlineData("o.user_id", true)]
+    [InlineData("o.ref", false)]
+    public void Run_NestedExcept_IsFalseWhenEveryInputOfTheInnerOneIs(string innerRight, bool answered)
+    {
+        AnswersOf(RunSet(NestedExcept14(innerRight), Int4)).ShouldBe([answered ? FromBranches : NoOrigin]);
+        AnswersOf(RunSet(NestedExcept18(innerRight), Int4)).ShouldBe([answered ? FromBranches : NoOrigin]);
+    }
+
+    // An INTERSECT that is a branch of a UNION ALL: its one input that is never NULL says nothing, since its type
+    // may be the other's.
+    [Fact]
+    public void Run_NestedIntersectWithAnInputThatMayBeNull_KeepsNoOrigin() =>
+        AnswersOf(
+                RunSet(
+                    AppendOf(Inputs18("Intersect", Scan("u", "u.id"), Scan("o", "o.ref")), Scan("u_1", "u_1.id")),
+                    Int4
+                )
+            )
+            .ShouldBe([NoOrigin]);
+
+    // A partitioned table in a branch is an Append of its partitions nested as a member, a union of them; an Append
+    // without a member returns nothing that proves anything.
+    [Fact]
+    public void Run_PartitionedTableAsAMember_IsAUnionOfItsPartitions()
+    {
+        var partitions = AppendOf(
+            Scan("p_1", "p_1.name") with
+            {
+                RelationName = "u_1",
+            },
+            Scan("p_2", "p_2.name") with
+            {
+                RelationName = "u_2",
+            }
+        );
+
+        AnswersOf(RunSet(AppendOf(Scan("o", "o.label"), partitions), Text)).ShouldBe([FromBranches]);
+        AnswersOf(RunSet(AppendOf(), Text)).ShouldBe([NoOrigin]);
+    }
+
+    // The walk does not take on a set operation under a join, nor one under grouping sets, which put NULL in a key.
+    [Fact]
+    public void Run_SetOperationUnderAJoin_KeepsNoOrigin() =>
+        AnswersOf(
+                RunSet(
+                    Join("Left", Scan("u", "u.name"), AppendOf(Scan("u_1", "u_1.name"), Scan("u_2", "u_2.name"))) with
+                    {
+                        Output = ["u_1.name"],
+                    },
+                    Text
+                )
+            )
+            .ShouldBe([NoOrigin]);
+
+    [Fact]
+    public void Run_SetOperationUnderGroupingSets_KeepsNoOrigin() =>
+        AnswersOf(
+                RunSet(
+                    Over("Aggregate", AppendOf(Scan("u", "u.name"), Scan("o", "o.label"))) with
+                    {
+                        HasGroupingSets = true,
+                        Output = ["u.name"],
+                    },
+                    Text
+                )
+            )
+            .ShouldBe([NoOrigin]);
+
+    // A branch is no part of the root's plan, whose instances find no grouping set in it: the node is no pass-through.
+    [Fact]
+    public void Run_GroupingSetsInsideABranch_KeepsNoOrigin() =>
+        AnswersOf(
+                RunSet(
+                    AppendOf(
+                        Over("Aggregate", Scan("u", "u.name")) with
+                        {
+                            HasGroupingSets = true,
+                            Output = ["u.name"],
+                        },
+                        Scan("o", "o.label")
+                    ),
+                    Text
+                )
+            )
+            .ShouldBe([NoOrigin]);
+
+    // Without the row description's types the walk answers no set operation, as before part C.
+    [Fact]
+    public void Run_SetOperationWithoutTheColumnsTypes_IsUnavailable()
+    {
+        var (columns, origins) = Built(false, Expression);
+
+        var outcome = NullabilityWalk.Run(
+            AppendOf(Scan("u", "u.name"), Scan("o", "o.label")),
+            columns,
+            origins,
+            new WalkScope(false, false, true, SetTables)
+        );
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        AnswersOf(outcome).ShouldBe([NoOrigin]);
+    }
+
+    // A column with an origin beside the set operation goes as it always did: kept, for a root without Output.
+    [Fact]
+    public void Run_ColumnWithAnOriginBesideASetOperation_IsKept()
+    {
+        var (columns, origins) = Built(true, NotNull, Expression);
+
+        var outcome = NullabilityWalk.Run(
+            AppendOf(Scan("u", "u.id", "u.name"), Scan("o", "o.user_id", "o.label")),
+            columns,
+            origins,
+            new WalkScope(true, false, true, SetTables) { ColumnTypes = [Int4, Text] }
+        );
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(outcome).ShouldBe([(true, "heuristic"), FromBranches]);
+    }
+
+    [Theory]
+    [InlineData("Append", true)]
+    [InlineData("SetOp", true)]
+    [InlineData("Recursive Union", false)]
+    public void ReachesSetOperation_ThroughNodesThatPassTheirChildOn_FindsIt(string nodeType, bool reaches)
+    {
+        var node = Scan("u", "u.name") with { NodeType = nodeType, Alias = null, RelationName = null };
+
+        NullabilityWalk.ReachesSetOperation(node).ShouldBe(reaches);
+        NullabilityWalk.ReachesSetOperation(Over("Limit", Over("Result", Over("Sort", node)))).ShouldBe(reaches);
+        NullabilityWalk.ReachesSetOperation(Join("Left", Scan("u"), node)).ShouldBeFalse();
+        NullabilityWalk.ReachesSetOperation(Over("Aggregate", node) with { HasGroupingSets = true }).ShouldBeFalse();
+    }
 }
