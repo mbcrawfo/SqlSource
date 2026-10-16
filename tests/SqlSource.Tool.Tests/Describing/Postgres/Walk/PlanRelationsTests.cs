@@ -1,9 +1,10 @@
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresPlans;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // Which relations a plan scans, for "relations" to be asked of them.
 public class PlanRelationsTests

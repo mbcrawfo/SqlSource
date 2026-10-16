@@ -1,9 +1,9 @@
 using System;
 using Shouldly;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // An entry of a plan's Output read as a whole: the forms that can never be NULL, the NULL constant, and the texts that
 // start or end like a form and are none.  The texts are as PostgreSQL 14 and 18 print them, which

@@ -1,4 +1,5 @@
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Postgres.Walk;
 
 namespace SqlSource.Tool.Describing.Postgres;
 

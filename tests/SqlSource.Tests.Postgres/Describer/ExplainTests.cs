@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
 using Xunit;
 

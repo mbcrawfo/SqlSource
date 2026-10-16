@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// The <c>reason</c> of <c>postgres.walk</c>: why a walk had no plan it could use, or, as <c>output-differs</c> on a

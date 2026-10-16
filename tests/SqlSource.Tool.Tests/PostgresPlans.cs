@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 
 namespace SqlSource.Tool.Tests;
 

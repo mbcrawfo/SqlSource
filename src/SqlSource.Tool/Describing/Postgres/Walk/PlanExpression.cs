@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// An entry of a plan's <c>Output</c> read as a whole: whether the server can ever return <c>NULL</c> for it, for the

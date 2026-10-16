@@ -1,7 +1,7 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// Whether a branch of a set operation hands its value to the result's column with no cast that could return

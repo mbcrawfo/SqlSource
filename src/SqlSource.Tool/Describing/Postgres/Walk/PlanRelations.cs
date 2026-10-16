@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// The relations a plan scans: what <c>relations</c> is asked, for the walk to read the <c>NOT NULL</c> and the type

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// The <c>Append</c>s of a plan that may scan a partitioned table: what <c>partitions</c> is asked, and what

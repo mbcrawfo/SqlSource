@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.Postgres;

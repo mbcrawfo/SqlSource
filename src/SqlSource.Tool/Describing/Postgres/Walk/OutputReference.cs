@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// An entry of a plan's <c>Output</c> that is a plain reference to a column: <c>alias.column</c>, which names the

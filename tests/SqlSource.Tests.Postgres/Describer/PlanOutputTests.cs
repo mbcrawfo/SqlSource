@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;

@@ -1,8 +1,8 @@
 using Shouldly;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // Whether a branch's value of one type reaches the set operation's column of another through a cast the server ships,
 // which tests/SqlSource.Tests.Postgres/Describer/PlanOutputTests.cs pins in both directions for every pair of a family.

@@ -3,10 +3,11 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresPlans;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // NullabilityWalk over plans a test writes: each column's answer, and the plan's value with its reason.
 public class NullabilityWalkTests

@@ -1,10 +1,11 @@
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresPlans;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // Which Appends of a plan may scan a partitioned table, what "partitions" is asked of them, and what their members
 // must agree on.

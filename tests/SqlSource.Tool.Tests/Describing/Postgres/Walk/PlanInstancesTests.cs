@@ -2,10 +2,11 @@ using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresPlans;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // PlanInstances over plans a test writes: which nodes name a relation instance, which of them a join above
 // null-extends, and what makes a plan unusable.

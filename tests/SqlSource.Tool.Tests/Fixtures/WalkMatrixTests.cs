@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text.Json;
 using Shouldly;
 using SqlSource.Tool.Describing.Capture;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 

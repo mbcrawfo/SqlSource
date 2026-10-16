@@ -7,6 +7,7 @@ using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresPlans;

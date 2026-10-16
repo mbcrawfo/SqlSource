@@ -1,8 +1,8 @@
 using Shouldly;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // An entry of a plan's Output read as a plain reference to a column, as PostgreSQL prints one: a name it need not
 // quote is lower-case letters, digits and underscores, and any other is in double quotes with "" for a quote.

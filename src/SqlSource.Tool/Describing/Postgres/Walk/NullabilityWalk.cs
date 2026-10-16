@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>A column after the walk, with what the walk read of it, as the log says it.</summary>
 /// <param name="Column">The column as it will be recorded.</param>
