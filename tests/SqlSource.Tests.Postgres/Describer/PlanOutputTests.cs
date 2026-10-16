@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
@@ -54,12 +55,15 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         + "u.email::text, upper(u.name), 'x'::email_t FROM users u JOIN orders o ON o.user_id = u.id";
 
     // The root of the plan of the SQL, on a connection of the test's own.
-    private async Task<PlanNode> ExplainAsync(string sql, string? connection = null)
+    private async Task<PlanNode> ExplainAsync(string sql, string? connection = null) =>
+        PlanNode.Read(await ExplainTextAsync(sql, connection)).ShouldNotBeNull();
+
+    // The plan of the SQL as the server writes it, for a key that PlanNode does not read.
+    private async Task<string> ExplainTextAsync(string sql, string? connection = null)
     {
         await using var source = NpgsqlDataSource.Create(connection ?? postgres.ConnectionString);
         await using var command = source.CreateCommand("EXPLAIN (VERBOSE, FORMAT JSON) " + sql);
-        var text = (string)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldNotBeNull();
-        return PlanNode.Read(text).ShouldNotBeNull();
+        return (string)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldNotBeNull();
     }
 
     // The generic plan of a statement of one parameter, with a NULL for it, as the describer asks for it, and with
@@ -221,6 +225,153 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
 
         root.Output.ShouldNotBeNull()[0].ShouldBe("('a'::text)");
         Followed(root).ShouldContain(static node => node.NodeType == "Append" || node.NodeType == "SetOp");
+    }
+
+    // A branch of a set operation whose output needs a cast is a Subquery Scan aliased *SELECT* <k>, which prints a
+    // column for each of the branch's, in the branch's order and under the branch's own names.  The first branch is
+    // text and the second varchar, so the second is coerced; its names cross the first's, and its scan prints them in
+    // its own order: the names say nothing of the place, and the place is the branch's.
+    [Fact]
+    public async Task Explain_SetOperationLeafScan_PrintsTheBranchInItsOrder()
+    {
+        var root = await ExplainAsync(
+            "SELECT o.note AS label, o.note AS note FROM orders o "
+                + "UNION ALL SELECT u.name AS note, u.email AS label FROM users u"
+        );
+
+        root.NodeType.ShouldBe("Append");
+        root.Plans.Select(static member => member.ParentRelationship).ShouldBe(["Member", "Member"]);
+        var scan = root.Plans[1];
+        scan.NodeType.ShouldBe("Subquery Scan");
+        scan.Alias.ShouldBe("*SELECT* 2");
+        scan.Output.ShouldBe(["\"*SELECT* 2\".note", "\"*SELECT* 2\".label"]);
+        var child = scan.Plans.Single(static child => child.ParentRelationship == "Subquery");
+        child.Output.ShouldBe(["u.name", "u.email"]);
+    }
+
+    // The implicit cast of a branch to the set operation's type is not in the scan: it prints the column as the
+    // branch's, int4, under a result of int8.  Only a node above the set operation prints the cast.
+    [Fact]
+    public async Task Explain_SetOperationLeafScan_HidesItsImplicitCast()
+    {
+        var root = await ExplainAsync("SELECT id FROM users UNION ALL SELECT id FROM orders");
+
+        root.NodeType.ShouldBe("Append");
+        var scan = root.Plans[0];
+        scan.NodeType.ShouldBe("Subquery Scan");
+        scan.Alias.ShouldBe("*SELECT* 1");
+        scan.Output.ShouldBe(["\"*SELECT* 1\".id"]);
+        scan.Plans.Single(static child => child.ParentRelationship == "Subquery").Output.ShouldBe(["users.id"]);
+        root.Plans[1].Output.ShouldBe(["orders.id"]);
+    }
+
+    // INTERSECT and EXCEPT are a SetOp.  On 14 its one input is an Append of the branches, each ending in a flag of
+    // its own, 0 for the left input and 1 for the right; on 18 it has two inputs, Outer and Inner, and no flag.
+    [Theory]
+    [InlineData("INTERSECT", "Intersect")]
+    [InlineData("INTERSECT ALL", "Intersect All")]
+    [InlineData("EXCEPT", "Except")]
+    [InlineData("EXCEPT ALL", "Except All")]
+    public async Task Explain_SetOp_HasFlaggedMembersOn14AndTwoInputsOn18(string keyword, string command)
+    {
+        if (postgres.Major is not (14 or 18))
+        {
+            Assert.Skip("The set operations are pinned for PostgreSQL 14 and 18 alone.");
+        }
+
+        var text = await ExplainTextAsync($"SELECT id FROM users {keyword} SELECT id FROM orders");
+
+        var root = PlanNode.Read(text).ShouldNotBeNull();
+        root.NodeType.ShouldBe("SetOp");
+        using (var document = JsonDocument.Parse(text))
+        {
+            document.RootElement[0].GetProperty("Plan").GetProperty("Command").GetString().ShouldBe(command);
+        }
+
+        if (postgres.Major == 14)
+        {
+            var append = root.Plans.Single();
+            append.ParentRelationship.ShouldBe("Outer");
+            append.NodeType.ShouldBe("Append");
+            append.Plans.ShouldAllBe(static member => member.ParentRelationship == "Member");
+            append
+                .Plans.Select(static member => member.Output.ShouldNotBeNull()[^1])
+                .ShouldBe(["0", "1"], ignoreOrder: true);
+        }
+        else
+        {
+            root.Plans.Select(static child => child.ParentRelationship).ShouldBe(["Outer", "Inner"]);
+            root.Plans.ShouldAllBe(static child => child.Output!.Count == 1);
+        }
+    }
+
+    // EXCEPT keeps its left input first even where it is the smaller: the member of flag 0 on 14, the Outer child on
+    // 18, whichever way the planner would order an INTERSECT.
+    [Fact]
+    public async Task Explain_Except_KeepsItsLeftInputFirst()
+    {
+        if (postgres.Major is not (14 or 18))
+        {
+            Assert.Skip("The set operations are pinned for PostgreSQL 14 and 18 alone.");
+        }
+
+        var root = await ExplainAsync(
+            "SELECT id FROM users WHERE id < 3 EXCEPT SELECT g FROM generate_series(1, 100000) g"
+        );
+
+        root.NodeType.ShouldBe("SetOp");
+        var (left, right) =
+            postgres.Major == 14
+                ? (
+                    root.Plans.Single().Plans.Single(static member => member.Output![^1] == "0"),
+                    root.Plans.Single().Plans.Single(static member => member.Output![^1] == "1")
+                )
+                : (
+                    root.Plans.Single(static child => child.ParentRelationship == "Outer"),
+                    root.Plans.Single(static child => child.ParentRelationship == "Inner")
+                );
+        All(left).Select(static node => node.RelationName).OfType<string>().ShouldBe(["users"]);
+        All(right).Select(static node => node.RelationName).OfType<string>().ShouldBeEmpty();
+    }
+
+    // A branch's value counts for the result's type where the two are in one family of built-in types, every ordered
+    // pair of which has a cast that the server ships: no user can add another, and none returns NULL for a value that
+    // is not.
+    [Fact]
+    public async Task Catalog_CastFamilies_AreBuiltInBothWays()
+    {
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand(
+            """
+            WITH family (id, type) AS (
+                VALUES
+                    (1, 'int2'::regtype), (1, 'int4'::regtype), (1, 'int8'::regtype), (1, 'numeric'::regtype),
+                    (1, 'float4'::regtype), (1, 'float8'::regtype),
+                    (2, 'text'::regtype), (2, 'varchar'::regtype), (2, 'bpchar'::regtype),
+                    (3, 'date'::regtype), (3, 'timestamp'::regtype), (3, 'timestamptz'::regtype)
+            ),
+            pair AS (
+                SELECT a.type AS source, b.type AS target
+                FROM family a JOIN family b ON b.id = a.id AND b.type <> a.type
+            )
+            SELECT
+                count(*) AS pairs,
+                count(*) FILTER (
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM pg_cast c
+                        WHERE c.castsource = p.source AND c.casttarget = p.target AND c.oid < 16384
+                    )
+                ) AS missing
+            FROM pair p
+            """
+        );
+        var token = TestContext.Current.CancellationToken;
+        await using var reader = await command.ExecuteReaderAsync(token);
+        (await reader.ReadAsync(token)).ShouldBeTrue();
+
+        // Six types and three, three, make 30, 6 and 6 ordered pairs.
+        reader.GetInt64(0).ShouldBe(42);
+        reader.GetInt64(1).ShouldBe(0);
     }
 
     // A function the path finds before the catalog's prints as the catalog's would: the reason a bare name is the
