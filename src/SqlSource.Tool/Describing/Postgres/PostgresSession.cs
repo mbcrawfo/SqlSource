@@ -18,9 +18,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <remarks>
 /// A query is described through one prepared statement: <c>PREPARE</c> takes a declared type as written, resolves
 /// it, checks it against every use of its parameter, and infers the rest.  The statement is then described through
-/// an <c>EXECUTE</c> that is never run, which gives its columns.  For a query that the outer-join gate lets in, an
-/// <c>EXPLAIN</c> of that <c>EXECUTE</c> under <c>force_generic_plan</c> gives the plan that
-/// <see cref="NullabilityWalk" /> walks.  A prepared statement is session state and
+/// an <c>EXECUTE</c> that is never run, which gives its columns.  For a query that the outer-join gate lets in, or
+/// one with a column of no origin, an <c>EXPLAIN</c> of that <c>EXECUTE</c> under <c>force_generic_plan</c> gives
+/// the plan that <see cref="NullabilityWalk" /> walks.  A prepared statement is session state and
 /// survives a rollback, so it is freed in a <c>finally</c>, outside any transaction; one left behind would be a
 /// leak until the session ends.  Its name is a counter, since the name is part of a request and a capture must be
 /// the same each time it is recorded.
@@ -209,8 +209,9 @@ internal sealed class PostgresSession : IDescribeSession
 
     // What is asked of a statement that was prepared, in this order: its columns, the tables they name, and every
     // type that the parameters, the columns and their origins have, once; the server's spelling of each type with
-    // each modifier the built types need, once; Npgsql's own reading of the SQL; and, for a gated query with rows,
-    // its generic plan.  The table match is made last and asks nothing: it reads the nullability the walk set.
+    // each modifier the built types need, once; Npgsql's own reading of the SQL; and, for a query with rows that is
+    // gated or has a column of no origin, its generic plan.  The table match is made last and asks nothing: it reads
+    // the nullability the walk set.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
         string statement,
@@ -303,9 +304,10 @@ internal sealed class PostgresSession : IDescribeSession
             return Failed(differs);
         }
 
-        // After the check, and for a gated query alone: one that is not gated pays nothing.
+        // After the check, for a gated query and for one with a column of no origin, which the plan may answer: one
+        // whose every column is a table's or a view's and that is not gated pays nothing.
         WalkOutcome? walked = null;
-        if (gated)
+        if (gated || (columns.Count > 0 && origins.Any(static origin => origin is null)))
         {
             var walk = await WalkAsync(
                 request,
@@ -313,6 +315,7 @@ internal sealed class PostgresSession : IDescribeSession
                 ArgumentCount(prepared),
                 built.Value,
                 origins,
+                new WalkScope(gated, OuterJoinGate.NamesOldOrNew(request.Sql)),
                 cancellationToken
             );
             if (!walk.Succeeded)
@@ -353,6 +356,7 @@ internal sealed class PostgresSession : IDescribeSession
         int arguments,
         IReadOnlyList<SidecarColumn> columns,
         ColumnOrigin?[] origins,
+        WalkScope scope,
         CancellationToken cancellationToken
     )
     {
@@ -379,7 +383,7 @@ internal sealed class PostgresSession : IDescribeSession
                 root,
                 columns,
                 origins,
-                OuterJoinGate.NamesOldOrNew(request.Sql)
+                scope
             ),
             _ => NullabilityWalk.Unavailable(WalkReasons.Unreadable, columns),
         };

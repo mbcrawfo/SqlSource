@@ -14,7 +14,7 @@ The nullability walk of the PostgreSQL describer ([`NullabilityWalk`](../../src/
 
 Two more things are not whole:
 
-- **A plan is asked for when it cannot change anything.**  The gate reads words, so `left(name, 3)` gates a query with no join, and a gated query none of whose columns has an origin is asked for its plan all the same.  Each costs one `EXPLAIN` in a transaction.
+- **A plan is asked for when it cannot change anything.**  The gate reads words, so `left(name, 3)` gates a query with no join and costs one `EXPLAIN` in a transaction.  A query with a column of no origin is planned whether or not it is gated, since the plan may answer that column as an expression.
 - **`postgres.column` holds the heuristic's answer for a gated query.**  The event is written when the column is built, before the plan is asked for; the answer the sidecar records is in `postgres.walk.column`.
 
 ## Why it exists

@@ -373,12 +373,19 @@ public class PostgresEventsTests
             null
         );
 
+    // The count of Listing has no origin, so the describe asks for the plan, which this server does not give.
+    private static readonly PostgresExplainAnswer NoPlan = new(
+        null,
+        new PostgresServerError("XX000", "no plan in this test", null, null, null)
+    );
+
     [Fact]
     public async Task Describe_QueryWithColumns_WritesColumnsTablesAColumnForEachAndCheck()
     {
         var log = new RecordingLog();
         var script = ListingScript()
-            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn));
+            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn))
+            .Answer("explain", new PostgresExplainRequest("sqlsource_1", 0, []), NoPlan);
 
         await DescribeAsync(script, log, Listing);
 
@@ -391,6 +398,10 @@ public class PostgresEventsTests
                 "column",
                 "column",
                 "check",
+                "explain",
+                "walk.column",
+                "walk.column",
+                "walk",
                 "table-match",
                 "deallocate",
             ]);
@@ -476,7 +487,7 @@ public class PostgresEventsTests
         Member(check, "result").ShouldBe((LogValue)"same");
         Member(check, "differs").ShouldBe(LogValue.Null);
 
-        var match = log.Events[7].Members;
+        var match = log.Events[11].Members;
         NamesOf(match).ShouldBe(["query", "result", "table"]);
         Member(match, "query").ShouldBe((LogValue)"ListUsers");
         Member(match, "result").ShouldBe((LogValue)"no-origin");
@@ -646,7 +657,8 @@ public class PostgresEventsTests
     {
         var log = new RecordingLog();
         var script = ListingScript()
-            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn));
+            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn))
+            .Answer("explain", new PostgresExplainRequest("sqlsource_1", 0, []), NoPlan);
 
         await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."), Listing);
 

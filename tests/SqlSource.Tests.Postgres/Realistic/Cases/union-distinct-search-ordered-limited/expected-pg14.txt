@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 parameter @pattern: text (inferred)
 column 0 id: bigint | nullable null | no-origin | -

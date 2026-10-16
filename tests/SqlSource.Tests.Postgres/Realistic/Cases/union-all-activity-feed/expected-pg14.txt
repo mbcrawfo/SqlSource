@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 parameter @account_id: integer (declared)
 column 0 kind: text | nullable null | no-origin | -

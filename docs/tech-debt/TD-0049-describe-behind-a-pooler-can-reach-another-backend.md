@@ -15,6 +15,8 @@ The describer needs one session, and the readme and `SQLSRC236` say to connect d
 
 ## Impact
 
+A stale plan matters to more queries since part A of the [nullability noise design](../superpowers/specs/2026-10-15-postgresql-nullability-noise-design.md): a query with a column of no origin is planned too, and the walk reads an expression of the plan's `Output`, a `count(*)` for one, as this query's.  So before it reads a plan the walk checks that the root's `Output` fits the described columns ([`NullabilityWalk`](../../src/SqlSource.Tool/Describing/Postgres/NullabilityWalk.cs)): each entry that is a reference the walk maps, for a column whose origin is a table, names a column of the origin's name.  A plan that fails is `unavailable` with the reason `output-differs`, and every column keeps what it was built with.  The check catches a stale plan whose references name other columns.  It does not catch one whose references agree, or one of expressions alone, `SELECT count(*), 'x'`, whose `count(*)` the walk would read for this query's.
+
 Low.  It needs a pooler in transaction mode, which is unsupported and documented as such, and other queries of the same run then fail as `SQLSRC236`.  An empty answer is always caught by `check`, with a message that names the wrong cause.  A wrong nullability needs a statement of the same name left by an earlier run, with the same column names and types and other origins, on the backend the call reached.
 
 ## Proposed fix

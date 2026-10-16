@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 parameter @since: date (inferred)
 column 0 id: integer | nullable false | catalog | billing.invoices.id

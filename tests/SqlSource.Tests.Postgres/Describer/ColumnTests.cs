@@ -253,7 +253,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         capture
             .Calls.Select(call => call.Method)
-            .ShouldBe(["open", "prepare", "columns", "types", "check", "deallocate"]);
+            .ShouldBe(["open", "prepare", "columns", "types", "check", "explain", "deallocate"]);
     }
 
     // Two tables of these tests alone: one with the modifiers the fixture schema lacks, and one with no column.
@@ -643,7 +643,8 @@ public sealed class ColumnTests(PostgresContainer postgres)
         NullabilityOf(gated.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog"), (null, "no-origin")]);
     }
 
-    // The query of the spec's Goal, without its join.
+    // The query of the spec's Goal, without its join.  Its count has no origin, so the plan is asked for it, and the
+    // columns of the table keep the catalog's answer.
     [Fact]
     public async Task Describe_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()
     {
@@ -651,7 +652,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
             "SELECT u.id, u.email, count(*) OVER () AS n FROM users u WHERE u.id = @id"
         );
 
-        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         NullabilityOf(description.Columns.ShouldNotBeNull())
             .ShouldBe([(false, "catalog"), (true, "catalog"), (null, "no-origin")]);
     }
@@ -743,10 +744,10 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_GateWordInAStringOrAComment_IsNotGated()
     {
-        var description = await ShouldDescribeAsync("SELECT id, 'left join' AS s FROM users -- outer");
+        var description = await ShouldDescribeAsync("SELECT id FROM users WHERE name <> 'left join' -- outer");
 
         description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
-        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(false, "catalog")]);
     }
 
     // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  In a gated query a view's

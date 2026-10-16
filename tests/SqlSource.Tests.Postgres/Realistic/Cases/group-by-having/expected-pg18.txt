@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 parameter @min_revenue: numeric (inferred)
 column 0 id: integer | nullable false | catalog | public.accounts.id

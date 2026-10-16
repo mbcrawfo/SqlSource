@@ -40,7 +40,10 @@ public class NullabilityWalkTests
     private static readonly Asked Expression = new(null, 0);
 
     // The columns as the session builds them for a gated query, with the heuristic's answer, and their origins.
-    private static (SidecarColumn[] Columns, ColumnOrigin?[] Origins) Built(params Asked[] asked)
+    private static (SidecarColumn[] Columns, ColumnOrigin?[] Origins) Built(params Asked[] asked) => Built(true, asked);
+
+    // The columns as the session builds them, for a gated query or for one that is not.
+    private static (SidecarColumn[] Columns, ColumnOrigin?[] Origins) Built(bool gated, params Asked[] asked)
     {
         var columns = new SidecarColumn[asked.Length];
         var origins = new ColumnOrigin?[asked.Length];
@@ -55,7 +58,7 @@ public class NullabilityWalkTests
                 origins[index],
                 PostgresRows.Of(PostgresRows.Int4),
                 TypeSpellings.None,
-                gated: true
+                gated
             );
         }
 
@@ -67,7 +70,14 @@ public class NullabilityWalkTests
     private static WalkOutcome Run(PlanNode root, bool oldAndNewMayBeNamed, params Asked[] asked)
     {
         var (columns, origins) = Built(asked);
-        return NullabilityWalk.Run(root, columns, origins, oldAndNewMayBeNamed);
+        return NullabilityWalk.Run(root, columns, origins, new WalkScope(Gated: true, oldAndNewMayBeNamed));
+    }
+
+    // A query that is planned for a column with no origin, and has no word of the gate.
+    private static WalkOutcome RunUngated(PlanNode root, params Asked[] asked)
+    {
+        var (columns, origins) = Built(false, asked);
+        return NullabilityWalk.Run(root, columns, origins, new WalkScope(Gated: false, OldAndNewMayBeNamed: false));
     }
 
     private static (bool? Nullable, string? Source)[] AnswersOf(WalkOutcome outcome) =>
@@ -128,6 +138,68 @@ public class NullabilityWalkTests
         outcome.Columns[0].Output.ShouldBe("b.id");
     }
 
+    // A query without a word of the gate is planned for its expressions alone: a column with an origin keeps the
+    // catalog's answer whatever its entry, since no outer join can have touched it.
+    [Fact]
+    public void Run_UngatedQueryWhoseEntryCannotBeMapped_KeepsTheCatalogsAnswer()
+    {
+        var plan = Over("Subquery Scan", Scan("t"), "Subquery") with { Alias = "s", Output = ["s.id", "count(*)"] };
+
+        var outcome = RunUngated(plan, NotNull, Expression);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(outcome).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+    }
+
+    [Fact]
+    public void Run_UngatedQueryWithAPlanThatCannotBeUsed_KeepsTheCatalogsAnswer()
+    {
+        var plan = Join("Inner", Scan("a"), Scan("a")) with { Output = ["a.id"] };
+
+        var outcome = RunUngated(plan, NotNull);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        outcome.Reason.ShouldBe(WalkReasons.DoubledAlias);
+        AnswersOf(outcome).ShouldBe([(false, "catalog")]);
+    }
+
+    // A plan whose reference names another column than the one the row description gives is no plan of this
+    // statement: a pooler can hand the explain another backend's statement of the same name (TD-0049).
+    [Theory]
+    [InlineData("t.opt")]
+    [InlineData("opt")]
+    public void Run_ReferenceThatNamesAnotherColumnThanTheOrigin_IsUnavailableWithOutputDiffers(string entry)
+    {
+        var outcome = Run(Scan("t", entry), NotNull);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        outcome.Reason.ShouldBe(WalkReasons.OutputDiffers);
+        AnswersOf(outcome).ShouldBe([(true, "heuristic")]);
+    }
+
+    [Fact]
+    public void Run_UngatedQueryWhoseReferenceNamesAnotherColumn_IsUnavailableAndKeepsTheCatalogsAnswer()
+    {
+        var outcome = RunUngated(Scan("t", "t.opt"), NotNull);
+
+        outcome.Reason.ShouldBe(WalkReasons.OutputDiffers);
+        AnswersOf(outcome).ShouldBe([(false, "catalog")]);
+    }
+
+    // A view's column prints as the column of the table under the view, under that column's name.
+    [Fact]
+    public void Run_ViewsColumnPrintedUnderTheBaseTablesName_IsWalked()
+    {
+        var outcome = Run(Scan("t", "t.opt"), OfView);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(outcome).ShouldBe([(null, "view")]);
+    }
+
+    [Fact]
+    public void Run_UnmappedReferenceAndExpression_PassTheCheck() =>
+        Run(LeftJoin("x.other", "a.id + 1"), NotNull, NotNull).Plan.ShouldBe(SidecarValues.Plan.Walked);
+
     // The rule of a NOT NULL is written once, in ColumnNullability: one that is NOT VALID is nullable here too.
     [Fact]
     public void Run_NotNullThatIsNotValidated_IsNullableByTheCatalog()
@@ -147,7 +219,12 @@ public class NullabilityWalkTests
             gated: true
         );
 
-        var outcome = NullabilityWalk.Run(Scan("n", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+        var outcome = NullabilityWalk.Run(
+            Scan("n", "id"),
+            [column],
+            [origin],
+            new WalkScope(Gated: true, OldAndNewMayBeNamed: false)
+        );
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
@@ -174,7 +251,12 @@ public class NullabilityWalkTests
             gated: true
         );
 
-        var outcome = NullabilityWalk.Run(Scan("p", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+        var outcome = NullabilityWalk.Run(
+            Scan("p", "id"),
+            [column],
+            [origin],
+            new WalkScope(Gated: true, OldAndNewMayBeNamed: false)
+        );
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
@@ -203,7 +285,12 @@ public class NullabilityWalkTests
             gated: true
         );
 
-        var outcome = NullabilityWalk.Run(Scan("pt", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+        var outcome = NullabilityWalk.Run(
+            Scan("pt", "id"),
+            [column],
+            [origin],
+            new WalkScope(Gated: true, OldAndNewMayBeNamed: false)
+        );
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
@@ -237,7 +324,12 @@ public class NullabilityWalkTests
             Output = ["t3.id"],
         };
 
-        var outcome = NullabilityWalk.Run(plan, [column], [origin], oldAndNewMayBeNamed: false);
+        var outcome = NullabilityWalk.Run(
+            plan,
+            [column],
+            [origin],
+            new WalkScope(Gated: true, OldAndNewMayBeNamed: false)
+        );
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
@@ -431,7 +523,7 @@ public class NullabilityWalkTests
         var (columns, origins) = Built(NotNull);
 
         var walked = NullabilityWalk
-            .Run(LeftJoin("a.id"), columns, origins, oldAndNewMayBeNamed: false)
+            .Run(LeftJoin("a.id"), columns, origins, new WalkScope(Gated: true, OldAndNewMayBeNamed: false))
             .Columns.ShouldHaveSingleItem()
             .Column;
 

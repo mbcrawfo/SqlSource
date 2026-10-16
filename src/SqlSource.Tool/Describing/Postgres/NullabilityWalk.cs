@@ -31,6 +31,17 @@ internal sealed record WalkOutcome(
     IReadOnlyList<WalkedColumn> Columns
 );
 
+/// <summary>What a walk is asked to answer, beside the plan and the columns.</summary>
+/// <param name="Gated">
+/// Whether <see cref="OuterJoinGate" /> found a word in the query.  Only then does the plan answer a column with an
+/// origin: a query without one is planned for its columns of no origin, and no outer join can have touched the rest.
+/// </param>
+/// <param name="OldAndNewMayBeNamed">
+/// Whether the query's SQL names <c>OLD</c> or <c>NEW</c>, so that a reference at a root <c>ModifyTable</c> may be
+/// PostgreSQL 18's old or new row.
+/// </param>
+internal sealed record WalkScope(bool Gated, bool OldAndNewMayBeNamed);
+
 /// <summary>
 /// The third layer of nullability: a column of a gated query is not nullable when its origin is <c>NOT NULL</c>
 /// and the plan proves that no outer join null-extends its relation instance.
@@ -61,17 +72,17 @@ internal static class NullabilityWalk
 {
     /// <summary>Walks a plan that was read.</summary>
     /// <param name="root">The root of the plan.</param>
-    /// <param name="columns">The columns as they were built for a gated query, with the heuristic's answer.</param>
-    /// <param name="origins">Where each column comes from, or null, in the order of the columns.</param>
-    /// <param name="oldAndNewMayBeNamed">
-    /// Whether the query's SQL names <c>OLD</c> or <c>NEW</c>, so that a reference at a root <c>ModifyTable</c> may be
-    /// PostgreSQL 18's old or new row.
+    /// <param name="columns">
+    /// The columns as they were built: for a gated query with the heuristic's answer, and for one that is not with the
+    /// catalog's.
     /// </param>
+    /// <param name="origins">Where each column comes from, or null, in the order of the columns.</param>
+    /// <param name="scope">What the walk is asked to answer.</param>
     public static WalkOutcome Run(
         PlanNode root,
         IReadOnlyList<SidecarColumn> columns,
         IReadOnlyList<ColumnOrigin?> origins,
-        bool oldAndNewMayBeNamed
+        WalkScope scope
     )
     {
         var instances = PlanInstances.Find(root);
@@ -88,14 +99,23 @@ internal static class NullabilityWalk
             return Unusable(reason, root, instances, columns);
         }
 
+        if (!OutputFits(entries, origins, instances))
+        {
+            return Unusable(WalkReasons.OutputDiffers, root, instances, columns);
+        }
+
         // The one alias a qualified reference may name at a ModifyTable that may return the old or the new row, or
         // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
-        var onlyAlias = oldAndNewMayBeNamed && root.NodeType == "ModifyTable" ? root.Alias ?? string.Empty : null;
+        var onlyAlias = scope.OldAndNewMayBeNamed && root.NodeType == "ModifyTable" ? root.Alias ?? string.Empty : null;
 
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
         {
-            walked.Add(ColumnOf(columns[index], origins[index], entries[index], instances, onlyAlias));
+            walked.Add(
+                scope.Gated
+                    ? ColumnOf(columns[index], origins[index], entries[index], instances, onlyAlias)
+                    : Kept(columns[index], entries[index])
+            );
         }
 
         return new WalkOutcome(SidecarValues.Plan.Walked, null, instances.Nodes, walked);
@@ -126,6 +146,32 @@ internal static class NullabilityWalk
         );
 
     private static WalkedColumn Kept(SidecarColumn column, string? entry) => new(column, entry, null, false, false);
+
+    // Whether every reference the walk can map names the column the row description gives as its origin.  A plan of
+    // another statement, which a pooler can give for this one's name (TD-0049), names other columns.  A view's column
+    // prints as the column of the table under it, under that column's name, so only a table's origin is compared, and
+    // only by name: a partition prints under its own alias and a child under its parent's columns' names.
+    private static bool OutputFits(
+        IReadOnlyList<string> entries,
+        IReadOnlyList<ColumnOrigin?> origins,
+        PlanInstances instances
+    )
+    {
+        for (var index = 0; index < origins.Count; index++)
+        {
+            if (
+                origins[index] is { Table.Relkind: "r" or "p" } origin
+                && OutputReference.Parse(entries[index]) is { } reference
+                && (reference.Alias is { } alias ? instances.TryFind(alias, out _) : instances.RootNamesAnInstance)
+                && !string.Equals(reference.Column, origin.Attribute.Name, StringComparison.Ordinal)
+            )
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
 
     private static string? EntryAt(PlanNode root, int index) =>
         root.Output is { } output && index < output.Count ? output[index] : null;

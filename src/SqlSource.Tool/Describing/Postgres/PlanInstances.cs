@@ -13,6 +13,7 @@ internal static class WalkReasons
     public const string UnknownJoinType = "unknown-join-type";
     public const string DoubledAlias = "doubled-alias";
     public const string GroupingSets = "grouping-sets";
+    public const string OutputDiffers = "output-differs";
 }
 
 /// <summary>A node the walk visited, as the log says it.</summary>

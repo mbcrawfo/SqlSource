@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 parameter @id: integer (inferred)
 parameter @category_id: integer (declared)

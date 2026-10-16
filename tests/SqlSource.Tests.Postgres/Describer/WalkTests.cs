@@ -74,6 +74,22 @@ public sealed class WalkTests(PostgresContainer postgres)
             )
         ).ShouldBe([(false, "catalog"), (false, "catalog"), (false, "catalog"), (false, "catalog")]);
 
+    // A column with no origin is answered from the plan, so a query without a word of the gate is planned for it,
+    // and its column of a table keeps the catalog's answer.
+    [Fact]
+    public async Task Describe_UngatedQueryWithAnExpression_IsWalkedAndKeepsTheCatalogsAnswer()
+    {
+        var description = await ShouldDescribeAsync("SELECT u.id, count(*) OVER () AS n FROM users u");
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        var id = description.Columns.ShouldNotBeNull()[0];
+        (id.Nullable, id.NullableSource).ShouldBe((false, "catalog"));
+    }
+
+    [Fact]
+    public async Task Describe_UngatedQueryWhoseEveryColumnHasAnOrigin_NeedsNoPlan() =>
+        (await ShouldDescribeAsync("SELECT u.id, u.name FROM users u")).Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+
     // The tool leaves the database as it found it: no statement, and the settings as "open" read them.
     [Fact]
     public async Task Describe_GatedQuery_LeavesNoStatementAndThePlanCacheModeAsOpenReadIt()
