@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 using SqlSource.Tool.Processes;
 using SqlSource.Tool.Projects;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // Stands in for "dotnet msbuild": answers the evaluation of a project with JSON, and the manifest target by writing
 // the file it was asked for.  It reads the command line as MSBuild would, so a test of the tool's arguments looks at

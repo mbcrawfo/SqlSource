@@ -1,6 +1,7 @@
 using System;
 using Shouldly;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing;

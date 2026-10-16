@@ -1,7 +1,7 @@
 using System;
 using Shouldly;
 using SqlSource.Snapshot;
-using SqlSource.Tests.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
 

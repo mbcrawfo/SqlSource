@@ -12,7 +12,7 @@ using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
-using SqlSource.Tool.Tests.Fixtures;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Describer;

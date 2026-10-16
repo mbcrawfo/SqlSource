@@ -1,5 +1,5 @@
-using System;
 using System.IO;
+using SqlSource.Testing;
 
 namespace SqlSource.Tests.Postgres;
 
@@ -7,9 +7,7 @@ namespace SqlSource.Tests.Postgres;
 // in the repository itself and not in an output folder: recording writes there.
 internal static class RepositoryPaths
 {
-    private const string Solution = "SqlSource.slnx";
-
-    public static string Root { get; } = FindRoot();
+    public static string Root { get; } = RepositoryRoot.Folder;
 
     // The folder with one folder for each engine: its schema.sql and its cases.
     public static string DescriberFixtures { get; } =
@@ -25,17 +23,4 @@ internal static class RepositoryPaths
     public static string RealisticSeed { get; } = Path.Combine(Realistic, "seed.sql");
 
     public static string RealisticCases { get; } = Path.Combine(Realistic, "Cases");
-
-    private static string FindRoot()
-    {
-        for (var folder = new DirectoryInfo(AppContext.BaseDirectory); folder is not null; folder = folder.Parent)
-        {
-            if (File.Exists(Path.Combine(folder.FullName, Solution)))
-            {
-                return folder.FullName;
-            }
-        }
-
-        throw new InvalidOperationException($"No folder above '{AppContext.BaseDirectory}' holds {Solution}.");
-    }
 }

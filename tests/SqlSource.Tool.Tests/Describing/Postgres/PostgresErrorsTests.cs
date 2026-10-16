@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
-using SqlSource.Tests.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;

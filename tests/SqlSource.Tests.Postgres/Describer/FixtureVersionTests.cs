@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Shouldly;
-using SqlSource.Tool.Tests.Fixtures;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;

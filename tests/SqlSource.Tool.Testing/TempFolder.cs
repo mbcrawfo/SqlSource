@@ -1,7 +1,7 @@
 using System;
 using System.IO;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // A folder of a test's own, deleted with everything in it when the test ends.
 internal sealed class TempFolder : IDisposable

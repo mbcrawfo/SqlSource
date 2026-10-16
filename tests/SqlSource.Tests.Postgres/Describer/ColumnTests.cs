@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
 using SqlSource.Snapshot;
-using SqlSource.Tests.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using Xunit;

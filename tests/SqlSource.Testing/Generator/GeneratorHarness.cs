@@ -13,13 +13,13 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using Xunit;
 
-namespace SqlSource.Tests.Generator;
+namespace SqlSource.Testing.Generator;
 
 // Runs the generator over in-memory C# and .sql files.
 //
-// The files of this folder are also compiled into tests/SqlSource.Tests.RoslynFloor, which runs them on Roslyn 4.8.0,
-// the oldest compiler the generator supports.  So they use only API that Roslyn 4.8.0 has, and the C# they hand to
-// the compiler is C# 12 at most.
+// tests/SqlSource.Tests.RoslynFloor references this library and runs it on Roslyn 4.8.0, the oldest compiler the
+// generator supports.  So the files of this folder use only API that Roslyn 4.8.0 has, and the C# they hand to the
+// compiler is C# 12 at most.
 internal static class GeneratorHarness
 {
     public const string SourcePath = "/app/Repo/Sample.cs";

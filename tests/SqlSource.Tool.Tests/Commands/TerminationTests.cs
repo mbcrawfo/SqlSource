@@ -6,7 +6,8 @@ using System.Security;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Tool.Tests.Fixtures;
+using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Commands;

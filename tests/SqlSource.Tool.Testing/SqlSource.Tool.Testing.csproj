@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The helpers of the tool's tests that tests/SqlSource.Tool.Tests and tests/SqlSource.Tests.Postgres share: the
+        harness of a whole command, the fakes of a process and a project, the start of the built tool, and the
+        harness of a describer's fixtures.  A library of the tests, never a test project of its own.  It is apart from
+        tests/SqlSource.Testing because it references the tool, which would raise the Roslyn of
+        tests/SqlSource.Tests.RoslynFloor.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>false</IsTestProject>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- The version the tool itself references: central pinning would otherwise hold it at the generator's. -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
+        <PackageReference Include="Shouldly" />
+        <!-- Assert and TestContext, without what makes a project a test executable. -->
+        <PackageReference Include="xunit.v3.assert" />
+        <PackageReference Include="xunit.v3.extensibility.core" />
+    </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="SqlSource.Tests.Postgres" />
+        <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
+        <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+        <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
+    </ItemGroup>
+</Project>

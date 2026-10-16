@@ -5,7 +5,7 @@ using System.Linq;
 using SqlSource.Tool.Processes;
 using Xunit;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // The programs that tests start: those of the operating system, for the tests of ProcessRunner, and the tool that
 // was built beside the tests, for a test that runs it in a process of its own.

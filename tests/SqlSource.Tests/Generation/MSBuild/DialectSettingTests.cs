@@ -5,7 +5,7 @@ using SqlSource.Generation;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Parsing;
 using SqlSource.Settings;
-using SqlSource.Tests.Generator;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.MSBuild;

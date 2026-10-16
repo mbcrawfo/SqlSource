@@ -4,8 +4,8 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
-using SqlSource.Tool.Tests;
-using SqlSource.Tool.Tests.Fixtures;
+using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;

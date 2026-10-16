@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Logging;

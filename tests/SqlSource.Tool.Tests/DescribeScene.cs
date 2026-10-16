@@ -1,5 +1,6 @@
 using System;
 using System.Threading.Tasks;
+using SqlSource.Tool.Testing;
 
 namespace SqlSource.Tool.Tests;
 

@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
-using SqlSource.Tool.Tests.Fixtures;
+using SqlSource.Tool.Testing.Fixtures;
 
 namespace SqlSource.Tests.Postgres.Realistic;
 

@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Tests.Snapshot;
+namespace SqlSource.Testing.Snapshot;
 
 // Builds the records of a sidecar with the values a test does not care about filled in.
 internal static class TestSidecars

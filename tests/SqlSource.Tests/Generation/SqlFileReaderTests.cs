@@ -7,7 +7,7 @@ using SqlSource.Generation.Paths;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
-using SqlSource.Tests.Generator;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation;

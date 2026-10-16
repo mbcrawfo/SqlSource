@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The helpers that the test projects share and that need nothing of the tool: the harness of the generator's
+        driver tests and the builder of a sidecar's records.  A library of the tests, never a test project of its own.
+    -->
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <IsTestProject>false</IsTestProject>
+    </PropertyGroup>
+    <ItemGroup>
+        <!--
+            No VersionOverride: tests/SqlSource.Tests.RoslynFloor references this library, and must stay on the pinned
+            Roslyn, the oldest one supported.
+        -->
+        <PackageReference Include="Microsoft.CodeAnalysis.CSharp" />
+        <PackageReference Include="Shouldly" />
+        <!-- TestContext, without what makes a project a test executable. -->
+        <PackageReference Include="xunit.v3.extensibility.core" />
+    </ItemGroup>
+    <ItemGroup>
+        <InternalsVisibleTo Include="SqlSource.Tests" />
+        <InternalsVisibleTo Include="SqlSource.Tests.RoslynFloor" />
+        <InternalsVisibleTo Include="SqlSource.Tests.Postgres" />
+        <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
+        <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+    </ItemGroup>
+</Project>

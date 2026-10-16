@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
 
-namespace SqlSource.Tests.Generator;
+namespace SqlSource.Testing.Generator;
 
 // What MSBuild tells a generator, as the compiler hands it over: the project's properties, and the metadata of each
 // .sql file by the file's path.  A null value is a project that does not set the property, and a path that is not

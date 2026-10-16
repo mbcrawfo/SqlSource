@@ -11,7 +11,7 @@ using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Fixtures;
+namespace SqlSource.Tool.Testing.Fixtures;
 
 // Describes the query of a case as a run does, and gives the text of the sidecar that holds its one entry.
 // DescribeAsync answers from the case's capture, with no database.  What is wrong with a case fails with the

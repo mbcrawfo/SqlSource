@@ -4,9 +4,10 @@ using System.Linq;
 using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Generation;
-using SqlSource.Tests.Generator;
+using SqlSource.Testing.Generator;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Planning;

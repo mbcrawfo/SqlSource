@@ -43,5 +43,11 @@
         <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
         <PackageVersion Include="xunit.analyzers" Version="2.1.0" />
         <PackageVersion Include="xunit.v3" Version="4.0.1" />
+        <!--
+            For tests/SqlSource.Testing and tests/SqlSource.Tool.Testing: what a library of the tests takes of xunit,
+            at the version xunit.v3 brings.
+        -->
+        <PackageVersion Include="xunit.v3.assert" Version="4.0.1" />
+        <PackageVersion Include="xunit.v3.extensibility.core" Version="4.0.1" />
     </ItemGroup>
 </Project>

@@ -10,7 +10,7 @@ using SqlSource.Tool.Planning;
 using SqlSource.Tool.Reporting;
 using Xunit;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // Runs the whole command in process, as Cli.Run does, with a host of the test's own: writers that are strings, a
 // working directory that is a temporary folder, and an environment that is a dictionary.

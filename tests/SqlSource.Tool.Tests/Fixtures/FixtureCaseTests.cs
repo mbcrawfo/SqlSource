@@ -1,5 +1,7 @@
 using System;
 using Shouldly;
+using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Fixtures;
