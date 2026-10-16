@@ -19,6 +19,13 @@ internal static partial class UserDocs
 
     private const string Manual = "docs/manual";
 
+    // The names of the block elements of CommonMark, whose tags start an HTML block whatever follows them.
+    private const string BlockTags =
+        "address|article|aside|base|basefont|blockquote|body|caption|center|col|colgroup|dd|details|dialog|dir|div|dl"
+        + "|dt|fieldset|figcaption|figure|footer|form|frame|frameset|h1|h2|h3|h4|h5|h6|head|header|hr|html|iframe"
+        + "|legend|li|link|main|menu|menuitem|nav|noframes|ol|optgroup|option|p|param|search|section|summary|table"
+        + "|tbody|td|tfoot|th|thead|title|tr|track|ul";
+
     private static readonly ConcurrentDictionary<string, Document> Documents = new(StringComparer.Ordinal);
 
     // The repository-relative paths, with '/', of the user documents.  A page of docs/manual/ is one for the user,
@@ -223,10 +230,13 @@ internal static partial class UserDocs
         opening.Groups[2].Value[0] != '`' || !opening.Groups[3].Value.Contains('`', StringComparison.Ordinal);
 
     // A line of '=' or '-' under a line of text makes the text a heading.  The line above is not text of a paragraph
-    // when it is blank, a heading, a quote, a list item, a table row, an HTML line, the closing fence of a block or a
-    // thematic break, and the underline is then a rule or part of that line.
+    // when it is blank, a heading, a quote, a list item, a table row, the closing fence of a block, a thematic break or
+    // the start of an HTML block, and the underline is then a rule or part of that line.
     private static bool IsSetextUnderline(string above, string line) =>
-        SetextPattern().IsMatch(line) && above.Trim().Length > 0 && !NotParagraphPattern().IsMatch(above);
+        SetextPattern().IsMatch(line)
+        && above.Trim().Length > 0
+        && !NotParagraphPattern().IsMatch(above)
+        && !HtmlBlockPattern().IsMatch(above);
 
     private static int CountOf(string text, string part)
     {
@@ -296,8 +306,24 @@ internal static partial class UserDocs
     [GeneratedRegex(@"^ {0,3}(?:=+|-+)[ \t]*$")]
     private static partial Regex SetextPattern();
 
-    [GeneratedRegex(@"^\s*(?:#|>|[-*+]\s|\d+[.)]\s|\||<|```|~~~|([-*_])(?:[ \t]*\1){2,}[ \t]*$)")]
+    // A heading, a quote, a list item, a table row, a closing fence (only backticks or only tildes) or a thematic
+    // break.
+    [GeneratedRegex(@"^\s*(?:#|>|[-*+]\s|\d+[.)]\s|\||`{3,}[ \t]*$|~{3,}[ \t]*$|([-*_])(?:[ \t]*\1){2,}[ \t]*$)")]
     private static partial Regex NotParagraphPattern();
+
+    // The start of an HTML block, as GitHub reads one: a comment, an opening or closing tag of a block element with
+    // anything after it, or any other complete opening or closing tag alone on its line.  A line that starts with an
+    // inline tag and goes on, such as `<b>bold</b> text` or `<a id="x"></a>`, is a paragraph.
+    [GeneratedRegex(
+        @"^\s*(?:<!--"
+            + @"|</?(?:"
+            + BlockTags
+            + @")(?:\s|/?>|$)"
+            + @"|<[A-Za-z][A-Za-z0-9-]*(?:\s[^<>]*)?/?>\s*$"
+            + @"|</[A-Za-z][A-Za-z0-9-]*\s*>\s*$)",
+        RegexOptions.IgnoreCase
+    )]
+    private static partial Regex HtmlBlockPattern();
 
     // Where the repository is on GitHub: the kind of URL, the ref and the path.  GitHub ignores the case of the owner
     // and the repository.

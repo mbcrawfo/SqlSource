@@ -69,6 +69,9 @@ public class UserDocsReadingTests
     [InlineData("Title", "=====")]
     [InlineData("Title", "-----")]
     [InlineData("Title", "-")]
+    [InlineData("```x``` text", "---")]
+    [InlineData("<b>bold</b> text", "---")]
+    [InlineData("""<a id="x"></a>""", "---")]
     public void Unsupported_SetextHeading_IsReported(string text, string underline) =>
         UserDocs.Read([text, underline]).Unsupported.Select(form => form.Line).ShouldBe([2]);
 
@@ -80,21 +83,30 @@ public class UserDocsReadingTests
     [InlineData("***", "---")]
     [InlineData("___", "---")]
     [InlineData("_ _ _", "---")]
-    [InlineData("* * *", "---")]
     [InlineData("1. item", "---")]
     [InlineData("1) item", "---")]
     [InlineData("> quote", "---")]
-    [InlineData("<div>", "---")]
     [InlineData("---", "---")]
     public void Unsupported_RuleOrTable_IsNotReported(string above, string line) =>
         UserDocs.Read([above, line]).Unsupported.ShouldBeEmpty();
 
     // The line above is the closing fence of a block, which is not a paragraph either.
     [Theory]
-    [InlineData("```")]
-    [InlineData("~~~")]
-    public void Unsupported_RuleAfterAFencedBlock_IsNotReported(string fence) =>
-        UserDocs.Read([fence, "text", fence, "---"]).Unsupported.ShouldBeEmpty();
+    [InlineData("```", "```")]
+    [InlineData("~~~", "~~~")]
+    [InlineData("````", "````  ")]
+    public void Unsupported_RuleAfterAFencedBlock_IsNotReported(string opening, string closing) =>
+        UserDocs.Read([opening, "text", closing, "---"]).Unsupported.ShouldBeEmpty();
+
+    // The line above starts an HTML block, which is not a paragraph either.
+    [Theory]
+    [InlineData("<!-- note -->")]
+    [InlineData("<details><summary>More</summary>")]
+    [InlineData("""<div class="x">text""")]
+    [InlineData("""<a id="x">""")]
+    [InlineData("</a>")]
+    public void Unsupported_RuleUnderAnHtmlBlock_IsNotReported(string above) =>
+        UserDocs.Read([above, "---"]).Unsupported.ShouldBeEmpty();
 
     [Fact]
     public void Blocks_BacktickInTheInfoOfABacktickFence_IsNotAFence()
