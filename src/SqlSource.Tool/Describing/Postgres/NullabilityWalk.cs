@@ -59,18 +59,13 @@ internal sealed record WalkOutcome(
 /// The type of each column as the row description gives it, by OID, in the order of the columns; null when the walk is
 /// to answer no column of a set operation from its branches.
 /// </param>
-/// <param name="SetOperationAliasMayBeWritten">
-/// Whether the query's SQL holds the text <c>*SELECT*</c>, so that a user may have written a set operation's alias
-/// for a subquery of their own, and no scan of that name is mapped by position.
-/// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
     bool CatalogFunctionsFirst,
     IReadOnlyDictionary<long, PostgresTableRow> Tables,
     IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? Partitions = null,
-    IReadOnlyList<long>? ColumnTypes = null,
-    bool SetOperationAliasMayBeWritten = false
+    IReadOnlyList<long>? ColumnTypes = null
 );
 
 /// <summary>

@@ -321,8 +321,7 @@ internal sealed class PostgresSession : IDescribeSession
                     OuterJoinGate.NamesOldOrNew(request.Sql),
                     PostgresSearchPath.PutsCatalogFirst(SettingOf("search_path")),
                     tables.Value,
-                    ColumnTypes: [.. columns.Select(static column => column.TypeOid)],
-                    SetOperationAliasMayBeWritten: request.Sql.Contains("*SELECT*", StringComparison.Ordinal)
+                    ColumnTypes: [.. columns.Select(static column => column.TypeOid)]
                 ),
                 cancellationToken
             );

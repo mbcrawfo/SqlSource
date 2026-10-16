@@ -1121,20 +1121,14 @@ public class NullabilityWalkTests
 
     private static readonly (bool?, string?) NoOrigin = (null, "no-origin");
 
-    private static WalkOutcome RunSet(PlanNode root, params long[] types) => RunSet(root, false, types);
-
-    private static WalkOutcome RunSet(PlanNode root, bool aliasMayBeWritten, params long[] types)
+    private static WalkOutcome RunSet(PlanNode root, params long[] types)
     {
         var (columns, origins) = Built(false, [.. types.Select(static _ => Expression)]);
         return NullabilityWalk.Run(
             root,
             columns,
             origins,
-            new WalkScope(false, false, true, SetTables)
-            {
-                ColumnTypes = types,
-                SetOperationAliasMayBeWritten = aliasMayBeWritten,
-            }
+            new WalkScope(false, false, true, SetTables) { ColumnTypes = types }
         );
     }
 
@@ -1272,33 +1266,72 @@ public class NullabilityWalkTests
     public void Run_LeafScanUnderAnAppend_IsNotMappedByPosition(string plan) =>
         AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
 
-    // A SetOp's own leaf scan is mapped by position: SELECT o.note AS label, o.note AS note ... EXCEPT SELECT u.name AS
-    // note, u.email AS label ... prints the crossed names, and column 0 is u.email.
-    private static PlanNode CrossedExcept(string alias) =>
+    // A 14 SetOp's flagged member is its own leaf scan, mapped by position: SELECT o.note AS label, o.note AS note ...
+    // EXCEPT SELECT u.name AS note, u.email AS label ... prints the crossed names, and column 0 is u.email.
+    private static PlanNode CrossedExcept14(string alias, PlanNode? branch = null) =>
         SetOp(
             "Except",
-            Over("Subquery Scan", Scan("u", "u.email", "u.name"), "Subquery") with
-            {
-                Alias = alias,
-                Output = [$"\"{alias}\".name", $"\"{alias}\".email"],
-            },
-            Scan("o", "o.label", "o.label")
+            AppendOf(
+                Over("Subquery Scan", branch ?? Scan("u", "u.email", "u.name"), "Subquery") with
+                {
+                    Alias = alias,
+                    Output = [$"\"{alias}\".name", $"\"{alias}\".email", "0"],
+                },
+                Select(2, Scan("o", "o.label", "o.label"), "\"*SELECT* 2\".label", "\"*SELECT* 2\".label", "1")
+            )
         ) with
         {
-            Output = [$"\"{alias}\".name", $"\"{alias}\".email"],
+            Output = [$"\"{alias}\".name", $"\"{alias}\".email", "(0)"],
         };
 
     [Fact]
-    public void Run_SetOpsLeafScan_IsMappedByPosition() =>
-        AnswersOf(RunSet(CrossedExcept("*SELECT* 1"), Text, Text)).ShouldBe([NoOrigin, FromBranches]);
+    public void Run_FlaggedLeafScanOn14_IsMappedByPosition() =>
+        AnswersOf(RunSet(CrossedExcept14("*SELECT* 1"), Text, Text)).ShouldBe([NoOrigin, FromBranches]);
 
     [Fact]
-    public void Run_SubqueryScanOfAnotherAlias_IsNotMappedByPosition() =>
-        AnswersOf(RunSet(CrossedExcept("s"), Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
+    public void Run_FlaggedSubqueryScanOfAnotherAlias_IsNotMappedByPosition() =>
+        AnswersOf(RunSet(CrossedExcept14("s"), Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
 
+    // A user's subquery of the same name under the planner's flagged scan, through a view, prints its columns in the
+    // order the branch needs them: only the flagged member itself is the planner's.
     [Fact]
-    public void Run_LeafScanWhenTheSqlMayWriteItsAlias_IsNotMapped() =>
-        AnswersOf(RunSet(CrossedExcept("*SELECT* 1"), true, Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
+    public void Run_UserScanOfTheSameNameUnderTheFlaggedScan_IsNotMappedByPosition()
+    {
+        var user = Over("Subquery Scan", Scan("u", "u.email", "u.name"), "Subquery") with
+        {
+            Alias = "*SELECT* 1",
+            Output = ["\"*SELECT* 1\".name", "\"*SELECT* 1\".email"],
+        };
+
+        AnswersOf(RunSet(CrossedExcept14("*SELECT* 1", user), Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
+    }
+
+    // On 18 the planner drops its own leaf scan when it adds nothing, and an input may be a user's subquery of that
+    // name: CREATE VIEW v AS SELECT "*SELECT* 9".b, "*SELECT* 9".a FROM (SELECT p.sku AS a, NULLIF(p.name, 'x') AS b
+    // FROM products p OFFSET 0) AS "*SELECT* 9"; SELECT b, a FROM v EXCEPT SELECT 'zz', 'zz', whose b is NULL.
+    [Theory]
+    [InlineData("Except")]
+    [InlineData("Intersect")]
+    public void Run_SubqueryScanOfTheLeafAliasAsAnInputOn18_IsNotMappedByPosition(string command)
+    {
+        var user = Over("Subquery Scan", Scan("u", "u.name", "NULLIF(u.name, 'x'::text)"), "Subquery") with
+        {
+            Alias = "*SELECT* 9",
+            Output = ["\"*SELECT* 9\".b", "\"*SELECT* 9\".a"],
+        };
+        // EXCEPT 'zz', 'zz'; and INTERSECT a nullable column, since an input of constants would prove it.
+        var other =
+            command == "Except"
+                ? Scan("x", "'zz'::text", "'zz'::text") with
+                {
+                    NodeType = "Result",
+                    Alias = null,
+                    RelationName = null,
+                }
+                : Scan("o", "o.note", "o.note");
+
+        AnswersOf(RunSet(Inputs18(command, user, other), Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
+    }
 
     // UNION on 14 is a HashAggregate over the Append, which prints a value the branch computed in parentheses and its
     // cast to the result's type; on 18 a Unique over a Sort.
@@ -1398,13 +1431,26 @@ public class NullabilityWalkTests
 
     public static TheoryData<string> SetOpsOfAnotherShape =>
         [
-            // Two members flagged 0, and none flagged.
+            // Two members flagged 0, three members, and none flagged.
             Text(
                 SetOp(
                     "Except",
                     AppendOf(
                         Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
                         Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "0")
+                    )
+                ) with
+                {
+                    Output = ["\"*SELECT* 1\".c", "(0)"],
+                }
+            ),
+            Text(
+                SetOp(
+                    "Intersect",
+                    AppendOf(
+                        Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
+                        Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "1"),
+                        Select(3, Scan("u_2", "u_2.name"), "\"*SELECT* 3\".c", "1")
                     )
                 ) with
                 {

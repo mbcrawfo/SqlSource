@@ -24,15 +24,17 @@ internal static partial class NullabilityWalk
     // There it proves the column only when each of its inputs does, and so each is of the result's family.
     //
     // A leaf scan of a set operation, a Subquery Scan aliased *SELECT* <k>, prints a reference to a column of its
-    // branch by the column's name, which the plan does not otherwise print, and only its place says which.  The scan is
-    // followed by place only as an input of a SetOp, whose target list the planner builds one entry for each column of
-    // the branch, in order.  Under an Append it never is: a UNION ALL that a subquery in FROM, a CTE or an inlined SQL
-    // function holds is pulled up into its query, and a branch the planner keeps as a scan prints the columns that
-    // query needs, in its order.  SELECT s.b, s.a FROM (SELECT p.sku AS a, p.name AS b ... UNION ALL (SELECT p2.sku,
-    // NULLIF(p2.name, 'x') ... LIMIT 5)) s prints "*SELECT* 2"."nullif", "*SELECT* 2".sku over a branch that prints
-    // p2.sku first, and nothing in the plan tells it from a scan in order.  A constant the planner put in the scan's
-    // place is read where it is.  A query whose SQL holds the text *SELECT* may name a subquery of its own so, and no
-    // scan is followed.
+    // branch by the column's name, which the plan does not otherwise print, and only its place says which.  It is
+    // followed by place only when it is itself a member of a 14 SetOp's Append with a flag last: the flag makes the
+    // planner's own leaf scan, built one entry for each column of the branch in order, and keeps it, so the member is
+    // that scan.  Nowhere else does the alias prove it.  Under an Append the planner may have pulled a UNION ALL that a
+    // subquery in FROM, a CTE or an inlined SQL function holds up into its query, and a branch it keeps as such a
+    // scan prints the columns that query needs, in its order: SELECT s.b, s.a FROM (SELECT p.sku AS a, p.name AS b
+    // ... UNION ALL (SELECT p2.sku, NULLIF(p2.name, 'x') ... LIMIT 5)) s prints "*SELECT* 2"."nullif",
+    // "*SELECT* 2".sku over a branch that prints p2.sku first.  On 18 the planner drops its own leaf scan when it
+    // adds nothing, and a SetOp's input may be a user's subquery of that very name, through a view, an inlined SQL
+    // function or a U&"..." identifier the SQL does not show, which prints its columns in the order its query needs.
+    // A constant the planner put in the scan's place is read where it is.
     //
     // Any other node that prints the value is walked as a plan of its own, as the walk walks the root: a reference by
     // the catalog's answer of an instance that no join of that plan extends, and an expression by PlanExpression.  A
@@ -44,6 +46,8 @@ internal static partial class NullabilityWalk
     private const string Member = "Member";
     private const string SetOp = "SetOp";
     private const string LeafScanPrefix = "*SELECT* ";
+    private const string LeftFlag = "0";
+    private const string RightFlag = "1";
 
     // Nodes that never project: the row is the child's, and so is each column.
     private static readonly HashSet<string> NeverProject =
@@ -203,15 +207,15 @@ internal static partial class NullabilityWalk
         );
 
     // How a node reaches the column: whether its type is the row description's, which holds only above every set
-    // operation and every cast a node printed, and whether the node is a SetOp's input, whose leaf scan the planner
-    // built in the branch's order.
-    private readonly record struct Reach(bool TypeIsTheColumns, bool InputOfASetOp)
+    // operation and every cast a node printed, and whether the node is itself a flagged member of a SetOp's Append on
+    // 14, the leaf scan the planner built in the branch's order.
+    private readonly record struct Reach(bool TypeIsTheColumns, bool FlaggedMember)
     {
         public static Reach Root => new(true, false);
 
         public static Reach Branch => new(false, false);
 
-        public static Reach Input => new(false, true);
+        public static Reach Flagged => new(false, true);
     }
 
     // The answer of a set operation's column at a node: whether every row the node returns holds a value at the
@@ -245,7 +249,7 @@ internal static partial class NullabilityWalk
 
             if (NeverProjectedChildOf(node) is { } passed)
             {
-                return ColumnAt(passed, ordinal, type, reach, depth);
+                return ColumnAt(passed, ordinal, type, reach with { FlaggedMember = false }, depth);
             }
 
             if (PassedOn(node, ordinal, depth) is var (child, cast))
@@ -253,7 +257,7 @@ internal static partial class NullabilityWalk
                 return ColumnAt(child, ordinal, type, new Reach(reach.TypeIsTheColumns && !cast, false), depth);
             }
 
-            if (reach.InputOfASetOp && LeafBranchOf(node, ordinal) is { } branch)
+            if (reach.FlaggedMember && LeafBranchOf(node, ordinal) is { } branch)
             {
                 return ColumnAt(branch, ordinal, type, Reach.Branch, depth + 1);
             }
@@ -270,24 +274,25 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            if (InputsOf(node) is not var (inputs, left))
+            if (InputsOf(node) is not var (inputs, left, flagged))
             {
                 return false;
             }
 
-            bool Proves(PlanNode input) => ColumnAt(input, ordinal, type, Reach.Input, depth + 1);
+            bool Proves(PlanNode input) =>
+                ColumnAt(input, ordinal, type, flagged ? Reach.Flagged : Reach.Branch, depth + 1);
             if (!reach.TypeIsTheColumns)
             {
-                return (intersect || left is not null) && inputs.All(Proves);
+                return inputs.All(Proves);
             }
 
-            return intersect ? inputs.Any(Proves) : left is not null && Proves(left);
+            return intersect ? inputs.Any(Proves) : Proves(left);
         }
 
-        // The inputs of a SetOp and its left one: on 18 its Outer and its Inner child; on 14 the members of its one
-        // Outer Append, through nodes that never project, each with its flag last, the left the one flagged 0.  The
-        // left is null when the flags do not name one.
-        private static (PlanNode[] Inputs, PlanNode? Left)? InputsOf(PlanNode node)
+        // The inputs of a SetOp, its left one, and whether they are flagged members: on 18 its Outer and its Inner
+        // child; on 14 the two members of its one Outer Append, through nodes that never project, each with its flag
+        // last, the left flagged 0 and the right 1.
+        private static (PlanNode[] Inputs, PlanNode Left, bool Flagged)? InputsOf(PlanNode node)
         {
             var children = RowChildrenOf(node);
             if (
@@ -296,7 +301,7 @@ internal static partial class NullabilityWalk
                 && children.FirstOrDefault(static child => child.ParentRelationship == Inner) is { } inner
             )
             {
-                return ([outer, inner], outer);
+                return ([outer, inner], outer, false);
             }
 
             if (children is not [{ ParentRelationship: Outer } only])
@@ -310,20 +315,20 @@ internal static partial class NullabilityWalk
                 append = under;
             }
 
-            if (append.NodeType != "Append" || MembersOf(append) is not [_, _, ..] members)
+            if (append.NodeType != "Append" || MembersOf(append) is not [var first, var second])
             {
                 return null;
             }
 
-            var flags = members.Select(static member => member.Output is [.., var last] ? last : null).ToArray();
-            if (!flags.All(static flag => flag is "0" or "1"))
+            return (FlagOf(first), FlagOf(second)) switch
             {
-                return null;
-            }
-
-            var left = members.Where((_, index) => flags[index] == "0").ToArray();
-            return (members, left is [var one] ? one : null);
+                (LeftFlag, RightFlag) => ([first, second], first, true),
+                (RightFlag, LeftFlag) => ([first, second], second, true),
+                _ => null,
+            };
         }
+
+        private static string? FlagOf(PlanNode member) => member.Output is [.., var last] ? last : null;
 
         // The child of a node that projects, when its entry at the ordinal is the child's printed entry there, E,
         // or E as a value the child computed, (E), or that and its cast to the result's type, ((E)::T); and no other
@@ -367,11 +372,10 @@ internal static partial class NullabilityWalk
             return (child, cast);
         }
 
-        // The branch of a set operation's own leaf scan, when its entry at the ordinal is a reference to its own
-        // alias and the SQL cannot have written that alias.
-        private PlanNode? LeafBranchOf(PlanNode node, int ordinal) =>
-            !scope.SetOperationAliasMayBeWritten
-            && node.NodeType == "Subquery Scan"
+        // The branch of a flagged member that is a set operation's own leaf scan, when its entry at the ordinal is a
+        // reference to its own alias.
+        private static PlanNode? LeafBranchOf(PlanNode node, int ordinal) =>
+            node.NodeType == "Subquery Scan"
             && node.Alias is { } alias
             && IsLeafAlias(alias)
             && node.Output is { } output

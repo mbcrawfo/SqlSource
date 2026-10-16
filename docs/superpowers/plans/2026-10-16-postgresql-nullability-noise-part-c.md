@@ -50,6 +50,8 @@ Probed on 2026-10-16, `EXPLAIN (VERBOSE)` of `EXECUTE` under `force_generic_plan
 7. **A root `Append` that prints no `Output`** is answered this way when a column has no origin, and its plan is `walked`, not `unavailable` (`walk-union`).  The spec lists no such diff; it is a plan the walk can now use.
 8. **What the walk does not take on:** a set operation under a join, an entry a node above the set operation computes, and a branch's entry through any scan of another plan but `*SELECT* <k>`.  Each stays as it is today and goes to TD-0051.
 
+- Found while building Task 4: decision 2 and fact 5 do not hold everywhere, and a `*SELECT* <k>` scan is followed by position only when it is itself a flagged member of a 14 `SetOp`'s `Append`.  A `UNION ALL` that a subquery in `FROM`, a CTE or an inlined SQL function holds is pulled up as an appendrel, and a branch the planner keeps as a `*SELECT* <k>` scan prints the outer query's columns in its order (`SELECT s.b, s.a FROM (... UNION ALL (SELECT ..., NULLIF(...) ... LIMIT 5)) s`, on 14 and 18).  On 18 the planner drops its own leaf scan when it adds nothing, so a `SetOp`'s input may be a user's subquery named `*SELECT* <k>` through a view, an inlined function or a `U&"..."` identifier the SQL does not show; `SetOperationAliasMayBeWritten` is dropped, since the flag, not the SQL text, is the proof.  Also: a nested `INTERSECT` or `EXCEPT`, whose own type is not the row description's, is `false` only when every input is; and a node with grouping sets is never a pass-through.
+
 ## Files
 
 | File | Change |
