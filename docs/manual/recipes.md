@@ -145,6 +145,8 @@ using System.Data.Common;
 using Dapper;
 using SqlSource;
 
+public sealed record User(int Id, string Name);
+
 [SqlSourceGenerate]
 public partial class UserRepository(DbConnection connection)
 {

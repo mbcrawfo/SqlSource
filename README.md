@@ -50,7 +50,7 @@ ORDER BY name;
 - **`-- name:`** starts a query and names it.  The name becomes the name of a C# member, so it is a C# identifier.
 - **`-- summary:`** documents the query.  Your editor shows it, with the SQL, where the query is used.
 - **`@id`** is a query parameter.  It stays in the SQL as written, and you give its value when you run the query.
-- **`-- param:`** gives a parameter a type, in your database's own words, and says whether it can be null.  Add one where it helps: here it says that `@name` may be null.  Without one, the database works out the type from how the parameter is used.
+- **`-- param:`** gives a parameter a type, in your database's own words, and says whether it can be null.  Add one where it helps: here it gives `@name` the type that PostgreSQL cannot work out from `@name IS NULL`, and says that it may be null.  Without one, the database works out the type from how the parameter is used.
 
 More: [the marker index](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sql-files.md#marker-index), [parameters and tokens](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/parameters-and-tokens.md).
 
@@ -106,6 +106,8 @@ public partial class UserRepository(DbConnection connection)
 More: [constants](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md#constants), [the Dapper and ADO.NET recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#dapper-and-adonet).
 
 ### 5. Describe your queries
+
+The tool describes PostgreSQL queries today.  For another database, skip this step and set the output to `sql`: see [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files)
 
 ```console
 $ dotnet sqlsource describe --connection postgres="Host=localhost;Database=app;Username=app;Password=secret"
@@ -193,7 +195,7 @@ Both projects can use SqlSource.  Each has its own copy of the attribute, and Sq
 | Look up a marker or a setting | [The marker index](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/sql-files.md#marker-index), [all settings](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#all-settings) |
 | Use a database other than PostgreSQL | [Database support](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#database-support) |
 | Keep the sidecars current after a schema change | [After a schema change](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#after-a-schema-change) |
-| Set up CI | [Check in CI](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#check-in-ci) |
+| Set up CI | [Check in CI](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#check-in-ci), [a GitHub Actions job](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#check-sidecars-in-ci) |
 | Look up a build error or a tool error | [Diagnostics](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md) |
 | See everything | [The manual](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md) |
 

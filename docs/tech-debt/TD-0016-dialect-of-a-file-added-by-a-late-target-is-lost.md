@@ -18,7 +18,7 @@ Low.  It takes a target that adds `.sql` files during the build, gives them a di
 
 ## Proposed fix
 
-None is known that runs last.  Such a target hooks `SqlSourceTrimMetadataOfFiles` instead, which runs it before the trim and the collecting wherever it is declared; the comment at the top of `build/SqlSource.targets` says so.  If it is reported, say the same in the "Dialect" section of `README.md`.
+None is known that runs last.  Such a target hooks `SqlSourceTrimMetadataOfFiles` instead, which runs it before the trim and the collecting wherever it is declared; the comment at the top of `build/SqlSource.targets` says so.  The known issues of [`docs/manual/settings.md`](../manual/settings.md#known-issues) say so, with a sample target.
 
 ## Trigger
 

@@ -15,11 +15,14 @@ SELECT id, name FROM {{table}} ORDER BY {{orderBy}};
 ```
 
 ```csharp
+using System.Data.Common;
 using Dapper;
 using SqlSource;
 
+public sealed record User(int Id, string Name);
+
 [SqlSourceGenerate]
-public partial class UserRepository(IDbConnection connection)
+public partial class UserRepository(DbConnection connection)
 {
     public Task<User> Get(int id) =>
         connection.QuerySingleAsync<User>(Sql.GetUser, new { id });
@@ -79,7 +82,7 @@ A type gets the files that its [`Path`](settings.md#setting-path) names, by the 
 
 - **A type's files are one set.**  A query name is used once across all of them: a second use is [SQLSRC008](diagnostics.md#sqlsrc008), and the file with the second one gets no members for that type.
 - **Two types may claim one file**, and each gets its own members from it.  They can ask for different things: each type's attribute applies to its own members only.
-- **A `.sql` file that no type claims is not read.**  A folder of migration scripts does no harm.
+- **A `.sql` file that no type claims is ignored**: see [Path](settings.md#setting-path).
 - **A file with an error produces no members** until it is fixed: see [`.sql` files](sql-files.md).  The other files of the type are unaffected.
 
 <a id="locations"></a>

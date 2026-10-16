@@ -20,7 +20,7 @@ Low.  It takes a target that adds `.sql` files while the build runs.  The failur
 
 ## Proposed fix
 
-A target that adds a `.sql` file hooks `SqlSourceTrimMetadataOfFiles`, which runs it before the manifest is written as well as before the trims; the comment at the top of `build/SqlSource.targets` and [TD-0016](TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) say the same for a build.  Phase 5 says so in `README.md`.  Phase 9's run inside a build does not have the limit: the build has run its hooks by then.
+A target that adds a `.sql` file hooks `SqlSourceTrimMetadataOfFiles`, which runs it before the manifest is written as well as before the trims; the comment at the top of `build/SqlSource.targets` and [TD-0016](TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) say the same for a build.  The known issues of [`docs/manual/settings.md`](../manual/settings.md#known-issues) say so, and those of `docs/manual/tool.md` point there.  Phase 9's run inside a build does not have the limit: the build has run its hooks by then.
 
 ## Trigger
 

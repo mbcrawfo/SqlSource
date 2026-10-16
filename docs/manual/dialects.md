@@ -67,7 +67,7 @@ MySQL and MariaDB have SQL modes that change how a string is read.  If your serv
 - **Options are not case-sensitive** and come in any order.  Spaces around the name and each option are ignored.
 - **Only `mysql` and `mariadb` have options.**  An option of another dialect, or one that does not exist, is the same error as a name that is not a dialect, and so is an empty one, as in `mysql,`.  Errors by place are on [the settings page](settings.md#setting-dialect).
 - **In a `-- dialect:` marker, the value is the rest of the line**: the name, then the options, separated by commas.  Nothing else may follow it on the line, a comment included.
-- **A value replaces the one it wins over whole**, options included.  A file with `-- dialect: mysql` in a project that sets `mysql,ansi-quotes` is read as plain `mysql`.
+- **A value written in several places**, options included, follows [the rules of the dialect setting](settings.md#setting-dialect).
 
 <a id="what-a-dialect-changes"></a>
 
@@ -136,7 +136,7 @@ If your SQL uses one of these constructs, check the generated SQL: hover over th
 | CockroachDB | `cockroachdb` | No | None |
 | Any other database | `ansi` | No | None |
 
-Every dialect is read, and every `.sql` file gets its constants and token methods whatever its database.  *Described* is something more: the `sqlsource` tool can ask the database about a query's parameters and columns and write the answer to a sidecar.  The tool decides by the dialect of the file, and asks only the databases in the table.  A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models` or `codegen`, so give a DuckDB file the output `sql`: see [the output setting](settings.md#setting-output).
+Every dialect is read, and every `.sql` file gets its constants and token methods whatever its database.  *Described* is something more: the `sqlsource` tool can ask the database about a query's parameters and columns and write the answer to a sidecar.  The tool decides by the dialect of the file, and asks only the databases marked Yes.  A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models` or `codegen`, so give a DuckDB file the output `sql`: see [the output setting](settings.md#setting-output).
 
 > **Coming in a later release.**  The tool will describe SQL Server queries.  See [what works today](README.md#what-works-today).
 

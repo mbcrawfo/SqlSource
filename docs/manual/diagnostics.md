@@ -897,7 +897,7 @@ The query must be described, its dialect is one whose databases can be asked, an
 /work/App/Queries/Users.sql(1,10): error SQLSRC216: This version of sqlsource cannot describe 'mssql'
 ```
 
-Update the tool, with `dotnet tool update SqlSource.Tool --prerelease`, to a version that describes the dialect; this version describes `postgres` alone.  Until then, set the output of the queries to `sql`, with `SqlSourceOutput` or an `-- output: sql` marker, to use their constants and methods without types.  The error is reported at each query that the run would have described, and each counts as failed.
+Set the output of the queries to `sql`, with an `-- output: sql` marker or `SqlSourceOutput` in the project file, to use their constants and methods without types; the tool then leaves them out.  Describing SQL Server queries comes in a later release, which you take by updating the `SqlSource` package and the tool together, as [SQLSRC206](#sqlsrc206) asks.  The error is reported at each query that the run would have described, and each counts as failed.
 
 See: [SQL Server](sqlserver.md)
 

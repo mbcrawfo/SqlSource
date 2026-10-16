@@ -79,7 +79,7 @@ LEFT JOIN customers c ON c.id = o.customer_id;
 
 For each column the tool records whether it can be null.  If `orders.id`, `orders.placed_at` and `customers.name` are all `NOT NULL`, `id` and `placed_at` above are never null, and `name` can be: the `LEFT JOIN` gives a null name to an order with no customer.
 
-SqlSource treats a column as possibly null unless it can show that it never is.  A column it treats as possibly null that never is costs a null check in your code; it never gives you a wrong value.
+SqlSource treats a column as possibly null unless it can show that it never is.  A column it treats as possibly null that never is costs a null check in your code.  When the tool connects directly to the server, it never gives you a wrong value; see [known issues](#known-issues) for a pooler.
 
 SqlSource can tell that a column is never null when it is:
 

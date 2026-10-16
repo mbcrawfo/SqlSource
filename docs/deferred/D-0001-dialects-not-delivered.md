@@ -6,7 +6,7 @@ The [dialect design](../superpowers/specs/2026-10-06-sql-dialects-design.md) res
 
 ## Delivered instead
 
-Eight dialects: `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` and `oracle`, in [`SqlDialectRules`](../../src/SqlSource/Parsing/SqlDialectRules.cs).  `README.md` says which of them to use for DuckDB, Firebird and Db2.
+Eight dialects: `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite` and `oracle`, in [`SqlDialectRules`](../../src/SqlSource/Parsing/SqlDialectRules.cs).  [`docs/manual/dialects.md`](../manual/dialects.md#choosing-a-dialect) says which of them to use for DuckDB, Firebird and Db2.
 
 ## Why deferred
 
@@ -14,7 +14,7 @@ Seven of the eight cover every engine whose ADO.NET providers have more than 100
 
 ## Remaining work
 
-A dialect is a value of `SqlDialect`, a name in `SqlDialectName`, a static property of `SqlDialectRules`, a row in the theory `Lex_Construct_IsReadByTheRulesOfTheDialect`, and a column in `README.md`.  A quoting form that no reader has is a new `QuoteReader` in `Parsing/Quoting/`.
+A dialect is a value of `SqlDialect`, a name in `SqlDialectName`, a static property of `SqlDialectRules`, a row in the theory `Lex_Construct_IsReadByTheRulesOfTheDialect`, and, in the user documentation, a row of "Choosing a dialect", a column of "What each dialect changes" and a row of "Database support" in `docs/manual/dialects.md`, and a value in the Dialect row of `docs/manual/settings.md`.  A quoting form that no reader has is a new `QuoteReader` in `Parsing/Quoting/`.
 
 | Engine | Read correctly today by | What it needs |
 |----|----|----|

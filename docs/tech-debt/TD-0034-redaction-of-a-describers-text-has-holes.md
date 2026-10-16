@@ -17,7 +17,7 @@ The tool does not read a connection string and so knows no part of one, and the 
 
 ## Impact
 
-Low.  The released tool has PostgreSQL's describer since sub-phase 3.6, so the last hole reaches users: a database that cannot be opened prints its host or its user under `SQLSRC224` and writes it to the log, which the readme warns of.  A describer's rule is to put the value, or a part of it, in nothing it returns, and this is the net under that rule, with these holes.
+Low.  The released tool has PostgreSQL's describer since sub-phase 3.6, so the last hole reaches users: a database that cannot be opened prints its host or its user under `SQLSRC224` and writes it to the log, which [the tool's manual page](../manual/tool.md#logs) warns of.  A describer's rule is to put the value, or a part of it, in nothing it returns, and this is the net under that rule, with these holes.
 
 ## Proposed fix
 

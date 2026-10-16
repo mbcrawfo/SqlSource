@@ -11,7 +11,7 @@ A try against PgBouncer 1.26 in transaction mode, with eight clients of `pgbench
 
 ## Why it exists
 
-The describer needs one session, and the readme and `SQLSRC236` say to connect directly.  `columns` cannot tell an empty answer from a statement without rows, and nothing short of asking the backend again before each call says which backend a call reached.  What can be told is refused as `SQLSRC236`: `Multiplexing=true` at `open`, a statement that is not listed, `42P05` and `26000`.
+The describer needs one session, and [`docs/manual/postgresql.md`](../manual/postgresql.md#connecting) and `SQLSRC236` say to connect directly.  `columns` cannot tell an empty answer from a statement without rows, and nothing short of asking the backend again before each call says which backend a call reached.  What can be told is refused as `SQLSRC236`: `Multiplexing=true` at `open`, a statement that is not listed, `42P05` and `26000`.
 
 ## Impact
 

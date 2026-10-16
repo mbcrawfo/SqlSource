@@ -50,7 +50,7 @@ A query is described through its [dialect](concepts.md#dialect).  The tool can a
 
 Either way, set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says.  For SQLSRC209 you can instead set the dialect, when the files are PostgreSQL.
 
-The tool reads `[SqlSourceGenerate]` from your C# source without compiling it, so `Path` and `Output` must be written out where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  See [SQLSRC208](diagnostics.md#sqlsrc208) and [the generator's known issues](generator.md#known-issues).
+The tool reads `[SqlSourceGenerate]` from your C# source without compiling it, which limits how `Path` and `Output` can be written there: see [the generator's known issues](generator.md#known-issues).
 
 <a id="connections"></a>
 
@@ -63,7 +63,7 @@ billing (postgres): 4 described, 0 skipped, 0 failed
 reports (postgres): 2 described, 0 skipped, 0 failed
 ```
 
-Each query that is described belongs to a [logical database](concepts.md#logical-database): a name such as `billing`, which the [database setting](settings.md#setting-database) gives it.  Without that setting it is the name of the query's dialect, `postgres` for a PostgreSQL file.  The tool connects to each logical database through the connection you give it under that name.
+Each query that is described belongs to a [logical database](concepts.md#logical-database): the name that the [database setting](settings.md#setting-database) gives it, such as `billing`, or the default that the setting's section gives.  The tool connects to each logical database through the connection you give it under that name.
 
 A connection is given in one of three ways.  The first that gives one wins:
 
@@ -81,7 +81,7 @@ A connection is given in one of three ways.  The first that gives one wins:
 - **A database that needs nothing described needs no connection.**  When every query of a database has a current sidecar entry, the tool asks the database nothing, and without a connection its summary line says `no connection`.  `--force` and `--check` describe every query, so every database of the run needs one then.
 - **A database with a query to describe and no connection** is [SQLSRC213](diagnostics.md#sqlsrc213).  Its `help:` line names the option and the variable to set, and lists any `--connection` names that matched no database of the run, so that a misspelt name is seen.
 
-The tool keeps connection strings to itself.  It prints none that it was given, writes none into a sidecar or a [log](#logs), and takes the connection variables out of the environment of the `dotnet msbuild` it runs to read your projects.  The connection string itself is the database's own: for PostgreSQL, see [connecting](postgresql.md#connecting).
+The tool keeps connection strings to itself as far as it can.  Wherever it finds the whole value of a connection in what it prints or writes to a [log](#logs), it writes `***` in its place, and it refuses to write that value into a sidecar.  A changed or partial value, or a connection string typed in the wrong place on the command line, can still appear: see [known issues](#known-issues).  The tool also takes the connection variables out of the environment of the `dotnet msbuild` it runs to read your projects.  The connection string itself is the database's own: for PostgreSQL, see [connecting](postgresql.md#connecting).
 
 <a id="sidecar-files"></a>
 
@@ -156,12 +156,12 @@ $ SQLSOURCE_CONNECTION_BILLING="$BILLING_CONNECTION" dotnet sqlsource describe -
 billing (postgres): 15 same, 1 differ, 0 failed
 ```
 
-`--check` is the command for a build server.  It describes every query of the run, as `--force` does, compares what the database says with the sidecars in the repository, and changes no file.  A sidecar that is missing or out of date is [SQLSRC219](diagnostics.md#sqlsrc219), which names the query and what differs, and its `help:` line names the command that fixes it.
+`--check` is the command for a build server.  It describes every query of the run, as `--force` does, compares what the database says with the sidecars in the repository, and changes no file.  A sidecar that is missing or out of date is [SQLSRC219](diagnostics.md#sqlsrc219), which names the query and what differs, and its `help:` line names the command that fixes it.  For a whole GitHub Actions job, see [the recipe](recipes.md#check-sidecars-in-ci).
 
 - **It needs a database with your schema**, such as one the job creates and migrates, and a connection for every database of the run.
 - **It compares what changes generated code**: the queries, their parameters and columns, their types and whether they can be null.  It does not compare the versions of the tool or of the server, so a sidecar that a developer wrote passes against a server of another patch release.
 - **Its exit code tells the two failures apart.**  `2` means a sidecar is out of date and nothing else went wrong: someone forgot to describe.  `1` means the check could not be made, such as a database that could not be opened.  See [exit codes](#exit-codes).
-- **With `--database`, `--project` or a `.sql` path**, it compares only what `describe` with the same filters would change.
+- **With `--database`, `--project` or a `.sql` path**, it compares only the queries that `describe` with the same filters would describe.  With `--database` it can miss a leftover entry that such a `describe` would drop: see [known issues](#known-issues).  A check with no filter has no such gap.
 
 <a id="summary"></a>
 
@@ -281,7 +281,7 @@ $ dotnet sqlsource describe --log sqlsource.log
 - **The file is overwritten by each run.**  The tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip on the command line never empties a file of your project ([SQLSRC218](diagnostics.md#sqlsrc218)).
 - **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it.
 
-**Read a log before you share it.**  It holds no connection string: the value of each `--connection` is written as `***`, and so is that value wherever the database driver repeats it in a message.  But it does hold:
+**Read a log before you share it.**  The tool writes each connection value as `***` wherever it finds it whole: the value of each `--connection` on the command line, and the value of each connection, from the command line or a variable, wherever the database driver repeats it in a message.  A changed or partial value, such as one keyword of it or the value with a space trimmed, and a connection string typed where a path or another option goes, can appear as written: search the log for your password before you share it.  The log also holds:
 
 - the version of the tool, of .NET and of the operating system, and the rest of your command line;
 - the paths of your projects and files, and the names of your queries and databases;
@@ -306,3 +306,5 @@ $ dotnet sqlsource describe --log sqlsource.log
 - **A project with several target frameworks is read for its first framework alone.**  A `.sql` file or a C# file that the project includes only for another framework, and a `[SqlSourceGenerate]` under an `#if` that only another framework defines, are not seen, and their queries are not described.  A project that references SqlSource for a later framework only is left out of a solution's run without a word, and is [SQLSRC204](diagnostics.md#sqlsrc204) when you name it.  Include the `.sql` files and the attributed types for every framework, or for the first one listed.
 - **A `.sql` file that one of your own build targets adds is not described.**  See [the known issues of settings](settings.md#known-issues) for what goes wrong and the one line that fixes it.
 - **A `.sql` file that two projects list** is described with the settings of the first project that claims it.  See [the known issues of `.sql` files](sql-files.md#known-issues).
+- **A connection string can appear in the output or a log when it is not there whole.**  The tool writes a connection value as `***` only where it finds the whole value.  A message of the database driver that quotes part of it, such as one keyword or the value with a space trimmed, is printed and logged as it is, and in rare cases so is a whole value that an error message builds from two pieces.  A connection string typed where a path or a `--project` goes, or a password typed after `--database`, can be printed and logged as typed, and a connection string given to `--connection` without its `name=` has its start printed and logged as a name.  Give each connection as `--connection <name>="..."` or in its variable, and search what you share, a log above all, for your password first.
+- **`--check --database` can pass a sidecar that `describe --database` would still rewrite.**  When a sidecar holds an entry for a query that was removed from its file, or whose output is now `sql`, and that entry belongs to a database the filter does not name, `--check --database billing` does not report it, while `describe --database billing` rewrites the file to drop it.  Run `--check` without `--database` in CI, which reports the entry; the next `describe` that writes the file drops it.

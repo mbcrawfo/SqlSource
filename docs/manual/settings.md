@@ -117,7 +117,7 @@ TRUNCATE TABLE audit_log;
 
 On the attribute: `[SqlSourceGenerate(Output = GeneratorOutput.Sql)]`.  As a marker it stands in the file header, for every query of the file, and inside a query.
 
-**Today, `Output` decides which queries the tool describes.**  `sqlsource describe` asks a database about the queries whose output is `models` or `codegen`.  A query whose output is `sql` needs no description, belongs to no [logical database](#setting-database) and needs no connection.  The tool reads the attribute from your C# source, so write the value out as shown: a constant or an expression there is [SQLSRC208](diagnostics.md#sqlsrc208).  A file claimed by two types, or listed by two projects, is described when either needs it.
+**Today, `Output` decides which queries the tool describes.**  `sqlsource describe` asks a database about the queries whose output is `models` or `codegen`.  A query whose output is `sql` needs no description, belongs to no [logical database](#setting-database) and needs no connection.  How the tool reads the value from the attribute is under [the generator's known issues](generator.md#known-issues).  A file claimed by two types, or listed by two projects, is described when either needs it.
 
 The tool can describe only some dialects: see [the database support table](dialects.md#database-support).  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](diagnostics.md#sqlsrc209) from the tool for every file.  Set the dialect, or set the output to `sql` for queries that want only their SQL.
 
