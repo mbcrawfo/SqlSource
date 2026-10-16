@@ -222,8 +222,9 @@ internal static partial class UserDocs
     private static bool IsOpening(Match opening) =>
         opening.Groups[2].Value[0] != '`' || !opening.Groups[3].Value.Contains('`', StringComparison.Ordinal);
 
-    // A line of '=' or '-' under a line of text makes the text a heading.  A list item, a table, a quote or a heading
-    // above it is not text of a paragraph, and '---' under a blank line is a rule.
+    // A line of '=' or '-' under a line of text makes the text a heading.  The line above is not text of a paragraph
+    // when it is blank, a heading, a quote, a list item, a table row, an HTML line, the closing fence of a block or a
+    // thematic break, and the underline is then a rule or part of that line.
     private static bool IsSetextUnderline(string above, string line) =>
         SetextPattern().IsMatch(line) && above.Trim().Length > 0 && !NotParagraphPattern().IsMatch(above);
 
