@@ -70,7 +70,7 @@ A query with `-- output: sql` has the output `sql`, whatever the other five say.
 The rules:
 
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
-- **A place that gives no value is skipped.**  A property, metadata or attribute string that is empty or white space gives none.
+- **A place that gives no value is skipped.**  A property, metadata or attribute string that is empty or white space gives none.  `Path` is the exception: see [Path](#setting-path).
 - **A setting has only the places its row of [the table](#all-settings) lists.**  A property or item metadata that SqlSource does not list is not read.  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 - **The attribute belongs to one type.**  Two types that claim one file each use their own attribute, and each gets its own result.
 
@@ -363,6 +363,7 @@ public partial class SharedQueries;
 - Without `Path`, the type gets every `.sql` file in the folder of the C# file that carries the attribute.  Subfolders are not searched.
 - A `Path` that ends in `.sql` names one file.  Any other `Path` names a folder, whose own `.sql` files the type gets.
 - `Path` is relative to the folder of the C# file, never to the project.  Both `/` and `\` separate folders.  Paths are compared ignoring case, so a project builds the same on every operating system: two `.sql` files of a type whose paths differ only by case are [SQLSRC013](diagnostics.md#sqlsrc013).
+- An empty `Path`, `Path = ""`, is the same as no `Path`.  A `Path` of white space is not: it is read as the name of a folder, like any other `Path`, and so matches nothing.
 - A `Path` that matches nothing is [SQLSRC004](diagnostics.md#sqlsrc004), and a folder with no `.sql` file when there is no `Path` is [SQLSRC005](diagnostics.md#sqlsrc005).
 - Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
 

@@ -1,19 +1,307 @@
 # The tool
 
-The `SqlSource.Tool` package and its `sqlsource` command.  This page is being written.
+The `SqlSource.Tool` package adds the `sqlsource` command to a project.  Its `describe` command connects to your database, asks it what the parameters and columns of each of your queries are, and writes the answers into [sidecar files](#sidecar-files) beside your `.sql` files.  You commit the sidecars with the project, so that the build never needs a database.
+
+```console
+$ dotnet sqlsource describe --connection billing="Host=localhost;Database=billing;Username=app;Password=secret"
+billing (postgres): 4 described, 0 skipped, 0 failed
+```
+
+The tool is optional.  The generator writes a constant or a token method for every query without it.  The tool is for queries that will get types: their models and query methods, which come in a later release, are built from the sidecars.
+
+> **Coming in a later release.**  The generator will read the sidecars that the tool writes to generate typed models and query methods.  Nothing in a build reads one today.  See [what works today](README.md#what-works-today).
+
+This page has two parts: [the workflow](#install-the-tool), from installing the tool to checking the sidecars in CI, and [the command reference](#command-reference).
+
+<a id="install-the-tool"></a>
+
+## Install the tool
+
+Install it as a local tool of your repository, from the folder at its root:
+
+```console
+$ dotnet new tool-manifest
+$ dotnet tool install SqlSource.Tool
+$ dotnet sqlsource describe
+```
+
+The first command creates the tool manifest, a `dotnet-tools.json` file, which records the tool and its version.  Commit that file.  Anyone who clones the repository, and a build server, then gets the same version with `dotnet tool restore`.
+
+Keep the tool at the version of the `SqlSource` package your projects use: the two are released together under one version number.  When you update the package, update the tool with `dotnet tool update SqlSource.Tool`.  A package and a tool of different versions can stop the tool from reading your project ([SQLSRC206](diagnostics.md#sqlsrc206)).  What else the tool needs is under [requirements](#requirements).
+
+<a id="which-queries"></a>
+
+## Which queries are described
+
+```sql postgres
+-- name: GetUser
+SELECT id, name FROM users WHERE id = @id;
+
+-- name: ResetAuditLog
+-- output: sql
+TRUNCATE TABLE audit_log;
+```
+
+`describe` finds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it runs on, and describes each query whose [output](settings.md#setting-output) is `models` or `codegen`.  `codegen` is the default, so `GetUser` above is described.  `ResetAuditLog` asks for its SQL alone, and the tool leaves it out: it needs no database and no connection.
+
+A query is described through its [dialect](concepts.md#dialect).  The tool can ask PostgreSQL today, which is the dialect `postgres`; the [database support table](dialects.md#database-support) lists every dialect.  A query that must be described and whose dialect cannot be is reported by the tool, and the build is not affected:
+
+- A file of a dialect that no version of the tool can describe, such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](diagnostics.md#sqlsrc209).  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.
+- A file of `mssql` passes that check, since SQL Server queries will be described, and each of its queries that must be described is [SQLSRC216](diagnostics.md#sqlsrc216) until then.  See [SQL Server](sqlserver.md).
+
+Either way, set the output of those queries to `sql`, or set the dialect, as [the output setting](settings.md#setting-output) says.
+
+The tool reads `[SqlSourceGenerate]` from your C# source without compiling it, so `Path` and `Output` must be written out where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  See [SQLSRC208](diagnostics.md#sqlsrc208) and [the generator's known issues](generator.md#known-issues).
+
+<a id="connections"></a>
+
+## Connections
+
+```console
+$ export SQLSOURCE_CONNECTION_BILLING="Host=localhost;Database=billing;Username=app;Password=secret"
+$ dotnet sqlsource describe --connection reports="Host=localhost;Database=reports;Username=app;Password=secret"
+billing (postgres): 4 described, 0 skipped, 0 failed
+reports (postgres): 2 described, 0 skipped, 0 failed
+```
+
+Each query that is described belongs to a [logical database](concepts.md#logical-database): a name such as `billing`, which the [database setting](settings.md#setting-database) gives it.  Without that setting it is the name of the query's dialect, `postgres` for a PostgreSQL file.  The tool connects to each logical database through the connection you give it under that name.
+
+A connection is given in one of three ways.  The first that gives one wins:
+
+| Order | Source | For the database `billing` |
+|----|----|----|
+| 1 | `--connection <name>=<connection string>` on the command line | `--connection billing="Host=localhost;Database=billing"` |
+| 2 | The environment variable of the name | `SQLSOURCE_CONNECTION_BILLING` |
+| 3 | `SQLSOURCE_CONNECTION` | Used only when the run has exactly one database to describe |
+
+- **The variable of a name** is `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`: `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  Two names that give one variable, such as `app-v2` and `app_v2`, are [SQLSRC214](diagnostics.md#sqlsrc214): give both on the command line, or rename one.
+- **`SQLSOURCE_CONNECTION`** is for a project with one database.  With more than one in the run it is used for none of them ([SQLSRC215](diagnostics.md#sqlsrc215)): set the variable of each name instead.
+- **A variable that is empty or holds only white space** is not set.
+- **A connection never goes in the project file**, since it holds credentials.
+- **Put the value of `--connection` in quotes.**  A shell splits it at a space.  On a command line that has `--connection`, an argument that holds `=` or `;` is refused, since it may be the rest of a connection string that the shell split.  Give the connection in its variable instead, or run the command from the folder of that path.
+- **A database that needs nothing described needs no connection.**  When every query of a database has a current sidecar entry, the tool asks the database nothing, and without a connection its summary line says `no connection`.  `--force` and `--check` describe every query, so every database of the run needs one then.
+- **A database with a query to describe and no connection** is [SQLSRC213](diagnostics.md#sqlsrc213).  Its `help:` line names the option and the variable to set, and lists any `--connection` names that matched no database of the run, so that a misspelt name is seen.
+
+The tool keeps connection strings to itself.  It prints none that it was given, writes none into a sidecar or a [log](#logs), and takes the connection variables out of the environment of the `dotnet msbuild` it runs to read your projects.  The connection string itself is the database's own: for PostgreSQL, see [connecting](postgresql.md#connecting).
 
 <a id="sidecar-files"></a>
 
 ## Sidecar files
 
+A sidecar is the tool's record of what the database said about each query's parameters and columns.  It is a JSON file named after the `.sql` file, beside it: `Users.sql.json` for `Users.sql`.
+
+```text
+Queries/
+    Users.sql
+    Users.sql.json      written by sqlsource describe
+```
+
+**Commit the sidecars with the project.**  The build will read them in place of a database, so that every developer and every build server gets the same generated code without a connection.  Only the person who changes a query, or the schema, needs a database to describe it again.
+
+**Never edit a sidecar by hand.**  The tool writes it whole.  To change what a sidecar says, change the query or the schema and run `describe` again.  A sidecar with a merge conflict is no exception: run `describe` after the merge, and it writes the file again.
+
+To keep the sidecars current:
+
+| When | Run |
+|----|----|
+| You add, change, rename or remove a query, a `-- param:` marker or a token's default | `dotnet sqlsource describe` |
+| The schema of the database changes | `dotnet sqlsource describe --force`: see [after a schema change](#after-a-schema-change) |
+| You update the tool | `dotnet sqlsource describe`, which describes every query again |
+| On a build server, to catch a sidecar that someone forgot | `dotnet sqlsource describe --check`: see [check in CI](#check-in-ci) |
+
+The format of a sidecar is described by its JSON Schema, [`sidecar-v1.schema.json`](../../schemas/sidecar-v1.schema.json), for the curious.  Nothing in this manual depends on it.
+
+<a id="describing-again"></a>
+
+## Describing again
+
+`describe` describes only what changed.  A query whose sidecar entry is current is skipped, and is not sent to the database.  An entry stops being current when any of these change:
+
+- The query's SQL.  A change to a comment alone does not count.
+- A `-- param:` marker of the query, or the default of one of its tokens.
+- The query's dialect, or its [logical database](#connections).
+- The version of the tool: a sidecar written by another version is described again whole.
+
+The tool cannot see a change to the schema, so a query whose SQL is as it was is skipped even when its table changed.  That is what `--force` is for.
+
+A sidecar is written whole or not at all.  When a query of a file fails, or a filter leaves one out whose entry is not current, the file's sidecar is left as it was, and [SQLSRC217](diagnostics.md#sqlsrc217) says so if the run described any of its queries.  Fix the query, or describe the whole file, and run `describe` again.
+
+When no query of a file needs an entry any more, because each was removed or now has the output `sql`, the tool deletes the file's sidecar.  It does so only in a run with no `--project`, `--database` or `.sql` path, and only when the run reported no error, so that a run over part of the project never removes what another part needs.
+
+A run that is stopped while it writes a sidecar leaves the old file or the new one, never part of either.  It can leave a temporary file beside it, named like `Users.sql.json.<id>.tmp`; the next `describe` of the whole project removes it once it is a minute old.
+
 <a id="after-a-schema-change"></a>
 
 ## After a schema change
+
+```console
+$ dotnet sqlsource describe --force
+billing (postgres): 16 described, 0 skipped, 0 failed
+```
+
+`--force` describes every query of the run again, current or not.  Run it after a migration, or any other change to the database that a query reads: a column that became nullable, a type that changed, a table that was renamed.  Then commit the sidecars it changed.  A query that the change broke, such as one that reads a column you dropped, is reported with what the server said ([SQLSRC225](diagnostics.md#sqlsrc225)).
+
+To describe again only the queries of one database, add `--database billing`.
 
 <a id="check-in-ci"></a>
 
 ## Check in CI
 
+```console
+$ dotnet tool restore
+$ dotnet restore
+$ SQLSOURCE_CONNECTION_BILLING="$BILLING_CONNECTION" dotnet sqlsource describe --check
+/work/App/Queries/Users.sql(3,10): error SQLSRC219: The sidecar is out of date for 'GetUser': columns[2].nullable is true, and the database says false
+    help: run 'dotnet sqlsource describe --force' and commit the sidecars
+    see: https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc219
+billing (postgres): 15 same, 1 differ, 0 failed
+```
+
+`--check` is the command for a build server.  It describes every query of the run, as `--force` does, compares what the database says with the sidecars in the repository, and changes no file.  A sidecar that is missing or out of date is [SQLSRC219](diagnostics.md#sqlsrc219), which names the query and what differs, and its `help:` line names the command that fixes it.
+
+- **It needs a database with your schema**, such as one the job creates and migrates, and a connection for every database of the run.
+- **It compares what changes generated code**: the queries, their parameters and columns, their types and whether they can be null.  It does not compare the versions of the tool or of the server, so a sidecar that a developer wrote passes against a server of another patch release.
+- **Its exit code tells the two failures apart.**  `2` means a sidecar is out of date and nothing else went wrong: someone forgot to describe.  `1` means the check could not be made, such as a database that could not be opened.  See [exit codes](#exit-codes).
+- **With `--database`, `--project` or a `.sql` path**, it compares only what `describe` with the same filters would change.
+
+<a id="summary"></a>
+
+## The summary
+
+Every run ends with one line for each database it ran on:
+
+```console
+billing (postgres): 4 described, 12 skipped, 0 failed
+reports (postgres): no connection, 5 skipped
+```
+
+- **described**: the queries the database was asked about in this run.
+- **skipped**: the queries whose sidecar entry was current.
+- **failed**: the queries that could not be described.  Each has an error above the summary.
+- **no connection**: the database has no connection and needed none, since all its queries were current.
+
+Under `--check` the counts are `same`, `differ` and `failed`.  A name given to `--database` that no query of the run has gets a line of zeros, so that a misspelt name is seen.  A run on a solution in which no project uses SqlSource prints `sqlsource: no project of '<path>' uses SqlSource` and no summary.
+
 <a id="command-reference"></a>
 
 ## Command reference
+
+```text
+dotnet sqlsource describe [<path>...] [--project <path>]... [--database <name>]...
+                          [--connection <name>=<connection string>]...
+                          [--force | --check] [--verbose] [--log <path>]
+```
+
+`dotnet sqlsource --help` and `dotnet sqlsource describe --help` print the options, and `dotnet sqlsource --version` the version of the tool.
+
+<a id="arguments"></a>
+
+### Arguments
+
+```console
+$ dotnet sqlsource describe
+$ dotnet sqlsource describe App.slnx
+$ dotnet sqlsource describe src/App/Queries/Users.sql src/App/Queries/Orders.sql
+```
+
+- **The project or solution to run on**: a `.sln`, `.slnx` or `.csproj` file, or a folder that holds exactly one of them.  Without it, the current folder.  Only one may be given.  The tool looks in that folder alone, not in the folders below it: none is [SQLSRC201](diagnostics.md#sqlsrc201) and more than one [SQLSRC202](diagnostics.md#sqlsrc202).
+- **In a solution**, the tool runs on every C# project that uses the SqlSource package, and leaves the others out without a word.  Every C# project of the solution must have been restored, one with no queries too ([SQLSRC220](diagnostics.md#sqlsrc220)).
+- **A path that ends in `.sql`** restricts the run to that file.  Several may be given.  It must be a file that a type of the run claims ([SQLSRC212](diagnostics.md#sqlsrc212)); the rest of the run goes on.
+
+A relative path is taken from the current folder.
+
+<a id="options"></a>
+
+### Options
+
+| Option | What it does |
+|----|----|
+| `--project <path>` | Runs on this project of the solution and not on the others.  May be given several times.  A path that is not a C# project of the solution is [SQLSRC207](diagnostics.md#sqlsrc207) |
+| `--database <name>` | Describes only the queries of this [logical database](#connections).  May be given several times.  Every other sidecar is left as it was |
+| `--connection <name>=<connection string>` | The connection of a database: see [connections](#connections).  May be given several times, once for each name |
+| `--force` | Describes every query of the run again, current or not: see [after a schema change](#after-a-schema-change) |
+| `--check` | Describes every query of the run, compares with the sidecars, writes nothing: see [check in CI](#check-in-ci).  With `--force` too, it is `--check` |
+| `--verbose` | Prints what the run decides as it goes: see [`--verbose`](#verbose) |
+| `--log <path>` | Writes a record of the run to a file: see [logs](#logs) |
+
+A run with `--project`, `--database` or a `.sql` path writes only the sidecars of the files whose queries it selected, and deletes none.
+
+<a id="environment-variables"></a>
+
+### Environment variables
+
+| Variable | What it does |
+|----|----|
+| `SQLSOURCE_CONNECTION_<NAME>` | The connection of the database `<name>`: see [connections](#connections) |
+| `SQLSOURCE_CONNECTION` | The connection of a run with exactly one database to describe |
+| `SQLSOURCE_LOG` | The path of the log, when `--log` is not given |
+| `SQLSOURCE_DEBUG` | Any value adds the stack trace to [SQLSRC200](diagnostics.md#sqlsrc200), for a bug report |
+
+A variable that is empty or holds only white space is not set.
+
+<a id="exit-codes"></a>
+
+### Exit codes
+
+| Code | When |
+|----|----|
+| `0` | The run reported no error |
+| `1` | An error was reported other than a sidecar out of date; the command line is wrong; the log could not be written; or the run was stopped with Ctrl+C, `SIGTERM` or `SIGHUP` |
+| `2` | `--check` found a sidecar out of date, and nothing else went wrong |
+
+A run that is stopped writes no further sidecar.  A second Ctrl+C ends the process at once.
+
+<a id="verbose"></a>
+
+### `--verbose`
+
+```console
+$ dotnet sqlsource describe --verbose
+sqlsource: unit '/work/App/App.csproj', a project, found in the working directory
+sqlsource: project '/work/App/App.csproj': net10.0, 1 .sql files
+sqlsource: file '/work/App/Queries/Users.sql': postgres, ready, claimed by /work/App/Queries/UserQueries.cs(3)
+sqlsource: database 'postgres' (postgres): connection from SQLSOURCE_CONNECTION_POSTGRES
+sqlsource: database 'postgres': server 18.6
+sqlsource: query 'GetUser' in '/work/App/Queries/Users.sql': described in 25 ms
+sqlsource: sidecar '/work/App/Queries/Users.sql.json': written
+postgres (postgres): 1 described, 0 skipped, 0 failed
+```
+
+`--verbose` prints a line for each project, file, database, query and sidecar, saying what the run decided for it, each starting with `sqlsource:`.  Use it to see why a query was skipped or a project left out.  Without it the tool prints its errors, the summary, and the line that ends a failed run or says that no project uses SqlSource.
+
+<a id="logs"></a>
+
+### Logs
+
+```console
+$ dotnet sqlsource describe --log sqlsource.log
+```
+
+`--log <path>`, or the variable `SQLSOURCE_LOG`, writes a record of the run to a file, one JSON object on each line.  It is what to attach to an issue when the tool does something you did not expect.
+
+- **The file is overwritten by each run.**  The tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip on the command line never empties a file of your project ([SQLSRC218](diagnostics.md#sqlsrc218)).
+- **A run that fails and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.
+
+**Read a log before you share it.**  It holds no connection string: the value of each `--connection` is written as `***`, and so is that value wherever the database driver repeats it in a message.  But it does hold:
+
+- the version of the tool, of .NET and of the operating system, and the rest of your command line;
+- the paths of your projects and files, and the names of your queries and databases;
+- the SQL of your queries as the tool sent it to the database, and what the server answered, its errors and warnings included;
+- for a database that could not be opened, what the server or the driver said, which can name its host and its user;
+- each error, and how the run ended.
+
+<a id="requirements"></a>
+
+### Requirements
+
+- **The .NET SDK**, and not only a runtime.  The tool asks MSBuild about your projects through `dotnet msbuild`.  It runs on .NET 8 or later.
+- **Restored projects.**  The tool does not restore: run `dotnet restore` first ([SQLSRC220](diagnostics.md#sqlsrc220)).
+- **The same version as the `SqlSource` package** of your projects ([SQLSRC206](diagnostics.md#sqlsrc206)).
+- **A database the tool can reach**, of a version it supports, for each logical database with a query to describe.  See [PostgreSQL](postgresql.md#connecting).
+
+## Known issues
+
+- **A project path or a `.sql` path through a symbolic link is not found.**  When the current folder is reached through a symbolic link and you give a full path that goes through the link, the tool compares it with the real path and finds no match: `--project` reports [SQLSRC207](diagnostics.md#sqlsrc207), and a `.sql` path [SQLSRC212](diagnostics.md#sqlsrc212), though the file is there.  The message shows both spellings.  Give the path relative to the current folder, or the full real path.
+- **A project with several target frameworks is read for its first framework alone.**  A `.sql` file or a C# file that the project includes only for another framework, and a `[SqlSourceGenerate]` under an `#if` that only another framework defines, are not seen, and their queries are not described.  A project that references SqlSource for a later framework only is left out of a solution's run without a word, and is [SQLSRC204](diagnostics.md#sqlsrc204) when you name it.  Include the `.sql` files and the attributed types for every framework, or for the first one listed.
+- **A `.sql` file that one of your own build targets adds is not described.**  See [the known issues of settings](settings.md#known-issues) for what goes wrong and the one line that fixes it.
+- **A `.sql` file that two projects list** is described with the settings of the first project that claims it.  See [the known issues of `.sql` files](sql-files.md#known-issues).

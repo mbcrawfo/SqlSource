@@ -1,6 +1,6 @@
 # The generator
 
-The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# beside your own code: a string constant for each query, or a method where the query has [tokens](concepts.md#token).  It needs no database and no setup beyond the package and one attribute.
+The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# beside your own code: a string constant for each query, or a method where the query has [tokens](concepts.md#token).  It needs no database and no setup beyond the package and one attribute, in a project that targets .NET 8 or later with C# 12 or later ([SQLSRC003](diagnostics.md#sqlsrc003), [SQLSRC012](diagnostics.md#sqlsrc012)).
 
 ```sql
 -- name: GetUser
@@ -15,6 +15,7 @@ SELECT id, name FROM {{table}} ORDER BY {{orderBy}};
 ```
 
 ```csharp
+using Dapper;
 using SqlSource;
 
 [SqlSourceGenerate]
@@ -74,7 +75,7 @@ Repository/
         Monthly.sql        not searched: it is in a subfolder
 ```
 
-Without `Path`, a type gets the `.sql` files in the folder of the C# file that carries the attribute.  `Path` names another folder, or one file.  The rules, with the errors for a `Path` that matches nothing, are under [Path](settings.md#setting-path).  What follows is what the generator does with the files.
+A type gets the files that its [`Path`](settings.md#setting-path) names, by the rules and with the errors given there.  What follows is what the generator does with the files.
 
 - **A type's files are one set.**  A query name is used once across all of them: a second use is [SQLSRC008](diagnostics.md#sqlsrc008), and the file with the second one gets no members for that type.
 - **Two types may claim one file**, and each gets its own members from it.  They can ask for different things: each type's attribute applies to its own members only.
@@ -99,7 +100,7 @@ public static partial class UserQueries;
 var sql = UserQueries.GetUser;
 ```
 
-`SqlLocation.Nested`, the default, puts the members in a class named `Sql`, nested in the type and private: the type's own code, and the types nested in it, use `Sql.GetUser`, and no other code can.  `SqlLocation.Direct` puts them on the type, as `UserQueries.GetUser`; they are public, so they are as visible as the type is.  The table is under [Where the SQL goes](settings.md#setting-sql-location).
+[`SqlLocation`](settings.md#setting-sql-location) chooses between a private class `Sql` nested in the type (`Nested`, the default) and the type itself (`Direct`).  Its section says what each means.  What to know when you choose:
 
 - Use `Nested` for queries that one class runs, and `Direct` for a type whose job is to hold queries that other code uses.
 - With `Nested`, the type cannot have a member or a type parameter named `Sql`, and cannot be called `Sql` itself ([SQLSRC007](diagnostics.md#sqlsrc007)).  Rename it, or use `Direct`.
@@ -131,11 +132,9 @@ var sql = Sql.ListFrom("users", "name DESC");
 // SELECT id, name FROM users ORDER BY name DESC;
 ```
 
-A query with a token is a `public static string` method with the name of the query, in place of a constant.  It has one `string` parameter for each distinct token, named after the token, in the order the names first appear in the SQL: `ListFrom(string table, string orderBy)`.  It returns the SQL with each token replaced by its argument.
+A query with a token is a `public static string` method with the name of the query, `ListFrom(string table, string orderBy)`, in place of a constant.  Its parameters, and what it returns, are under [tokens](parameters-and-tokens.md#tokens).
 
 A token is replaced by plain text substitution and nothing is escaped.  **Pass only text that your own code chooses**, such as a table name from a fixed list, and a [query parameter](concepts.md#query-parameter) for every value.  By default the method throws for a null, empty or blank argument.  The rules for tokens, their defaults and that check are on [parameters and tokens](parameters-and-tokens.md#tokens).
-
-A query that gains its first token changes from a constant to a method, so the code that uses it stops compiling until it passes the arguments.
 
 <a id="intellisense"></a>
 
@@ -203,4 +202,5 @@ SqlSource turns that warning off for these types and for nothing else, as the su
 ## Known issues
 
 - **The tool reads the attribute without compiling your code.**  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text, so `Path` and `Output` must be written out where the attribute is: `Path = "Queries"` and `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation or a cast there compiles, and the tool reports [SQLSRC208](diagnostics.md#sqlsrc208) and describes nothing for the type.  The build is not affected.  Two more things follow from the same reading.  An alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`) works in the build and is not seen by the tool, so the type's queries are not described.  An attribute inside `#if` is read with the compilation constants the tool gets from your project, which may not be those of the configuration you build.  Write the attribute under its own name, and outside `#if` where you can.
+- **Under `Direct`, a query named like a member that the type declares is a compiler error.**  A query `Get` in a type that declares a method `Get` gives the compiler's CS0102, in the generated code, and no SQLSRC error.  Rename the query, or use `Nested`.
 - **Where the suppression of CS0436 does not run, the warning is shown.**  The suppression is part of the package's analyzers.  A compiler or an editor that does not run it still reports CS0436 in a project that sees the internals of another one that uses SqlSource, and a project that treats warnings as errors then fails to build there.  SqlSource has not been checked in the live analysis of Visual Studio or Rider.  If you see the warning, add `<NoWarn>$(NoWarn);CS0436</NoWarn>` to the project that sees the other's internals.  That also hides a conflict between two types of your own.
