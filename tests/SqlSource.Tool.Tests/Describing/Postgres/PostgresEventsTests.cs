@@ -778,6 +778,79 @@ public class PostgresEventsTests
         _ = Member(partitions, "error").ShouldBeOfType<LogValue.Members>();
     }
 
+    // The event of "relations" is built from what it is given; the tests of the session say when it is asked.
+    [Fact]
+    public void Relations_RowsOfTheServer_WritesTheRelationsAndTheRows()
+    {
+        var log = new RecordingLog();
+        var request = new PostgresRelationsRequest([
+            new PostgresRelationName("public", "orders"),
+            new PostgresRelationName("public", "users"),
+        ]);
+        var answer = new PostgresTablesAnswer([PostgresTables.Users], null);
+
+        PostgresEvents.Relations(log, "ListUsers", request, answer, 4);
+
+        var (name, members) = log.Events.ShouldHaveSingleItem();
+        name.ShouldBe("relations");
+        NamesOf(members).ShouldBe(["query", "relations", "rows", "durationMs"]);
+        Member(members, "query").ShouldBe((LogValue)"ListUsers");
+        Member(members, "relations")
+            .ShouldBe(
+                LogValue.ListOf([
+                    LogValue.MapOf(new("schema", "public"), new("table", "orders")),
+                    LogValue.MapOf(new("schema", "public"), new("table", "users")),
+                ])
+            );
+        var users = Member(members, "rows")
+            .ShouldBeOfType<LogValue.Items>()
+            .Values.ShouldHaveSingleItem()
+            .ShouldBeOfType<LogValue.Members>();
+        users
+            .Values.Select(value => value.Name)
+            .ShouldBe([
+                "oid",
+                "relkind",
+                "schema",
+                "name",
+                "columns",
+                "relhassubclass",
+                "hasForeignPartition",
+                "hasInsteadRule",
+            ]);
+        users.Values[3].Value.ShouldBe((LogValue)"users");
+        Member(members, "durationMs").ShouldBe((LogValue)4L);
+    }
+
+    // A relations call that failed has its error in the place of the rows.
+    [Fact]
+    public void Relations_ErrorOfTheServer_WritesItInThePlaceOfTheRows()
+    {
+        var log = new RecordingLog();
+        var refused = new PostgresServerError("42501", "permission denied", null, null, null);
+
+        PostgresEvents.Relations(
+            log,
+            "ListUsers",
+            new PostgresRelationsRequest([new PostgresRelationName("public", "users")]),
+            new PostgresTablesAnswer(null, refused),
+            0
+        );
+
+        var members = log.Events.ShouldHaveSingleItem().Members;
+        NamesOf(members).ShouldBe(["query", "relations", "error", "durationMs"]);
+        Member(members, "error")
+            .ShouldBe(
+                LogValue.MapOf(
+                    new("sqlState", "42501"),
+                    new("message", "permission denied"),
+                    new("detail", LogValue.Null),
+                    new("hint", LogValue.Null),
+                    new("position", LogValue.Null)
+                )
+            );
+    }
+
     // A table of one column, whole in the answer of "tables", and the query that is the table.  It says nothing of a
     // foreign partition or of an INSTEAD rule, as an answer recorded before the members existed.
     private static readonly PostgresTableRow Ids = PostgresTables.TableOf(
