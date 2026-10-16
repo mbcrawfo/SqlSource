@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using Shouldly;
@@ -8,7 +9,8 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Realistic;
 
 // The reading of the cases' folders: every folder of Cases is a case, a case.json that is wrong fails naming the
-// case and the fault, and a folder holds its query, its truth and the expectation of each major it is recorded on.
+// case and the fault, a folder holds its query, its truth and the expectation of each major it is recorded on, and a
+// case runs on the majors from its minimum on.
 public sealed class RealisticCasesTests
 {
     private const string FirstCase = "aggregate-cte-left-joined";
@@ -17,6 +19,10 @@ public sealed class RealisticCasesTests
 
     // macOS writes it into a folder that Finder shows, and .gitignore keeps it out of the repository.
     private const string FinderFile = ".DS_Store";
+
+    // The cases of the corpus, by the names of their folders alone, so that a case.json that is wrong fails the rows
+    // of its own case.  Every theory over the corpus takes them.
+    public static TheoryData<string> Cases => [with(RealisticCases.Names)];
 
     [Fact]
     public void All_Cases_HoldTheFirstCase() => RealisticCases.All.ShouldContain(found => found.Name == FirstCase);
@@ -45,7 +51,7 @@ public sealed class RealisticCasesTests
 
     // Each case is checked apart, so that a broken one fails its own row.
     [Theory]
-    [MemberData(nameof(RealisticQueryTests.Cases), MemberType = typeof(RealisticQueryTests))]
+    [MemberData(nameof(Cases))]
     public void Folder_Case_HoldsItsQueryItsTruthAndTheExpectationsOfItsRecordedMajorsAlone(string name)
     {
         var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, name));
@@ -55,8 +61,24 @@ public sealed class RealisticCasesTests
             .Select(Path.GetFileName)
             .Where(static file => file != FinderFile)
             .Order(StringComparer.Ordinal)
-            .ShouldBe(RealisticRun.FilesOf(found).Order(StringComparer.Ordinal), $"{found} holds other files");
+            .ShouldBe(found.Files.Order(StringComparer.Ordinal), $"{found} holds other files");
     }
+
+    [Theory]
+    [InlineData(null, 14, true)]
+    [InlineData(17, 14, false)]
+    [InlineData(17, 17, true)]
+    [InlineData(17, 18, true)]
+    public void RunsOn_MinimumMajorAndServer_IsWhetherTheCaseRuns(int? minimum, int major, bool runs) =>
+        (Case() with { MinimumMajor = minimum }).RunsOn(major).ShouldBe(runs);
+
+    [Theory]
+    [InlineData(null, new[] { "query.sql", "case.json", "expected-pg14.txt", "expected-pg18.txt" })]
+    [InlineData(17, new[] { "query.sql", "case.json", "expected-pg18.txt" })]
+    public void Files_MinimumMajor_AreTheQueryTheTruthAndAnExpectationOfEachRecordedMajorItRunsOn(
+        int? minimum,
+        string[] files
+    ) => (Case() with { MinimumMajor = minimum }).Files.ShouldBe(files);
 
     [Fact]
     public void Read_FolderWithoutCaseJson_ThrowsNamingTheCase()
@@ -189,4 +211,7 @@ public sealed class RealisticCasesTests
         found.Samples.Count.ShouldBe(1);
         found.Samples[0].ShouldBeEmpty();
     }
+
+    private static RealisticCase Case() =>
+        new("keyed", "keyed", null, null, [], [new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)]);
 }

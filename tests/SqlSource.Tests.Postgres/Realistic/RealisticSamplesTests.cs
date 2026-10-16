@@ -6,19 +6,18 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic;
 
-// The oracle's work that needs no server: the substitution of a case's sample values and the checks of its samples
-// against the query's parameters.  Its runs against the server are in RealisticDatabaseTests.
-public sealed class RealisticOracleTests
+// The sample values of a case: their substitution into its SQL and their checks against the query's parameters.
+public sealed class RealisticSamplesTests
 {
     [Fact]
     public void Substitute_ParameterInAStringACommentOrAQuotedName_IsLeftAlone() =>
-        RealisticOracle
+        RealisticSamples
             .Substitute("SELECT '@x', \"@x\", @x -- @x", Values(("x", "1")), Values(("x", "integer")))
             .ShouldBe("SELECT '@x', \"@x\", (1)::integer -- @x");
 
     [Fact]
     public void Substitute_TwoParameters_ReplacesEachWithItsCastLiteral() =>
-        RealisticOracle
+        RealisticSamples
             .Substitute(
                 "WHERE a = @a AND b = @B",
                 Values(("a", "'x'"), ("b", "NULL")),
@@ -30,7 +29,7 @@ public sealed class RealisticOracleTests
     public void Substitute_ParameterNotInTheSample_ThrowsNamingIt() =>
         Should
             .Throw<InvalidOperationException>(() =>
-                RealisticOracle.Substitute(
+                RealisticSamples.Substitute(
                     "WHERE a = @a AND c = @c",
                     Values(("a", "1")),
                     Values(("a", "integer"), ("c", "integer"))
@@ -39,32 +38,30 @@ public sealed class RealisticOracleTests
             .Message.ShouldContain("@c");
 
     [Fact]
-    public void CheckSampleKeys_KeyThatNamesNoParameter_ThrowsNamingTheCaseAndTheKey()
+    public void CheckKeys_KeyThatNamesNoParameter_ThrowsNamingTheCaseAndTheKey()
     {
         var found = Case(Values(("from", "'2024-01-01'"), ("tto", "'2025-01-01'")));
 
-        var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticOracle.CheckSampleKeys(found, ["from", "to"])
-        );
+        var thrown = Should.Throw<InvalidOperationException>(() => RealisticSamples.CheckKeys(found, ["from", "to"]));
 
         thrown.Message.ShouldContain("realistic/keyed");
         thrown.Message.ShouldContain("@tto");
     }
 
     [Fact]
-    public void CheckSampleKeys_KeyThatDiffersInCaseAlone_DoesNotThrow() =>
-        Should.NotThrow(() => RealisticOracle.CheckSampleKeys(Case(Values(("From", "'2024-01-01'"))), ["from", "to"]));
+    public void CheckKeys_KeyThatDiffersInCaseAlone_DoesNotThrow() =>
+        Should.NotThrow(() => RealisticSamples.CheckKeys(Case(Values(("From", "'2024-01-01'"))), ["from", "to"]));
 
     // A run never sends NULL for a parameter that its marker does not say is null, so a sample does not either.
     [Theory]
     [InlineData("NULL")]
     [InlineData(" null ")]
-    public void CheckSampleNulls_NullForAParameterNotMarkedNull_ThrowsNamingTheCaseAndTheParameter(string value)
+    public void CheckNulls_NullForAParameterNotMarkedNull_ThrowsNamingTheCaseAndTheParameter(string value)
     {
         var found = Case(Values(("Status", value)));
 
         var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticOracle.CheckSampleNulls(found, [Parameter("status", null), Parameter("q", true)])
+            RealisticSamples.CheckNulls(found, [Parameter("status", null), Parameter("q", true)])
         );
 
         thrown.Message.ShouldContain("realistic/keyed");
@@ -72,17 +69,17 @@ public sealed class RealisticOracleTests
     }
 
     [Fact]
-    public void CheckSampleNulls_NullForAParameterNotNullByItsMarker_Throws() =>
+    public void CheckNulls_NullForAParameterNotNullByItsMarker_Throws() =>
         Should.Throw<InvalidOperationException>(() =>
-            RealisticOracle.CheckSampleNulls(Case(Values(("status", "NULL"))), [Parameter("status", false)])
+            RealisticSamples.CheckNulls(Case(Values(("status", "NULL"))), [Parameter("status", false)])
         );
 
     [Theory]
     [InlineData("NULL", true)]
     [InlineData("'NULL'", false)]
-    public void CheckSampleNulls_NullForAParameterMarkedNullOrNoNull_DoesNotThrow(string value, bool? nullable) =>
+    public void CheckNulls_NullForAParameterMarkedNullOrNoNull_DoesNotThrow(string value, bool? nullable) =>
         Should.NotThrow(() =>
-            RealisticOracle.CheckSampleNulls(Case(Values(("status", value))), [Parameter("status", nullable)])
+            RealisticSamples.CheckNulls(Case(Values(("status", value))), [Parameter("status", nullable)])
         );
 
     private static Dictionary<string, string> Values(params (string Name, string Value)[] values)

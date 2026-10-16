@@ -8,12 +8,12 @@ using SqlSource.Tool.Describing.Describers;
 using Xunit;
 using Xunit.Sdk;
 
-namespace SqlSource.Tests.Postgres.Realistic;
+namespace SqlSource.Tests.Postgres.Realistic.Describer;
 
-// The rules a run of a case shares that need no server: which majors a case runs and is recorded on, which files its
-// folder holds, that a description has the columns of the truth, and the text a description is recorded as.  A case
-// described against the server is in RealisticDatabaseTests.
-public sealed class RealisticRunTests
+// The rules of describing a case that need no server: what the theory of a recorded description does on each major,
+// that a description has the columns of the truth, and the text a description is recorded as.  A case described
+// against the server is in RealisticDescriptionTests.
+public sealed class RealisticDescribeTests
 {
     [Theory]
     [InlineData(true, 14, Expectation.Record)]
@@ -23,23 +23,7 @@ public sealed class RealisticRunTests
     [InlineData(false, 18, Expectation.Compare)]
     [InlineData(false, 17, Expectation.Skip)]
     public void ExpectationOn_RecordingAndMajor_IsWhatTheTheoryDoes(bool recording, int major, Expectation expected) =>
-        RealisticRun.ExpectationOn(recording, major).ShouldBe(expected);
-
-    [Theory]
-    [InlineData(null, 14, true)]
-    [InlineData(17, 14, false)]
-    [InlineData(17, 17, true)]
-    [InlineData(17, 18, true)]
-    public void RunsOn_MinimumMajorAndServer_IsWhetherTheCaseRuns(int? minimum, int major, bool runs) =>
-        RealisticRun.RunsOn(Case() with { MinimumMajor = minimum }, major).ShouldBe(runs);
-
-    [Theory]
-    [InlineData(null, new[] { "query.sql", "case.json", "expected-pg14.txt", "expected-pg18.txt" })]
-    [InlineData(17, new[] { "query.sql", "case.json", "expected-pg18.txt" })]
-    public void FilesOf_MinimumMajor_IsTheQueryTheTruthAndAnExpectationOfEachRecordedMajorItRunsOn(
-        int? minimum,
-        string[] files
-    ) => RealisticRun.FilesOf(Case() with { MinimumMajor = minimum }).ShouldBe(files);
+        RealisticDescribe.ExpectationOn(recording, major).ShouldBe(expected);
 
     [Fact]
     public void ColumnsOf_ColumnNamedOtherwiseThanItsTruth_FailsNamingTheCaseAndThePosition()
@@ -59,7 +43,7 @@ public sealed class RealisticRunTests
             )
         );
 
-        var thrown = Should.Throw<FailException>(() => RealisticRun.ColumnsOf(found, described));
+        var thrown = Should.Throw<FailException>(() => RealisticDescribe.ColumnsOf(found, described));
 
         thrown.Message.ShouldStartWith("realistic/keyed column 1 is described as account_id");
     }
@@ -91,7 +75,7 @@ public sealed class RealisticRunTests
             null
         );
 
-        RealisticRun
+        RealisticDescribe
             .Render(Outcome<QueryDescription, DescribeFailure>.Of(description))
             .ShouldBe(
                 "kind: rows\n"
@@ -105,7 +89,7 @@ public sealed class RealisticRunTests
 
     [Fact]
     public void Render_RefusalWithHelp_WritesTheHelpBetweenItsArgumentsAndTheServer() =>
-        RealisticRun
+        RealisticDescribe
             .Render(
                 Outcome<QueryDescription, DescribeFailure>.Failed(
                     new DescribeFailure(
