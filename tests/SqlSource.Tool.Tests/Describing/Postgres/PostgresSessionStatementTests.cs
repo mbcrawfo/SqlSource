@@ -5,7 +5,6 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
-using static SqlSource.Tool.Testing.NullabilityAnswers;
 using static SqlSource.Tool.Tests.PostgresRequests;
 using static SqlSource.Tool.Tests.PostgresSessionCases;
 

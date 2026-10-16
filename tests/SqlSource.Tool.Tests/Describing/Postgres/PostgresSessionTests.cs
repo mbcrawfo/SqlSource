@@ -2,7 +2,6 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
-using static SqlSource.Tool.Testing.NullabilityAnswers;
 using static SqlSource.Tool.Tests.PostgresRequests;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;

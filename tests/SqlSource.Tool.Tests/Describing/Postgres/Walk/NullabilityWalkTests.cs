@@ -218,7 +218,7 @@ public sealed class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([UnknownNoOrigin]);
     }
 
-    private static readonly Dictionary<string, string> SetOperationRows = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> SetOperationsRows = new(StringComparer.Ordinal)
     {
         ["aggregate-over-an-append"] = Text(
             Over(
@@ -258,14 +258,14 @@ public sealed class NullabilityWalkTests
         ),
     };
 
-    public static TheoryData<string> SetOperations => [.. SetOperationRows.Keys];
+    public static TheoryData<string> SetOperations => [.. SetOperationsRows.Keys];
 
     // The root of a set operation prints its first branch, which says nothing of the others.
     [Theory]
     [MemberData(nameof(SetOperations))]
     public void Run_ExpressionOverASetOperation_KeepsNoOrigin(string name)
     {
-        var outcome = RunUngated(PlanNode.Read(SetOperationRows[name]).ShouldNotBeNull(), Expression);
+        var outcome = RunUngated(PlanNode.Read(SetOperationsRows[name]).ShouldNotBeNull(), Expression);
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
         AnswersOf(outcome).ShouldBe([UnknownNoOrigin]);
@@ -698,7 +698,7 @@ public sealed class NullabilityWalkTests
         AnswersOf(Run(plan, OfA, NotNull)).ShouldBe([NotNullCatalog, NullableOuterJoin]);
     }
 
-    private static readonly Dictionary<string, string> UnresolvableChildRows = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> UnresolvableChildrenRows = new(StringComparer.Ordinal)
     {
         // A LATERAL subquery's Output may name the query above, which is no instance of its plan.
         ["lateral-names-the-query-above"] = Text(Scan("t", "t.id", "u.id")),
@@ -712,14 +712,14 @@ public sealed class NullabilityWalkTests
         ["no-output"] = Text(Scan("t")),
     };
 
-    public static TheoryData<string> UnresolvableChildren => [.. UnresolvableChildRows.Keys];
+    public static TheoryData<string> UnresolvableChildren => [.. UnresolvableChildrenRows.Keys];
 
     [Theory]
     [MemberData(nameof(UnresolvableChildren))]
     public void Run_SubqueryColumnThatCannotBeResolved_KeepsTheHeuristic(string name) =>
         AnswersOf(
                 Run(
-                    Subquery(PlanNode.Read(UnresolvableChildRows[name]).ShouldNotBeNull(), "s.x") with
+                    Subquery(PlanNode.Read(UnresolvableChildrenRows[name]).ShouldNotBeNull(), "s.x") with
                     {
                         Output = ["s.x"],
                     },

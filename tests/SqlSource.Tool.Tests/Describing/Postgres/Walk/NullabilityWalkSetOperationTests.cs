@@ -108,9 +108,16 @@ public sealed class NullabilityWalkSetOperationTests
         AnswersOf(outcome).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
     }
 
-    private static readonly Dictionary<string, string> BranchRows = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> BranchesThatMayBeNullRows = new(StringComparer.Ordinal)
     {
-        ["null"] = Text(Scan("x", "NULL::text") with { NodeType = "Result", Alias = null, RelationName = null }),
+        ["null-constant"] = Text(
+            Scan("x", "NULL::text") with
+            {
+                NodeType = "Result",
+                Alias = null,
+                RelationName = null,
+            }
+        ),
         ["nullable-column"] = Text(Scan("o", "o.note")),
         ["side-a-left-join-extends"] = Text(
             Join("Left", Scan("u", "u.id"), Scan("o", "o.label")) with
@@ -128,14 +135,19 @@ public sealed class NullabilityWalkSetOperationTests
         ),
     };
 
-    public static TheoryData<string> BranchesThatMayBeNull => [.. BranchRows.Keys];
+    public static TheoryData<string> BranchesThatMayBeNull => [.. BranchesThatMayBeNullRows.Keys];
 
     // A NULL, a nullable column, the side a LEFT JOIN extends, a relation that "tables" and "relations" did not
     // answer, and a user subquery's scan, which is mapped by no position.
     [Theory]
     [MemberData(nameof(BranchesThatMayBeNull))]
     public void Run_UnionAllWithABranchThatMayBeNull_KeepsNoOrigin(string name) =>
-        AnswersOf(RunSet(AppendOf(Scan("u", "u.name"), PlanNode.Read(BranchRows[name]).ShouldNotBeNull()), TextOid))
+        AnswersOf(
+                RunSet(
+                    AppendOf(Scan("u", "u.name"), PlanNode.Read(BranchesThatMayBeNullRows[name]).ShouldNotBeNull()),
+                    TextOid
+                )
+            )
             .ShouldBe([UnknownNoOrigin]);
 
     // The branch's cast to the result's type is not printed: an integer under a bigint is in the family, an integer
@@ -173,9 +185,9 @@ public sealed class NullabilityWalkSetOperationTests
     // planner keeps as a "*SELECT* <k>" scan in the order the outer query needs: SELECT s.b, s.a FROM (SELECT
     // p.sku AS a, p.name AS b ... UNION ALL (SELECT p2.sku, NULLIF(p2.name, 'x') ... LIMIT 5)) s.  Its column 0 is
     // NULLIF's, and by position it would be p2.sku.
-    private static readonly Dictionary<string, string> AppendrelRows = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> AppendrelsRows = new(StringComparer.Ordinal)
     {
-        ["nullif-of-a-constant"] = Text(
+        ["nullif-against-a-constant"] = Text(
             AppendOf(
                 Scan("u", "u.name", "u.name"),
                 Select(
@@ -211,12 +223,12 @@ public sealed class NullabilityWalkSetOperationTests
         ),
     };
 
-    public static TheoryData<string> Appendrels => [.. AppendrelRows.Keys];
+    public static TheoryData<string> Appendrels => [.. AppendrelsRows.Keys];
 
     [Theory]
     [MemberData(nameof(Appendrels))]
     public void Run_LeafScanUnderAnAppend_IsNotMappedByPosition(string name) =>
-        AnswersOf(RunSet(PlanNode.Read(AppendrelRows[name]).ShouldNotBeNull(), TextOid, TextOid))
+        AnswersOf(RunSet(PlanNode.Read(AppendrelsRows[name]).ShouldNotBeNull(), TextOid, TextOid))
             .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
 
     // A 14 SetOp's flagged member is its own leaf scan, mapped by position: SELECT u.email AS name, u.name AS email
@@ -355,39 +367,41 @@ public sealed class NullabilityWalkSetOperationTests
             Output = outer.Output,
         };
 
-    private static readonly Dictionary<string, (string Plan, bool Answered)> IntersectRows = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, (string Plan, bool Answered)> IntersectsRows = new(
+        StringComparer.Ordinal
+    )
     {
         ["pg14-intersect-right-first"] = (
             Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)),
             true
         ),
         ["pg14-intersect-all"] = (Text(Flagged14("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true),
-        ["pg14-intersect-of-a-nullable-input"] = (
+        ["pg14-intersect-of-two-nullable-inputs"] = (
             Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))),
             false
         ),
         ["pg18-intersect"] = (Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.name"))), true),
         ["pg18-intersect-all"] = (Text(Inputs18("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true),
-        ["pg18-intersect-of-a-nullable-input"] = (
+        ["pg18-intersect-of-two-nullable-inputs"] = (
             Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))),
             false
         ),
     };
 
-    public static TheoryData<string> Intersects => [.. IntersectRows.Keys];
+    public static TheoryData<string> Intersects => [.. IntersectsRows.Keys];
 
     [Theory]
     [MemberData(nameof(Intersects))]
     public void Run_Intersect_IsFalseWhenEitherInputIs(string name)
     {
-        var (plan, answered) = IntersectRows[name];
+        var (plan, answered) = IntersectsRows[name];
 
         AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), TextOid))
             .ShouldBe([answered ? NotNullSetOperation : UnknownNoOrigin]);
     }
 
     // EXCEPT returns rows of its left input alone: on 14 the member flagged 0, on 18 the Outer child.
-    private static readonly Dictionary<string, (string Plan, bool Answered)> ExceptRows = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, (string Plan, bool Answered)> ExceptsRows = new(StringComparer.Ordinal)
     {
         ["pg14-except"] = (Text(Flagged14("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true),
         ["pg14-except-all-right-first"] = (
@@ -409,19 +423,19 @@ public sealed class NullabilityWalkSetOperationTests
         ),
     };
 
-    public static TheoryData<string> Excepts => [.. ExceptRows.Keys];
+    public static TheoryData<string> Excepts => [.. ExceptsRows.Keys];
 
     [Theory]
     [MemberData(nameof(Excepts))]
     public void Run_Except_IsItsLeftInputs(string name)
     {
-        var (plan, answered) = ExceptRows[name];
+        var (plan, answered) = ExceptsRows[name];
 
         AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), TextOid))
             .ShouldBe([answered ? NotNullSetOperation : UnknownNoOrigin]);
     }
 
-    private static readonly Dictionary<string, string> AnotherShapeRows = new(StringComparer.Ordinal)
+    private static readonly Dictionary<string, string> SetOpsOfAnotherShapeRows = new(StringComparer.Ordinal)
     {
         // Two members flagged 0, three members, and none flagged.
         ["two-members-flagged-0"] = Text(
@@ -483,12 +497,13 @@ public sealed class NullabilityWalkSetOperationTests
         ),
     };
 
-    public static TheoryData<string> SetOpsOfAnotherShape => [.. AnotherShapeRows.Keys];
+    public static TheoryData<string> SetOpsOfAnotherShape => [.. SetOpsOfAnotherShapeRows.Keys];
 
     [Theory]
     [MemberData(nameof(SetOpsOfAnotherShape))]
     public void Run_SetOperationOfAnotherShape_KeepsNoOrigin(string name) =>
-        AnswersOf(RunSet(PlanNode.Read(AnotherShapeRows[name]).ShouldNotBeNull(), TextOid)).ShouldBe([UnknownNoOrigin]);
+        AnswersOf(RunSet(PlanNode.Read(SetOpsOfAnotherShapeRows[name]).ShouldNotBeNull(), TextOid))
+            .ShouldBe([UnknownNoOrigin]);
 
     // a EXCEPT b EXCEPT c: on 14 the inner SetOp is a Result member that prints its entries and a flag of its own, on
     // 18 the Outer input.  The inner one's type is the common type of its own inputs, which the row description does

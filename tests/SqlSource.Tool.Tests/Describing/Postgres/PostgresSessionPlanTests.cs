@@ -179,7 +179,7 @@ public sealed class PostgresSessionPlanTests
         AnswersOf(description).ShouldBe([NullableOuterJoin, UnknownNoOrigin]);
     }
 
-    private static readonly Dictionary<string, (string? Plan, string? Error)> UnusablePlanRows = new(
+    private static readonly Dictionary<string, (string? Plan, string? Error)> PlansThatCannotBeUsedRows = new(
         StringComparer.Ordinal
     )
     {
@@ -197,7 +197,7 @@ public sealed class PostgresSessionPlanTests
         ),
     };
 
-    public static TheoryData<string> PlansThatCannotBeUsed => [.. UnusablePlanRows.Keys];
+    public static TheoryData<string> PlansThatCannotBeUsed => [.. PlansThatCannotBeUsedRows.Keys];
 
     [Theory]
     [MemberData(nameof(PlansThatCannotBeUsed))]
@@ -205,7 +205,7 @@ public sealed class PostgresSessionPlanTests
         string name
     )
     {
-        var (plan, error) = UnusablePlanRows[name];
+        var (plan, error) = PlansThatCannotBeUsedRows[name];
         var answer = new PostgresExplainAnswer(
             plan,
             error is null ? null : new PostgresServerError("57014", error, null, null, null)

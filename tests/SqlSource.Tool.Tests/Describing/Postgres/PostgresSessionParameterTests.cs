@@ -7,7 +7,6 @@ using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
-using static SqlSource.Tool.Testing.NullabilityAnswers;
 using static SqlSource.Tool.Tests.PostgresRequests;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;

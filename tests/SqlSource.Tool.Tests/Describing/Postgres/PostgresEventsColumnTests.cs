@@ -5,13 +5,56 @@ using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresEventCases;
-using static SqlSource.Tool.Tests.PostgresPlans;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // What the describer says in the run's log of the columns, the tables and the check.
 public sealed class PostgresEventsColumnTests
 {
+    // A column holds the modifier of the row description, or null for a capture recorded before it was read.
+    [Fact]
+    public void Columns_ColumnsWithAndWithoutAModifier_WritesTheModifierOrNull()
+    {
+        var log = new RecordingLog();
+        var answer = new PostgresColumnsAnswer(
+            [
+                PostgresTables.ExpressionOf(0, "name", PostgresRows.Varchar.Oid, 32, null, null, 36),
+                PostgresTables.ExpressionOf(1, "n", PostgresRows.Int8.Oid),
+            ],
+            null
+        );
+
+        PostgresEvents.Columns(log, "GetUser", ColumnsOfQuery, answer, 1);
+
+        Member(log.Events.ShouldHaveSingleItem().Members, "columns")
+            .ShouldBe(
+                LogValue.ListOf([
+                    LogValue.MapOf(
+                        new("ordinal", 0L),
+                        new("name", "name"),
+                        new("typeOid", 1043L),
+                        new("tableOid", 0L),
+                        new("attributeNumber", 0L),
+                        new("length", 32L),
+                        new("precision", LogValue.Null),
+                        new("scale", LogValue.Null),
+                        new("typeModifier", 36L)
+                    ),
+                    LogValue.MapOf(
+                        new("ordinal", 1L),
+                        new("name", "n"),
+                        new("typeOid", 20L),
+                        new("tableOid", 0L),
+                        new("attributeNumber", 0L),
+                        new("length", LogValue.Null),
+                        new("precision", LogValue.Null),
+                        new("scale", LogValue.Null),
+                        new("typeModifier", LogValue.Null)
+                    ),
+                ])
+            );
+    }
+
     private static readonly PostgresCheckRequest Check = new(
         Query.Sql,
         [.. CheckedParameters.Select(static parameter => new PostgresCheckParameter(parameter.Name, parameter.Type))]
