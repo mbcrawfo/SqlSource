@@ -6,7 +6,7 @@
       "method": "open",
       "request": {},
       "answer": {
-        "serverVersion": "18.4",
+        "serverVersion": "18.6",
         "driverVersion": "10.0.3",
         "settings": [
           {

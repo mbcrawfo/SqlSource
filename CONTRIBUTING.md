@@ -46,11 +46,13 @@ A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both, so i
 
 `tests/SqlSource.Tool.Tests/Fixtures/Projects/` holds small projects that are no part of the solution.  `ManifestTargetTests` and `FixtureProjectTests` copy one to a temporary folder outside the repository, with the package's two MSBuild files and `global.json` beside it, and run `dotnet msbuild` on it for real, the second through the tool's own code, so these tests need the SDK that `global.json` pins and take a second or two each.  MSBuild reads the environment for its properties, and the workflow has a variable named `CONFIGURATION`, so in CI a fixture is evaluated as `Release`: a test of a fixture expects no `Debug`, in a constant or in a path.  A fixture is never built or restored, and a test leaves nothing in the repository.  A file under that folder is copied to the test project's output as it is; add a project there as a folder with an `App.csproj` that imports `../build/SqlSource.props` and `../build/SqlSource.targets`.
 
-`tests/SqlSource.Tests.Postgres` needs Docker running, and its first run pulls the image.  The image is `postgres:18`, named in one place, `PostgresContainer.DefaultImage`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported:
+`tests/SqlSource.Tests.Postgres` needs Docker running, and its first run pulls the image.  The image is `postgres:18.6`, named in one place, `PostgresContainer.DefaultImage`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported, which CI runs as `postgres:14.24`:
 
 ```bash
-SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14 dotnet test --project tests/SqlSource.Tests.Postgres
+SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres
 ```
+
+Every database image the tests run is pinned to a major and a minor, such as `postgres:18.6`, and never to a bare major such as `postgres:18`.  The recorded fixtures carry the version of the server they were recorded against, and a bare major moves to each new minor without a word, so the tests would run a server the recordings never saw.  This holds for the default image, for the image CI runs on the oldest supported version, and for the image of any engine added later.  `PostgresContainerTests` fails on an image whose tag is not a major and a minor, or whose server reports another version, and `FixtureVersionTests` fails on a fixture case recorded against any version but the default image's.  Moving to a new minor is a change of its own: bump the tag, record the fixtures and the realistic corpus again on the new image, as below, and read the diff, all in the same pull request.
 
 `dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh`, runs it on the default image.
 
@@ -66,7 +68,7 @@ The realistic corpus is recorded by its own script, `tools/record-realistic.sh`,
 
 ```bash
 tools/record-realistic.sh
-SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14 tools/record-realistic.sh
+SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 tools/record-realistic.sh
 ```
 
 To add a case, add its folder with a `query.sql` and a `case.json`, which holds the truth, written from the SQL and `schema.sql` and never from what the describer answers, and run both.  When a column of the truth can be `NULL` and no row of `seed.sql` makes it so, add such a row to `seed.sql`, which never removes one; `exempt` is for a `NULL` no seed can show.  The noise budget is lowered in the change that lowers the noise, the test says to, and raised only in a change that adds cases.

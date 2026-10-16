@@ -8,7 +8,7 @@
       "hash": "4c490ed6de1f4b9585e30b6ef0c09dfb91174184d572c7b594c89a36d239d001",
       "engine": "postgres",
       "database": "postgres",
-      "serverVersion": "18.4",
+      "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {
         "schema": "public",

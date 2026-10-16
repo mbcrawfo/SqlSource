@@ -8,7 +8,7 @@
       "hash": "ff2d66780f376730975b275431fb569a280769423f42e0a47cfa751a0419d36e",
       "engine": "postgres",
       "database": "postgres",
-      "serverVersion": "18.4",
+      "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
       "plan": "not-needed",
