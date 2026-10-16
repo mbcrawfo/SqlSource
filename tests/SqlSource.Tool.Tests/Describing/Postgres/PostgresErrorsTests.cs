@@ -121,8 +121,8 @@ public class PostgresErrorsTests
         failure.Help.ShouldBe(PostgresErrors.NotATypeNameHelp);
     }
 
-    private static PostgresPrepareRequest Prepared(string statement, params string[] types) =>
-        new(statement, "SELECT 1", types);
+    private static PostgresPrepareRequest Prepared(int number, params string[] types) =>
+        new(PostgresScript.Statement(number), "SELECT 1", types);
 
     private static PostgresServerError Error(string state, string message, int? position = null, string? hint = null) =>
         new(state, message, null, hint, position);
@@ -134,7 +134,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             new PostgresServerError("42P14", "utility statements cannot be prepared", null, null, null),
             Query(),
-            Prepared("sqlsource_1"),
+            Prepared(1),
             "app"
         );
 
@@ -157,7 +157,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             new PostgresServerError(state, message, null, null, 40),
             Query(),
-            Prepared("sqlsource_1"),
+            Prepared(1),
             "app"
         );
 
@@ -173,7 +173,7 @@ public class PostgresErrorsTests
     [Fact]
     public void Prepare_NotListedMessageWithASqlState_IsSqlsrc225() =>
         PostgresErrors
-            .Prepare(Error("42601", PostgresLive.StatementNotListed), Query(), Prepared("sqlsource_1"), "app")
+            .Prepare(Error("42601", PostgresLive.StatementNotListed), Query(), Prepared(1), "app")
             .Descriptor.Id.ShouldBe("SQLSRC225");
 
     // 26000 is matched by its SQLSTATE alone.
@@ -207,7 +207,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42P18", "could not determine data type of parameter $2"),
             Query(Inferred("a"), Inferred("b")),
-            Prepared("sqlsource_1", "unknown", "unknown"),
+            Prepared(1, "unknown", "unknown"),
             "app"
         );
 
@@ -227,7 +227,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42P08", "could not determine data type of parameter $1", 62),
             Query(Inferred("name")),
-            Prepared("sqlsource_7", "unknown"),
+            Prepared(7, "unknown"),
             "app"
         );
 
@@ -242,7 +242,7 @@ public class PostgresErrorsTests
     [InlineData("42P08", "could not determine data type of a parameter")]
     public void Prepare_ParameterErrorThatNamesNoParameterOfTheList_IsSqlsrc225(string state, string message) =>
         PostgresErrors
-            .Prepare(Error(state, message), Query(Inferred("a")), Prepared("sqlsource_1", "unknown"), "app")
+            .Prepare(Error(state, message), Query(Inferred("a")), Prepared(1, "unknown"), "app")
             .Descriptor.Id.ShouldBe("SQLSRC225");
 
     // The character 32 of "PREPARE sqlsource_10 (unknown, nope_t" is the n of nope_t.
@@ -252,7 +252,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42704", "type \"nope_t\" does not exist", 32),
             Query(Inferred("id"), Declared("tenant", "nope_t")),
-            Prepared("sqlsource_10", "unknown", "nope_t"),
+            Prepared(10, "unknown", "nope_t"),
             "app"
         );
 
@@ -270,7 +270,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42704", "type \"nope_t\" does not exist", 47),
             Query(Inferred("p")),
-            Prepared("sqlsource_11", "unknown"),
+            Prepared(11, "unknown"),
             "app"
         );
 
@@ -287,7 +287,7 @@ public class PostgresErrorsTests
             .Prepare(
                 Error("42704", "type \"nope_t\" does not exist"),
                 Query(Declared("p", "nope_t")),
-                Prepared("sqlsource_1", "nope_t"),
+                Prepared(1, "nope_t"),
                 "app"
             )
             .Descriptor.Id.ShouldBe("SQLSRC225");
@@ -302,7 +302,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error(state, message, 23),
             Query(Declared("p", "numeric(2,-3)")),
-            Prepared("sqlsource_35", "numeric(2,-3)"),
+            Prepared(35, "numeric(2,-3)"),
             "app"
         );
 
@@ -316,12 +316,7 @@ public class PostgresErrorsTests
     [Fact]
     public void Prepare_ErrorInsideTheTypeListAtAnInferredParameter_IsSqlsrc225() =>
         PostgresErrors
-            .Prepare(
-                Error("42601", "syntax error", 23),
-                Query(Inferred("p")),
-                Prepared("sqlsource_1", "unknown"),
-                "app"
-            )
+            .Prepare(Error("42601", "syntax error", 23), Query(Inferred("p")), Prepared(1, "unknown"), "app")
             .Descriptor.Id.ShouldBe("SQLSRC225");
 
     // A parameter with no declared type takes the type of its first use, which a type error may be the fault of.
@@ -342,7 +337,7 @@ public class PostgresErrorsTests
                 Declared("n", "int"),
                 Inferred("q")
             ),
-            Prepared("sqlsource_1", "unknown", "int", "unknown"),
+            Prepared(1, "unknown", "int", "unknown"),
             "app"
         );
 
@@ -361,7 +356,7 @@ public class PostgresErrorsTests
             .Prepare(
                 Error("42883", "operator does not exist: integer = text", 40),
                 QueryOf("SELECT id FROM accounts WHERE id = @x", Inferred("x")),
-                Prepared("sqlsource_1", "unknown"),
+                Prepared(1, "unknown"),
                 "app"
             )
             .Help.ShouldBe(
@@ -382,7 +377,7 @@ public class PostgresErrorsTests
             .Prepare(
                 Error("42883", "operator does not exist: integer + text"),
                 QueryOf(sql, Inferred("x"), Inferred("y")),
-                Prepared("sqlsource_1", "unknown", "unknown"),
+                Prepared(1, "unknown", "unknown"),
                 "app"
             )
             .Help.ShouldBe(PostgresErrors.InferredParameterHelp([Inferred("y")]));
@@ -402,7 +397,7 @@ public class PostgresErrorsTests
             .Prepare(
                 Error("42883", "operator does not exist: integer + text"),
                 QueryOf(sql, Inferred("x")),
-                Prepared("sqlsource_1", "unknown"),
+                Prepared(1, "unknown"),
                 "app"
             )
             .Help.ShouldBe(PostgresErrors.InferredParameterHelp([Inferred("x")]));
@@ -413,7 +408,7 @@ public class PostgresErrorsTests
             .Prepare(
                 Error("42883", "function lowr(text) does not exist"),
                 QueryOf("SELECT lowr(name) FROM accounts WHERE id = @id::int", Inferred("id")),
-                Prepared("sqlsource_1", "unknown"),
+                Prepared(1, "unknown"),
                 "app"
             )
             .Help.ShouldBeNull();
@@ -430,7 +425,7 @@ public class PostgresErrorsTests
             .Prepare(
                 Error("42883", "operator does not exist: integer = text", 40),
                 Query(Declared("x", "text")),
-                Prepared("sqlsource_1", "text"),
+                Prepared(1, "text"),
                 "app"
             )
             .Help.ShouldBeNull();
@@ -441,7 +436,7 @@ public class PostgresErrorsTests
             .Prepare(
                 Error("42P01", "relation \"nope\" does not exist", 40),
                 Query(Inferred("x")),
-                Prepared("sqlsource_1", "unknown"),
+                Prepared(1, "unknown"),
                 "app"
             )
             .Help.ShouldBeNull();
@@ -452,7 +447,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             Error("42883", "operator does not exist: character varying = integer", 63, "You might need to add casts."),
             Query(Declared("p", "int")),
-            Prepared("sqlsource_12", "int"),
+            Prepared(12, "int"),
             "app"
         );
 
@@ -473,7 +468,7 @@ public class PostgresErrorsTests
         var failure = PostgresErrors.Prepare(
             new PostgresServerError(null, "Exception while reading from stream", null, null, null),
             Query(),
-            Prepared("sqlsource_1"),
+            Prepared(1),
             "app"
         );
 
@@ -486,7 +481,7 @@ public class PostgresErrorsTests
     [Fact]
     public void Prepare_TypeListWithACharacterOutsideTheBasicPlane_StillCountsFromTheSql()
     {
-        var prepare = Prepared("sqlsource_1", "\"\U0001F600\"");
+        var prepare = Prepared(1, "\"\U0001F600\"");
         var head = ParameterPlaceholders.HeadLength(prepare.Statement, prepare.Types);
 
         var failure = PostgresErrors.Prepare(

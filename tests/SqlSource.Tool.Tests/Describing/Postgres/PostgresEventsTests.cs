@@ -19,22 +19,15 @@ public class PostgresEventsTests
         new EquatableArray<SqlQueryParameter>([new SqlQueryParameter("id", null, null, false)])
     );
 
-    private static readonly PostgresPrepareRequest Prepare = new(
-        "sqlsource_1",
-        "SELECT 1 FROM users WHERE id = $1",
-        ["unknown"]
-    );
+    // Query as the session prepares it.
+    private const string PreparedSql = "SELECT 1 FROM users WHERE id = $1";
 
-    private static readonly PostgresDeallocateRequest Deallocate = new("sqlsource_1");
-
-    private static readonly PostgresColumnsRequest Columns = new("sqlsource_1", 1);
+    private static readonly PostgresColumnsRequest Columns = new(PostgresScript.Statement(1), 1);
 
     private static readonly PostgresCheckRequest Check = new(
         "SELECT 1 FROM users WHERE id = @id",
         [new PostgresCheckParameter("id", "integer")]
     );
-
-    private static readonly PostgresCheckAnswer Agrees = new([], null, null);
 
     private static LogValue Member(LogMember[] members, string name) =>
         members.Single(member => member.Name == name).Value;
@@ -53,11 +46,11 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var script = new PostgresScript()
             .Open()
-            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
-            .Answer("columns", Columns, PostgresScript.NoColumns)
-            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
-            .Answer("check", Check, Agrees)
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Columns(1, 1)
+            .Resolves([23], PostgresRows.Int4)
+            .Checks("SELECT 1 FROM users WHERE id = @id", [("id", "integer")])
+            .Frees(1);
 
         await DescribeAsync(script, log);
 
@@ -67,7 +60,7 @@ public class PostgresEventsTests
         NamesOf(prepare).ShouldBe(["query", "statement", "sql", "types", "parameterTypes", "durationMs"]);
         Member(prepare, "query").ShouldBe((LogValue)"GetUser");
         Member(prepare, "statement").ShouldBe((LogValue)"sqlsource_1");
-        Member(prepare, "sql").ShouldBe((LogValue)"SELECT 1 FROM users WHERE id = $1");
+        Member(prepare, "sql").ShouldBe((LogValue)PreparedSql);
         Member(prepare, "types").ShouldBe(LogValue.ListOfTexts(["unknown"]));
         Member(prepare, "parameterTypes").ShouldBe(LogValue.ListOf([23L]));
         _ = Member(prepare, "durationMs").ShouldBeOfType<LogValue.Number>();
@@ -107,7 +100,9 @@ public class PostgresEventsTests
     {
         var log = new RecordingLog();
         var rejected = new PostgresServerError("42P01", "relation \"users\" does not exist", "a detail", null, 49);
-        var script = new PostgresScript().Open().Answer("prepare", Prepare, new PostgresPrepareAnswer(null, rejected));
+        var script = new PostgresScript()
+            .Open()
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer(null, rejected));
 
         await DescribeAsync(script, log);
 
@@ -254,10 +249,10 @@ public class PostgresEventsTests
         );
         var script = new PostgresScript()
             .Open()
-            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
-            .Answer("columns", Columns, PostgresScript.NoColumns)
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Columns(1, 1)
             .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer(null, refused))
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Frees(1);
 
         await DescribeAsync(script, log);
 
@@ -290,11 +285,11 @@ public class PostgresEventsTests
         );
         var script = new PostgresScript()
             .Open()
-            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
-            .Answer("columns", Columns, PostgresScript.NoColumns)
-            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
-            .Answer("check", Check, Agrees)
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(gone));
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Columns(1, 1)
+            .Resolves([23], PostgresRows.Int4)
+            .Checks("SELECT 1 FROM users WHERE id = @id", [("id", "integer")])
+            .Frees(1, new PostgresDeallocateAnswer(gone));
 
         await DescribeAsync(script, log);
 
@@ -310,11 +305,11 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var script = new PostgresScript()
             .Open()
-            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
-            .Answer("columns", Columns, PostgresScript.NoColumns)
-            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
-            .Answer("check", Check, Agrees)
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Columns(1, 1)
+            .Resolves([23], PostgresRows.Int4)
+            .Checks("SELECT 1 FROM users WHERE id = @id", [("id", "integer")])
+            .Frees(1);
 
         await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."));
 
@@ -344,48 +339,17 @@ public class PostgresEventsTests
     private static PostgresScript ListingScript() =>
         new PostgresScript()
             .Open()
-            .Answer(
-                "prepare",
-                new PostgresPrepareRequest("sqlsource_1", Listing.Sql, []),
-                new PostgresPrepareAnswer([], null)
-            )
-            .Answer(
-                "columns",
-                new PostgresColumnsRequest("sqlsource_1", 0),
-                new PostgresColumnsAnswer([IdColumn, CountColumn], null)
-            )
-            .Answer(
-                "tables",
-                new PostgresTablesRequest([PostgresTables.Users.Oid]),
-                new PostgresTablesAnswer([PostgresTables.Users], null)
-            )
-            .Answer(
-                "types",
-                new PostgresTypesRequest([20, 23]),
-                new PostgresTypesAnswer([PostgresRows.Int8, PostgresRows.Int4], null)
-            )
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
-
-    private static PostgresCheckAnswer Sees(params PostgresColumnRow[] columns) =>
-        new(
-            [.. columns.Select(static column => new PostgresCheckColumn(column.Name, column.TypeOid, "a type"))],
-            null,
-            null
-        );
-
-    // The count of Listing has no origin, so the describe asks for the plan, which this server does not give.
-    private static readonly PostgresExplainAnswer NoPlan = new(
-        null,
-        new PostgresServerError("XX000", "no plan in this test", null, null, null)
-    );
+            .Prepares(1, Listing.Sql, [], new PostgresPrepareAnswer([], null))
+            .Columns(1, 0, IdColumn, CountColumn)
+            .Tables([PostgresTables.Users.Oid], PostgresTables.Users)
+            .Resolves([20, 23], PostgresRows.Int8, PostgresRows.Int4)
+            .Frees(1);
 
     [Fact]
     public async Task Describe_QueryWithColumns_WritesColumnsTablesAColumnForEachAndCheck()
     {
         var log = new RecordingLog();
-        var script = ListingScript()
-            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn))
-            .Answer("explain", new PostgresExplainRequest("sqlsource_1", 0, []), NoPlan);
+        var script = ListingScript().Checks(Listing.Sql, [], IdColumn, CountColumn).PlansNothing(1, 0);
 
         await DescribeAsync(script, log, Listing);
 
@@ -500,11 +464,11 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var script = new PostgresScript()
             .Open()
-            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
-            .Answer("columns", Columns, PostgresScript.NoColumns)
-            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
-            .Answer("check", Check, Agrees)
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Columns(1, 1)
+            .Resolves([23], PostgresRows.Int4)
+            .Checks("SELECT 1 FROM users WHERE id = @id", [("id", "integer")])
+            .Frees(1);
 
         await DescribeAsync(script, log);
 
@@ -516,7 +480,7 @@ public class PostgresEventsTests
     public async Task Describe_CheckThatDiffers_WritesWhatDiffers()
     {
         var log = new RecordingLog();
-        var script = ListingScript().Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn));
+        var script = ListingScript().Checks(Listing.Sql, [], IdColumn);
 
         await DescribeAsync(script, log, Listing);
 
@@ -531,11 +495,11 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var script = new PostgresScript()
             .Open()
-            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
-            .Answer("columns", Columns, PostgresScript.NoColumns)
-            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Columns(1, 1)
+            .Resolves([23], PostgresRows.Int4)
             .Answer("check", Check, new PostgresCheckAnswer(null, null, new PostgresBindError("id", "no such type")))
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Frees(1);
 
         await DescribeAsync(script, log);
 
@@ -552,11 +516,11 @@ public class PostgresEventsTests
         var canceled = new PostgresServerError("57014", "canceling statement due to user request", null, null, null);
         var script = new PostgresScript()
             .Open()
-            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
-            .Answer("columns", Columns, PostgresScript.NoColumns)
-            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Columns(1, 1)
+            .Resolves([23], PostgresRows.Int4)
             .Answer("check", Check, new PostgresCheckAnswer(null, canceled, null, null, false))
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Frees(1);
 
         await DescribeAsync(script, log);
 
@@ -573,9 +537,9 @@ public class PostgresEventsTests
         var lost = new PostgresServerError(null, "the connection to the server was lost", null, null, null);
         var script = new PostgresScript()
             .Open()
-            .Answer("prepare", Prepare, new PostgresPrepareAnswer([23], null))
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
             .Answer("columns", Columns, new PostgresColumnsAnswer(null, lost))
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Frees(1);
 
         await DescribeAsync(script, log);
 
@@ -590,22 +554,14 @@ public class PostgresEventsTests
         var refused = new PostgresServerError("42501", "permission denied for table pg_attribute", null, null, null);
         var script = new PostgresScript()
             .Open()
-            .Answer(
-                "prepare",
-                new PostgresPrepareRequest("sqlsource_1", Listing.Sql, []),
-                new PostgresPrepareAnswer([], null)
-            )
-            .Answer(
-                "columns",
-                new PostgresColumnsRequest("sqlsource_1", 0),
-                new PostgresColumnsAnswer([IdColumn], null)
-            )
+            .Prepares(1, Listing.Sql, [], new PostgresPrepareAnswer([], null))
+            .Columns(1, 0, IdColumn)
             .Answer(
                 "tables",
                 new PostgresTablesRequest([PostgresTables.Users.Oid]),
                 new PostgresTablesAnswer(null, refused)
             )
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Frees(1);
 
         await DescribeAsync(script, log, Listing);
 
@@ -621,29 +577,16 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var script = new PostgresScript()
             .Open()
-            .Answer(
-                "prepare",
-                new PostgresPrepareRequest("sqlsource_1", Listing.Sql, []),
-                new PostgresPrepareAnswer([], null)
+            .Prepares(1, Listing.Sql, [], new PostgresPrepareAnswer([], null))
+            .Columns(
+                1,
+                0,
+                new(0, "one", 23, 0, 0, null, null, null),
+                new(1, "pair", 2249, 0, 0, null, null, null),
+                new(2, "two", 23, 0, 0, null, null, null)
             )
-            .Answer(
-                "columns",
-                new PostgresColumnsRequest("sqlsource_1", 0),
-                new PostgresColumnsAnswer(
-                    [
-                        new(0, "one", 23, 0, 0, null, null, null),
-                        new(1, "pair", 2249, 0, 0, null, null, null),
-                        new(2, "two", 23, 0, 0, null, null, null),
-                    ],
-                    null
-                )
-            )
-            .Answer(
-                "types",
-                new PostgresTypesRequest([23, 2249]),
-                new PostgresTypesAnswer([PostgresRows.Int4, PostgresRows.Record], null)
-            )
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Resolves([23, 2249], PostgresRows.Int4, PostgresRows.Record)
+            .Frees(1);
 
         await DescribeAsync(script, log, Listing);
 
@@ -656,9 +599,7 @@ public class PostgresEventsTests
     public async Task Describe_ThroughTheLogOfASession_RemovesTheSecretFromAColumnsNameAndItsOrigin()
     {
         var log = new RecordingLog();
-        var script = ListingScript()
-            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn))
-            .Answer("explain", new PostgresExplainRequest("sqlsource_1", 0, []), NoPlan);
+        var script = ListingScript().Checks(Listing.Sql, [], IdColumn, CountColumn).PlansNothing(1, 0);
 
         await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."), Listing);
 
@@ -700,14 +641,9 @@ public class PostgresEventsTests
             new PostgresRelationName("public", "users_2"),
         ]);
         var script = ListingScript()
-            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn))
-            .Answer(
-                "explain",
-                new PostgresExplainRequest("sqlsource_1", 0, []),
-                new PostgresExplainAnswer(Text(plan), null)
-            )
-            .Answer(
-                "partitions",
+            .Checks(Listing.Sql, [], IdColumn, CountColumn)
+            .Explains(1, 0, new PostgresExplainAnswer(Text(plan), null))
+            .Partitions(
                 asked,
                 new PostgresPartitionsAnswer(
                     [
@@ -756,14 +692,9 @@ public class PostgresEventsTests
             Output = ["u.id", "1"],
         };
         var script = ListingScript()
-            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn))
-            .Answer(
-                "explain",
-                new PostgresExplainRequest("sqlsource_1", 0, []),
-                new PostgresExplainAnswer(Text(plan), null)
-            )
-            .Answer(
-                "partitions",
+            .Checks(Listing.Sql, [], IdColumn, CountColumn)
+            .Explains(1, 0, new PostgresExplainAnswer(Text(plan), null))
+            .Partitions(
                 new PostgresPartitionsRequest([new PostgresRelationName("public", "users_1")]),
                 new PostgresPartitionsAnswer(
                     null,
@@ -771,8 +702,7 @@ public class PostgresEventsTests
                 )
             )
             // The Append is then read as a set operation, whose branch's relation is asked for.
-            .Answer(
-                "relations",
+            .Relations(
                 new PostgresRelationsRequest([new PostgresRelationName("public", "users_1")]),
                 new PostgresTablesAnswer([], null)
             );
@@ -880,16 +810,12 @@ public class PostgresEventsTests
         var id = PostgresTables.ColumnOf(0, "id", 23, Ids, 1);
         return new PostgresScript()
             .Open()
-            .Answer(
-                "prepare",
-                new PostgresPrepareRequest("sqlsource_1", Whole.Sql, []),
-                new PostgresPrepareAnswer([], null)
-            )
-            .Answer("columns", new PostgresColumnsRequest("sqlsource_1", 0), new PostgresColumnsAnswer([id], null))
-            .Answer("tables", new PostgresTablesRequest([Ids.Oid]), new PostgresTablesAnswer([Ids], null))
-            .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer([PostgresRows.Int4], null))
-            .Answer("check", new PostgresCheckRequest(Whole.Sql, []), Sees(id))
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Prepares(1, Whole.Sql, [], new PostgresPrepareAnswer([], null))
+            .Columns(1, 0, id)
+            .Tables([Ids.Oid], Ids)
+            .Resolves([23], PostgresRows.Int4)
+            .Checks(Whole.Sql, [], id)
+            .Frees(1);
     }
 
     [Fact]
@@ -920,7 +846,7 @@ public class PostgresEventsTests
     public async Task Describe_CheckThatDiffers_WritesNoTableMatch()
     {
         var log = new RecordingLog();
-        var script = ListingScript().Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn));
+        var script = ListingScript().Checks(Listing.Sql, [], IdColumn);
 
         await DescribeAsync(script, log, Listing);
 
@@ -947,7 +873,9 @@ public class PostgresEventsTests
     {
         var log = new RecordingLog();
         var rejected = new PostgresServerError("42P01", "relation \"users\" does not exist", null, null, null);
-        var script = new PostgresScript().Open().Answer("prepare", Prepare, new PostgresPrepareAnswer(null, rejected));
+        var script = new PostgresScript()
+            .Open()
+            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer(null, rejected));
 
         await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."));
 
@@ -987,29 +915,13 @@ public class PostgresEventsTests
     private static PostgresScript JoinedScript(PostgresExplainAnswer explain) =>
         new PostgresScript()
             .Open()
-            .Answer(
-                "prepare",
-                new PostgresPrepareRequest("sqlsource_1", Joined.Sql, []),
-                new PostgresPrepareAnswer([], null)
-            )
-            .Answer(
-                "columns",
-                new PostgresColumnsRequest("sqlsource_1", 0),
-                new PostgresColumnsAnswer([UserId, Total], null)
-            )
-            .Answer(
-                "tables",
-                new PostgresTablesRequest([PostgresTables.Users.Oid, PostgresTables.Orders.Oid]),
-                new PostgresTablesAnswer([PostgresTables.Users, PostgresTables.Orders], null)
-            )
-            .Answer(
-                "types",
-                new PostgresTypesRequest([23, 1700]),
-                new PostgresTypesAnswer([PostgresRows.Int4, PostgresRows.Numeric], null)
-            )
-            .Answer("check", new PostgresCheckRequest(Joined.Sql, []), Sees(UserId, Total))
-            .Answer("explain", new PostgresExplainRequest("sqlsource_1", 0, []), explain)
-            .Answer("deallocate", Deallocate, new PostgresDeallocateAnswer(null));
+            .Prepares(1, Joined.Sql, [], new PostgresPrepareAnswer([], null))
+            .Columns(1, 0, UserId, Total)
+            .Tables([PostgresTables.Users.Oid, PostgresTables.Orders.Oid], PostgresTables.Users, PostgresTables.Orders)
+            .Resolves([23, 1700], PostgresRows.Int4, PostgresRows.Numeric)
+            .Checks(Joined.Sql, [], UserId, Total)
+            .Explains(1, 0, explain)
+            .Frees(1);
 
     [Fact]
     public async Task Describe_GatedQuery_WritesExplainANodeForEachAColumnForEachAndWalkBeforeTheMatch()
