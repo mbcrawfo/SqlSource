@@ -14,8 +14,7 @@ public sealed class FixtureCaseTests : IDisposable
 
     public void Dispose() => _folder.Dispose();
 
-    private FixtureCase Case() =>
-        new(SidecarValues.Engine.Postgres, "one", _folder.CreateFolder($"{SidecarValues.Engine.Postgres}/one"));
+    private FixtureCase Case() => new(SidecarValues.Engine.Postgres, "one", _folder.CreateFolder("postgres/one"));
 
     [Fact]
     public void ExplainSettings_CaseWithoutTheFile_HasNone() => Case().ExplainSettings.ShouldBeEmpty();

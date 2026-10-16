@@ -28,7 +28,7 @@ public sealed class FixtureCasesTests : IDisposable
         var cases = FixtureCases.Of(SidecarValues.Engine.Postgres, _folder.Path);
 
         cases.Select(found => found.Name).ShouldBe(["a", "b"]);
-        cases.ShouldAllBe(found => found.Engine == SidecarValues.Engine.Postgres);
+        cases.ShouldAllBe(found => found.Engine == "postgres");
         cases[0].Folder.ShouldBe(_folder.PathOf("postgres/a"));
     }
 }

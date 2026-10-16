@@ -19,14 +19,19 @@ public class PostgresEventsTests
         new EquatableArray<SqlQueryParameter>([new SqlQueryParameter("id", null, null, false)])
     );
 
-    // Query as the session prepares it.
+    // Query as the session prepares it, and the types it sends for its parameter.
     private const string PreparedSql = "SELECT 1 FROM users WHERE id = $1";
+
+    private static readonly string[] PreparedTypes = ["unknown"];
+
+    // The parameter of Query as "check" is sent it.
+    private static readonly (string Name, string Type)[] CheckedParameters = [("id", "integer")];
 
     private static readonly PostgresColumnsRequest Columns = new(PostgresScript.Statement(1), 1);
 
     private static readonly PostgresCheckRequest Check = new(
-        "SELECT 1 FROM users WHERE id = @id",
-        [new PostgresCheckParameter("id", "integer")]
+        Query.Sql,
+        [.. CheckedParameters.Select(static parameter => new PostgresCheckParameter(parameter.Name, parameter.Type))]
     );
 
     private static LogValue Member(LogMember[] members, string name) =>
@@ -46,10 +51,10 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
             .Columns(1, 1)
             .Resolves([23], PostgresRows.Int4)
-            .Checks("SELECT 1 FROM users WHERE id = @id", [("id", "integer")])
+            .Checks(Query.Sql, CheckedParameters)
             .Frees(1);
 
         await DescribeAsync(script, log);
@@ -60,7 +65,7 @@ public class PostgresEventsTests
         NamesOf(prepare).ShouldBe(["query", "statement", "sql", "types", "parameterTypes", "durationMs"]);
         Member(prepare, "query").ShouldBe((LogValue)"GetUser");
         Member(prepare, "statement").ShouldBe((LogValue)"sqlsource_1");
-        Member(prepare, "sql").ShouldBe((LogValue)PreparedSql);
+        Member(prepare, "sql").ShouldBe((LogValue)"SELECT 1 FROM users WHERE id = $1");
         Member(prepare, "types").ShouldBe(LogValue.ListOfTexts(["unknown"]));
         Member(prepare, "parameterTypes").ShouldBe(LogValue.ListOf([23L]));
         _ = Member(prepare, "durationMs").ShouldBeOfType<LogValue.Number>();
@@ -102,7 +107,7 @@ public class PostgresEventsTests
         var rejected = new PostgresServerError("42P01", "relation \"users\" does not exist", "a detail", null, 49);
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer(null, rejected));
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer(null, rejected));
 
         await DescribeAsync(script, log);
 
@@ -249,7 +254,7 @@ public class PostgresEventsTests
         );
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
             .Columns(1, 1)
             .Answer("types", new PostgresTypesRequest([23]), new PostgresTypesAnswer(null, refused))
             .Frees(1);
@@ -285,10 +290,10 @@ public class PostgresEventsTests
         );
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
             .Columns(1, 1)
             .Resolves([23], PostgresRows.Int4)
-            .Checks("SELECT 1 FROM users WHERE id = @id", [("id", "integer")])
+            .Checks(Query.Sql, CheckedParameters)
             .Frees(1, new PostgresDeallocateAnswer(gone));
 
         await DescribeAsync(script, log);
@@ -305,10 +310,10 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
             .Columns(1, 1)
             .Resolves([23], PostgresRows.Int4)
-            .Checks("SELECT 1 FROM users WHERE id = @id", [("id", "integer")])
+            .Checks(Query.Sql, CheckedParameters)
             .Frees(1);
 
         await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."));
@@ -462,10 +467,10 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
             .Columns(1, 1)
             .Resolves([23], PostgresRows.Int4)
-            .Checks("SELECT 1 FROM users WHERE id = @id", [("id", "integer")])
+            .Checks(Query.Sql, CheckedParameters)
             .Frees(1);
 
         await DescribeAsync(script, log);
@@ -493,7 +498,7 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
             .Columns(1, 1)
             .Resolves([23], PostgresRows.Int4)
             .Answer("check", Check, new PostgresCheckAnswer(null, null, new PostgresBindError("id", "no such type")))
@@ -514,7 +519,7 @@ public class PostgresEventsTests
         var canceled = new PostgresServerError("57014", "canceling statement due to user request", null, null, null);
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
             .Columns(1, 1)
             .Resolves([23], PostgresRows.Int4)
             .Answer("check", Check, new PostgresCheckAnswer(null, canceled, null, null, false))
@@ -535,7 +540,7 @@ public class PostgresEventsTests
         var lost = new PostgresServerError(null, "the connection to the server was lost", null, null, null);
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer([23], null))
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
             .Answer("columns", Columns, new PostgresColumnsAnswer(null, lost))
             .Frees(1);
 
@@ -854,7 +859,7 @@ public class PostgresEventsTests
         var rejected = new PostgresServerError("42P01", "relation \"users\" does not exist", null, null, null);
         var script = new PostgresScript()
             .Open()
-            .Prepares(1, PreparedSql, ["unknown"], new PostgresPrepareAnswer(null, rejected));
+            .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer(null, rejected));
 
         await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."));
 
