@@ -293,6 +293,30 @@ internal sealed record PostgresCheckColumn(string Name, long TypeOid, string Dat
 /// <param name="Message">Npgsql's own message.</param>
 internal sealed record PostgresBindError(string Parameter, string Message);
 
+/// <summary>A relation as a plan names it: its schema and its name apart, since a name may hold a dot.</summary>
+internal sealed record PostgresRelationName(string Schema, string Name);
+
+/// <summary>The request of <c>partitions</c>.</summary>
+/// <param name="Relations">
+/// The relations the members of a plan's <c>Append</c>s scan (<see cref="PlanPartitions" />), in schema and name
+/// order, each once.
+/// </param>
+internal sealed record PostgresPartitionsRequest(IReadOnlyList<PostgresRelationName> Relations);
+
+/// <summary>The ancestors of each relation asked for, or why the catalog could not be read.</summary>
+/// <param name="Rows">One for each relation that exists, in schema and name order.</param>
+/// <param name="Error">What the server said, or null.  It is logged and never reported.</param>
+internal sealed record PostgresPartitionsAnswer(IReadOnlyList<PostgresPartitionRow>? Rows, PostgresServerError? Error);
+
+/// <summary>What <c>pg_partition_ancestors</c> says of one relation.</summary>
+/// <param name="Schema">The relation's schema.</param>
+/// <param name="Name">Its name.</param>
+/// <param name="Ancestors">
+/// The partitioned tables it is a partition of, by OID, nearest first, without itself: none for a relation that is
+/// no partition.
+/// </param>
+internal sealed record PostgresPartitionRow(string Schema, string Name, IReadOnlyList<long> Ancestors);
+
 /// <summary>Everything that decides the answer of <c>explain</c>.</summary>
 /// <param name="Statement">The prepared statement to plan.</param>
 /// <param name="Parameters">

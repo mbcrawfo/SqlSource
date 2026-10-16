@@ -27,8 +27,11 @@ public class WalkMatrixTests
     // A column of a view that nothing extends.
     private const string OfView = "null view";
 
-    // An expression.
+    // An expression the plan does not answer.
     private const string NoOrigin = "null no-origin";
+
+    // An expression the plan shows can never be NULL.
+    private const string Expression = "false expression";
 
     private const string Walked = "walked";
     private const string Unavailable = "unavailable";
@@ -55,15 +58,15 @@ public class WalkMatrixTests
         ["walk-reduced-by-join"] = (Walked, [Kept, Kept, Kept]),
         ["walk-removed"] = (Walked, [Kept, Kept]),
         ["walk-subquery-flattened"] = (Walked, [Kept, Joined]),
-        ["walk-subquery-kept"] = (Walked, [Heuristic, Heuristic, NoOrigin]),
+        ["walk-subquery-kept"] = (Walked, [Kept, Joined, NoOrigin]),
         ["walk-cte-inlined"] = (Walked, [Kept, Joined]),
-        ["walk-cte-materialized"] = (Walked, [Heuristic, Heuristic]),
+        ["walk-cte-materialized"] = (Walked, [Kept, Joined]),
         ["walk-lateral"] = (Walked, [Kept, Joined]),
         ["walk-view"] = (Walked, [OfView, OfView, Joined, Joined, Joined]),
         ["walk-view-nullable-side"] = (Walked, [Kept, Joined]),
         ["walk-using"] = (Walked, [NoOrigin, Joined, Joined]),
         ["walk-natural"] = (Walked, [NoOrigin, NoOrigin, Joined, Joined]),
-        ["walk-aggregate"] = (Walked, [Kept, Joined, NoOrigin]),
+        ["walk-aggregate"] = (Walked, [Kept, Joined, Expression]),
         ["walk-union"] = (Unavailable, [NoOrigin, NoOrigin]),
         ["walk-returning"] = (Walked, [Kept, Kept, Joined]),
         ["walk-proved-empty"] = (Walked, [Kept, Heuristic]),

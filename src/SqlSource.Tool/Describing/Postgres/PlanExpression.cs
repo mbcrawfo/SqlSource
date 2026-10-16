@@ -33,9 +33,10 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <c>GREATEST</c>, <c>LEAST</c>, <c>CASE</c> and the tests are syntax, and no search path changes them.
 /// </para>
 /// <para>
-/// The text cannot tell a value the root computes from one a node under a join computed and printed by its
-/// expression, so the caller asks only of a plan where no join null-extends a side and no set operation prints its
-/// first branch at the root (<see cref="NullabilityWalk" />).
+/// The text alone cannot tell a value the root computes from one a node under a join computed and printed by its
+/// expression, so the caller asks only of a plan where no set operation prints its first branch at the root, and
+/// either no join null-extends a side or the entry is read at the node that computes it, where a span in parentheses
+/// that a node under a join computed may be marked unknown (<see cref="NullabilityWalk" />).
 /// </para>
 /// </remarks>
 internal static class PlanExpression
@@ -59,14 +60,102 @@ internal static class PlanExpression
     /// Whether the walk proves a reference that is an argument not <c>NULL</c>.  A reference that is the whole entry
     /// is never asked.
     /// </param>
+    /// <param name="groupPreserved">
+    /// Whether a span in parentheses inside the entry, given as the text inside them, may be read as what it says, or
+    /// null when every one may.  The walk says no for a value a node under a join that null-extends computed, which
+    /// the node that computes the entry takes from it and prints in parentheses: such a span is unknown, whatever its
+    /// form.  The entry as a whole is never asked.
+    /// </param>
     /// <returns>
     /// False when the server can never return <c>NULL</c> for the entry, true for a <c>NULL</c> constant, and null
     /// when the entry as a whole is no form this class knows.
     /// </returns>
-    public static bool? NullableOf(string entry, bool catalogFunctions, Func<OutputReference, bool> provedNotNull) =>
+    public static bool? NullableOf(
+        string entry,
+        bool catalogFunctions,
+        Func<OutputReference, bool> provedNotNull,
+        Func<string, bool>? groupPreserved = null
+    ) =>
         Tokens.Read(entry) is { Count: > 0 } tokens
-            ? new Reader(entry, tokens, catalogFunctions, provedNotNull).Form(0, tokens.Count)
+            ? new Reader(entry, tokens, catalogFunctions, provedNotNull, groupPreserved).Form(0, tokens.Count)
             : null;
+
+    /// <summary>
+    /// The text inside the one pair of parentheses that wraps the whole entry, with its quotes and its parentheses
+    /// balanced, or null when none does: how a node prints a value a node under it computed.
+    /// </summary>
+    public static string? Unwrapped(string entry) =>
+        Tokens.Read(entry) is [{ Kind: Kind.Open, Start: 0 }, .., { Kind: Kind.Close } last] tokens
+        && last.End == entry.Length
+        && new Reader(entry, tokens, false, static _ => false, null).WrapsWhole(tokens.Count)
+            ? entry[1..^1]
+            : null;
+
+    /// <summary>
+    /// Whether an entry that is no plain reference may still print a column of that name: it names it, bare or quoted,
+    /// or holds a parameter, <c>$1</c>, or its quotes or its parentheses do not balance.  A value a node takes from the
+    /// query above, a <c>LATERAL</c> reference, prints as <c>(u.id)</c>, and so does a placeholder over a column.
+    /// </summary>
+    public static bool MayNameColumn(string entry, string column)
+    {
+        if (Tokens.Read(entry) is not { } tokens)
+        {
+            return true;
+        }
+
+        foreach (var token in tokens)
+        {
+            var text = entry[token.Start..token.End];
+            string? named = null;
+            if (token.Kind == Kind.Word)
+            {
+                named = text;
+            }
+            else if (token.Kind == Kind.QuotedName)
+            {
+                named = text[1..^1].Replace("\"\"", "\"", StringComparison.Ordinal);
+            }
+
+            if (
+                string.Equals(named, column, StringComparison.Ordinal)
+                || (token.Kind == Kind.Other && text.Contains('$', StringComparison.Ordinal))
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// The text inside each pair of parentheses of the entry, outermost first, or none when its quotes or its
+    /// parentheses do not balance: among them, each value a node takes from a node under it that computed it.
+    /// </summary>
+    public static IReadOnlyList<string> Groups(string entry)
+    {
+        if (Tokens.Read(entry) is not { } tokens)
+        {
+            return [];
+        }
+
+        var groups = new List<string>();
+        var open = new Stack<Token>();
+        foreach (var token in tokens)
+        {
+            if (token.Kind == Kind.Open)
+            {
+                open.Push(token);
+            }
+            else if (token.Kind == Kind.Close && open.TryPop(out var opening) && opening.Kind == Kind.Open)
+            {
+                groups.Add(entry[opening.End..token.Start]);
+            }
+        }
+
+        groups.Reverse();
+        return groups;
+    }
 
     private enum Kind
     {
@@ -261,6 +350,7 @@ internal static class PlanExpression
         private readonly List<Token> _tokens;
         private readonly bool _catalogFunctions;
         private readonly Func<OutputReference, bool> _provedNotNull;
+        private readonly Func<string, bool>? _groupPreserved;
 
         // The index of the token that closes each opening parenthesis or bracket, and -1 for any other.
         private readonly int[] _closes;
@@ -269,13 +359,15 @@ internal static class PlanExpression
             string entry,
             List<Token> tokens,
             bool catalogFunctions,
-            Func<OutputReference, bool> provedNotNull
+            Func<OutputReference, bool> provedNotNull,
+            Func<string, bool>? groupPreserved
         )
         {
             _entry = entry;
             _tokens = tokens;
             _catalogFunctions = catalogFunctions;
             _provedNotNull = provedNotNull;
+            _groupPreserved = groupPreserved;
             _closes = new int[tokens.Count];
             var open = new Stack<int>();
             for (var index = 0; index < tokens.Count; index++)
@@ -302,6 +394,14 @@ internal static class PlanExpression
 
             if (IsGroup(from, to))
             {
+                if (
+                    (from > 0 || to < _tokens.Count)
+                    && _groupPreserved?.Invoke(_entry[_tokens[from].End.._tokens[to - 1].Start]) == false
+                )
+                {
+                    return null;
+                }
+
                 return IsTest(from + 1, to - 1) ? false : Form(from + 1, to - 1);
             }
 
@@ -322,6 +422,9 @@ internal static class PlanExpression
 
             return IsCase(from, to) && CaseResultsAreNotNull(from, to) ? false : null;
         }
+
+        // Whether the first token is a parenthesis that the last closes.
+        public bool WrapsWhole(int count) => IsGroup(0, count);
 
         // Whether the span is one parenthesis and the one that closes it.
         private bool IsGroup(int from, int to) => Is(from, Kind.Open) && _closes[from] == to - 1;

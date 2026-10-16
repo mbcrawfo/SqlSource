@@ -3,6 +3,6 @@ plan: walked
 table-match: no-origin
 column 0 id: integer | nullable false | catalog | public.accounts.id
 column 1 account: jsonb | nullable null | no-origin | -
-column 2 orders: json | nullable null | no-origin | -
+column 2 orders: json | nullable false | expression | -
 column 3 coupons: json | nullable null | no-origin | -
 column 4 order_count: bigint | nullable null | no-origin | -

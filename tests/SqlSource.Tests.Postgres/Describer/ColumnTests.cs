@@ -673,7 +673,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
         TypeNamesOf(columns).ShouldBe(["integer", "public.email_t", "numeric(18,2)", "bigint"]);
         NullabilityOf(columns)
-            .ShouldBe([(false, "catalog"), (true, "catalog"), (true, "outer-join"), (null, "no-origin")]);
+            .ShouldBe([(false, "catalog"), (true, "catalog"), (true, "outer-join"), (false, "expression")]);
         columns
             .Select(column => column.Origin)
             .ShouldBe([Origin("users", "id"), Origin("users", "email"), Origin("orders", "total"), null]);

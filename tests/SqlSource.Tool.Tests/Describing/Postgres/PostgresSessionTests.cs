@@ -1271,6 +1271,94 @@ public class PostgresSessionTests
         described.Value.ShouldNotBeNull().Plan.ShouldBe(SidecarValues.Plan.Walked);
     }
 
+    // users scanned as the partitions users_1 and users_2, on the side the join keeps.
+    private static readonly PlanNode PartitionedUsers = Over(
+        "WindowAgg",
+        Join(
+            "Left",
+            Over("Append", Scan("x")) with
+            {
+                Plans =
+                [
+                    Scan("u_1", "u_1.id") with
+                    {
+                        RelationName = "users_1",
+                        ParentRelationship = "Member",
+                    },
+                    Scan("u_2", "u_2.id") with
+                    {
+                        RelationName = "users_2",
+                        ParentRelationship = "Member",
+                    },
+                ],
+            },
+            Scan("o", "o.user_id")
+        ) with
+        {
+            Output = ["u.id"],
+        }
+    ) with
+    {
+        Output = ["u.id", "count(*) OVER w1"],
+    };
+
+    private static readonly PostgresPartitionsRequest PartitionsOfUsers = new([
+        new PostgresRelationName("public", "users_1"),
+        new PostgresRelationName("public", "users_2"),
+    ]);
+
+    // The query of users.id and an aggregate, planned over the partitions, with "partitions" answering what the test
+    // gives.
+    private static async Task<QueryDescription> DescribeUsersIdOverPartitionsAsync(PostgresPartitionsAnswer partitions)
+    {
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, GatedUsersId, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        _ = Checks(script, GatedUsersId, [], Expression(0, "id", 23), Expression(1, "n", 20));
+        _ = Explains(script, 1, 0, PlanOf(PartitionedUsers));
+        _ = script.Answer("partitions", PartitionsOfUsers, partitions);
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(GatedUsersId), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        return described.Value.ShouldNotBeNull();
+    }
+
+    // A plan with an Append of scans under one alias and a number asks the ancestors of their relations, and the walk
+    // reads the Append as the table they are partitions of.
+    [Fact]
+    public async Task DescribeAsync_PlanWithAnAppendOfPartitions_AsksTheirAncestorsAndWalksThroughThem()
+    {
+        var users = PostgresTables.Users;
+
+        var description = await DescribeUsersIdOverPartitionsAsync(
+            new PostgresPartitionsAnswer(
+                [new("public", "users_1", [users.Oid]), new("public", "users_2", [users.Oid])],
+                null
+            )
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([(false, "catalog"), (false, "expression")]);
+    }
+
+    // A "partitions" that fails is logged and never reported: the Append is read as a set operation.
+    [Fact]
+    public async Task DescribeAsync_PartitionsThatFails_ReadsTheAppendAsASetOperation()
+    {
+        var description = await DescribeUsersIdOverPartitionsAsync(
+            new PostgresPartitionsAnswer(null, new PostgresServerError("XX000", "no catalog", null, null, null))
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([(true, "heuristic"), (null, "no-origin")]);
+    }
+
     // The same query planned with users as the side the join null-extends.
     [Fact]
     public async Task DescribeAsync_GatedQueryWhoseJoinExtendsTheColumnsSide_IsNullableByTheOuterJoin()

@@ -222,6 +222,27 @@ internal static class PostgresEvents
         );
 
     /// <summary>
+    /// <c>postgres.partitions</c>: the relations the members of the plan's <c>Append</c>s scan, and the ancestors of
+    /// each or the error.  An error leaves those <c>Append</c>s as the walk reads any other.
+    /// </summary>
+    public static void Partitions(
+        IRunLog log,
+        string query,
+        PostgresPartitionsRequest request,
+        PostgresPartitionsAnswer answer,
+        long durationMs
+    ) =>
+        log.Write(
+            "partitions",
+            new("query", query),
+            new("relations", LogValue.ListOf(request.Relations.Select(RelationOf))),
+            answer.Error is { } error
+                ? new LogMember(Error, ErrorOf(error))
+                : new LogMember("rows", LogValue.ListOf((answer.Rows ?? []).Select(PartitionOf))),
+            new(Duration, durationMs)
+        );
+
+    /// <summary>
     /// The events of a walk, in this order: <c>postgres.walk.node</c> for each node that was visited,
     /// <c>postgres.walk.column</c> for each column, and <c>postgres.walk</c> with the plan's value and, when it is
     /// <c>unavailable</c>, the reason.  It is the one place that tells a failed <c>EXPLAIN</c> from a plan the
@@ -307,6 +328,16 @@ internal static class PostgresEvents
             new("precision", LogValue.Of(column.Precision)),
             new("scale", LogValue.Of(column.Scale)),
             new("typeModifier", LogValue.Of(column.TypeModifier))
+        );
+
+    private static LogValue RelationOf(PostgresRelationName relation) =>
+        LogValue.MapOf(new("schema", relation.Schema), new("table", relation.Name));
+
+    private static LogValue PartitionOf(PostgresPartitionRow row) =>
+        LogValue.MapOf(
+            new("schema", row.Schema),
+            new("table", row.Name),
+            new("ancestors", LogValue.ListOf(row.Ancestors.Select(static oid => (LogValue)oid)))
         );
 
     private static LogValue TableOf(PostgresTableRow table) =>
