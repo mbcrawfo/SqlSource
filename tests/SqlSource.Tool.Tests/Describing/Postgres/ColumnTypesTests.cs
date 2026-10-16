@@ -53,7 +53,7 @@ public class ColumnTypesTests
     [Fact]
     public void OidOf_ColumnWithoutAnOrigin_IsTheReportedType() =>
         ColumnTypes
-            .OidOf(new PostgresColumnRow(0, "c", 1043, 0, 0, 254, null, null), null, PostgresRows.Of())
+            .OidOf(PostgresTables.ExpressionOf(0, "c", PostgresRows.Varchar.Oid, 254), null, PostgresRows.Of())
             .ShouldBe(1043);
 
     [Fact]

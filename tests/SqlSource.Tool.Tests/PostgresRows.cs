@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Testing;
 
 namespace SqlSource.Tool.Tests;
 
@@ -42,6 +43,9 @@ internal static class PostgresRows
     public static PostgresTypeRow TaggedArray { get; } = ArrayOf(16699, "_tagged", Tagged);
 
     public static PostgresTypeRow EmailT { get; } = DomainOf(16387, "email_t", Varchar);
+
+    // email_t with the modifier of its varchar(254).
+    public static PostgresTypeRow EmailT254 { get; } = EmailT with { Typtypmod = Typmods.Varchar254 };
 
     // A domain over a domain.
     public static PostgresTypeRow D2 { get; } = DomainOf(16500, "d2", EmailT);

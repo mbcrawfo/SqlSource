@@ -58,8 +58,8 @@ public class NullabilityWalkTests
         for (var index = 0; index < asked.Length; index++)
         {
             var row = asked[index].Of is { } table
-                ? PostgresTables.ColumnOf(index, $"c{index}", 23, table, asked[index].Attnum)
-                : new PostgresColumnRow(index, $"c{index}", 23, 0, 0, null, null, null);
+                ? PostgresTables.ColumnOf(index, $"c{index}", PostgresRows.Int4.Oid, table, asked[index].Attnum)
+                : PostgresTables.ExpressionOf(index, $"c{index}", PostgresRows.Int4.Oid);
             origins[index] = ColumnOrigin.Find(row, Tables);
             columns[index] = PostgresColumns.Build(
                 row,
@@ -374,7 +374,7 @@ public class NullabilityWalkTests
             "n",
             PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true, notNullValidated: false)
         );
-        var row = PostgresTables.ColumnOf(0, "id", 23, table, 1);
+        var row = PostgresTables.ColumnOf(0, "id", PostgresRows.Int4.Oid, table, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(table));
         var column = PostgresColumns.Build(
             row,
@@ -401,7 +401,7 @@ public class NullabilityWalkTests
         {
             Relhassubclass = true,
         };
-        var row = PostgresTables.ColumnOf(0, "id", 23, parent, 1);
+        var row = PostgresTables.ColumnOf(0, "id", PostgresRows.Int4.Oid, parent, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(parent));
         var column = PostgresColumns.Build(
             row,
@@ -430,7 +430,7 @@ public class NullabilityWalkTests
             Relhassubclass = true,
             HasForeignPartition = true,
         };
-        var row = PostgresTables.ColumnOf(0, "id", 23, parted, 1);
+        var row = PostgresTables.ColumnOf(0, "id", PostgresRows.Int4.Oid, parted, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(parted));
         var column = PostgresColumns.Build(
             row,
@@ -459,7 +459,7 @@ public class NullabilityWalkTests
         {
             HasInsteadRule = true,
         };
-        var row = PostgresTables.ColumnOf(0, "id", 23, ruled, 1);
+        var row = PostgresTables.ColumnOf(0, "id", PostgresRows.Int4.Oid, ruled, 1);
         var origin = ColumnOrigin.Find(row, PostgresTables.Of(ruled));
         var column = PostgresColumns.Build(
             row,
@@ -828,22 +828,7 @@ public class NullabilityWalkTests
     };
 
     private static PlanNode PartitionsOfT() =>
-        Over("Append", Scan("x")) with
-        {
-            Plans =
-            [
-                Scan("p_1", "p_1.id", "p_1.opt") with
-                {
-                    RelationName = "t_1",
-                    ParentRelationship = "Member",
-                },
-                Scan("p_2", "p_2.id", "p_2.opt") with
-                {
-                    RelationName = "t_2",
-                    ParentRelationship = "Member",
-                },
-            ],
-        };
+        Append(Member("p_1", "t_1", "p_1.id", "p_1.opt"), Member("p_2", "t_2", "p_2.id", "p_2.opt"));
 
     private static WalkOutcome RunWithPartitions(PlanNode root, params Asked[] asked)
     {
@@ -1117,11 +1102,8 @@ public class NullabilityWalkTests
         );
     }
 
-    private static PlanNode AppendOf(params PlanNode[] members) =>
-        Over("Append", Scan("x")) with
-        {
-            Plans = [.. members.Select(static member => member with { ParentRelationship = "Member" })],
-        };
+    // An Append whose children are all its members.
+    private static PlanNode AppendOf(params PlanNode[] members) => Append([.. members.Select(Member)]);
 
     // A set operation's leaf scan, "*SELECT* <k>", over the branch's plan.
     private static PlanNode Select(int k, PlanNode branch, params string[] output) =>

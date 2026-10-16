@@ -128,8 +128,8 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var answer = new PostgresColumnsAnswer(
             [
-                new PostgresColumnRow(0, "name", 1043, 0, 0, 32, null, null, 36),
-                new PostgresColumnRow(1, "n", 20, 0, 0, null, null, null),
+                PostgresTables.ExpressionOf(0, "name", PostgresRows.Varchar.Oid, 32, null, null, 36),
+                PostgresTables.ExpressionOf(1, "n", PostgresRows.Int8.Oid),
             ],
             null
         );
@@ -331,16 +331,14 @@ public class PostgresEventsTests
         EquatableArray<SqlQueryParameter>.Empty
     );
 
-    private static readonly PostgresColumnRow IdColumn = PostgresTables.ColumnOf(0, "id", 23, PostgresTables.Users, 1);
-
-    private static readonly PostgresColumnRow CountColumn = new(1, "n", 20, 0, 0, null, null, null);
+    private static readonly PostgresColumnRow CountColumn = PostgresTables.ExpressionOf(1, "n", PostgresRows.Int8.Oid);
 
     // The script of Listing without "check" and "explain", which a test adds as it needs.
     private static PostgresScript ListingScript() =>
         new PostgresScript()
             .Open()
             .Prepares(1, Listing.Sql, [], new PostgresPrepareAnswer([], null))
-            .Columns(1, 0, IdColumn, CountColumn)
+            .Columns(1, 0, PostgresTables.UsersId, CountColumn)
             .Tables([PostgresTables.Users.Oid], PostgresTables.Users)
             .Resolves([20, 23], PostgresRows.Int8, PostgresRows.Int4)
             .Frees(1);
@@ -349,7 +347,7 @@ public class PostgresEventsTests
     public async Task Describe_QueryWithColumns_WritesColumnsTablesAColumnForEachAndCheck()
     {
         var log = new RecordingLog();
-        var script = ListingScript().Checks(Listing.Sql, [], IdColumn, CountColumn).PlansNothing(1, 0);
+        var script = ListingScript().Checks(Listing.Sql, [], PostgresTables.UsersId, CountColumn).PlansNothing(1, 0);
 
         await DescribeAsync(script, log, Listing);
 
@@ -480,7 +478,7 @@ public class PostgresEventsTests
     public async Task Describe_CheckThatDiffers_WritesWhatDiffers()
     {
         var log = new RecordingLog();
-        var script = ListingScript().Checks(Listing.Sql, [], IdColumn);
+        var script = ListingScript().Checks(Listing.Sql, [], PostgresTables.UsersId);
 
         await DescribeAsync(script, log, Listing);
 
@@ -555,7 +553,7 @@ public class PostgresEventsTests
         var script = new PostgresScript()
             .Open()
             .Prepares(1, Listing.Sql, [], new PostgresPrepareAnswer([], null))
-            .Columns(1, 0, IdColumn)
+            .Columns(1, 0, PostgresTables.UsersId)
             .Answer(
                 "tables",
                 new PostgresTablesRequest([PostgresTables.Users.Oid]),
@@ -581,9 +579,9 @@ public class PostgresEventsTests
             .Columns(
                 1,
                 0,
-                new(0, "one", 23, 0, 0, null, null, null),
-                new(1, "pair", 2249, 0, 0, null, null, null),
-                new(2, "two", 23, 0, 0, null, null, null)
+                PostgresTables.ExpressionOf(0, "one", PostgresRows.Int4.Oid),
+                PostgresTables.ExpressionOf(1, "pair", PostgresRows.Record.Oid),
+                PostgresTables.ExpressionOf(2, "two", PostgresRows.Int4.Oid)
             )
             .Resolves([23, 2249], PostgresRows.Int4, PostgresRows.Record)
             .Frees(1);
@@ -599,7 +597,7 @@ public class PostgresEventsTests
     public async Task Describe_ThroughTheLogOfASession_RemovesTheSecretFromAColumnsNameAndItsOrigin()
     {
         var log = new RecordingLog();
-        var script = ListingScript().Checks(Listing.Sql, [], IdColumn, CountColumn).PlansNothing(1, 0);
+        var script = ListingScript().Checks(Listing.Sql, [], PostgresTables.UsersId, CountColumn).PlansNothing(1, 0);
 
         await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."), Listing);
 
@@ -616,22 +614,7 @@ public class PostgresEventsTests
         var log = new RecordingLog();
         var plan = Over(
             "WindowAgg",
-            Over("Append", Scan("x")) with
-            {
-                Plans =
-                [
-                    Scan("u_1", "u_1.id") with
-                    {
-                        RelationName = "users_1",
-                        ParentRelationship = "Member",
-                    },
-                    Scan("u_2", "u_2.id") with
-                    {
-                        RelationName = "users_2",
-                        ParentRelationship = "Member",
-                    },
-                ],
-            }
+            Append(PostgresPlans.Member("u_1", "users_1", "u_1.id"), PostgresPlans.Member("u_2", "users_2", "u_2.id"))
         ) with
         {
             Output = ["u.id", "count(*) OVER w1"],
@@ -641,7 +624,7 @@ public class PostgresEventsTests
             new PostgresRelationName("public", "users_2"),
         ]);
         var script = ListingScript()
-            .Checks(Listing.Sql, [], IdColumn, CountColumn)
+            .Checks(Listing.Sql, [], PostgresTables.UsersId, CountColumn)
             .Explains(1, 0, new PostgresExplainAnswer(Text(plan), null))
             .Partitions(
                 asked,
@@ -686,13 +669,9 @@ public class PostgresEventsTests
     public async Task Describe_PartitionsThatFails_WritesItsErrorInThePlaceOfTheRows()
     {
         var log = new RecordingLog();
-        var plan = Over("Append", Scan("x")) with
-        {
-            Plans = [Scan("u_1", "u_1.id") with { RelationName = "users_1", ParentRelationship = "Member" }],
-            Output = ["u.id", "1"],
-        };
+        var plan = Append(PostgresPlans.Member("u_1", "users_1", "u_1.id")) with { Output = ["u.id", "1"] };
         var script = ListingScript()
-            .Checks(Listing.Sql, [], IdColumn, CountColumn)
+            .Checks(Listing.Sql, [], PostgresTables.UsersId, CountColumn)
             .Explains(1, 0, new PostgresExplainAnswer(Text(plan), null))
             .Partitions(
                 new PostgresPartitionsRequest([new PostgresRelationName("public", "users_1")]),
@@ -807,7 +786,7 @@ public class PostgresEventsTests
 
     private static PostgresScript WholeScript()
     {
-        var id = PostgresTables.ColumnOf(0, "id", 23, Ids, 1);
+        var id = PostgresTables.ColumnOf(0, "id", PostgresRows.Int4.Oid, Ids, 1);
         return new PostgresScript()
             .Open()
             .Prepares(1, Whole.Sql, [], new PostgresPrepareAnswer([], null))
@@ -846,7 +825,7 @@ public class PostgresEventsTests
     public async Task Describe_CheckThatDiffers_WritesNoTableMatch()
     {
         var log = new RecordingLog();
-        var script = ListingScript().Checks(Listing.Sql, [], IdColumn);
+        var script = ListingScript().Checks(Listing.Sql, [], PostgresTables.UsersId);
 
         await DescribeAsync(script, log, Listing);
 
@@ -893,12 +872,10 @@ public class PostgresEventsTests
         new EquatableArray<SqlQueryParameter>([])
     );
 
-    private static readonly PostgresColumnRow UserId = PostgresTables.ColumnOf(0, "id", 23, PostgresTables.Users, 1);
-
     private static readonly PostgresColumnRow Total = PostgresTables.ColumnOf(
         1,
         "total",
-        1700,
+        PostgresRows.Numeric.Oid,
         PostgresTables.Orders,
         3
     );
@@ -916,10 +893,10 @@ public class PostgresEventsTests
         new PostgresScript()
             .Open()
             .Prepares(1, Joined.Sql, [], new PostgresPrepareAnswer([], null))
-            .Columns(1, 0, UserId, Total)
+            .Columns(1, 0, PostgresTables.UsersId, Total)
             .Tables([PostgresTables.Users.Oid, PostgresTables.Orders.Oid], PostgresTables.Users, PostgresTables.Orders)
             .Resolves([23, 1700], PostgresRows.Int4, PostgresRows.Numeric)
-            .Checks(Joined.Sql, [], UserId, Total)
+            .Checks(Joined.Sql, [], PostgresTables.UsersId, Total)
             .Explains(1, 0, explain)
             .Frees(1);
 

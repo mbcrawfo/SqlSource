@@ -11,15 +11,6 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 // must agree on.
 public class PlanPartitionsTests
 {
-    private static PlanNode Member(string alias, string relation, params string[] output) =>
-        Scan(alias, output) with
-        {
-            RelationName = relation,
-            ParentRelationship = "Member",
-        };
-
-    private static PlanNode Append(params PlanNode[] members) => Over("Append", Scan("x")) with { Plans = members };
-
     private static readonly Dictionary<PostgresRelationName, IReadOnlyList<long>> Partitions = new()
     {
         [new PostgresRelationName("public", "e_2024")] = [100, 200],
@@ -61,7 +52,7 @@ public class PlanPartitionsTests
                 )
             ),
             Text(Append(Member("e_1", "e_2024"), Member("e_2", "e_2025") with { ParentRelationship = "Outer" })),
-            Text(Over("Append", Scan("x")) with { Plans = [] }),
+            Text(Append()),
             Text(Over("Sort", Member("e_1", "e_2024"))),
         ];
 

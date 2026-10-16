@@ -3,6 +3,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
+using static SqlSource.Tool.Tests.PostgresRequests;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -12,10 +13,6 @@ public class ParameterPlaceholdersTests
 {
     private static EquatableArray<SqlQueryParameter> List(params SqlQueryParameter[] parameters) =>
         new([.. parameters]);
-
-    private static SqlQueryParameter Inferred(string name) => new(name, null, null, false);
-
-    private static SqlQueryParameter Declared(string name, string type) => new(name, type, null, true);
 
     [Fact]
     public void Rewrite_ParameterOnceAndTwice_HasOneOrdinal() =>

@@ -9,7 +9,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 public class ColumnFacetsTests
 {
     private static PostgresColumnRow Column(int? length = null, int? precision = null, int? scale = null) =>
-        new(0, "c", 0, 0, 0, length, precision, scale);
+        PostgresTables.ExpressionOf(0, "c", 0, length, precision, scale);
 
     [Theory]
     [InlineData("bpchar")]

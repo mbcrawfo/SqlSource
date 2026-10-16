@@ -64,6 +64,17 @@ internal static class PostgresPlans
             [child with { ParentRelationship = relationship }]
         );
 
+    // An Append over the members the test gives, which keep the relationship they have: see Member.
+    public static PlanNode Append(params PlanNode[] members) => Over("Append", Scan("x")) with { Plans = members };
+
+    // A node as a member of an Append.
+    public static PlanNode Member(PlanNode scan) => scan with { ParentRelationship = "Member" };
+
+    // A scan of a relation of public, under an alias of its own, as a member of an Append: a partition, or a branch
+    // of a set operation.
+    public static PlanNode Member(string alias, string relation, params string[] output) =>
+        Member(Scan(alias, output) with { RelationName = relation });
+
     public static string Text(PlanNode root) =>
         JsonSerializer.Serialize(new[] { new Dictionary<string, object?> { ["Plan"] = MapOf(root) } });
 

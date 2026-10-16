@@ -18,14 +18,6 @@ public class PlanInstancesTests
         return instance.NullExtended;
     }
 
-    private static PlanNode Member(PlanNode scan) => scan with { ParentRelationship = "Member" };
-
-    // A scan of a partition, under an alias of the table's and a number.
-    private static PlanNode Partition(string alias, string relation, params string[] output) =>
-        Member(Scan(alias, output) with { RelationName = relation });
-
-    private static PlanNode Append(params PlanNode[] members) => Over("Append", Scan("x")) with { Plans = members };
-
     // The answer of "partitions": parts_1 and parts_2 are partitions of 16800, which is a partition of 16801.
     private static readonly Dictionary<PostgresRelationName, IReadOnlyList<long>> Partitions = new()
     {
@@ -423,7 +415,7 @@ public class PlanInstancesTests
         var plan = Join(
             "Left",
             Scan("u"),
-            Append(Partition("p_1", "parts_1", "p_1.id", "p_1.kind"), Partition("p_2", "parts_2", "p_2.id", "p_2.kind"))
+            Append(Member("p_1", "parts_1", "p_1.id", "p_1.kind"), Member("p_2", "parts_2", "p_2.id", "p_2.kind"))
         );
 
         var instances = WithPartitions(plan);
@@ -438,7 +430,7 @@ public class PlanInstancesTests
     // Members that scan no column print no Output, which is the same for each.
     [Fact]
     public void Find_AppendOfPartitionsWithoutOutput_IsAPartitionedInstance() =>
-        WithPartitions(Over("Aggregate", Append(Partition("p_1", "parts_1"), Partition("p_2", "parts_2"))))
+        WithPartitions(Over("Aggregate", Append(Member("p_1", "parts_1"), Member("p_2", "parts_2"))))
             .TryFind("p", out _)
             .ShouldBeTrue();
 
@@ -449,11 +441,11 @@ public class PlanInstancesTests
     {
         PlanNode[] plans =
         [
-            Append(Partition("p_1", "parts_1", "p_1.id", "p_1.kind"), Partition("p_2", "parts_2", "p_2.id", "p_2.id")),
-            Append(Partition("p_1", "parts_1", "p_1.id"), Partition("p_2", "other", "p_2.id")),
-            Append(Partition("p_1", "parts_1", "p_1.id"), Partition("p_2", "plain", "p_2.id")),
-            Append(Partition("p_1", "parts_1", "p_1.id"), Partition("p_2", "missing", "p_2.id")),
-            Append(Partition("p_1", "parts_1", "p_1.id"), Partition("q_2", "parts_2", "q_2.id")),
+            Append(Member("p_1", "parts_1", "p_1.id", "p_1.kind"), Member("p_2", "parts_2", "p_2.id", "p_2.id")),
+            Append(Member("p_1", "parts_1", "p_1.id"), Member("p_2", "other", "p_2.id")),
+            Append(Member("p_1", "parts_1", "p_1.id"), Member("p_2", "plain", "p_2.id")),
+            Append(Member("p_1", "parts_1", "p_1.id"), Member("p_2", "missing", "p_2.id")),
+            Append(Member("p_1", "parts_1", "p_1.id"), Member("q_2", "parts_2", "q_2.id")),
         ];
 
         foreach (var plan in plans)
@@ -463,8 +455,6 @@ public class PlanInstancesTests
             instances.TryFind("p", out _).ShouldBeFalse();
         }
 
-        PlanInstances
-            .Find(Append(Partition("p_1", "parts_1"), Partition("p_2", "parts_2")))
-            .HasSetOperation.ShouldBeTrue();
+        PlanInstances.Find(Append(Member("p_1", "parts_1"), Member("p_2", "parts_2"))).HasSetOperation.ShouldBeTrue();
     }
 }
