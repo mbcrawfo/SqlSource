@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
@@ -63,7 +64,7 @@ public class DescriberTests
     public async Task OpenAsync_DescriberOfTheTests_MakesEveryCallThroughTheExchange()
     {
         var describer = new FakeDescriber();
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         var exchange = new CapturingExchange(LiveExchange.Instance, capture);
         var token = TestContext.Current.CancellationToken;
 
@@ -73,10 +74,7 @@ public class DescriberTests
             token
         );
         await using var session = opened.Value.ShouldNotBeNull();
-        var described = await session.DescribeAsync(
-            new DescribeRequest("GetUser", "SELECT 1;", EquatableArray<SqlQueryParameter>.Empty),
-            token
-        );
+        var described = await session.DescribeAsync(CaptureInputs.GetUser, token);
 
         capture.Calls.Select(call => call.Method).ShouldBe(["open", "describe"]);
         described.Value.ShouldBe(FakeDescriber.NoRows);
@@ -96,19 +94,11 @@ public class DescriberTests
             NullRunLog.Instance,
             token
         );
-        var described = await opened
-            .Value.ShouldNotBeNull()
-            .DescribeAsync(new DescribeRequest("GetUser", "SELECT 1;", EquatableArray<SqlQueryParameter>.Empty), token);
+        var described = await opened.Value.ShouldNotBeNull().DescribeAsync(CaptureInputs.GetUser, token);
 
         described.Value.ShouldBeNull();
         described.Failure.ShouldNotBeNull().Step.ShouldBe(DescribeStep.DescribeColumns);
     }
-
-    private static readonly DescribeRequest GetUser = new(
-        "GetUser",
-        "SELECT 1;",
-        EquatableArray<SqlQueryParameter>.Empty
-    );
 
     private static async Task<IDescribeSession> OpenAsync(FakeDescriber describer)
     {
@@ -128,7 +118,7 @@ public class DescriberTests
         describer.Descriptions["GetUser"] = FakeDescriber.TypedRows;
 
         await using var session = await OpenAsync(describer);
-        var described = await session.DescribeAsync(GetUser, TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(CaptureInputs.GetUser, TestContext.Current.CancellationToken);
 
         described.Value.ShouldBe(FakeDescriber.TypedRows);
         session.Server.ShouldBe(describer.Server);
@@ -147,7 +137,7 @@ public class DescriberTests
         );
 
         await using var session = await OpenAsync(describer);
-        var described = await session.DescribeAsync(GetUser, TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(CaptureInputs.GetUser, TestContext.Current.CancellationToken);
 
         described.Value.ShouldBeNull();
         var failure = described.Failure.ShouldNotBeNull();
@@ -177,7 +167,7 @@ public class DescriberTests
         await using var session = await OpenAsync(describer);
 
         _ = await Should.ThrowAsync<NotSupportedException>(async () =>
-            await session.DescribeAsync(GetUser, TestContext.Current.CancellationToken)
+            await session.DescribeAsync(CaptureInputs.GetUser, TestContext.Current.CancellationToken)
         );
     }
 

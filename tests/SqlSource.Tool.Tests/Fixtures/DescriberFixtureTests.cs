@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
@@ -161,9 +162,8 @@ public sealed class DescriberFixtureTests : IDisposable
             cut.Add(call);
         }
 
-        _ = _folder.WriteFile($"postgres/cut/{FixtureCase.QueryFile}", source.Query);
-        _ = _folder.WriteFile($"postgres/cut/{FixtureCase.CaptureFile}", CaptureJson.Write(cut));
-        var fixture = new FixtureCase("postgres", "cut", _folder.PathOf("postgres/cut"));
+        var fixture = FixtureCaseFiles.Create(_folder.Path, SidecarValues.Engine.Postgres, "cut", source.Query);
+        await FixtureCaseFiles.WriteCaptureAsync(fixture, cut, TestContext.Current.CancellationToken);
 
         _ = await Should.ThrowAsync<CaptureMissException>(() => FixtureReplay.DescribeAsync(fixture, DescriberOf));
     }

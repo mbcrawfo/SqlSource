@@ -3,6 +3,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
@@ -14,7 +15,7 @@ public class PostgresColumnsTests
     public void Build_Column_HasItsOrdinalItsNameAndItsTypeWithFacets() =>
         PostgresColumns
             .Build(
-                new PostgresColumnRow(2, "balance", 1700, 0, 0, null, 18, 2),
+                PostgresTables.ExpressionOf(2, "balance", PostgresRows.Numeric.Oid, null, 18, 2),
                 null,
                 PostgresRows.Of(PostgresRows.Numeric),
                 TypeSpellings.None,
@@ -38,7 +39,7 @@ public class PostgresColumnsTests
     public void Build_ArrayColumn_DropsTheFacetsOfItsElement()
     {
         var column = PostgresColumns.Build(
-            new PostgresColumnRow(0, "names", 1015, 0, 0, 10, null, null),
+            PostgresTables.ExpressionOf(0, "names", PostgresRows.VarcharArray.Oid, 10),
             null,
             PostgresRows.Of(PostgresRows.VarcharArray, PostgresRows.Varchar),
             TypeSpellings.None,
@@ -60,7 +61,7 @@ public class PostgresColumnsTests
         Should
             .Throw<InvalidOperationException>(() =>
                 PostgresColumns.Build(
-                    new PostgresColumnRow(0, "c", 23, 0, 0, null, null, null),
+                    PostgresTables.ExpressionOf(0, "c", PostgresRows.Int4.Oid),
                     null,
                     PostgresRows.Of(),
                     TypeSpellings.None,
@@ -75,8 +76,8 @@ public class PostgresColumnsTests
         var users = PostgresTables.Users;
         var rows = PostgresRows.Of(PostgresRows.Int4, PostgresRows.Text);
 
-        var id = Build(PostgresTables.ColumnOf(0, "user_id", 23, users, 1), users, rows);
-        var upper = Build(PostgresTables.ColumnOf(1, "u", 25, users, 9), users, rows);
+        var id = Build(PostgresTables.ColumnOf(0, "user_id", PostgresRows.Int4.Oid, users, 1), users, rows);
+        var upper = Build(PostgresTables.ColumnOf(1, "u", PostgresRows.Text.Oid, users, 9), users, rows);
 
         id.Origin.ShouldBe(new SidecarOrigin("public", "users", "id"));
         (id.Identity, id.Computed).ShouldBe((true, false));
@@ -89,7 +90,7 @@ public class PostgresColumnsTests
     {
         var users = PostgresTables.Users;
         var rows = PostgresRows.Of(PostgresRows.Int4);
-        var column = PostgresTables.ColumnOf(0, "id", 23, users, 1);
+        var column = PostgresTables.UsersId;
 
         var plain = Build(column, users, rows);
         var gated = Build(column, users, rows, gated: true);
@@ -102,7 +103,7 @@ public class PostgresColumnsTests
     public void Build_ColumnWithoutAnOrigin_SaysNothingOfIdentityOrComputed()
     {
         var column = PostgresColumns.Build(
-            new PostgresColumnRow(0, "n", 23, 0, 0, null, null, null),
+            PostgresTables.ExpressionOf(0, "n", PostgresRows.Int4.Oid),
             null,
             PostgresRows.Of(PostgresRows.Int4),
             TypeSpellings.None,
@@ -121,7 +122,7 @@ public class PostgresColumnsTests
         var users = PostgresTables.Users;
 
         var column = Build(
-            PostgresTables.ColumnOf(0, "email", 1043, users, 3, length: 254),
+            PostgresTables.ColumnOf(0, "email", PostgresRows.Varchar.Oid, users, 3, length: 254),
             users,
             PostgresRows.Of(PostgresRows.EmailT, PostgresRows.Varchar)
         );
@@ -143,10 +144,10 @@ public class PostgresColumnsTests
     public void Build_ColumnWithATypeModifier_IsTheServersSpellingWithTheDecodedFacets()
     {
         var column = PostgresColumns.Build(
-            new PostgresColumnRow(0, "names", 1015, 0, 0, 99, null, null, 14),
+            PostgresTables.ExpressionOf(0, "names", PostgresRows.VarcharArray.Oid, 99, null, null, Typmods.Varchar10),
             null,
             PostgresRows.Of(PostgresRows.VarcharArray, PostgresRows.Varchar),
-            TypeSpellings.From([new PostgresSpellingRow(1043, 14, "character varying(10)")]),
+            TypeSpellings.From([new PostgresSpellingRow(1043, Typmods.Varchar10, "character varying(10)")]),
             false
         );
 
@@ -167,13 +168,13 @@ public class PostgresColumnsTests
         var users = PostgresTables.Users;
 
         var column = Build(
-            PostgresTables.ColumnOf(0, "email", 1043, users, 3) with
+            PostgresTables.ColumnOf(0, "email", PostgresRows.Varchar.Oid, users, 3) with
             {
-                TypeModifier = 258,
+                TypeModifier = Typmods.Varchar254,
             },
             users,
             PostgresRows.Of(PostgresRows.EmailT, PostgresRows.Varchar),
-            TypeSpellings.From([new PostgresSpellingRow(1043, 258, "character varying(254)")])
+            TypeSpellings.From([new PostgresSpellingRow(1043, Typmods.Varchar254, "character varying(254)")])
         );
 
         column.Type.ShouldBe(

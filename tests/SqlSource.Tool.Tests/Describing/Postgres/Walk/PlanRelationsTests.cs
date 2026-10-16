@@ -9,23 +9,15 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 // Which relations a plan scans, for "relations" to be asked of them.
 public class PlanRelationsTests
 {
-    private static PlanNode Member(string alias, string relation, string schema = "public") =>
-        Scan(alias) with
-        {
-            RelationName = relation,
-            Schema = schema,
-            ParentRelationship = "Member",
-        };
-
-    private static PlanNode Append(params PlanNode[] members) => Over("Append", Scan("x")) with { Plans = members };
-
     private static PostgresRelationName Name(string schema, string name) => new(schema, name);
 
     // The members of a set operation are scans like any other, and the answer is in schema and name order.
     [Fact]
     public void Of_MembersOfAnAppend_AreTheirRelationsInOrder() =>
         PlanRelations
-            .Of(Append(Member("o", "orders"), Member("u", "users"), Member("i", "invoices", "billing")))
+            .Of(
+                Append(Member("o", "orders"), Member("u", "users"), Member("i", "invoices") with { Schema = "billing" })
+            )
             .ShouldBe([Name("billing", "invoices"), Name("public", "orders"), Name("public", "users")]);
 
     // The leaf scan of a branch is under a Subquery Scan, which is the child of a member or of a join.

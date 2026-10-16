@@ -1,9 +1,9 @@
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
@@ -27,21 +27,18 @@ public sealed class FixtureReplayTests : IDisposable
     public void Dispose() => _folder.Dispose();
 
     // A case of postgres under the temporary folder, with its query.sql.
-    private FixtureCase Case(string name = "typed", string query = Query)
-    {
-        _ = _folder.WriteFile($"postgres/{name}/{FixtureCase.QueryFile}", query);
-        return new FixtureCase("postgres", name, _folder.PathOf($"postgres/{name}"));
-    }
+    private FixtureCase Case(string name = "typed", string query = Query) =>
+        FixtureCaseFiles.Create(_folder.Path, SidecarValues.Engine.Postgres, name, query);
 
     private void Write(FixtureCase fixture, string file, string text) =>
         _ = _folder.WriteFile($"{fixture.Engine}/{fixture.Name}/{file}", text);
 
     // Describes the case through a describer that knows the query, and writes the two files a recording writes.
-    private async Task<FakeDescriber> RecordAsync(FixtureCase fixture)
+    private static async Task<FakeDescriber> RecordAsync(FixtureCase fixture)
     {
         var describer = new FakeDescriber();
         describer.Descriptions["GetUser"] = FakeDescriber.TypedRows;
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
 
         var expected = await FixtureReplay.DescribeThroughAsync(
             fixture,
@@ -50,39 +47,8 @@ public sealed class FixtureReplayTests : IDisposable
             new CapturingExchange(LiveExchange.Instance, capture)
         );
 
-        Write(fixture, FixtureCase.CaptureFile, CaptureJson.Write(capture));
-        Write(fixture, FixtureCase.ExpectedFile, expected);
+        await FixtureCaseFiles.WriteRecordingAsync(fixture, capture, expected, TestContext.Current.CancellationToken);
         return describer;
-    }
-
-    [Fact]
-    public void Case_ItsThreeFiles_AreReadFromItsFolder()
-    {
-        var fixture = Case();
-        Write(fixture, FixtureCase.CaptureFile, "a capture");
-        Write(fixture, FixtureCase.ExpectedFile, "a sidecar");
-
-        fixture.Query.ShouldBe(Query);
-        fixture.Capture.ShouldBe("a capture");
-        fixture.Expected.ShouldBe("a sidecar");
-        fixture.ToString().ShouldBe("postgres/typed");
-    }
-
-    [Fact]
-    public void Of_EngineWithNoFolder_IsEmpty() => FixtureCases.Of("no-such-engine").ShouldBeEmpty();
-
-    [Fact]
-    public void Of_EngineWithCases_GivesThemInNameOrder()
-    {
-        _ = Case("b");
-        _ = Case("a");
-        _ = _folder.WriteFile("postgres/schema.sql", "CREATE TABLE users ();\n");
-
-        var cases = FixtureCases.Of("postgres", _folder.Path);
-
-        cases.Select(found => found.Name).ShouldBe(["a", "b"]);
-        cases.ShouldAllBe(found => found.Engine == "postgres");
-        cases[0].Folder.ShouldBe(_folder.PathOf("postgres/a"));
     }
 
     [Fact]
@@ -214,7 +180,7 @@ public sealed class FixtureReplayTests : IDisposable
     public async Task DescribeAsync_QueryFileThatIsNotOneQuery_FailsNamingTheCase(string query)
     {
         var fixture = Case("odd", query);
-        Write(fixture, FixtureCase.CaptureFile, CaptureJson.Write(new DescribeCapture("postgres")));
+        Write(fixture, FixtureCase.CaptureFile, CaptureJson.Write(new DescribeCapture(SidecarValues.Engine.Postgres)));
 
         var thrown = await Should.ThrowAsync<InvalidOperationException>(async () =>
             await FixtureReplay.DescribeAsync(fixture, _ => new FakeDescriber())

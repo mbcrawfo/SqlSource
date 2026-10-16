@@ -3,10 +3,11 @@ using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Parsing;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Capture;
@@ -15,14 +16,6 @@ namespace SqlSource.Tool.Tests.Describing.Capture;
 // asks the engine, and fails loudly on a question the capture does not hold.
 public class ReplayingExchangeTests
 {
-    private const string Awkward = "SELECT '<é>' AS \"a\"\r\nFROM t";
-
-    private static readonly DescribeRequest GetUser = new(
-        "GetUser",
-        "SELECT 1;",
-        EquatableArray<SqlQueryParameter>.Empty
-    );
-
     private int _live;
 
     private static FakeDescribeRequest Question(string sql = "SELECT 1;") => new("GetUser", sql, []);
@@ -31,7 +24,7 @@ public class ReplayingExchangeTests
 
     private static DescribeCapture Capture(params (FakeDescribeRequest Request, FakeOpenAnswer Answer)[] calls)
     {
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         foreach (var (request, answer) in calls)
         {
             capture.Add(new CaptureCall("ask", CaptureJson.ToElement(request), CaptureJson.ToElement(answer)));
@@ -64,12 +57,12 @@ public class ReplayingExchangeTests
     {
         var token = TestContext.Current.CancellationToken;
         var opened = await describer.OpenAsync(
-            new OpenRequest("billing", "replay", exchange, TimeProvider.System),
+            new OpenRequest("billing", FixtureReplay.Connection, exchange, TimeProvider.System),
             NullRunLog.Instance,
             token
         );
         await using var session = opened.Value.ShouldNotBeNull();
-        return (session.Server, await session.DescribeAsync(GetUser, token));
+        return (session.Server, await session.DescribeAsync(CaptureInputs.GetUser, token));
     }
 
     [Fact]
@@ -77,7 +70,7 @@ public class ReplayingExchangeTests
     {
         var told = new FakeDescriber { Server = FakeDescriber.ServerWith("17.1", "4.5.6") };
         told.Descriptions["GetUser"] = FakeDescriber.TypedRows;
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         var (_, recorded) = await DescribeAsync(told, new CapturingExchange(LiveExchange.Instance, capture));
         var untold = new FakeDescriber();
         var replay = new ReplayingExchange(capture);
@@ -97,7 +90,7 @@ public class ReplayingExchangeTests
     {
         var told = new FakeDescriber();
         told.Failures["GetUser"] = FakeDescriber.Failure("GetUser", "42P01: relation \"users\" does not exist");
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         _ = await DescribeAsync(told, new CapturingExchange(LiveExchange.Instance, capture));
 
         var (_, replayed) = await DescribeAsync(new FakeDescriber(), new ReplayingExchange(capture));
@@ -195,10 +188,10 @@ public class ReplayingExchangeTests
     [Fact]
     public async Task AskAsync_CaptureReadFromItsFile_FindsARequestWithAwkwardText()
     {
-        var text = CaptureJson.Write(Capture((Question(Awkward), Answer("1"))));
+        var text = CaptureJson.Write(Capture((Question(CaptureInputs.AwkwardSql), Answer("1"))));
         var exchange = new ReplayingExchange(CaptureJson.Read(text).Value.ShouldNotBeNull());
 
-        (await AskAsync(exchange, Question(Awkward))).ShouldBe("1");
+        (await AskAsync(exchange, Question(CaptureInputs.AwkwardSql))).ShouldBe("1");
     }
 
     [Theory]
@@ -207,7 +200,7 @@ public class ReplayingExchangeTests
     public async Task AskAsync_AnswerThatIsNotOfTheAnswersShape_ThrowsNamingTheMethod(string answer, string reason)
     {
         using var document = JsonDocument.Parse(answer);
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         capture.Add(new CaptureCall("ask", CaptureJson.ToElement(Question()), document.RootElement.Clone()));
         var exchange = new ReplayingExchange(capture);
 
@@ -223,7 +216,7 @@ public class ReplayingExchangeTests
     {
         using var asked = JsonDocument.Parse(request);
         using var answered = JsonDocument.Parse(answer);
-        var capture = new DescribeCapture("postgres");
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
         capture.Add(new CaptureCall("ask", asked.RootElement.Clone(), answered.RootElement.Clone()));
         return capture;
     }
@@ -372,9 +365,9 @@ public class ReplayingExchangeTests
     {
         var told = new FakeDescriber();
         told.Descriptions["GetUser"] = FakeDescriber.TypedRows;
-        var first = new DescribeCapture("postgres");
+        var first = new DescribeCapture(SidecarValues.Engine.Postgres);
         _ = await DescribeAsync(told, new CapturingExchange(LiveExchange.Instance, first));
-        var second = new DescribeCapture("postgres");
+        var second = new DescribeCapture(SidecarValues.Engine.Postgres);
 
         _ = await DescribeAsync(new FakeDescriber(), new CapturingExchange(new ReplayingExchange(first), second));
 

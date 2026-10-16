@@ -4,6 +4,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
@@ -243,14 +244,10 @@ public class PostgresTypesTests
     }
 
     // A type with a modifier, as a column gives it: the server spells the pair, and the facets are decoded from the
-    // number.  Varchar10 and IntervalYearToMonth are numbers a server gave, in TypeModifiersTests; Varchar254 and
-    // Tagged7 follow varchartypmodin's rule, the length plus 4.
-    private const int Varchar10 = 14;
-    private const int Varchar254 = 258;
+    // number.  IntervalYearToMonth is a number a server gave, in TypeModifiersTests; Tagged7 follows varchartypmodin's
+    // rule, the length plus 4, as Typmods does.
     private const int Tagged7 = 11;
     private const int IntervalYearToMonth = 458751;
-
-    private static readonly PostgresTypeRow EmailT254 = PostgresRows.EmailT with { Typtypmod = Varchar254 };
 
     private static readonly PostgresType CharacterVarying254 = TestSidecars.Postgres(
         "character varying(254)",
@@ -272,8 +269,8 @@ public class PostgresTypesTests
             .Build(
                 1015,
                 PostgresRows.Of(PostgresRows.Varchar, PostgresRows.VarcharArray),
-                Varchar10,
-                Spelled((1043, Varchar10, "character varying(10)"))
+                Typmods.Varchar10,
+                Spelled((1043, Typmods.Varchar10, "character varying(10)"))
             )
             .ShouldBe(
                 TestSidecars.Postgres(
@@ -317,10 +314,10 @@ public class PostgresTypesTests
     public void Build_ParameterOfADomain_GivesItsBaseTheDomainsModifier()
     {
         var built = PostgresTypes.Build(
-            EmailT254.Oid,
-            PostgresRows.Of(PostgresRows.Varchar, EmailT254),
+            PostgresRows.EmailT254.Oid,
+            PostgresRows.Of(PostgresRows.Varchar, PostgresRows.EmailT254),
             -1,
-            Spelled((1043, Varchar254, "character varying(254)"))
+            Spelled((1043, Typmods.Varchar254, "character varying(254)"))
         );
 
         built.Name.ShouldBe("public.email_t");
@@ -335,17 +332,20 @@ public class PostgresTypesTests
     // the inner domain's own typtypmod reaches varchar.
     [Theory]
     [InlineData(-1)]
-    [InlineData(Varchar254)]
+    [InlineData(Typmods.Varchar254)]
     public void Build_DomainOverADomain_GivesEachBaseItsModifier(int modifier)
     {
-        var work = PostgresRows.DomainOf(16400, "work_email", EmailT254, "billing") with { Typtypmod = -1 };
+        var work = PostgresRows.DomainOf(16400, "work_email", PostgresRows.EmailT254, "billing") with
+        {
+            Typtypmod = -1,
+        };
 
         PostgresTypes
             .Build(
                 work.Oid,
-                PostgresRows.Of(PostgresRows.Varchar, EmailT254, work),
+                PostgresRows.Of(PostgresRows.Varchar, PostgresRows.EmailT254, work),
                 modifier,
-                Spelled((1043, Varchar254, "character varying(254)"))
+                Spelled((1043, Typmods.Varchar254, "character varying(254)"))
             )
             .ShouldBe(
                 TestSidecars.Postgres(
@@ -361,16 +361,16 @@ public class PostgresTypesTests
     // email_t[]: the array's name is its element's, the domain's, and the domain's base has the domain's modifier.
     [Theory]
     [InlineData(-1)]
-    [InlineData(Varchar254)]
+    [InlineData(Typmods.Varchar254)]
     public void Build_ArrayOfADomain_GivesTheDomainsBaseTheModifier(int modifier)
     {
-        var emails = PostgresRows.ArrayOf(16386, "_email_t", EmailT254);
+        var emails = PostgresRows.ArrayOf(16386, "_email_t", PostgresRows.EmailT254);
 
         var built = PostgresTypes.Build(
             emails.Oid,
-            PostgresRows.Of(PostgresRows.Varchar, EmailT254, emails),
+            PostgresRows.Of(PostgresRows.Varchar, PostgresRows.EmailT254, emails),
             modifier,
-            Spelled((1043, Varchar254, "character varying(254)"))
+            Spelled((1043, Typmods.Varchar254, "character varying(254)"))
         );
 
         built.Name.ShouldBe("public.email_t[]");
@@ -382,9 +382,12 @@ public class PostgresTypesTests
     [Fact]
     public void PairsOf_EachCaseAbove_IsExactlyWhatBuildLooksUp()
     {
-        var work = PostgresRows.DomainOf(16400, "work_email", EmailT254, "billing") with { Typtypmod = -1 };
-        var emails = PostgresRows.ArrayOf(16386, "_email_t", EmailT254);
-        var emailRange = PostgresRows.RangeOf(16410, "email_range", EmailT254);
+        var work = PostgresRows.DomainOf(16400, "work_email", PostgresRows.EmailT254, "billing") with
+        {
+            Typtypmod = -1,
+        };
+        var emails = PostgresRows.ArrayOf(16386, "_email_t", PostgresRows.EmailT254);
+        var emailRange = PostgresRows.RangeOf(16410, "email_range", PostgresRows.EmailT254);
         var rows = PostgresRows.Of(
             PostgresRows.Int4,
             PostgresRows.Varchar,
@@ -396,23 +399,23 @@ public class PostgresTypesTests
             PostgresRows.TaggedArray,
             PostgresRows.UserStatus,
             PostgresRows.Int4range,
-            EmailT254,
+            PostgresRows.EmailT254,
             work,
             emails,
             emailRange
         );
         (long Oid, int Modifier, PostgresTypmodPair[] Pairs)[] cases =
         [
-            (1015, Varchar10, [new(1043, Varchar10)]),
-            (1231, 393222, [new(1700, 393222)]),
+            (1015, Typmods.Varchar10, [new(1043, Typmods.Varchar10)]),
+            (1231, Typmods.Numeric6Scale2, [new(1700, Typmods.Numeric6Scale2)]),
             (1186, IntervalYearToMonth, [new(1186, IntervalYearToMonth)]),
             (PostgresRows.Tagged.Oid, Tagged7, [new(PostgresRows.Tagged.Oid, Tagged7)]),
             (PostgresRows.TaggedArray.Oid, Tagged7, [new(PostgresRows.Tagged.Oid, Tagged7)]),
-            (EmailT254.Oid, -1, [new(1043, Varchar254)]),
-            (EmailT254.Oid, Varchar254, [new(1043, Varchar254)]),
-            (work.Oid, -1, [new(1043, Varchar254)]),
-            (emails.Oid, Varchar254, [new(1043, Varchar254)]),
-            (emailRange.Oid, -1, [new(1043, Varchar254)]),
+            (PostgresRows.EmailT254.Oid, -1, [new(1043, Typmods.Varchar254)]),
+            (PostgresRows.EmailT254.Oid, Typmods.Varchar254, [new(1043, Typmods.Varchar254)]),
+            (work.Oid, -1, [new(1043, Typmods.Varchar254)]),
+            (emails.Oid, Typmods.Varchar254, [new(1043, Typmods.Varchar254)]),
+            (emailRange.Oid, -1, [new(1043, Typmods.Varchar254)]),
             (23, -1, []),
             (1043, -1, []),
             (1015, -1, []),
@@ -443,7 +446,7 @@ public class PostgresTypesTests
                 PostgresTypes.Build(
                     1015,
                     PostgresRows.Of(PostgresRows.Varchar, PostgresRows.VarcharArray),
-                    Varchar10,
+                    Typmods.Varchar10,
                     TypeSpellings.None
                 )
             )

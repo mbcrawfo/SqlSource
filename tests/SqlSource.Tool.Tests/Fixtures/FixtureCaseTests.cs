@@ -1,5 +1,6 @@
 using System;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -13,7 +14,7 @@ public sealed class FixtureCaseTests : IDisposable
 
     public void Dispose() => _folder.Dispose();
 
-    private FixtureCase Case() => new("postgres", "one", _folder.CreateFolder("postgres/one"));
+    private FixtureCase Case() => new(SidecarValues.Engine.Postgres, "one", _folder.CreateFolder("postgres/one"));
 
     [Fact]
     public void ExplainSettings_CaseWithoutTheFile_HasNone() => Case().ExplainSettings.ShouldBeEmpty();
@@ -28,5 +29,18 @@ public sealed class FixtureCaseTests : IDisposable
         );
 
         Case().ExplainSettings.ShouldBe(["enable_mergejoin=off", "enable_nestloop=off"]);
+    }
+
+    [Fact]
+    public void Case_ItsThreeFiles_AreReadFromItsFolder()
+    {
+        var fixture = FixtureCaseFiles.Create(_folder.Path, SidecarValues.Engine.Postgres, "typed", "SELECT 1;\n");
+        _ = _folder.WriteFile($"postgres/typed/{FixtureCase.CaptureFile}", "a capture");
+        _ = _folder.WriteFile($"postgres/typed/{FixtureCase.ExpectedFile}", "a sidecar");
+
+        fixture.Query.ShouldBe("SELECT 1;\n");
+        fixture.Capture.ShouldBe("a capture");
+        fixture.Expected.ShouldBe("a sidecar");
+        fixture.ToString().ShouldBe("postgres/typed");
     }
 }
