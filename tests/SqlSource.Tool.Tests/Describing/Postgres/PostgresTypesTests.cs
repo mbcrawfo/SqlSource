@@ -243,7 +243,8 @@ public class PostgresTypesTests
     }
 
     // A type with a modifier, as a column gives it: the server spells the pair, and the facets are decoded from the
-    // number.  Every number below is one that a server gave, in TypeModifiersTests.
+    // number.  Varchar10 and IntervalYearToMonth are numbers a server gave, in TypeModifiersTests; Varchar254 and
+    // Tagged7 follow varchartypmodin's rule, the length plus 4.
     private const int Varchar10 = 14;
     private const int Varchar254 = 258;
     private const int Tagged7 = 11;

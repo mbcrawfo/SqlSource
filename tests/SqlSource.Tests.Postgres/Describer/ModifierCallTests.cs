@@ -34,7 +34,7 @@ public sealed class ModifierCallTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task TypesAsync_DomainWithAndWithoutAModifier_GivesItsTyptypmod()
+    public async Task TypesAsync_BaseTypeAndDomainWithAModifier_GiveEachItsTyptypmod()
     {
         var token = TestContext.Current.CancellationToken;
         await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);

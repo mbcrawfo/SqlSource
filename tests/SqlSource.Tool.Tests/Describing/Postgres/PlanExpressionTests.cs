@@ -148,14 +148,14 @@ public class PlanExpressionTests
 
     private static bool CreatedAt(OutputReference reference) => reference.Column == "created_at";
 
-    // A span in parentheses the walk says may not be read is unknown, whatever its form; the entry as a whole is never
-    // asked.
+    // A span in parentheses the walk says may not be read is read as unknown, whatever its form; the entry as a
+    // whole is never asked.
     [Theory]
     [InlineData("COALESCE(('x'::text), 'y'::text)", false)]
     [InlineData("COALESCE(('x'::text))", null)]
     [InlineData("CASE WHEN (a > 1) THEN ('x'::text) ELSE 'y'::text END", null)]
     [InlineData("('x'::text)", false)]
-    public void NullableOf_GroupTheWalkVetoes_IsUnknown(string entry, bool? expected) =>
+    public void NullableOf_GroupTheWalkVetoes_IsReadAsUnknown(string entry, bool? expected) =>
         PlanExpression
             .NullableOf(entry, catalogFunctions: true, static _ => false, static group => group != "'x'::text")
             .ShouldBe(expected);

@@ -30,7 +30,6 @@ public class PostgresLiveTests
             .ExplainText(new PostgresExplainRequest("sqlsource_7", 2, []))
             .ShouldBe("EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlsource_7(NULL, NULL)");
 
-    // The generic plan first, partition pruning off, then each setting in the order of the request.
     [Fact]
     public void SetTexts_RequestWithSettings_ForcesTheGenericPlanWithoutPruningThenSetsEach() =>
         PostgresLive

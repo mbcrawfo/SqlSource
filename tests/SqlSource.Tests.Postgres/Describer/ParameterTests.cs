@@ -14,8 +14,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
-// A query's parameters against a real server.  Every describe here runs in a session of its own and ends with no
-// prepared statement left in it.
+// A query's parameters against a real server.  A describe through DescribeAsync runs in a session of its own and
+// ends with no prepared statement left in it.
 [Collection(UsesPostgres.Name)]
 public sealed class ParameterTests(PostgresContainer postgres)
 {

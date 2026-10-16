@@ -5,8 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
-// The rows of the spec's table, in its order, and the rules of the catalog the reviews added: the first that fits a
-// column is its answer.
+// The arms of ColumnNullability.Of, in its order: the first that fits a column is its answer.
 public class ColumnNullabilityTests
 {
     private static ColumnOrigin Origin(

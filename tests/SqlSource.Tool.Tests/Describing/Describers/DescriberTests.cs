@@ -162,7 +162,8 @@ public class DescriberTests
         failure.Help.ShouldBe("check the SQL");
     }
 
-    // The describer of the tests carries the types its tests give it.  Phase 6 adds SQL Server's.
+    // The describer of the tests carries PostgreSQL's types and those of an engine the sidecar's model does not
+    // know; a SQL Server type it refuses, until phase 6 adds that engine.
     [Fact]
     public async Task DescribeAsync_DescriptionWithASqlServerType_IsNotCarriedThroughTheExchange()
     {

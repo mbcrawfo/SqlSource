@@ -55,7 +55,8 @@ public class PostgresErrorsTests
         failure.Help.ShouldBe(PostgresErrors.SessionNotKeptHelp);
     }
 
-    // Each line the server gave, in the order the epic fixes, and a position counted from where the SQL starts.
+    // Each line the server gave, in the order PostgresErrors.ServerLines fixes, and a position counted from where the
+    // SQL starts.
     [Fact]
     public void ServerLines_ErrorWithEveryPart_GivesEachInOrder() =>
         PostgresErrors
@@ -534,8 +535,9 @@ public class PostgresErrorsTests
             .SchemaChanged(Query(), DescribeStep.ResolveType, "the type of the column 'n' no longer exists")
             .Step.ShouldBe(DescribeStep.ResolveType);
 
-    // What PostgreSQL 13 says of "types".  The position is in the tool's own query of the catalog, which the user
-    // never wrote, so there is no line for it; the detail and the hint of the server stay.
+    // An error of "types" with a position, as PostgreSQL 13 gave before the tool refused it at "open".  The position
+    // is in the tool's own query of the catalog, which the user never wrote, so there is no line for it; the detail
+    // and the hint of the server stay.
     [Fact]
     public void Types_ErrorWithAPosition_HasNoPositionLine() =>
         PostgresErrors

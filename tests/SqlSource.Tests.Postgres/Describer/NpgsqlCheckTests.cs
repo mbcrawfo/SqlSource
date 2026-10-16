@@ -105,15 +105,15 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     // its base, so returned as a column it differs: the two tests of an array of a domain below assert its name and
     // that difference.
     //
-    // The last two were tried against Npgsql 10.0.3 on PostgreSQL 14 and 18, with SELECT @p AS p, to see the type the
-    // server was sent, with the default search_path and with public."char", other.<long name> and public."numeric"
-    // standing before pg_catalog on it.  "char" and pg_catalog."char" are refused: the data type name "could not be
-    // found in the types that were loaded by Npgsql", and so is internalchar.  char, which is Npgsql's own
-    // DataTypeName for NpgsqlDbType.InternalChar, and pg_catalog.char bind "char" in every session.  The array's
+    // The last two, and numeric, were tried against Npgsql 10.0.3 on PostgreSQL 14 and 18, with SELECT @p AS p, to see
+    // the type the server was sent, with the default search_path and with public."char", other.<long name> and
+    // public."numeric" standing before pg_catalog on it.  "char" and pg_catalog."char" are refused: the data type name
+    // "could not be found in the types that were loaded by Npgsql", and so is internalchar.  char, which is Npgsql's
+    // own DataTypeName for NpgsqlDbType.InternalChar, and pg_catalog.char bind "char" in every session.  The array's
     // public.<long name>[] and the unqualified <long name>[] are refused: "Name is too long and would be truncated".
     // public.<array's name> binds the array in every session; the unqualified <array's name> binds it too, but is
-    // refused as ambiguous once another schema holds a type of the same name.  numeric binds pg_catalog's numeric
-    // in every session.
+    // refused as ambiguous once another schema holds a type of the same name.  numeric binds pg_catalog's numeric in
+    // every session.
     [Theory]
     [InlineData("int", "integer")]
     [InlineData("bigint", "bigint")]

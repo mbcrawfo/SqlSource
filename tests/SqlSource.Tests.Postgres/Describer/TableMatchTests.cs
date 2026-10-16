@@ -35,7 +35,7 @@ public sealed class TableMatchTests(PostgresContainer postgres)
         description.MatchesTable.ShouldBe(new SidecarTable(schema, table));
     }
 
-    // The first two queries of the spec's Goal.
+    // The whole of users, by * and by its list in order.
     [Theory]
     [InlineData("SELECT * FROM users WHERE id = @id")]
     [InlineData("SELECT id, name, email, status, tags, balance, created_at, deleted_at, name_upper FROM users")]
@@ -79,8 +79,8 @@ public sealed class TableMatchTests(PostgresContainer postgres)
         await ShouldMatchAsync("SELECT * FROM match_dropped", "match_dropped");
     }
 
-    // Each query differs from users in one way, the third of the spec's Goal in two, and says the first check that
-    // failed.
+    // Each query differs from users in one way, and SELECT id, name AS user_name FROM users in two, and says the
+    // first check that failed.
     [Theory]
     [InlineData("SELECT *, upper(name) AS shouted FROM users", "no-origin")]
     [InlineData("SELECT u.*, o.* FROM users AS u JOIN orders AS o ON o.user_id = u.id", "several-tables")]

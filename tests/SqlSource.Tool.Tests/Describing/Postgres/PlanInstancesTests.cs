@@ -7,8 +7,8 @@ using static SqlSource.Tool.Tests.PostgresPlans;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
-// Steps 1 and 2 of the walk, over plans a test writes: which nodes name a relation instance, which of them a join
-// above null-extends, and what makes a plan unusable.
+// PlanInstances over plans a test writes: which nodes name a relation instance, which of them a join above
+// null-extends, and what makes a plan unusable.
 public class PlanInstancesTests
 {
     private static bool ExtendedIn(PlanInstances instances, string alias)

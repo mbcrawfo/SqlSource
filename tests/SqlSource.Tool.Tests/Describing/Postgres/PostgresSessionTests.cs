@@ -256,7 +256,7 @@ public class PostgresSessionTests
             new PostgresExplainAnswer(null, new PostgresServerError("XX000", "no plan in this test", null, null, null))
         );
 
-    // The trailing ";" is not sent, the parameter is $1, and the statement is freed when the describe is done.
+    // The trailing ";" is not sent, and the statement is freed when the describe is done.
     [Fact]
     public async Task DescribeAsync_Query_AsksPrepareThenDeallocateForTheStatement()
     {
@@ -443,8 +443,8 @@ public class PostgresSessionTests
         exchange.Unused.ShouldBeEmpty();
     }
 
-    // The walk is the one call after "check" that names the statement, so it finds out too.  The plan of a session
-    // that lost its statement is no heuristic: the describe fails, and the statement is freed.
+    // "explain" is the one call after "check" that names the statement and reports, so it finds out too.  A session
+    // that lost its statement is no reason for the heuristic: the describe fails, and the statement is freed.
     [Fact]
     public async Task DescribeAsync_ExplainAnswers26000_IsSqlsrc236AtExplain()
     {
@@ -1359,8 +1359,8 @@ public class PostgresSessionTests
         AnswersOf(description).ShouldBe([(true, "heuristic"), (null, "no-origin")]);
     }
 
-    // A UNION ALL of users and of orders' partitions, whose first column has users.id as its origin in the row
-    // description the test writes, and whose second has none: the plan answers it from its branches.
+    // A UNION ALL of users and of orders, or of orders' partitions, whose first column has users.id as its origin in
+    // the row description the test writes, and whose second has none: the plan answers it from its branches.
     private const string UnionOfUsersAndOrders =
         "SELECT id, user_id FROM users UNION ALL SELECT user_id, user_id FROM o";
 
@@ -1555,7 +1555,7 @@ public class PostgresSessionTests
         members.ShouldContain(member => member.Name == "error");
     }
 
-    // The same query planned with users as the side the join null-extends.
+    // The gated query of users.id and a window's count, planned with users as the side the join null-extends.
     [Fact]
     public async Task DescribeAsync_GatedQueryWhoseJoinExtendsTheColumnsSide_IsNullableByTheOuterJoin()
     {

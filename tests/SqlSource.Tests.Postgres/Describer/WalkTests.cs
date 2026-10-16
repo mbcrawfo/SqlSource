@@ -54,7 +54,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     private async Task<int> ServerMajorAsync() =>
         int.Parse((string)(await ScalarAsync("SHOW server_version_num"))!, CultureInfo.InvariantCulture) / 10000;
 
-    // The query of the spec's Goal, and its table.
+    // A left join: the side it keeps is not null by the catalog, and the side it extends is nullable by the join.
     [Fact]
     public async Task Describe_LeftJoin_KeepsTheOuterSideNotNullAndExtendsTheInnerOne() =>
         (

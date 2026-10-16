@@ -49,7 +49,8 @@ internal static class Programs
         return tool;
     }
 
-    // Path.GetTempPath reads the first where there are signals, and the others on Windows.
+    // Path.GetTempPath reads TMPDIR on Unix and TMP or TEMP on Windows.  DOTNET_NOLOGO keeps the SDK's first-run
+    // banner out of the output.
     public static void SetToolEnvironment(ProcessStartInfo start, string temp)
     {
         start.Environment["TMPDIR"] = temp;
