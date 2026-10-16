@@ -22,8 +22,9 @@ cd "$repo_root"
 # The default image is named in one place, which is read here and not repeated.
 default_image="$(sed -n 's/.*DefaultImage = "\(.*\)";.*/\1/p' "$PROJECT/PostgresContainer.cs")"
 image="${SQLSOURCE_TESTS_POSTGRES_IMAGE:-$default_image}"
-# A case is a folder that holds a query.sql, which is what the test finds.
-count="$(find "$CASES" -mindepth 2 -maxdepth 2 -type f -name query.sql | wc -l | tr -d ' ')"
+# A case is every folder of the engine's, as the test finds them: one with no query.sql fails its test, and the
+# recording.
+count="$(find "$CASES" -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')"
 
 printf 'Recording %s cases of postgres against %s ... ' "$count" "$image"
 if ! output="$(SQLSOURCE_RECORD_FIXTURES=1 dotnet test --project "$PROJECT" -- --filter-class "$TESTS" 2>&1)"; then
