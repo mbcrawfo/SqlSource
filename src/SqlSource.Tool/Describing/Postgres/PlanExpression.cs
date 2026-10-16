@@ -509,7 +509,13 @@ internal static class PlanExpression
 
             // The plan prints a type's name bare whenever the search path finds it, text and date as any other: a
             // user's type of that name in a schema ahead of pg_catalog prints the same.
-            if (_catalogFunctions && Is(from, Kind.String) && Is(from + 1, Kind.Cast) && IsTypeName(from + 2, to))
+            if (
+                _catalogFunctions
+                && to - from >= 3
+                && Is(from, Kind.String)
+                && Is(from + 1, Kind.Cast)
+                && IsTypeName(from + 2, to)
+            )
             {
                 return BuiltInType(from + 2, to);
             }

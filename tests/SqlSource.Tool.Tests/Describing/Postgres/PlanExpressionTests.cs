@@ -289,6 +289,8 @@ public class PlanExpressionTests
     [InlineData("'x'::text || 'y'::text")]
     [InlineData("'x'::text, 'y'::text")]
     [InlineData("('x'::text")]
+    [InlineData("'x'::")]
+    [InlineData("('x'::)")]
     [InlineData("")]
     public void TypeOf_AnythingElse_IsNull(string entry) =>
         PlanExpression.TypeOf(entry, catalogFunctions: true).ShouldBeNull();
