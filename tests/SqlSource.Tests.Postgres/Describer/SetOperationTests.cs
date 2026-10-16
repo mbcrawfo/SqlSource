@@ -261,6 +261,20 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         ).ShouldBeTrue();
     }
 
+    // A partitioned table's root Append prints no Output and is a union of its partitions, which "partitions" says it
+    // is: its constants are answered, as expressions, since the SQL holds no set operation, and the plan is walked.
+    [Fact]
+    public async Task Describe_ConstantOverAPartitionedTablesRootAppend_IsAnExpression()
+    {
+        await RunAsync(Partitioned);
+
+        (await WalkedAsync("SELECT p.id, 'x'::text AS k, 1 AS one FROM setop_parts p")).ShouldBe([
+            (false, "catalog"),
+            (false, "expression"),
+            (false, "expression"),
+        ]);
+    }
+
     // Names that cross do not cross the answer: a branch is read by place, not by the names its scan prints.  The
     // branch's two columns share a name, and the left input's second is the nullable one.
     [Theory]

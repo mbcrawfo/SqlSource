@@ -19,9 +19,10 @@ internal static partial class NullabilityWalk
     //
     // A branch's value counts only when its type carries to the result's (SetOperationTypes): the planner casts a
     // branch to the result's type, and the plan does not print the cast.  The result's type is the row description's,
-    // which is a nested set operation's own type only at the top: below another, an INTERSECT or an EXCEPT is of the
-    // common type of its own inputs, which may be the type of an input that proves nothing, reached by a user's cast.
-    // There it proves the column only when each of its inputs does, and so each is of the result's family.
+    // which is a set operation's own type only at the top and where no node above prints a cast of its value: below
+    // another set operation, or under a node that prints ((E)::T), an INTERSECT or an EXCEPT is of the common type of
+    // its own inputs, which may be the type of an input that proves nothing, reached by a user's cast.  There it
+    // proves the column only when each of its inputs does, and so each is of the result's family.
     //
     // A leaf scan of a set operation, a Subquery Scan aliased *SELECT* <k>, prints a reference to a column of its
     // branch by the column's name, which the plan does not otherwise print, and only its place says which.  It is
@@ -125,7 +126,9 @@ internal static partial class NullabilityWalk
             : null;
 
     // Each column of no origin from the set operation's inputs, and each with an origin as the walk answers it: by
-    // its entry at a root that prints one in a gated query, and kept otherwise.
+    // its entry at a root that prints one in a gated query, and kept otherwise.  A root Append that is a partitioned
+    // table's (PlanPartitions), where the plan holds no set operation, is a union of its partitions all the same; its
+    // answer is an expression's, since the SQL holds no set operation.
     private static WalkOutcome RunSetOperation(
         PlanNode root,
         IReadOnlyList<SidecarColumn> columns,
@@ -138,6 +141,9 @@ internal static partial class NullabilityWalk
     {
         var branches = new SetOperations(plans, scope);
         var onlyAlias = plans.OnlyAliasOf(root);
+        var source = instances.HasSetOperation
+            ? SidecarValues.NullableSource.SetOperation
+            : SidecarValues.NullableSource.Expression;
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
         {
@@ -149,7 +155,7 @@ internal static partial class NullabilityWalk
                         columns[index] with
                         {
                             Nullable = false,
-                            NullableSource = SidecarValues.NullableSource.SetOperation,
+                            NullableSource = source,
                         },
                         entry,
                         null,

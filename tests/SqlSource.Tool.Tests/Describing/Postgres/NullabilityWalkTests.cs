@@ -1560,6 +1560,49 @@ public class NullabilityWalkTests
         AnswersOf(RunSet(AppendOf(), Text)).ShouldBe([NoOrigin]);
     }
 
+    // A partitioned table's root Append prints no Output, and is a union of its partitions: its constant is answered,
+    // as an expression when "partitions" says the Append is the table's, and as a set operation's when it was not
+    // answered and the Append is read as one.
+    [Theory]
+    [InlineData(true, "expression")]
+    [InlineData(false, "set-operation")]
+    public void Run_ConstantOverAPartitionedTablesRootAppend_IsAnsweredWithTheAppendsReading(
+        bool answered,
+        string source
+    )
+    {
+        var root = AppendOf(
+            Scan("p_1", "p_1.id", "'x'::text") with
+            {
+                RelationName = "u_1",
+            },
+            Scan("p_2", "p_2.id", "'x'::text") with
+            {
+                RelationName = "u_2",
+            }
+        );
+        var (columns, origins) = Built(false, Expression, Expression);
+        var partitions = new Dictionary<PostgresRelationName, IReadOnlyList<long>>
+        {
+            [new PostgresRelationName("public", "u_1")] = [SetU.Oid],
+            [new PostgresRelationName("public", "u_2")] = [SetU.Oid],
+        };
+
+        var outcome = NullabilityWalk.Run(
+            root,
+            columns,
+            origins,
+            new WalkScope(false, false, true, SetTables)
+            {
+                Partitions = answered ? partitions : null,
+                ColumnTypes = [Int4, Text],
+            }
+        );
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(outcome).ShouldBe([(false, source), (false, source)]);
+    }
+
     // The walk does not take on a set operation under a join, nor one under grouping sets, which put NULL in a key.
     [Fact]
     public void Run_SetOperationUnderAJoin_KeepsNoOrigin() =>
