@@ -6,7 +6,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
 /// An entry of a plan's <c>Output</c> read as a whole: whether the server can ever return <c>NULL</c> for it, for the
-/// few forms whose answer the text alone settles.
+/// few forms whose answer the text alone settles, and the type of the few whose type it settles too.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -51,6 +51,25 @@ internal static class PlanExpression
         "cume_dist",
     ];
 
+    // The built-in types of a quoted literal's cast, as the plan spells them without a modifier.
+    private static readonly Dictionary<string, long> TypesByName = new(StringComparer.Ordinal)
+    {
+        ["text"] = 25,
+        ["character varying"] = 1043,
+        ["bpchar"] = 1042,
+        ["character"] = 1042,
+        ["smallint"] = 21,
+        ["integer"] = 23,
+        ["bigint"] = 20,
+        ["numeric"] = 1700,
+        ["real"] = 700,
+        ["double precision"] = 701,
+        ["date"] = 1082,
+        ["timestamp without time zone"] = 1114,
+        ["timestamp with time zone"] = 1184,
+        ["boolean"] = 16,
+    };
+
     private static readonly HashSet<string> Variadic = [with(StringComparer.Ordinal), "COALESCE", "GREATEST", "LEAST"];
 
     /// <summary>What the entry says of its column.</summary>
@@ -78,6 +97,21 @@ internal static class PlanExpression
     ) =>
         Tokens.Read(entry) is { Count: > 0 } tokens
             ? new Reader(entry, tokens, catalogFunctions, provedNotNull, groupPreserved).Form(0, tokens.Count)
+            : null;
+
+    /// <summary>
+    /// The type of an entry that is a whole constant or a form of this class whose type is fixed, or null.  The forms
+    /// are those of <see cref="NullableOf" /> with a type that does not depend on its arguments: a quoted literal with
+    /// a cast to a built-in type, a number, <c>true</c> or <c>false</c>, a test, <c>count</c> and the rankings.
+    /// <c>NULL::type</c>, <c>COALESCE</c>, <c>CASE</c>, a reference and a cast of anything else have none, and neither
+    /// has a text that merely starts with a form.
+    /// </summary>
+    /// <param name="entry">The entry as the plan prints it.</param>
+    /// <param name="catalogFunctions">Whether an unqualified function name is <c>pg_catalog</c>'s.</param>
+    /// <returns>The OID of the type, or null when the entry as a whole is no form that has one.</returns>
+    public static long? TypeOf(string entry, bool catalogFunctions) =>
+        Tokens.Read(entry) is { Count: > 0 } tokens
+            ? new Reader(entry, tokens, catalogFunctions, static _ => false, null).TypeOid(0, tokens.Count)
             : null;
 
     /// <summary>
@@ -423,6 +457,75 @@ internal static class PlanExpression
             return IsCase(from, to) && CaseResultsAreNotNull(from, to) ? false : null;
         }
 
+        /// <summary>The OID, or null, as <see cref="TypeOf" /> answers, for the span as a whole.</summary>
+        public long? TypeOid(int from, int to)
+        {
+            if (to <= from)
+            {
+                return null;
+            }
+
+            if (IsGroup(from, to))
+            {
+                return IsTest(from + 1, to - 1) ? TypesByName["boolean"] : TypeOid(from + 1, to - 1);
+            }
+
+            if (to - from == 1)
+            {
+                if (IsWord(from, "true") || IsWord(from, "false"))
+                {
+                    return TypesByName["boolean"];
+                }
+
+                // A number the plan prints bare is an integer without a point and a numeric with one: a bigint or a
+                // float is a literal with its cast.
+                if (!Is(from, Kind.Number))
+                {
+                    return null;
+                }
+
+                return TypesByName[Text(from).Contains('.', StringComparison.Ordinal) ? "numeric" : "integer"];
+            }
+
+            if (Is(from, Kind.String) && Is(from + 1, Kind.Cast) && IsTypeName(from + 2, to))
+            {
+                return BuiltInType(from + 2, to);
+            }
+
+            if (_catalogFunctions && IsCountOrRanking(from, to, anyArgument: true))
+            {
+                return TypesByName[Text(from) is "percent_rank" or "cume_dist" ? "double precision" : "bigint"];
+            }
+
+            return null;
+        }
+
+        // The type a name of one or more words spells, without a modifier in parentheses, if it is a built-in one that
+        // is listed.  An array, a schema or a quoted name is none.
+        private long? BuiltInType(int from, int to)
+        {
+            var words = new List<string>();
+            var at = from;
+            while (at < to)
+            {
+                if (Is(at, Kind.Word))
+                {
+                    words.Add(Text(at));
+                    at++;
+                }
+                else if (Is(at, Kind.Open))
+                {
+                    at = _closes[at] + 1;
+                }
+                else
+                {
+                    return null;
+                }
+            }
+
+            return TypesByName.TryGetValue(string.Join(' ', words), out var oid) ? oid : null;
+        }
+
         // Whether the first token is a parenthesis that the last closes.
         public bool WrapsWhole(int count) => IsGroup(0, count);
 
@@ -524,8 +627,10 @@ internal static class PlanExpression
         // count(*), with an optional FILTER (...) and an optional OVER, or a ranking with its OVER, to the end.  The
         // parentheses hold nothing else: a function of another schema whose argument's type is exact beats the
         // catalog's count("any") whatever the order of the path, and prints bare, while one of the catalog's own
-        // signature, count(*) or rank(), is found in pg_catalog first.
-        private bool IsCountOrRanking(int from, int to)
+        // signature, count(*) or rank(), is found in pg_catalog first.  With anyArgument count may hold an
+        // argument too, which TypeOf takes: the type is the catalog's bigint, and a form that NullableOf does not
+        // answer false never makes its column not null.
+        private bool IsCountOrRanking(int from, int to, bool anyArgument = false)
         {
             var isCount = IsWord(from, "count");
             if (!isCount && !(Is(from, Kind.Word) && Rankings.Contains(Text(from))))
@@ -539,7 +644,12 @@ internal static class PlanExpression
             }
 
             var holds = _closes[from + 1] - (from + 2);
-            if (isCount ? holds != 1 || Text(from + 2) != "*" : holds != 0)
+            if (!isCount && holds != 0)
+            {
+                return false;
+            }
+
+            if (isCount && (anyArgument ? holds < 1 : holds != 1 || Text(from + 2) != "*"))
             {
                 return false;
             }
