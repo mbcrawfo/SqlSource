@@ -32,6 +32,7 @@ public class UserDocsLinksTests
     [InlineData("What a dialect changes?", "what-a-dialect-changes")]
     [InlineData("A [linked](other.md#x) heading", "a-linked-heading")]
     [InlineData("Under_score and dash-ed", "under_score-and-dash-ed")]
+    [InlineData("Cafe\u0301 au lait", "cafe\u0301-au-lait")]
     public void Slug_FollowsGitHub(string heading, string slug) => UserDocs.Slug(heading).ShouldBe(slug);
 
     [Fact]
@@ -43,21 +44,28 @@ public class UserDocsLinksTests
         anchors.ShouldContain("sqlsrc236");
     }
 
+    // A parser that finds nothing would make every other test of this folder pass.
+    [Fact]
+    public void UserDocs_HaveLinks()
+    {
+        UserDocs.Files.ShouldNotBeEmpty();
+        UserDocs.Links().ShouldNotBeEmpty();
+        UserDocs.Links().Select(link => link.File).Distinct().ShouldContain("README.md");
+        UserDocs.Links().Select(link => link.File).Distinct().ShouldContain("docs/manual/diagnostics.md");
+    }
+
+    // The tests read inline links and "#" headings.  Another form is not read, and what it names would not be checked.
+    [Fact]
+    public void UserDocs_UseInlineLinksAndAtxHeadingsOnly() =>
+        UserDocs.UnsupportedForms().Select(form => $"{form.File}:{form.Line}: {form.Message}").ShouldBeEmpty();
+
     [Fact]
     public void RelativeLinks_ReachAFileAndAnchorThatExist() =>
-        Problems(
-                (file, target) =>
-                    target.StartsWith(UserDocs.RepositoryUrl, StringComparison.Ordinal) ? null : Follow(file, target)
-            )
-            .ShouldBeEmpty();
+        Problems((file, target) => UserDocs.IsRepositoryLink(target) ? null : Follow(file, target)).ShouldBeEmpty();
 
     [Fact]
     public void RepositoryUrls_ReachAFileAndAnchorThatExist() =>
-        Problems(
-                (file, target) =>
-                    target.StartsWith(UserDocs.RepositoryUrl, StringComparison.Ordinal) ? Follow(file, target) : null
-            )
-            .ShouldBeEmpty();
+        Problems((file, target) => UserDocs.IsRepositoryLink(target) ? Follow(file, target) : null).ShouldBeEmpty();
 
     [Fact]
     public void PackedReadmes_HaveOnlyAbsoluteLinks() =>
@@ -114,6 +122,11 @@ public class UserDocsLinksTests
     // reaches what it names, and for a link that goes to another site.
     private static string? Follow(string file, string target)
     {
+        if (UserDocs.RepositoryLinkProblem(target) is { } problem)
+        {
+            return problem;
+        }
+
         if (UserDocs.Resolve(file, target) is not var (path, anchor))
         {
             return null;

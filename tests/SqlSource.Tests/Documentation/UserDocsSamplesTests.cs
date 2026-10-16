@@ -1,7 +1,10 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using Xunit;
 
@@ -15,6 +18,14 @@ public class UserDocsSamplesTests
 {
     private const string Fragment = "fragment";
     private const string Error = "error";
+
+    // A parser that finds no block would make the test below pass.
+    [Fact]
+    public void UserDocs_HaveSqlSamples() =>
+        UserDocs
+            .FencedBlocks()
+            .Count(block => block.Info.StartsWith("sql", StringComparison.OrdinalIgnoreCase))
+            .ShouldBeGreaterThan(0);
 
     [Fact]
     public void SqlSamples_Parse()
@@ -55,6 +66,9 @@ public class UserDocsSamplesTests
     private static string Describe(string file, int fence, string text, SqlParseError error)
     {
         var line = fence + 1 + text.Take(error.Span.Start).Count(character => character == '\n');
-        return $"{file}:{line}: {error.Kind} {string.Join(", ", error.Arguments)}";
+        var descriptor = SqlDiagnostics.ForParseError(error.Kind);
+        object?[] arguments = [.. error.Arguments];
+        var message = Diagnostic.Create(descriptor, Location.None, arguments).GetMessage(CultureInfo.InvariantCulture);
+        return $"{file}:{line}: {descriptor.Id}: {message}";
     }
 }
