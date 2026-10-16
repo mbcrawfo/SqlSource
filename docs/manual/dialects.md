@@ -31,7 +31,7 @@ The [dialect](concepts.md#dialect) is the set of rules that SqlSource reads a `.
 
 Names are not case-sensitive.
 
-Choose the dialect named for your database.  A database that has no dialect of its own may be read correctly by one that has: the last column says which, such as `postgres` for DuckDB.  For any other, use `ansi`.
+Choose the dialect named for your database.  A database that has no dialect of its own may be read correctly by one that has: the last column says which, such as `postgres` for DuckDB, whose files then need the output `sql` (see [database support](#database-support)).  For any other, use `ansi`.
 
 `ansi` is the default, so a project that sets nothing is read by it.  It reads the SQL of every database by one set of rules, and misreads each construct in [the table below](#what-a-dialect-changes) that it says No to and your database says Yes to.  It also reads the quoting forms of PostgreSQL and MySQL that are rarely anything else: `` `...` ``, `$tag$...$tag$` and `E'...'`.  The fix for a misread is to set the dialect.
 
@@ -108,7 +108,7 @@ SqlSource reads these differently from the database, whatever the dialect:
 
 | Construct | Database | How SqlSource reads it |
 |----|----|----|
-| A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */` | MySQL, MariaDB | The comment ends at the first `*/`.  Where the server ends it depends on the server's version |
+| A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */` | MySQL, MariaDB | The comment ends at the first `*/`, so the quote after it opens a string that is never closed: the error [SQLSRC101](diagnostics.md#sqlsrc101).  Where the server ends the comment depends on the server's version |
 | A block comment that is still open at the end of the file | SQLite | The error [SQLSRC102](diagnostics.md#sqlsrc102).  SQLite accepts it, but it would take every later query of the file with it |
 | A file whose lines end with a carriage return alone, with no line feed | MySQL, SQLite, CockroachDB | A line ends there, as in every dialect.  These databases end a `--` comment only at a line feed |
 | A client command that is not SQL: `DELIMITER`, `GO`, SQL*Plus `PROMPT` and `REM`, a psql `\` command | All | As SQL, so a quote in it can open a string |
@@ -136,7 +136,7 @@ If your SQL uses one of these constructs, check the generated SQL: hover over th
 | CockroachDB | `cockroachdb` | No | None |
 | Any other database | `ansi` | No | None |
 
-Every dialect is read, and every `.sql` file gets its constants and token methods whatever its database.  *Described* is something more: the `sqlsource` tool can ask the database about a query's parameters and columns and write the answer to a sidecar.  The tool decides by the dialect of the file, and asks only the databases in the table.  A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.
+Every dialect is read, and every `.sql` file gets its constants and token methods whatever its database.  *Described* is something more: the `sqlsource` tool can ask the database about a query's parameters and columns and write the answer to a sidecar.  The tool decides by the dialect of the file, and asks only the databases in the table.  A database that merely shares a dialect with one of them, such as DuckDB with `postgres`, is read by that dialect's rules and cannot be described.  The tool still tries to describe a file read as `postgres` whose output is `models` or `codegen`, so give a DuckDB file the output `sql`: see [the output setting](settings.md#setting-output).
 
 > **Coming in a later release.**  The tool will describe SQL Server queries.  See [what works today](README.md#what-works-today).
 

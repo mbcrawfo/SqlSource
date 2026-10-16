@@ -33,7 +33,7 @@ SqlSource finds the parameters of a query: `@` and a name of letters, digits and
 - **A parameter stays in the SQL exactly as written.**  The constant for `GetUser` holds `@id`.
 - **Names are compared ignoring case.**  `@Id` and `@id` are one parameter.
 - **Only `@` starts a parameter.**  `:name`, `$1` and `?` are not found, and stay in the SQL as written.
-- **Some uses of `@` are not parameters.**  `@>`, `<@`, `@@`, `@?` and `@@ROWCOUNT` are not, and neither is the `@` inside a word, such as `user@host`.
+- **Some uses of `@` are not parameters.**  `@>`, `@@`, `@?` and `@@ROWCOUNT` are not, and neither is the `@` inside a word, such as `user@host`, or an `@` that no name follows, such as the one in `a <@ b`.  The `@` of `<@b` is a parameter, `b`.
 - **A parameter inside a hint is not found.**  A hint, `/*+ ... */` or `/*! ... */`, is copied whole.
 - **A name that looks like a parameter is not always one to the database.**  See [names that are read as parameters](#names-read-as-parameters).
 
@@ -53,14 +53,14 @@ A `-- param:` marker inside a query declares one parameter.  The form is `@name`
 
 - **The type is written in the database's own words**, such as `decimal(18,2)` or `double precision`.  SqlSource does not check it.  When the tool describes the query, it asks the database to resolve the type and checks it against every use of the parameter: a type the database does not have is [SQLSRC228](diagnostics.md#sqlsrc228).
 - **Without a type, the database decides.**  The tool takes the type that the database infers from how the parameter is used.  When a use says nothing, as in `SELECT @p IS NULL`, the tool cannot, and the fix is a type here ([SQLSRC226](diagnostics.md#sqlsrc226), [SQLSRC227](diagnostics.md#sqlsrc227)).
-- **`null` says the value can be null.**  No database reports whether a parameter can be null, so this is the only way to say it.  A parameter that does not say `null` is not nullable.  `not null` is accepted because it is what a column definition says, and means the same as saying nothing.
+- **`null` says the value can be null.**  No database reports whether a parameter can be null, so this is the only way to say it.  A parameter that does not say `null` is read as not nullable, and `not null` is accepted because it is what a column definition says; it has the same meaning as saying nothing.  Today the declaration is recorded by the tool in the sidecar and changes no generated code: models will use it in a later release.
 - **A parameter that only a token brings needs a type.**  When a parameter stands only in the default of a token (see [defaults](#token-defaults)), nothing but the marker can say what it is.  The marker without a type is [SQLSRC117](diagnostics.md#sqlsrc117), and no marker at all is [SQLSRC118](diagnostics.md#sqlsrc118).  In the example under [defaults](#token-defaults), `-- param: @page int` is what makes the query valid.
 - **The marker names the parameter as the SQL writes it**, `@name`, alone or followed by a space.  Anything else is [SQLSRC111](diagnostics.md#sqlsrc111).
-- **A parameter may be declared twice** if the two markers say the same.  Two that differ in type or in `null` are [SQLSRC112](diagnostics.md#sqlsrc112).
+- **A parameter may be declared twice** if the two markers say the same.  Two that differ in type or in nullability are [SQLSRC112](diagnostics.md#sqlsrc112), and `not null` counts as a difference: `@a int` and `@a int not null` conflict, though they mean the same.
 
 The marker goes inside a query, under its `-- name:` line.  In the file header it is [SQLSRC116](diagnostics.md#sqlsrc116): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 
-A change to a `-- param:` marker, like a change to the SQL, makes the query's sidecar out of date.  Run `dotnet sqlsource describe` again: see [sidecar files](tool.md#sidecar-files).
+A change to a `-- param:` marker, like a change to the SQL, makes the query's sidecar out of date, and so does adding or removing `not null`, since it is recorded apart from saying nothing.  Run `dotnet sqlsource describe` again: see [sidecar files](tool.md#sidecar-files).
 
 <a id="declared-variables"></a>
 
