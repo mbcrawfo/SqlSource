@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
@@ -27,13 +26,15 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
         reader.GetString(0).ShouldBe(PostgresContainer.Database);
         reader.GetBoolean(2).ShouldBeTrue();
         reader.GetBoolean(3).ShouldBeTrue();
-        // "postgres:18" runs a server whose version starts "18.".  A tag that starts with no number says nothing.
-        var major = new string([.. PostgresContainer.Image.Split(':')[^1].TakeWhile(char.IsAsciiDigit)]);
-        if (major.Length > 0)
-        {
-            reader.GetString(1).ShouldStartWith(major + ".");
-        }
+        // "postgres:18.6" runs a server whose server_version is "18.6 (Debian 18.6-1.pgdg13+1)".
+        reader.GetString(1).Split(' ')[0].ShouldBe(PostgresContainer.TagOf(PostgresContainer.Image));
     }
+
+    // Every image the tests run, the default or the one the variable names, is pinned to a major and a minor.  A
+    // bare major moves to each new minor unseen; see CONTRIBUTING.md.
+    [Fact]
+    public void Image_OfTheRun_IsPinnedToAMajorAndAMinor() =>
+        PostgresContainer.TagOf(PostgresContainer.Image).ShouldMatch(@"^\d+\.\d+$");
 
     [Fact]
     public void Image_OfTheRun_IsTheVariablesValueOrTheDefault()

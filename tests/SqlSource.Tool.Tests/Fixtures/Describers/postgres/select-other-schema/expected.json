@@ -8,7 +8,7 @@
       "hash": "e26db7f6a0f8c49e9ef8a66321401c9933f09198815b7f2c3f9c5abf4b9aea26",
       "engine": "postgres",
       "database": "postgres",
-      "serverVersion": "18.4",
+      "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": {
         "schema": "billing",
