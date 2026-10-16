@@ -295,7 +295,7 @@ internal static partial class UserDocs
     [GeneratedRegex(@"^ {0,3}(?:=+|-+)[ \t]*$")]
     private static partial Regex SetextPattern();
 
-    [GeneratedRegex(@"^\s*(?:#|>|[-*+]\s|\d+[.)]\s|\||<|```|~~~)")]
+    [GeneratedRegex(@"^\s*(?:#|>|[-*+]\s|\d+[.)]\s|\||<|```|~~~|([-*_])(?:[ \t]*\1){2,}[ \t]*$)")]
     private static partial Regex NotParagraphPattern();
 
     // Where the repository is on GitHub: the kind of URL, the ref and the path.  GitHub ignores the case of the owner

@@ -77,9 +77,18 @@ public class UserDocsReadingTests
     [InlineData("- item", "---")]
     [InlineData("| a | b |", "|---|---|")]
     [InlineData("# Title", "---")]
-    [InlineData("```", "---")]
+    [InlineData("***", "---")]
+    [InlineData("___", "---")]
+    [InlineData("* * *", "---")]
+    [InlineData("- - -", "---")]
+    [InlineData("---", "---")]
     public void Unsupported_RuleOrTable_IsNotReported(string above, string line) =>
         UserDocs.Read([above, line]).Unsupported.ShouldBeEmpty();
+
+    // The line above is the closing fence of a block, which is not a paragraph either.
+    [Fact]
+    public void Unsupported_RuleAfterAFencedBlock_IsNotReported() =>
+        UserDocs.Read(["```", "text", "```", "---"]).Unsupported.ShouldBeEmpty();
 
     [Fact]
     public void Blocks_BacktickInTheInfoOfABacktickFence_IsNotAFence()
