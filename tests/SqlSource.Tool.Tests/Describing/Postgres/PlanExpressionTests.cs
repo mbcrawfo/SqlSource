@@ -187,4 +187,111 @@ public class PlanExpressionTests
         string column,
         bool expected
     ) => PlanExpression.MayNameColumn(entry, column).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("'x'::text", 25)]
+    [InlineData("('x'::text)", 25)]
+    [InlineData("'x'::character varying", 1043)]
+    [InlineData("'x'::character varying(254)", 1043)]
+    [InlineData("'x'::bpchar", 1042)]
+    [InlineData("'x'::character(3)", 1042)]
+    [InlineData("'1'::smallint", 21)]
+    [InlineData("'-1'::integer", 23)]
+    [InlineData("0", 23)]
+    [InlineData("12", 23)]
+    [InlineData("1.5", 1700)]
+    [InlineData("'5'::bigint", 20)]
+    [InlineData("'1.5'::numeric(10,2)", 1700)]
+    [InlineData("'1.5'::real", 700)]
+    [InlineData("'1.5'::double precision", 701)]
+    [InlineData("'2024-01-01'::date", 1082)]
+    [InlineData("'2024-01-01'::timestamp without time zone", 1114)]
+    [InlineData("'2024-01-01'::timestamp(3) without time zone", 1114)]
+    [InlineData("'2024-01-01'::timestamp with time zone", 1184)]
+    [InlineData("true", 16)]
+    [InlineData("false", 16)]
+    [InlineData("(u.deleted_at IS NULL)", 16)]
+    [InlineData("((u.deleted_at IS NOT NULL))", 16)]
+    [InlineData("(NOT ((u.email)::text IS DISTINCT FROM (u.name)::text))", 16)]
+    [InlineData("count(*)", 20)]
+    [InlineData("(count(*) FILTER (WHERE (status = 'a'::user_status)))", 20)]
+    [InlineData("count(o.id)", 20)]
+    [InlineData("count(*) OVER (?)", 20)]
+    [InlineData("row_number() OVER w1", 20)]
+    [InlineData("(rank() OVER w2)", 20)]
+    [InlineData("dense_rank() OVER w2", 20)]
+    [InlineData("percent_rank() OVER (?)", 701)]
+    [InlineData("cume_dist() OVER w2", 701)]
+    public void TypeOf_ConstantOrKnownForm_IsItsTypeOid(string entry, long expected) =>
+        PlanExpression.TypeOf(entry, catalogFunctions: true).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("count(*)")]
+    [InlineData("count(o.id)")]
+    [InlineData("row_number() OVER w1")]
+    [InlineData("percent_rank() OVER (?)")]
+    public void TypeOf_FunctionOfAnySchema_IsNull(string entry) =>
+        PlanExpression.TypeOf(entry, catalogFunctions: false).ShouldBeNull();
+
+    // The plan prints a type's name through a visibility check, so a type of that name earlier on the path than
+    // pg_catalog would print as the built-in one.
+    [Theory]
+    [InlineData("'x'::text")]
+    [InlineData("'2024-01-01'::date")]
+    [InlineData("'5'::bigint")]
+    [InlineData("('x'::character varying)")]
+    public void TypeOf_LiteralWhenTheCatalogIsNotFirst_IsNull(string entry) =>
+        PlanExpression.TypeOf(entry, catalogFunctions: false).ShouldBeNull();
+
+    [Theory]
+    [InlineData("1", 23)]
+    [InlineData("true", 16)]
+    [InlineData("(u.deleted_at IS NULL)", 16)]
+    public void TypeOf_FormWithoutATypeName_IsItsTypeWhateverThePath(string entry, long expected) =>
+        PlanExpression.TypeOf(entry, catalogFunctions: false).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("(\"*SELECT* 1\".id)::bigint", "\"*SELECT* 1\".id")]
+    [InlineData("(u.id)::numeric(10,2)", "u.id")]
+    [InlineData("((u.id + 1))::double precision", "(u.id + 1)")]
+    public void CastOperand_CastOfAGroup_IsTheTextInside(string entry, string expected) =>
+        PlanExpression.CastOperand(entry).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("u.id")]
+    [InlineData("(u.id)")]
+    [InlineData("u.id::bigint")]
+    [InlineData("(u.id)::bigint + 1")]
+    [InlineData("(u.id)::bigint COLLATE \"C\"")]
+    [InlineData("(u.id)::")]
+    [InlineData("(u.id")]
+    public void CastOperand_AnythingElse_IsNull(string entry) => PlanExpression.CastOperand(entry).ShouldBeNull();
+
+    [Theory]
+    [InlineData("NULL::text")]
+    [InlineData("COALESCE(max((email)::text), 'x'::text)")]
+    [InlineData("CASE WHEN (u.deleted_at IS NULL) THEN 'open'::text ELSE 'closed'::text END")]
+    [InlineData("'active'::user_status")]
+    [InlineData("'{}'::text[]")]
+    [InlineData("'x'::text COLLATE \"C\"")]
+    [InlineData("u.id")]
+    [InlineData("(u.id)::bigint")]
+    [InlineData("(u.id)")]
+    [InlineData("count(*) + 1")]
+    [InlineData("(count(*) + 1)")]
+    [InlineData("count(*) OVER")]
+    [InlineData("rank()")]
+    [InlineData("rank(1) OVER w1")]
+    [InlineData("1 + 1")]
+    [InlineData("1.5e3")]
+    [InlineData("true AND false")]
+    [InlineData("(a IS NULL) AND b")]
+    [InlineData("'x'::text || 'y'::text")]
+    [InlineData("'x'::text, 'y'::text")]
+    [InlineData("('x'::text")]
+    [InlineData("'x'::")]
+    [InlineData("('x'::)")]
+    [InlineData("")]
+    public void TypeOf_AnythingElse_IsNull(string entry) =>
+        PlanExpression.TypeOf(entry, catalogFunctions: true).ShouldBeNull();
 }

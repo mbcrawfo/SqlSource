@@ -1359,6 +1359,202 @@ public class PostgresSessionTests
         AnswersOf(description).ShouldBe([(true, "heuristic"), (null, "no-origin")]);
     }
 
+    // A UNION ALL of users and of orders' partitions, whose first column has users.id as its origin in the row
+    // description the test writes, and whose second has none: the plan answers it from its branches.
+    private const string UnionOfUsersAndOrders =
+        "SELECT id, user_id FROM users UNION ALL SELECT user_id, user_id FROM o";
+
+    private static PlanNode UnionPlan(bool partitioned)
+    {
+        var orders = partitioned
+            ? Over("Append", Scan("x")) with
+            {
+                Plans =
+                [
+                    Scan("o_1", "o_1.user_id", "o_1.user_id") with
+                    {
+                        RelationName = "orders_1",
+                        ParentRelationship = "Member",
+                    },
+                    Scan("o_2", "o_2.user_id", "o_2.user_id") with
+                    {
+                        RelationName = "orders_2",
+                        ParentRelationship = "Member",
+                    },
+                ],
+            }
+            : Scan("orders", "orders.user_id", "orders.user_id");
+        return Over("Append", Scan("x")) with
+        {
+            Plans =
+            [
+                Scan("users", "users.id", "users.id") with
+                {
+                    ParentRelationship = "Member",
+                },
+                orders with
+                {
+                    ParentRelationship = "Member",
+                },
+            ],
+        };
+    }
+
+    private static readonly PostgresTableRow Orders1 = PostgresTables.Orders with { Oid = 16420, Name = "orders_1" };
+
+    private static readonly PostgresTableRow Orders2 = PostgresTables.Orders with { Oid = 16421, Name = "orders_2" };
+
+    // The describe of the UNION ALL, with each call after "explain" the script writes.
+    private static async Task<(QueryDescription Description, RecordingLog Log)> DescribeUnionAsync(
+        PlanNode plan,
+        Action<PostgresScript> afterExplain
+    )
+    {
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, UnionOfUsersAndOrders, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "user_id", 23));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = Checks(script, UnionOfUsersAndOrders, [], Expression(0, "id", 23), Expression(1, "user_id", 23));
+        _ = Explains(script, 1, 0, PlanOf(plan));
+        afterExplain(script);
+        var exchange = Frees(script, 1).Play();
+        var log = new RecordingLog();
+        await using var session = await PostgresScript.SessionAsync(exchange, log);
+
+        var described = await session.DescribeAsync(
+            Request(UnionOfUsersAndOrders),
+            TestContext.Current.CancellationToken
+        );
+
+        exchange.Unused.ShouldBeEmpty();
+        return (described.Value.ShouldNotBeNull(), log);
+    }
+
+    // "relations" is asked after "partitions", for the relations that "tables" did not answer, and the walk reads
+    // their NOT NULL.
+    [Fact]
+    public async Task DescribeAsync_SetOperationWithAColumnOfNoOrigin_AsksTheRelationsItsBranchesScan()
+    {
+        var (description, log) = await DescribeUnionAsync(
+            UnionPlan(partitioned: true),
+            script =>
+            {
+                _ = script.Answer(
+                    "partitions",
+                    new PostgresPartitionsRequest([
+                        new PostgresRelationName("public", "orders_1"),
+                        new PostgresRelationName("public", "orders_2"),
+                    ]),
+                    new PostgresPartitionsAnswer(
+                        [
+                            new("public", "orders_1", [PostgresTables.Orders.Oid]),
+                            new("public", "orders_2", [PostgresTables.Orders.Oid]),
+                        ],
+                        null
+                    )
+                );
+                _ = script.Answer(
+                    "relations",
+                    new PostgresRelationsRequest([
+                        new PostgresRelationName("public", "orders_1"),
+                        new PostgresRelationName("public", "orders_2"),
+                    ]),
+                    new PostgresTablesAnswer([Orders1, Orders2], null)
+                );
+            }
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([(false, "catalog"), (false, "set-operation")]);
+        log.Events.Select(written => written.Name)
+            .Where(name => name is "explain" or "partitions" or "relations" or "walk")
+            .ShouldBe(["explain", "partitions", "relations", "walk"]);
+    }
+
+    // Every relation the plan scans is one "tables" answered: nothing more is asked, and the script holds nothing.
+    [Fact]
+    public async Task DescribeAsync_SetOperationOfRelationsTablesAnswered_AsksNoRelations()
+    {
+        var plan = Over("Append", Scan("x")) with
+        {
+            Plans =
+            [
+                Scan("users", "users.id", "users.id") with
+                {
+                    ParentRelationship = "Member",
+                },
+                Scan("u2", "u2.id", "u2.id") with
+                {
+                    RelationName = "users",
+                    ParentRelationship = "Member",
+                },
+            ],
+        };
+
+        var (description, _) = await DescribeUnionAsync(plan, static _ => { });
+
+        AnswersOf(description).ShouldBe([(false, "catalog"), (false, "set-operation")]);
+    }
+
+    // The root reaches no set operation: the one under the join is not taken on, and nothing more is asked.
+    [Fact]
+    public async Task DescribeAsync_SetOperationUnderAJoin_AsksNoRelations()
+    {
+        var plan = Join("Left", Scan("users", "users.id"), UnionPlan(partitioned: false)) with
+        {
+            Output = ["users.id", "orders.user_id"],
+        };
+
+        var (description, _) = await DescribeUnionAsync(plan, static _ => { });
+
+        AnswersOf(description).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+    }
+
+    // A gated query whose every column has an origin: the plan answers no column of no origin, and nothing more is
+    // asked.
+    [Fact]
+    public async Task DescribeAsync_SetOperationWhoseEveryColumnHasAnOrigin_AsksNoRelations()
+    {
+        const string Sql = "SELECT u.id FROM users u LEFT JOIN orders o ON o.user_id = u.id UNION ALL SELECT 1";
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, Sql, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = Checks(script, Sql, [], Expression(0, "id", 23));
+        _ = Explains(script, 1, 0, PlanOf(UnionPlan(partitioned: false)));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(Sql), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([(true, "heuristic")]);
+    }
+
+    // A "relations" that fails is logged and never reported: the walk goes on without its rows.
+    [Fact]
+    public async Task DescribeAsync_RelationsThatFails_IsLoggedAndTheColumnIsKept()
+    {
+        var (description, log) = await DescribeUnionAsync(
+            UnionPlan(partitioned: false),
+            static script =>
+                script.Answer(
+                    "relations",
+                    new PostgresRelationsRequest([new PostgresRelationName("public", "orders")]),
+                    new PostgresTablesAnswer(null, new PostgresServerError("XX000", "no catalog", null, null, null))
+                )
+        );
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        var (_, members) = log.Events.Single(written => written.Name == "relations");
+        members.ShouldContain(member => member.Name == "error");
+    }
+
     // The same query planned with users as the side the join null-extends.
     [Fact]
     public async Task DescribeAsync_GatedQueryWhoseJoinExtendsTheColumnsSide_IsNullableByTheOuterJoin()

@@ -296,6 +296,12 @@ internal sealed record PostgresBindError(string Parameter, string Message);
 /// <summary>A relation as a plan names it: its schema and its name apart, since a name may hold a dot.</summary>
 internal sealed record PostgresRelationName(string Schema, string Name);
 
+/// <summary>The request of <c>relations</c>.  Its answer is the one of <c>tables</c>.</summary>
+/// <param name="Relations">
+/// The relations a plan scans (<see cref="PlanRelations" />), in schema and name order, each once.
+/// </param>
+internal sealed record PostgresRelationsRequest(IReadOnlyList<PostgresRelationName> Relations);
+
 /// <summary>The request of <c>partitions</c>.</summary>
 /// <param name="Relations">
 /// The relations the members of a plan's <c>Append</c>s scan (<see cref="PlanPartitions" />), in schema and name

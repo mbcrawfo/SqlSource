@@ -53,6 +53,7 @@ internal static class SidecarValues
         public const string View = "view";
         public const string ForeignTable = "foreign-table";
         public const string Expression = "expression";
+        public const string SetOperation = "set-operation";
         public const string NoOrigin = "no-origin";
         public const string Heuristic = "heuristic";
     }
