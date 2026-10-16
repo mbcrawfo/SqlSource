@@ -47,8 +47,8 @@ SqlSource is delivered in phases.  This table is the one list of what works in t
 | Describing SQL Server queries | Coming ([SQLSRC216](diagnostics.md#sqlsrc216) until then) | [SQL Server](sqlserver.md) |
 | Models for the parameters and rows of a query | Coming | [Models](generator.md#models) |
 | Generated query methods | Coming | [Query methods](generator.md#query-methods) |
-| Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |
-| Custom type mapping | Coming | Not documented until it is delivered; for a type that cannot be bound, see [SQLSRC232](diagnostics.md#sqlsrc232) |
+| Library maps for the types of libraries such as NodaTime | Coming | [NodaTime and other libraries](../../README.md#nodatime-and-other-libraries) |
+| Custom type mapping | Coming | [Custom type mapping](../../README.md#custom-type-mapping); for a type that cannot be bound, see [SQLSRC232](diagnostics.md#sqlsrc232) |
 | Build integration: the tool running in your build | Coming | Not documented until it is delivered; today you run the tool yourself: [install the tool](tool.md#install-the-tool) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |
 
