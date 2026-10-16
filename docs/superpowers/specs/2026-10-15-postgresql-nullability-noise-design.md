@@ -29,6 +29,8 @@ It depends on [the suite of realistic queries](2026-10-15-postgresql-realistic-q
 - `EXISTS (...)` as a column.  On 14 the planner prints both an `EXISTS` and an `x IN (subquery)` as `(hashed SubPlan 2)`, and on 18 it can print an `EXISTS` as `(ANY (u.id = (hashed SubPlan 2).col1))`.  The text cannot tell them apart, and `IN` can return `NULL`.  It stays in TD-0051.
 - Aggregates other than `count`: `sum`, `max`, `array_agg`, `json_agg`, `string_agg` return `NULL` over no rows, and the plan does not say whether a group can be empty or a `FILTER` excludes every row.
 - `VALUES`, whose plan does not print its rows.
+- A column of a view, which the describer answers `null` with `view` (`view-joined-left`).  It stays in TD-0051.
+- A `RETURNING` column of a nullable table column where the statement writes a value that is not `NULL`, which keeps the catalog's `true` (`insert-select-returning`, `update-from-aggregate-returning`, `data-modifying-cte-archive`).  It stays in TD-0051.
 - The `OLD` and `NEW` rows of PostgreSQL 18's `RETURNING`, and an extension's `Custom Scan`, TD-0046's seventh and fourth bullets, which stay in TD-0046.
 - Any change to how the generator reads a sidecar beyond the new values of `nullableSource`, which a reader that does not know them already ignores.
 
@@ -161,7 +163,7 @@ Three pull requests, in the order A, B, C, each with its own plan, after the sui
 - re-records the fixture cases with `tools/record-fixtures.sh` where an answer of theirs changes;
 - updates `docs/tech-debt/` for what it closes and what it finds.
 
-TD-0051, opened by the suite for the noise it measures, is updated by each of parts A, B and C to hold what stays noise: strict functions and operators, `EXISTS` as a column, aggregates other than `count`, `VALUES`, and anything a part leaves unproved.  It names the suite's cases that show each.
+TD-0051, opened by the suite for the noise it measures, is updated by each of parts A, B and C to hold what stays noise: strict functions and operators, `EXISTS` as a column, aggregates other than `count`, `VALUES`, a column of a view, a `RETURNING` column of a written value, and anything a part leaves unproved.  It names the suite's cases that show each.
 
 ## Success
 
