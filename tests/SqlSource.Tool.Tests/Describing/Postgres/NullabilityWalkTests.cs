@@ -180,19 +180,27 @@ public class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([(false, "catalog")]);
     }
 
-    // A plan whose reference names another column than the one the row description gives is no plan of this
-    // statement: a pooler can hand the explain another backend's statement of the same name (TD-0049).
+    // A plan whose reference names another column than the one the row description gives may be no plan of this
+    // statement: a pooler can hand the explain another backend's statement of the same name (TD-0049).  Its
+    // expressions are not read, and a gated query's columns with an origin are walked as they always were.
     [Theory]
     [InlineData("t.opt")]
     [InlineData("opt")]
-    public void Run_ReferenceThatNamesAnotherColumnThanTheOrigin_IsUnavailableWithOutputDiffers(string entry)
+    public void Run_ReferenceThatNamesAnotherColumnThanTheOrigin_IsWalkedAndReadsNoExpression(string entry)
     {
-        var outcome = Run(Scan("t", entry), NotNull);
+        var outcome = Run(Scan("t", entry, "'k'::text"), NotNull, Expression);
 
-        outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
         outcome.Reason.ShouldBe(WalkReasons.OutputDiffers);
-        AnswersOf(outcome).ShouldBe([(true, "heuristic")]);
+        AnswersOf(outcome).ShouldBe([(false, "catalog"), (null, "no-origin")]);
     }
+
+    // A query that gives a table's columns aliases, users u(a, b), prints them under the aliases: the check takes it
+    // for another statement's plan, and the join's answer stands as it always did.
+    [Fact]
+    public void Run_ReferenceThatNamesAnotherColumnUnderALeftJoin_KeepsTheJoinsAnswer() =>
+        AnswersOf(Run(LeftJoin("a.other", "b.other"), NotNull, NotNull))
+            .ShouldBe([(false, "catalog"), (true, "outer-join")]);
 
     [Fact]
     public void Run_UngatedQueryWhoseReferenceNamesAnotherColumn_IsUnavailableAndKeepsTheCatalogsAnswer()
@@ -253,25 +261,25 @@ public class NullabilityWalkTests
             )
             .ShouldBe([(null, "no-origin")]);
 
-    // A NOT EXISTS of a query without a word of the gate plans as an anti join, which returns nothing of its other
-    // side; one of a gated query may be a LEFT JOIN ... IS NULL, which returns that side NULL.
+    // An anti join may be a LEFT JOIN ... IS NULL, which returns its other side NULL, and a view brings one into a
+    // query without a word of the gate: the words do not say what the plan holds.
     [Theory]
-    [InlineData("Anti", false, false)]
-    [InlineData("Right Anti", false, false)]
-    [InlineData("Anti", true, null)]
-    [InlineData("Right Anti", true, null)]
-    public void Run_ExpressionUnderAnAntiJoin_IsAnsweredOnlyWhenNotGated(string joinType, bool gated, bool? nullable)
+    [InlineData("Anti", false)]
+    [InlineData("Right Anti", false)]
+    [InlineData("Anti", true)]
+    [InlineData("Right Anti", true)]
+    public void Run_ExpressionUnderAnAntiJoin_KeepsNoOrigin(string joinType, bool gated)
     {
         var outcome = RunAs(
             Scope(gated),
             Join(joinType, Scan("a"), Scan("b")) with
             {
-                Output = ["'k'::text"],
+                Output = ["('x'::text)"],
             },
             Expression
         );
 
-        AnswersOf(outcome).ShouldBe([(nullable, nullable is null ? "no-origin" : "expression")]);
+        AnswersOf(outcome).ShouldBe([(null, "no-origin")]);
     }
 
     public static TheoryData<string> SetOperations =>

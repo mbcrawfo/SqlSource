@@ -14,13 +14,17 @@ namespace SqlSource.Tests.Postgres.Describer;
 public sealed class PlanOutputTests(PostgresContainer postgres)
 {
     /// <summary>
-    /// An aggregate <c>shadow.count(*)</c> that always returns <c>NULL</c>, made by SQL that can be run again.  On a
-    /// path that names <c>shadow</c> before <c>pg_catalog</c> the plan prints it as <c>count(*)</c>.
+    /// Aggregates <c>shadow.count(*)</c> and <c>shadow.count(integer)</c> that always return <c>NULL</c>, made by SQL
+    /// that can be run again.  On a path that names <c>shadow</c> before <c>pg_catalog</c> the plan prints the first
+    /// as <c>count(*)</c>; on any path that names <c>shadow</c>, the second beats <c>pg_catalog.count("any")</c> for an
+    /// integer by its exact type and prints as <c>count(id)</c>.
     /// </summary>
     internal const string ShadowCount = """
         CREATE SCHEMA IF NOT EXISTS shadow;
         CREATE OR REPLACE FUNCTION shadow.nulls(int8) RETURNS int8 LANGUAGE sql AS 'SELECT NULL::int8';
         CREATE OR REPLACE AGGREGATE shadow.count(*) (sfunc = shadow.nulls, stype = int8);
+        CREATE OR REPLACE FUNCTION shadow.nulls(int8, integer) RETURNS int8 LANGUAGE sql AS 'SELECT NULL::int8';
+        CREATE OR REPLACE AGGREGATE shadow.count(integer) (sfunc = shadow.nulls, stype = int8);
         """;
 
     private const string OneTable =
@@ -82,7 +86,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         "(count(*) FILTER (WHERE (status = 'active'::user_status)))",
         false
     )]
-    [InlineData(Windows, 2, "(count(DISTINCT name))", "(count(DISTINCT name))", false)]
+    [InlineData(Windows, 2, "(count(DISTINCT name))", "(count(DISTINCT name))", null)]
     [InlineData(Windows, 3, "count(*) OVER (?)", "count(*) OVER w1", false)]
     [InlineData(Windows, 4, "(row_number() OVER (?))", "(row_number() OVER w2)", false)]
     [InlineData(Windows, 5, "(rank() OVER (?))", "(rank() OVER w2)", false)]

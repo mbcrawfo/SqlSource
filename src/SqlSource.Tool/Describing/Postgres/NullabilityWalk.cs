@@ -21,7 +21,10 @@ internal sealed record WalkedColumn(
 
 /// <summary>What a walk gave: the plan's value, each column, and what the log says of how.</summary>
 /// <param name="Plan"><c>walked</c>, or <c>unavailable</c> when the walk had no plan it could use.</param>
-/// <param name="Reason">Why it is <c>unavailable</c>, one of <see cref="WalkReasons" />, or null.</param>
+/// <param name="Reason">
+/// Why it is <c>unavailable</c>, one of <see cref="WalkReasons" />, or null; for a plan that was <c>walked</c>,
+/// <c>output-differs</c> when its expressions were not read.
+/// </param>
 /// <param name="Nodes">The nodes that were visited, none when there was no plan to read.</param>
 /// <param name="Columns">Every column of the result, in order.</param>
 internal sealed record WalkOutcome(
@@ -113,7 +116,11 @@ internal static class NullabilityWalk
             return Unusable(reason, root, instances, columns);
         }
 
-        if (!OutputFits(entries, origins, instances))
+        // A plan that may be another statement's is read for no expression.  A gated query's columns with an origin are
+        // walked as they were before expressions were read, since column aliases print a column under another name,
+        // and a query that is not gated has nothing else to read.
+        var fits = OutputFits(entries, origins, instances);
+        if (!fits && !scope.Gated)
         {
             return Unusable(WalkReasons.OutputDiffers, root, instances, columns);
         }
@@ -122,9 +129,7 @@ internal static class NullabilityWalk
         // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
         var onlyAlias = scope.OldAndNewMayBeNamed && root.NodeType == "ModifyTable" ? root.Alias ?? string.Empty : null;
 
-        var expressions = AnswersExpressions(instances, scope.Gated)
-            ? new Expressions(scope, instances, onlyAlias)
-            : null;
+        var expressions = fits && AnswersExpressions(instances) ? new Expressions(scope, instances, onlyAlias) : null;
 
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
@@ -145,7 +150,12 @@ internal static class NullabilityWalk
             );
         }
 
-        return new WalkOutcome(SidecarValues.Plan.Walked, null, instances.Nodes, walked);
+        return new WalkOutcome(
+            SidecarValues.Plan.Walked,
+            fits ? null : WalkReasons.OutputDiffers,
+            instances.Nodes,
+            walked
+        );
     }
 
     /// <summary>
@@ -176,13 +186,11 @@ internal static class NullabilityWalk
 
     // Whether an entry of the root may be read as an expression the root computes.  A set operation prints its first
     // branch at the root, and a node under a join that null-extends prints a value it computed by its expression, a
-    // pulled-up constant or a LATERAL count, which is NULL for a row the join did not match.  An anti join returns
-    // nothing of its other side, but in a gated query it may be a LEFT JOIN ... IS NULL, which returns that side NULL.
-    private static bool AnswersExpressions(PlanInstances instances, bool gated) =>
-        !instances.HasSetOperation
-        && instances.Nodes.All(visited =>
-            visited.NullExtends == "none" || (!gated && visited.Node.JoinType is "Anti" or "Right Anti")
-        );
+    // pulled-up constant or a LATERAL count, which is NULL for a row the join did not match.  An anti join may be a
+    // LEFT JOIN ... IS NULL, which returns that side NULL, and a view brings one into a query without a word of the
+    // gate.
+    private static bool AnswersExpressions(PlanInstances instances) =>
+        !instances.HasSetOperation && instances.Nodes.All(static visited => visited.NullExtends == "none");
 
     // A column of no origin: the answer of its entry as an expression, or what it was built with.
     private static WalkedColumn ExpressionOf(SidecarColumn column, string entry, Expressions? expressions) =>

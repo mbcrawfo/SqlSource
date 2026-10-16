@@ -90,6 +90,15 @@ public sealed class WalkTests(PostgresContainer postgres)
     public async Task Describe_UngatedQueryWhoseEveryColumnHasAnOrigin_NeedsNoPlan() =>
         (await ShouldDescribeAsync("SELECT u.id, u.name FROM users u")).Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
 
+    // Column aliases print the columns under the aliases, which the check of the plan's Output takes for another
+    // statement's: the walk still answers the columns, and reads no expression.
+    [Fact]
+    public async Task Describe_TableWithColumnAliases_IsWalked() =>
+        (await WalkedAsync("SELECT u.a, o.total FROM users u(a, b) LEFT JOIN orders o ON o.user_id = u.a")).ShouldBe([
+            (false, "catalog"),
+            (true, "outer-join"),
+        ]);
+
     // The tool leaves the database as it found it: no statement, and the settings as "open" read them.
     [Fact]
     public async Task Describe_GatedQuery_LeavesNoStatementAndThePlanCacheModeAsOpenReadIt()

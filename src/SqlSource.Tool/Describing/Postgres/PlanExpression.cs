@@ -17,7 +17,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// them, which is how a node prints a value its child computed.
 /// </para>
 /// <para>
-/// The forms: <c>count(...)</c>, with a <c>FILTER</c> or an <c>OVER</c> or neither; <c>row_number()</c>,
+/// The forms: <c>count(*)</c>, with a <c>FILTER</c> or an <c>OVER</c> or neither; <c>row_number()</c>,
 /// <c>rank()</c>, <c>dense_rank()</c>, <c>percent_rank()</c> and <c>cume_dist()</c> with an <c>OVER</c>; a constant,
 /// a quoted literal with its cast, a number, <c>true</c> or <c>false</c>, and <c>NULL::type</c>, which is the one
 /// that can be <c>NULL</c>; the tests <c>IS NULL</c>, <c>IS NOT NULL</c> and <c>IS DISTINCT FROM</c>, and the
@@ -418,7 +418,10 @@ internal static class PlanExpression
             return !Text(index).Any(char.IsAsciiLetterUpper);
         }
 
-        // count(...), with an optional FILTER (...) and an optional OVER, or a ranking with its OVER, to the end.
+        // count(*), with an optional FILTER (...) and an optional OVER, or a ranking with its OVER, to the end.  The
+        // parentheses hold nothing else: a function of another schema whose argument's type is exact beats the
+        // catalog's count("any") whatever the order of the path, and prints bare, while one of the catalog's own
+        // signature, count(*) or rank(), is found in pg_catalog first.
         private bool IsCountOrRanking(int from, int to)
         {
             var isCount = IsWord(from, "count");
@@ -428,6 +431,12 @@ internal static class PlanExpression
             }
 
             if (from + 1 >= to || !Is(from + 1, Kind.Open))
+            {
+                return false;
+            }
+
+            var holds = _closes[from + 1] - (from + 2);
+            if (isCount ? holds != 1 || Text(from + 2) != "*" : holds != 0)
             {
                 return false;
             }

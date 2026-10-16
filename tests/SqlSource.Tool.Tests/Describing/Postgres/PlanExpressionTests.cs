@@ -17,7 +17,6 @@ public class PlanExpressionTests
     [Theory]
     [InlineData("count(*)")]
     [InlineData("(count(*))")]
-    [InlineData("(count(DISTINCT name))")]
     [InlineData("(count(*) FILTER (WHERE (status = 'active'::user_status)))")]
     [InlineData("count(*) OVER (?)")]
     [InlineData("count(*) OVER w1")]
@@ -65,6 +64,12 @@ public class PlanExpressionTests
         PlanExpression.NullableOf(entry, catalogFunctions: true, NoneProved).ShouldBe(true);
 
     [Theory]
+    [InlineData("(count(DISTINCT name))")]
+    [InlineData("count(id)")]
+    [InlineData("count(u.id) OVER w1")]
+    [InlineData("(count(email) FILTER (WHERE (status = 'active'::user_status)))")]
+    [InlineData("rank(id) OVER w1")]
+    [InlineData("row_number(x) OVER (?)")]
     [InlineData("(count(*) + NULL::integer)")]
     [InlineData("(COALESCE(o.note, 'x'::text) || NULL::text)")]
     [InlineData("((a IS NULL) AND b)")]

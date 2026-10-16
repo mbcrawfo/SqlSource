@@ -73,7 +73,22 @@ public sealed class ExpressionTests(PostgresContainer postgres)
                     + "row_number() OVER (ORDER BY id) AS position, rank() OVER (ORDER BY id) AS place "
                     + "FROM users GROUP BY id"
             )
-        ).ShouldBe([(false, "catalog"), NotNull, NotNull, NotNull, NotNull, NotNull, NotNull]);
+        ).ShouldBe([(false, "catalog"), NotNull, NotNull, Unknown, NotNull, NotNull, NotNull]);
+
+    // An aggregate of another schema whose argument's type is exact beats pg_catalog.count("any") whatever the path's
+    // order, and the plan prints it bare: only count(*) is the catalog's by its text.
+    [Fact]
+    public async Task Describe_CountOfAnArgumentThatAnotherSchemaTakes_StaysUnknown()
+    {
+        await RunAsync(PlanOutputTests.ShadowCount);
+
+        (
+            await AnswersAsync(
+                "SELECT count(u.id) AS n, count(*) AS m FROM users u",
+                $"{postgres.ConnectionString};Search Path=pg_catalog,shadow,public"
+            )
+        ).ShouldBe([Unknown, NotNull]);
+    }
 
     // The root of a set operation prints its first branch: a constant there says nothing of the NULL of the other.
     [Theory]
@@ -102,14 +117,33 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     public async Task Describe_ExpressionFromTheSideALeftJoinExtends_StaysUnknown(string sql) =>
         (await AnswersAsync(sql)).Skip(1).ShouldBe([Unknown, Unknown]);
 
-    // A NOT EXISTS plans as an anti join, which returns nothing of its other side.
+    // A view brings a LEFT JOIN ... IS NULL into a query without a word of the gate, and the anti join it plans as
+    // returns the pulled-up constant NULL.
     [Fact]
-    public async Task Describe_ExpressionBesideNotExists_IsAnswered() =>
+    public async Task Describe_ExpressionUnderAnAntiJoinOfAView_StaysUnknown()
+    {
+        await RunAsync(
+            "CREATE OR REPLACE VIEW expression_lonely AS SELECT u.id, s.k FROM users u "
+                + "LEFT JOIN (SELECT o.user_id, 'x'::text AS k FROM orders o) s ON s.user_id = u.id "
+                + "WHERE s.user_id IS NULL"
+        );
+
+        (
+            await AnswersAsync(
+                "SELECT CASE WHEN l.id > 0 THEN l.k ELSE 'y' END AS k2, coalesce(l.k, NULL) AS k3 "
+                    + "FROM expression_lonely l"
+            )
+        ).ShouldBe([Unknown, Unknown]);
+    }
+
+    // A NOT EXISTS plans as an anti join too, which the text cannot tell from the view's.
+    [Fact]
+    public async Task Describe_ExpressionBesideNotExists_StaysUnknown() =>
         (
             await AnswersAsync(
                 "SELECT u.id, 'k' AS k FROM users u WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)"
             )
-        ).ShouldBe([(false, "catalog"), NotNull]);
+        ).ShouldBe([(false, "catalog"), Unknown]);
 
     // A partitioned table plans as an Append, which the text cannot tell from a UNION's.
     [Fact]
