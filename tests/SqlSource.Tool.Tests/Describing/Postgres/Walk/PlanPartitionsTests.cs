@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
@@ -36,30 +37,34 @@ public class PlanPartitionsTests
             .ShouldBe([new PostgresRelationName("public", "e_2024")]);
     }
 
-    public static TheoryData<string> NoShape =>
-        [
-            Text(Append(Member("e_1", "e_2024"), Member("f_2", "e_2025"))),
-            Text(Append(Member("e_1", "e_2024"), Member("e", "e_2025"))),
-            Text(Append(Member("e_1", "e_2024"), Member("e_x", "e_2025"))),
-            Text(
-                Append(
-                    Member("e_1", "e_2024"),
-                    Over("Subquery Scan", Scan("s"), "Subquery") with
-                    {
-                        ParentRelationship = "Member",
-                        Alias = "e_2",
-                    }
-                )
-            ),
-            Text(Append(Member("e_1", "e_2024"), Member("e_2", "e_2025") with { ParentRelationship = "Outer" })),
-            Text(Append()),
-            Text(Over("Sort", Member("e_1", "e_2024"))),
-        ];
+    private static readonly Dictionary<string, string> NoShapeRows = new(StringComparer.Ordinal)
+    {
+        ["member-of-another-prefix"] = Text(Append(Member("e_1", "e_2024"), Member("f_2", "e_2025"))),
+        ["member-without-a-number"] = Text(Append(Member("e_1", "e_2024"), Member("e", "e_2025"))),
+        ["member-with-a-word-for-a-number"] = Text(Append(Member("e_1", "e_2024"), Member("e_x", "e_2025"))),
+        ["subquery-scan-member"] = Text(
+            Append(
+                Member("e_1", "e_2024"),
+                Over("Subquery Scan", Scan("s"), "Subquery") with
+                {
+                    ParentRelationship = "Member",
+                    Alias = "e_2",
+                }
+            )
+        ),
+        ["outer-child"] = Text(
+            Append(Member("e_1", "e_2024"), Member("e_2", "e_2025") with { ParentRelationship = "Outer" })
+        ),
+        ["no-members"] = Text(Append()),
+        ["sort-over-a-member"] = Text(Over("Sort", Member("e_1", "e_2024"))),
+    };
+
+    public static TheoryData<string> NoShape => [.. NoShapeRows.Keys];
 
     [Theory]
     [MemberData(nameof(NoShape))]
-    public void MembersOf_AppendOfAnotherShape_IsEmpty(string plan) =>
-        PlanPartitions.MembersOf(PlanNode.Read(plan).ShouldNotBeNull()).ShouldBeEmpty();
+    public void MembersOf_AppendOfAnotherShape_IsEmpty(string name) =>
+        PlanPartitions.MembersOf(PlanNode.Read(NoShapeRows[name]).ShouldNotBeNull()).ShouldBeEmpty();
 
     [Fact]
     public void ShapeOf_AppendOfScansUnderOnePrefix_IsThePrefix()
@@ -97,17 +102,21 @@ public class PlanPartitionsTests
             .ParentsOf(Append(Member("E_1", "e_2024", "\"E_1\".id"), Member("E_2", "e_2025", "\"E_2\".id")), Partitions)
             .ShouldBe([100, 200]);
 
-    public static TheoryData<string> NotOneTable =>
-        [
-            Text(Append(Member("e_1", "e_2024", "e_1.id"), Member("e_2", "e_2025", "e_2.kind"))),
-            Text(Append(Member("e_1", "e_2024", "e_1.id"), Member("e_2", "e_2025"))),
-            Text(Append(Member("e_1", "e_2024"), Member("e_2", "missing"))),
-        ];
+    private static readonly Dictionary<string, string> NotOneTableRows = new(StringComparer.Ordinal)
+    {
+        ["members-print-other-columns"] = Text(
+            Append(Member("e_1", "e_2024", "e_1.id"), Member("e_2", "e_2025", "e_2.kind"))
+        ),
+        ["member-prints-no-column"] = Text(Append(Member("e_1", "e_2024", "e_1.id"), Member("e_2", "e_2025"))),
+        ["member-not-answered"] = Text(Append(Member("e_1", "e_2024"), Member("e_2", "missing"))),
+    };
+
+    public static TheoryData<string> NotOneTable => [.. NotOneTableRows.Keys];
 
     [Theory]
     [MemberData(nameof(NotOneTable))]
-    public void ParentsOf_MembersThatDifferOrAreNotAnswered_AreNone(string plan) =>
-        PlanPartitions.ParentsOf(PlanNode.Read(plan).ShouldNotBeNull(), Partitions).ShouldBeEmpty();
+    public void ParentsOf_MembersThatDifferOrAreNotAnswered_AreNone(string name) =>
+        PlanPartitions.ParentsOf(PlanNode.Read(NotOneTableRows[name]).ShouldNotBeNull(), Partitions).ShouldBeEmpty();
 
     // Members of two tables share only the ancestor above both.
     [Fact]

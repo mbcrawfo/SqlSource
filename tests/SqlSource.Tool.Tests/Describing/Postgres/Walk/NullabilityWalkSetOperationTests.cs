@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
@@ -107,21 +108,34 @@ public sealed class NullabilityWalkSetOperationTests
         AnswersOf(outcome).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
     }
 
-    public static TheoryData<string> BranchesThatMayBeNull =>
-        [
-            Text(Scan("x", "NULL::text") with { NodeType = "Result", Alias = null, RelationName = null }),
-            Text(Scan("o", "o.note")),
-            Text(Join("Left", Scan("u", "u.id"), Scan("o", "o.label")) with { Output = ["o.label"] }),
-            Text(Scan("w", "w.name")),
-            Text(Over("Subquery Scan", Scan("u", "u.name"), "Subquery") with { Alias = "s", Output = ["s.name"] }),
-        ];
+    private static readonly Dictionary<string, string> BranchRows = new(StringComparer.Ordinal)
+    {
+        ["null"] = Text(Scan("x", "NULL::text") with { NodeType = "Result", Alias = null, RelationName = null }),
+        ["nullable-column"] = Text(Scan("o", "o.note")),
+        ["side-a-left-join-extends"] = Text(
+            Join("Left", Scan("u", "u.id"), Scan("o", "o.label")) with
+            {
+                Output = ["o.label"],
+            }
+        ),
+        ["unanswered-relation"] = Text(Scan("w", "w.name")),
+        ["user-subquery-scan"] = Text(
+            Over("Subquery Scan", Scan("u", "u.name"), "Subquery") with
+            {
+                Alias = "s",
+                Output = ["s.name"],
+            }
+        ),
+    };
+
+    public static TheoryData<string> BranchesThatMayBeNull => [.. BranchRows.Keys];
 
     // A NULL, a nullable column, the side a LEFT JOIN extends, a relation that "tables" and "relations" did not
     // answer, and a user subquery's scan, which is mapped by no position.
     [Theory]
     [MemberData(nameof(BranchesThatMayBeNull))]
-    public void Run_UnionAllWithABranchThatMayBeNull_KeepsNoOrigin(string branch) =>
-        AnswersOf(RunSet(AppendOf(Scan("u", "u.name"), PlanNode.Read(branch).ShouldNotBeNull()), TextOid))
+    public void Run_UnionAllWithABranchThatMayBeNull_KeepsNoOrigin(string name) =>
+        AnswersOf(RunSet(AppendOf(Scan("u", "u.name"), PlanNode.Read(BranchRows[name]).ShouldNotBeNull()), TextOid))
             .ShouldBe([UnknownNoOrigin]);
 
     // The branch's cast to the result's type is not printed: an integer under a bigint is in the family, an integer
@@ -159,48 +173,50 @@ public sealed class NullabilityWalkSetOperationTests
     // planner keeps as a "*SELECT* <k>" scan in the order the outer query needs: SELECT s.b, s.a FROM (SELECT
     // p.sku AS a, p.name AS b ... UNION ALL (SELECT p2.sku, NULLIF(p2.name, 'x') ... LIMIT 5)) s.  Its column 0 is
     // NULLIF's, and by position it would be p2.sku.
-    public static TheoryData<string> Appendrels =>
-        [
-            Text(
+    private static readonly Dictionary<string, string> AppendrelRows = new(StringComparer.Ordinal)
+    {
+        ["nullif-of-a-constant"] = Text(
+            AppendOf(
+                Scan("u", "u.name", "u.name"),
+                Select(
+                    2,
+                    Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, 'x'::text)")) with
+                    {
+                        Output = ["u_1.name", "(NULLIF(u_1.name, 'x'::text))"],
+                    },
+                    "\"*SELECT* 2\".\"nullif\"",
+                    "\"*SELECT* 2\".name"
+                )
+            )
+        ),
+        ["nullif-of-the-column-under-a-sort"] = Text(
+            Over(
+                "Sort",
                 AppendOf(
                     Scan("u", "u.name", "u.name"),
                     Select(
                         2,
-                        Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, 'x'::text)")) with
+                        Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, u_1.name)")) with
                         {
-                            Output = ["u_1.name", "(NULLIF(u_1.name, 'x'::text))"],
+                            Output = ["u_1.name", "(NULLIF(u_1.name, u_1.name))"],
                         },
                         "\"*SELECT* 2\".\"nullif\"",
                         "\"*SELECT* 2\".name"
                     )
                 )
-            ),
-            Text(
-                Over(
-                    "Sort",
-                    AppendOf(
-                        Scan("u", "u.name", "u.name"),
-                        Select(
-                            2,
-                            Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, u_1.name)")) with
-                            {
-                                Output = ["u_1.name", "(NULLIF(u_1.name, u_1.name))"],
-                            },
-                            "\"*SELECT* 2\".\"nullif\"",
-                            "\"*SELECT* 2\".name"
-                        )
-                    )
-                ) with
-                {
-                    Output = ["u.name", "u.name"],
-                }
-            ),
-        ];
+            ) with
+            {
+                Output = ["u.name", "u.name"],
+            }
+        ),
+    };
+
+    public static TheoryData<string> Appendrels => [.. AppendrelRows.Keys];
 
     [Theory]
     [MemberData(nameof(Appendrels))]
-    public void Run_LeafScanUnderAnAppend_IsNotMappedByPosition(string plan) =>
-        AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), TextOid, TextOid))
+    public void Run_LeafScanUnderAnAppend_IsNotMappedByPosition(string name) =>
+        AnswersOf(RunSet(PlanNode.Read(AppendrelRows[name]).ShouldNotBeNull(), TextOid, TextOid))
             .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
 
     // A 14 SetOp's flagged member is its own leaf scan, mapped by position: SELECT u.email AS name, u.name AS email
@@ -339,105 +355,140 @@ public sealed class NullabilityWalkSetOperationTests
             Output = outer.Output,
         };
 
-    public static TheoryData<string, bool> Intersects =>
-        new()
-        {
-            { Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)), true },
-            { Text(Flagged14("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true },
-            { Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))), false },
-            { Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.name"))), true },
-            { Text(Inputs18("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true },
-            { Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))), false },
-        };
+    private static readonly Dictionary<string, (string Plan, bool Answered)> IntersectRows = new(StringComparer.Ordinal)
+    {
+        ["pg14-intersect-right-first"] = (
+            Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)),
+            true
+        ),
+        ["pg14-intersect-all"] = (Text(Flagged14("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true),
+        ["pg14-intersect-of-a-nullable-input"] = (
+            Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))),
+            false
+        ),
+        ["pg18-intersect"] = (Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.name"))), true),
+        ["pg18-intersect-all"] = (Text(Inputs18("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true),
+        ["pg18-intersect-of-a-nullable-input"] = (
+            Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))),
+            false
+        ),
+    };
+
+    public static TheoryData<string> Intersects => [.. IntersectRows.Keys];
 
     [Theory]
     [MemberData(nameof(Intersects))]
-    public void Run_Intersect_IsFalseWhenEitherInputIs(string plan, bool answered) =>
+    public void Run_Intersect_IsFalseWhenEitherInputIs(string name)
+    {
+        var (plan, answered) = IntersectRows[name];
+
         AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), TextOid))
             .ShouldBe([answered ? NotNullSetOperation : UnknownNoOrigin]);
+    }
 
     // EXCEPT returns rows of its left input alone: on 14 the member flagged 0, on 18 the Outer child.
-    public static TheoryData<string, bool> Excepts =>
-        new()
-        {
-            { Text(Flagged14("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true },
-            { Text(Flagged14("Except All", Scan("u", "u.name"), Scan("o", "o.note"), rightFirst: true)), true },
-            { Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"))), false },
-            { Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)), false },
-            { Text(Inputs18("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true },
-            { Text(Inputs18("Except All", Scan("o", "o.note"), Scan("u", "u.name"))), false },
-        };
+    private static readonly Dictionary<string, (string Plan, bool Answered)> ExceptRows = new(StringComparer.Ordinal)
+    {
+        ["pg14-except"] = (Text(Flagged14("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true),
+        ["pg14-except-all-right-first"] = (
+            Text(Flagged14("Except All", Scan("u", "u.name"), Scan("o", "o.note"), rightFirst: true)),
+            true
+        ),
+        ["pg14-except-of-a-nullable-left"] = (
+            Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"))),
+            false
+        ),
+        ["pg14-except-of-a-nullable-left-right-first"] = (
+            Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)),
+            false
+        ),
+        ["pg18-except"] = (Text(Inputs18("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true),
+        ["pg18-except-all-of-a-nullable-left"] = (
+            Text(Inputs18("Except All", Scan("o", "o.note"), Scan("u", "u.name"))),
+            false
+        ),
+    };
+
+    public static TheoryData<string> Excepts => [.. ExceptRows.Keys];
 
     [Theory]
     [MemberData(nameof(Excepts))]
-    public void Run_Except_IsItsLeftInputs(string plan, bool answered) =>
+    public void Run_Except_IsItsLeftInputs(string name)
+    {
+        var (plan, answered) = ExceptRows[name];
+
         AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), TextOid))
             .ShouldBe([answered ? NotNullSetOperation : UnknownNoOrigin]);
+    }
 
-    public static TheoryData<string> SetOpsOfAnotherShape =>
-        [
-            // Two members flagged 0, three members, and none flagged.
-            Text(
-                SetOp(
-                    "Except",
-                    AppendOf(
-                        Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
-                        Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "0")
-                    )
-                ) with
-                {
-                    Output = ["\"*SELECT* 1\".c", "(0)"],
-                }
-            ),
-            Text(
-                SetOp(
-                    "Intersect",
-                    AppendOf(
-                        Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
-                        Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "1"),
-                        Select(3, Scan("u_2", "u_2.name"), "\"*SELECT* 3\".c", "1")
-                    )
-                ) with
-                {
-                    Output = ["\"*SELECT* 1\".c", "(0)"],
-                }
-            ),
-            Text(
-                SetOp(
-                    "Except",
-                    AppendOf(Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c"), Scan("u_1", "u_1.name"))
-                ) with
-                {
-                    Output = ["\"*SELECT* 1\".c"],
-                }
-            ),
-            // A command the walk does not know, and none.
-            Text(Inputs18("Merge", Scan("u", "u.name"), Scan("u_1", "u_1.name"))),
-            Text(Inputs18("Intersect", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with { Command = null }),
-            // A recursive CTE's union.
-            Text(
-                Over(
-                    "Sort",
-                    AppendOf(
-                        Join("Inner", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with
-                        {
-                            NodeType = "Recursive Union",
-                            JoinType = null,
-                            Output = ["u.name"],
-                        },
-                        Scan("u_2", "u_2.name")
-                    )
-                ) with
-                {
-                    Output = ["u.name"],
-                }
-            ),
-        ];
+    private static readonly Dictionary<string, string> AnotherShapeRows = new(StringComparer.Ordinal)
+    {
+        // Two members flagged 0, three members, and none flagged.
+        ["two-members-flagged-0"] = Text(
+            SetOp(
+                "Except",
+                AppendOf(
+                    Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
+                    Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "0")
+                )
+            ) with
+            {
+                Output = ["\"*SELECT* 1\".c", "(0)"],
+            }
+        ),
+        ["three-members"] = Text(
+            SetOp(
+                "Intersect",
+                AppendOf(
+                    Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
+                    Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "1"),
+                    Select(3, Scan("u_2", "u_2.name"), "\"*SELECT* 3\".c", "1")
+                )
+            ) with
+            {
+                Output = ["\"*SELECT* 1\".c", "(0)"],
+            }
+        ),
+        ["no-member-flagged"] = Text(
+            SetOp("Except", AppendOf(Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c"), Scan("u_1", "u_1.name"))) with
+            {
+                Output = ["\"*SELECT* 1\".c"],
+            }
+        ),
+        // A command the walk does not know, and none.
+        ["unknown-command"] = Text(Inputs18("Merge", Scan("u", "u.name"), Scan("u_1", "u_1.name"))),
+        ["no-command"] = Text(
+            Inputs18("Intersect", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with
+            {
+                Command = null,
+            }
+        ),
+        // A recursive CTE's union.
+        ["recursive-union"] = Text(
+            Over(
+                "Sort",
+                AppendOf(
+                    Join("Inner", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with
+                    {
+                        NodeType = "Recursive Union",
+                        JoinType = null,
+                        Output = ["u.name"],
+                    },
+                    Scan("u_2", "u_2.name")
+                )
+            ) with
+            {
+                Output = ["u.name"],
+            }
+        ),
+    };
+
+    public static TheoryData<string> SetOpsOfAnotherShape => [.. AnotherShapeRows.Keys];
 
     [Theory]
     [MemberData(nameof(SetOpsOfAnotherShape))]
-    public void Run_SetOperationOfAnotherShape_KeepsNoOrigin(string plan) =>
-        AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), TextOid)).ShouldBe([UnknownNoOrigin]);
+    public void Run_SetOperationOfAnotherShape_KeepsNoOrigin(string name) =>
+        AnswersOf(RunSet(PlanNode.Read(AnotherShapeRows[name]).ShouldNotBeNull(), TextOid)).ShouldBe([UnknownNoOrigin]);
 
     // a EXCEPT b EXCEPT c: on 14 the inner SetOp is a Result member that prints its entries and a flag of its own, on
     // 18 the Outer input.  The inner one's type is the common type of its own inputs, which the row description does

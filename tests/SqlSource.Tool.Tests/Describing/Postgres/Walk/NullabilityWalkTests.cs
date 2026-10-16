@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
@@ -217,47 +218,54 @@ public sealed class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([UnknownNoOrigin]);
     }
 
-    public static TheoryData<string> SetOperations =>
-        [
-            Text(
-                Over(
-                    "Aggregate",
-                    Over("Append", Scan("a"), "Member") with
-                    {
-                        Plans =
-                        [
-                            Scan("a") with
-                            {
-                                ParentRelationship = "Member",
-                            },
-                            Scan("b") with
-                            {
-                                ParentRelationship = "Member",
-                            },
-                        ],
-                    }
-                ) with
+    private static readonly Dictionary<string, string> SetOperationRows = new(StringComparer.Ordinal)
+    {
+        ["aggregate-over-an-append"] = Text(
+            Over(
+                "Aggregate",
+                Over("Append", Scan("a"), "Member") with
                 {
-                    Output = ["('a'::text)"],
+                    Plans =
+                    [
+                        Scan("a") with
+                        {
+                            ParentRelationship = "Member",
+                        },
+                        Scan("b") with
+                        {
+                            ParentRelationship = "Member",
+                        },
+                    ],
                 }
-            ),
-            Text(Over("Sort", Over("Append", Scan("a"), "Member")) with { Output = ["('a'::text)"] }),
-            Text(
-                Join("Inner", Scan("a"), Scan("b")) with
-                {
-                    NodeType = "SetOp",
-                    JoinType = null,
-                    Output = ["('a'::text)"],
-                }
-            ),
-        ];
+            ) with
+            {
+                Output = ["('a'::text)"],
+            }
+        ),
+        ["sort-over-an-append"] = Text(
+            Over("Sort", Over("Append", Scan("a"), "Member")) with
+            {
+                Output = ["('a'::text)"],
+            }
+        ),
+        ["set-op-over-two-scans"] = Text(
+            Join("Inner", Scan("a"), Scan("b")) with
+            {
+                NodeType = "SetOp",
+                JoinType = null,
+                Output = ["('a'::text)"],
+            }
+        ),
+    };
+
+    public static TheoryData<string> SetOperations => [.. SetOperationRows.Keys];
 
     // The root of a set operation prints its first branch, which says nothing of the others.
     [Theory]
     [MemberData(nameof(SetOperations))]
-    public void Run_ExpressionOverASetOperation_KeepsNoOrigin(string plan)
+    public void Run_ExpressionOverASetOperation_KeepsNoOrigin(string name)
     {
-        var outcome = RunUngated(PlanNode.Read(plan).ShouldNotBeNull(), Expression);
+        var outcome = RunUngated(PlanNode.Read(SetOperationRows[name]).ShouldNotBeNull(), Expression);
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
         AnswersOf(outcome).ShouldBe([UnknownNoOrigin]);
@@ -535,27 +543,32 @@ public sealed class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([NotNullCatalog, NullableOuterJoin]);
     }
 
-    public static TheoryData<string, string> Unusable =>
-        new()
-        {
-            { "no-output", Text(Over("Append", Scan("a"), "Member")) },
-            { "no-output", Text(LeftJoin("a.id")) },
-            { "unknown-join-type", Text(Join("Sideways", Scan("a"), Scan("b")) with { Output = ["a.id", "a.opt"] }) },
-            { "doubled-alias", Text(Join("Inner", Scan("a"), Scan("a")) with { Output = ["a.id", "a.opt"] }) },
-            {
-                "grouping-sets",
-                Text(Over("Aggregate", Scan("a")) with { HasGroupingSets = true, Output = ["a.id", "a.opt"] })
-            },
-        };
+    private static readonly Dictionary<string, (string Reason, string Plan)> UnusableRows = new(StringComparer.Ordinal)
+    {
+        ["no-output-of-an-append"] = ("no-output", Text(Over("Append", Scan("a"), "Member"))),
+        ["fewer-outputs-than-columns"] = ("no-output", Text(LeftJoin("a.id"))),
+        ["unknown-join-type"] = (
+            "unknown-join-type",
+            Text(Join("Sideways", Scan("a"), Scan("b")) with { Output = ["a.id", "a.opt"] })
+        ),
+        ["doubled-alias"] = (
+            "doubled-alias",
+            Text(Join("Inner", Scan("a"), Scan("a")) with { Output = ["a.id", "a.opt"] })
+        ),
+        ["grouping-sets"] = (
+            "grouping-sets",
+            Text(Over("Aggregate", Scan("a")) with { HasGroupingSets = true, Output = ["a.id", "a.opt"] })
+        ),
+    };
+
+    public static TheoryData<string> Unusable => [.. UnusableRows.Keys];
 
     // The first is a UNION's Append, which has no Output; the second has fewer entries than the result has columns.
     [Theory]
     [MemberData(nameof(Unusable))]
-    public void Run_PlanThatCannotBeUsed_IsUnavailableWithItsReasonAndEveryColumnKeepsWhatItWasBuiltWith(
-        string reason,
-        string plan
-    )
+    public void Run_PlanThatCannotBeUsed_IsUnavailableWithItsReasonAndEveryColumnKeepsWhatItWasBuiltWith(string name)
     {
+        var (reason, plan) = UnusableRows[name];
         var outcome = Run(PlanNode.Read(plan).ShouldNotBeNull(), NotNull, OfView);
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
@@ -685,24 +698,34 @@ public sealed class NullabilityWalkTests
         AnswersOf(Run(plan, OfA, NotNull)).ShouldBe([NotNullCatalog, NullableOuterJoin]);
     }
 
-    public static TheoryData<string> UnresolvableChildren =>
-        [
-            // A LATERAL subquery's Output may name the query above, which is no instance of its plan.
-            Text(Scan("t", "t.id", "u.id")),
-            // A bare name says nothing of which instance.
-            Text(Join("Inner", Scan("t"), Scan("b")) with { Output = ["t.id", "id"] }),
-            // A set operation prints its first branch.
-            Text(Over("Sort", Over("Append", Scan("t"), "Member")) with { Output = ["t.id"] }),
-            // No entry is of the origin's table.
-            Text(Scan("b", "b.id")),
-            // No Output at all.
-            Text(Scan("t")),
-        ];
+    private static readonly Dictionary<string, string> UnresolvableChildRows = new(StringComparer.Ordinal)
+    {
+        // A LATERAL subquery's Output may name the query above, which is no instance of its plan.
+        ["lateral-names-the-query-above"] = Text(Scan("t", "t.id", "u.id")),
+        // A bare name says nothing of which instance.
+        ["bare-name"] = Text(Join("Inner", Scan("t"), Scan("b")) with { Output = ["t.id", "id"] }),
+        // A set operation prints its first branch.
+        ["set-operation"] = Text(Over("Sort", Over("Append", Scan("t"), "Member")) with { Output = ["t.id"] }),
+        // No entry is of the origin's table.
+        ["no-entry-of-the-origins-table"] = Text(Scan("b", "b.id")),
+        // No Output at all.
+        ["no-output"] = Text(Scan("t")),
+    };
+
+    public static TheoryData<string> UnresolvableChildren => [.. UnresolvableChildRows.Keys];
 
     [Theory]
     [MemberData(nameof(UnresolvableChildren))]
-    public void Run_SubqueryColumnThatCannotBeResolved_KeepsTheHeuristic(string child) =>
-        AnswersOf(Run(Subquery(PlanNode.Read(child).ShouldNotBeNull(), "s.x") with { Output = ["s.x"] }, NotNull))
+    public void Run_SubqueryColumnThatCannotBeResolved_KeepsTheHeuristic(string name) =>
+        AnswersOf(
+                Run(
+                    Subquery(PlanNode.Read(UnresolvableChildRows[name]).ShouldNotBeNull(), "s.x") with
+                    {
+                        Output = ["s.x"],
+                    },
+                    NotNull
+                )
+            )
             .ShouldBe([NullableHeuristic]);
 
     // A subquery inside a subquery is resolved in turn.

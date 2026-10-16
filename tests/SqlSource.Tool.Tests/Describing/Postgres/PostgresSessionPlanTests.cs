@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -177,27 +179,33 @@ public sealed class PostgresSessionPlanTests
         AnswersOf(description).ShouldBe([NullableOuterJoin, UnknownNoOrigin]);
     }
 
-    public static TheoryData<string?, string?> PlansThatCannotBeUsed =>
-        new()
-        {
-            // The server gave no plan: the error is logged and never reported.
-            { null, "canceling statement due to statement timeout" },
-            // The text is no plan.
-            { "not json", null },
-            { "[]", null },
-            // An answer that holds neither.
-            { null, null },
-            // A plan that is read and cannot be used.
-            { Text(Join("Sideways", Scan("u"), Scan("o")) with { Output = ["u.id", "n"] }), null },
-        };
+    private static readonly Dictionary<string, (string? Plan, string? Error)> UnusablePlanRows = new(
+        StringComparer.Ordinal
+    )
+    {
+        // The server gave no plan: the error is logged and never reported.
+        ["no-plan-and-an-error"] = (null, "canceling statement due to statement timeout"),
+        // The text is no plan.
+        ["text-that-is-no-json"] = ("not json", null),
+        ["empty-list"] = ("[]", null),
+        // An answer that holds neither.
+        ["no-plan-and-no-error"] = (null, null),
+        // A plan that is read and cannot be used.
+        ["plan-the-walk-cannot-use"] = (
+            Text(Join("Sideways", Scan("u"), Scan("o")) with { Output = ["u.id", "n"] }),
+            null
+        ),
+    };
+
+    public static TheoryData<string> PlansThatCannotBeUsed => [.. UnusablePlanRows.Keys];
 
     [Theory]
     [MemberData(nameof(PlansThatCannotBeUsed))]
     public async Task DescribeAsync_GatedQueryWithoutAPlanTheWalkCanUse_IsDescribedByTheHeuristicAndUnavailable(
-        string? plan,
-        string? error
+        string name
     )
     {
+        var (plan, error) = UnusablePlanRows[name];
         var answer = new PostgresExplainAnswer(
             plan,
             error is null ? null : new PostgresServerError("57014", error, null, null, null)
