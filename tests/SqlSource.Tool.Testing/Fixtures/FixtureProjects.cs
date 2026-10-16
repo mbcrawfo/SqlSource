@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 
-namespace SqlSource.Tool.Tests.Fixtures;
+namespace SqlSource.Tool.Testing.Fixtures;
 
 // The projects of Fixtures/Projects, copied to a temporary folder outside the repository, so that nothing of the
 // repository's own build applies to them.  The package's props and targets are in build/ beside the copies, where

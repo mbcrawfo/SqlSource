@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text.Json;
 using SqlSource.Tool.Processes;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // What FakeProcessRunner answers for one project, in MSBuild's place.  As it is made, it is a restored project
 // with one target framework that uses SqlSource and whose manifest holds nothing but the project.

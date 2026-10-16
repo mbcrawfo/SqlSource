@@ -1,4 +1,4 @@
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // The values that stand for a secret.  A test searches what the tool wrote for one of them, so none is a word the
 // tool writes itself, and each differs from the others where a test tells them apart.

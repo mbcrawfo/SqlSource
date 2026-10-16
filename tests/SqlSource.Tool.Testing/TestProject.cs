@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using SqlSource.Tool.Projects;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // A project in a temporary folder: C# and .sql files on the disk, and the manifest that the package's target would
 // write for them, built here.  A test of the plan gives RunPlanner the manifest; a test of the command gives the

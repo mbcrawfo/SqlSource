@@ -5,6 +5,7 @@ using System.Threading;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Planning;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Planning;

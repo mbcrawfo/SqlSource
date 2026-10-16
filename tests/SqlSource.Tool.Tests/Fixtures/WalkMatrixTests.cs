@@ -5,6 +5,7 @@ using System.Text.Json;
 using Shouldly;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Fixtures;

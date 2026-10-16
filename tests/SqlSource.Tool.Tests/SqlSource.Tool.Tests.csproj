@@ -20,8 +20,9 @@
     <ItemGroup>
         <!--
             Fixtures/Projects holds projects that the tests run "dotnet msbuild" on.  They are no code of this
-            project.  Fixtures/FixtureProjects.cs copies one out of the repository before it is used, with the
-            package's MSBuild files and the repository's global.json beside it, so all of them go to the output.
+            project.  Fixtures/FixtureProjects.cs of tests/SqlSource.Tool.Testing copies one out of the repository
+            before it is used, with the package's MSBuild files and the repository's global.json beside it, so all of
+            them go to the output.
         -->
         <Compile Remove="Fixtures/Projects/**" />
         <None Remove="Fixtures/Projects/**" />
@@ -39,8 +40,8 @@
         <None Include="../../global.json" Link="Fixtures/global.json" CopyToOutputDirectory="PreserveNewest" />
         <!--
             Fixtures/Describers holds the cases of the describers, under a folder for each engine: a query, the
-            capture of describing it and the sidecar expected of it.  Fixtures/FixtureCases.cs finds them in the
-            output.  The engine's schema.sql is beside its cases.
+            capture of describing it and the sidecar expected of it.  Fixtures/FixtureCases.cs of
+            tests/SqlSource.Tool.Testing finds them in the output.  The engine's schema.sql is beside its cases.
         -->
         <None Remove="Fixtures/Describers/**" />
         <None Include="Fixtures/Describers/**" CopyToOutputDirectory="PreserveNewest" />
@@ -49,5 +50,6 @@
         <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
+        <ProjectReference Include="../SqlSource.Tool.Testing/SqlSource.Tool.Testing.csproj" />
     </ItemGroup>
 </Project>

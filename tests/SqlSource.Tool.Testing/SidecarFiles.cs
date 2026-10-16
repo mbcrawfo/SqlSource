@@ -8,7 +8,7 @@ using SqlSource.Snapshot.Reading;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Planning;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // A sidecar as a file: one that a test puts beside a .sql file, or reads from there.  TestSidecars, of the
 // generator's tests, builds the records.

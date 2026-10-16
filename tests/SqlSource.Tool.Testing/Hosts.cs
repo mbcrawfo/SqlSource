@@ -4,7 +4,7 @@ using System.IO;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Processes;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // A host for a test that calls a part of the tool and not the whole command: nothing is written anywhere.
 internal static class Hosts

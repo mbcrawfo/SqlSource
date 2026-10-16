@@ -2,7 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace SqlSource.Tool.Tests.Fixtures;
+namespace SqlSource.Tool.Testing.Fixtures;
 
 // One case of a describer's fixtures: a folder with a query, the capture of describing it and the sidecar
 // expected of it.  An optional issue.md beside them says where the case came from.  An optional

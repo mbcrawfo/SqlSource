@@ -2,7 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using Shouldly;
-using SqlSource.Tool.Tests.Fixtures;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Projects;

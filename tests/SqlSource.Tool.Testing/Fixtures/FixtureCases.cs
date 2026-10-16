@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 
-namespace SqlSource.Tool.Tests.Fixtures;
+namespace SqlSource.Tool.Testing.Fixtures;
 
 // The cases of Fixtures/Describers/<engine>/, which the build copies to the output.  A folder under the engine's
 // is a case; a file there, the engine's schema.sql for one, is none.

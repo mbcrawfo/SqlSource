@@ -2,7 +2,7 @@ using System.Linq;
 using SqlSource.Tool.Planning;
 using Xunit;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // The plan of a project that a test builds, for a test of what comes after the plan.
 internal static class Plans

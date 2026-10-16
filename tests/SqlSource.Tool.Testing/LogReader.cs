@@ -2,7 +2,7 @@ using System.IO;
 using System.Linq;
 using System.Text.Json;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // The lines of a log, each parsed: a line that is not one JSON object fails the test that reads it.
 internal static class LogReader
