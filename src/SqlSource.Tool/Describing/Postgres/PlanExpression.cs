@@ -28,7 +28,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </para>
 /// <para>
 /// A function name is the catalog's only when the plan prints it unqualified and the session finds
-/// <c>pg_catalog</c>'s functions first: the plan prints a function bare whenever
+/// <c>pg_catalog</c>'s functions first (<see cref="PostgresSearchPath" />): the plan prints a function bare whenever
 /// the search path finds it, so <c>count(*)</c> may be another schema's aggregate.  <c>COALESCE</c>,
 /// <c>GREATEST</c>, <c>LEAST</c>, <c>CASE</c> and the tests are syntax, and no search path changes them.
 /// </para>
