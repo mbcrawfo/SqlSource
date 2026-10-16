@@ -8,7 +8,7 @@
       "hash": "a6955b66a6ff8997725f70ff49672525f0fede34c935452b9a64820631240b3f",
       "engine": "postgres",
       "database": "postgres",
-      "serverVersion": "18.4",
+      "serverVersion": "18.6",
       "resultKind": "rows",
       "matchesTable": null,
       "plan": "walked",

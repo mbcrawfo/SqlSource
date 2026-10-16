@@ -13,8 +13,9 @@ namespace SqlSource.Tests.Postgres;
 public sealed class PostgresContainer : IAsyncLifetime
 {
     // The one place that names the image.  tools/record-fixtures.sh and tools/record-realistic.sh read it from this
-    // line, by its shape.
-    public const string DefaultImage = "postgres:18";
+    // line, by its shape.  It names a major and a minor, as every image of the tests does: the recorded fixtures
+    // carry the version they were recorded against, and a moving tag would run another.  See CONTRIBUTING.md.
+    public const string DefaultImage = "postgres:18.6";
 
     // Names another image: CI runs the tests again on the oldest PostgreSQL that is supported.
     public const string ImageVariable = "SQLSOURCE_TESTS_POSTGRES_IMAGE";
@@ -32,6 +33,9 @@ public sealed class PostgresContainer : IAsyncLifetime
 
     public static string Image =>
         Environment.GetEnvironmentVariable(ImageVariable) is { Length: > 0 } image ? image : DefaultImage;
+
+    // The tag of an image, which for a pinned image is the server's version: "postgres:18.6" is "18.6".
+    public static string TagOf(string image) => image[(image.LastIndexOf(':') + 1)..];
 
     // Of the database "fixtures".
     public string ConnectionString => _container.GetConnectionString();

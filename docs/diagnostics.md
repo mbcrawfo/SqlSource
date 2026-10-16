@@ -920,7 +920,7 @@ The tool asked the server to prepare the query, and the server refused it: a syn
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'GetUser': relation "user" does not exist
-    query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
+    query: GetUser, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
     server: 42P01: relation "user" does not exist
     server: at character 15
@@ -932,7 +932,7 @@ A parameter with no declared type takes the type of its first use, so `placed_at
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC225: The server rejected the query 'ListRecentOrders': operator does not exist: timestamp with time zone > interval
-    query: ListRecentOrders, database app, postgres 18.4, Npgsql 10.0.3
+    query: ListRecentOrders, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
     server: 42883: operator does not exist: timestamp with time zone > interval
     server: hint: No operator matches the given name and argument types. You might need to add explicit type casts.
@@ -952,7 +952,7 @@ The step `check parameters` gives it too, for an error of the tool's comparison 
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'ListUsers': canceling statement due to statement timeout
-    query: ListUsers, database app, postgres 18.4, Npgsql 10.0.3
+    query: ListUsers, database app, postgres 18.6, Npgsql 10.0.3
     step: check parameters
     server: 57014: canceling statement due to statement timeout
 ```
@@ -965,7 +965,7 @@ The server gives each parameter a type from the way the query uses it, and nothi
 
 ```console
 /work/App/Queries/Checks.sql(1,10): error SQLSRC226: The type of the parameter '@p' of the query 'IsNull' could not be determined
-    query: IsNull, database app, postgres 18.4, Npgsql 10.0.3
+    query: IsNull, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
     server: 42P18: could not determine data type of parameter $1
     help: cast the parameter where it is used, @p::int, or declare its type with -- param: @p int
@@ -981,7 +981,7 @@ PostgreSQL takes a parameter's type from its first use.  Here the first use says
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC227: The first use of the parameter '@name' of the query 'FindUsers' does not fix its type
-    query: FindUsers, database app, postgres 18.4, Npgsql 10.0.3
+    query: FindUsers, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
     server: 42P08: could not determine data type of parameter $1
     server: at character 28
@@ -1002,7 +1002,7 @@ A `-- param:` marker gives a parameter a type, and the tool asks the server to r
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC228: The type 'user_state' declared for the parameter '@status' of the query 'ListUsers' is not valid: the database has no such type
-    query: ListUsers, database app, postgres 18.4, Npgsql 10.0.3
+    query: ListUsers, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
     server: 42704: type "user_state" does not exist
     help: write a type the database has, schema-qualified if it is not on the search path
@@ -1018,7 +1018,7 @@ A column of the query has a pseudo-type, a type that the server knows by name an
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC229: The column 'row' of the query 'ListPairs' has the type 'record', which cannot be described
-    query: ListPairs, database app, postgres 18.4, Npgsql 10.0.3
+    query: ListPairs, database app, postgres 18.6, Npgsql 10.0.3
     step: resolve type
     help: cast the column to a concrete type, or give the expression an alias and a cast
 ```
@@ -1033,7 +1033,7 @@ A query is one statement.  The tool prepares it on the server to describe it, an
 
 ```console
 /work/App/Queries/Cleanup.sql(1,10): error SQLSRC230: The query 'Cleanup' holds more than one statement
-    query: Cleanup, database app, postgres 18.4, Npgsql 10.0.3
+    query: Cleanup, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
     help: one statement for each query; a ; is allowed at the end alone
 ```
@@ -1050,7 +1050,7 @@ SqlSource finds the parameters of a query with its own reading of the SQL, and d
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC231: Npgsql reads the parameters of the query 'ListUsers' differently from SqlSource: syntax error at or near "@"
-    query: ListUsers, database app, postgres 18.4, Npgsql 10.0.3
+    query: ListUsers, database app, postgres 18.6, Npgsql 10.0.3
     step: check parameters
     server: 42601: syntax error at or near "@"
     help: a @ that one of the two reads as a parameter and the other as text; the server's lines say where; a table, a column or a type that another session changed during the run shows the same way, so run describe again
@@ -1064,7 +1064,7 @@ A difference may leave the columns the same, and then the server accepts both re
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC231: Npgsql reads the parameters of the query 'ListUsers' differently from SqlSource: the SQL with $n parts at character 45: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource
-    query: ListUsers, database app, postgres 18.4, Npgsql 10.0.3
+    query: ListUsers, database app, postgres 18.6, Npgsql 10.0.3
     step: check parameters
     help: a @ or a : that one of the two reads as a parameter and the other as text; the message says where the two texts part
 ```
@@ -1092,7 +1092,7 @@ A type whose name or whose schema's name needs quotes (`"My Schema"."Status"`), 
 
 ```console
 /work/App/Queries/Pairs.sql(1,10): error SQLSRC232: Npgsql cannot bind the type 'public.pair' of the parameter '@pair' of the query 'ListPairs'
-    query: ListPairs, database app, postgres 18.4, Npgsql 10.0.3
+    query: ListPairs, database app, postgres 18.6, Npgsql 10.0.3
     step: check parameters
     server: Writing is not supported for parameters having DataTypeName 'public.pair'.
     help: Npgsql cannot send a value of this type; declare the parameter as text with -- param: and cast it to the type where it is used; a later version may let a project declare a conversion for the type
@@ -1108,7 +1108,7 @@ The tool describes a query by asking the server to prepare it, and the server pr
 
 ```console
 /work/App/Queries/Archive.sql(1,10): error SQLSRC233: The query 'Archive' is a CALL statement, which the tool cannot describe
-    query: Archive, database app, postgres 18.4, Npgsql 10.0.3
+    query: Archive, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
     help: give the query -- output: sql; the tool describes SELECT without INTO, INSERT, UPDATE, DELETE, MERGE, VALUES and TABLE
 ```
@@ -1127,7 +1127,7 @@ The tool finds a query's parameters by their `@name` and sends the SQL with `$1`
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC234: The query 'GetUser' writes the parameter '$1' itself
-    query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
+    query: GetUser, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
     help: write the parameter as @name; generated code binds parameters by name
 ```
@@ -1170,7 +1170,7 @@ Behind a pooler the session has opened, so the query line names the server and t
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC236: The connection to the database 'app' does not keep one session
-    query: GetUser, database app, postgres 18.4, Npgsql 10.0.3
+    query: GetUser, database app, postgres 18.6, Npgsql 10.0.3
     step: describe parameters
     server: the server does not list the statement it prepared
     help: connect directly to the server, not through a pooler in transaction mode, and without Multiplexing=true
