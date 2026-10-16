@@ -28,7 +28,7 @@ public sealed class DatabaseRunsTests : IDisposable
 
     private readonly TempFolder _folder = new();
     private readonly FakeDescriber _describer = new();
-    private readonly DescribeCapture _capture = new("postgres");
+    private readonly DescribeCapture _capture = new(SidecarValues.Engine.Postgres);
     private readonly CapturingExchange _exchange;
     private readonly Dictionary<string, string> _environment = [];
     private readonly StringWriter _error = new(CultureInfo.InvariantCulture) { NewLine = "\n" };

@@ -9,6 +9,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -21,7 +22,7 @@ internal sealed class PostgresScript
     public const string Database = "app";
 
     // No connection string: under a replay nothing reads it.
-    public const string Connection = "replay";
+    public const string Connection = FixtureReplay.Connection;
 
     private readonly DescribeCapture _capture = new(SidecarValues.Engine.Postgres);
 

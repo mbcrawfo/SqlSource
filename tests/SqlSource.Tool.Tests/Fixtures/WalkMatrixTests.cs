@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Testing.Fixtures;
@@ -38,7 +39,7 @@ public class WalkMatrixTests
     private const string Walked = "walked";
     private const string Unavailable = "unavailable";
 
-    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.Of("postgres");
+    private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.Of(SidecarValues.Engine.Postgres);
 
     private static readonly Dictionary<string, (string Plan, string[] Columns)> Rows = new(StringComparer.Ordinal)
     {
