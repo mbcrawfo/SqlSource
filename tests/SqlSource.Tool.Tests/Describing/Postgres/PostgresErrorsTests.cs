@@ -74,6 +74,9 @@ public class PostgresErrorsTests
     private static DescribeRequest Query(params SqlQueryParameter[] parameters) =>
         new("Q", "SELECT 1", new EquatableArray<SqlQueryParameter>([.. parameters]));
 
+    private static DescribeRequest QueryOf(string sql, params SqlQueryParameter[] parameters) =>
+        new("Q", sql, new EquatableArray<SqlQueryParameter>([.. parameters]));
+
     private static SqlQueryParameter Inferred(string name) => new(name, null, null, false);
 
     private static SqlQueryParameter Declared(string name, string type) => new(name, type, null, true);
@@ -332,7 +335,12 @@ public class PostgresErrorsTests
     {
         var failure = PostgresErrors.Prepare(
             Error(state, message, 47),
-            Query(Inferred("age"), Declared("n", "int"), Inferred("q")),
+            QueryOf(
+                "SELECT id FROM orders WHERE placed_at > now() - @age AND n = @n AND q = @q",
+                Inferred("age"),
+                Declared("n", "int"),
+                Inferred("q")
+            ),
             Prepared("sqlsource_1", "unknown", "int", "unknown"),
             "app"
         );
@@ -340,9 +348,9 @@ public class PostgresErrorsTests
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
         failure.Arguments.ShouldBe(["Q", message]);
         failure.Help.ShouldBe(
-            "the server gave each of @age, @q the type of its first use, which may not be the type meant: cast the "
-                + "parameter where it is used to the type meant, @age::<type>, or declare its type with "
-                + "-- param: @age <type>"
+            "if the error is at a use of a parameter, the server gave each of @age, @q the type of its first use, "
+                + "which may not be the type meant: cast the parameter where it is used to the type meant, "
+                + "@age::<type>, or declare its type with -- param: @age <type>"
         );
     }
 
@@ -351,14 +359,63 @@ public class PostgresErrorsTests
         PostgresErrors
             .Prepare(
                 Error("42883", "operator does not exist: integer = text", 40),
-                Query(Inferred("x")),
+                QueryOf("SELECT id FROM accounts WHERE id = @x", Inferred("x")),
                 Prepared("sqlsource_1", "unknown"),
                 "app"
             )
             .Help.ShouldBe(
-                "the server gave @x the type of its first use, which may not be the type meant: cast the parameter "
-                    + "where it is used to the type meant, @x::<type>, or declare its type with -- param: @x <type>"
+                "if the error is at a use of a parameter, the server gave @x the type of its first use, which may not "
+                    + "be the type meant: cast the parameter where it is used to the type meant, @x::<type>, or "
+                    + "declare its type with -- param: @x <type>"
             );
+
+    // A cast at a use fixes the type there, with white space and comments before the "::", and a parameter cast at
+    // every use is not named.
+    [Theory]
+    [InlineData("SELECT @x::int + @y")]
+    [InlineData("SELECT @x::int + @X /* a */ :: int + @y")]
+    [InlineData("SELECT CAST(@x AS int) + @y")]
+    [InlineData("SELECT cast ( -- a\n @x as int) + @y")]
+    public void Prepare_TypeErrorWithAParameterCastAtEveryUse_DoesNotNameIt(string sql) =>
+        PostgresErrors
+            .Prepare(
+                Error("42883", "operator does not exist: integer + text"),
+                QueryOf(sql, Inferred("x"), Inferred("y")),
+                Prepared("sqlsource_1", "unknown", "unknown"),
+                "app"
+            )
+            .Help.ShouldBe(PostgresErrors.InferredParameterHelp([Inferred("y")]));
+
+    // A "::" in a string or a comment, a ": :", a CAST of more than the parameter and a cast of a parenthesis fix
+    // nothing at the parameter.
+    [Theory]
+    [InlineData("SELECT @x::int + @x")]
+    [InlineData("SELECT @x + CAST(@x AS int)")]
+    [InlineData("SELECT @x '::int'")]
+    [InlineData("SELECT @x -- ::int")]
+    [InlineData("SELECT @x : :int")]
+    [InlineData("SELECT CAST(@x + 1 AS int)")]
+    [InlineData("SELECT (@x)::int")]
+    public void Prepare_TypeErrorWithAParameterUncastAtOneUse_NamesIt(string sql) =>
+        PostgresErrors
+            .Prepare(
+                Error("42883", "operator does not exist: integer + text"),
+                QueryOf(sql, Inferred("x")),
+                Prepared("sqlsource_1", "unknown"),
+                "app"
+            )
+            .Help.ShouldBe(PostgresErrors.InferredParameterHelp([Inferred("x")]));
+
+    [Fact]
+    public void Prepare_TypeErrorWithEveryParameterOfNoDeclaredTypeCast_IsSqlsrc225WithNoHelp() =>
+        PostgresErrors
+            .Prepare(
+                Error("42883", "function lowr(text) does not exist"),
+                QueryOf("SELECT lowr(name) FROM accounts WHERE id = @id::int", Inferred("id")),
+                Prepared("sqlsource_1", "unknown"),
+                "app"
+            )
+            .Help.ShouldBeNull();
 
     [Fact]
     public void InferredParameterHelp_NoParameter_ThrowsArgumentException() =>
