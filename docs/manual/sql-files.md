@@ -13,13 +13,13 @@ WHERE id = @id;
 SELECT id, name FROM users ORDER BY name;
 ```
 
-A **marker** is a line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows.  Nothing else in a comment is read.  The words are matched ignoring case, the blanks after `--` are optional, and the colon follows the word directly: `-- name: GetUser` and `--NAME:GetUser` are markers, `-- name : GetUser` is a comment.  A comment after SQL on the same line, or inside a block comment or a string, is not a marker either.  Under `mysql` and `mariadb` the two dashes need a space after them to start a comment at all, so there a marker needs one too.
+A [marker](concepts.md#marker) is a line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows.  Nothing else in a comment is read.  The words are matched ignoring case, the blanks after `--` are optional, and the colon follows the word directly: `-- name: GetUser` and `--NAME:GetUser` are markers, `-- name : GetUser` is a comment.  A comment after SQL on the same line, or inside a block comment or a string, is not a marker either.  Under `mysql` and `mariadb` the two dashes need a space after them to start a comment at all, so there a marker needs one too.
 
 <a id="marker-index"></a>
 
 ## Marker index
 
-A marker stands in one of two places.  A marker that describes one query stands **inside the query**, under its `-- name:` line.  A marker that describes the whole file stands in the **file header**, before the first `-- name:` line.  See [the file header](#the-file-header).  A file with no `-- name:` line is one query and takes both kinds.
+A marker stands in one of two places.  A marker that describes one query stands **inside the query**, under its `-- name:` line.  A marker that describes the whole file stands in the [file header](concepts.md#file-header), before the first `-- name:` line.  See [the file header](#the-file-header) below.  A file with no `-- name:` line is one query and takes both kinds.
 
 | Marker | Purpose | File header | Inside a query | Documented in |
 |----|----|----|----|----|
@@ -31,12 +31,14 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- token:` | Gives a token a default | no | yes | [Parameters and tokens](parameters-and-tokens.md) |
 | `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Parameters and tokens](parameters-and-tokens.md) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](settings.md#setting-database) |
-| `-- output:` | What is generated for a query | yes | yes | [Output](settings.md#setting-output) |
-| `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model | yes | no | [Suffix of a model's name](settings.md#setting-model-suffix) |
-| `-- model-namespace:` | The namespace of the models | yes | no | [Namespace of the models](settings.md#setting-model-namespace) |
-| `-- input-model-type:`, `-- output-model-type:` | The shape of a model | yes | yes | [Shape of a model](settings.md#setting-model-type) |
-| `-- input-model:`, `-- output-model:` | The name of one query's model | no | yes | [Name of one query's model](settings.md#setting-model-name) |
-| `-- collection-type:` | The type that holds many rows | yes | yes | [Collection type](settings.md#setting-collection-type) |
+| `-- output:` | What is generated for a query.  Today it decides which queries the tool describes (`models` or `codegen`); its effect on generated code comes later | yes | yes | [Output](settings.md#setting-output) |
+| `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model (no effect yet) | yes | no | [Suffix of a model's name](settings.md#setting-model-suffix) |
+| `-- model-namespace:` | The namespace of the models (no effect yet) | yes | no | [Namespace of the models](settings.md#setting-model-namespace) |
+| `-- input-model-type:`, `-- output-model-type:` | The shape of a model (no effect yet) | yes | yes | [Shape of a model](settings.md#setting-model-type) |
+| `-- input-model:`, `-- output-model:` | The name of one query's model (no effect yet) | no | yes | [Name of one query's model](settings.md#setting-model-name) |
+| `-- collection-type:` | The type that holds many rows (no effect yet) | yes | yes | [Collection type](settings.md#setting-collection-type) |
+
+> **Coming in a later release.**  The markers above that say "no effect yet" will shape generated models and query methods; today they are read and checked, and change no generated code.  See [what works today](README.md#what-works-today).
 
 A marker that is a setting links to its section of [the settings page](settings.md), which also says where else the setting can be given, which place wins, and whether the setting has an effect today.  A marker where its column says "no" is an error: see [markers in the wrong place](#markers-in-the-wrong-place).
 
@@ -83,7 +85,7 @@ A name can be followed by `->` and one of five shapes.  They are checked today a
 | `none` | Nothing |
 | `rowcount` | The number of rows the statement affected |
 
-The case of a shape is ignored.  A word that is not one of the five, or anything else after the name, is [SQLSRC111](diagnostics.md#sqlsrc111).  A file with no `-- name:` line has no place to write a shape.
+The case of a shape is ignored.  A word after `->` that is not one of the five, or none, is [SQLSRC111](diagnostics.md#sqlsrc111).  Text after a name with no `->`, as in `-- name: Get User`, is read as part of the name and is [SQLSRC103](diagnostics.md#sqlsrc103).  A file with no `-- name:` line has no place to write a shape.
 
 <a id="summaries"></a>
 
@@ -115,7 +117,7 @@ A `-- summary:` before the first `-- name:` line belongs to no query and is [SQL
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-The **file header** is the part of a file before its first `-- name:` line.  It may hold:
+The [file header](concepts.md#file-header) is the part of a file before its first `-- name:` line.  It may hold:
 
 - Comments, such as a licence.  Comments in the header are never part of any query's SQL, even for a query that keeps its comments.
 - The markers whose "File header" column in the [index](#marker-index) says yes.  Those that are settings apply to every query in the file, unless a query gives its own.  [The settings page](settings.md#precedence) says which place wins when a setting is given in several.
@@ -158,7 +160,7 @@ A marker goes before the SQL it describes.  These are the mistakes, and what eac
 
 | Mistake | Error |
 |----|----|
-| A marker where its column in the [index](#marker-index) says "no": one for the whole file inside a query, or one for a query in the file header | [SQLSRC116](diagnostics.md#sqlsrc116) |
+| A marker where its column in the [index](#marker-index) says "no", other than the two cases below: one for the whole file inside a query, or one for a query in the file header | [SQLSRC116](diagnostics.md#sqlsrc116) |
 | A `-- summary:` before the first `-- name:` line | [SQLSRC107](diagnostics.md#sqlsrc107) |
 | A `-- dialect:` inside a query or after SQL | [SQLSRC115](diagnostics.md#sqlsrc115) |
 | SQL before the first `-- name:` line | [SQLSRC106](diagnostics.md#sqlsrc106) |
@@ -186,5 +188,5 @@ An error in a `.sql` file is reported at its line and column in that file, and t
 
 ## Known issues
 
-- **A file that is not saved as UTF-8.**  Save your `.sql` files as UTF-8, which current editors write.  A file in another encoding, such as Windows-1252, that has a character outside ASCII in its SQL (comments do not count), is read one way by the tool and another by the compiler.  The query then has two different texts.  Nothing compares them today; when the generator starts to read sidecars, the entry of such a query will always be reported out of date.  Saving the file as UTF-8 fixes it.
+- **A file that is not saved as UTF-8.**  Save your `.sql` files as UTF-8, which current editors write.  A file in another encoding, such as Windows-1252, that has a character outside ASCII in its SQL (comments do not count), is read one way by the tool and another by the compiler.  The query then has two different texts.  Nothing compares them today; when the generator starts to read sidecars, it will always find the sidecar of such a query out of date.  Saving the file as UTF-8 fixes it.
 - **A `.sql` file that two projects list.**  When two projects of one solution include the same `.sql` file, each with a type that claims it, the file has one sidecar.  The tool describes it with the dialect and database of the first project in the run that claims it, and ignores what the second project says.  A run on only one of the two projects does not see what the other needs: it can write a sidecar that lacks entries the other project needs, or delete a sidecar that the other project needs.  Give the file the same dialect and database in both projects, and describe the whole solution in one run.

@@ -1,10 +1,13 @@
 # Concepts
 
-SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler and turns each query into C# code: a string constant, or a method where the query has tokens.  The **tool**, in the `SqlSource.Tool` package, is optional.  It connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project.
+SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: a string constant, or a method where the query has tokens.  The **tool**, in the `SqlSource.Tool` package, is optional.  It connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project.  In a later release the generator will read it during the build, so that the build needs no database.
 
 ```mermaid
 flowchart LR
-    sql[".sql file"] --> generator["Generator"]
+    sql[".sql file"] --> generator
+    subgraph build["Your build"]
+        generator["Generator"]
+    end
     generator --> code["Constants and methods"]
     sql --> tool["Tool + your database"]
     tool --> sidecar["Sidecar"]
