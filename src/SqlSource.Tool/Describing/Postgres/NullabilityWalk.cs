@@ -297,7 +297,8 @@ internal static class NullabilityWalk
 
     // The entries of a plan read as expressions, with a reference inside one answered as the walk answers a column:
     // through an instance that no join extends, to a column of a relation that "tables" answered, by the catalog's
-    // rule.  A bare name is the plan's one relation's, since a plan of several prints every name with its alias, and
+    // rule.  A bare name is the plan's one relation's (PlanInstances.BareAlias): a plan of several prints every name
+    // with its alias but the columns of a relation the planner proved empty, a Result under an outer join, and
     // at a ModifyTable that may return the old or the new row only the target's alias is a relation.  An entry is read
     // in a plan where no join null-extends a side, or where the walk follows it to the node that computes it and no
     // join null-extends that node: a node prints a value computed under it in one pair of parentheses, at every node
@@ -423,7 +424,7 @@ internal static class NullabilityWalk
 
         private bool ProvedNotNull(OutputReference reference)
         {
-            var alias = reference.Alias ?? (scope.OldAndNewMayBeNamed ? null : instances.SoleAlias);
+            var alias = reference.Alias ?? (scope.OldAndNewMayBeNamed ? null : instances.BareAlias);
             if (
                 alias is null
                 || (onlyAlias is not null && !string.Equals(alias, onlyAlias, StringComparison.Ordinal))
@@ -525,10 +526,17 @@ internal static class NullabilityWalk
             var found = Resolution.NoCandidate;
             foreach (var entry in entries)
             {
-                // An expression is never the column, which is a plain reference.  A bare name, or an alias that is no
-                // instance of this plan, a LATERAL reference to the query above for one, may be: nothing can be said.
+                // An expression is never the column, which is a plain reference in the subquery, unless the planner
+                // made the reference a parameter or a placeholder, (u.id), a LATERAL reference to the query above for
+                // one: an expression that names the column's name, or holds a parameter, says nothing can be said.  So
+                // does a bare name, or an alias that is no instance of this plan.
                 if (OutputReference.Parse(entry) is not { } reference)
                 {
+                    if (PlanExpression.MayNameColumn(entry, origin.Attribute.Name))
+                    {
+                        return Resolution.Unknown;
+                    }
+
                     continue;
                 }
 

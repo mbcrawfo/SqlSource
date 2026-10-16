@@ -174,4 +174,17 @@ public class PlanExpressionTests
     [InlineData("('x)'::text", null)]
     public void Unwrapped_Entry_IsTheTextInsideTheParenthesesThatWrapItWhole(string entry, string? expected) =>
         PlanExpression.Unwrapped(entry).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("(u.id)", "id", true)]
+    [InlineData("upper((u.\"Id\")::text)", "Id", true)]
+    [InlineData("$1", "id", true)]
+    [InlineData("'id'::text", "id", false)]
+    [InlineData("row_number() OVER w1", "id", false)]
+    [InlineData("(u.name", "id", true)]
+    public void MayNameColumn_Entry_IsWhetherItNamesTheColumnOrHoldsAParameter(
+        string entry,
+        string column,
+        bool expected
+    ) => PlanExpression.MayNameColumn(entry, column).ShouldBe(expected);
 }

@@ -1034,4 +1034,45 @@ public class NullabilityWalkTests
 
         AnswersOf(RunUngated(plan, Expression, Expression)).ShouldBe([(false, "expression"), (null, "no-origin")]);
     }
+
+    // A LATERAL reference to the query above, or a placeholder over a column, prints as the column in parentheses: the
+    // subquery's column may be that entry, which is no reference, and another entry of its table and column decides
+    // nothing.
+    [Theory]
+    [InlineData("(t.id)")]
+    [InlineData("((t.id))")]
+    [InlineData("upper((t.id)::text)")]
+    [InlineData("$1")]
+    public void Run_SubqueryColumnThatAnExpressionMayPrint_KeepsTheHeuristic(string entry) =>
+        AnswersOf(Run(Subquery(Scan("t", entry, "t.id"), "s.x") with { Output = ["s.x"] }, NotNull))
+            .ShouldBe([(true, "heuristic")]);
+
+    // An expression that does not name the column is never it.
+    [Fact]
+    public void Run_SubqueryColumnBesideAnExpressionOfAnotherName_IsAnswered() =>
+        AnswersOf(
+                Run(
+                    Subquery(Scan("t", "row_number() OVER w1", "(t.opt)", "t.id"), "s.x") with
+                    {
+                        Output = ["s.x"],
+                    },
+                    NotNull
+                )
+            )
+            .ShouldBe([(false, "catalog")]);
+
+    // A relation the planner proved empty is a Result under the outer join, and its columns print bare though the
+    // plan has another relation: a bare name in an expression is no column of that one.
+    [Fact]
+    public void Run_BareNameInAnExpressionOfAPlanOfSeveralRelations_IsUnproved()
+    {
+        var empty = Scan("x") with { NodeType = "Result", Alias = null, RelationName = null, Output = ["id", "opt"] };
+        var plan = Join("Left", Scan("t", "t.id"), empty) with
+        {
+            Output = ["t.id", "COALESCE(id, id)", "CASE WHEN (t.id > 0) THEN id ELSE 0 END"],
+        };
+
+        AnswersOf(RunUngated(plan, NotNull, Expression, Expression))
+            .ShouldBe([(false, "catalog"), (null, "no-origin"), (null, "no-origin")]);
+    }
 }

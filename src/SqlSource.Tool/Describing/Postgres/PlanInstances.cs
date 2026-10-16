@@ -164,9 +164,6 @@ internal sealed class PlanInstances
     /// </summary>
     public bool HasSetOperation { get; private set; }
 
-    /// <summary>The alias of the plan's one relation instance, or null when it has none or several.</summary>
-    public string? SoleAlias => _instances.Count == 1 ? _instances.Keys.First() : null;
-
     /// <summary>The instances of a plan that holds no partitioned table and no scan of another plan.</summary>
     public static PlanInstances Find(PlanNode root) => new(root, root, NoPartitions);
 

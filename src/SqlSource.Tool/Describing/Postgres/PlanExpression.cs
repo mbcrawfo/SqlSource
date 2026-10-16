@@ -92,6 +92,43 @@ internal static class PlanExpression
             : null;
 
     /// <summary>
+    /// Whether an entry that is no plain reference may still print a column of that name: it names it, bare or quoted,
+    /// or holds a parameter, <c>$1</c>, or its quotes or its parentheses do not balance.  A value a node takes from the
+    /// query above, a <c>LATERAL</c> reference, prints as <c>(u.id)</c>, and so does a placeholder over a column.
+    /// </summary>
+    public static bool MayNameColumn(string entry, string column)
+    {
+        if (Tokens.Read(entry) is not { } tokens)
+        {
+            return true;
+        }
+
+        foreach (var token in tokens)
+        {
+            var text = entry[token.Start..token.End];
+            string? named = null;
+            if (token.Kind == Kind.Word)
+            {
+                named = text;
+            }
+            else if (token.Kind == Kind.QuotedName)
+            {
+                named = text[1..^1].Replace("\"\"", "\"", StringComparison.Ordinal);
+            }
+
+            if (
+                string.Equals(named, column, StringComparison.Ordinal)
+                || (token.Kind == Kind.Other && text.Contains('$', StringComparison.Ordinal))
+            )
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
     /// The text inside each pair of parentheses of the entry, outermost first, or none when its quotes or its
     /// parentheses do not balance: among them, each value a node takes from a node under it that computed it.
     /// </summary>

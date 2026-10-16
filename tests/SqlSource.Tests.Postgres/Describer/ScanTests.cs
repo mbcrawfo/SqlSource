@@ -197,4 +197,53 @@ public sealed class ScanTests(PostgresContainer postgres)
                     + "LEFT JOIN (SELECT o2.id, 'x'::text AS c FROM orders o2) s ON s.id = o.id"
             )
         ).ShouldBe([Catalog, Expression, Expression, Unknown]);
+
+    // The column through the scan is u.id of a LATERAL subquery on the side a join extends, which the scanned plan
+    // prints as (u.id), a parameter or a placeholder, beside a plain u.id of the side the join keeps: the server
+    // returns NULL for it, and the plain reference must not decide it.  Each first column may be NULL.
+    [Theory]
+    [InlineData(
+        "WITH c AS MATERIALIZED (SELECT t.y, u.id AS z FROM users u LEFT JOIN LATERAL "
+            + "(SELECT u.id AS y FROM orders o WHERE o.user_id = u.id) t ON true) SELECT c.y FROM c"
+    )]
+    [InlineData(
+        "WITH c AS MATERIALIZED (SELECT t.nm, u.name FROM users u LEFT JOIN LATERAL "
+            + "(SELECT u.name AS nm FROM orders o WHERE o.user_id = u.id LIMIT 1) t ON true) SELECT c.nm FROM c"
+    )]
+    [InlineData(
+        "SELECT s.y, s.z FROM (SELECT t.y, u.id AS z, row_number() OVER (PARTITION BY u.id) AS rn FROM users u "
+            + "LEFT JOIN LATERAL (SELECT u.id AS y FROM orders o WHERE o.user_id = u.id) t ON true) s WHERE s.rn = 1"
+    )]
+    [InlineData(
+        "SELECT s.y FROM (SELECT t.y FROM users u LEFT JOIN LATERAL "
+            + "(SELECT u.id AS y FROM orders o WHERE o.user_id = u.id LIMIT 1) t ON true ORDER BY u.id LIMIT 10) s "
+            + "WHERE s.y IS DISTINCT FROM 0"
+    )]
+    [InlineData(
+        "SELECT s.y, o.id FROM orders o LEFT JOIN users u ON u.id = o.user_id AND u.deleted_at IS NOT NULL "
+            + "CROSS JOIN LATERAL (SELECT u.id AS y, u2.id AS z FROM users u2 WHERE u2.id = o.user_id LIMIT 5) s "
+            + "WHERE s.z > 0"
+    )]
+    public async Task Describe_SubqueryColumnThatTheScannedPlanPrintsInParentheses_IsNeverFalse(string sql) =>
+        (await DescribedAsync(sql)).Answers[0].Nullable.ShouldNotBe(false);
+
+    // A relation the planner proves empty under an outer join is a Result, whose columns print bare in a plan of
+    // several relations: an expression of them is NULL on every row.  PostgreSQL 18 proves the last one empty from
+    // the NOT NULL of placed_at; 14 does not, and prints o.id.
+    [Theory]
+    [InlineData(
+        "SELECT CASE WHEN u.id > 0 THEN b.name ELSE 'n' END AS y, u.id FROM users u "
+            + "LEFT JOIN (SELECT * FROM users WHERE false) b ON u.id = b.id"
+    )]
+    [InlineData("SELECT coalesce(b.id, b.id) AS y, u.id FROM users u LEFT JOIN users b ON false")]
+    [InlineData(
+        "SELECT coalesce(o.id, o.user_id) AS z, u.id FROM users u "
+            + "LEFT JOIN orders o ON o.user_id = u.id AND o.placed_at IS NULL"
+    )]
+    [InlineData(
+        "UPDATE orders o SET note = o.note FROM (SELECT 1 AS one) x LEFT JOIN users b ON false "
+            + "RETURNING coalesce(b.id, b.id) AS bid, o.id"
+    )]
+    public async Task Describe_ExpressionOfARelationProvedEmpty_IsNeverFalse(string sql) =>
+        (await DescribedAsync(sql)).Answers[0].Nullable.ShouldNotBe(false);
 }

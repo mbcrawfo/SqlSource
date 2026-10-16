@@ -138,7 +138,7 @@ public class PlanInstancesTests
         );
 
         instances.Nodes.Count.ShouldBe(1);
-        instances.SoleAlias.ShouldBeNull();
+        instances.BareAlias.ShouldBeNull();
     }
 
     // A Subquery Scan is an instance of the plan of its Subquery child, which is not visited.
@@ -393,17 +393,6 @@ public class PlanInstancesTests
     [Fact]
     public void HasSetOperation_JoinOfTwoScans_IsFalse() =>
         PlanInstances.Find(Join("Inner", Scan("a"), Scan("b"))).HasSetOperation.ShouldBeFalse();
-
-    [Fact]
-    public void SoleAlias_OneInstance_IsItsAlias()
-    {
-        PlanInstances.Find(Over("Sort", Scan("t"))).SoleAlias.ShouldBe("t");
-        PlanInstances.Find(Over("ModifyTable", Scan("t")) with { Alias = "t" }).SoleAlias.ShouldBe("t");
-    }
-
-    [Fact]
-    public void SoleAlias_TwoInstances_IsNull() =>
-        PlanInstances.Find(Join("Inner", Scan("a"), Scan("b"))).SoleAlias.ShouldBeNull();
 
     [Fact]
     public void IsExtended_NodeUnderTheSideAJoinExtends_IsTrue()
