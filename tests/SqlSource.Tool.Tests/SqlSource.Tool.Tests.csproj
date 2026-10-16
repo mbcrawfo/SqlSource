@@ -47,7 +47,6 @@
         <None Include="Fixtures/Describers/**" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
     <ItemGroup>
-        <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
         <ProjectReference Include="../SqlSource.Tool.Testing/SqlSource.Tool.Testing.csproj" />
