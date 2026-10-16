@@ -18,6 +18,8 @@ flowchart LR
 
 The rest of this page defines the words the manual uses.  Each is used in this one sense everywhere.
 
+<a id="glossary"></a>
+
 ## Glossary
 
 ### The files

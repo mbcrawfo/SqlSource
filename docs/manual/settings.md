@@ -27,6 +27,8 @@ internal static partial class Reports;
 
 The first block writes settings as markers in a `.sql` file, the second as an MSBuild property and as item metadata, the third as properties of the attribute.  Which of the three a setting accepts is in the table.  To read one folder of a project differently from the rest, see [configure one folder differently](#configure-a-folder).
 
+<a id="all-settings"></a>
+
 ## All settings
 
 Each name links to its section.  An empty cell says the setting cannot be written there.  **File header** is the part of a `.sql` file before its first `-- name:` line, and **In a query** is under a `-- name:` line: see [the marker index](sql-files.md#marker-index).
@@ -79,6 +81,8 @@ Three exceptions, stated plainly:
 - **A list of generator parameters replaces the one below it whole.**  It never adds to it.  See [generator parameters](#setting-generator-parameters).
 - **A dialect value replaces the one below it whole**, options included.  The dialect has no attribute and no in-query level: a file has one dialect, which is the marker in its file header, else its item metadata, else the property, else `ansi`.  See [dialect](#setting-dialect).
 - **`SqlLocation`, `MethodLocation` and `Path` exist only on the attribute.**  They have nothing to choose between.
+
+<a id="a-value-that-is-wrong"></a>
 
 ### A value that is wrong
 

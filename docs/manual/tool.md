@@ -74,7 +74,7 @@ A connection is given in one of three ways.  The first that gives one wins:
 | 3 | `SQLSOURCE_CONNECTION` | Used only when the run has exactly one database |
 
 - **The variable of a name** is `SQLSOURCE_CONNECTION_`, then the name in upper case with every character that is not a letter or a digit written as `_`: `billing-v2` reads `SQLSOURCE_CONNECTION_BILLING_V2`.  Two names that give one variable, such as `app-v2` and `app_v2`, are [SQLSRC214](diagnostics.md#sqlsrc214): give both on the command line, or rename one.
-- **`SQLSOURCE_CONNECTION`** is for a project with one database.  With more than one in the run it is used for none of them ([SQLSRC215](diagnostics.md#sqlsrc215)): set the variable of each name instead.
+- **`SQLSOURCE_CONNECTION`** is for a project with one database.  With more than one database in the run it is used for none of them, though a database that is in the run only through queries with errors of their own does not count ([SQLSRC215](diagnostics.md#sqlsrc215)): set the variable of each name instead.
 - **A variable that is empty or holds only white space** is not set.
 - **A connection never goes in the project file**, since it holds credentials.
 - **Put the value of `--connection` in quotes.**  A shell splits it at a space.  On a command line that has `--connection`, an argument that holds `=` or `;` is refused, since it may be the rest of a connection string that the shell split.  Give the connection in its variable instead, or run the command from the folder of that path.
@@ -297,6 +297,8 @@ $ dotnet sqlsource describe --log sqlsource.log
 - **Restored projects.**  The tool does not restore: run `dotnet restore` first ([SQLSRC220](diagnostics.md#sqlsrc220)).
 - **The same version as the `SqlSource` package** of your projects ([SQLSRC206](diagnostics.md#sqlsrc206)).
 - **A database the tool can reach**, of a version it supports, for each logical database with a query to describe.  See [PostgreSQL](postgresql.md#connecting).
+
+<a id="known-issues"></a>
 
 ## Known issues
 

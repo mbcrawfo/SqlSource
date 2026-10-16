@@ -147,6 +147,8 @@ A query that must be described and whose dialect cannot be is reported by the to
 
 Either error goes away when the query's output is `sql`, which asks for the SQL alone and needs no database: see [the output setting](settings.md#setting-output).  The build is not affected by either.
 
+<a id="known-issues"></a>
+
 ## Known issues
 
 - **A `.sql` file that two projects list** is described by the tool with the dialect of the first project in the run that claims it, and the dialect the second project gives it is ignored.  Give the file the same dialect in both.  See [known issues of `.sql` files](sql-files.md#known-issues).

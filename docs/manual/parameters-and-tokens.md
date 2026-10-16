@@ -192,6 +192,8 @@ An empty fragment can be what you want, for an optional clause for example, so t
 
 With validation off the method checks nothing.  An empty argument leaves nothing where its token was, and a null argument throws `NullReferenceException`.
 
+<a id="known-issues"></a>
+
 ## Known issues
 
 - **A `--` comment inside a token's default swallows its closing braces.**  A line comment runs to the end of its line and takes the `}}` with it, so the token ends at the next `}}` further down, or not at all.  In `{{filter:AND a = 1 -- note}}` followed by a line holding `{{orderBy:name}}`, the default of `filter` runs to the braces of `orderBy`, and the token `orderBy` is gone.  Nothing is reported; the method is missing an argument, which you notice when it does not compile.  Keep line comments out of defaults, and put the comment on a line of its own.

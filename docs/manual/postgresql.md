@@ -90,7 +90,7 @@ SqlSource can tell that a column is never null when it is:
 - **`COALESCE`, `GREATEST` or `LEAST`** with an argument that is never null, or **a `CASE` with an `ELSE`** whose every result is never null.
 - **A column of a `UNION`, an `INTERSECT` or an `EXCEPT`** at the top of the query, when every value it can return there is never null by the rules above: every branch of a `UNION`, either side of an `INTERSECT`, the left side of an `EXCEPT`.
 
-Each of these counts only where an outer join cannot leave it null.
+`count(*)` and the rankings, constants, tests, and `COALESCE`, `GREATEST`, `LEAST` and `CASE` each count only where an outer join cannot leave them null.
 
 SqlSource treats a column as possibly null when:
 
@@ -123,6 +123,8 @@ SqlSource treats a column as possibly null when:
 ## Query methods
 
 > **Coming in a later release.**  The generator will write a method that runs each described PostgreSQL query through Npgsql and returns its rows.  See [what works today](README.md#what-works-today).
+
+<a id="known-issues"></a>
 
 ## Known issues
 

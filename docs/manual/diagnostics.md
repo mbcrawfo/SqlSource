@@ -110,6 +110,8 @@ public class UserRepository { }
 
 Add `partial` to the type named in the message.
 
+See: [The attribute](generator.md#attribute)
+
 ## SQLSRC002
 
 **Type is file-local**
@@ -122,6 +124,8 @@ file partial class UserRepository { }
 ```
 
 Remove the `file` modifier, or move the attribute to a type that is not file-local.
+
+See: [The attribute](generator.md#attribute)
 
 ## SQLSRC003
 
@@ -144,6 +148,8 @@ public partial class UserRepository { }
 
 Check the spelling, and that the path starts from the folder of this source file and not from the project.  If the file exists, check that the build sees it.  The package registers the `.sql` files under the project's own folder, so a file outside it, such as a linked file, must be listed as an `AdditionalFiles` item.  So must every `.sql` file of a project that sets `SqlSourceIncludeFiles` to `false`.
 
+See: [Path](settings.md#setting-path)
+
 ## SQLSRC005
 
 **Folder has no SQL file**
@@ -151,6 +157,8 @@ Check the spelling, and that the path starts from the folder of this source file
 Without `Path`, the type gets every `.sql` file in the folder of the source file that carries the attribute.  That folder has none.
 
 Add a `.sql` file next to the source file, or set `Path` to the folder or file that holds the queries.  If a file is there, check that the build sees it, as described for [SQLSRC004](#sqlsrc004).
+
+See: [Path](settings.md#setting-path)
 
 ## SQLSRC006
 
@@ -164,6 +172,8 @@ public partial class UserRepository { }
 ```
 
 Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  `Output` takes `GeneratorOutput.Sql`, `GeneratorOutput.Models` or `GeneratorOutput.CodeGen`.  `InputModelType` and `OutputModelType` take `GeneratorModelType.Record`, `SealedRecord`, `Class` or `SealedClass`; `CollectionType` takes a member of `GeneratorCollectionType`; `MethodLocation` takes a member of `MethodLocation`.  `InputModelSuffix` and `OutputModelSuffix` take characters that can be part of an identifier, and `ModelNamespace` takes a namespace such as `App.Models`; a value that is empty or only white space is not set.  The type gets no members until the value is fixed.
+
+See: [All settings](settings.md#all-settings)
 
 ## SQLSRC007
 
@@ -181,6 +191,8 @@ public partial class UserRepository
 
 Rename the member, the type or the type parameter, or set `SqlLocation = SqlLocation.Direct` so that the queries become members of the type itself.
 
+See: [Where the members go](generator.md#locations)
+
 ## SQLSRC008
 
 **Query name is used in two files**
@@ -188,6 +200,8 @@ Rename the member, the type or the type parameter, or set `SqlLocation = SqlLoca
 Two `.sql` files of one type each have a query with the same name, and a type cannot have two members with one name.  The error is at the second query, and the message names the file that holds the first.  The file that holds the second query produces no members for that type.
 
 Rename one of the queries.
+
+See: [Which files belong to a type](generator.md#files-of-a-type)
 
 ## SQLSRC009
 
@@ -201,6 +215,8 @@ SELECT 1;
 ```
 
 Rename the query.
+
+See: [Where the members go](generator.md#locations)
 
 ## SQLSRC011
 
@@ -226,6 +242,8 @@ The error has no file and line, because the compiler does not tell a generator w
 Correct the name, or remove the setting to get the default, `ansi`.  While a value is wrong the files it covers are read as `ansi`; a file whose own metadata is wrong does not fall back to the project's property.
 
 The compiler hands a generator only the part of a value before the first `;` or `#`, as for [SQLSRC014](#sqlsrc014).
+
+See: [Dialect](settings.md#setting-dialect)
 
 ## SQLSRC012
 
@@ -264,6 +282,8 @@ Write `Update` in place of `Include` to change the item the package adds, and sp
 
 The error is reported only for a `.sql` file that a type uses.
 
+See: [Path](settings.md#setting-path)
+
 ## SQLSRC014
 
 **MSBuild setting is not valid**
@@ -282,6 +302,8 @@ Correct the value, or remove it to keep the default.  While it is wrong the sett
 
 The compiler hands a generator only the part of a value before the first `;` or `#`.
 
+See: [A value that is wrong](settings.md#a-value-that-is-wrong)
+
 ## SQLSRC101
 
 **Quote is not closed**
@@ -292,7 +314,9 @@ A string or a quoted identifier starts and never ends.  The error is at the open
 SELECT 'unfinished FROM users;
 ```
 
-Close the quote.  If the SQL is valid for your database, SqlSource is reading it by the rules of another one: `'it\'s'` is one string in MySQL and an unclosed one elsewhere.  Set the dialect of the file; see [Dialects](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#dialects) in the README, which also lists the few constructs that no dialect setting reads correctly.
+Close the quote.  If the SQL is valid for your database, SqlSource is reading it by the rules of another one: `'it\'s'` is one string in MySQL and an unclosed one elsewhere.  Set the dialect of the file.  A few constructs are read differently from the database whatever the dialect: see [what is still read differently](dialects.md#still-read-differently).
+
+See: [What each dialect changes](dialects.md#what-a-dialect-changes)
 
 ## SQLSRC102
 
@@ -305,9 +329,11 @@ A block comment or a hint starts with `/*` and never ends.  The error is at the 
 SELECT 1;
 ```
 
-Close the comment.  Whether a `/*` inside a comment needs its own `*/` depends on the dialect: it does in the default dialect, in SQL Server and in PostgreSQL, and it does not in MySQL, MariaDB, SQLite and Oracle.  If the SQL is valid for your database, set the dialect of the file; see [Dialects](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#dialects) in the README.
+Close the comment.  Whether a `/*` inside a comment needs its own `*/` depends on the dialect: it does in the default dialect, in SQL Server and in PostgreSQL, and it does not in MySQL, MariaDB, SQLite and Oracle.  If the SQL is valid for your database, set the dialect of the file.
 
 SQLite accepts a comment that is still open at the end of the file.  SqlSource does not, in any dialect, because the comment would take every later query of the file with it.
+
+See: [What each dialect changes](dialects.md#what-a-dialect-changes)
 
 ## SQLSRC103
 
@@ -324,6 +350,8 @@ Rename the query, for example to `GetUser`.
 
 The name ends at `->`, when the marker has one.
 
+See: [Queries and names](sql-files.md#queries-and-names)
+
 ## SQLSRC104
 
 **Query name is used twice**
@@ -331,6 +359,8 @@ The name ends at `->`, when the marker has one.
 Two `-- name:` markers in one file have the same name.  The error is at the second.
 
 Rename one of the queries.
+
+See: [Queries and names](sql-files.md#queries-and-names)
 
 ## SQLSRC105
 
@@ -344,6 +374,8 @@ get-user.sql
 ```
 
 Add a `-- name:` marker at the top of the file, or rename the file.  If the file is not meant to be a query of this type, move it out of the type's folder or point the type's `Path` somewhere else.
+
+See: [A file with no `-- name:`](sql-files.md#a-file-with-no-name)
 
 ## SQLSRC106
 
@@ -360,6 +392,8 @@ SELECT 1;
 
 Move the SQL below a `-- name:` marker, or delete it.
 
+See: [The file header](sql-files.md#the-file-header)
+
 ## SQLSRC107
 
 **Summary before the first name**
@@ -373,6 +407,8 @@ SELECT 1;
 ```
 
 Move the summary below the `-- name:` marker.
+
+See: [Summaries](sql-files.md#summaries)
 
 ## SQLSRC108
 
@@ -390,6 +426,8 @@ SELECT 2;
 
 Move the marker below the `-- name:` marker of the query it describes, or delete it.
 
+See: [Markers in the wrong place](sql-files.md#markers-in-the-wrong-place)
+
 ## SQLSRC109
 
 **Generator parameter is not known**
@@ -402,6 +440,8 @@ A `-- generator:` marker holds a word that is not a generator parameter.  The ge
 
 Correct the parameter.  A dialect is not a generator parameter: it has a marker of its own, `-- dialect: name`.
 
+See: [Generator parameters](settings.md#setting-generator-parameters)
+
 ## SQLSRC110
 
 **Generator parameter is missing**
@@ -409,6 +449,8 @@ Correct the parameter.  A dialect is not a generator parameter: it has a marker 
 A `-- generator:` marker has nothing after the colon.
 
 Add a generator parameter, or delete the line.
+
+See: [Generator parameters](settings.md#setting-generator-parameters)
 
 ## SQLSRC111
 
@@ -439,6 +481,8 @@ A `-- param:` marker starts with the parameter as the SQL writes it, `@name`, al
 
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
+See: [Marker index](sql-files.md#marker-index)
+
 ## SQLSRC112
 
 **Settings conflict**
@@ -454,6 +498,8 @@ Two settings contradict each other.  The error is at the second.
 
 Remove one of the two.  A query's list replaces the one before the first `-- name:` marker, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
 
+See: [A value that is wrong](settings.md#a-value-that-is-wrong)
+
 ## SQLSRC113
 
 **Query has no SQL**
@@ -466,6 +512,8 @@ A query, or a whole file without `-- name:` markers, holds nothing but whitespac
 ```
 
 Write the SQL, or delete the query.
+
+See: [Queries and names](sql-files.md#queries-and-names)
 
 ## SQLSRC114
 
@@ -480,6 +528,8 @@ SELECT * FROM {{class}};
 The same holds for the name in a `-- token:` marker.
 
 Rename the token.  If the braces are literal text and not a token, add `-- token-ignore: class` to the query.
+
+See: [Tokens](parameters-and-tokens.md#tokens)
 
 ## SQLSRC115
 
@@ -505,6 +555,8 @@ SELECT 1;
 ```
 
 A file cannot mix dialects.  Put the queries for another database in a file of their own.
+
+See: [Markers in the wrong place](sql-files.md#markers-in-the-wrong-place)
 
 ## SQLSRC116
 
@@ -540,6 +592,8 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 
 The table is this error's, with two exceptions.  A `-- summary:` before the first `-- name:` marker is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
 
+See: [Markers in the wrong place](sql-files.md#markers-in-the-wrong-place)
+
 ## SQLSRC117
 
 **Parameter has no type**
@@ -554,6 +608,8 @@ SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
 
 Give the type, in the database's own words: `-- param: @page int`.
 
+See: [Giving a parameter a type: `-- param:`](parameters-and-tokens.md#param-marker)
+
 ## SQLSRC118
 
 **Parameter is not declared**
@@ -566,6 +622,8 @@ SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
 ```
 
 Declare the parameter with its type: `-- param: @page int`.
+
+See: [Defaults](parameters-and-tokens.md#token-defaults)
 
 ## SQLSRC119
 
@@ -581,6 +639,8 @@ SELECT COUNT(*) FROM users;
 
 Remove the marker.
 
+See: [Name of one query's model](settings.md#setting-model-name)
+
 ## SQLSRC200
 
 **The tool failed unexpectedly**
@@ -594,6 +654,8 @@ sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.IO.FileNotFou
 
 Here the working directory was deleted while a terminal was still in it.  When the message names such a condition of your machine, mend that.  Otherwise it is a bug in the tool: set the environment variable `SQLSOURCE_DEBUG` to any value, run the command again, and [report it](https://github.com/mbcrawfo/SqlSource/issues) with the lines that start with `trace:`.
 
+See: [Environment variables](tool.md#environment-variables)
+
 ## SQLSRC201
 
 **No project or solution found**
@@ -605,6 +667,8 @@ Run the command from the folder of the project or the solution, or name the one 
 ```console
 $ dotnet sqlsource describe src/App/App.csproj
 ```
+
+See: [Arguments](tool.md#arguments)
 
 ## SQLSRC202
 
@@ -618,6 +682,8 @@ Name the one to run on:
 $ dotnet sqlsource describe App.slnx
 ```
 
+See: [Arguments](tool.md#arguments)
+
 ## SQLSRC203
 
 **Path is not a project or a solution**
@@ -625,6 +691,8 @@ $ dotnet sqlsource describe App.slnx
 The path given to `sqlsource describe` does not exist, or is a file that is not a `.sln`, `.slnx` or `.csproj` file.  A solution filter, `.slnf`, and a project of another language are not read.  The message holds the full path the tool looked at: a relative path is resolved against the current directory.  An empty path is this error too, which is what a variable that is not set gives in a shell.
 
 Give the path of a solution, of a C# project, or of a directory that holds exactly one of them.
+
+See: [Arguments](tool.md#arguments)
 
 ## SQLSRC204
 
@@ -639,6 +707,8 @@ $ dotnet sqlsource describe src/Tools/Tools.csproj
 ```
 
 Add the package with `dotnet add package SqlSource` and restore, or run the command on the project that has the queries.  A project with several target frameworks is read by the first of them: one that references SqlSource for a later framework alone is this error.
+
+See: [Arguments](tool.md#arguments)
 
 ## SQLSRC205
 
@@ -655,6 +725,8 @@ $ dotnet sqlsource describe
 
 Mend what MSBuild reports; `dotnet build` of the project reports the same.  When MSBuild says that the target `SqlSourceWriteManifest` does not exist, the SqlSource package of the project is older than the tool: update the package.  When the reason is that the project file does not exist, the solution lists a project that is not on the disk: restore the file, or take the project out of the solution.  When the reason is that `dotnet` could not be started, the .NET SDK is not installed or not on the path: the tool needs it, and not only the runtime it runs on.
 
+See: [Requirements](tool.md#requirements)
+
 ## SQLSRC206
 
 **Project manifest cannot be read**
@@ -670,6 +742,8 @@ The SqlSource package of the project and the `sqlsource` tool are of different v
 
 Any other reason, one that names a line for one, means that the target wrote a file the tool does not expect of its own version.  That is a bug in SqlSource: [report it](https://github.com/mbcrawfo/SqlSource/issues) with the message.
 
+See: [Install the tool](tool.md#install-the-tool)
+
 ## SQLSRC207
 
 **Project is not in the run**
@@ -682,6 +756,8 @@ sqlsource : error SQLSRC207: '/work/Tools.csproj' is not a project of '/work/App
 ```
 
 Give the path of a `.csproj` file that the solution lists.  `dotnet sln list` shows them.
+
+See: [Options](tool.md#options)
 
 ## SQLSRC208
 
@@ -702,6 +778,8 @@ internal static partial class Queries;
 
 Write the value where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended; the build is not affected.
 
+See: [Known issues](generator.md#known-issues)
+
 ## SQLSRC209
 
 **Output needs a dialect that can be described**
@@ -713,6 +791,8 @@ A query whose output is `models` or `codegen` gets its types from a database, an
 ```
 
 Set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` at the top of the file.  Or, for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types, and no query of the file is described until it is mended.
+
+See: [Database support](dialects.md#database-support)
 
 ## SQLSRC210
 
@@ -732,6 +812,8 @@ SELECT id, name FROM users {{where}};
 
 Give the token a default where it stands, `{{where:WHERE deleted_at IS NULL}}`, or once for the query with a marker, `-- token: {{where:WHERE deleted_at IS NULL}}`.  An empty default, `{{where:}}`, describes the query with nothing there.  The default is a sample for describing and nothing else: the generated method still takes the token as an argument.  The error is reported once for each token without a default, at the name of its query.
 
+See: [Defaults](parameters-and-tokens.md#token-defaults)
+
 ## SQLSRC211
 
 **Database has two dialects**
@@ -743,6 +825,8 @@ Each query that is described belongs to one logical database: the one its `-- da
 ```
 
 Give the queries of one of the two files another database, or the dialect of the other file.  The database keeps the dialect of the first file that names it, in the order of the projects and then of the files' paths.  The error is reported once for each other file, at its first query of that database, and no query of that database in that file is described until it is mended.  A query whose output is `sql` belongs to no database and is not counted, and neither is a file that already has [SQLSRC209](#sqlsrc209).
+
+See: [Database](settings.md#setting-database)
 
 ## SQLSRC212
 
@@ -757,6 +841,8 @@ sqlsource : error SQLSRC212: '/work/App/Queries/User.sql' is not a .sql file tha
 
 Check the spelling of the path.  If the file exists, it is either not a file of the project, as when `SqlSourceIncludeFiles` is off and the project does not list it, or no type claims it: a type claims the `.sql` files in the folder of its own source file, or the ones its `Path` names.  With `--project`, the file must be claimed by a type of one of the projects named.  The rest of the run goes on.
 
+See: [Arguments](tool.md#arguments)
+
 ## SQLSRC213
 
 **Database has no connection**
@@ -770,6 +856,8 @@ A query that must be described belongs to a database that the run has no connect
 
 Give the connection in one of the two ways the `help:` line names, or leave the database out of the run with `--database`.  When `--connection` was given for a name that no database of the run has, the `help:` line lists those names, so that a misspelt one is seen.  The error is reported once for a database, at its first query that must be described, and those queries count as failed.  A database whose queries all have a current entry needs no connection, and its summary line says `no connection`; under `--force` every query is described, so every database of the run needs one.
 
+See: [Connections](tool.md#connections)
+
 ## SQLSRC214
 
 **Two databases share a connection variable**
@@ -781,6 +869,8 @@ The variable of a database's name is the name in upper case with every character
 ```
 
 Give both databases their connection on the command line, `--connection app-v2=<connection string> --connection app_v2=<connection string>`, or rename one of them.  A connection on the command line for one of the two is not enough: the variable would then be read for the other alone, and a reader of the command could not tell.  The error is reported once for each of the two databases that has a query to describe, at its first such query, and those queries count as failed.
+
+See: [Connections](tool.md#connections)
 
 ## SQLSRC215
 
@@ -795,6 +885,8 @@ Give both databases their connection on the command line, `--connection app-v2=<
 
 Set the variable of each database, as the `help:` line names them, or give each with `--connection`, or restrict the run to one database with `--database`.  The error stands in the place of [SQLSRC213](#sqlsrc213) and is reported as that one is: once for a database, at its first query that must be described.
 
+See: [Connections](tool.md#connections)
+
 ## SQLSRC216
 
 **No describer for the dialect**
@@ -806,6 +898,8 @@ The query must be described, its dialect is one whose databases can be asked, an
 ```
 
 Update the tool, with `dotnet tool update SqlSource.Tool`, to a version that describes the dialect; this version describes `postgres` alone.  Until then, set the output of the queries to `sql`, with `SqlSourceOutput` or an `-- output: sql` marker, to use their constants and methods without types.  The error is reported at each query that the run would have described, and each counts as failed.
+
+See: [SQL Server](sqlserver.md)
 
 ## SQLSRC217
 
@@ -821,6 +915,8 @@ A sidecar is written whole or not at all: when every query of its `.sql` file th
 
 Mend the queries that failed, or run `describe` without the filter that left a query out, so that every query of the file is described in one run.  The sidecar on the disk is as it was before the run.  The error is there so that a description that was not saved does not look like a success; a file that was held back with none of its queries described has only the errors of those queries.
 
+See: [Describing again](tool.md#describing-again)
+
 ## SQLSRC218
 
 **File could not be changed**
@@ -834,6 +930,8 @@ The tool could not write a sidecar, or could not delete one that its `.sql` file
 Give yourself the right to write in the folder of the `.sql` file, or close the program that holds the sidecar open, and run the command again.  A sidecar is deleted only in a run with no `--project`, `--database` or `.sql` path, in which nothing was reported as an error before the files were decided: a setting that is not valid, or a type that could not be read, can make a file look as if it needs no entry.  A sidecar that the system will not let the tool open, for lack of permission, because it is locked or because it is a directory, is not deleted when the file beside it needs no entry: nothing says that it is not the file of a newer tool, so it is left as it is and reported as one that `could not be read`.  Delete it yourself, or give yourself the right to read it.  `describe --check` reports the same, since it could not check the file.  A sidecar is written to a temporary file beside it and then moved over the old one, so a run that fails or is stopped leaves the old file or the new one and never a part of either.  The rest of the run goes on after an error about a sidecar.
 
 A log has three cases.  When the log cannot be made or emptied as the run starts, because its folder is not there, it is a directory, or the system will not let the tool write it, nothing runs and the exit code is 1: give a path that can be written, or run the command from another folder.  When the path ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, in any case, the tool refuses it with the reason `a log is not written over a .sql file, a sidecar, a project or a solution`, touches nothing and runs nothing, so that a name left out before a `.sql` path does not empty that file: give the log a name of its own.  When the log stops being writable while the run goes on, as when the disk is full, the run finishes and writes its sidecars, the error is reported once at the end, and the exit code is 1; the log holds what was written before it stopped.
+
+See: [Logs](tool.md#logs)
 
 ## SQLSRC219
 
@@ -861,6 +959,8 @@ The `help:` line under each error names the command that mends it.  Run `dotnet 
 
 The tool exits with the code 2 when it reported this error and no other, so that a build can tell a sidecar that is out of date from a check that could not be made.  A query that could not be described has an error of its own, and the exit code is then 1.
 
+See: [Check in CI](tool.md#check-in-ci)
+
 ## SQLSRC220
 
 **Project was not restored**
@@ -874,6 +974,8 @@ $ dotnet sqlsource describe
 ```
 
 Run `dotnet restore` on the solution or the project, then the command again.  In a solution every C# project is checked, one that has no SQL too: a run on a fresh checkout must not succeed by finding nothing.  A reference that keeps the package's MSBuild files out of the project, `ExcludeAssets="build"` for one, gives this error after a restore as well: remove that from the reference.
+
+See: [Requirements](tool.md#requirements)
 
 ## SQLSRC221
 
@@ -928,6 +1030,8 @@ The tool could not open a session with the database of a query that must be desc
 ```
 
 Start the database, or correct the connection string that `--connection` or the database's variable gives.  When the line is `Npgsql cannot read the connection string`, the string is not written as Npgsql wants one, `Host=localhost;Database=app;Username=app;Password=...`: the tool does not repeat what the driver said of it, since that can quote the string.  The same holds for a file that the string or the environment names, a client certificate, a key or a password file (`SslCertificate`, `SslKey`, `Passfile`, or `PGSSLCERT`, `PGSSLKEY`, `PGPASSFILE`), whose path the driver's own text would quote: the line is `a file that the connection string or the environment names cannot be read` when the file or its folder is not there or the tool may not open it, and `a file that the connection string or the environment names is not what Npgsql expects: it is not in the right form, or its password is wrong` when the driver read it and could not use it, such as a line of a password file that is no entry.  `Npgsql does not support these settings of the connection string together` is a `Target Session Attributes` other than `Any` for one host, or a `Replication Mode` for several, and `GSS authentication is not available on this machine` is a server that asks for GSS where the operating system's GSS library cannot be loaded.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.
+
+See: [Connecting](postgresql.md#connecting)
 
 ## SQLSRC225
 
@@ -990,6 +1094,8 @@ The server gives each parameter a type from the way the query uses it, and nothi
 
 Cast the parameter where it is used, or declare its type with a `-- param:` marker.  The same error, at the step `resolve type` and with no `server:` line, says that the server did give the parameter a type and that the type is a pseudo-type, which no value has: `row_to_json(@p)` makes `@p` a `record`.  Its `help:` line names the pseudo-type, and the fix is the same.
 
+See: [Parameters](postgresql.md#parameters)
+
 ## SQLSRC227
 
 **Parameter's first use does not fix its type**
@@ -1006,6 +1112,8 @@ PostgreSQL takes a parameter's type from its first use.  Here the first use says
 ```
 
 Declare the parameter's type with `-- param: @name text`, or turn the condition round so that the use that fixes the type comes first.
+
+See: [Parameters](postgresql.md#parameters)
 
 ## SQLSRC228
 
@@ -1027,6 +1135,8 @@ A `-- param:` marker gives a parameter a type, and the tool asks the server to r
 
 Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `timestamp(3) without time zone`, `public.user_status`, `"My Schema"."Status"[]`.  A type in a schema that is not on the search path of the connection needs its schema.  A marker's type runs to the end of its line, but for a `null` or `not null` that ends it, so nothing else may follow it there.
 
+See: [Parameters](postgresql.md#parameters)
+
 ## SQLSRC229
 
 **Column type is not supported**
@@ -1041,6 +1151,8 @@ A column of the query has a pseudo-type, a type that the server knows by name an
 ```
 
 Select the fields of the row as columns of their own, or cast the expression to a type the database has: `ROW(a, b)::pair`, with `pair` a composite type, or `to_jsonb(s)` for a whole row.  A parameter of a pseudo-type that the query returns is reported for the parameter, as [SQLSRC226](#sqlsrc226) or [SQLSRC228](#sqlsrc228).
+
+See: [What can be described](postgresql.md#what-can-be-described)
 
 ## SQLSRC230
 
@@ -1058,6 +1170,8 @@ A query is one statement.  The tool prepares it on the server to describe it, an
 Give each statement a `-- name:` of its own.  A `;` at the end of the statement is allowed, with white space and comments after it; a `;` inside a string, a dollar-quoted string or a comment does not count.  A `;` inside parentheses counts as the end of a statement, since the tool does not read the structure of the SQL; no statement that can be prepared holds one.
 
 This check is a help and not what keeps a second statement from being run.  The tool hands the query to the server as one statement that the driver cannot split, and the server refuses a text of several before it runs anything.  So a text that the tool reads as one statement and the server as two is [SQLSRC225](#sqlsrc225) with the server's `42601: cannot insert multiple commands into a prepared statement`, and nothing of it is run.
+
+See: [What can be described](postgresql.md#what-can-be-described)
 
 ## SQLSRC231
 
@@ -1094,6 +1208,8 @@ One difference has no `@` in it: a parameter that is an array of a domain, `-- p
 
 A pooler in transaction mode, such as PgBouncer, can also show as this error: the describe of a statement that is missing on another backend can answer no columns and no error, so the message ends "... columns for Npgsql and 0 for SqlSource", and a statement that an earlier run left on a pooled backend can give the wrong column names.  The fix is a direct connection to the server, as [SQLSRC236](#sqlsrc236) says.  An error of the check that says nothing of how Npgsql reads the SQL, such as a lost connection, is [SQLSRC225](#sqlsrc225) at the same step.  If the SQL is plain and the two still differ, report it.
 
+See: [What can be described](postgresql.md#what-can-be-described)
+
 ## SQLSRC232
 
 **Type cannot be bound by Npgsql**
@@ -1117,6 +1233,8 @@ A type whose name or whose schema's name needs quotes (`"My Schema"."Status"`), 
 
 Declare the parameter as `text` and cast it where it is used: `-- param: @pair text` with `@pair::public.pair` in the SQL.  A way for a project to declare a conversion of its own for such a type, for parameters, models and generated code, is planned for a later release.  For a type with no name the help is `the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare the parameter as text with -- param: and cast it to the type where it is used`.  The error is also given for a parameter that only a `-- param:` marker declares: Npgsql resolves the type of every parameter it is handed.
 
+See: [What can be described](postgresql.md#what-can-be-described)
+
 ## SQLSRC233
 
 **Statement cannot be described**
@@ -1136,6 +1254,8 @@ Give the query `-- output: sql`: its SQL is still a string constant, or a method
 
 A word that the tool does not know stays [SQLSRC225](#sqlsrc225): `SELEC 1` is a typo and the server says so.  Describing `CALL` and data definition is planned for a later release.
 
+See: [What can be described](postgresql.md#what-can-be-described)
+
 ## SQLSRC234
 
 **Query writes a positional parameter**
@@ -1151,6 +1271,8 @@ The tool finds a query's parameters by their `@name` and sends the SQL with `$1`
 
 Write the parameter as `@name`.  A `$` followed by a digit that is part of a name (`a$1`), or that stands in a string, a dollar-quoted string, a quoted identifier or a comment, is text and not a parameter.
 
+See: [What can be described](postgresql.md#what-can-be-described)
+
 ## SQLSRC235
 
 **Server version is not supported**
@@ -1164,6 +1286,8 @@ The tool supports PostgreSQL 14 and later, and the server that the database's co
 ```
 
 Upgrade the server, or point the tool at a database of PostgreSQL 14 or later, a copy of the schema on a newer server for one.  The error is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed.  A version that does not start with a number is not refused, since the tool cannot tell what it is.
+
+See: [Connecting](postgresql.md#connecting)
 
 ## SQLSRC236
 
@@ -1194,3 +1318,5 @@ Behind a pooler the session has opened, so the query line names the server and t
 ```
 
 Connect directly to the server: the address of the database itself, not of the pooler, and without `Multiplexing=true`.  Hosted providers that pool connections offer a direct endpoint beside the pooled one.  The tool needs this only to describe queries; the code it generates runs through whatever connection the application uses.  The error for `Multiplexing=true` is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed; one found at a query is reported at that query.
+
+See: [Connecting](postgresql.md#connecting)
