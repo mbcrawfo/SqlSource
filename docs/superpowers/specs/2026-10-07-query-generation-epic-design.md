@@ -418,7 +418,8 @@ Recommended:
 
 Each phase keeps the documents current, by the rules in `AGENTS.md`:
 
-- `README.md`'s installation section changes with phase 5: add the package and the tool, set the dialect, run `describe`, commit the sidecar; and a one-line note that a project wanting only the constants sets `SqlSourceOutput=Sql` and can keep the default dialect.  It gains a section on models: running `describe`, committing the sidecar, the overrides, the type map and its option, the Dapper settings a user who stays with Dapper needs, and what is unsupported.  Phase 5 writes it for PostgreSQL; phase 6 adds SQL Server; phase 7 the library maps; phase 8 the generated methods; phase 9 the online mode.
+- The user documentation is `README.md`, for the average user, who should not need to read further, and the manual in `docs/manual/`, for a user with a specific need ([user documentation overhaul](2026-10-16-user-documentation-overhaul-design.md)).  It describes what works today and marks what is coming with a "Coming in a later release" callout.  Each phase flips its rows of the manual's "What works today" table and its Status cells in `docs/manual/settings.md`, replaces its callouts with documentation, and adds or removes its known issues, in the pages that the phase map of `docs/manual/AGENTS.md` names: phase 5 the README's getting started, "Only want to generate models?" and "Custom type mapping", `generator.md`, `postgresql.md` and `settings.md`; phase 6 `sqlserver.md` and the database support table of `dialects.md`; phase 7 the README's "NodaTime and other libraries" and the database pages; phase 8 the README's main path and FAQ, `generator.md` and `settings.md`; phase 9 `tool.md`, `settings.md` and the README's getting started; phase 10 `tool.md`.
+- What the README's installation and models sections were to hold goes to those pages: running `describe` and committing the sidecar to the README's getting started, which already shows both; the type map, its option and what is unsupported to the database page; the overrides to `settings.md`; the Dapper settings a user who stays with Dapper needs to `recipes.md`.  Where a decision below says that the README says something, it is said on the page the phase map names, and in the README too only when it is on the common path.
 - `CONTRIBUTING.md` gains the tool project, the end-to-end projects and their images, and the new package check.
 - `docs/publishing.md` covers the second package from phase 2.
 - `docs/tech-debt` gains the tool's syntax-level attribute reader in phase 2.
@@ -721,7 +722,7 @@ The existing suites pass unchanged in behaviour; the only edits are settings.
 4. Emission of the input and output types with documentation, once per full name from the collected set; table models; the override suffix stripped from names.
 5. The `DependentUpon` nesting in the targets, with its spike.
 6. The end-to-end `.sql` files, schemas and committed sidecars in `tests/SqlSource.Tests.Postgres`, which phase 3 created, and `tools/describe-end-to-end.sh`.  The realistic corpus under `Realistic/` is the project's realistic queries, by the decisions on it under Testing: its cases that are not refused become `Models` queries with committed sidecars, and its truth, oracle and noise budget stay as they are.
-7. The README's installation section and its section on models.
+7. The user documentation of models for PostgreSQL: the README's getting started, "Only want to generate models?" and "Custom type mapping"; `docs/manual/generator.md`, `docs/manual/postgresql.md`, and the model settings' status in `docs/manual/settings.md`.
 
 ### Decided
 
@@ -751,7 +752,7 @@ Generator tests over sidecars: every row of the state table, the type map, namin
 1. The SQL Server describer over Microsoft.Data.SqlClient.
 2. The SQL Server type map, every type SqlClient reads, and its driver probe.  The library maps are phase 7's.
 3. `tests/SqlSource.Tests.SqlServer`, with the describer's container tests, the end-to-end files, `tools/describe-end-to-end.sh` and the CI matrix extended for it.
-4. The README's SQL Server additions.
+4. `docs/manual/sqlserver.md` as a page like `postgresql.md`, the database support table of `docs/manual/dialects.md`, and every page that says PostgreSQL alone can be described, the README's status line and supported environments among them.
 
 ### Decided
 
@@ -791,7 +792,7 @@ The describer against a SQL Server container, recorded as fixtures for `SqlSourc
 2. NetTopologySuite: through `Npgsql.NetTopologySuite` and `NetTopologySuite.IO.SqlServerBytes`.
 3. `JsonDocument` and `JsonElement`: built into Npgsql, by parsing on SQL Server.  `SqlJson` on SqlClient 6.0 and later, gated on its flag.
 4. Detection from the compilation keyed on the plugin assembly, a property per library, and the three map-row shapes under Types in C#.
-5. The README's section on libraries, with the `Use...()` call each plugin needs.
+5. The README's "NodaTime and other libraries" section, with the `Use...()` call each plugin needs; the Types section of each database page in `docs/manual/`; and a row in `docs/manual/settings.md` for each library's property.
 
 ### Decided
 
@@ -846,7 +847,7 @@ The end-to-end projects run every query through its generated method and assert 
 2. The `.env` file as a connection source in the tool.
 3. `sqlsource describe --watch`.
 4. The packed tool in `tools/check-package-install.sh`.
-5. The README's online-mode section, `.env` and `.gitignore` guidance, and `CONTRIBUTING.md`.
+5. The online mode, `.env` and `.gitignore` guidance and watch mode in `docs/manual/tool.md`, `SqlSourceOnline` in `docs/manual/settings.md`, step 5 of the README's getting started, and `CONTRIBUTING.md`.
 
 ### Decided
 
@@ -872,7 +873,7 @@ The end-to-end projects run every query through its generated method and assert 
 1. `sqlsource diagnose --query <file>:<name>`: re-describe one query with logging, obfuscate, write the bundle and the mapping file.
 2. The obfuscation: keyed hashing per identifier class, dictionary-based replacement over the structured plan fields, the plan's expression strings, the SQL and the catalog rows, and a `--scrub` that obfuscates a bundle made with `--no-obfuscate`.
 3. `sqlsource replay <bundle>`: run the pipeline from the capture, print every walk and table-match decision, diff the entry.
-4. The README's bug-report section and the issue template that asks for a bundle.
+4. Making and sharing a bundle, and the two commands, in `docs/manual/tool.md`, and the issue template that asks for a bundle.
 
 ### Decided
 
