@@ -22,8 +22,8 @@ namespace SqlSource.Tool.Describing.Capture;
 /// <para>
 /// A capture that holds more than was asked is no error: <see cref="Unused" /> says what was left.  A capture may
 /// be older than a record: an answer that lacks a nullable member is read with null there, and one that lacks a
-/// member that is not nullable is a <see cref="CaptureMissException" /> that names the member
-/// (<see cref="AnswerNulls" />).
+/// member of a reference type that is not nullable is a <see cref="CaptureMissException" /> that names the member
+/// (<see cref="AnswerNulls" />).  A missing member of a value type is read as its default and is not found.
 /// </para>
 /// </remarks>
 /// <param name="capture">The calls to answer from.  It is read once, when the exchange is made.</param>

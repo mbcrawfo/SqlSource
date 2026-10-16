@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using SqlSource.Tool.Describing.Postgres.Walk;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -251,7 +252,7 @@ internal sealed record PostgresCheckRequest(string Sql, IReadOnlyList<PostgresCh
 /// </param>
 internal sealed record PostgresCheckParameter(string Name, string DataTypeName);
 
-/// <summary>What Npgsql's own describe of the SQL gave.  One of the three members is not null.</summary>
+/// <summary>What Npgsql's own describe of the SQL gave.  One of Columns, Error and DriverError is not null.</summary>
 /// <param name="Columns">The columns of the result, in order.</param>
 /// <param name="Error">
 /// What the server said, or what Npgsql said of a text it would not send: it has no SQLSTATE then.
@@ -298,7 +299,8 @@ internal sealed record PostgresRelationName(string Schema, string Name);
 
 /// <summary>The request of <c>relations</c>.  Its answer is the one of <c>tables</c>.</summary>
 /// <param name="Relations">
-/// The relations a plan scans (<see cref="PlanRelations" />), in schema and name order, each once.
+/// The relations a plan scans (<see cref="PlanRelations" />) that <c>tables</c> did not answer, in schema and name
+/// order, each once.
 /// </param>
 internal sealed record PostgresRelationsRequest(IReadOnlyList<PostgresRelationName> Relations);
 
@@ -326,7 +328,7 @@ internal sealed record PostgresPartitionRow(string Schema, string Name, IReadOnl
 /// <summary>Everything that decides the answer of <c>explain</c>.</summary>
 /// <param name="Statement">The prepared statement to plan.</param>
 /// <param name="Parameters">
-/// The number of parameter types the server resolved for the statement, a <c>$n</c> that the SQL writes itself
+/// The number of parameter types the server resolved for the statement, a <c>$n</c> the tool's lexer did not see
 /// included: a <c>NULL</c> is passed for each, since <c>EXPLAIN EXECUTE</c> takes no other number.
 /// </param>
 /// <param name="Settings">
@@ -339,5 +341,8 @@ internal sealed record PostgresExplainRequest(string Statement, int Parameters, 
 /// <param name="Plan">
 /// The text <c>EXPLAIN (VERBOSE, FORMAT JSON)</c> returned, as the server wrote it.
 /// </param>
-/// <param name="Error">What the server said, or null.  It is logged and never reported.</param>
+/// <param name="Error">
+/// What the server said, or null.  It is logged and never reported, but <c>26000</c>, a statement that is gone,
+/// which is <c>SQLSRC236</c>.
+/// </param>
 internal sealed record PostgresExplainAnswer(string? Plan, PostgresServerError? Error);

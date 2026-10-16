@@ -3,13 +3,13 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresPlans;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
-// Steps 3 and 4 of the walk, over plans a test writes: each row of the spec's table of a column, and the plan's
-// value with its reason.
+// NullabilityWalk over plans a test writes: each column's answer, and the plan's value with its reason.
 public class NullabilityWalkTests
 {
     // A table with a NOT NULL column and a nullable one, and a view of the same two.
@@ -181,7 +181,7 @@ public class NullabilityWalkTests
 
     // A plan whose reference names another column than the one the row description gives may be no plan of this
     // statement: a pooler can hand the explain another backend's statement of the same name (TD-0049).  Its
-    // expressions are not read, and a gated query's columns with an origin are walked as they always were.
+    // expressions are not read, and a gated query's columns with an origin are walked.
     [Theory]
     [InlineData("t.opt")]
     [InlineData("opt")]
@@ -195,7 +195,7 @@ public class NullabilityWalkTests
     }
 
     // A query that gives a table's columns aliases, users u(a, b), prints them under the aliases: the check takes it
-    // for another statement's plan, and the join's answer stands as it always did.
+    // for another statement's plan, and the join's answer stands.
     [Fact]
     public void Run_ReferenceThatNamesAnotherColumnUnderALeftJoin_KeepsTheJoinsAnswer() =>
         AnswersOf(Run(LeftJoin("a.other", "b.other"), NotNull, NotNull))
@@ -447,9 +447,9 @@ public class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
 
-    // And a NOT NULL column of a table with an INSTEAD rule, in the plan of the defect: the INSERT into t2 is
-    // replaced by the rule's INSERT into t3, so the root ModifyTable is t3's and its Output names t3, while the row
-    // description keeps t2 as the column's origin.  The walk maps t3, nothing extends it, and the answer is t2's.
+    // And a NOT NULL column of a table with an INSTEAD rule: the INSERT into t2 is replaced by the rule's INSERT
+    // into t3, so the root ModifyTable is t3's and its Output names t3, while the row description keeps t2 as the
+    // column's origin.  The walk maps t3, nothing extends it, and the answer is t2's.
     [Fact]
     public void Run_NotNullColumnOfATableWithAnInsteadRule_IsNullableByTheCatalog()
     {
@@ -616,7 +616,7 @@ public class NullabilityWalkTests
     // The first is a UNION's Append, which has no Output; the second has fewer entries than the result has columns.
     [Theory]
     [MemberData(nameof(Unusable))]
-    public void Run_PlanThatCannotBeUsed_IsUnavailableWithItsReasonAndEveryColumnKeepsTheHeuristic(
+    public void Run_PlanThatCannotBeUsed_IsUnavailableWithItsReasonAndEveryColumnKeepsWhatItWasBuiltWith(
         string reason,
         string plan
     )
@@ -824,7 +824,7 @@ public class NullabilityWalkTests
             .ShouldBe([(false, "catalog"), (true, "catalog"), (true, "outer-join")]);
     }
 
-    // The relations scanned here, as "partitions" answers: p_1 and p_2 are partitions of t.
+    // The relations scanned here, as "partitions" answers: t_1 and t_2, scanned as p_1 and p_2, are partitions of t.
     private static readonly Dictionary<PostgresRelationName, IReadOnlyList<long>> Partitions = new()
     {
         [new PostgresRelationName("public", "t_1")] = [Table.Oid],
@@ -866,7 +866,7 @@ public class NullabilityWalkTests
         AnswersOf(RunWithPartitions(extended, NotNull, OfB)).ShouldBe([(true, "outer-join"), (false, "catalog")]);
     }
 
-    // Without the answer of "partitions" the Append is a set operation, as it always was.
+    // Without the answer of "partitions" the Append is read as a set operation.
     [Fact]
     public void Run_PartitionedTableWithoutPartitions_KeepsTheHeuristic() =>
         AnswersOf(Run(Join("Left", PartitionsOfT(), Scan("b")) with { Output = ["p.id"] }, NotNull))
@@ -1221,8 +1221,8 @@ public class NullabilityWalkTests
 
     // An appendrel, a UNION ALL that a FROM subquery, a CTE or an inlined SQL function holds, prints a branch that the
     // planner keeps as a "*SELECT* <k>" scan in the order the outer query needs: SELECT s.b, s.a FROM (SELECT
-    // p.sku AS a, p.name AS b ... UNION ALL (SELECT ..., NULLIF(...) ... LIMIT 5)) s.  Its column 0 is NULLIF's, and by
-    // position it would be p2.sku.
+    // p.sku AS a, p.name AS b ... UNION ALL (SELECT p2.sku, NULLIF(p2.name, 'x') ... LIMIT 5)) s.  Its column 0 is
+    // NULLIF's, and by position it would be p2.sku.
     public static TheoryData<string> Appendrels =>
         [
             Text(
@@ -1266,8 +1266,8 @@ public class NullabilityWalkTests
     public void Run_LeafScanUnderAnAppend_IsNotMappedByPosition(string plan) =>
         AnswersOf(RunSet(PlanNode.Read(plan).ShouldNotBeNull(), Text, Text)).ShouldBe([NoOrigin, NoOrigin]);
 
-    // A 14 SetOp's flagged member is its own leaf scan, mapped by position: SELECT o.note AS label, o.note AS note ...
-    // EXCEPT SELECT u.name AS note, u.email AS label ... prints the crossed names, and column 0 is u.email.
+    // A 14 SetOp's flagged member is its own leaf scan, mapped by position: SELECT u.email AS name, u.name AS email
+    // FROM u EXCEPT SELECT o.label, o.label FROM o prints the crossed names, and column 0 is u.email.
     private static PlanNode CrossedExcept14(string alias, PlanNode? branch = null) =>
         SetOp(
             "Except",
@@ -1649,7 +1649,7 @@ public class NullabilityWalkTests
             )
             .ShouldBe([NoOrigin]);
 
-    // Without the row description's types the walk answers no set operation, as before part C.
+    // Without the row description's types the walk answers no set operation.
     [Fact]
     public void Run_SetOperationWithoutTheColumnsTypes_IsUnavailable()
     {
@@ -1666,7 +1666,7 @@ public class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([NoOrigin]);
     }
 
-    // A column with an origin beside the set operation goes as it always did: kept, for a root without Output.
+    // A column with an origin beside the set operation is kept, for a root without Output.
     [Fact]
     public void Run_ColumnWithAnOriginBesideASetOperation_IsKept()
     {

@@ -44,7 +44,9 @@ public class SidecarReaderTests
         + ColumnsJson
         + "}";
 
-    // One entry with every key of the format, on one line.  Each test changes one thing in it.
+    // One entry, on one line, with every key of the file, of an entry, of a parameter, of a column and of an origin.
+    // Its types are a base and an array, with no bindName, length, precision or scale, and no key of another kind.
+    // Each test changes one thing in it.
     private const string Valid = "{'formatVersion': 1, 'toolVersion': '1.2.3', 'queries': {'Q': " + EntryJson + "}}";
 
     private const string SqlServerType = /*lang=json*/

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>A column after the walk, with what the walk read of it, as the log says it.</summary>
 /// <param name="Column">The column as it will be recorded.</param>
@@ -138,8 +138,8 @@ internal static partial class NullabilityWalk
         }
 
         // A plan that may be another statement's is read for no expression.  A gated query's columns with an origin are
-        // walked as they were before expressions were read, since column aliases print a column under another name,
-        // and a query that is not gated has nothing else to read.
+        // still walked, since column aliases print a column under another name, and a query that is not gated has
+        // nothing else to read.
         var fits = OutputFits(entries, origins, instances);
         if (!fits && !scope.Gated)
         {
@@ -288,7 +288,7 @@ internal static partial class NullabilityWalk
         {
             Resolution.Extended => (true, SidecarValues.NullableSource.OuterJoin),
 
-            // The catalog's answer: NOT NULL for a table, and unknown with "view" for a view.
+            // The catalog's answer, by ColumnNullability's rule for a query that is not gated.
             Resolution.Preserved => ColumnNullability.Of(origin, gated: false),
             Resolution.Unknown or Resolution.NoCandidate => ColumnNullability.Of(origin, gated: true),
             _ => throw new InvalidOperationException($"Unknown resolution {resolved}."),
@@ -500,11 +500,10 @@ internal static partial class NullabilityWalk
     }
 
     // The plans of a walk: the root's, and the plan of each scan of another plan, each walked as a plan of its own.
-    // A column through a scan is resolved by its origin and never by its place or its name: a Subquery Scan prints the
-    // subquery's columns in the order the query above needs them, and the plan prints no name of the subquery's
-    // columns.  A column with an origin is a plain reference to that column in the subquery, so its entry of the
-    // child plan's Output is among the references to a relation instance of the origin's table and column; when
-    // every such reference agrees, the column is what they are.
+    // A column through a scan is resolved by its origin, as the class's remarks say.  A column with an origin is a
+    // plain reference to that column in the subquery, so its entry of the child plan's Output is among the
+    // references to a relation instance of the origin's table and column; when every such reference agrees, the
+    // column is what they are.
     private sealed class Plans(PlanNode tree, WalkScope scope)
     {
         /// <summary>

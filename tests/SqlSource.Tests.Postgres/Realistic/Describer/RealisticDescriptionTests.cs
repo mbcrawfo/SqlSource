@@ -15,16 +15,16 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
 {
     public const string RecordVariable = "SQLSOURCE_RECORD_REALISTIC";
 
-    private const string FirstCase = "aggregate-cte-left-joined";
+    private const string KnownCase = "aggregate-cte-left-joined";
 
     private const string RecordScript = "tools/record-realistic.sh";
 
     private static bool Recording => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(RecordVariable));
 
     [Fact]
-    public async Task DescribeAsync_FirstCase_IsDescribedAndRendered()
+    public async Task DescribeAsync_KnownCase_IsDescribedAndRendered()
     {
-        var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, FirstCase));
+        var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, KnownCase));
 
         var described = await RealisticDescribe.DescribeAsync(found, postgres.RealisticConnectionString);
 

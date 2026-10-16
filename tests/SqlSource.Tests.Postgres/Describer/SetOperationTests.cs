@@ -8,7 +8,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
-// What part C of the walk answers against a real server: a column of a set operation, from the branches the operation
+// What the walk answers against a real server for a column of a set operation, from the branches the operation
 // returns rows of, and the shapes that keep it unknown.  The set operations are pinned for PostgreSQL 14 and 18 alone:
 // 14 plans INTERSECT and EXCEPT as a SetOp over an Append of flagged members, 18 as a SetOp with two inputs.  Where a
 // column stays unknown because the server can return NULL in it, the test runs the query over rows that make it, in a

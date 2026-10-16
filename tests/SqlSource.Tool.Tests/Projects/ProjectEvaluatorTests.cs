@@ -170,7 +170,8 @@ public sealed class ProjectEvaluatorTests : IDisposable
         FakeProcessRunner.PropertyOf(_runner.Requests[1], "SqlSourceManifestFile").ShouldStartWith(_temp);
     }
 
-    // The table of the spec: the first row that holds.
+    // The table of "Whether a project uses SqlSource", the first row that holds, in
+    // docs/superpowers/specs/2026-10-09-query-generation-phase-2-3-project-manifest-design.md.
     [Theory]
     [InlineData("true", "", "", nameof(ProjectState.UsesSqlSource))]
     [InlineData("True", "SqlSource", "missing", nameof(ProjectState.UsesSqlSource))]

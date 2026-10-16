@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// An entry of a plan's <c>Output</c> read as a whole: whether the server can ever return <c>NULL</c> for it, for the
@@ -17,7 +17,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// them, which is how a node prints a value its child computed.
 /// </para>
 /// <para>
-/// The forms: <c>count(*)</c>, with a <c>FILTER</c> or an <c>OVER</c> or neither; <c>row_number()</c>,
+/// The forms: <c>count(*)</c>, with an optional <c>FILTER</c> and an optional <c>OVER</c>; <c>row_number()</c>,
 /// <c>rank()</c>, <c>dense_rank()</c>, <c>percent_rank()</c> and <c>cume_dist()</c> with an <c>OVER</c>; a constant,
 /// a quoted literal with its cast, a number, <c>true</c> or <c>false</c>, and <c>NULL::type</c>, which is the one
 /// that can be <c>NULL</c>; the tests <c>IS NULL</c>, <c>IS NOT NULL</c> and <c>IS DISTINCT FROM</c>, and the

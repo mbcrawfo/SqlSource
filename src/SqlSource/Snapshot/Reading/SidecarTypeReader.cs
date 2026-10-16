@@ -23,8 +23,9 @@ internal static class SidecarTypeReader
         SidecarKeys.Subtype,
     ];
 
-    // The keys of a parameter's own type: a type has a bind name only there.  It is last, so that the keys it shares
-    // with the arrays above keep their bits, and so that Require and Has work with either array.
+    // The keys of a parameter's own type, here and for each engine below: a type has a bind name only there.  It is
+    // last, so that the keys shared with the engine's own array keep their bits, and so that Require and Has work
+    // with either array.
     private static readonly string[] PostgresParameterKeys = [.. PostgresKeys, SidecarKeys.BindName];
 
     private static readonly string[] SqlServerKeys =

@@ -39,10 +39,11 @@ public class OuterJoinGateTests
     // A function, and no join: the gate cannot tell, and the walk finds nothing to null-extend.
     [InlineData("SELECT left(name, 3) FROM users")]
     [InlineData("left")]
+    // A join however it is spaced or quoted.
     [InlineData("SELECT 1 FROM a\nLEFT\nJOIN b ON true")]
     [InlineData("SELECT 1 FROM a NATURAL FULL JOIN b")]
     [InlineData("SELECT 1 FROM \"a\"LEFT JOIN b ON true")]
-    // The old and the new row of a RETURNING list, and a MERGE: NULL with no join in the plan.
+    // The old and the new row of a RETURNING list, and a MERGE: NULL with no outer join written in the SQL.
     [InlineData("INSERT INTO t (id) VALUES (1) RETURNING old.id, new.id")]
     [InlineData("DELETE FROM t WHERE id = 1 RETURNING old.id")]
     [InlineData("UPDATE t SET v = 1 RETURNING WITH (OLD AS o, NEW AS n) o.v, n.v")]
@@ -63,6 +64,7 @@ public class OuterJoinGateTests
     [InlineData("SELECT status, count(*) FROM users GROUP BY status")]
     // Inside a string, a comment, a hint, a quoted identifier and a dollar-quoted string.
     [InlineData("SELECT 'left join' FROM users")]
+    [InlineData("SELECT 'merge' FROM t")]
     [InlineData("SELECT id FROM users -- left join")]
     [InlineData("SELECT id /* FULL OUTER */ FROM users")]
     [InlineData("SELECT /*+ rollup */ id FROM users")]
@@ -74,11 +76,11 @@ public class OuterJoinGateTests
     [InlineData("SELECT x_left, left_x, left1, a.fullname FROM users")]
     [InlineData("SELECT groupings, cubed, outermost, rights FROM users")]
     [InlineData("SELECT renewal, older, newest, merged, new_value, old_id FROM t")]
-    [InlineData("SELECT 'merge' FROM t")]
     // Only OLD and NEW are names the server resolves when quoted: a quoted word of the others does not count.
     [InlineData("SELECT \"left\" FROM t")]
     // A parameter is no word of the SQL.
     [InlineData("SELECT id FROM users WHERE id = @left")]
+    // Nothing at all.
     [InlineData("")]
     public void IsGated_QueryThatHoldsNoWord_IsNotGated(string sql) => OuterJoinGate.IsGated(sql).ShouldBeFalse();
 

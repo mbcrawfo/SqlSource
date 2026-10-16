@@ -1,9 +1,9 @@
 using System;
 using Shouldly;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // An entry of a plan's Output read as a whole: the forms that can never be NULL, the NULL constant, and the texts that
 // start or end like a form and are none.  The texts are as PostgreSQL 14 and 18 print them, which
@@ -148,14 +148,14 @@ public class PlanExpressionTests
 
     private static bool CreatedAt(OutputReference reference) => reference.Column == "created_at";
 
-    // A span in parentheses the walk says may not be read is unknown, whatever its form; the entry as a whole is never
-    // asked.
+    // A span in parentheses the walk says may not be read is read as unknown, whatever its form; the entry as a
+    // whole is never asked.
     [Theory]
     [InlineData("COALESCE(('x'::text), 'y'::text)", false)]
     [InlineData("COALESCE(('x'::text))", null)]
     [InlineData("CASE WHEN (a > 1) THEN ('x'::text) ELSE 'y'::text END", null)]
     [InlineData("('x'::text)", false)]
-    public void NullableOf_GroupTheWalkVetoes_IsUnknown(string entry, bool? expected) =>
+    public void NullableOf_GroupTheWalkVetoes_IsReadAsUnknown(string entry, bool? expected) =>
         PlanExpression
             .NullableOf(entry, catalogFunctions: true, static _ => false, static group => group != "'x'::text")
             .ShouldBe(expected);

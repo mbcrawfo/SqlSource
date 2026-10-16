@@ -101,7 +101,7 @@ public class PostgresEventsTests
         Member(deallocate, "error").ShouldBe(LogValue.Null);
     }
 
-    // A prepare that failed has its error in the place of the types, and nothing else is asked or written.
+    // A prepare that failed has its error in the place of parameterTypes, and nothing else is asked or written.
     [Fact]
     public async Task Describe_PrepareThatFails_WritesItsErrorAndNoOtherEvent()
     {
@@ -340,7 +340,7 @@ public class PostgresEventsTests
 
     private static readonly PostgresColumnRow CountColumn = new(1, "n", 20, 0, 0, null, null, null);
 
-    // The script of Listing up to "types", which a test ends as it needs.
+    // The script of Listing without "check" and "explain", which a test adds as it needs.
     private static PostgresScript ListingScript() =>
         new PostgresScript()
             .Open()
@@ -1097,8 +1097,8 @@ public class PostgresEventsTests
         Member(walk, "reason").ShouldBe(LogValue.Null);
     }
 
-    // The column event of sub-phase 3.3 is written when the column is built, with the heuristic's answer: the
-    // walk's own event holds what the sidecar records.
+    // The column event is written when the column is built, with the heuristic's answer: the walk's own event holds
+    // what the sidecar records.
     [Fact]
     public async Task Describe_GatedQuery_KeepsTheHeuristicInTheColumnEventAndTheAnswerInTheWalks()
     {

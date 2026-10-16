@@ -1,7 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         The helpers that the test projects share and that need nothing of the tool: the harness of the generator's
-        driver tests and the builder of a sidecar's records.  A library of the tests, never a test project of its own.
+        driver tests, the builder of a sidecar's records, and RepositoryRoot, which finds the repository's folder.  A
+        library of the tests, never a test project of its own.
     -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>

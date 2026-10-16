@@ -1,4 +1,5 @@
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Postgres.Walk;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -19,8 +20,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// <c>NOT NULL</c>, but a foreign table may be a partition: it inherits the parent's <c>NOT NULL</c>, which nothing
 /// enforces on its remote rows, and a query of the parent reads them.  So a <c>NOT NULL</c> column of a partitioned
 /// table with a foreign table anywhere in its partition tree is nullable too, and one of a partitioned table without
-/// one is the catalog's.  So is a <c>NOT NULL</c> column of a table or a partitioned table with a
-/// <c>DO INSTEAD</c> rule on <c>INSERT</c>, <c>UPDATE</c> or <c>DELETE</c>: the statement is replaced by the rule's
+/// one is the catalog's.  A <c>NOT NULL</c> column of a table or a partitioned table with a <c>DO INSTEAD</c> rule
+/// on <c>INSERT</c>, <c>UPDATE</c> or <c>DELETE</c> is nullable too: the statement is replaced by the rule's
 /// action, usually on another relation, whose rows the <c>RETURNING</c> list gives, where the column may be nullable
 /// or set to <c>NULL</c>, while the row description keeps this table as the column's origin.  The rule costs every
 /// <c>NOT NULL</c> column of such a table wherever the table is a column's origin, a plain <c>SELECT</c> from it
@@ -29,7 +30,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </remarks>
 internal static class ColumnNullability
 {
-    /// <summary>The first row of the table that fits.</summary>
+    /// <summary>Whether the column can be <c>NULL</c>, and the source of the answer: the first arm that fits.</summary>
     /// <param name="origin">Where the column comes from, or null.</param>
     /// <param name="gated">Whether <see cref="OuterJoinGate" /> found a word in the query.</param>
     public static (bool? Nullable, string Source) Of(ColumnOrigin? origin, bool gated) =>

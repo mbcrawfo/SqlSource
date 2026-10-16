@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 internal static partial class NullabilityWalk
 {

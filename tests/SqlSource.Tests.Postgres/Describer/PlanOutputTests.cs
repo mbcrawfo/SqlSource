@@ -4,7 +4,7 @@ using System.Text.Json;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
@@ -213,7 +213,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         PlanExpression.NullableOf(entry, catalogFunctions: true, static _ => false).ShouldBe(expected);
     }
 
-    // The root of a set operation prints its first branch, so a constant there says nothing of the other branches.
+    // The root of a set operation prints its first branch, whatever the operation.
     [Theory]
     [InlineData("SELECT 'a'::text AS k FROM users UNION SELECT NULL FROM orders")]
     [InlineData("SELECT 'a'::text AS k FROM users INTERSECT SELECT note FROM orders")]

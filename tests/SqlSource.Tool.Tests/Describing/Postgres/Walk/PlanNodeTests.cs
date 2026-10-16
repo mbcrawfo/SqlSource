@@ -1,9 +1,9 @@
 using System.Linq;
 using Shouldly;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // The plan as EXPLAIN (VERBOSE, FORMAT JSON) writes it, read into the keys the walk uses.
 public class PlanNodeTests

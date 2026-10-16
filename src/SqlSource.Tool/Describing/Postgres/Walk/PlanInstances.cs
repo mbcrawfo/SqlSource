@@ -3,9 +3,12 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
-/// <summary>Why a walk had no plan it could use, as the <c>reason</c> of <c>postgres.walk</c> says it.</summary>
+/// <summary>
+/// The <c>reason</c> of <c>postgres.walk</c>: why a walk had no plan it could use, or, as <c>output-differs</c> on a
+/// <c>walked</c> plan, why its expressions were not read.
+/// </summary>
 internal static class WalkReasons
 {
     public const string ExplainFailed = "explain-failed";
@@ -63,7 +66,7 @@ internal sealed record PlanInstance(
 
 /// <summary>
 /// The relation instances of a plan, each by its alias, and whether a join on the path from the root to it
-/// null-extends its side: the first two steps of the walk.
+/// null-extends its side.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -164,7 +167,10 @@ internal sealed class PlanInstances
     /// </summary>
     public bool HasSetOperation { get; private set; }
 
-    /// <summary>The instances of a plan that holds no partitioned table and no scan of another plan.</summary>
+    /// <summary>
+    /// The instances of a whole plan, with no answer of <c>partitions</c>: an <c>Append</c> of a partitioned table's
+    /// partitions is read as a set operation.
+    /// </summary>
     public static PlanInstances Find(PlanNode root) => new(root, root, NoPartitions);
 
     /// <summary>The instances of a plan, or of a plan inside another.</summary>

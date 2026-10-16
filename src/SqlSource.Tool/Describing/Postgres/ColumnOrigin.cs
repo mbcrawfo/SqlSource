@@ -5,7 +5,8 @@ using System.Linq;
 namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
-/// The column of a table or a view that a column of a result comes from, as the catalog holds both.
+/// The column of a relation that a column of a result comes from (a table, a partitioned table, a view, a
+/// materialized view or a foreign table), as the catalog holds both.
 /// </summary>
 /// <param name="Table">The relation.</param>
 /// <param name="Attribute">Its column.</param>

@@ -192,7 +192,10 @@ internal static class PostgresErrors
     /// <c>SQLSRC233</c>: the statement is of a kind that <c>PREPARE</c> does not take.  Nothing of it is sent.
     /// </summary>
     /// <param name="query">The query.</param>
-    /// <param name="kind">The kind, in upper case, as <see cref="StatementShape.RefusedKind" /> gives it.</param>
+    /// <param name="kind">
+    /// The kind: its word in upper case, as <see cref="StatementShape.RefusedKind" /> gives it, or <c>utility</c> for
+    /// the server's <c>42P14</c>.
+    /// </param>
     public static DescribeFailure NotDescribable(DescribeRequest query, string kind) =>
         new(
             ToolDiagnostics.StatementCannotBeDescribed,

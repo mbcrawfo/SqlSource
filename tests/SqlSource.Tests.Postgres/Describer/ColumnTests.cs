@@ -644,8 +644,8 @@ public sealed class ColumnTests(PostgresContainer postgres)
         NullabilityOf(gated.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog"), (false, "expression")]);
     }
 
-    // The query of the spec's Goal, without its join.  Its count has no origin, so the plan is asked for it and
-    // answers it, and the columns of the table keep the catalog's answer.
+    // A query with no word of the gate.  Its count has no origin, so the plan is asked for it and answers it as an
+    // expression, and the columns of the table keep the catalog's answer.
     [Fact]
     public async Task Describe_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()
     {
@@ -658,7 +658,8 @@ public sealed class ColumnTests(PostgresContainer postgres)
             .ShouldBe([(false, "catalog"), (true, "catalog"), (false, "expression")]);
     }
 
-    // The query of the spec's Goal: each row of its table.
+    // A left join with a count over the window: the plan is walked, the columns of users keep the catalog's answer,
+    // the extended orders.total is nullable by the join, and the count is not null as an expression.
     [Fact]
     public async Task Describe_LeftJoin_IsWalkedAndOnlyTheExtendedSideIsNullableByTheJoin()
     {
@@ -695,9 +696,9 @@ public sealed class ColumnTests(PostgresContainer postgres)
         (status.Nullable, status.NullableSource).ShouldBe((true, "heuristic"));
     }
 
-    // PostgreSQL 18's old and new row of a RETURNING list are NULL for the row an INSERT had no old one of, and
-    // each column keeps its table as its origin, and the plan prints them as old.id and new.id, which name no
-    // relation instance.
+    // PostgreSQL 18's old row of a RETURNING list is NULL for a row an INSERT adds.  Each column keeps its table as
+    // its origin, and the plan prints them as old.id and new.id, which name no relation instance, so both keep the
+    // heuristic.
     [Fact]
     public async Task Describe_ReturningOldAndNew_KeepsTheHeuristic()
     {

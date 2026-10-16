@@ -13,7 +13,7 @@ namespace SqlSource.Tests.Postgres.Realistic;
 // case runs on the majors from its minimum on.
 public sealed class RealisticCasesTests
 {
-    private const string FirstCase = "aggregate-cte-left-joined";
+    private const string KnownCase = "aggregate-cte-left-joined";
 
     private const string Query = "-- name: Q\nSELECT 1;\n";
 
@@ -25,7 +25,7 @@ public sealed class RealisticCasesTests
     public static TheoryData<string> Cases => [with(RealisticCases.Names)];
 
     [Fact]
-    public void All_Cases_HoldTheFirstCase() => RealisticCases.All.ShouldContain(found => found.Name == FirstCase);
+    public void All_Cases_HoldAKnownCase() => RealisticCases.All.ShouldContain(found => found.Name == KnownCase);
 
     [Fact]
     public void NamesIn_FolderWithoutQuerySql_IsNamedAndNotSkipped()

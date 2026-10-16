@@ -656,7 +656,7 @@ public sealed class DatabaseRunsTests : IDisposable
     public void Of_TextThatHoldsTheSecretTwice_HasTheMarkInBothPlaces() =>
         Redaction.Of("a s3cret and a s3cret", "s3cret").ShouldBe("a *** and a ***");
 
-    // A describer whose OpenAsync is not async: what it throws leaves the call itself, and no task holds it.
+    // A describer whose OpenAsync is not async.
     private sealed class ThrowsBeforeItReturns : IQueryDescriber
     {
         public SqlDialect Dialect => SqlDialect.PostgreSql;

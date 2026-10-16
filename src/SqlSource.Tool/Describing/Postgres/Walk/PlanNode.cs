@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using System.Text.Json;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
 /// A node of a plan as <c>EXPLAIN (VERBOSE, FORMAT JSON)</c> writes it: the keys the walk reads, and no other.

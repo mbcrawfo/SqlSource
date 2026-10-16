@@ -7,14 +7,14 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
-// What part B of the walk answers against a real server: a column through a scan of another plan, a partitioned
+// What the walk answers against a real server through a scan: a column through a scan of another plan, a partitioned
 // table, a foreign table and a root that is not the scan, and an expression the walk follows to the node that computes
 // it; and the shapes near them that keep what they had.
 [Collection(UsesPostgres.Name)]
 public sealed class ScanTests(PostgresContainer postgres)
 {
-    // A partitioned table and a foreign table of these tests alone, made by SQL that can be run again, and left: the
-    // container is thrown away.  The foreign table is orders, read back through postgres_fdw from this very server.
+    // A partitioned table of these tests alone, made by SQL that can be run again, and left: the container is thrown
+    // away.
     private const string Partitioned = """
         CREATE TABLE IF NOT EXISTS scan_parts (id integer NOT NULL, kind integer NOT NULL, note text)
             PARTITION BY LIST (kind);
@@ -149,7 +149,8 @@ public sealed class ScanTests(PostgresContainer postgres)
         (await DescribedAsync(sql)).Answers.ShouldBe([Unknown]);
     }
 
-    // A foreign table's scan is an instance: unknown where nothing extends it, nullable where a join does.
+    // A foreign table's scan is an instance: unknown where nothing extends it, nullable where a join does.  The
+    // foreign table, scan_foreign, is orders, read back through postgres_fdw from this very server.
     [Fact]
     public async Task Describe_ForeignTableOnEachSideOfALeftJoin_IsAnsweredByItsSide()
     {
@@ -228,7 +229,7 @@ public sealed class ScanTests(PostgresContainer postgres)
         (await DescribedAsync(sql)).Answers[0].Nullable.ShouldNotBe(false);
 
     // A relation the planner proves empty under an outer join is a Result, whose columns print bare in a plan of
-    // several relations: an expression of them is NULL on every row.  PostgreSQL 18 proves the last one empty from
+    // several relations: an expression of them is NULL on every row.  PostgreSQL 18 proves the third one empty from
     // the NOT NULL of placed_at; 14 does not, and prints o.id.
     [Theory]
     [InlineData(

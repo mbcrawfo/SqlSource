@@ -18,7 +18,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </para>
 /// <para>
 /// The list is the first words of the statements in the <c>stmt</c> production of PostgreSQL 18's <c>gram.y</c>
-/// (<c>REL_18_STABLE</c>) that <c>PREPARE</c> does not take, which are the words of the design plus <c>ANALYSE</c>,
+/// (<c>REL_18_STABLE</c>) that <c>PREPARE</c> does not take, <c>ANALYSE</c> among them,
 /// the other spelling of <c>ANALYZE</c> that the grammar has.  Every other statement of the production starts with a
 /// word on the list: the <c>ALTER</c>, <c>CREATE</c> and <c>DROP</c> forms, <c>SET</c> for the variable and for
 /// <c>SET CONSTRAINTS</c>, <c>SECURITY</c> for <c>SECURITY LABEL</c>, and <c>BEGIN</c>, <c>START</c>, <c>COMMIT</c>,

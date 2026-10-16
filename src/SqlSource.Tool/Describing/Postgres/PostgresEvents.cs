@@ -1,5 +1,6 @@
 using System.Linq;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.Postgres;
@@ -14,9 +15,10 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// event of its own: the run's <c>database.open</c> records what the session knows of its server.  A describe
 /// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, <c>spellings</c>, one <c>column</c> for each
 /// column, <c>check</c>, <c>table-match</c> and <c>deallocate</c>, in that order, each only when its call was made,
-/// and <c>table-match</c> only for a statement with rows whose check agreed.  A gated query with rows
-/// writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>, one <c>walk.node</c> for each node the
-/// walk visited, one <c>walk.column</c> for each column, and <c>walk</c>.
+/// and <c>table-match</c> only for a statement with rows whose check agreed.  A query with rows that is gated or has
+/// a column of no origin writes, between <c>check</c> and <c>table-match</c>, <c>explain</c>, <c>partitions</c> and
+/// <c>relations</c> when each is asked, one <c>walk.node</c> for each node the walk visited, one
+/// <c>walk.column</c> for each column, and <c>walk</c>.
 /// </remarks>
 internal static class PostgresEvents
 {
@@ -159,8 +161,8 @@ internal static class PostgresEvents
         );
 
     /// <summary>
-    /// <c>postgres.column</c>: one column as it will be recorded, and whether its query was gated.  It is the one
-    /// place that says why a column is nullable beside what was asked to find out.
+    /// <c>postgres.column</c>: one column as it was built from the catalog, and whether its query was gated.  For a
+    /// query the walk planned, the nullability recorded is the one of <c>walk.column</c>.
     /// </summary>
     public static void Column(IRunLog log, string query, SidecarColumn column, bool gated) =>
         log.Write(
@@ -243,8 +245,8 @@ internal static class PostgresEvents
         );
 
     /// <summary>
-    /// <c>postgres.relations</c>: the relations a plan scans, and the rows of those that exist, as <c>tables</c> holds
-    /// them, or the error.
+    /// <c>postgres.relations</c>: the relations a plan scans that <c>tables</c> did not answer, and the rows of those
+    /// that exist, as <c>tables</c> holds them, or the error.
     /// </summary>
     public static void Relations(
         IRunLog log,
@@ -265,9 +267,9 @@ internal static class PostgresEvents
 
     /// <summary>
     /// The events of a walk, in this order: <c>postgres.walk.node</c> for each node that was visited,
-    /// <c>postgres.walk.column</c> for each column, and <c>postgres.walk</c> with the plan's value and, when it is
-    /// <c>unavailable</c>, the reason.  It is the one place that tells a failed <c>EXPLAIN</c> from a plan the
-    /// walk could not use.
+    /// <c>postgres.walk.column</c> for each column, and <c>postgres.walk</c> with the plan's value and the reason when
+    /// there is one: why the plan is <c>unavailable</c>, or <c>output-differs</c> for a <c>walked</c> one.  It is the
+    /// one place that tells a failed <c>EXPLAIN</c> from a plan the walk could not use.
     /// </summary>
     /// <remarks>
     /// The relation of a node is its schema and its name apart, as the table of <c>table-match</c> is: a name may

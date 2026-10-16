@@ -6,7 +6,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The protocol reports a domain column as its base type, so only the catalog knows that the column is a domain.
-public class ColumnTypeTests
+public class ColumnTypesTests
 {
     private static readonly PostgresTableRow Table = PostgresTables.TableOf(
         7,

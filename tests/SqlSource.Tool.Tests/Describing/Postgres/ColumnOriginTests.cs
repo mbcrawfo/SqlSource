@@ -27,8 +27,8 @@ public class ColumnOriginTests
             .Find(new PostgresColumnRow(0, "n", 20, 0, 0, null, null, null), PostgresTables.Of(Users))
             .ShouldBeNull();
 
-    // ctid and xmin report their table and an attribute number below zero.  The table may have no column at all,
-    // and may be missing from an answer the test writes: neither is looked at.
+    // ctid and xmin report their table and an attribute number below zero.  Zero is no column either.  The table
+    // may have no column at all, and may be missing from an answer the test writes: neither is looked at.
     [Theory]
     [InlineData(-1)]
     [InlineData(-6)]

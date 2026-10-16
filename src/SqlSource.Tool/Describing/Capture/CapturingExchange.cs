@@ -6,7 +6,7 @@ using SqlSource.Tool.Describing.Describers;
 namespace SqlSource.Tool.Describing.Capture;
 
 /// <summary>
-/// The exchange that records: it asks another exchange, the live one in a real run, and adds each call with its
+/// The exchange that records: it asks another exchange, usually the live one, and adds each call with its
 /// request and its answer to a capture.
 /// </summary>
 /// <remarks>

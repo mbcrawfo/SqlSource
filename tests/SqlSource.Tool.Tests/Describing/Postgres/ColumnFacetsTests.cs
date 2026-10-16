@@ -62,7 +62,8 @@ public class ColumnFacetsTests
     public void Of_IntervalWithThePrecision65535_HasNone() =>
         ColumnFacets.Of("interval", Column(precision: 65535)).ShouldBe(PostgresFacets.None);
 
-    // Npgsql gives an array the numbers of its element: they are dropped.
+    // A type that carries no facet drops what it was given, an array included, to which Npgsql gives the numbers of
+    // its element.
     [Theory]
     [InlineData("text")]
     [InlineData("int4")]
