@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generator;

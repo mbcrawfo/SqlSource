@@ -2,7 +2,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using Xunit;
-using static SqlSource.Tests.Snapshot.TestSidecars;
+using static SqlSource.Testing.Snapshot.TestSidecars;
 
 namespace SqlSource.Tests.Snapshot;
 

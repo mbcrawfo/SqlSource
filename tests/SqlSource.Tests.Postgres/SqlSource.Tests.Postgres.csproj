@@ -22,8 +22,6 @@
         <Compile Include="../SqlSource.Tool.Tests/Fixtures/FixtureCase.cs" Link="Fixtures/FixtureCase.cs" />
         <Compile Include="../SqlSource.Tool.Tests/Fixtures/FixtureCases.cs" Link="Fixtures/FixtureCases.cs" />
         <Compile Include="../SqlSource.Tool.Tests/Fixtures/FixtureReplay.cs" Link="Fixtures/FixtureReplay.cs" />
-        <!-- The builder of a sidecar's records.  tests/SqlSource.Tests owns the file. -->
-        <Compile Include="../SqlSource.Tests/Snapshot/TestSidecars.cs" Link="Snapshot/TestSidecars.cs" />
         <!--
             The harness of a whole command, which DescribeCommandTests runs in process against the container, and
             the start of the built tool and the copy of a fixture project, which ToolProcessTests runs it on.
@@ -66,5 +64,6 @@
     <ItemGroup>
         <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+        <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
     </ItemGroup>
 </Project>

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using Bogus;
 using SqlSource.Snapshot;
-using static SqlSource.Tests.Snapshot.TestSidecars;
+using static SqlSource.Testing.Snapshot.TestSidecars;
 
 namespace SqlSource.Tests.Snapshot;
 

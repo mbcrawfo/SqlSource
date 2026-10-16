@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generator;

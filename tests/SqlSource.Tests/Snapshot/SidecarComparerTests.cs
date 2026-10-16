@@ -3,7 +3,7 @@ using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using SqlSource.Snapshot;
 using Xunit;
-using static SqlSource.Tests.Snapshot.TestSidecars;
+using static SqlSource.Testing.Snapshot.TestSidecars;
 
 namespace SqlSource.Tests.Snapshot;
 

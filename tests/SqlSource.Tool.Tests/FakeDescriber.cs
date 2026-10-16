@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
-using SqlSource.Tests.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
 

@@ -2,7 +2,7 @@ using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Text;
 
-namespace SqlSource.Tests.Generator;
+namespace SqlSource.Testing.Generator;
 
 // A .sql file as the compiler hands it to a generator, without a file on disk.  A null text is a file that cannot be
 // read.

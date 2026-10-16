@@ -5,7 +5,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
-using SqlSource.Tests.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Planning;
 
 namespace SqlSource.Tool.Tests;

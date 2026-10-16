@@ -4,7 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
-using SqlSource.Tests.Snapshot;
+using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;

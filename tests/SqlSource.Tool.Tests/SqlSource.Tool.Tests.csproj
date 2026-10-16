@@ -44,27 +44,10 @@
         -->
         <None Remove="Fixtures/Describers/**" />
         <None Include="Fixtures/Describers/**" CopyToOutputDirectory="PreserveNewest" />
-        <!--
-            The harness of the generator's driver tests, for GeneratorParityTests, which runs the generator and the
-            tool's planner over the same sources.  tests/SqlSource.Tests.RoslynFloor compiles the same files.
-        -->
-        <Compile Include="../SqlSource.Tests/Generator/GeneratorHarness.cs" Link="Generator/GeneratorHarness.cs" />
-        <Compile
-            Include="../SqlSource.Tests/Generator/InMemoryAdditionalText.cs"
-            Link="Generator/InMemoryAdditionalText.cs"
-        />
-        <Compile
-            Include="../SqlSource.Tests/Generator/TestOptionsProvider.cs"
-            Link="Generator/TestOptionsProvider.cs"
-        />
-        <!--
-            The builder of a sidecar's records, with the values a test does not care about filled in, for
-            SidecarFiles.  tests/SqlSource.Tests compiles the same file.
-        -->
-        <Compile Include="../SqlSource.Tests/Snapshot/TestSidecars.cs" Link="Snapshot/TestSidecars.cs" />
     </ItemGroup>
     <ItemGroup>
         <ProjectReference Include="../../src/SqlSource.Tool/SqlSource.Tool.csproj" />
         <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+        <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
     </ItemGroup>
 </Project>

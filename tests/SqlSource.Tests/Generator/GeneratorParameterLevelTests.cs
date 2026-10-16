@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Shouldly;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generator;

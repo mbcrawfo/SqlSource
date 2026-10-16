@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Settings;
-using SqlSource.Tests.Generator;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.MSBuild;
