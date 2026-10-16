@@ -157,8 +157,8 @@ internal sealed class PostgresSession : IDescribeSession
         CancellationToken cancellationToken
     )
     {
-        // Before anything is sent: one statement, of a kind PREPARE takes, and every declared type written as a type
-        // name.
+        // Before anything is sent: one statement, of a kind PREPARE takes, with no "$n" of its own, and every declared
+        // type written as a type name.
         if (ParameterPlaceholders.Rewrite(request.Sql, request.Parameters) is not { } sql)
         {
             return Failed(PostgresErrors.SeveralStatements(request));
@@ -350,9 +350,9 @@ internal sealed class PostgresSession : IDescribeSession
         WalkOutcome? walked
     ) => walked is null ? built : [.. walked.Columns.Select(static column => column.Column)];
 
-    // How many arguments an EXECUTE of the statement takes: a type for each parameter the server resolved, which is
-    // the query's own, since the SQL holds no "$n" of its own.  The describe of "columns" takes any number, and
-    // EXPLAIN EXECUTE refuses any but this one.
+    // How many arguments an EXECUTE of the statement takes: a type for each parameter the server resolved, the
+    // query's own and any "$n" the server read where the tool's lexer did not.  The describe of "columns" takes any
+    // number, and EXPLAIN EXECUTE refuses any but this one.
     private static int ArgumentCount(PostgresPrepareAnswer prepared) =>
         prepared.ParameterTypes?.Count
         ?? throw new InvalidOperationException("The answer to 'prepare' holds no types and no error.");
@@ -418,7 +418,7 @@ internal sealed class PostgresSession : IDescribeSession
 
     // The ancestors of each relation the members of the plan's Appends scan, for the walk to tell a partitioned table
     // from a set operation, or null when the plan has no Append of that shape and nothing is asked.  An error is
-    // logged and never reported: every Append is then read as a set operation, as it was before the call.
+    // logged and never reported: every Append is then read as a set operation, as when no partition is known.
     private async Task<IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>?> PartitionsOfAsync(
         DescribeRequest request,
         PlanNode root,
@@ -762,8 +762,8 @@ internal sealed class PostgresSession : IDescribeSession
         );
 
     // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.  One
-    // with rows says what became of its plan, "not-needed" when it was not gated, and which table its result is,
-    // or the first check of the match that failed.
+    // with rows says what became of its plan, "not-needed" when it was not gated and every column has an origin, and
+    // which table its result is, or the first check of the match that failed.
     private static Outcome<QueryDescription, DescribeFailure> Described(
         IReadOnlyList<DescribedParameter> parameters,
         IReadOnlyList<SidecarColumn> columns,

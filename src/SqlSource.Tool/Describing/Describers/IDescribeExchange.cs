@@ -11,8 +11,9 @@ namespace SqlSource.Tool.Describing.Describers;
 /// </summary>
 /// <remarks>
 /// A request and an answer are plain records that <c>CaptureJson.Options</c> writes and reads, and a call that can
-/// fail on the server returns the failure as its answer.  No exchange looks at either beyond writing it.  The two
-/// other shapes are named and not linked: this folder uses nothing of <c>Describing/Capture/</c>.
+/// fail on the server returns the failure as its answer.  No exchange looks inside either but to write it, and
+/// the replaying one to key a request and read an answer back.  The two other shapes are named and not linked:
+/// this folder uses nothing of <c>Describing/Capture/</c>.
 /// </remarks>
 internal interface IDescribeExchange
 {

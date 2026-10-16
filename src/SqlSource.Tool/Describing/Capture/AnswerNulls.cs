@@ -9,14 +9,15 @@ namespace SqlSource.Tool.Describing.Capture;
 /// Finds a null in an answer where the answer's record says there is none.
 /// </summary>
 /// <remarks>
-/// System.Text.Json reads a member that a capture lacks, or holds as null, as null whatever the record declares.  A
-/// capture may be older than the record, so a nullable member that is absent is what it is; a member that is not
-/// nullable and is null would fail the describer somewhere later, with nothing that names the capture.
+/// System.Text.Json reads a member of a reference type that a capture lacks, or holds as null, as null whatever the
+/// record declares; a missing member of a value type is its default, which this cannot find.  A capture may be
+/// older than the record, so a nullable member that is absent is what it is; a member that is not nullable and is
+/// null would fail the describer somewhere later, with nothing that names the capture.
 /// </remarks>
 internal static class AnswerNulls
 {
     /// <summary>
-    /// The path of the first such member, as the capture's file names it, <c>server.settings[0].value</c> for one,
+    /// The path of the first such member, as the capture's file names it, <c>settings[0].value</c> for one,
     /// or null when the answer has none.
     /// </summary>
     public static string? Find(object answer) => FindIn(answer, string.Empty);

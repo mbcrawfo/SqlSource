@@ -174,8 +174,8 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// </remarks>
     /// <exception cref="NpgsqlException">
     /// The server could not be reached or refused, the driver cannot read the connection string, a file it names
-    /// cannot be read or used, its settings are not supported together, the string sets <c>Multiplexing=true</c>, or
-    /// the connection was open and is so no longer.
+    /// cannot be read or used, its settings are not supported together, the string sets <c>Multiplexing=true</c>, the
+    /// operating system's GSS library cannot be loaded, or the connection was open and is so no longer.
     /// </exception>
     public async Task<NpgsqlConnection> OpenAsync(CancellationToken cancellationToken)
     {

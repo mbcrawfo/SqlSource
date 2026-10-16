@@ -8,8 +8,8 @@ using System.Text.Json.Serialization;
 namespace SqlSource.Tool.Describing.Capture;
 
 /// <summary>
-/// A capture as text: the file of a fixture and of a bug bundle, and the one way a request and an answer are
-/// written.
+/// A capture as text: the file of a fixture and, from phase 10, of a bug bundle, and the one way a request and an
+/// answer are written.
 /// </summary>
 /// <remarks>
 /// The file is indented and its line ends are <c>\n</c> on every platform, so that a capture under version control
