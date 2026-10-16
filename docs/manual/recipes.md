@@ -65,7 +65,7 @@ Rules: [which files belong to a type](generator.md#files-of-a-type), [which `.sq
 
 ## Use several databases
 
-Name the logical database of each file, and give the tool a connection for each name:
+In a PostgreSQL project (`SqlSourceDialect` set to `postgres`), name the logical database of each file, and give the tool a connection for each name:
 
 ```sql postgres
 -- database: billing
@@ -82,7 +82,7 @@ billing (postgres): 4 described, 0 skipped, 0 failed
 reports (postgres): 2 described, 0 skipped, 0 failed
 ```
 
-The files of `reports` start with `-- database: reports`.  A file without the marker belongs to the database named after its dialect.
+The files of `reports` start with `-- database: reports`.
 
 Rules: [database](settings.md#setting-database), [connections](tool.md#connections).
 
@@ -90,7 +90,7 @@ Rules: [database](settings.md#setting-database), [connections](tool.md#connectio
 
 ## Check the sidecars in CI
 
-A build server describes every query against a database that has your schema, and fails when a sidecar that is checked in does not match.  This GitHub Actions job starts PostgreSQL, creates the schema, and runs the check:
+In a PostgreSQL project (`SqlSourceDialect` set to `postgres`), this GitHub Actions job starts PostgreSQL, creates the schema, and fails when a sidecar that is checked in does not match:
 
 ```yaml
 jobs:
@@ -117,13 +117,13 @@ jobs:
           SQLSOURCE_CONNECTION: Host=localhost;Database=postgres;Username=postgres;Password=ci
 ```
 
-The job fails with exit code 2 when a sidecar is out of date, and with 1 when the check could not be made.  `SQLSOURCE_CONNECTION` serves a project with one database; with several, set the variable of each name.
-
-Rules: [check in CI](tool.md#check-in-ci), [connections](tool.md#connections), [exit codes](tool.md#exit-codes), [SQLSRC219](diagnostics.md#sqlsrc219).
+Rules: [check in CI](tool.md#check-in-ci), [connections](tool.md#connections) for the variable, [exit codes](tool.md#exit-codes), [SQLSRC219](diagnostics.md#sqlsrc219).
 
 <a id="after-a-migration"></a>
 
 ## Describe again after a schema change
+
+In a PostgreSQL project (`SqlSourceDialect` set to `postgres`), after a migration:
 
 ```console
 $ dotnet sqlsource describe --force
@@ -132,17 +132,19 @@ $ git add '*.sql.json'
 $ git commit -m "Describe the queries again after the migration"
 ```
 
-The tool cannot see a change to the schema, so `--force` describes every query again, and you commit the sidecars it changed.  Add `--database billing` to describe one database alone.
-
 Rules: [after a schema change](tool.md#after-a-schema-change), [describing again](tool.md#describing-again).
 
 <a id="dapper-and-adonet"></a>
 
 ## Use the queries with Dapper or your own ADO.NET code
 
-The members SqlSource generates are plain strings, so any library can run them:
+The members SqlSource generates are plain strings, so any library can run them.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
 
 ```csharp
+using System.Data.Common;
+using Dapper;
+using SqlSource;
+
 [SqlSourceGenerate]
 public partial class UserRepository(DbConnection connection)
 {
@@ -208,7 +210,5 @@ using SqlSource;
 [SqlSourceGenerate(Path = "Queries")]
 internal static partial class TestQueries;
 ```
-
-Both projects have their own copy of the attribute, and the test project sees two.  It uses its own, and SqlSource turns off the compiler's warning about the conflict (CS0436), so nothing has to be added to `NoWarn`.
 
 Rules: [projects that share internals](generator.md#projects-that-share-internals), and [known issues](generator.md#known-issues) for an editor that still shows the warning.

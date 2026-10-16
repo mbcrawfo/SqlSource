@@ -784,7 +784,7 @@ See: [Known issues](generator.md#known-issues)
 
 **Output needs a dialect that can be described**
 
-A query whose output is `models` or `codegen` gets its types from a database, and SqlSource can ask two: PostgreSQL, the dialect `postgres`, and SQL Server, the dialect `mssql`.  This file has a query with such an output and another dialect.  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
+A query whose output is `models` or `codegen` gets its types from a database, and the dialect SqlSource can describe today is `postgres`.  The dialect `mssql` passes this check, since describing SQL Server queries comes in a later release, and its queries get [SQLSRC216](#sqlsrc216) until then.  This file has a query with such an output and another dialect.  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'codegen' needs a dialect that can be described, and the dialect of this file is 'ansi'.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.

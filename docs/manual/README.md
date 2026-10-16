@@ -32,7 +32,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 
 ## What works today
 
-SqlSource is delivered in phases.  This table is the one list of what works in the current release and what is still to come.  A feature that is coming is marked with a callout on the page that will document it, and the callout links back here.
+SqlSource is delivered in phases.  This table is the one list of what works in the current release and what is still to come.  Where a page for a coming feature exists, it marks the feature with a callout that links back here.
 
 | Feature | Status | Where documented |
 |----|----|----|
