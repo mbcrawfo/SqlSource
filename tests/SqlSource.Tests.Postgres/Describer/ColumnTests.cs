@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
@@ -31,17 +30,6 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     private static string[] TypeNamesOf(IEnumerable<SidecarColumn> columns) =>
         [.. columns.Select(static column => column.Type.Name)];
-
-    // One value from the server, on a connection of the test's own.
-    private async Task<object?> ScalarAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
-    }
-
-    private async Task<int> ServerMajorAsync() =>
-        int.Parse((string)(await ScalarAsync("SHOW server_version_num"))!, CultureInfo.InvariantCulture) / 10000;
 
     [Fact]
     public async Task Describe_Select_IsRowsWithItsColumnsInOrder()
@@ -181,7 +169,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_NumericWithANegativeScale_HasIt()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 15, "PostgreSQL 14 has no negative scale.");
+        postgres.SkipBelow(15, "PostgreSQL 14 has no negative scale.");
 
         var column = (await ColumnsOfAsync("SELECT NULL::numeric(2,-3) AS c")).ShouldHaveSingleItem();
 
@@ -226,7 +214,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         description.ResultKind.ShouldBe(SidecarResultKind.Rows);
         description.Columns.ShouldNotBeNull().Select(column => column.Name).ShouldBe(["id", "placed_at"]);
-        (await ScalarAsync("SELECT count(*) FROM orders")).ShouldBe(0L);
+        (await postgres.ScalarAsync("SELECT count(*) FROM orders")).ShouldBe(0L);
     }
 
     [Fact]
@@ -294,12 +282,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         ORDER BY a.attnum
         """;
 
-    private async Task MakeOwnTablesAsync()
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(OwnTables);
-        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-    }
+    private Task MakeOwnTablesAsync() => postgres.ExecuteAsync(OwnTables);
 
     private async Task<List<string>> FormatTypesOfAsync(string table)
     {
@@ -467,16 +450,12 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_NotNullThatIsNotValid_IsNullable()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "Only PostgreSQL 18 has a NOT NULL that is NOT VALID.");
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        {
-            await using var command = source.CreateCommand(NotValidTable);
-            _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-        }
+        postgres.SkipBelow(18, "Only PostgreSQL 18 has a NOT NULL that is NOT VALID.");
+        await postgres.ExecuteAsync(NotValidTable);
 
         // The premise: the server sets attnotnull for a constraint that is not validated.
         (
-            await ScalarAsync(
+            await postgres.ScalarAsync(
                 "SELECT attnotnull FROM pg_catalog.pg_attribute "
                     + "WHERE attrelid = 'column_not_valid'::regclass AND attname = 'id'"
             )
@@ -504,7 +483,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         {
             await using var made = source.CreateCommand(InheritanceTables);
             _ = await made.ExecuteNonQueryAsync(token);
-            if (await ServerMajorAsync() < 18)
+            if (postgres.Major < 18)
             {
                 await using var dropped = source.CreateCommand("ALTER TABLE inh_child ALTER COLUMN v DROP NOT NULL");
                 _ = await dropped.ExecuteNonQueryAsync(token);
@@ -549,17 +528,11 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ColumnsOfAPartitionedTableWithAForeignPartition_AreNullableByTheCatalog()
     {
-        var token = TestContext.Current.CancellationToken;
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        {
-            await using var made = source.CreateCommand(
-                ForeignPartitionTables(new NpgsqlConnectionStringBuilder(postgres.ConnectionString))
-            );
-            _ = await made.ExecuteNonQueryAsync(token);
-        }
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
+        await postgres.ExecuteAsync(ForeignPartitionTables(connection));
 
         // The premise: a query of the parent returns the remote row's NULL.
-        (await ScalarAsync("SELECT p.v IS NULL FROM fp_parted p WHERE p.id = 1")).ShouldBe(true);
+        (await postgres.ScalarAsync("SELECT p.v IS NULL FROM fp_parted p WHERE p.id = 1")).ShouldBe(true);
 
         var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM fp_parted p");
 
@@ -582,17 +555,11 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ColumnOfAForeignTable_IsUnknownFromTheForeignTable()
     {
-        var token = TestContext.Current.CancellationToken;
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        {
-            await using var made = source.CreateCommand(
-                ForeignTable(new NpgsqlConnectionStringBuilder(postgres.ConnectionString))
-            );
-            _ = await made.ExecuteNonQueryAsync(token);
-        }
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
+        await postgres.ExecuteAsync(ForeignTable(connection));
 
         // The premise: a query of the foreign table returns the remote row's NULL.
-        (await ScalarAsync("SELECT f.v IS NULL FROM ft_foreign f WHERE f.id = 1")).ShouldBe(true);
+        (await postgres.ScalarAsync("SELECT f.v IS NULL FROM ft_foreign f WHERE f.id = 1")).ShouldBe(true);
 
         var plain = await ColumnsOfAsync("SELECT f.id, f.v FROM ft_foreign f");
         var gated = await ColumnsOfAsync("SELECT f.id, j.id AS jid FROM ft_foreign f LEFT JOIN users j ON j.id = f.id");
@@ -702,7 +669,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ReturningOldAndNew_KeepsTheHeuristic()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         var description = await ShouldDescribeAsync(
             "INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING old.id, new.id"
@@ -720,7 +687,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_MergeReturning_ExtendsTheSourceAndNotTheTarget()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 17, "PostgreSQL before 17 has no RETURNING for MERGE.");
+        postgres.SkipBelow(17, "PostgreSQL before 17 has no RETURNING for MERGE.");
 
         var description = await ShouldDescribeAsync(
             "MERGE INTO orders AS o USING users AS u ON o.user_id = u.id "
@@ -757,15 +724,9 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ColumnsOfAViewAndOfAMaterializedView_SayView()
     {
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        await using (
-            var create = source.CreateCommand(
-                "CREATE MATERIALIZED VIEW IF NOT EXISTS column_users AS SELECT id, name FROM users"
-            )
-        )
-        {
-            _ = await create.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-        }
+        await postgres.ExecuteAsync(
+            "CREATE MATERIALIZED VIEW IF NOT EXISTS column_users AS SELECT id, name FROM users"
+        );
 
         var view = await ColumnsOfAsync("SELECT id, name, email, status FROM active_users");
         var materialized = await ColumnsOfAsync("SELECT id FROM column_users");

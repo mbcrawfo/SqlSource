@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
 using Testcontainers.PostgreSql;
@@ -26,10 +29,17 @@ public sealed class PostgresContainer : IAsyncLifetime
     // and the rows that tests count in it stay as they are.
     public const string RealisticDatabase = "realistic";
 
+    // Why a test of old and new in RETURNING skips before PostgreSQL 18.
+    public const string NoOldAndNewInReturning = "PostgreSQL before 18 has no old and new in RETURNING.";
+
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(Image).WithDatabase(Database).Build();
 
     // The server's major version, read once when the container has started.
     public int Major { get; private set; }
+
+    // The majors that CI runs and that are recorded on: a realistic case's description, the noise budget and the
+    // forms of a plan that the tests pin.
+    public static IReadOnlyList<int> RecordedMajors { get; } = [14, 18];
 
     public static string Image =>
         Environment.GetEnvironmentVariable(ImageVariable) is { Length: > 0 } image ? image : DefaultImage;
@@ -43,6 +53,39 @@ public sealed class PostgresContainer : IAsyncLifetime
     // Of the database "realistic".
     public string RealisticConnectionString =>
         new NpgsqlConnectionStringBuilder(ConnectionString) { Database = RealisticDatabase }.ConnectionString;
+
+    // Runs one statement of the test's own on the database "fixtures".
+    public async Task ExecuteAsync(string sql)
+    {
+        await using var source = NpgsqlDataSource.Create(ConnectionString);
+        await using var command = source.CreateCommand(sql);
+        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+    }
+
+    // One value from the server, on the database "fixtures".
+    public async Task<object?> ScalarAsync(string sql)
+    {
+        await using var source = NpgsqlDataSource.Create(ConnectionString);
+        await using var command = source.CreateCommand(sql);
+        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+    }
+
+    // Skips the test on a server before that major, which lacks what the reason names.
+    public void SkipBelow(int major, string reason) => SkipBelow(Major, major, reason);
+
+    public static void SkipBelow(int server, int major, string reason) => Assert.SkipWhen(server < major, reason);
+
+    // Skips the test on a server whose major is not recorded, where what it pins has no expectation.
+    public void SkipUnlessRecordedMajor(string what) => SkipUnlessRecordedMajor(Major, what);
+
+    public static void SkipUnlessRecordedMajor(int server, string what) =>
+        Assert.SkipUnless(
+            RecordedMajors.Contains(server),
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"{what} are pinned for PostgreSQL {string.Join(" and ", RecordedMajors)} alone."
+            )
+        );
 
     public async ValueTask InitializeAsync()
     {

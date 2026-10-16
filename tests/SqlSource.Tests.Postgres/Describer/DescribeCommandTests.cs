@@ -72,14 +72,6 @@ public sealed class DescribeCommandTests : IDisposable
     private Task<CliResult> DescribeWithAsync(string connection, params string[] args) =>
         _run.RunAsync(["describe", "--connection", Database + "=" + connection, .. args]);
 
-    // Runs a statement on a connection of the test's own, outside a transaction.
-    private async Task<object?> ExecuteAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(_postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
-    }
-
     // An entry as two runs that describe the same query give it: where its name stands in the text, the version of
     // the server and the name of the database are left out.
     private static SidecarEntry Comparable(SidecarEntry entry) =>
@@ -148,13 +140,13 @@ public sealed class DescribeCommandTests : IDisposable
     [Fact]
     public async Task Check_ColumnAddedAfterDescribe_DiffersUntilDescribedWithForce()
     {
-        _ = await ExecuteAsync("CREATE TABLE command_widgets (id integer PRIMARY KEY, name text NOT NULL)");
+        await _postgres.ExecuteAsync("CREATE TABLE command_widgets (id integer PRIMARY KEY, name text NOT NULL)");
         try
         {
             var widgets = AddSql("widgets.sql", "-- name: GetWidgets\nSELECT * FROM command_widgets;\n");
             var described = await DescribeAsync();
             described.ExitCode.ShouldBe(0, described.Error);
-            _ = await ExecuteAsync("ALTER TABLE command_widgets ADD COLUMN note text");
+            await _postgres.ExecuteAsync("ALTER TABLE command_widgets ADD COLUMN note text");
 
             var check = await DescribeAsync("--check");
 
@@ -170,7 +162,7 @@ public sealed class DescribeCommandTests : IDisposable
         }
         finally
         {
-            _ = await ExecuteAsync("DROP TABLE IF EXISTS command_widgets");
+            await _postgres.ExecuteAsync("DROP TABLE IF EXISTS command_widgets");
         }
     }
 
@@ -288,14 +280,17 @@ public sealed class DescribeCommandTests : IDisposable
     // CREATE ROLE and CREATE DATABASE have no IF NOT EXISTS, and the container outlives the test.
     private async Task CreateLogRoleAndDatabaseAsync()
     {
-        if (await ExecuteAsync($"SELECT count(*) FROM pg_catalog.pg_roles WHERE rolname = '{LogRole}'") is 0L)
+        if (await _postgres.ScalarAsync($"SELECT count(*) FROM pg_catalog.pg_roles WHERE rolname = '{LogRole}'") is 0L)
         {
-            _ = await ExecuteAsync($"CREATE ROLE {LogRole} LOGIN PASSWORD '{Secrets.Marker}'");
+            await _postgres.ExecuteAsync($"CREATE ROLE {LogRole} LOGIN PASSWORD '{Secrets.Marker}'");
         }
 
-        if (await ExecuteAsync($"SELECT count(*) FROM pg_catalog.pg_database WHERE datname = '{LogDatabase}'") is 0L)
+        if (
+            await _postgres.ScalarAsync($"SELECT count(*) FROM pg_catalog.pg_database WHERE datname = '{LogDatabase}'")
+            is 0L
+        )
         {
-            _ = await ExecuteAsync($"CREATE DATABASE {LogDatabase} OWNER {LogRole}");
+            await _postgres.ExecuteAsync($"CREATE DATABASE {LogDatabase} OWNER {LogRole}");
         }
     }
 }

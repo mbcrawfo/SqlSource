@@ -204,7 +204,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_TableDroppedBetweenColumnsAndTables_IsSqlsrc225AtCatalogAndNoThrow()
     {
-        await ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
+        await postgres.ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
         var capture = new DescribeCapture("postgres");
         var exchange = new DropsTheTableAfterColumns(postgres.ConnectionString);
         var opened = await Sessions.OpenAsync(postgres.ConnectionString, new CapturingExchange(exchange, capture));
@@ -249,13 +249,6 @@ public sealed class SessionTests(PostgresContainer postgres)
         described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
         var sent = exchange.Sent.ShouldNotBeNull();
         exchange.Listed.ShouldBe(ParameterPlaceholders.PrepareText(sent.Statement, sent.Types, sent.Sql));
-    }
-
-    private async Task ExecuteAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     private static DescribeFailure ShouldBeRejected(

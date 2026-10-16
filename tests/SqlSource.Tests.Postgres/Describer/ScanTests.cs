@@ -45,13 +45,6 @@ public sealed class ScanTests(PostgresContainer postgres)
         );
     }
 
-    private async Task RunAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-    }
-
     // The row-number dedupe: the subquery is planned apart, under a Subquery Scan, and its LEFT JOIN extends orders.
     [Fact]
     public async Task Describe_ColumnsThroughASubqueryScan_AreAnsweredByTheirOrigins() =>
@@ -99,7 +92,7 @@ public sealed class ScanTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_PartitionedTableOnEachSideOfALeftJoin_IsAnsweredByItsSide()
     {
-        await RunAsync(ScratchSchema.Partitioned);
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
         (
             await WalkedAsync(
@@ -117,7 +110,7 @@ public sealed class ScanTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_AggregateOverAPartitionedTable_IsAnswered()
     {
-        await RunAsync(ScratchSchema.Partitioned);
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
         (await WalkedAsync("SELECT count(*) AS n, 'p' AS k FROM scratch_parts p WHERE p.kind = @kind")).ShouldBe([
             Expression,
@@ -138,7 +131,7 @@ public sealed class ScanTests(PostgresContainer postgres)
     )]
     public async Task Describe_UnionAllOfTwoPartitionsWithOtherBranches_StaysUnknown(string sql)
     {
-        await RunAsync(ScratchSchema.Partitioned);
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
         (await DescribedAsync(sql)).Answers.ShouldBe([Unknown]);
     }
@@ -149,7 +142,7 @@ public sealed class ScanTests(PostgresContainer postgres)
     public async Task Describe_ForeignTableOnEachSideOfALeftJoin_IsAnsweredByItsSide()
     {
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
-        await RunAsync(
+        await postgres.ExecuteAsync(
             "CREATE EXTENSION IF NOT EXISTS postgres_fdw; "
                 + "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_foreign_server WHERE srvname = 'scan_loop') THEN "
                 + "CREATE SERVER scan_loop FOREIGN DATA WRAPPER postgres_fdw "

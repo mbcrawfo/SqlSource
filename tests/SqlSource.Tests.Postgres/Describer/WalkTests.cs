@@ -1,8 +1,6 @@
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Npgsql;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
@@ -34,17 +32,6 @@ public sealed class WalkTests(PostgresContainer postgres)
             .. description.Columns.ShouldNotBeNull().Select(static column => (column.Nullable, column.NullableSource)),
         ];
     }
-
-    // One value from the server, on a connection of the test's own.
-    private async Task<object?> ScalarAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
-    }
-
-    private async Task<int> ServerMajorAsync() =>
-        int.Parse((string)(await ScalarAsync("SHOW server_version_num"))!, CultureInfo.InvariantCulture) / 10000;
 
     // A left join: the side it keeps is not null by the catalog, and the side it extends is nullable by the join.
     [Fact]
@@ -145,7 +132,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_InsertSelectFromATableAliasedOld_KeepsTheHeuristicForOld()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         (
             await WalkedAsync(
@@ -159,7 +146,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_InsertSelectFromATableQuotedOld_KeepsTheHeuristicForOld()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         (
             await WalkedAsync(
@@ -173,7 +160,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ReturningQuotedOldWithNoOtherGateWord_IsGatedAndKeepsTheHeuristic()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         (
             await WalkedAsync("INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING \"old\".id")
@@ -184,7 +171,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_OldAliasThatIsAlsoATablesAlias_IsRefusedByTheServer()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         var described = await Sessions.DescribeAsync(
             postgres.ConnectionString,
@@ -207,7 +194,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_JoinConditionTheNewerPlannerProvesFalse_IsNullableOnEveryVersion()
     {
-        var proved = await ServerMajorAsync() >= 17;
+        var proved = postgres.Major >= 17;
 
         var columns = await WalkedAsync(
             "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id AND o.id IS NULL"
@@ -235,11 +222,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_PartitionedTable_IsAnsweredByItsSide()
     {
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        await using (var create = source.CreateCommand(ScratchSchema.Partitioned))
-        {
-            _ = await create.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-        }
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
         (await WalkedAsync("SELECT p.id, u.name FROM scratch_parts p LEFT JOIN users u ON u.id = p.id")).ShouldBe([
             (false, "catalog"),

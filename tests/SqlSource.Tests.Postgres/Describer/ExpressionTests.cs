@@ -1,6 +1,5 @@
 using System.Linq;
 using System.Threading.Tasks;
-using Npgsql;
 using Shouldly;
 using Xunit;
 
@@ -27,13 +26,6 @@ public sealed class ExpressionTests(PostgresContainer postgres)
                 .Columns.ShouldNotBeNull()
                 .Select(static column => (column.Nullable, column.NullableSource)),
         ];
-    }
-
-    private async Task RunAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     [Fact]
@@ -74,7 +66,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_CountOfAnArgumentThatAnotherSchemaTakes_StaysUnknown()
     {
-        await RunAsync(ScratchSchema.ShadowCount);
+        await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
 
         (
             await AnswersAsync(
@@ -122,7 +114,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ExpressionUnderAnAntiJoinOfAView_StaysUnknown()
     {
-        await RunAsync(
+        await postgres.ExecuteAsync(
             "CREATE OR REPLACE VIEW expression_lonely AS SELECT u.id, s.k FROM users u "
                 + "LEFT JOIN (SELECT o.user_id, 'x'::text AS k FROM orders o) s ON s.user_id = u.id "
                 + "WHERE s.user_id IS NULL"
@@ -150,7 +142,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_PartitionedTableAggregate_IsAnswered()
     {
-        await RunAsync(ScratchSchema.Partitioned);
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
         (await AnswersAsync("SELECT count(*) AS n FROM scratch_parts")).ShouldBe([NotNull]);
     }
@@ -159,7 +151,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_CountShadowedOnTheSearchPath_StaysUnknown()
     {
-        await RunAsync(ScratchSchema.ShadowCount);
+        await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
 
         (
             await AnswersAsync(

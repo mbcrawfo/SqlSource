@@ -57,15 +57,13 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
         var found = RealisticDescribe.Start(name, postgres.Major);
         var path = found.ExpectedPath(postgres.Major);
         var expectation = RealisticDescribe.ExpectationOn(Recording, postgres.Major);
-        if (expectation == Expectation.Skip)
-        {
-            Assert.Skip(RealisticDescribe.SkipMessage);
-        }
-
+        // A recording on a major that is not recorded fails before the skip, which would hide it.
         if (expectation == Expectation.Refuse)
         {
             Assert.Fail(RealisticDescribe.RefuseMessage);
         }
+
+        postgres.SkipUnlessRecordedMajor("The expectations");
 
         var rendered = RealisticDescribe.Render(
             await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString)

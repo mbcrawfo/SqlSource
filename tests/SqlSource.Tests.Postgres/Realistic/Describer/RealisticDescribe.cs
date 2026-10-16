@@ -33,8 +33,6 @@ public enum Expectation
 // are here too: that the server runs the case, and that a description has the columns of the truth.
 internal static class RealisticDescribe
 {
-    public const string SkipMessage = "The expectations are recorded on PostgreSQL 14 and 18 alone.";
-
     public const string RefuseMessage = "Record on PostgreSQL 14 or 18.";
 
     // What is not there, in a rendered line.
@@ -47,7 +45,7 @@ internal static class RealisticDescribe
     );
 
     public static Expectation ExpectationOn(bool recording, int major) =>
-        (recording, RealisticCase.RecordedMajors.Contains(major)) switch
+        (recording, PostgresContainer.RecordedMajors.Contains(major)) switch
         {
             (true, true) => Expectation.Record,
             (true, false) => Expectation.Refuse,

@@ -29,12 +29,13 @@ internal sealed record RealisticCase(
     // The truth and the sample values, written by hand.  Recording never writes it.
     public const string CaseFile = "case.json";
 
-    // The majors that a case's description and the noise budget are recorded on, as CI runs them.
-    public static IReadOnlyList<int> RecordedMajors { get; } = [14, 18];
-
     // The files of the case's folder: its query, its truth, and the description of each recorded major it runs on.
     public IReadOnlyList<string> Files =>
-        [QueryFile, CaseFile, .. RecordedMajors.Where(RunsOn).Select(major => Path.GetFileName(ExpectedPath(major)))];
+        [
+            QueryFile,
+            CaseFile,
+            .. PostgresContainer.RecordedMajors.Where(RunsOn).Select(major => Path.GetFileName(ExpectedPath(major))),
+        ];
 
     // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
     public bool RunsOn(int major) => MinimumMajor is not { } minimum || minimum <= major;

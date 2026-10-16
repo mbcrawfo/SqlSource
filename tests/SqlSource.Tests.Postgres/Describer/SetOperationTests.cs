@@ -30,10 +30,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
 
     private async Task<(bool? Nullable, string? Source)[]> WalkedAsync(string sql)
     {
-        if (postgres.Major is not (14 or 18))
-        {
-            Assert.Skip("The set operations are pinned for PostgreSQL 14 and 18 alone.");
-        }
+        postgres.SkipUnlessRecordedMajor("The set operations");
 
         var described = await Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql));
 
@@ -44,13 +41,6 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         [
             .. description.Columns.ShouldNotBeNull().Select(static column => (column.Nullable, column.NullableSource)),
         ];
-    }
-
-    private async Task RunAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
     }
 
     // Whether the query returns a NULL in the column over the rows of the setup, which are rolled back.
@@ -243,7 +233,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_UnionAllOfAPartitionedTable_IsAnsweredByItsColumns()
     {
-        await RunAsync(ScratchSchema.Partitioned);
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
         var sql = "SELECT p.id, p.note FROM scratch_parts p UNION ALL SELECT o.user_id, o.note FROM orders o";
 
         (await WalkedAsync(sql)).ShouldBe([Proven, Unknown]);
@@ -257,7 +247,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ConstantOverAPartitionedTablesRootAppend_IsAnExpression()
     {
-        await RunAsync(ScratchSchema.Partitioned);
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
         (await WalkedAsync("SELECT p.id, 'x'::text AS k, 1 AS one FROM scratch_parts p")).ShouldBe([
             (false, "catalog"),
@@ -369,7 +359,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ViewWhoseSubqueryIsNamedLikeALeafScan_StaysUnknown()
     {
-        await RunAsync(
+        await postgres.ExecuteAsync(
             "CREATE OR REPLACE VIEW setop_leaf_alias AS SELECT \"*SELECT* 9\".b, \"*SELECT* 9\".a FROM "
                 + "(SELECT u.name AS a, NULLIF(u.name, 'x') AS b FROM users u OFFSET 0) AS \"*SELECT* 9\""
         );
@@ -428,7 +418,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_UnionAllOfAnInlinedFunctionWithALimitBranch_StaysUnknown()
     {
-        await RunAsync(
+        await postgres.ExecuteAsync(
             "CREATE OR REPLACE FUNCTION setop_pairs() RETURNS TABLE (a varchar, b varchar) LANGUAGE sql STABLE AS "
                 + "$$ SELECT u.name, u.name FROM users u "
                 + "UNION ALL (SELECT x.name, NULLIF(x.name, 'x') FROM users x LIMIT 5) $$"
