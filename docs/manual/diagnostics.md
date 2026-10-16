@@ -2,6 +2,8 @@
 
 Every problem SqlSource finds is an error, and none can be turned off or made a warning.  The generator reports its errors in the build.  An error in a `.sql` file is reported at its line and column in that file, and a `.sql` file with an error produces no members until the error is fixed.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error.
 
+**Project and attribute**
+
 | Id | Title |
 |----|----|
 | [SQLSRC001](#sqlsrc001) | Type must be partial |
@@ -17,6 +19,11 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC012](#sqlsrc012) | Language version is not supported |
 | [SQLSRC013](#sqlsrc013) | SQL file paths differ only by case |
 | [SQLSRC014](#sqlsrc014) | MSBuild setting is not valid |
+
+**`.sql` files**
+
+| Id | Title |
+|----|----|
 | [SQLSRC101](#sqlsrc101) | Quote is not closed |
 | [SQLSRC102](#sqlsrc102) | Comment is not closed |
 | [SQLSRC103](#sqlsrc103) | Query name is not valid |
@@ -36,6 +43,11 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC117](#sqlsrc117) | Parameter has no type |
 | [SQLSRC118](#sqlsrc118) | Parameter is not declared |
 | [SQLSRC119](#sqlsrc119) | Query has no parameters |
+
+**The tool**
+
+| Id | Title |
+|----|----|
 | [SQLSRC200](#sqlsrc200) | The tool failed unexpectedly |
 | [SQLSRC201](#sqlsrc201) | No project or solution found |
 | [SQLSRC202](#sqlsrc202) | More than one project or solution found |
@@ -60,6 +72,11 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC221](#sqlsrc221) | Sidecar was written by a newer tool |
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
+
+**PostgreSQL**
+
+| Id | Title |
+|----|----|
 | [SQLSRC224](#sqlsrc224) | Database could not be opened |
 | [SQLSRC225](#sqlsrc225) | Server rejected the query |
 | [SQLSRC226](#sqlsrc226) | Parameter type could not be determined |
@@ -1098,7 +1115,7 @@ A type whose name or whose schema's name needs quotes (`"My Schema"."Status"`), 
     help: Npgsql cannot send a value of this type; declare the parameter as text with -- param: and cast it to the type where it is used; a later version may let a project declare a conversion for the type
 ```
 
-Declare the parameter as `text` and cast it where it is used: `-- param: @pair text` with `@pair::public.pair` in the SQL.  A way for a project to declare a conversion of its own for such a type, for parameters, models and generated code, is planned work that is not done, tracked as [D-0003](deferred/D-0003-custom-type-conversion.md).  For a type with no name the help is `the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare the parameter as text with -- param: and cast it to the type where it is used`.  The error is also given for a parameter that only a `-- param:` marker declares: Npgsql resolves the type of every parameter it is handed.
+Declare the parameter as `text` and cast it where it is used: `-- param: @pair text` with `@pair::public.pair` in the SQL.  A way for a project to declare a conversion of its own for such a type, for parameters, models and generated code, is planned work that is not done, tracked as [D-0003](../deferred/D-0003-custom-type-conversion.md).  For a type with no name the help is `the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare the parameter as text with -- param: and cast it to the type where it is used`.  The error is also given for a parameter that only a `-- param:` marker declares: Npgsql resolves the type of every parameter it is handed.
 
 ## SQLSRC233
 
@@ -1117,7 +1134,7 @@ Give the query `-- output: sql`: its SQL is still a string constant, or a method
 
 `SELECT ... INTO` is refused as `SELECT INTO` on every version of the server.  PostgreSQL 15 and later prepare it and 14 does not, but it creates a table, as `CREATE TABLE AS` does, and a sidecar must not depend on the server it was described against.  Write `CREATE TABLE ... AS` with `-- output: sql`, or select the rows and insert them in a second query.  A statement that the tool's check misses and that the server names as one it cannot prepare, `42P14: utility statements cannot be prepared`, is this error too, and the message then reads "is a utility statement".
 
-A word that the tool does not know stays [SQLSRC225](#sqlsrc225): `SELEC 1` is a typo and the server says so.  Describing `CALL` and data definition is tracked as [D-0002](deferred/D-0002-describing-call-and-data-definition.md).
+A word that the tool does not know stays [SQLSRC225](#sqlsrc225): `SELEC 1` is a typo and the server says so.  Describing `CALL` and data definition is tracked as [D-0002](../deferred/D-0002-describing-call-and-data-definition.md).
 
 ## SQLSRC234
 

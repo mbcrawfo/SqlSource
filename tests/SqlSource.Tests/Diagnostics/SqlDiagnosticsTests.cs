@@ -40,7 +40,7 @@ public class SqlDiagnosticsTests
         {
             // The anchor of a heading is its text in lower case, and an id is "SQLSRC" followed by digits.
             descriptor.HelpLinkUri.ShouldBe(
-                "https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc" + descriptor.Id[6..]
+                "https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc" + descriptor.Id[6..]
             );
         }
     }

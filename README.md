@@ -57,7 +57,7 @@ The package is a development dependency.  It adds nothing to your application's 
 - Without `Path`, the type gets every `.sql` file in the folder of the source file that carries the attribute.  Subfolders are not searched.
 - A `Path` that ends in `.sql` names one file: `[SqlSourceGenerate(Path = "Queries/Users.sql")]`.
 - Any other `Path` names a folder: `[SqlSourceGenerate(Path = "../Queries")]`.
-- `Path` is always relative to the folder of the source file, never to the project.  Both `/` and `\` separate folders, and paths are compared ignoring case, so a project builds the same on every operating system.  Two `.sql` files of a type whose paths differ only by case are therefore an error, [SQLSRC013](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc013).
+- `Path` is always relative to the folder of the source file, never to the project.  Both `/` and `\` separate folders, and paths are compared ignoring case, so a project builds the same on every operating system.  Two `.sql` files of a type whose paths differ only by case are therefore an error, [SQLSRC013](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc013).
 - Two types may use the same file.  A `.sql` file that no type uses is ignored, so a folder of migration scripts elsewhere in the project does no harm.
 
 ### Locations
@@ -132,7 +132,7 @@ Words are matched ignoring case.  A marker that describes one query goes inside 
 | `input-model`, `output-model` | no | yes | A type's name, or its full name |
 | `collection-type` | yes | yes | A collection type |
 
-A marker inside a query wins over the same marker before the first query.  Writing a marker twice in one place is fine when the value is the same, and the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112) when it is not.  A marker where its column says no is the error [SQLSRC116](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc116), with two exceptions: a `-- summary:` before the first `-- name:` line is [SQLSRC107](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc107), and a `-- dialect:` that is inside a query or after SQL is [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc115).  A comment of yours that happens to start with one of these words and a colon is read as a marker: reword it.
+A marker inside a query wins over the same marker before the first query.  Writing a marker twice in one place is fine when the value is the same, and the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc112) when it is not.  A marker where its column says no is the error [SQLSRC116](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc116), with two exceptions: a `-- summary:` before the first `-- name:` line is [SQLSRC107](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc107), and a `-- dialect:` that is inside a query or after SQL is [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc115).  A comment of yours that happens to start with one of these words and a colon is read as a marker: reword it.
 
 ### What reaches the generated SQL
 
@@ -217,10 +217,10 @@ SELECT id FROM notes WHERE body = 'it\'s here'; # MySQL reads this as a comment
 
 The marker wins over the metadata, and the metadata over the property.  A file has one dialect:
 
-- The marker goes before the file's first `-- name:` line and before its first SQL.  Anywhere else it is the error [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc115).
+- The marker goes before the file's first `-- name:` line and before its first SQL.  Anywhere else it is the error [SQLSRC115](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc115).
 - Its value is the rest of the line: a dialect name, then any options, separated by commas, with any spaces around them.  Nothing else may follow it on the line.
 - It takes effect on the line after it.  Comments above it, such as a licence header, are read by the dialect that the metadata or the property gives.
-- A name that is not a dialect is an error: [SQLSRC011](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc011) in the property or the metadata, [SQLSRC111](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc111) in the marker.
+- A name that is not a dialect is an error: [SQLSRC011](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc011) in the property or the metadata, [SQLSRC111](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc111) in the marker.
 
 ### Options of a dialect
 
@@ -283,7 +283,7 @@ SqlSource reads these differently from the database, whatever the dialect:
 | Construct | Database | How SqlSource reads it |
 |----|----|----|
 | A versioned comment whose body holds a string that contains `*/`, such as `/*!50700 SELECT '*/' */` | MySQL, MariaDB | The comment ends at the first `*/`.  Where the server ends it depends on the server's version. |
-| A block comment that is still open at the end of the file | SQLite | The error [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc102) |
+| A block comment that is still open at the end of the file | SQLite | The error [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc102) |
 | A file whose lines end with a carriage return alone, with no line feed | MySQL, SQLite, CockroachDB | A line ends there, as in every dialect.  These databases end a `--` comment only at a line feed. |
 | A client command that is not SQL: `DELIMITER`, `GO`, SQL*Plus `PROMPT` and `REM`, a psql `\` command | All | As SQL, so a quote in it can open a string |
 
@@ -291,7 +291,7 @@ And `ansi` reads the SQL of every database by one set of rules, so it misreads e
 
 A misread has one of two results:
 
-- **A build error** that reports an unclosed quote or comment ([SQLSRC101](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc101), [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc102)) in SQL that is valid for your database.  `keep-comments` does not help.
+- **A build error** that reports an unclosed quote or comment ([SQLSRC101](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc101), [SQLSRC102](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc102)) in SQL that is valid for your database.  `keep-comments` does not help.
 - **Missing SQL.**  The misread quotes happen to balance, and the SQL after them is taken for a comment and removed: under `ansi`, `SELECT 'a\'b -- c', 2` becomes `SELECT 'a\'b`.  Nothing is reported.  `keep-comments` on the query prevents the removal.
 
 If your SQL uses one of these constructs, check the generated SQL: hover over the member, or read its documentation.
@@ -315,7 +315,7 @@ WHERE created_at >= @since AND (@name IS NULL OR name = @name) {{paging:LIMIT 20
 
 - The form is `@name`, then a type, then `null` or `not null`; the type and the last part are each optional.  The type is in the database's own words and is not checked here: `decimal(18,2)`, `double precision`.
 - `not null` says what saying nothing says.  It is accepted because it is what a column definition says.
-- A parameter that the query's SQL does not hold, because it comes only with a token, must be declared with its type: without one it is the error [SQLSRC117](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc117).  A parameter that appears only in a token's default and is not declared is [SQLSRC118](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc118).
+- A parameter that the query's SQL does not hold, because it comes only with a token, must be declared with its type: without one it is the error [SQLSRC117](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc117).  A parameter that appears only in a token's default and is not declared is [SQLSRC118](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc118).
 - Under `mssql`, a name that the query declares with `DECLARE` is a local variable and not a parameter, wherever the query writes it: the only parameter of `DECLARE @n int = @start; SELECT @n` is `@start`.  A list of declarations ends at a `;` or at the word that starts the next statement.  If a name is taken for a variable and is a parameter, a `-- param:` marker with its type makes it one.  Under every other dialect the name is read as a parameter.
 - A MySQL user variable is read as a parameter, and so are the parameters of a procedure that the SQL creates, and `@x` written for PostgreSQL's absolute value of `x`: write `abs(x)`.
 
@@ -336,7 +336,7 @@ var sql = Sql.ListFrom("users", "name DESC");
 // SELECT id, name FROM users ORDER BY name DESC;
 ```
 
-- A token's name is a C# identifier that is not a reserved keyword; a keyword is the error [SQLSRC114](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc114).  Spaces and tabs inside the braces are ignored.
+- A token's name is a C# identifier that is not a reserved keyword; a keyword is the error [SQLSRC114](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc114).  Spaces and tabs inside the braces are ignored.
 - Names are case-sensitive: `{{Table}}` and `{{table}}` are two parameters.
 - A name that is used more than once is one parameter, and every occurrence is replaced.
 - A token is replaced wherever it is written, including inside a string or a quoted identifier.
@@ -360,7 +360,7 @@ ORDER BY {{orderBy:name}};
 A default is a sample of what the caller will pass.  It changes nothing that is generated today: the method still takes each token as a `string`, and nothing uses the default at run time.  It is there for the tool that will describe a query to its database, which needs SQL it can send.
 
 - A `-- token:` marker inside a query gives the default for a token that the query writes several times, or whose sample is long.  Its value is exactly what the SQL would hold: one token with its default.
-- Two defaults for one token of a query must be the same.  Two that differ are the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc112).  A comment makes two that look the same differ: a default in the SQL is read without its comments, and a `-- token:` marker's is read as written, so `{{f:a /* c */ b}}` in both places is that error.  Keep comments out of defaults.
+- Two defaults for one token of a query must be the same.  Two that differ are the error [SQLSRC112](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc112).  A comment makes two that look the same differ: a default in the SQL is read without its comments, and a `-- token:` marker's is read as written, so `{{f:a /* c */ b}}` in both places is that error.  Keep comments out of defaults.
 - `{{a:b}}` in SQL that does not mean a token, the text of a template for example, is kept as written by a `-- token-ignore: a` marker.
 
 **Tokens are for trusted text only.**  A token is replaced by string concatenation.  Nothing is escaped, quoted or checked for safety, so a value that a user can influence is a SQL injection.  Use a token for a fragment that your own code chooses, such as a table name from a fixed list, and a query parameter for every value.
@@ -409,7 +409,7 @@ Where the methods go is decided where the type is declared, as `SqlLocation` is:
 
 ## Errors
 
-Every problem SqlSource finds is a build error with an id that starts `SQLSRC`.  An error in a `.sql` file is reported at its line and column in that file, and that file produces no members until it is fixed.  [docs/diagnostics.md](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md) explains each one.
+Every problem SqlSource finds is a build error with an id that starts `SQLSRC`.  An error in a `.sql` file is reported at its line and column in that file, and that file produces no members until it is fixed.  [docs/manual/diagnostics.md](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md) explains each one.
 
 ## MSBuild
 
@@ -447,7 +447,7 @@ To turn the default off and list the files yourself:
 </ItemGroup>
 ```
 
-A word that is not a generator parameter is the error [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).  The compiler hands a generator only the part of a value before the first `;` or `#`, so separate the words with spaces or with line breaks: the list may be written with one word on each line.
+A word that is not a generator parameter is the error [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc014).  The compiler hands a generator only the part of a value before the first `;` or `#`, so separate the words with spaces or with line breaks: the list may be written with one word on each line.
 
 ### Settings for models and methods
 
@@ -478,13 +478,13 @@ The package removes the white space around the value of each property and metada
 </PropertyGroup>
 ```
 
-A line break inside one word puts a space there: `App.` and `Models` on two lines are `App. Models`, which is not a namespace and is reported as [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc014).
+A line break inside one word puts a space there: `App.` and `Models` on two lines are `App. Models`, which is not a namespace and is reported as [SQLSRC014](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc014).
 
 ## Supported environments
 
-A project that uses SqlSource must target .NET 8 or later; the generated code relies on it, and an older target is reported as [SQLSRC003](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc003).
+A project that uses SqlSource must target .NET 8 or later; the generated code relies on it, and an older target is reported as [SQLSRC003](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc003).
 
-The generated code is C# 12, the default language version of a project that targets .NET 8.  A project that sets `LangVersion` below 12 gets [SQLSRC012](https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#sqlsrc012).
+The generated code is C# 12, the default language version of a project that targets .NET 8.  A project that sets `LangVersion` below 12 gets [SQLSRC012](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#sqlsrc012).
 
 The generator is compiled against Roslyn 4.8.0, so it loads in the .NET 8 SDK and later and in Visual Studio 2022 17.8 and later.  Older SDKs and IDEs are not supported.
 

@@ -8,7 +8,7 @@ namespace SqlSource.Tool.Reporting;
 /// <summary>
 /// One error of the tool, as data.  <see cref="Reporter" /> writes it.
 /// </summary>
-/// <param name="Descriptor">What is wrong.  Its id has a section in <c>docs/diagnostics.md</c>.</param>
+/// <param name="Descriptor">What is wrong.  Its id has a section in <c>docs/manual/diagnostics.md</c>.</param>
 /// <param name="Path">The full path of the file the error is about, or null when it is about no file.</param>
 /// <param name="Position">Where in the file, counted from zero, or null.  Never set without a path.</param>
 /// <param name="Arguments">The text the descriptor's message quotes.</param>

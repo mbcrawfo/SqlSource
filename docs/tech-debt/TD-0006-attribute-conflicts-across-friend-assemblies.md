@@ -24,7 +24,7 @@ The suppressor is also code that exists only for this: it binds the name at each
 
 ## Proposed fix
 
-When the floor reaches Roslyn 4.14, call `AddEmbeddedAttributeDefinition` in the post-initialization step and mark every generated type with `[Microsoft.CodeAnalysis.Embedded]`.  Then delete `AttributeConflictSuppressor`, the `#pragma` in the generated file, the paragraph on `SQLSRC901` in `docs/diagnostics.md` and the section "Projects that share internals" in `README.md`.  Keep the tests of `AttributeConflictTests` that expect no CS0436, and make them pass with no analyzer loaded.
+When the floor reaches Roslyn 4.14, call `AddEmbeddedAttributeDefinition` in the post-initialization step and mark every generated type with `[Microsoft.CodeAnalysis.Embedded]`.  Then delete `AttributeConflictSuppressor`, the `#pragma` in the generated file, the paragraph on `SQLSRC901` in `docs/manual/diagnostics.md` and the section "Projects that share internals" in `README.md`.  Keep the tests of `AttributeConflictTests` that expect no CS0436, and make them pass with no analyzer loaded.
 
 ## Trigger
 

@@ -11,8 +11,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Diagnostics;
 
-// docs/diagnostics.md is the list of diagnostics a user reads.  These tests keep it complete: a descriptor that is
-// added, removed or renamed fails the build of this project's tests until the document says the same.
+// docs/manual/diagnostics.md is the list of diagnostics a user reads.  These tests keep it complete: a descriptor that
+// is added, removed or renamed fails the build of this project's tests until the document says the same.
 public class DiagnosticsDocumentTests
 {
     private const string HeadingPrefix = "## ";
@@ -23,7 +23,7 @@ public class DiagnosticsDocumentTests
     );
 
     private static readonly string[] Lines = File.ReadAllLines(
-        Path.Combine(AppContext.BaseDirectory, "docs", "diagnostics.md")
+        Path.Combine(AppContext.BaseDirectory, "docs", "manual", "diagnostics.md")
     );
 
     [Fact]

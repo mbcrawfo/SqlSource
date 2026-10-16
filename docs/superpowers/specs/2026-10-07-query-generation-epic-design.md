@@ -373,7 +373,7 @@ Decided:
 
 Recommended:
 
-- The diagnostic ids are a new range, `SQLSRC2xx`, for the generator's and the tool's conditions alike: a stale, missing or orphaned snapshot entry; a sidecar whose engine is not the file's dialect; version mismatches; an unmapped type; an unsupported type; a parameter with no type and no marker; a column with no name; two columns with one name; a name that is not an identifier; the server's errors; the lexer-versus-Npgsql disagreement.  The tool uses the generator's ids where the condition is shared.  `docs/diagnostics.md` gains each one in the phase that adds it.  The tool's descriptors live in the generator assembly beside the generator's, so the diagnostics document test and `AnalyzerReleases` cover both; a parse error phase 1 adds takes the next `SQLSRC1xx` id, as the parser's errors do today.  Phase 2 uses `SQLSRC200` to `SQLSRC223` and phase 3 `SQLSRC224` to `SQLSRC232`, each assigned to its sub-phases in its section below, and the later phases take ids from `SQLSRC237`.
+- The diagnostic ids are a new range, `SQLSRC2xx`, for the generator's and the tool's conditions alike: a stale, missing or orphaned snapshot entry; a sidecar whose engine is not the file's dialect; version mismatches; an unmapped type; an unsupported type; a parameter with no type and no marker; a column with no name; two columns with one name; a name that is not an identifier; the server's errors; the lexer-versus-Npgsql disagreement.  The tool uses the generator's ids where the condition is shared.  `docs/manual/diagnostics.md` gains each one in the phase that adds it.  The tool's descriptors live in the generator assembly beside the generator's, so the diagnostics document test and `AnalyzerReleases` cover both; a parse error phase 1 adds takes the next `SQLSRC1xx` id, as the parser's errors do today.  Phase 2 uses `SQLSRC200` to `SQLSRC223` and phase 3 `SQLSRC224` to `SQLSRC232`, each assigned to its sub-phases in its section below, and the later phases take ids from `SQLSRC237`.
 - Fixtures live under `tests/SqlSource.Tool.Tests/Fixtures/Describers/<engine>/<case>/` as `query.sql`, `capture.json`, `expected.json` and an optional `issue.md`, with `capture.json` byte for byte the bundle's, beside the engine's `schema.sql`.  A `captureVersion` and `tools/record-fixtures.sh`, phase 3's, which re-records the unobfuscated fixtures against the containers, mitigate the coupling of captures to the interface's shape; an obfuscated fixture that outlives its interface version is deleted and its case re-tested by hand.  `expected.json` is a sidecar with the one entry, its `toolVersion` fixed to `fixture`, so that the whole entry is compared and a version bump touches no fixture.
 - `--log` without `--verbose` keeps the console quiet; `--verbose` without `--log` writes nothing to disk.  There is no `--diagnostics <dir>`; the bundle is the directory-shaped output.
 
@@ -422,7 +422,7 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 - `CONTRIBUTING.md` gains the tool project, the end-to-end projects and their images, and the new package check.
 - `docs/publishing.md` covers the second package from phase 2.
 - `docs/tech-debt` gains the tool's syntax-level attribute reader in phase 2.
-- `docs/diagnostics.md` gains each diagnostic in the phase that adds it.
+- `docs/manual/diagnostics.md` gains each diagnostic in the phase that adds it.
 
 ## Phase 0 - names
 
@@ -430,7 +430,7 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 
 1. `SqlQueriesAttribute` becomes `SqlSourceGenerateAttribute`, used as `[SqlSourceGenerate]`; `SqlQueriesMode` becomes `SqlLocation`, and so does the attribute's `Mode` property.  The values `Nested` and `Direct` and the `Path` property are unchanged.
 2. `-- SqlSource:` becomes `-- generator:`, and its `dialect=` directive becomes the marker `-- dialect: postgres`.  What a `-- generator:` line holds is called a generator parameter, not a directive, in the code and the documents.
-3. Every place that names them: the generator's emitted source, the suppressor, the parser, the README, `docs/diagnostics.md`, the tests, and `tools/package-install`.
+3. Every place that names them: the generator's emitted source, the suppressor, the parser, the README, `docs/manual/diagnostics.md`, the tests, and `tools/package-install`.
 
 ### Decided
 
@@ -442,7 +442,7 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 
 ### Technical notes
 
-- The diagnostics that mention the directive form, the invalid dialect in a file and the misplaced dialect, are reworded, keep their ids, and their sections in `docs/diagnostics.md` follow.
+- The diagnostics that mention the directive form, the invalid dialect in a file and the misplaced dialect, are reworded, keep their ids, and their sections in `docs/manual/diagnostics.md` follow.
 - The parser's names for the directive scope and the preamble dialect follow the rename, so that later phases do not read "directive" in code and "marker" in the documents.
 
 ### Testing
@@ -476,7 +476,7 @@ The existing tests, under the new names and markers.  The package-install check 
 - A value from a fixed list is matched ignoring case and ignoring hyphens and spaces inside it, in a marker, a property, the metadata and the attribute alike.
 - `SQLSRC006` covers every invalid attribute value and `SQLSRC014` every invalid MSBuild value, property or metadata, with no position.
 - The metadata that the compiler reads is on items of the type `SqlSourceSettingsFile`, and one target trims every metadata.
-- Nothing a user sees changes beyond the attribute's new properties, which are accepted and have no effect yet, `SqlSourceTokenValidation` giving way to `SqlSourceGeneratorParameters`, `token-ignore` becoming a marker, and a query's generator parameters replacing the preamble's instead of merging.  No member is generated from the parameter list, and the only diagnostics added are invalid setting values and whatever the new markers need, with the next `SQLSRC1xx` ids for parse errors and `SQLSRC0xx` for setting values, as today; `SQLSRC010` is removed with `SqlSourceTokenValidation`, and `docs/diagnostics.md` and `AnalyzerReleases.Unshipped.md` follow.
+- Nothing a user sees changes beyond the attribute's new properties, which are accepted and have no effect yet, `SqlSourceTokenValidation` giving way to `SqlSourceGeneratorParameters`, `token-ignore` becoming a marker, and a query's generator parameters replacing the preamble's instead of merging.  No member is generated from the parameter list, and the only diagnostics added are invalid setting values and whatever the new markers need, with the next `SQLSRC1xx` ids for parse errors and `SQLSRC0xx` for setting values, as today; `SQLSRC010` is removed with `SqlSourceTokenValidation`, and `docs/manual/diagnostics.md` and `AnalyzerReleases.Unshipped.md` follow.
 
 ### Recommended
 
@@ -604,7 +604,7 @@ Phase 3 is six sub-phases, each with a spec, a plan and a pull request of its ow
 5. **3.5.**  The generic plan through the prepared statement, the plan model, the walk with its safety nets, `plan` and the walk's provenance, and the matrix recorded as fixtures under each join method.
 6. **3.6.**  Npgsql's logger into the run's log, the describer registered in `ToolHost.Create`, the command proven whole against the container, the tool's readme, and the close of the phase.
 
-Each sub-phase adds the log events of the step it adds, as phase 2 did, and the diagnostics of the step with their sections in `docs/diagnostics.md`.
+Each sub-phase adds the log events of the step it adds, as phase 2 did, and the diagnostics of the step with their sections in `docs/manual/diagnostics.md`.
 
 ### Decided
 
@@ -640,7 +640,7 @@ By a spike against PostgreSQL 14 and 18 through Npgsql 10, run before the sub-ph
 - **`format_type(oid, -1)` of `bit` is `"bit"`, quoted, since plain `bit` means `bit(1)`.**  A bit with a length is written `bit(n)` by the tool, and one without keeps the server's spelling, which is how every bit parameter is spelled.
 - **The columns come from Npgsql's `GetColumnSchema` without `KeyInfo`, with three decodings.**  Sub-phase 3.3's spike found that the schema is filled from the row description alone and that the server is asked nothing more.  Npgsql gives no scale for a `numeric` whose scale is zero, a negative scale 2048 too high, and the precision 65535 for an interval with fields and no precision; and it gives an array the numbers of its element, which are dropped.  `EXECUTE` is described whatever the number of its arguments, and a statement described so, an `INSERT ... RETURNING` for one, is not run.
 - **An array of a domain is not flattened by the protocol**, and a domain is, to the base at the end of its chain.  So a column of `email_t[]` is recorded as it is with no help from its origin, and a column of `email_t` is the domain only through its origin.
-- **The check tells a type Npgsql cannot bind from a text it will not send by asking again.**  Npgsql throws a `NotSupportedException`, an `InvalidCastException` or, for a name that is too long, an `ArgumentException` for both and sends nothing, so 3.3 asks for each parameter alone with a text of its own.  Some kinds of type are refused by their spelled name, and `docs/diagnostics.md` lists them under `SQLSRC232`: one that needs quotes, `"char"`, a domain over a domain, a composite type, a table's row type, a type of the system catalogs that Npgsql does not load, an array of a type whose name is 63 characters long, and the bit type, spelled `"bit"`; `SQLSRC232` is therefore reachable from a `.sql` file, and phase 8 decides how generated code names a type to Npgsql.
+- **The check tells a type Npgsql cannot bind from a text it will not send by asking again.**  Npgsql throws a `NotSupportedException`, an `InvalidCastException` or, for a name that is too long, an `ArgumentException` for both and sends nothing, so 3.3 asks for each parameter alone with a text of its own.  Some kinds of type are refused by their spelled name, and `docs/manual/diagnostics.md` lists them under `SQLSRC232`: one that needs quotes, `"char"`, a domain over a domain, a composite type, a table's row type, a type of the system catalogs that Npgsql does not load, an array of a type whose name is 63 characters long, and the bit type, spelled `"bit"`; `SQLSRC232` is therefore reachable from a `.sql` file, and phase 8 decides how generated code names a type to Npgsql.
 - **The check does not see a `$n` that the SQL writes itself**: both describes accept it.  It compares columns, and nothing gives the placeholders Npgsql found.
 - **A connection string Npgsql cannot read is `SQLSRC224`** with one fixed line and nothing of the driver's text, whose inner exception quotes the value.
 - **The diagnostics**, in `Diagnostics/ToolDiagnostics.cs`:
@@ -694,7 +694,7 @@ The server's errors and what the tool says, as settled:
 
 ### Documentation
 
-`CONTRIBUTING.md` for the fourth test project, Docker serving the tests, the images and the variable.  `src/SqlSource.Tool/README.md` in 3.6, when the describer is registered.  `docs/diagnostics.md` in the sub-phase that adds each id.  `docs/tech-debt` for the limits the spike found.  The README of the repository waits for phase 5.
+`CONTRIBUTING.md` for the fourth test project, Docker serving the tests, the images and the variable.  `src/SqlSource.Tool/README.md` in 3.6, when the describer is registered.  `docs/manual/diagnostics.md` in the sub-phase that adds each id.  `docs/tech-debt` for the limits the spike found.  The README of the repository waits for phase 5.
 
 ## Phase 4 - defaults
 
