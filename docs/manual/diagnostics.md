@@ -288,7 +288,7 @@ The compiler hands a generator only the part of a value before the first `;` or 
 
 A string or a quoted identifier starts and never ends.  The error is at the opening quote or bracket.
 
-```sql
+```sql error
 SELECT 'unfinished FROM users;
 ```
 
@@ -300,7 +300,7 @@ Close the quote.  If the SQL is valid for your database, SqlSource is reading it
 
 A block comment or a hint starts with `/*` and never ends.  The error is at the `/*`.
 
-```sql
+```sql error
 /* outer /* inner */
 SELECT 1;
 ```
@@ -315,7 +315,7 @@ SQLite accepts a comment that is still open at the end of the file.  SqlSource d
 
 The value of a `-- name:` marker becomes the name of a C# member, so it must be a C# identifier and must not be a reserved keyword such as `class`.
 
-```sql
+```sql error
 -- name: get-user
 SELECT 1;
 ```
@@ -351,7 +351,7 @@ Add a `-- name:` marker at the top of the file, or rename the file.  If the file
 
 In a file that has `-- name:` markers, only comments and the markers that describe the whole file may come before the first one: the table of [SQLSRC116](#sqlsrc116) has the list.  SQL there would belong to no query.
 
-```sql
+```sql error
 SET search_path TO app;
 
 -- name: GetUser
@@ -366,7 +366,7 @@ Move the SQL below a `-- name:` marker, or delete it.
 
 A `-- summary:` marker describes the query it is in.  One before the first `-- name:` marker is in no query.
 
-```sql
+```sql error
 -- summary: Loads one user.
 -- name: GetUser
 SELECT 1;
@@ -380,7 +380,7 @@ Move the summary below the `-- name:` marker.
 
 A marker comes before the SQL it describes.  This one stands after the last SQL of its query, where a reader would take it to belong to the next one.  That usually means it was written above the next `-- name:` marker and was meant for that query.
 
-```sql
+```sql error
 -- name: GetUser
 SELECT 1;
 -- summary: Lists every user.
@@ -396,7 +396,7 @@ Move the marker below the `-- name:` marker of the query it describes, or delete
 
 A `-- generator:` marker holds a word that is not a generator parameter.  The generator parameters are `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` and `default`.  `token-validation` is gone because omitting `no-token-validation` says it.  `token-ignore` was a generator parameter and is a marker now: `-- token-ignore: name`, inside the query.
 
-```sql
+```sql error
 -- generator: keep-comment
 ```
 
@@ -420,7 +420,7 @@ A generator parameter has a value it does not take; what follows a name in a `--
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
 - `-- dialect:` needs the name of a dialect, as in `-- dialect: postgres`, with any options after it, as in `-- dialect: mysql, ansi-quotes`.  The names and the options are those of [SQLSRC011](#sqlsrc011).  The value is the rest of the line, so nothing else may follow it.
 
-```sql
+```sql error
 -- generator: keep-comments=true
 -- dialect: pgsql
 -- dialect: mysql keep-comments
@@ -460,7 +460,7 @@ Remove one of the two.  A query's list replaces the one before the first `-- nam
 
 A query, or a whole file without `-- name:` markers, holds nothing but whitespace, comments and markers.  A file that cannot be read is reported the same way, at its first line.
 
-```sql
+```sql error
 -- name: GetUser
 -- TODO: write this query
 ```
@@ -473,7 +473,7 @@ Write the SQL, or delete the query.
 
 A token `{{name}}` becomes a parameter of a generated method, so its name must not be a reserved C# keyword.
 
-```sql
+```sql error
 SELECT * FROM {{class}};
 ```
 
@@ -487,7 +487,7 @@ Rename the token.  If the braces are literal text and not a token, add `-- token
 
 A `-- dialect:` marker sets the dialect of a whole file, and it changes how the text after it is read.  So it must come before the file's first `-- name:` marker and before the file's first SQL.  This one is inside a named query, or after SQL.
 
-```sql
+```sql error
 -- name: GetUser
 -- dialect: mysql
 SELECT 1;
@@ -512,7 +512,7 @@ A file cannot mix dialects.  Put the queries for another database in a file of t
 
 A marker stands in the wrong part of its file.  Some markers describe one query and go inside it, after its `-- name:` line; some describe the whole file and go before the first `-- name:` line.  The message says which this one is.
 
-```sql
+```sql error
 -- token: {{filter:AND deleted_at IS NULL}}
 
 -- name: ListUsers
@@ -546,7 +546,7 @@ The table is this error's, with two exceptions.  A `-- summary:` before the firs
 
 A `-- param:` marker names a parameter that is not in the SQL of its query.  Such a parameter reaches the query only inside the text of a token, so nothing but the marker can say what type it has.
 
-```sql
+```sql error
 -- name: ListUsers
 -- param: @page
 SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
@@ -560,7 +560,7 @@ Give the type, in the database's own words: `-- param: @page int`.
 
 A parameter appears in the default of a token, in the SQL or in a `-- token:` marker, and nowhere else in the query.  A default is a sample, and a type taken from a sample alone would be a guess.
 
-```sql
+```sql error
 -- name: ListUsers
 SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
 ```
@@ -573,7 +573,7 @@ Declare the parameter with its type: `-- param: @page int`.
 
 An `-- input-model:` marker names the type of a query's parameters, and this query has none: no `@name` in its SQL and no `-- param:` marker.  Under the `mssql` dialect a name that the query declares with `DECLARE` is a local variable, and is not a parameter.
 
-```sql
+```sql error
 -- name: CountUsers
 -- input-model: CountArgs
 SELECT COUNT(*) FROM users;
@@ -1115,7 +1115,7 @@ A type whose name or whose schema's name needs quotes (`"My Schema"."Status"`), 
     help: Npgsql cannot send a value of this type; declare the parameter as text with -- param: and cast it to the type where it is used; a later version may let a project declare a conversion for the type
 ```
 
-Declare the parameter as `text` and cast it where it is used: `-- param: @pair text` with `@pair::public.pair` in the SQL.  A way for a project to declare a conversion of its own for such a type, for parameters, models and generated code, is planned work that is not done, tracked as [D-0003](../deferred/D-0003-custom-type-conversion.md).  For a type with no name the help is `the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare the parameter as text with -- param: and cast it to the type where it is used`.  The error is also given for a parameter that only a `-- param:` marker declares: Npgsql resolves the type of every parameter it is handed.
+Declare the parameter as `text` and cast it where it is used: `-- param: @pair text` with `@pair::public.pair` in the SQL.  A way for a project to declare a conversion of its own for such a type, for parameters, models and generated code, is planned for a later release.  For a type with no name the help is `the type has no name that Npgsql can be given without ambiguity; rename the schema or the type, or declare the parameter as text with -- param: and cast it to the type where it is used`.  The error is also given for a parameter that only a `-- param:` marker declares: Npgsql resolves the type of every parameter it is handed.
 
 ## SQLSRC233
 
@@ -1134,7 +1134,7 @@ Give the query `-- output: sql`: its SQL is still a string constant, or a method
 
 `SELECT ... INTO` is refused as `SELECT INTO` on every version of the server.  PostgreSQL 15 and later prepare it and 14 does not, but it creates a table, as `CREATE TABLE AS` does, and a sidecar must not depend on the server it was described against.  Write `CREATE TABLE ... AS` with `-- output: sql`, or select the rows and insert them in a second query.  A statement that the tool's check misses and that the server names as one it cannot prepare, `42P14: utility statements cannot be prepared`, is this error too, and the message then reads "is a utility statement".
 
-A word that the tool does not know stays [SQLSRC225](#sqlsrc225): `SELEC 1` is a typo and the server says so.  Describing `CALL` and data definition is tracked as [D-0002](../deferred/D-0002-describing-call-and-data-definition.md).
+A word that the tool does not know stays [SQLSRC225](#sqlsrc225): `SELEC 1` is a typo and the server says so.  Describing `CALL` and data definition is planned for a later release.
 
 ## SQLSRC234
 
