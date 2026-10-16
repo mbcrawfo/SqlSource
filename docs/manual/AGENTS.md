@@ -81,7 +81,7 @@ Every phase of query generation (`docs/superpowers/specs/2026-10-07-query-genera
 3. **Rewrites the sentences that say it is missing or still to come**, such as "Nothing in a build reads them today" or "It takes effect when generated models arrive".  This finds most of them, among many lines to read past; it is not exhaustive, so read each page the table below names:
 
    ```console
-   $ git grep -n -i -E "no effect yet|today|coming|arrive|later release|\byet\b|until|\bwill\b|growing" -- README.md src/SqlSource.Tool/README.md docs/manual
+   $ git grep -n -i -E "no effect yet|today|coming|arrive|later release|until|growing|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md docs/manual
    ```
 
 4. **Adds or removes its known issues** as its `docs/tech-debt` and `docs/deferred` items open and close.
