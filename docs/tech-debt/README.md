@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0053`
+Next id: `TD-0056`
 
 ## Active items
 
@@ -40,6 +40,9 @@ Next id: `TD-0053`
 | [TD-0050](TD-0050-a-catalog-types-name-depends-on-the-search-path.md) | Open | 2026-10-14 | Low | The name of a type of `pg_catalog` that has no modifier is `format_type(oid, -1)`, which qualifies it when a user type of the same name stands before `pg_catalog` on the session's `search_path`, so such a name depends on the session |
 | [TD-0051](TD-0051-columns-that-cannot-be-null-are-answered-nullable.md) | Open | 2026-10-15 | Medium | The PostgreSQL describer answers nullable or unknown for about a third of the realistic corpus's columns that cannot be `NULL`: expressions that parts A and B of the noise design do not answer, a column of no origin through a subquery the planner keeps apart, a `UNION` branch the planner keeps as a scan and recursive CTEs, `EXISTS` as a column, aggregates other than `count(*)`, `VALUES` and strict functions; `RealisticNullabilityNoiseTests` holds the count |
 | [TD-0052](TD-0052-explain-plans-every-partition.md) | Open | 2026-10-15 | Low | The PostgreSQL describer asks for a query's plan with partition pruning off, so that the members of a partitioned table's `Append` show for the `NULL`s of its parameters, and a query over a table of many partitions is planned, and logged, with every partition |
+| [TD-0053](TD-0053-duplicated-and-uneven-patterns-in-the-postgresql-describer.md) | Open | 2026-10-16 | Low | Duplicated and uneven patterns in the PostgreSQL describer: six readers of quoted names, five rules for a word character of the SQL, the SQL lexed six times a describe, a plan's node types as literals in four files, hand-kept type tables, and the call pattern of `PostgresSession` written ten times |
+| [TD-0054](TD-0054-duplicated-and-uneven-patterns-in-the-postgresql-tests.md) | Open | 2026-10-16 | Low | Duplicated and uneven patterns in the tests of the PostgreSQL describer: the session's script and a column's nullability spelled by hand in many classes, helpers of the container tests copied per class, test classes of over a thousand lines, and uneven names |
+| [TD-0055](TD-0055-two-container-test-classes-create-one-table.md) | Open | 2026-10-16 | Low | `WalkTests` and `ExpressionTests` each create `walk_parts` with `IF NOT EXISTS` on the one server, so an edit to one copy is used or not by the order the classes run in |
 
 ## Columns
 
