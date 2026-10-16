@@ -6,7 +6,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The kind of statement a text is, read from its first word and from an INTO: a word to refuse is on a list, so a
 // typo such as SELEC is never refused here and reaches the server.
-public class StatementShapeTests
+public sealed class StatementShapeTests
 {
     [Theory]
     [InlineData("ABORT")]

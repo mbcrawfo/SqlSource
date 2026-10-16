@@ -33,7 +33,7 @@ public sealed class FixtureCasesTests(PostgresContainer postgres)
 
     [Theory]
     [MemberData(nameof(Cases))]
-    public async Task Describe_Case_GivesTheExpectedEntry(string name)
+    public async Task DescribeAsync_Case_GivesTheExpectedEntry(string name)
     {
         var fixture = Found.Single(found => found.Name == name);
         if (Recording.IsAsked(RecordVariable))

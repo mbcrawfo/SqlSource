@@ -10,7 +10,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The sidecar's record of a type, from the rows of the closure.
-public class PostgresTypesTests
+public sealed class PostgresTypesTests
 {
     private static readonly PostgresType Integer = TestSidecars.Postgres();
 

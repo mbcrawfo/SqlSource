@@ -6,7 +6,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The arms of ColumnNullability.Of, in its order: the first that fits a column is its answer.
-public class ColumnNullabilityTests
+public sealed class ColumnNullabilityTests
 {
     private static ColumnOrigin Origin(
         string relkind,

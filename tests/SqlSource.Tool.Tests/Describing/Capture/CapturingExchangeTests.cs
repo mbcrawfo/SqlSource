@@ -13,7 +13,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Capture;
 
 // The exchange that records: every call of a describer is in the capture, in order, as it was asked and answered.
-public class CapturingExchangeTests
+public sealed class CapturingExchangeTests
 {
     private readonly DescribeCapture _capture = new(SidecarValues.Engine.Postgres);
     private readonly FakeDescriber _describer = new();

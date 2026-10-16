@@ -6,7 +6,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // Whether the session finds pg_catalog's functions first, from the search_path that "open" read: PostgreSQL searches
 // pg_catalog first unless the path names it later.
-public class PostgresSearchPathTests
+public sealed class PostgresSearchPathTests
 {
     [Theory]
     [InlineData("\"$user\", public")]

@@ -6,7 +6,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The texts the live functions make themselves.  What they do with a server is in tests/SqlSource.Tests.Postgres.
-public class PostgresLiveTests
+public sealed class PostgresLiveTests
 {
     [Fact]
     public void ExecuteText_StatementWithoutParameters_HasNoList() =>

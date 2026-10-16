@@ -6,7 +6,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // A column's facets from the three numbers Npgsql gives, which are the type's modifier decoded.  A type takes the
 // numbers it carries and no other, whatever the answer holds.
-public class ColumnFacetsTests
+public sealed class ColumnFacetsTests
 {
     private static PostgresColumnRow Column(int? length = null, int? precision = null, int? scale = null) =>
         PostgresTables.ExpressionOf(0, "c", 0, length, precision, scale);

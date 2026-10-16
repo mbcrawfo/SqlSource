@@ -14,7 +14,7 @@ public sealed class RealisticNullabilitySafetyTests(PostgresContainer postgres)
 {
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
-    public async Task Describe_Case_IsNotNullOnlyWhereTheTruthIs(string name)
+    public async Task DescribeAsync_Case_IsNotNullOnlyWhereTheTruthIs(string name)
     {
         var found = RealisticDescribe.Start(name, postgres.Major);
         var (columns, _) = await RealisticDescribe.DescribedAsync(found, postgres.RealisticConnectionString);

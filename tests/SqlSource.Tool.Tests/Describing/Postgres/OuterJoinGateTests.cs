@@ -7,7 +7,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The gate: whether a query holds a word that can make a NOT NULL column of a table come back NULL.  It reads
 // words and no structure, so it may say yes where there is no join, and never says no where there is one.
-public class OuterJoinGateTests
+public sealed class OuterJoinGateTests
 {
     [Theory]
     [InlineData("LEFT")]

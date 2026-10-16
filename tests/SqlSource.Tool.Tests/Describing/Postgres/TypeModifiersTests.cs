@@ -6,7 +6,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // A type modifier as pg_attribute.atttypmod holds it, decoded by type.  Every number below was read from a PostgreSQL
 // 18 server with `SELECT atttypmod FROM pg_attribute`.
-public class TypeModifiersTests
+public sealed class TypeModifiersTests
 {
     [Theory]
     [InlineData("varchar", 14, 10, null, null)]

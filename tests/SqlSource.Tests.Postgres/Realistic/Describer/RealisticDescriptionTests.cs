@@ -31,7 +31,7 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
 
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
-    public async Task Describe_Case_IsRefusedOnlyAsItsCaseSays(string name)
+    public async Task DescribeAsync_Case_IsRefusedOnlyAsItsCaseSays(string name)
     {
         var found = RealisticDescribe.Start(name, postgres.Major);
 
@@ -49,7 +49,7 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
 
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
-    public async Task Describe_Case_IsItsRecordedDescription(string name)
+    public async Task DescribeAsync_Case_IsItsRecordedDescription(string name)
     {
         var found = RealisticDescribe.Start(name, postgres.Major);
         var path = found.ExpectedPath(postgres.Major);

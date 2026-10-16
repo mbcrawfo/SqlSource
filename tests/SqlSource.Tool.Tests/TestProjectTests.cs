@@ -6,7 +6,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests;
 
 // TestProject stands in for a project and for MSBuild's answer about it.  These hold it to the format of a manifest.
-public class TestProjectTests
+public sealed class TestProjectTests
 {
     [Fact]
     public void Manifest_ProjectWithFilesAndSettings_IsReadByTheToolsReader()

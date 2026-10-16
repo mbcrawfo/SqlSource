@@ -12,7 +12,7 @@ using static SqlSource.Tool.Tests.PostgresRequests;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // A server's error, or a refusal of the tool, as the failure the run reports at the query.
-public class PostgresErrorsTests
+public sealed class PostgresErrorsTests
 {
     [Fact]
     public void Open_ErrorWithASqlState_IsSqlsrc224AtNoStepWithTheServersLine()
@@ -639,7 +639,7 @@ public class PostgresErrorsTests
     }
 
     // A timeout or a failing server says nothing of how Npgsql reads the text, and the verdict says so
-    // (CheckVerdictTests holds the rule): it is the server rejecting the query at the step, with the lines of the
+    // (NpgsqlCheckTests holds the rule): it is the server rejecting the query at the step, with the lines of the
     // error and no help.
     [Fact]
     public void Check_VerdictErrorOutsideClass42_IsSqlsrc225AtCheckParameters()

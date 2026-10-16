@@ -10,7 +10,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // Which Appends of a plan may scan a partitioned table, what "partitions" is asked of them, and what their members
 // must agree on.
-public class PlanPartitionsTests
+public sealed class PlanPartitionsTests
 {
     private static readonly Dictionary<PostgresRelationName, IReadOnlyList<long>> Partitions = new()
     {

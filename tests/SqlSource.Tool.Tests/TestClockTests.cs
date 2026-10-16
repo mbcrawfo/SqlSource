@@ -5,7 +5,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests;
 
 // TestClock stands in for the machine's clock.  This holds its start to the text the tests expect in a log.
-public class TestClockTests
+public sealed class TestClockTests
 {
     [Fact]
     public void Now_NewClock_IsTheInstantOfStartIso()

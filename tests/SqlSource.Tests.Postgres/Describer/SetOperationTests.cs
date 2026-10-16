@@ -75,7 +75,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         "SELECT u.id, u.name FROM users u UNION ALL SELECT x.id, x.name FROM users x "
             + "UNION ALL SELECT y.id, y.name FROM users y"
     )]
-    public async Task Describe_UnionOfNotNullColumns_IsAnswered(string sql) =>
+    public async Task DescribeAsync_UnionOfNotNullColumns_IsAnswered(string sql) =>
         (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
 
     // The planner casts the int4 branch to the result's int8 and the plan does not print the cast; under UNION and
@@ -84,7 +84,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [InlineData("SELECT u.id FROM users u UNION ALL SELECT o.id FROM orders o")]
     [InlineData("SELECT o.id FROM orders o UNION ALL SELECT u.id FROM users u")]
     [InlineData("SELECT u.id FROM users u UNION SELECT o.id FROM orders o")]
-    public async Task Describe_UnionOfInt4AndInt8_StaysUnknown(string sql) =>
+    public async Task DescribeAsync_UnionOfInt4AndInt8_StaysUnknown(string sql) =>
         (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin]);
 
     // Under INTERSECT and EXCEPT 14's flagged member is the planner's own leaf scan, followed by place; 18 prints the
@@ -93,12 +93,12 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Theory]
     [InlineData("SELECT u.id FROM users u INTERSECT SELECT s.big FROM samples s")]
     [InlineData("SELECT u.id FROM users u EXCEPT SELECT o.id FROM orders o")]
-    public async Task Describe_IntersectAndExceptOfACastBranch_AreAnsweredOn14AndUnknownOn18(string sql) =>
+    public async Task DescribeAsync_IntersectAndExceptOfACastBranch_AreAnsweredOn14AndUnknownOn18(string sql) =>
         (await WalkedAsync(sql)).ShouldBe([postgres.Major == 14 ? NotNullSetOperation : UnknownNoOrigin]);
 
     // An INTERSECT is proven by either input: the int8 side needs no cast.
     [Fact]
-    public async Task Describe_IntersectWhoseInt8InputIsNotNull_IsAnswered() =>
+    public async Task DescribeAsync_IntersectWhoseInt8InputIsNotNull_IsAnswered() =>
         (await WalkedAsync("SELECT u.id FROM users u INTERSECT SELECT o.id FROM orders o")).ShouldBe([
             NotNullSetOperation,
         ]);
@@ -111,7 +111,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [InlineData("SELECT u.id FROM users u UNION SELECT NULL::integer", 0)]
     [InlineData("SELECT u.created_at FROM users u UNION ALL SELECT x.deleted_at FROM users x", 0)]
     [InlineData("SELECT x.deleted_at FROM users x UNION ALL SELECT u.created_at FROM users u", 0)]
-    public async Task Describe_UnionWithABranchThatMayBeNull_StaysUnknown(string sql, int column)
+    public async Task DescribeAsync_UnionWithABranchThatMayBeNull_StaysUnknown(string sql, int column)
     {
         (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, column)).ShouldBeTrue();
@@ -119,7 +119,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
 
     // The preserved side of a LEFT JOIN in a branch is answered by its column, the extended side is not.
     [Fact]
-    public async Task Describe_UnionOfALeftJoinBranch_AnswersThePreservedColumnAlone()
+    public async Task DescribeAsync_UnionOfALeftJoinBranch_AnswersThePreservedColumnAlone()
     {
         var sql =
             "SELECT u.id, o.id FROM users u LEFT JOIN orders o ON o.user_id = u.id "
@@ -134,12 +134,12 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [InlineData("SELECT u.deleted_at FROM users u INTERSECT SELECT x.created_at FROM users x")]
     [InlineData("SELECT u.created_at FROM users u INTERSECT SELECT x.deleted_at FROM users x")]
     [InlineData("SELECT u.deleted_at FROM users u INTERSECT ALL SELECT x.created_at FROM users x")]
-    public async Task Describe_IntersectWithOneNotNullInput_IsAnswered(string sql) =>
+    public async Task DescribeAsync_IntersectWithOneNotNullInput_IsAnswered(string sql) =>
         (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation]);
 
     // Both inputs may be NULL, and NULL equals NULL in an INTERSECT: the row is returned.
     [Fact]
-    public async Task Describe_IntersectOfTwoNullableColumns_StaysUnknown()
+    public async Task DescribeAsync_IntersectOfTwoNullableColumns_StaysUnknown()
     {
         var sql = "SELECT u.deleted_at FROM users u INTERSECT SELECT x.deleted_at FROM users x";
 
@@ -151,13 +151,13 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Theory]
     [InlineData("SELECT u.created_at FROM users u EXCEPT SELECT x.deleted_at FROM users x")]
     [InlineData("SELECT u.created_at FROM users u EXCEPT ALL SELECT x.deleted_at FROM users x")]
-    public async Task Describe_ExceptWithANotNullLeft_IsAnswered(string sql) =>
+    public async Task DescribeAsync_ExceptWithANotNullLeft_IsAnswered(string sql) =>
         (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation]);
 
     [Theory]
     [InlineData("SELECT u.deleted_at FROM users u EXCEPT SELECT x.created_at FROM users x")]
     [InlineData("SELECT u.deleted_at FROM users u EXCEPT ALL SELECT x.created_at FROM users x")]
-    public async Task Describe_ExceptWithANullableLeft_StaysUnknown(string sql)
+    public async Task DescribeAsync_ExceptWithANullableLeft_StaysUnknown(string sql)
     {
         (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
@@ -206,7 +206,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
             + " EXCEPT SELECT y.deleted_at FROM users y",
         false
     )]
-    public async Task Describe_NestedSetOperations_AreAnsweredByWhatEachLevelProves(string sql, bool proven) =>
+    public async Task DescribeAsync_NestedSetOperations_AreAnsweredByWhatEachLevelProves(string sql, bool proven) =>
         (await WalkedAsync(sql)).ShouldBe([proven ? NotNullSetOperation : UnknownNoOrigin]);
 
     // The nested shapes whose column the server does return NULL in.
@@ -219,12 +219,12 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         "SELECT u.deleted_at FROM users u EXCEPT (SELECT x.created_at FROM users x"
             + " INTERSECT SELECT y.created_at FROM users y)"
     )]
-    public async Task Describe_NestedSetOperationWithANullableLeftmostBranch_ReturnsNull(string sql) =>
+    public async Task ReturnsNullAsync_NestedSetOperationWithANullableLeftmostBranch_IsTrue(string sql) =>
         (await ReturnsNullAsync(Rows, sql, 0)).ShouldBeTrue();
 
     // A partitioned table in a branch is an Append of its partitions nested as a member: each must prove the column.
     [Fact]
-    public async Task Describe_UnionAllOfAPartitionedTable_IsAnsweredByItsColumns()
+    public async Task DescribeAsync_UnionAllOfAPartitionedTable_IsAnsweredByItsColumns()
     {
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
         var sql = "SELECT p.id, p.note FROM scratch_parts p UNION ALL SELECT o.user_id, o.note FROM orders o";
@@ -238,7 +238,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // A partitioned table's root Append prints no Output and is a union of its partitions, which "partitions" says it
     // is: its constants are answered, as expressions, since the SQL holds no set operation, and the plan is walked.
     [Fact]
-    public async Task Describe_ConstantOverAPartitionedTablesRootAppend_IsAnExpression()
+    public async Task DescribeAsync_ConstantOverAPartitionedTablesRootAppend_IsAnExpression()
     {
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
@@ -260,7 +260,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
         "SELECT u.created_at AS note, u.deleted_at AS note FROM users u "
             + "INTERSECT SELECT x.created_at, x.deleted_at FROM users x"
     )]
-    public async Task Describe_BranchWithTwoColumnsOfOneName_IsReadByPlace(string sql)
+    public async Task DescribeAsync_BranchWithTwoColumnsOfOneName_IsReadByPlace(string sql)
     {
         (await WalkedAsync(sql)).ShouldBe([NotNullSetOperation, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, 1)).ShouldBeTrue();
@@ -287,7 +287,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
             + "UNION ALL SELECT u.name AS note, u.email AS label FROM users u",
         1
     )]
-    public async Task Describe_UnionAllWhoseBranchNamesCrossThePlaces_StaysUnknown(string sql, int column)
+    public async Task DescribeAsync_UnionAllWhoseBranchNamesCrossThePlaces_StaysUnknown(string sql, int column)
     {
         (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
         (await ReturnsNullAsync(Rows, sql, column)).ShouldBeTrue();
@@ -297,7 +297,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // s over the SetOp, which the walk does not enter, so nothing is answered and no column is read as another.  The
     // server never returns NULL in the first column (created_at) and does in the second (deleted_at).
     [Fact]
-    public async Task Describe_ExceptInASubqueryReadInAnotherOrder_StaysUnknown()
+    public async Task DescribeAsync_ExceptInASubqueryReadInAnotherOrder_StaysUnknown()
     {
         var sql =
             "SELECT s.b, s.a FROM (SELECT u.deleted_at AS a, u.created_at AS b FROM users u "
@@ -312,7 +312,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // is created_at in both branches and a is deleted_at in one.  Where the second branch puts deleted_at into b, b
     // can be NULL, and is.
     [Fact]
-    public async Task Describe_UnionAllInASubqueryReadInAnotherOrder_IsAnsweredByItsMembersPlaces()
+    public async Task DescribeAsync_UnionAllInASubqueryReadInAnotherOrder_IsAnsweredByItsMembersPlaces()
     {
         (
             await WalkedAsync(
@@ -334,7 +334,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // scan and the user's "*SELECT* 1" is the SetOp's input.  Either way the user's scan is no leaf scan of the
     // planner's, and the SQL's text holds the alias, so no alias is followed by place.  Column 0 is deleted_at here.
     [Fact]
-    public async Task Describe_BranchThatWritesTheLeafScansAlias_StaysUnknown()
+    public async Task DescribeAsync_BranchThatWritesTheLeafScansAlias_StaysUnknown()
     {
         var sql =
             "SELECT \"*SELECT* 1\".b, \"*SELECT* 1\".a FROM "
@@ -350,7 +350,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // (which would map the user's scan by place) and 18 as the SetOp's input; neither is followed.  b is
     // NULLIF(name, 'x') and a the name, and the row of the user named x has a NULL b.
     [Fact]
-    public async Task Describe_ViewWhoseSubqueryIsNamedLikeALeafScan_StaysUnknown()
+    public async Task DescribeAsync_ViewWhoseSubqueryIsNamedLikeALeafScan_StaysUnknown()
     {
         await postgres.ExecuteAsync(
             "CREATE OR REPLACE VIEW setop_leaf_alias AS SELECT \"*SELECT* 9\".b, \"*SELECT* 9\".a FROM "
@@ -366,7 +366,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // the Aggregate's entry that is the Append's printed one at its place, so it is answered like the union's column.
     // The plan is a HashAggregate straight over the Append (the subquery is pulled up).
     [Fact]
-    public async Task Describe_GroupByOverAUnionAll_AnswersTheKeyAndNotTheAggregate()
+    public async Task DescribeAsync_GroupByOverAUnionAll_AnswersTheKeyAndNotTheAggregate()
     {
         var nullable =
             "SELECT s.k, count(*) AS n FROM (SELECT u.deleted_at AS k FROM users u "
@@ -384,7 +384,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
 
     // A recursive CTE is a Recursive Union read through a CTE Scan: it proves nothing.
     [Fact]
-    public async Task Describe_RecursiveCte_StaysUnknown() =>
+    public async Task DescribeAsync_RecursiveCte_StaysUnknown() =>
         (
             await WalkedAsync(
                 "WITH RECURSIVE r (n) AS (SELECT 1 UNION ALL SELECT r.n + 1 FROM r WHERE r.n < 5) SELECT r.n FROM r"
@@ -396,7 +396,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // The root is a scan the walk does not enter, and "*SELECT* 2" under an Append is no leaf scan it follows by
     // place.  Neither column is answered; the first is the one that is NULL.
     [Fact]
-    public async Task Describe_UnionAllWithALimitBranchReadInAnotherOrder_StaysUnknown()
+    public async Task DescribeAsync_UnionAllWithALimitBranchReadInAnotherOrder_StaysUnknown()
     {
         var sql =
             "SELECT s.b, s.a FROM (SELECT u.name AS a, u.name AS b FROM users u "
@@ -409,7 +409,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // The same through an inlined SQL function: the root is a Subquery Scan aliased "*SELECT*" (the function's body
     // as a subquery) over the same Append, with "*SELECT* 2" printing "nullif" before name.
     [Fact]
-    public async Task Describe_UnionAllOfAnInlinedFunctionWithALimitBranch_StaysUnknown()
+    public async Task DescribeAsync_UnionAllOfAnInlinedFunctionWithALimitBranch_StaysUnknown()
     {
         await postgres.ExecuteAsync(
             "CREATE OR REPLACE FUNCTION setop_pairs() RETURNS TABLE (a varchar, b varchar) LANGUAGE sql STABLE AS "
@@ -425,7 +425,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     // A Merge Append is a union of its members as an Append is: an ORDER BY with a LIMIT over a UNION ALL of two
     // primary keys reads both through their indexes.
     [Fact]
-    public async Task Describe_MergeAppendOfTwoIndexScans_IsAnswered() =>
+    public async Task DescribeAsync_MergeAppendOfTwoIndexScans_IsAnswered() =>
         (
             await WalkedAsync(
                 "SELECT s.id FROM (SELECT u.id FROM users u UNION ALL SELECT i.id FROM billing.invoices i) s "

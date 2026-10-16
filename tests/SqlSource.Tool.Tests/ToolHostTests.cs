@@ -9,7 +9,7 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests;
 
-public class ToolHostTests
+public sealed class ToolHostTests
 {
     [Fact]
     public void Create_RealHost_IsTheConsoleTheCurrentDirectoryAndTheEnvironment()
