@@ -6,7 +6,8 @@
 # schema, the seed or a case, and reads the diff of what it wrote before committing it.
 # It needs Docker.  The image is the one of the tests, which SQLSOURCE_TESTS_POSTGRES_IMAGE overrides.  The
 # expectations are those of PostgreSQL 14 and 18, so recording both is two runs, the second with
-# SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.
+# SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24, the image of the run on PostgreSQL 14 in
+# .github/workflows/build.yml.
 # Usage: record-realistic.sh
 set -euo pipefail
 

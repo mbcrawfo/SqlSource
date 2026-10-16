@@ -76,8 +76,8 @@ public sealed class FixtureCasesTests(PostgresContainer postgres)
         await File.WriteAllTextAsync(Path.Combine(fixture.Folder, FixtureCase.ExpectedFile), expected, token);
     }
 
-    // An expected.json keeps the version it was recorded against.  CI describes the same cases on two servers, and
-    // the default tag moves from one patch to the next, so the two texts are compared with one value there.
+    // An expected.json keeps the version it was recorded against.  CI describes the same cases on two servers, so the
+    // two texts are compared with one value there; FixtureVersionTests holds that version to the default image.
     private static string WithOneServerVersion(string sidecar)
     {
         var key = sidecar.IndexOf(VersionKey, StringComparison.Ordinal);
