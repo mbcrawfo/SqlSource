@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Testing.Fixtures;
 
 namespace SqlSource.Tests.Postgres.Realistic;
@@ -45,7 +46,7 @@ internal sealed record RealisticCase(
         Path.Combine(Folder, string.Create(CultureInfo.InvariantCulture, $"expected-pg{major}.txt"));
 
     // The case as FixtureReplay plans one.
-    public FixtureCase AsFixture => new("postgres", Name, Folder);
+    public FixtureCase AsFixture => new(SidecarValues.Engine.Postgres, Name, Folder);
 
     // How a failure names a case, by the name of its folder: the one spelling, which the reader uses before it has
     // a case.

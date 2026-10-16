@@ -1,9 +1,9 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
@@ -21,26 +21,22 @@ public sealed class FixtureCasesTests(PostgresContainer postgres)
 {
     public const string RecordVariable = "SQLSOURCE_RECORD_FIXTURES";
 
-    private const string Engine = "postgres";
-
     // As SidecarWriter writes the key.
     private const string VersionKey = "\"serverVersion\": \"";
 
     private static readonly IReadOnlyList<FixtureCase> Found = FixtureCases.Of(
-        Engine,
+        SidecarValues.Engine.Postgres,
         RepositoryPaths.DescriberFixtures
     );
 
     public static TheoryData<string> Cases => [with(Found.Select(static found => found.Name))];
-
-    private static bool Recording => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(RecordVariable));
 
     [Theory]
     [MemberData(nameof(Cases))]
     public async Task Describe_Case_GivesTheExpectedEntry(string name)
     {
         var fixture = Found.Single(found => found.Name == name);
-        if (Recording)
+        if (Recording.IsAsked(RecordVariable))
         {
             await RecordAsync(fixture);
             return;
@@ -59,7 +55,7 @@ public sealed class FixtureCasesTests(PostgresContainer postgres)
     private async Task RecordAsync(FixtureCase fixture)
     {
         var token = TestContext.Current.CancellationToken;
-        var capture = new DescribeCapture(Engine);
+        var capture = new DescribeCapture(SidecarValues.Engine.Postgres);
 
         var expected = await FixtureReplay.DescribeThroughAsync(
             fixture,
@@ -68,12 +64,7 @@ public sealed class FixtureCasesTests(PostgresContainer postgres)
             new CapturingExchange(LiveExchange.Instance, capture)
         );
 
-        await File.WriteAllTextAsync(
-            Path.Combine(fixture.Folder, FixtureCase.CaptureFile),
-            CaptureJson.Write(capture),
-            token
-        );
-        await File.WriteAllTextAsync(Path.Combine(fixture.Folder, FixtureCase.ExpectedFile), expected, token);
+        await FixtureCaseFiles.WriteRecordingAsync(fixture, capture, expected, token);
     }
 
     // An expected.json keeps the version it was recorded against.  CI describes the same cases on two servers, so the
