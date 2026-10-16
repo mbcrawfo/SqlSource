@@ -1,0 +1,21 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "account_id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "total", "nullable": false },
+    { "name": "running_total", "nullable": false },
+    {
+      "name": "previous_total",
+      "nullable": true,
+      "why": "lag has no row before the first of each account; carol's order 4 is her only one"
+    },
+    {
+      "name": "change",
+      "nullable": true,
+      "why": "lag has no row before the first of each account, and the difference with NULL is NULL"
+    },
+    { "name": "revenue_rank", "nullable": false },
+    { "name": "account_orders", "nullable": false }
+  ]
+}

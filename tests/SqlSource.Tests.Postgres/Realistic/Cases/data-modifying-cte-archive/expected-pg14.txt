@@ -1,0 +1,9 @@
+kind: rows
+plan: not-needed
+table-match: matched
+parameter @cutoff: timestamp with time zone (inferred)
+column 0 id: bigint | nullable false | catalog | public.events.id
+column 1 account_id: integer | nullable false | catalog | public.events.account_id
+column 2 at: timestamp with time zone | nullable false | catalog | public.events.at
+column 3 kind: text | nullable false | catalog | public.events.kind
+column 4 payload: jsonb | nullable true | catalog | public.events.payload

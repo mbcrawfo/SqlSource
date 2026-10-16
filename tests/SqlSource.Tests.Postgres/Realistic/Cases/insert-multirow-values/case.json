@@ -1,0 +1,19 @@
+{
+  "columns": [
+    { "name": "order_id", "nullable": false },
+    { "name": "line_no", "nullable": false },
+    { "name": "product_id", "nullable": false },
+    { "name": "quantity", "nullable": false },
+    { "name": "unit_price", "nullable": false },
+    { "name": "line_total", "nullable": false }
+  ],
+  "samples": [
+    {
+      "order_id": "3",
+      "first_product_id": "10",
+      "first_quantity": "1",
+      "second_product_id": "14",
+      "second_quantity": "2"
+    }
+  ]
+}

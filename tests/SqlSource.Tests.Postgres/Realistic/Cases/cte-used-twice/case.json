@@ -1,0 +1,13 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "account_id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "note", "nullable": true, "why": "orders.note is nullable; orders 2 and 3 have none" },
+    { "name": "later_id", "nullable": true, "why": "an account's last order has no later one on the left join" },
+    { "name": "later_placed_at", "nullable": true, "why": "an account's last order has no later one on the left join" }
+  ],
+  "samples": [
+    { "since": "'2024-01-01'" }
+  ]
+}

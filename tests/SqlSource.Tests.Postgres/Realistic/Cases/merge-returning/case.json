@@ -1,0 +1,28 @@
+{
+  "minimumMajor": 17,
+  "columns": [
+    { "name": "action", "nullable": false },
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "price", "nullable": false },
+    {
+      "name": "category_id",
+      "nullable": true,
+      "why": "products.category_id is nullable, and the insert sets none; the sample's T-010 is new"
+    },
+    {
+      "name": "discontinued_on",
+      "nullable": true,
+      "why": "products.discontinued_on is nullable, and the insert sets none; the sample's T-010 is new"
+    }
+  ],
+  "samples": [
+    {
+      "ids": "'{40,41,42}'",
+      "skus": "'{HT-001,HT-002,T-010}'",
+      "names": "'{Claw hammer,Chisel,Clamp}'",
+      "prices": "'{13.00,7.50,4.50}'"
+    }
+  ]
+}

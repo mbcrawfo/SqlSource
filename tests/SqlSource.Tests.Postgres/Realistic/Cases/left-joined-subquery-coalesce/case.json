@@ -1,0 +1,21 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "order_id",
+      "nullable": true,
+      "why": "the subquery is on the nullable side of the left join; dave and erin have no order"
+    },
+    {
+      "name": "coupon_code",
+      "nullable": true,
+      "why": "coalesce is computed inside the subquery, which the join extends for dave and erin: no order"
+    },
+    {
+      "name": "channel",
+      "nullable": true,
+      "why": "the constant is computed inside the subquery, which the join extends for dave and erin: no order"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "email", "nullable": true, "why": "accounts.email is nullable; bob has none" },
+    { "name": "spent", "nullable": false },
+    {
+      "name": "line_count",
+      "nullable": true,
+      "why": "an account with no ordered line has no row of totals on the left join; bob and dave have none"
+    },
+    {
+      "name": "account_id",
+      "nullable": true,
+      "why": "an account with no ordered line has no row of totals on the left join; bob and dave have none"
+    }
+  ],
+  "samples": [{ "limit": "10", "offset": "0" }]
+}

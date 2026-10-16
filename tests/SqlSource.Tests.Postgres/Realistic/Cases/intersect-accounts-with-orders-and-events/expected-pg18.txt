@@ -1,0 +1,7 @@
+kind: rows
+plan: not-needed
+table-match: no-origin
+parameter @since: timestamp with time zone (inferred)
+column 0 id: integer | nullable null | no-origin | -
+column 1 name: character varying(100) | nullable null | no-origin | -
+column 2 email: text | nullable null | no-origin | -

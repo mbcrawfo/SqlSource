@@ -1,0 +1,12 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "account_id", "nullable": false },
+    { "name": "at", "nullable": false },
+    { "name": "kind", "nullable": false },
+    { "name": "payload", "nullable": false }
+  ],
+  "samples": [
+    { "cutoff": "'2025-01-01'" }
+  ]
+}

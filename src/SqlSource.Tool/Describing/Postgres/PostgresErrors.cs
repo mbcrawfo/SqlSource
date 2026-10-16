@@ -88,6 +88,9 @@ internal static class PostgresErrors
     public const string InvalidSqlStatementName = "26000";
     private const string IndeterminateDatatype = "42P18";
     private const string AmbiguousParameter = "42P08";
+    private const string UndefinedFunction = "42883";
+    private const string DatatypeMismatch = "42804";
+    private const string AmbiguousFunction = "42725";
 
     /// <summary>
     /// <c>SQLSRC224</c>: no session.  Every failure of <c>open</c> is this one, whatever its SQLSTATE: a wrong
@@ -291,8 +294,146 @@ internal static class PostgresErrors
                 );
         }
 
-        return Rejected(error, query, DescribeStep.DescribeParameters, lines);
+        // A parameter with no declared type takes the type of its first use, and a type error may be the fault of that,
+        // unless a cast fixes its type at every use.
+        var undeclared = error.SqlState is UndefinedFunction or DatatypeMismatch or AmbiguousFunction
+            ? Undeclared(query)
+            : [];
+        return Rejected(
+            error,
+            query,
+            DescribeStep.DescribeParameters,
+            lines,
+            undeclared.Count > 0 ? InferredParameterHelp(undeclared) : null
+        );
     }
+
+    /// <summary>
+    /// The help of <c>SQLSRC225</c> for a type error in a query that has parameters of no declared type and a use
+    /// that no cast fixes: the server gave each the type of its first use.  It does not know that the error is at a
+    /// parameter, and says so.  The example is the first of them, with <c>&lt;type&gt;</c> in the place of a type: the
+    /// tool cannot know the type meant, and a guess such as <c>int</c> can be what gave the error.
+    /// </summary>
+    /// <param name="undeclared">
+    /// The parameters whose type no marker declares and no cast fixes at every use, in the order of the query: one
+    /// at least.
+    /// </param>
+    /// <exception cref="ArgumentException"><paramref name="undeclared"/> is empty.</exception>
+    public static string InferredParameterHelp(IReadOnlyList<SqlQueryParameter> undeclared)
+    {
+        if (undeclared.Count == 0)
+        {
+            throw new ArgumentException("The help names one parameter at least.", nameof(undeclared));
+        }
+
+        var first = Written(undeclared[0]);
+        var names = undeclared.Count == 1 ? first : "each of " + string.Join(", ", undeclared.Select(Written));
+        return $"if the error is at a use of a parameter, the server gave {names} the type of its first use, which "
+            + $"may not be the type meant: cast the parameter where it is used to the type meant, {first}::<type>, or "
+            + $"declare its type with -- param: {first} <type>";
+    }
+
+    // The parameters of no declared type that the SQL uses at least once without a cast that fixes the type there,
+    // in the order of the query.  A SQL that does not lex, which the plan's parser read, names every one of them:
+    // the help is no place to fail.
+    private static List<SqlQueryParameter> Undeclared(DescribeRequest query)
+    {
+        var lexed = SqlLexer.Lex(query.Sql, SqlDialectRules.PostgreSql);
+        var uncast = lexed.Error is null ? Uncast(query.Sql, lexed.Lexemes) : null;
+        return
+        [
+            .. query.Parameters.Where(parameter =>
+                parameter.Type is null && (uncast is null || uncast.Contains(parameter.Name))
+            ),
+        ];
+    }
+
+    // The names, ignoring case as the plan matches them, of the parameters with a use that is not "@x::t" or
+    // "CAST(@x AS t)": white space and comments may stand between any two of the pieces, and a string, a quoted
+    // name or a comment holds no piece.  The name is the parameter's text after its one-character prefix.
+    private static HashSet<string> Uncast(string sql, EquatableArray<SqlLexeme> lexemes)
+    {
+        var pieces = Pieces(sql, lexemes);
+        var uncast = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        for (var index = 0; index < pieces.Count; index++)
+        {
+            if (pieces[index] is not { Parameter: true } parameter)
+            {
+                continue;
+            }
+
+            var cast =
+                PieceAt(pieces, index + 1) == "::"
+                || (
+                    IsWord(PieceAt(pieces, index - 2), "CAST")
+                    && PieceAt(pieces, index - 1) == "("
+                    && IsWord(PieceAt(pieces, index + 1), "AS")
+                );
+            if (!cast)
+            {
+                _ = uncast.Add(parameter.Text[1..]);
+            }
+        }
+
+        return uncast;
+    }
+
+    // The SQL as a list of pieces, without white space or comments: a word, a "::", any other character, a string or
+    // a quoted name whole, and a parameter.
+    private static List<(string Text, bool Parameter)> Pieces(string sql, EquatableArray<SqlLexeme> lexemes)
+    {
+        var pieces = new List<(string Text, bool Parameter)>();
+        foreach (var lexeme in lexemes)
+        {
+            var text = sql.Substring(lexeme.Span.Start, lexeme.Span.Length);
+            if (lexeme.Kind == SqlLexemeKind.Text)
+            {
+                TextPieces(text, pieces);
+            }
+            else if (lexeme.Kind is SqlLexemeKind.Parameter or SqlLexemeKind.Quoted)
+            {
+                pieces.Add((text, lexeme.Kind == SqlLexemeKind.Parameter));
+            }
+        }
+
+        return pieces;
+    }
+
+    private static void TextPieces(string text, List<(string Text, bool Parameter)> pieces)
+    {
+        var index = 0;
+        while (index < text.Length)
+        {
+            var start = index;
+            if (char.IsWhiteSpace(text[index]))
+            {
+                index++;
+                continue;
+            }
+
+            if (IsWordCharacter(text[index]))
+            {
+                while (index < text.Length && IsWordCharacter(text[index]))
+                {
+                    index++;
+                }
+            }
+            else
+            {
+                index += text[index] == ':' && index + 1 < text.Length && text[index + 1] == ':' ? 2 : 1;
+            }
+
+            pieces.Add((text[start..index], false));
+        }
+    }
+
+    private static string? PieceAt(List<(string Text, bool Parameter)> pieces, int index) =>
+        index >= 0 && index < pieces.Count && !pieces[index].Parameter ? pieces[index].Text : null;
+
+    private static bool IsWord(string? piece, string word) =>
+        string.Equals(piece, word, StringComparison.OrdinalIgnoreCase);
+
+    private static bool IsWordCharacter(char c) => char.IsLetterOrDigit(c) || c is '_' or '$';
 
     /// <summary>
     /// A parameter as the SQL writes one: the server names it <c>$1</c>, and the user wrote <c>@id</c>.
@@ -305,7 +446,7 @@ internal static class PostgresErrors
     /// a position the server gives is in the tool's own query of the catalog, and not in the user's SQL.
     /// </summary>
     public static DescribeFailure Types(PostgresServerError error, DescribeRequest query) =>
-        Rejected(error, query, DescribeStep.ResolveType, ServerLines(error with { Position = null }, 0));
+        Rejected(error, query, DescribeStep.ResolveType, ServerLines(error with { Position = null }, 0), null);
 
     /// <summary>
     /// <c>SQLSRC225</c> at the step <c>describe columns</c>: the prepared statement could not be described.  There
@@ -318,7 +459,7 @@ internal static class PostgresErrors
         var lines = ServerLines(error with { Position = null }, 0);
         return error.SqlState == InvalidSqlStatementName
             ? SessionNotKept(database, DescribeStep.DescribeColumns, lines)
-            : Rejected(error, query, DescribeStep.DescribeColumns, lines);
+            : Rejected(error, query, DescribeStep.DescribeColumns, lines, null);
     }
 
     /// <summary>
@@ -326,7 +467,7 @@ internal static class PostgresErrors
     /// position line: a position the server gives is in the tool's own query of the catalog.
     /// </summary>
     public static DescribeFailure Tables(PostgresServerError error, DescribeRequest query) =>
-        Rejected(error, query, DescribeStep.Catalog, ServerLines(error with { Position = null }, 0));
+        Rejected(error, query, DescribeStep.Catalog, ServerLines(error with { Position = null }, 0), null);
 
     /// <summary>
     /// A parameter whose type is a pseudo-type.  The server accepts one and says nothing, so there is no server
@@ -412,7 +553,7 @@ internal static class PostgresErrors
             : EquatableArray<string>.Empty;
         if (verdict.Result == NpgsqlCheck.Error && answer.Error is { } failed)
         {
-            return Rejected(failed, query, DescribeStep.CheckParameters, lines);
+            return Rejected(failed, query, DescribeStep.CheckParameters, lines, null);
         }
 
         return new DescribeFailure(
@@ -519,19 +660,20 @@ internal static class PostgresErrors
             SchemaChangedHelp
         );
 
-    // SQLSRC225.  The server's lines say what is wrong, so there is no help.
+    // SQLSRC225.  The server's lines say what is wrong, so there is no help unless the caller knows more.
     private static DescribeFailure Rejected(
         PostgresServerError error,
         DescribeRequest query,
         DescribeStep step,
-        EquatableArray<string> serverLines
+        EquatableArray<string> serverLines,
+        string? help
     ) =>
         new(
             ToolDiagnostics.ServerRejectedQuery,
             new EquatableArray<string>([query.Name, error.Message]),
             step,
             serverLines,
-            null
+            help
         );
 
     // The parameter whose declared type the server's position falls in, or null: for no position, one in the SQL,

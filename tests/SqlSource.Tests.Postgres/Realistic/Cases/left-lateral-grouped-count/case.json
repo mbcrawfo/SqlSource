@@ -1,0 +1,16 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "order_count",
+      "nullable": true,
+      "why": "a grouped subquery has no row for an account with no order, dave or erin, and the join extends it"
+    },
+    {
+      "name": "last_placed_at",
+      "nullable": true,
+      "why": "a grouped subquery has no row for an account with no order, dave or erin, and the join extends it"
+    }
+  ]
+}

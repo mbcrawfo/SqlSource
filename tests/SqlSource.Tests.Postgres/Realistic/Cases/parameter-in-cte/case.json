@@ -1,0 +1,22 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "order_count", "nullable": false },
+    { "name": "last_placed_at", "nullable": false },
+    {
+      "name": "last_login_at",
+      "nullable": true,
+      "why": "an account with no login has no row of the lateral subquery; carol has logouts alone"
+    },
+    {
+      "name": "last_login_device",
+      "nullable": true,
+      "why": "no lateral row for an account with no login, and payload need not hold the key; carol has no login"
+    }
+  ],
+  "samples": [
+    { "since": "'2024-01-01'" },
+    { "since": "'2024-07-15'" }
+  ]
+}

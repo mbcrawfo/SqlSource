@@ -1,0 +1,11 @@
+kind: rows
+plan: walked
+table-match: several-tables
+parameter @since: timestamp with time zone (inferred)
+column 0 account_id: integer | nullable null | view | public.account_orders.account_id
+column 1 name: character varying(100) | nullable null | view | public.account_orders.name
+column 2 status: public.account_status | nullable false | catalog | public.accounts.status
+column 3 order_id: bigint | nullable true | outer-join | public.account_orders.order_id
+column 4 placed_at: timestamp with time zone | nullable true | outer-join | public.account_orders.placed_at
+column 5 amount: public.positive_amount | nullable true | outer-join | billing.invoices.amount
+column 6 paid_on: date | nullable true | outer-join | billing.invoices.paid_on

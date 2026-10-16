@@ -1,0 +1,18 @@
+{
+  "columns": [
+    { "name": "order_id", "nullable": false },
+    { "name": "account_id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "amount",
+      "nullable": true,
+      "why": "the domain's NOT NULL is not checked for a NULL already of the domain; unpaid invoice 4 has none"
+    },
+    { "name": "issued_on", "nullable": false },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "orders.shipped_at is nullable; orders 2 and 3, whose invoices are unpaid, are unshipped"
+    }
+  ]
+}

@@ -17,3 +17,7 @@ schemas/*.json text eol=lf
 
 # A describer's fixture is compared byte for byte, and its SQL is in a request that keys a recorded answer
 tests/SqlSource.Tool.Tests/Fixtures/Describers/** text eol=lf
+
+# A realistic case's expectation is compared byte for byte, and the `at character` of a refusal counts its query's
+# line ends
+tests/SqlSource.Tests.Postgres/Realistic/Cases/** text eol=lf

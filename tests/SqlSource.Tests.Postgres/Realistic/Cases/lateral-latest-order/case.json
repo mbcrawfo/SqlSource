@@ -1,0 +1,10 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "order_id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "note", "nullable": true, "why": "orders.note is nullable; alice's latest, order 2, has none" },
+    { "name": "line_count", "nullable": false }
+  ]
+}

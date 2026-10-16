@@ -1,0 +1,8 @@
+{
+  "columns": [
+    { "name": "column1", "nullable": false },
+    { "name": "column2", "nullable": false },
+    { "name": "column3", "nullable": false },
+    { "name": "column4", "nullable": true, "why": "the rows of standard and pickup give a NULL" }
+  ]
+}

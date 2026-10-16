@@ -1,0 +1,10 @@
+kind: rows
+plan: walked
+table-match: no-origin
+parameter @since: timestamp with time zone (inferred)
+column 0 id: integer | nullable false | catalog | public.accounts.id
+column 1 name: character varying(100) | nullable false | catalog | public.accounts.name
+column 2 order_count: bigint | nullable null | no-origin | -
+column 3 last_placed_at: timestamp with time zone | nullable null | no-origin | -
+column 4 last_login_at: timestamp with time zone | nullable true | heuristic | public.events.at
+column 5 last_login_device: text | nullable null | no-origin | -

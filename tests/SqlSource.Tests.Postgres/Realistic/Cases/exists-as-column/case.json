@@ -1,0 +1,10 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "email", "nullable": true, "why": "accounts.email is nullable; bob and erin have none" },
+    { "name": "has_orders", "nullable": false },
+    { "name": "has_uninvoiced_orders", "nullable": false },
+    { "name": "is_closed", "nullable": false }
+  ]
+}

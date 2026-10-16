@@ -1,0 +1,14 @@
+kind: rows
+plan: walked
+table-match: no-origin
+parameter @ids: integer[] (inferred)
+parameter @skus: text[] (inferred)
+parameter @names: text[] (inferred)
+parameter @prices: numeric[] (inferred)
+column 0 action: text | nullable null | no-origin | -
+column 1 id: integer | nullable false | catalog | public.products.id
+column 2 sku: text | nullable false | catalog | public.products.sku
+column 3 name: text | nullable false | catalog | public.products.name
+column 4 price: numeric(12,2) | nullable false | catalog | public.products.price
+column 5 category_id: integer | nullable true | catalog | public.products.category_id
+column 6 discontinued_on: date | nullable true | catalog | public.products.discontinued_on

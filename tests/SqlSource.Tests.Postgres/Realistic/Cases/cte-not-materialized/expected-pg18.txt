@@ -1,0 +1,8 @@
+kind: rows
+plan: walked
+table-match: no-origin
+column 0 sku: text | nullable false | catalog | public.products.sku
+column 1 name: text | nullable false | catalog | public.products.name
+column 2 price: numeric(12,2) | nullable false | catalog | public.products.price
+column 3 category: text | nullable true | outer-join | public.categories.name
+column 4 units_sold: bigint | nullable null | no-origin | -

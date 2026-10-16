@@ -1,0 +1,26 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "at", "nullable": false },
+    { "name": "kind", "nullable": false },
+    {
+      "name": "device",
+      "nullable": true,
+      "why": "events.payload is nullable and need not hold the key; event 6 has no payload"
+    },
+    {
+      "name": "account_name",
+      "nullable": true,
+      "why": "events.account_id has no foreign key; event 8 is of account 99, which is not there"
+    },
+    {
+      "name": "closed_at",
+      "nullable": true,
+      "why": "accounts.closed_at is nullable, and event 8 finds no account; alice is open"
+    }
+  ],
+  "samples": [
+    { "from": "'2025-01-01'" },
+    { "from": "'2000-01-01'" }
+  ]
+}

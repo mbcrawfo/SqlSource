@@ -1,0 +1,9 @@
+{
+  "columns": [
+    { "name": "account_id", "nullable": false },
+    { "name": "name", "nullable": true, "why": "the right join finds no open account for carol's order 4" },
+    { "name": "status", "nullable": true, "why": "the right join finds no open account for carol's order 4" },
+    { "name": "order_id", "nullable": false },
+    { "name": "placed_at", "nullable": false }
+  ]
+}

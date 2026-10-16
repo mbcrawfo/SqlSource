@@ -1,0 +1,16 @@
+{
+  "columns": [
+    { "name": "account_id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "category_id",
+      "nullable": true,
+      "why": "an account with no line has no product on the left joins; dave has none"
+    },
+    {
+      "name": "category",
+      "nullable": true,
+      "why": "no product, or a product with no category, finds no category; dave, and product 13"
+    }
+  ]
+}

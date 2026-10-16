@@ -1,0 +1,14 @@
+kind: rows
+plan: not-needed
+table-match: no-origin
+parameter @order_id: bigint (inferred)
+parameter @first_product_id: integer (inferred)
+parameter @first_quantity: integer (inferred)
+parameter @second_product_id: integer (inferred)
+parameter @second_quantity: integer (inferred)
+column 0 order_id: bigint | nullable false | catalog | public.order_lines.order_id
+column 1 line_no: integer | nullable false | catalog | public.order_lines.line_no
+column 2 product_id: integer | nullable false | catalog | public.order_lines.product_id
+column 3 quantity: integer | nullable false | catalog | public.order_lines.quantity
+column 4 unit_price: numeric(12,2) | nullable false | catalog | public.order_lines.unit_price
+column 5 line_total: numeric | nullable null | no-origin | -

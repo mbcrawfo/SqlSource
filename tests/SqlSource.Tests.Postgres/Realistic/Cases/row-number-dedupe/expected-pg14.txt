@@ -1,0 +1,8 @@
+kind: rows
+plan: walked
+table-match: several-tables
+column 0 account_id: integer | nullable true | heuristic | public.accounts.id
+column 1 name: character varying(100) | nullable true | heuristic | public.accounts.name
+column 2 order_id: bigint | nullable true | heuristic | public.orders.id
+column 3 placed_at: timestamp with time zone | nullable true | heuristic | public.orders.placed_at
+column 4 shipped_at: timestamp with time zone | nullable true | heuristic | public.orders.shipped_at

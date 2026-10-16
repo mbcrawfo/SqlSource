@@ -1,0 +1,16 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "order_id", "nullable": false },
+    {
+      "name": "amount",
+      "nullable": true,
+      "why": "the domain positive_amount's NOT NULL lets a NULL already of the domain through; invoice 4 holds one"
+    },
+    { "name": "issued_on", "nullable": false },
+    { "name": "paid_on", "nullable": true, "why": "billing.invoices.paid_on is nullable; invoices 2 to 4 are unpaid" }
+  ],
+  "samples": [
+    { "limit": "10" }
+  ]
+}

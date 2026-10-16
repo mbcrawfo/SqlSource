@@ -1,0 +1,9 @@
+kind: rows
+plan: walked
+table-match: no-origin
+column 0 id: integer | nullable null | no-origin | -
+column 1 parent_id: integer | nullable null | no-origin | -
+column 2 name: text | nullable null | no-origin | -
+column 3 path: text | nullable null | no-origin | -
+column 4 depth: integer | nullable null | no-origin | -
+column 5 product_count: bigint | nullable null | no-origin | -

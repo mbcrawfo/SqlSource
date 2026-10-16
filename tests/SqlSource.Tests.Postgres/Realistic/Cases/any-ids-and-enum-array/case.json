@@ -1,0 +1,12 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "status", "nullable": false },
+    { "name": "email", "nullable": true, "why": "accounts.email is nullable; bob and erin have none" },
+    { "name": "order_count", "nullable": false }
+  ],
+  "samples": [
+    { "ids": "'{1,2,3,5}'", "statuses": "'{active,suspended}'" }
+  ]
+}

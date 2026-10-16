@@ -1,0 +1,14 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "email",
+      "nullable": true,
+      "why": "accounts.email is nullable; bob, who has no email, ordered and logged in"
+    }
+  ],
+  "samples": [
+    { "since": "'2024-01-01'" }
+  ]
+}

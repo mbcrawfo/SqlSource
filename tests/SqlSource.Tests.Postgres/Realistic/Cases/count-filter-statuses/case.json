@@ -1,0 +1,22 @@
+{
+  "columns": [
+    { "name": "total", "nullable": false },
+    { "name": "active", "nullable": false },
+    { "name": "inactive", "nullable": false },
+    { "name": "with_email", "nullable": false },
+    {
+      "name": "newest_created_at",
+      "nullable": true,
+      "why": "with no GROUP BY there is a row over no input, and max of none is NULL; no account is created after 2030"
+    },
+    {
+      "name": "avg_active_tags",
+      "nullable": true,
+      "why": "avg of no row is NULL when no active account passes; none is created after 2030"
+    }
+  ],
+  "samples": [
+    { "since": "'2024-01-01'" },
+    { "since": "'2030-01-01'" }
+  ]
+}

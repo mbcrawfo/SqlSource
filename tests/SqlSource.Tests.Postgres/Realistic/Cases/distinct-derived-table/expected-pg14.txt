@@ -1,0 +1,7 @@
+kind: rows
+plan: walked
+table-match: several-tables
+column 0 account_id: integer | nullable false | catalog | public.accounts.id
+column 1 name: character varying(100) | nullable false | catalog | public.accounts.name
+column 2 category_id: integer | nullable true | outer-join | public.products.category_id
+column 3 category: text | nullable true | outer-join | public.categories.name

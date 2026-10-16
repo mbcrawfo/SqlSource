@@ -1,0 +1,26 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "at", "nullable": false },
+    { "name": "kind", "nullable": false },
+    {
+      "name": "account_name",
+      "nullable": true,
+      "why": "events.account_id has no foreign key; event 8 is of account 99, which is not there"
+    },
+    {
+      "name": "device",
+      "nullable": true,
+      "why": "events.payload need not hold the key; event 7 of ip 10.0.0.3 has no device"
+    },
+    {
+      "name": "item_count",
+      "nullable": true,
+      "why": "events.payload need not hold items, and jsonb_array_length of NULL is NULL; event 4 has none"
+    }
+  ],
+  "samples": [
+    { "filter": "'{\"ip\":\"10.0.0.3\"}'", "key": "'ip'" },
+    { "filter": "'{\"device\":\"phone\"}'", "key": "'device'" }
+  ]
+}

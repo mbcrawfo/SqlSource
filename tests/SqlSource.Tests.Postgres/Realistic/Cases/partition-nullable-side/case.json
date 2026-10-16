@@ -1,0 +1,24 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "kind",
+      "nullable": true,
+      "why": "an account with no event since @from has none on the left join; bob, dave and erin"
+    },
+    {
+      "name": "at",
+      "nullable": true,
+      "why": "an account with no event since @from has none on the left join; bob, dave and erin"
+    },
+    {
+      "name": "ip",
+      "nullable": true,
+      "why": "events.payload is nullable, and the left join may find no event; bob, dave and erin"
+    }
+  ],
+  "samples": [
+    { "from": "'2025-01-01'" }
+  ]
+}

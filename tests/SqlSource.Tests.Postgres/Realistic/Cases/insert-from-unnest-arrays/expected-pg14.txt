@@ -1,0 +1,14 @@
+kind: rows
+plan: walked
+table-match: order-differs
+parameter @ids: integer[] (inferred)
+parameter @skus: text[] (inferred)
+parameter @names: text[] (inferred)
+parameter @prices: numeric[] (inferred)
+parameter @category_slugs: text[] (inferred)
+column 0 id: integer | nullable false | catalog | public.products.id
+column 1 sku: text | nullable false | catalog | public.products.sku
+column 2 name: text | nullable false | catalog | public.products.name
+column 3 price: numeric(12,2) | nullable false | catalog | public.products.price
+column 4 category_id: integer | nullable true | catalog | public.products.category_id
+column 5 discontinued_on: date | nullable true | catalog | public.products.discontinued_on

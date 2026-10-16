@@ -1,0 +1,7 @@
+kind: rows
+plan: not-needed
+table-match: no-origin
+column 0 column1: text | nullable null | no-origin | -
+column 1 column2: text | nullable null | no-origin | -
+column 2 column3: numeric | nullable null | no-origin | -
+column 3 column4: integer | nullable null | no-origin | -

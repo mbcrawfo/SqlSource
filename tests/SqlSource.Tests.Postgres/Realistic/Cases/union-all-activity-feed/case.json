@@ -1,0 +1,15 @@
+{
+  "columns": [
+    { "name": "kind", "nullable": false },
+    { "name": "ref_id", "nullable": false },
+    { "name": "at", "nullable": false },
+    {
+      "name": "detail",
+      "nullable": true,
+      "why": "orders.note, events.payload and invoices.paid_on are nullable; alice's order 2 has no note"
+    }
+  ],
+  "samples": [
+    { "account_id": "1" }
+  ]
+}

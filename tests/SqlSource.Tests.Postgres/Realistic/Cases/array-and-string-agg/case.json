@@ -1,0 +1,18 @@
+{
+  "columns": [
+    { "name": "account_id", "nullable": false },
+    { "name": "product_ids", "nullable": false },
+    { "name": "product_names", "nullable": false },
+    {
+      "name": "category_slugs",
+      "nullable": true,
+      "why": "array_agg of no row is NULL when no product bought has a category; carol bought only gift card 13"
+    },
+    {
+      "name": "coupons",
+      "nullable": true,
+      "why": "string_agg skips NULLs and is NULL when all are; carol's order 4 has no coupon"
+    },
+    { "name": "units", "nullable": false }
+  ]
+}

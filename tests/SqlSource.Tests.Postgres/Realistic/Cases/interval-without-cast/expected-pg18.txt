@@ -1,0 +1,7 @@
+failure: SQLSRC225
+argument: ListRecentOrders
+argument: operator does not exist: timestamp with time zone > interval
+help: if the error is at a use of a parameter, the server gave @age the type of its first use, which may not be the type meant: cast the parameter where it is used to the type meant, @age::<type>, or declare its type with -- param: @age <type>
+server: 42883: operator does not exist: timestamp with time zone > interval
+server: hint: No operator matches the given name and argument types. You might need to add explicit type casts.
+server: at character 86

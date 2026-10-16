@@ -1,0 +1,10 @@
+kind: rows
+plan: walked
+table-match: names-differ
+parameter @since: timestamp with time zone (inferred)
+column 0 id: bigint | nullable true | heuristic | public.orders.id
+column 1 account_id: integer | nullable true | heuristic | public.orders.account_id
+column 2 placed_at: timestamp with time zone | nullable true | heuristic | public.orders.placed_at
+column 3 note: text | nullable true | heuristic | public.orders.note
+column 4 later_id: bigint | nullable true | heuristic | public.orders.id
+column 5 later_placed_at: timestamp with time zone | nullable true | heuristic | public.orders.placed_at

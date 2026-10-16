@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0051`
+Next id: `TD-0052`
 
 ## Active items
 
@@ -38,6 +38,7 @@ Next id: `TD-0051`
 | [TD-0048](TD-0048-driver-levels-trust-npgsqls-messages.md) | Open | 2026-10-14 | Low | The run log forwards Npgsql's messages at levels, Debug for commands and transactions and Warning for every other category, that trust the driver not to name the host, the user or the database, and the tool removes only the connection's whole value |
 | [TD-0049](TD-0049-describe-behind-a-pooler-can-reach-another-backend.md) | Open | 2026-10-14 | Low | Behind a pooler in transaction mode, the `columns` and `explain` calls of the PostgreSQL describer can reach a backend that lacks the prepared statement, which `check` then reports as `SQLSRC231` and not `SQLSRC236`, or one that holds a statement of the same name from an earlier run, whose columns or plan are read for the query |
 | [TD-0050](TD-0050-a-catalog-types-name-depends-on-the-search-path.md) | Open | 2026-10-14 | Low | The name of a type of `pg_catalog` that has no modifier is `format_type(oid, -1)`, which qualifies it when a user type of the same name stands before `pg_catalog` on the session's `search_path`, so such a name depends on the session |
+| [TD-0051](TD-0051-columns-that-cannot-be-null-are-answered-nullable.md) | Open | 2026-10-15 | Medium | The PostgreSQL describer answers nullable or unknown for about half of the realistic corpus's columns that cannot be `NULL`: expressions with no origin, set operations and recursive CTEs, `EXISTS` as a column, aggregates other than `count`, `VALUES`, strict functions, and the walk's gaps of TD-0046; `RealisticNoiseBudgetTests` holds the count |
 
 ## Columns
 

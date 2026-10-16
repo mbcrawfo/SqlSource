@@ -1,0 +1,13 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "account_id", "nullable": false },
+    { "name": "during", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "email", "nullable": true, "why": "accounts.email is nullable; bob, suspended, has none" }
+  ],
+  "samples": [
+    { "status": "'suspended'" },
+    { "status": "'active'" }
+  ]
+}

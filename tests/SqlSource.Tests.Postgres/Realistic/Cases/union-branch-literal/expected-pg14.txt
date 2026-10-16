@@ -1,0 +1,7 @@
+kind: rows
+plan: not-needed
+table-match: no-origin
+column 0 id: integer | nullable null | no-origin | -
+column 1 name: text | nullable null | no-origin | -
+column 2 slug: text | nullable null | no-origin | -
+column 3 sort_group: integer | nullable null | no-origin | -
