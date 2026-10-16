@@ -19,7 +19,7 @@ A [marker](concepts.md#marker) is a line comment that starts its line and has th
 
 ## Marker index
 
-A marker stands in one of two places.  A marker that describes one query stands **inside the query**, under its `-- name:` line.  A marker that describes the whole file stands in the [file header](concepts.md#file-header), before the first `-- name:` line.  See [the file header](#the-file-header) below.  A file with no `-- name:` line is one query and takes both kinds.
+A marker stands in one of two places.  A marker that describes one query stands **inside the query**, under its `-- name:` line.  A marker that describes the whole file stands in the [file header](concepts.md#file-header), before the first `-- name:` line.  A file with no `-- name:` line is one query and takes both kinds.
 
 | Marker | Purpose | File header | Inside a query | Documented in |
 |----|----|----|----|----|
@@ -38,7 +38,7 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- input-model:`, `-- output-model:` | The name of one query's model (no effect yet) | no | yes | [Name of one query's model](settings.md#setting-model-name) |
 | `-- collection-type:` | The type that holds many rows (no effect yet) | yes | yes | [Collection type](settings.md#setting-collection-type) |
 
-> **Coming in a later release.**  The markers above that say "no effect yet" will shape generated models and query methods; today they are read and checked, and change no generated code.  See [what works today](README.md#what-works-today).
+> **Coming in a later release.**  The markers above that have no effect yet will shape generated models and query methods; today they are read and checked, and change no generated code.  See [what works today](README.md#what-works-today).
 
 A marker that is a setting links to its section of [the settings page](settings.md), which also says where else the setting can be given, which place wins, and whether the setting has an effect today.  A marker where its column says "no" is an error: see [markers in the wrong place](#markers-in-the-wrong-place).
 
@@ -85,7 +85,7 @@ A name can be followed by `->` and one of five shapes.  They are checked today a
 | `none` | Nothing |
 | `rowcount` | The number of rows the statement affected |
 
-The case of a shape is ignored.  A word after `->` that is not one of the five, or none, is [SQLSRC111](diagnostics.md#sqlsrc111).  Text after a name with no `->`, as in `-- name: Get User`, is read as part of the name and is [SQLSRC103](diagnostics.md#sqlsrc103).  A file with no `-- name:` line has no place to write a shape.
+The case of a shape is ignored.  A word after `->` that is not one of the five, or no word at all, is [SQLSRC111](diagnostics.md#sqlsrc111).  Text after a name with no `->`, as in `-- name: Get User`, is read as part of the name and is [SQLSRC103](diagnostics.md#sqlsrc103).  A file with no `-- name:` line has no place to write a shape.
 
 <a id="summaries"></a>
 
