@@ -253,7 +253,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         capture
             .Calls.Select(call => call.Method)
-            .ShouldBe(["open", "prepare", "columns", "types", "check", "deallocate"]);
+            .ShouldBe(["open", "prepare", "columns", "types", "check", "explain", "deallocate"]);
     }
 
     // Two tables of these tests alone: one with the modifiers the fixture schema lacks, and one with no column.
@@ -613,7 +613,8 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // The rule replaces the INSERT by its action, and the rows of its RETURNING list are the action's, while the row
     // description keeps the target as the column's origin: the column is nullable whatever the target's NOT NULL
     // says, whether the query is gated or not.  The gated one's plan inserts into the other table under its own
-    // alias, which the walk maps to the target's column and finds nothing extends.
+    // alias, which the walk maps to the target's column and finds nothing extends.  Its constant is the rewritten
+    // statement's, which the plan prints, and is never NULL.
     [Fact]
     public async Task Describe_ReturningOfATableWithAnInsteadRule_IsNullableByTheCatalog()
     {
@@ -640,10 +641,11 @@ public sealed class ColumnTests(PostgresContainer postgres)
         plain.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
         NullabilityOf(plain.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog")]);
         gated.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        NullabilityOf(gated.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog"), (null, "no-origin")]);
+        NullabilityOf(gated.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog"), (false, "expression")]);
     }
 
-    // The query of the spec's Goal, without its join.
+    // The query of the spec's Goal, without its join.  Its count has no origin, so the plan is asked for it and
+    // answers it, and the columns of the table keep the catalog's answer.
     [Fact]
     public async Task Describe_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()
     {
@@ -651,9 +653,9 @@ public sealed class ColumnTests(PostgresContainer postgres)
             "SELECT u.id, u.email, count(*) OVER () AS n FROM users u WHERE u.id = @id"
         );
 
-        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         NullabilityOf(description.Columns.ShouldNotBeNull())
-            .ShouldBe([(false, "catalog"), (true, "catalog"), (null, "no-origin")]);
+            .ShouldBe([(false, "catalog"), (true, "catalog"), (false, "expression")]);
     }
 
     // The query of the spec's Goal: each row of its table.
@@ -743,10 +745,10 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_GateWordInAStringOrAComment_IsNotGated()
     {
-        var description = await ShouldDescribeAsync("SELECT id, 'left join' AS s FROM users -- outer");
+        var description = await ShouldDescribeAsync("SELECT id FROM users WHERE name <> 'left join' -- outer");
 
         description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
-        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(false, "catalog")]);
     }
 
     // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  In a gated query a view's

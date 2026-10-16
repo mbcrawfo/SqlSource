@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 parameter @from: timestamp with time zone (inferred)
 column 0 id: integer | nullable false | catalog | public.accounts.id

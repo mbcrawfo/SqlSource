@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 parameter @order_id: bigint (inferred)
 parameter @first_product_id: integer (inferred)

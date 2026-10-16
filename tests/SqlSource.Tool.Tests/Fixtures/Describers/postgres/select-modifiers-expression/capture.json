@@ -172,6 +172,18 @@
       }
     },
     {
+      "method": "explain",
+      "request": {
+        "statement": "sqlsource_1",
+        "parameters": 0,
+        "settings": []
+      },
+      "answer": {
+        "plan": "[\n  {\n    \"Plan\": {\n      \"Node Type\": \"Seq Scan\",\n      \"Parallel Aware\": false,\n      \"Async Capable\": false,\n      \"Relation Name\": \"modifiers\",\n      \"Schema\": \"public\",\n      \"Alias\": \"m\",\n      \"Startup Cost\": 0.00,\n      \"Total Cost\": 15.38,\n      \"Plan Rows\": 430,\n      \"Plan Width\": 54,\n      \"Disabled\": false,\n      \"Output\": [\"'1 day'::interval day to second(3)\", \"CASE names[1] WHEN ''::text THEN names[2] ELSE names[1] END\"]\n    }\n  }\n]",
+        "error": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"

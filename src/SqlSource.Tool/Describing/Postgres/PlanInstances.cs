@@ -13,6 +13,7 @@ internal static class WalkReasons
     public const string UnknownJoinType = "unknown-join-type";
     public const string DoubledAlias = "doubled-alias";
     public const string GroupingSets = "grouping-sets";
+    public const string OutputDiffers = "output-differs";
 }
 
 /// <summary>A node the walk visited, as the log says it.</summary>
@@ -49,6 +50,17 @@ internal sealed class PlanInstances
     private const string None = "none";
     private const string ModifyTable = "ModifyTable";
 
+    // The nodes of a set operation, whose root prints its first branch: a UNION's Append, ordered or not, the SetOp of
+    // an INTERSECT or an EXCEPT, and a recursive CTE's union.
+    private static readonly HashSet<string> SetOperations =
+    [
+        with(StringComparer.Ordinal),
+        "Append",
+        "Merge Append",
+        "SetOp",
+        "Recursive Union",
+    ];
+
     private static readonly HashSet<string> RelationScans =
     [
         with(StringComparer.Ordinal),
@@ -61,7 +73,7 @@ internal sealed class PlanInstances
         "Sample Scan",
     ];
 
-    private readonly Dictionary<string, bool> _extended = [with(StringComparer.Ordinal)];
+    private readonly Dictionary<string, Instance> _instances = [with(StringComparer.Ordinal)];
     private readonly List<VisitedNode> _nodes = [];
     private readonly string? _target;
     private bool _targetScanSeen;
@@ -92,11 +104,44 @@ internal sealed class PlanInstances
     /// </summary>
     public bool RootNamesAnInstance { get; }
 
+    /// <summary>
+    /// Whether a node that was visited is of a set operation, an <c>Append</c> or a <c>SetOp</c> for two, whose root
+    /// prints the first branch's values: a value there says nothing of the other branches.  A partitioned table's
+    /// <c>Append</c> is one too, which the text cannot tell from a <c>UNION</c>'s.
+    /// </summary>
+    public bool HasSetOperation { get; private set; }
+
+    /// <summary>The alias of the plan's one relation instance, or null when it has none or several.</summary>
+    public string? SoleAlias => _instances.Count == 1 ? _instances.Keys.First() : null;
+
     /// <summary>The instances of a plan.</summary>
     public static PlanInstances Find(PlanNode root) => new(root);
 
     /// <summary>Whether the alias names an instance, and whether a join null-extends it.</summary>
-    public bool TryFind(string alias, out bool nullExtended) => _extended.TryGetValue(alias, out nullExtended);
+    public bool TryFind(string alias, out bool nullExtended)
+    {
+        nullExtended = false;
+        if (!_instances.TryGetValue(alias, out var instance))
+        {
+            return false;
+        }
+
+        nullExtended = instance.NullExtended;
+        return true;
+    }
+
+    /// <summary>The schema and the name of the relation an alias names, when the plan says both.</summary>
+    public bool TryFindRelation(string alias, out string schema, out string relation)
+    {
+        schema = relation = string.Empty;
+        if (!_instances.TryGetValue(alias, out var instance) || instance is not { Schema: { } s, Relation: { } r })
+        {
+            return false;
+        }
+
+        (schema, relation) = (s, r);
+        return true;
+    }
 
     private static bool NamesAnInstance(PlanNode node, bool isRoot) =>
         node.Alias is not null && (RelationScans.Contains(node.NodeType) || (isRoot && node.NodeType == ModifyTable));
@@ -130,9 +175,10 @@ internal sealed class PlanInstances
             Reason ??= WalkReasons.GroupingSets;
         }
 
+        HasSetOperation |= SetOperations.Contains(node.NodeType);
         if (node.Alias is { } alias && NamesAnInstance(node, depth == 0))
         {
-            Add(alias, depth, extended);
+            Add(alias, depth, new Instance(extended, node.Schema, node.RelationName));
         }
 
         foreach (var child in node.Plans.Where(static child => child.ParentRelationship is Outer or Inner))
@@ -142,7 +188,7 @@ internal sealed class PlanInstances
         }
     }
 
-    private void Add(string alias, int depth, bool extended)
+    private void Add(string alias, int depth, Instance instance)
     {
         // The first scan of the target's alias under the ModifyTable is the target, which the root already named.
         if (depth > 0 && !_targetScanSeen && string.Equals(alias, _target, StringComparison.Ordinal))
@@ -151,9 +197,12 @@ internal sealed class PlanInstances
             return;
         }
 
-        if (!_extended.TryAdd(alias, extended))
+        if (!_instances.TryAdd(alias, instance))
         {
             Reason ??= WalkReasons.DoubledAlias;
         }
     }
+
+    // A relation instance: whether a join null-extends it, and the relation it scans as the plan names it.
+    private sealed record Instance(bool NullExtended, string? Schema, string? Relation);
 }

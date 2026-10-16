@@ -1,8 +1,8 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 column 0 id: integer | nullable false | catalog | public.accounts.id
 column 1 name: character varying(100) | nullable false | catalog | public.accounts.name
 column 2 tag: text | nullable null | no-origin | -
 column 3 ordinal: bigint | nullable null | no-origin | -
-column 4 accounts_with_tag: bigint | nullable null | no-origin | -
+column 4 accounts_with_tag: bigint | nullable false | expression | -

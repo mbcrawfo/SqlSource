@@ -52,6 +52,7 @@ internal static class SidecarValues
         public const string OuterJoin = "outer-join";
         public const string View = "view";
         public const string ForeignTable = "foreign-table";
+        public const string Expression = "expression";
         public const string NoOrigin = "no-origin";
         public const string Heuristic = "heuristic";
     }

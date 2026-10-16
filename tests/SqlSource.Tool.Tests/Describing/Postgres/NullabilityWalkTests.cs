@@ -24,10 +24,17 @@ public class NullabilityWalkTests
 
     private static readonly PostgresTableRow Foreign = Table with { Oid = 16703, Name = "ft", Relkind = "f" };
 
+    // Two more tables like the first, for the scans "a" and "b" of PostgresPlans, which name the table of the alias.
+    private static readonly PostgresTableRow TableA = Table with { Oid = 16706, Name = "a" };
+
+    private static readonly PostgresTableRow TableB = Table with { Oid = 16707, Name = "b" };
+
     private static readonly IReadOnlyDictionary<long, PostgresTableRow> Tables = PostgresTables.Of(
         Table,
         View,
-        Foreign
+        Foreign,
+        TableA,
+        TableB
     );
 
     // A column of the table, of the view, or of an expression when the table is null.
@@ -40,7 +47,10 @@ public class NullabilityWalkTests
     private static readonly Asked Expression = new(null, 0);
 
     // The columns as the session builds them for a gated query, with the heuristic's answer, and their origins.
-    private static (SidecarColumn[] Columns, ColumnOrigin?[] Origins) Built(params Asked[] asked)
+    private static (SidecarColumn[] Columns, ColumnOrigin?[] Origins) Built(params Asked[] asked) => Built(true, asked);
+
+    // The columns as the session builds them, for a gated query or for one that is not.
+    private static (SidecarColumn[] Columns, ColumnOrigin?[] Origins) Built(bool gated, params Asked[] asked)
     {
         var columns = new SidecarColumn[asked.Length];
         var origins = new ColumnOrigin?[asked.Length];
@@ -55,7 +65,7 @@ public class NullabilityWalkTests
                 origins[index],
                 PostgresRows.Of(PostgresRows.Int4),
                 TypeSpellings.None,
-                gated: true
+                gated
             );
         }
 
@@ -67,7 +77,23 @@ public class NullabilityWalkTests
     private static WalkOutcome Run(PlanNode root, bool oldAndNewMayBeNamed, params Asked[] asked)
     {
         var (columns, origins) = Built(asked);
-        return NullabilityWalk.Run(root, columns, origins, oldAndNewMayBeNamed);
+        return NullabilityWalk.Run(root, columns, origins, Scope(true, oldAndNewMayBeNamed));
+    }
+
+    private static WalkScope Scope(bool gated, bool oldAndNewMayBeNamed = false, bool catalogFunctionsFirst = true) =>
+        new(gated, oldAndNewMayBeNamed, catalogFunctionsFirst, Tables);
+
+    private static WalkOutcome RunAs(WalkScope scope, PlanNode root, params Asked[] asked)
+    {
+        var (columns, origins) = Built(scope.Gated, asked);
+        return NullabilityWalk.Run(root, columns, origins, scope);
+    }
+
+    // A query that is planned for a column with no origin, and has no word of the gate.
+    private static WalkOutcome RunUngated(PlanNode root, params Asked[] asked)
+    {
+        var (columns, origins) = Built(false, asked);
+        return NullabilityWalk.Run(root, columns, origins, Scope(false));
     }
 
     private static (bool? Nullable, string? Source)[] AnswersOf(WalkOutcome outcome) =>
@@ -117,7 +143,8 @@ public class NullabilityWalkTests
         AnswersOf(Run(LeftJoin("a.id", "b.id", "a.id + 1"), OfForeign, OfForeign, OfForeign))
             .ShouldBe([(null, "foreign-table"), (true, "outer-join"), (null, "foreign-table")]);
 
-    // Nothing of the plan can make it non-nullable, so it is not looked up, whatever its entry is.
+    // Under a join that null-extends, an expression is not answered: the text cannot tell one the root computes from
+    // one a node under the join computed.  A column without an origin is never mapped.
     [Fact]
     public void Run_ColumnWithoutAnOrigin_IsUnknownAndIsNotLookedUp()
     {
@@ -126,6 +153,219 @@ public class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([(null, "no-origin"), (null, "no-origin")]);
         outcome.Columns.ShouldAllBe(static walked => !walked.Mapped && walked.Reference == null);
         outcome.Columns[0].Output.ShouldBe("b.id");
+    }
+
+    // A query without a word of the gate is planned for its expressions alone: a column with an origin keeps the
+    // catalog's answer whatever its entry, since no outer join can have touched it.
+    [Fact]
+    public void Run_UngatedQueryWhoseEntryCannotBeMapped_KeepsTheCatalogsAnswer()
+    {
+        var plan = Over("Subquery Scan", Scan("t"), "Subquery") with { Alias = "s", Output = ["s.id", "count(*)"] };
+
+        var outcome = RunUngated(plan, NotNull, Expression);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(outcome).ShouldBe([(false, "catalog"), (false, "expression")]);
+    }
+
+    [Fact]
+    public void Run_UngatedQueryWithAPlanThatCannotBeUsed_KeepsTheCatalogsAnswer()
+    {
+        var plan = Join("Inner", Scan("a"), Scan("a")) with { Output = ["a.id"] };
+
+        var outcome = RunUngated(plan, NotNull);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
+        outcome.Reason.ShouldBe(WalkReasons.DoubledAlias);
+        AnswersOf(outcome).ShouldBe([(false, "catalog")]);
+    }
+
+    // A plan whose reference names another column than the one the row description gives may be no plan of this
+    // statement: a pooler can hand the explain another backend's statement of the same name (TD-0049).  Its
+    // expressions are not read, and a gated query's columns with an origin are walked as they always were.
+    [Theory]
+    [InlineData("t.opt")]
+    [InlineData("opt")]
+    public void Run_ReferenceThatNamesAnotherColumnThanTheOrigin_IsWalkedAndReadsNoExpression(string entry)
+    {
+        var outcome = Run(Scan("t", entry, "'k'::text"), NotNull, Expression);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        outcome.Reason.ShouldBe(WalkReasons.OutputDiffers);
+        AnswersOf(outcome).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+    }
+
+    // A query that gives a table's columns aliases, users u(a, b), prints them under the aliases: the check takes it
+    // for another statement's plan, and the join's answer stands as it always did.
+    [Fact]
+    public void Run_ReferenceThatNamesAnotherColumnUnderALeftJoin_KeepsTheJoinsAnswer() =>
+        AnswersOf(Run(LeftJoin("a.other", "b.other"), NotNull, NotNull))
+            .ShouldBe([(false, "catalog"), (true, "outer-join")]);
+
+    [Fact]
+    public void Run_UngatedQueryWhoseReferenceNamesAnotherColumn_IsUnavailableAndKeepsTheCatalogsAnswer()
+    {
+        var outcome = RunUngated(Scan("t", "t.opt"), NotNull);
+
+        outcome.Reason.ShouldBe(WalkReasons.OutputDiffers);
+        AnswersOf(outcome).ShouldBe([(false, "catalog")]);
+    }
+
+    // A view's column prints as the column of the table under the view, under that column's name.
+    [Fact]
+    public void Run_ViewsColumnPrintedUnderTheBaseTablesName_IsWalked()
+    {
+        var outcome = Run(Scan("t", "t.opt"), OfView);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(outcome).ShouldBe([(null, "view")]);
+    }
+
+    [Fact]
+    public void Run_UnmappedReferenceAndExpression_PassTheCheck() =>
+        Run(LeftJoin("x.other", "a.id + 1"), NotNull, NotNull).Plan.ShouldBe(SidecarValues.Plan.Walked);
+
+    [Fact]
+    public void Run_ExpressionWithNoJoin_IsAnsweredFromItsEntry()
+    {
+        var plan = Over("Sort", Scan("t")) with
+        {
+            Output = ["(count(*))", "'a'::text", "NULL::text", "upper((t.opt)::text)"],
+        };
+
+        var outcome = RunUngated(plan, Expression, Expression, Expression, Expression);
+
+        AnswersOf(outcome)
+            .ShouldBe([(false, "expression"), (false, "expression"), (true, "expression"), (null, "no-origin")]);
+    }
+
+    [Theory]
+    [InlineData("Inner", true)]
+    [InlineData("Inner", false)]
+    [InlineData("Semi", true)]
+    [InlineData("Right Semi", false)]
+    public void Run_ExpressionUnderAJoinThatExtendsNothing_IsAnswered(string joinType, bool gated) =>
+        AnswersOf(RunAs(Scope(gated), Join(joinType, Scan("a"), Scan("b")) with { Output = ["'k'::text"] }, Expression))
+            .ShouldBe([(false, "expression")]);
+
+    // A constant or a COALESCE of a subquery the planner pulled up from the side a LEFT JOIN extends prints at the root
+    // as the same text, and is NULL for a row the join did not match.
+    [Theory]
+    [InlineData("Left", true)]
+    [InlineData("Right", true)]
+    [InlineData("Full", true)]
+    [InlineData("Left", false)]
+    public void Run_ExpressionUnderAJoinThatExtends_KeepsNoOrigin(string joinType, bool gated) =>
+        AnswersOf(
+                RunAs(Scope(gated), Join(joinType, Scan("a"), Scan("b")) with { Output = ["('x'::text)"] }, Expression)
+            )
+            .ShouldBe([(null, "no-origin")]);
+
+    // An anti join may be a LEFT JOIN ... IS NULL, which returns its other side NULL, and a view brings one into a
+    // query without a word of the gate: the words do not say what the plan holds.
+    [Theory]
+    [InlineData("Anti", false)]
+    [InlineData("Right Anti", false)]
+    [InlineData("Anti", true)]
+    [InlineData("Right Anti", true)]
+    public void Run_ExpressionUnderAnAntiJoin_KeepsNoOrigin(string joinType, bool gated)
+    {
+        var outcome = RunAs(
+            Scope(gated),
+            Join(joinType, Scan("a"), Scan("b")) with
+            {
+                Output = ["('x'::text)"],
+            },
+            Expression
+        );
+
+        AnswersOf(outcome).ShouldBe([(null, "no-origin")]);
+    }
+
+    public static TheoryData<string> SetOperations =>
+        [
+            Text(
+                Over(
+                    "Aggregate",
+                    Over("Append", Scan("a"), "Member") with
+                    {
+                        Plans =
+                        [
+                            Scan("a") with
+                            {
+                                ParentRelationship = "Member",
+                            },
+                            Scan("b") with
+                            {
+                                ParentRelationship = "Member",
+                            },
+                        ],
+                    }
+                ) with
+                {
+                    Output = ["('a'::text)"],
+                }
+            ),
+            Text(Over("Sort", Over("Append", Scan("a"), "Member")) with { Output = ["('a'::text)"] }),
+            Text(
+                Join("Inner", Scan("a"), Scan("b")) with
+                {
+                    NodeType = "SetOp",
+                    JoinType = null,
+                    Output = ["('a'::text)"],
+                }
+            ),
+        ];
+
+    // The root of a set operation prints its first branch, which says nothing of the others.
+    [Theory]
+    [MemberData(nameof(SetOperations))]
+    public void Run_ExpressionOverASetOperation_KeepsNoOrigin(string plan)
+    {
+        var outcome = RunUngated(PlanNode.Read(plan).ShouldNotBeNull(), Expression);
+
+        outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(outcome).ShouldBe([(null, "no-origin")]);
+    }
+
+    [Fact]
+    public void Run_FunctionWhenTheCatalogIsNotFirst_KeepsNoOrigin() =>
+        AnswersOf(RunAs(Scope(false, catalogFunctionsFirst: false), Scan("t", "count(*)"), Expression))
+            .ShouldBe([(null, "no-origin")]);
+
+    [Theory]
+    [InlineData("GREATEST(a.id, a.opt)", false)]
+    [InlineData("GREATEST(a.opt, b.opt)", null)]
+    [InlineData("GREATEST(c.id, a.opt)", null)]
+    public void Run_ReferenceArgumentUnderAnInnerJoin_IsTheCatalogsAnswerOfItsInstance(string entry, bool? nullable) =>
+        AnswersOf(RunUngated(Join("Inner", Scan("a"), Scan("b")) with { Output = [entry] }, Expression))
+            .ShouldBe([(nullable, nullable is null ? "no-origin" : "expression")]);
+
+    // A plan of one relation prints its columns bare.
+    [Fact]
+    public void Run_BareReferenceArgumentOfThePlansOneRelation_IsTheCatalogsAnswer() =>
+        AnswersOf(RunUngated(Over("Sort", Scan("a")) with { Output = ["(GREATEST(id, opt))"] }, Expression))
+            .ShouldBe([(false, "expression")]);
+
+    [Fact]
+    public void Run_BareReferenceArgumentUnderAJoinOfTwo_KeepsNoOrigin() =>
+        AnswersOf(RunUngated(Join("Inner", Scan("a"), Scan("b")) with { Output = ["GREATEST(id, opt)"] }, Expression))
+            .ShouldBe([(null, "no-origin")]);
+
+    // PostgreSQL 18's old row is no instance: only the target's alias is a reference the walk proves.
+    [Fact]
+    public void Run_ReferenceToTheOldRow_IsNotProved()
+    {
+        var plan = Over("ModifyTable", Scan("t")) with
+        {
+            Alias = "t",
+            RelationName = "t",
+            Schema = "public",
+            Output = ["COALESCE(old.id, NULL::integer)", "COALESCE(t.id, NULL::integer)"],
+        };
+
+        AnswersOf(RunAs(Scope(true, oldAndNewMayBeNamed: true), plan, Expression, Expression))
+            .ShouldBe([(null, "no-origin"), (false, "expression")]);
     }
 
     // The rule of a NOT NULL is written once, in ColumnNullability: one that is NOT VALID is nullable here too.
@@ -147,7 +387,7 @@ public class NullabilityWalkTests
             gated: true
         );
 
-        var outcome = NullabilityWalk.Run(Scan("n", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+        var outcome = NullabilityWalk.Run(Scan("n", "id"), [column], [origin], Scope(true));
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
@@ -174,7 +414,7 @@ public class NullabilityWalkTests
             gated: true
         );
 
-        var outcome = NullabilityWalk.Run(Scan("p", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+        var outcome = NullabilityWalk.Run(Scan("p", "id"), [column], [origin], Scope(true));
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
@@ -203,7 +443,7 @@ public class NullabilityWalkTests
             gated: true
         );
 
-        var outcome = NullabilityWalk.Run(Scan("pt", "id"), [column], [origin], oldAndNewMayBeNamed: false);
+        var outcome = NullabilityWalk.Run(Scan("pt", "id"), [column], [origin], Scope(true));
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
@@ -237,7 +477,7 @@ public class NullabilityWalkTests
             Output = ["t3.id"],
         };
 
-        var outcome = NullabilityWalk.Run(plan, [column], [origin], oldAndNewMayBeNamed: false);
+        var outcome = NullabilityWalk.Run(plan, [column], [origin], Scope(true));
 
         AnswersOf(outcome).ShouldBe([(true, "catalog")]);
     }
@@ -431,7 +671,7 @@ public class NullabilityWalkTests
         var (columns, origins) = Built(NotNull);
 
         var walked = NullabilityWalk
-            .Run(LeftJoin("a.id"), columns, origins, oldAndNewMayBeNamed: false)
+            .Run(LeftJoin("a.id"), columns, origins, Scope(true))
             .Columns.ShouldHaveSingleItem()
             .Column;
 

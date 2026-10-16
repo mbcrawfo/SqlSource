@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 column 0 id: bigint | nullable false | catalog | public.orders.id
 column 1 account_id: integer | nullable false | catalog | public.orders.account_id
@@ -8,5 +8,5 @@ column 3 total: numeric | nullable null | no-origin | -
 column 4 running_total: numeric | nullable null | no-origin | -
 column 5 previous_total: numeric | nullable null | no-origin | -
 column 6 change: numeric | nullable null | no-origin | -
-column 7 revenue_rank: bigint | nullable null | no-origin | -
-column 8 account_orders: bigint | nullable null | no-origin | -
+column 7 revenue_rank: bigint | nullable false | expression | -
+column 8 account_orders: bigint | nullable false | expression | -

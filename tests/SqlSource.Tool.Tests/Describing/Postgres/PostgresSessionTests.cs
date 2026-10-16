@@ -246,6 +246,16 @@ public class PostgresSessionTests
 
     private static PostgresExplainAnswer PlanOf(PlanNode root) => new(Text(root), null);
 
+    // "explain" for a statement whose column of no origin makes the describe ask for the plan, in a test of something
+    // else: the server gives none, and every column keeps what it was built with.
+    private static PostgresScript PlansNothing(PostgresScript script, int number, int parameters) =>
+        Explains(
+            script,
+            number,
+            parameters,
+            new PostgresExplainAnswer(null, new PostgresServerError("XX000", "no plan in this test", null, null, null))
+        );
+
     // The trailing ";" is not sent, the parameter is $1, and the statement is freed when the describe is done.
     [Fact]
     public async Task DescribeAsync_Query_AsksPrepareThenDeallocateForTheStatement()
@@ -464,6 +474,36 @@ public class PostgresSessionTests
         failure.Arguments.ShouldBe([PostgresScript.Database]);
         failure.Step.ShouldBe(DescribeStep.Explain);
         failure.ServerLines.ShouldBe(["26000: prepared statement \"sqlsource_1\" does not exist"]);
+        exchange.Unused.ShouldBeEmpty();
+    }
+
+    // A query planned for its expression alone finds out the same way.
+    [Fact]
+    public async Task DescribeAsync_UngatedQueryWithAnExpressionExplainAnswers26000_IsSqlsrc236AtExplain()
+    {
+        var gone = new PostgresServerError(
+            "26000",
+            "prepared statement \"sqlsource_1\" does not exist",
+            null,
+            null,
+            null
+        );
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, UngatedUsersId, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        _ = Checks(script, UngatedUsersId, [], Expression(0, "id", 23), Expression(1, "n", 20));
+        _ = Explains(script, 1, 0, new PostgresExplainAnswer(null, gone));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(UngatedUsersId), TestContext.Current.CancellationToken);
+
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.Step.ShouldBe(DescribeStep.Explain);
         exchange.Unused.ShouldBeEmpty();
     }
 
@@ -731,6 +771,19 @@ public class PostgresSessionTests
             Expression(1, "varchar", 1043),
             Expression(2, "numeric", 1700)
         );
+        _ = Explains(
+            script,
+            1,
+            0,
+            PlanOf(
+                Scan("x") with
+                {
+                    NodeType = "Result",
+                    Alias = null,
+                    Output = ["1", "'a'::character varying(100)", "2.00"],
+                }
+            )
+        );
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -742,7 +795,7 @@ public class PostgresSessionTests
         var description = described.Value.ShouldNotBeNull();
         description.ResultKind.ShouldBe(SidecarResultKind.Rows);
         description.MatchesTable.ShouldBeNull();
-        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
         description
             .Columns.ShouldNotBeNull()
@@ -796,6 +849,7 @@ public class PostgresSessionTests
             Expression(1, "b", 23),
             Expression(2, "c", 23)
         );
+        _ = PlansNothing(script, 1, 1);
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -911,6 +965,7 @@ public class PostgresSessionTests
         _ = Tables(script, [users.Oid], users);
         _ = Resolves(script, [27], PostgresRows.Tid);
         _ = Checks(script, "SELECT ctid FROM users", [], Expression(0, "ctid", 27));
+        _ = PlansNothing(script, 1, 0);
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -1098,17 +1153,76 @@ public class PostgresSessionTests
         return described.Value.ShouldNotBeNull();
     }
 
+    // A column with no origin is answered from the plan, so the plan is asked for, and the column of the table keeps
+    // the catalog's answer: without a word of the gate no outer join can have touched it.
     [Fact]
-    public async Task DescribeAsync_QueryWithoutAGateWord_TakesNullabilityFromTheCatalogAndNeedsNoPlan()
+    public async Task DescribeAsync_QueryWithoutAGateWordWithAnExpression_AsksForThePlanAndKeepsTheCatalogsAnswer()
     {
-        var description = await DescribeUsersIdAsync("SELECT id, count(*) OVER () AS n FROM users");
+        var plan = Over("WindowAgg", Scan("users")) with { Output = ["users.id", "count(*) OVER w1"] };
 
-        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
-        description
-            .Columns.ShouldNotBeNull()
-            .Select(column => (column.Nullable, column.NullableSource))
-            .ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        var description = await DescribeUsersIdAsync(UngatedUsersId, PlanOf(plan));
+
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([(false, "catalog"), (false, "expression")]);
     }
+
+    // A count the session's path may find in another schema than pg_catalog is no count the walk knows.
+    [Fact]
+    public async Task DescribeAsync_SearchPathThatPutsTheCatalogLast_LeavesAFunctionUnknown()
+    {
+        var users = PostgresTables.Users;
+        var plan = Over("WindowAgg", Scan("users")) with { Output = ["users.id", "count(*) OVER w1"] };
+        var script = new PostgresScript().Answer(
+            "open",
+            PostgresOpenRequest.Instance,
+            PostgresScript.Opened with
+            {
+                Settings =
+                [
+                    new PostgresSetting("search_path", "public, pg_catalog"),
+                    new PostgresSetting("plan_cache_mode", "auto"),
+                    new PostgresSetting("standard_conforming_strings", "on"),
+                ],
+            }
+        );
+        _ = PreparesOnly(script, 1, UngatedUsersId, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1), Expression(1, "n", 20));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [20, 23], PostgresRows.Int8, PostgresRows.Int4);
+        _ = Checks(script, UngatedUsersId, [], Expression(0, "id", 23), Expression(1, "n", 20));
+        _ = Explains(script, 1, 0, PlanOf(plan));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(UngatedUsersId), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+    }
+
+    [Fact]
+    public async Task DescribeAsync_QueryWhoseEveryColumnHasAnOrigin_NeedsNoPlan()
+    {
+        const string Sql = "SELECT id FROM users";
+        var users = PostgresTables.Users;
+        var script = new PostgresScript().Open();
+        _ = PreparesOnly(script, 1, Sql, [], new([], null));
+        _ = Columns(script, 1, 0, PostgresTables.ColumnOf(0, "id", 23, users, 1));
+        _ = Tables(script, [users.Oid], users);
+        _ = Resolves(script, [23], PostgresRows.Int4);
+        _ = Checks(script, Sql, [], Expression(0, "id", 23));
+        var exchange = Frees(script, 1).Play();
+        await using var session = await PostgresScript.SessionAsync(exchange);
+
+        var described = await session.DescribeAsync(Request(Sql), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        var description = described.Value.ShouldNotBeNull();
+        description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
+        AnswersOf(description).ShouldBe([(false, "catalog")]);
+    }
+
+    private const string UngatedUsersId = "SELECT id, count(*) OVER () AS n FROM users";
 
     private const string GatedUsersId =
         "SELECT u.id, count(*) OVER () AS n FROM users u LEFT JOIN orders o ON o.user_id = u.id";
@@ -1634,6 +1748,7 @@ public class PostgresSessionTests
         _ = Columns(script, 1, 1, Expression(0, "s", PostgresRows.MySchemaStatus.Oid));
         _ = Resolves(script, [PostgresRows.MySchemaStatus.Oid], PostgresRows.MySchemaStatus);
         _ = Checks(script, Sql, [("s", "My Schema.Status")], Expression(0, "s", PostgresRows.MySchemaStatus.Oid));
+        _ = PlansNothing(script, 1, 1);
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -1736,6 +1851,7 @@ public class PostgresSessionTests
             [("email", "public.email_t")],
             columns
         );
+        _ = PlansNothing(script, 1, 1);
         var exchange = Frees(script, 1).Play();
         var log = new RecordingLog();
         await using var session = await PostgresScript.SessionAsync(exchange, log);
@@ -1770,6 +1886,7 @@ public class PostgresSessionTests
         _ = Columns(script, 1, 1, columns);
         _ = Resolves(script, [25], PostgresRows.Text);
         _ = Checks(script, "SELECT @p::text AS a", [("p", "text")], columns);
+        _ = PlansNothing(script, 1, 1);
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -1797,6 +1914,7 @@ public class PostgresSessionTests
         _ = Columns(script, 1, 0, columns);
         _ = Resolves(script, [1015, 1186], PostgresRows.Varchar, PostgresRows.VarcharArray, PostgresRows.Interval);
         _ = Checks(script, "SELECT names, d FROM t", [], columns);
+        _ = PlansNothing(script, 1, 0);
         var exchange = Frees(script, 1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 

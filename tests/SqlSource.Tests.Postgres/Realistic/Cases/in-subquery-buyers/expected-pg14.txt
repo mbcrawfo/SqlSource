@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 parameter @min_amount: numeric (declared)
 parameter @limit: bigint (inferred)

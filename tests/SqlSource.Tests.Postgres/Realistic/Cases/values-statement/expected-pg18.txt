@@ -1,5 +1,5 @@
 kind: rows
-plan: not-needed
+plan: walked
 table-match: no-origin
 column 0 column1: text | nullable null | no-origin | -
 column 1 column2: text | nullable null | no-origin | -

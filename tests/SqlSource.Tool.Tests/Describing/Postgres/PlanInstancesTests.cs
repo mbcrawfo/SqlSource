@@ -235,4 +235,57 @@ public class PlanInstancesTests
     [Fact]
     public void Find_AntiJoin_SaysItExtendsItsInnerSide() =>
         PlanInstances.Find(Join("Anti", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe("inner");
+
+    // A set operation prints its first branch at the root: an Append under a UNION's Aggregate or under a Sort, and a
+    // SetOp over an Append on 14 or over its two branches as Outer and Inner on 18.
+    [Fact]
+    public void HasSetOperation_AppendOrSetOpUnderTheRoot_IsTrue()
+    {
+        var append = Over("Append", Scan("a"), "Member") with
+        {
+            Plans =
+            [
+                Scan("a") with
+                {
+                    ParentRelationship = "Member",
+                },
+                Scan("b") with
+                {
+                    ParentRelationship = "Member",
+                },
+            ],
+        };
+        var setOp = Join("Inner", Scan("a"), Scan("b")) with { NodeType = "SetOp", JoinType = null };
+
+        PlanInstances.Find(Over("Aggregate", append)).HasSetOperation.ShouldBeTrue();
+        PlanInstances.Find(Over("Sort", append)).HasSetOperation.ShouldBeTrue();
+        PlanInstances.Find(setOp).HasSetOperation.ShouldBeTrue();
+        PlanInstances.Find(Over("Recursive Union", Scan("a"))).HasSetOperation.ShouldBeTrue();
+        PlanInstances.Find(Over("Merge Append", Scan("a"))).HasSetOperation.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void HasSetOperation_JoinOfTwoScans_IsFalse() =>
+        PlanInstances.Find(Join("Inner", Scan("a"), Scan("b"))).HasSetOperation.ShouldBeFalse();
+
+    [Fact]
+    public void SoleAlias_OneInstance_IsItsAlias()
+    {
+        PlanInstances.Find(Over("Sort", Scan("t"))).SoleAlias.ShouldBe("t");
+        PlanInstances.Find(Over("ModifyTable", Scan("t")) with { Alias = "t" }).SoleAlias.ShouldBe("t");
+    }
+
+    [Fact]
+    public void SoleAlias_TwoInstances_IsNull() =>
+        PlanInstances.Find(Join("Inner", Scan("a"), Scan("b"))).SoleAlias.ShouldBeNull();
+
+    [Fact]
+    public void TryFindRelation_AliasOfAScan_IsItsSchemaAndRelation()
+    {
+        var instances = PlanInstances.Find(Join("Inner", Scan("a"), Scan("b")));
+
+        instances.TryFindRelation("b", out var schema, out var relation).ShouldBeTrue();
+        (schema, relation).ShouldBe(("public", "b"));
+        instances.TryFindRelation("c", out _, out _).ShouldBeFalse();
+    }
 }
