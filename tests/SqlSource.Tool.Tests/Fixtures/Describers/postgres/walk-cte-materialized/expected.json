@@ -24,8 +24,8 @@
             "schema": "pg_catalog",
             "internalName": "int4"
           },
-          "nullable": true,
-          "nullableSource": "heuristic",
+          "nullable": false,
+          "nullableSource": "catalog",
           "origin": {
             "schema": "public",
             "table": "users",
@@ -46,7 +46,7 @@
             "scale": 2
           },
           "nullable": true,
-          "nullableSource": "heuristic",
+          "nullableSource": "outer-join",
           "origin": {
             "schema": "public",
             "table": "orders",

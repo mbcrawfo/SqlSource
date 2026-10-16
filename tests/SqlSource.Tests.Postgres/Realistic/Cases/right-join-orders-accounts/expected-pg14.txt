@@ -1,7 +1,7 @@
 kind: rows
 plan: walked
 table-match: no-origin
-column 0 account_id: integer | nullable null | no-origin | -
+column 0 account_id: integer | nullable false | expression | -
 column 1 name: character varying(100) | nullable true | outer-join | public.accounts.name
 column 2 status: public.account_status | nullable true | outer-join | public.accounts.status
 column 3 order_id: bigint | nullable false | catalog | public.orders.id

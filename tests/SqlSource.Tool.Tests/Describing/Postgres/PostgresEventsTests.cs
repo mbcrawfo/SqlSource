@@ -667,6 +667,117 @@ public class PostgresEventsTests
             .ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "***"), new("column", "id")));
     }
 
+    // A plan over an Append of two partitions asks their ancestors between "explain" and the walk, and the event says
+    // what was asked and what was answered.
+    [Fact]
+    public async Task Describe_PlanWithAnAppendOfPartitions_WritesPartitionsBeforeTheWalk()
+    {
+        var log = new RecordingLog();
+        var plan = Over(
+            "WindowAgg",
+            Over("Append", Scan("x")) with
+            {
+                Plans =
+                [
+                    Scan("u_1", "u_1.id") with
+                    {
+                        RelationName = "users_1",
+                        ParentRelationship = "Member",
+                    },
+                    Scan("u_2", "u_2.id") with
+                    {
+                        RelationName = "users_2",
+                        ParentRelationship = "Member",
+                    },
+                ],
+            }
+        ) with
+        {
+            Output = ["u.id", "count(*) OVER w1"],
+        };
+        var asked = new PostgresPartitionsRequest([
+            new PostgresRelationName("public", "users_1"),
+            new PostgresRelationName("public", "users_2"),
+        ]);
+        var script = ListingScript()
+            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn))
+            .Answer(
+                "explain",
+                new PostgresExplainRequest("sqlsource_1", 0, []),
+                new PostgresExplainAnswer(Text(plan), null)
+            )
+            .Answer(
+                "partitions",
+                asked,
+                new PostgresPartitionsAnswer(
+                    [
+                        new("public", "users_1", [PostgresTables.Users.Oid]),
+                        new("public", "users_2", [16999, PostgresTables.Users.Oid]),
+                    ],
+                    null
+                )
+            );
+
+        await DescribeAsync(script, log, Listing);
+
+        log.Events.Select(written => written.Name)
+            .SkipWhile(static name => name != "explain")
+            .Take(3)
+            .ShouldBe(["explain", "partitions", "walk.node"]);
+        var partitions = log.Events.Single(static written => written.Name == "partitions").Members;
+        NamesOf(partitions).ShouldBe(["query", "relations", "rows", "durationMs"]);
+        Member(partitions, "query").ShouldBe((LogValue)"ListUsers");
+        Member(partitions, "relations")
+            .ShouldBe(
+                LogValue.ListOf([
+                    LogValue.MapOf(new("schema", "public"), new("table", "users_1")),
+                    LogValue.MapOf(new("schema", "public"), new("table", "users_2")),
+                ])
+            );
+        Member(partitions, "rows")
+            .ShouldBeOfType<LogValue.Items>()
+            .Values[1]
+            .ShouldBe(
+                LogValue.MapOf(
+                    new("schema", "public"),
+                    new("table", "users_2"),
+                    new("ancestors", LogValue.ListOf([16999L, PostgresTables.Users.Oid]))
+                )
+            );
+    }
+
+    [Fact]
+    public async Task Describe_PartitionsThatFails_WritesItsErrorInThePlaceOfTheRows()
+    {
+        var log = new RecordingLog();
+        var plan = Over("Append", Scan("x")) with
+        {
+            Plans = [Scan("u_1", "u_1.id") with { RelationName = "users_1", ParentRelationship = "Member" }],
+            Output = ["u.id", "1"],
+        };
+        var script = ListingScript()
+            .Answer("check", new PostgresCheckRequest(Listing.Sql, []), Sees(IdColumn, CountColumn))
+            .Answer(
+                "explain",
+                new PostgresExplainRequest("sqlsource_1", 0, []),
+                new PostgresExplainAnswer(Text(plan), null)
+            )
+            .Answer(
+                "partitions",
+                new PostgresPartitionsRequest([new PostgresRelationName("public", "users_1")]),
+                new PostgresPartitionsAnswer(
+                    null,
+                    new PostgresServerError("42501", "permission denied", null, null, null)
+                )
+            );
+
+        await DescribeAsync(script, log, Listing);
+
+        var partitions = log.Events.Single(static written => written.Name == "partitions").Members;
+        NamesOf(partitions).ShouldBe(["query", "relations", "error", "durationMs"]);
+        _ = Member(partitions, "error").ShouldBeOfType<LogValue.Members>();
+    }
+
     // A table of one column, whole in the answer of "tables", and the query that is the table.  It says nothing of a
     // foreign partition or of an INSTEAD rule, as an answer recorded before the members existed.
     private static readonly PostgresTableRow Ids = PostgresTables.TableOf(

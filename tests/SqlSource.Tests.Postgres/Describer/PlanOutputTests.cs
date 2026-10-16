@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
@@ -27,6 +28,13 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         CREATE OR REPLACE AGGREGATE shadow.count(integer) (sfunc = shadow.nulls, stype = int8);
         """;
 
+    // A partitioned table of these tests alone, made by SQL that can be run again.
+    private const string Partitioned = """
+        CREATE TABLE IF NOT EXISTS plan_parts (id integer NOT NULL, kind integer NOT NULL) PARTITION BY LIST (kind);
+        CREATE TABLE IF NOT EXISTS plan_parts_1 PARTITION OF plan_parts FOR VALUES IN (1);
+        CREATE TABLE IF NOT EXISTS plan_parts_2 PARTITION OF plan_parts FOR VALUES IN (2);
+        """;
+
     private const string OneTable =
         "SELECT deleted_at IS NULL, greatest(created_at, deleted_at), coalesce(email, 'x') FROM users a ORDER BY id";
 
@@ -52,6 +60,44 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         await using var command = source.CreateCommand("EXPLAIN (VERBOSE, FORMAT JSON) " + sql);
         var text = (string)(await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldNotBeNull();
         return PlanNode.Read(text).ShouldNotBeNull();
+    }
+
+    // The generic plan of a statement of one parameter, with a NULL for it, as the describer asks for it, and with
+    // partition pruning or without.
+    [SuppressMessage(
+        "Security",
+        "CA2100:Review SQL queries for security vulnerabilities",
+        Justification = "The SQL and the type are the test's own constants."
+    )]
+    private async Task<PlanNode> ExplainExecuteAsync(string sql, string type, bool pruning)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var connection = await source.OpenConnectionAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        foreach (
+            var text in new[]
+            {
+                "SET LOCAL plan_cache_mode = force_generic_plan",
+                $"SET LOCAL enable_partition_pruning = {(pruning ? "on" : "off")}",
+                $"PREPARE plan_output ({type}) AS {sql}",
+            }
+        )
+        {
+            await using var set = new NpgsqlCommand(text, connection, transaction);
+            _ = await set.ExecuteNonQueryAsync(token);
+        }
+
+        await using var command = new NpgsqlCommand(
+            "EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE plan_output(NULL)",
+            connection,
+            transaction
+        );
+        var plan = (string)(await command.ExecuteScalarAsync(token)).ShouldNotBeNull();
+        await transaction.RollbackAsync(token);
+        await using var deallocate = new NpgsqlCommand("DEALLOCATE plan_output", connection);
+        _ = await deallocate.ExecuteNonQueryAsync(token);
+        return PlanNode.Read(plan).ShouldNotBeNull();
     }
 
     private async Task RunAsync(string sql)
@@ -193,10 +239,89 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         (await command.ExecuteScalarAsync(TestContext.Current.CancellationToken)).ShouldBe(true);
     }
 
+    // A Subquery Scan prints the subquery's columns in the order the query above needs them, and its child in the
+    // subquery's own: the reason no column through a scan is mapped by its place.
+    [Fact]
+    public async Task Explain_SubqueryScan_PrintsItsColumnsInTheOrderTheyAreUsed()
+    {
+        var root = await ExplainAsync(
+            "SELECT s.total, s.id FROM (SELECT o.id, o.total, row_number() OVER () AS n FROM orders o) s "
+                + "WHERE s.n > 1"
+        );
+
+        var scan = Followed(root).Single(static node => node.NodeType == "Subquery Scan");
+        scan.Output.ShouldBe(["s.total", "s.id"]);
+        var child = scan.Plans.Single(static child => child.ParentRelationship == "Subquery");
+        child.Output.ShouldNotBeNull().Take(2).ShouldBe(["o.id", "o.total"]);
+    }
+
+    // Each scan of a CTE names it, and the CTE's plan is one InitPlan named for it, wherever it hangs.
+    [Fact]
+    public async Task Explain_CteScan_NamesTheInitPlanOfItsCte()
+    {
+        var root = await ExplainAsync(
+            "WITH recent AS (SELECT o.id, o.user_id FROM orders o) "
+                + "SELECT r.id, n.id FROM recent r LEFT JOIN recent n ON n.user_id = r.user_id"
+        );
+
+        Followed(root)
+            .Where(static node => node.NodeType == "CTE Scan")
+            .Select(static node => (node.Alias, node.CteName))
+            .ShouldBe([("r", "recent"), ("n", "recent")], ignoreOrder: true);
+        var plans = All(root).Where(static node => node.ParentRelationship == "InitPlan").ToArray();
+        plans.Single().SubplanName.ShouldBe("CTE recent");
+        plans.Single().Output.ShouldBe(["o.id", "o.user_id"]);
+    }
+
+    // The NULL of a parameter prunes every partition when the executor starts, and EXPLAIN shows the Append with no
+    // member.  Without partition pruning every member shows, each under the table's alias and a number, with the same
+    // Output but for the alias, and the nodes above print the table's alias.
+    [Fact]
+    public async Task Explain_PartitionedTableWithoutPruning_PrintsEveryMember()
+    {
+        await RunAsync(Partitioned);
+        const string Sql = "SELECT p.id, p.kind FROM plan_parts p WHERE p.kind = $1 ORDER BY p.id";
+
+        var pruned = await ExplainExecuteAsync(Sql, "integer", pruning: true);
+        var unpruned = await ExplainExecuteAsync(Sql, "integer", pruning: false);
+
+        Followed(pruned).Single(static node => node.NodeType == "Append").Plans.ShouldBeEmpty();
+        unpruned.Output.ShouldBe(["p.id", "p.kind"]);
+        var append = Followed(unpruned).Single(static node => node.NodeType == "Append");
+        append.Output.ShouldBeNull();
+        append
+            .Plans.Select(static member => (member.ParentRelationship, member.Alias, member.RelationName))
+            .ShouldBe([("Member", "p_1", "plan_parts_1"), ("Member", "p_2", "plan_parts_2")]);
+        append.Plans[0].Output.ShouldBe(["p_1.id", "p_1.kind"]);
+        append.Plans[1].Output.ShouldBe(["p_2.id", "p_2.kind"]);
+    }
+
+    // A value computed under a join prints in one pair of parentheses at every node above the node that computes
+    // it, and as itself there; a value the join computes prints as itself at the join.
+    [Fact]
+    public async Task Explain_ValueComputedBelow_IsParenthesisedAboveIt()
+    {
+        var root = await ExplainAsync(
+            "SELECT u.id, s.k, coalesce(s.note, 'z') AS z FROM users u LEFT JOIN "
+                + "(SELECT o.user_id, 'x'::text AS k, o.note FROM orders o) s ON s.user_id = u.id "
+                + "ORDER BY u.name LIMIT 5"
+        );
+
+        var path = Followed(root);
+        var join = path.Single(static node => node.JoinType == "Right");
+        root.Output.ShouldNotBeNull().Take(3).ShouldBe(["u.id", "('x'::text)", "(COALESCE(o.note, 'z'::text))"]);
+        join.Output.ShouldNotBeNull().Take(3).ShouldBe(["u.id", "('x'::text)", "COALESCE(o.note, 'z'::text)"]);
+        var scan = path.Single(static node => node.Alias == "o");
+        scan.Output.ShouldNotBeNull().ShouldContain("'x'::text");
+    }
+
     // The node and every node under it through the sides of a join or the one input of another node.
     private static PlanNode[] Followed(PlanNode node) =>
         [
             node,
             .. node.Plans.Where(static child => child.ParentRelationship is "Outer" or "Inner").SelectMany(Followed),
         ];
+
+    // The node and every node under it, whatever the relationship.
+    private static PlanNode[] All(PlanNode node) => [node, .. node.Plans.SelectMany(All)];
 }
