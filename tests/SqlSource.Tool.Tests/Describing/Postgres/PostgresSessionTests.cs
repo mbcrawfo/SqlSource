@@ -10,6 +10,7 @@ using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
 using Xunit;
+using static SqlSource.Tool.Testing.NullabilityAnswers;
 using static SqlSource.Tool.Tests.PostgresPlans;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
@@ -1077,7 +1078,7 @@ public class PostgresSessionTests
         var description = await DescribeUsersIdAsync(UngatedUsersId, PostgresScript.PlanOf(plan));
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        AnswersOf(description).ShouldBe([(false, "catalog"), (false, "expression")]);
+        AnswersOf(description).ShouldBe([NotNullCatalog, NotNullExpression]);
     }
 
     // A count the session's path may find in another schema than pg_catalog is no count the walk knows.
@@ -1111,7 +1112,7 @@ public class PostgresSessionTests
         var described = await session.DescribeAsync(Request(UngatedUsersId), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
-        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
     }
 
     [Fact]
@@ -1133,7 +1134,7 @@ public class PostgresSessionTests
         exchange.Unused.ShouldBeEmpty();
         var description = described.Value.ShouldNotBeNull();
         description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
-        AnswersOf(description).ShouldBe([(false, "catalog")]);
+        AnswersOf(description).ShouldBe([NotNullCatalog]);
     }
 
     private const string UngatedUsersId = "SELECT id, count(*) OVER () AS n FROM users";
@@ -1142,7 +1143,7 @@ public class PostgresSessionTests
         "SELECT u.id, count(*) OVER () AS n FROM users u LEFT JOIN orders o ON o.user_id = u.id";
 
     private static (bool? Nullable, string? Source)[] AnswersOf(QueryDescription description) =>
-        [.. description.Columns.ShouldNotBeNull().Select(static column => (column.Nullable, column.NullableSource))];
+        Of(description.Columns.ShouldNotBeNull());
 
     // users is the side the join keeps: its NOT NULL column stays so, by the catalog.
     [Fact]
@@ -1153,7 +1154,7 @@ public class PostgresSessionTests
         var description = await DescribeUsersIdAsync(GatedUsersId, PostgresScript.PlanOf(plan));
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        AnswersOf(description).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        AnswersOf(description).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
     }
 
     // The settings of the describer are in the request, so a capture recorded with them is replayed with them.
@@ -1258,7 +1259,7 @@ public class PostgresSessionTests
         );
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        AnswersOf(description).ShouldBe([(false, "catalog"), (false, "expression")]);
+        AnswersOf(description).ShouldBe([NotNullCatalog, NotNullExpression]);
     }
 
     // A "partitions" that fails is logged and never reported: the Append is read as a set operation.
@@ -1270,7 +1271,7 @@ public class PostgresSessionTests
         );
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        AnswersOf(description).ShouldBe([(true, "heuristic"), (null, "no-origin")]);
+        AnswersOf(description).ShouldBe([NullableHeuristic, UnknownNoOrigin]);
     }
 
     // A UNION ALL of users and of orders, or of orders' partitions, whose first column has users.id as its origin in
@@ -1381,7 +1382,7 @@ public class PostgresSessionTests
         );
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        AnswersOf(description).ShouldBe([(false, "catalog"), (false, "set-operation")]);
+        AnswersOf(description).ShouldBe([NotNullCatalog, NotNullSetOperation]);
         log.Events.Select(written => written.Name)
             .Where(name => name is "explain" or "partitions" or "relations" or "walk")
             .ShouldBe(["explain", "partitions", "relations", "walk"]);
@@ -1409,7 +1410,7 @@ public class PostgresSessionTests
 
         var (description, _) = await DescribeUnionAsync(plan, static _ => { });
 
-        AnswersOf(description).ShouldBe([(false, "catalog"), (false, "set-operation")]);
+        AnswersOf(description).ShouldBe([NotNullCatalog, NotNullSetOperation]);
     }
 
     // The root reaches no set operation: the one under the join is not taken on, and nothing more is asked.
@@ -1423,7 +1424,7 @@ public class PostgresSessionTests
 
         var (description, _) = await DescribeUnionAsync(plan, static _ => { });
 
-        AnswersOf(description).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        AnswersOf(description).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
     }
 
     // A gated query whose every column has an origin: the plan answers no column of no origin, and nothing more is
@@ -1446,7 +1447,7 @@ public class PostgresSessionTests
         var described = await session.DescribeAsync(Request(Sql), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
-        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([(true, "heuristic")]);
+        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([NullableHeuristic]);
     }
 
     // A "relations" that fails is logged and never reported: the walk goes on without its rows.
@@ -1464,7 +1465,7 @@ public class PostgresSessionTests
         );
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        AnswersOf(description).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        AnswersOf(description).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
         var (_, members) = log.Events.Single(written => written.Name == "relations");
         members.ShouldContain(member => member.Name == "error");
     }
@@ -1478,7 +1479,7 @@ public class PostgresSessionTests
         var description = await DescribeUsersIdAsync(GatedUsersId, PostgresScript.PlanOf(plan));
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        AnswersOf(description).ShouldBe([(true, "outer-join"), (null, "no-origin")]);
+        AnswersOf(description).ShouldBe([NullableOuterJoin, UnknownNoOrigin]);
     }
 
     public static TheoryData<string?, string?> PlansThatCannotBeUsed =>
@@ -1511,7 +1512,7 @@ public class PostgresSessionTests
 
         description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
-        AnswersOf(description).ShouldBe([(true, "heuristic"), (null, "no-origin")]);
+        AnswersOf(description).ShouldBe([NullableHeuristic, UnknownNoOrigin]);
     }
 
     // A check that fails ends the describe before the plan is asked for: the script holds no "explain".
@@ -1563,7 +1564,7 @@ public class PostgresSessionTests
         );
 
         exchange.Unused.ShouldBeEmpty();
-        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([(false, "catalog")]);
+        AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([NotNullCatalog]);
     }
 
     // A statement without rows has no provenance and asks for no plan, gate word or not.
