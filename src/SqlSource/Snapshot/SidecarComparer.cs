@@ -119,8 +119,8 @@ internal static class SidecarComparer
         }
 
         // Two entries of one engine hold types of one shape, and a type of an engine this version does not know has
-        // only its name.  The name and the bind name are the keys every shape has, and a nested type has no bind
-        // name, so both are compared here, before the shape's own keys.
+        // its name and, on a parameter's own type, its bind name.  Those two are the keys every shape has, and a
+        // nested type has no bind name, so both are compared here, before the shape's own keys.
         var difference =
             Text(SidecarKeys.Name, committed.Name, described.Name)
             ?? Text(SidecarKeys.BindName, committed.BindName, described.BindName)
