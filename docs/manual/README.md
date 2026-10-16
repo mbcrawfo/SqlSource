@@ -11,4 +11,6 @@
 - [Dialects](dialects.md): how each database's comments and strings are read.
 - [The generator](generator.md): what the `SqlSource` package generates.
 - [The tool](tool.md): the `SqlSource.Tool` package and its `sqlsource` command.
+- [PostgreSQL](postgresql.md): how SqlSource works with PostgreSQL.
+- [SQL Server](sqlserver.md): how SqlSource works with SQL Server.
 - [Diagnostics](diagnostics.md): what each `SQLSRC` error means and how to fix it.

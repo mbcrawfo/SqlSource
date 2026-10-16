@@ -13,7 +13,7 @@ WHERE id = @id;
 SELECT id, name FROM users ORDER BY name;
 ```
 
-A [marker](concepts.md#marker) is a line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows.  Nothing else in a comment is read.  The words are matched ignoring case, the blanks after `--` are optional, and the colon follows the word directly: `-- name: GetUser` and `--NAME:GetUser` are markers, `-- name : GetUser` is a comment.  A comment after SQL on the same line, or inside a block comment or a string, is not a marker either.  Under `mysql` and `mariadb` the two dashes need a space after them to start a comment at all, so there a marker needs one too.
+A [marker](concepts.md#marker) is a line comment that starts its line and has the form `-- word: rest`, where the word is one SqlSource knows.  Nothing else in a comment is read.  The words are matched ignoring case, the blanks after `--` are optional, and the colon follows the word directly: `-- name: GetUser` and `--NAME:GetUser` are markers, `-- name : GetUser` is a comment.  A comment after SQL on the same line, or inside a block comment or a string, is not a marker either.  Under `mysql` and `mariadb` the two dashes need a space after them to start a comment at all, so there a marker needs one too: see [markers under `mysql` and `mariadb`](dialects.md#markers-under-mysql).
 
 <a id="marker-index"></a>
 
@@ -25,11 +25,11 @@ A marker stands in one of two places.  A marker that describes one query stands 
 |----|----|----|----|----|
 | `-- name:` | Starts a query and names it, with an optional result shape | no | starts one | [Queries and names](#queries-and-names) |
 | `-- summary:` | Documents the query's generated member | no | yes | [Summaries](#summaries) |
-| `-- dialect:` | The dialect the file is read by, and its options | yes | no | [Dialects](dialects.md) |
+| `-- dialect:` | The dialect the file is read by, and its options.  The names and the reading rules are on [the dialects page](dialects.md) | yes | no | [Dialect](settings.md#setting-dialect) |
 | `-- generator:` | Generator parameters | yes | yes | [Generator parameters](settings.md#setting-generator-parameters) |
-| `-- param:` | Gives a query parameter its type and whether it can be null | no | yes | [Parameters and tokens](parameters-and-tokens.md) |
-| `-- token:` | Gives a token a default | no | yes | [Parameters and tokens](parameters-and-tokens.md) |
-| `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Parameters and tokens](parameters-and-tokens.md) |
+| `-- param:` | Gives a query parameter its type and whether it can be null | no | yes | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
+| `-- token:` | Gives a token a default | no | yes | [Defaults](parameters-and-tokens.md#token-marker) |
+| `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Text that looks like a token](parameters-and-tokens.md#token-ignore) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](settings.md#setting-database) |
 | `-- output:` | What is generated for a query.  Today it decides which queries the tool describes (`models` or `codegen`); its effect on generated code comes later | yes | yes | [Output](settings.md#setting-output) |
 | `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model (no effect yet) | yes | no | [Suffix of a model's name](settings.md#setting-model-suffix) |

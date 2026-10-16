@@ -25,7 +25,7 @@ SELECT id, name FROM users;
 internal static partial class Reports;
 ```
 
-The first block writes settings as markers in a `.sql` file, the second as an MSBuild property and as item metadata, the third as properties of the attribute.  Which of the three a setting accepts is in the table.
+The first block writes settings as markers in a `.sql` file, the second as an MSBuild property and as item metadata, the third as properties of the attribute.  Which of the three a setting accepts is in the table.  To read one folder of a project differently from the rest, see [configure one folder differently](#configure-a-folder).
 
 ## All settings
 
@@ -65,13 +65,13 @@ A setting written in several places has the value of the most specific place tha
 | 5 | The MSBuild property of the project | `<SqlSourceOutput>sql</SqlSourceOutput>` |
 | 6 | The default | `codegen` |
 
-A query with `-- output: sql` has the output `sql`, whatever the other five say.  A query without it takes the file header's `models`, and so on down the table.
+A query with `-- output: sql` has the output `sql`, whatever the other five say.  A query without it takes the file header's `models`, and so on down the table.  To give the files of one folder their own values, see [configure one folder differently](#configure-a-folder).
 
 The rules:
 
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
 - **A place that gives no value is skipped.**  A property, metadata or attribute string that is empty or white space gives none.
-- **A setting has only the places its row of [the table](#all-settings) lists.**  A property or item metadata that SqlSource does not list is not read.  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
+- **A setting has only the places its row of [the table](#all-settings) lists.**  A property or item metadata that SqlSource does not list is not read.  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 - **The attribute belongs to one type.**  Two types that claim one file each use their own attribute, and each gets its own result.
 
 Three exceptions, stated plainly:
@@ -85,7 +85,7 @@ Three exceptions, stated plainly:
 | Written as | Reported as | What happens |
 |----|----|----|
 | A marker | [SQLSRC111](diagnostics.md#sqlsrc111), a dialect included.  A generator parameter that does not exist is [SQLSRC109](diagnostics.md#sqlsrc109); a value that contradicts another in the same place is [SQLSRC112](diagnostics.md#sqlsrc112) | The file produces no members until it is fixed |
-| An MSBuild property or item metadata | [SQLSRC014](diagnostics.md#sqlsrc014), and for a dialect [SQLSRC011](diagnostics.md#sqlsrc011) | The error has no file and line.  The setting is not set, so the place below it wins |
+| An MSBuild property or item metadata | [SQLSRC014](diagnostics.md#sqlsrc014), and for a dialect [SQLSRC011](diagnostics.md#sqlsrc011) | The error has no file and line.  The setting is not set, so the place below it wins; a dialect that is wrong is read as `ansi` instead, as [the dialect](#setting-dialect) says |
 | A property of the attribute | [SQLSRC006](diagnostics.md#sqlsrc006) | The type produces no members until it is fixed |
 
 <a id="setting-output"></a>
@@ -170,7 +170,7 @@ The [dialect](concepts.md#dialect) is the set of rules by which SqlSource reads 
 - **A file has one dialect.**  The marker goes in the file header, before the first SQL, and not inside a query: anywhere else it is [SQLSRC115](diagnostics.md#sqlsrc115).  It takes effect on the line after it, so comments above it are read by the dialect that the metadata or the property gives.
 - **A value replaces the one below it whole.**  A file with `-- dialect: mysql` in a project that sets `mysql,ansi-quotes` is read as plain `mysql`.
 - **A value that is not a dialect** is [SQLSRC111](diagnostics.md#sqlsrc111) in a marker and [SQLSRC011](diagnostics.md#sqlsrc011) in a property or item metadata.  A file whose property or metadata is wrong is read as `ansi` meanwhile.
-- **The tool reads the dialect too.**  It decides which queries the tool can describe: `postgres` today.  See [dialects](dialects.md#database-support).
+- **The tool reads the dialect too.**  It decides which queries the tool can describe: `postgres` today.  A query of `mssql` that must be described is [SQLSRC216](diagnostics.md#sqlsrc216), since describing SQL Server queries is coming.  See [database support](dialects.md#database-support).
 
 <a id="setting-generator-parameters"></a>
 
@@ -192,7 +192,7 @@ A [generator parameter](concepts.md#generator-parameter) is a word that changes 
 | Parameter | Effect | Status |
 |----|----|----|
 | `keep-comments` | Comments and blank lines stay in the generated SQL: see [what reaches the generated SQL](sql-files.md#generated-sql) | Works today |
-| `no-token-validation` | The method of a query with tokens does not check its arguments: see [parameters and tokens](parameters-and-tokens.md) | Works today |
+| `no-token-validation` | The method of a query with tokens does not check its arguments: see [validation](parameters-and-tokens.md#token-validation) | Works today |
 | `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` | None yet | [Accepted; no effect yet](README.md#what-works-today) |
 | `default` | The empty list: every default.  It stands alone, or repeated | Works today |
 
@@ -372,12 +372,12 @@ This is separate from [which files the compiler is given](#included-files), whic
 
 ## Configure one folder differently
 
-A project reads its `.sql` files as PostgreSQL and keeps no comments.  One folder, `Legacy/`, holds MySQL files, and wants their comments kept.  Item metadata gives a folder its own settings:
+A project reads its `.sql` files as PostgreSQL and keeps the comments of its queries.  One folder, `Legacy/`, holds MySQL files, and their queries take token fragments that are sometimes empty, so the folder turns the token check off.  Item metadata gives a folder its own settings:
 
 ```xml
 <PropertyGroup>
     <SqlSourceDialect>postgres</SqlSourceDialect>
-    <SqlSourceGeneratorParameters>no-token-validation</SqlSourceGeneratorParameters>
+    <SqlSourceGeneratorParameters>keep-comments</SqlSourceGeneratorParameters>
 </PropertyGroup>
 <ItemGroup>
     <AdditionalFiles Update="Legacy/**/*.sql"
@@ -386,10 +386,10 @@ A project reads its `.sql` files as PostgreSQL and keeps no comments.  One folde
 </ItemGroup>
 ```
 
-Every file under `Legacy/` is read as `mysql`, keeps its comments, and skips the token check as the rest of the project does.  Every other file is untouched.  Three things to notice:
+Every file under `Legacy/` is read as `mysql`, keeps its comments, and skips the token check.  Every other file is untouched: it is read as `postgres`, keeps its comments, and checks its tokens.  Three things to notice:
 
-- The folder's list says `no-token-validation` again.  A list replaces the project's whole, so a folder that wants what the project asks for repeats it.
-- The dialect is a value of its own too.  If the project said `mysql,ansi-quotes`, this folder would be read as plain `mysql`.
+- The folder's list says `keep-comments` again.  A list replaces the project's whole, so a folder that wants what the project asks for repeats it.  Without it, the files of `Legacy/` would lose their comments.
+- The dialect is a value of its own too.  Had the project set `mysql,ansi-quotes` as its dialect, this folder would still be read as plain `mysql`.
 - A file's own marker still wins: a `-- generator: default` or a `-- dialect: mariadb` in one of the files overrides both lines above.  See [which place wins](#precedence).
 
 `Update` can stand anywhere in your project file, since the package has already listed the `.sql` files.  A project that [lists its own files](#included-files) gives the metadata where it lists them:
@@ -448,5 +448,14 @@ A line break inside one word puts a space there.  `App.` and `Models` on two lin
 
 ## Known issues
 
-- **A `.sql` file that a target of your own adds loses its item metadata.**  This takes a target that adds an `AdditionalFiles` item while the build runs, that runs just before the SDK writes the settings file for the compiler (`BeforeTargets="GenerateMSBuildEditorConfigFileCore"`), and that is declared after the package's targets, as everything in `Directory.Build.targets` is.  The file is compiled, but its metadata does not reach SqlSource, nothing is reported, and the file is read with the project's settings.  Hook `SqlSourceTrimMetadataOfFiles` instead, with `BeforeTargets="SqlSourceTrimMetadataOfFiles"`, which runs your target first wherever it is declared.
-- **The tool does not see a file that a build target adds**, unless that target hooks `SqlSourceTrimMetadataOfFiles` as above.  The file is compiled, and `sqlsource` describes none of its queries.  The same hook mends it.
+- **A `.sql` file that one of your own build targets adds is not fully seen.**  This is about a target in your project that adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as one that writes a file or copies it in.  The build compiles the file, and nothing is reported, but two things go wrong.  `sqlsource` leaves out the file's queries, so it describes none of them.  And the settings you gave the file as item metadata, its dialect for one, are dropped when the target runs late in the build, so the file is read with the project's settings.  To make both work, tell your target to run before the package reads its settings, wherever the target is declared:
+
+  ```xml
+  <Target Name="AddGeneratedSql" BeforeTargets="SqlSourceTrimMetadataOfFiles">
+      <ItemGroup>
+          <AdditionalFiles Include="obj/generated/*.sql" SqlSourceDialect="postgres" />
+      </ItemGroup>
+  </Target>
+  ```
+
+  Change the name, the path and the metadata to your own.  `BeforeTargets="SqlSourceTrimMetadataOfFiles"` is the line that matters.
