@@ -37,7 +37,7 @@ internal static class PostgresEvents
         long durationMs
     ) =>
         log.Write(
-            "prepare",
+            PostgresCallNames.Prepare,
             new("query", query),
             new("statement", request.Statement),
             new("sql", request.Sql),
@@ -54,7 +54,7 @@ internal static class PostgresEvents
     /// <summary><c>postgres.types</c>: each row as the answer holds it, or the error.</summary>
     public static void Types(IRunLog log, PostgresTypesRequest request, PostgresTypesAnswer answer, long durationMs) =>
         log.Write(
-            "types",
+            PostgresCallNames.Types,
             new("oids", LogValue.ListOf(request.Oids.Select(static oid => (LogValue)oid))),
             answer.Error is { } error
                 ? new LogMember(Error, ErrorOf(error))
@@ -72,7 +72,7 @@ internal static class PostgresEvents
         long durationMs
     ) =>
         log.Write(
-            "spellings",
+            PostgresCallNames.Spellings,
             new(
                 "pairs",
                 LogValue.ListOf(
@@ -107,7 +107,7 @@ internal static class PostgresEvents
         long durationMs
     ) =>
         log.Write(
-            "columns",
+            PostgresCallNames.Columns,
             new("query", query),
             new("statement", request.Statement),
             answer.Error is { } error
@@ -124,7 +124,7 @@ internal static class PostgresEvents
         long durationMs
     ) =>
         log.Write(
-            "tables",
+            PostgresCallNames.Tables,
             new("oids", LogValue.ListOf(request.Oids.Select(static oid => (LogValue)oid))),
             answer.Error is { } error
                 ? new LogMember(Error, ErrorOf(error))
@@ -146,7 +146,7 @@ internal static class PostgresEvents
         long durationMs
     ) =>
         log.Write(
-            "check",
+            PostgresCallNames.Check,
             new("query", query),
             new(
                 "parameters",
@@ -215,7 +215,7 @@ internal static class PostgresEvents
         long durationMs
     ) =>
         log.Write(
-            "explain",
+            PostgresCallNames.Explain,
             new("query", query),
             new("statement", request.Statement),
             new("settings", LogValue.ListOfTexts(request.Settings)),
@@ -236,7 +236,7 @@ internal static class PostgresEvents
         long durationMs
     ) =>
         log.Write(
-            "partitions",
+            PostgresCallNames.Partitions,
             new("query", query),
             new("relations", LogValue.ListOf(request.Relations.Select(RelationOf))),
             answer.Error is { } error
@@ -257,7 +257,7 @@ internal static class PostgresEvents
         long durationMs
     ) =>
         log.Write(
-            "relations",
+            PostgresCallNames.Relations,
             new("query", query),
             new("relations", LogValue.ListOf(request.Relations.Select(RelationOf))),
             answer.Error is { } error
@@ -326,7 +326,7 @@ internal static class PostgresEvents
         long durationMs
     ) =>
         log.Write(
-            "deallocate",
+            PostgresCallNames.Deallocate,
             new("statement", request.Statement),
             new(Error, answer.Error is { } error ? ErrorOf(error) : LogValue.Null),
             new(Duration, durationMs)

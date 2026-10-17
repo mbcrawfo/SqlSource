@@ -26,7 +26,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// leak until the session ends.  Its name is a counter, since the name is part of a request and a capture must be
 /// the same each time it is recorded.
 /// </remarks>
-internal sealed class PostgresSession : IDescribeSession
+internal sealed partial class PostgresSession : IDescribeSession
 {
     public const string DriverName = "Npgsql";
 
@@ -95,7 +95,7 @@ internal sealed class PostgresSession : IDescribeSession
         try
         {
             var answer = await request.Exchange.AskAsync(
-                "open",
+                PostgresCallNames.Open,
                 PostgresOpenRequest.Instance,
                 (_, token) => live.OpenAsync(token),
                 cancellationToken
@@ -124,24 +124,6 @@ internal sealed class PostgresSession : IDescribeSession
                 await connection.DisposeAsync();
             }
         }
-    }
-
-    /// <summary>
-    /// The major version of a version as a sidecar records it: its leading digits, so <c>13.12</c> is 13 and
-    /// <c>18beta1</c> is 18.  Null when it starts with no digit, or with more of them than an <see cref="int" />
-    /// holds: the tool cannot tell what it is.
-    /// </summary>
-    public static int? MajorVersionOf(string version)
-    {
-        var end = 0;
-        while (end < version.Length && char.IsAsciiDigit(version[end]))
-        {
-            end++;
-        }
-
-        return int.TryParse(version.AsSpan(0, end), NumberStyles.None, CultureInfo.InvariantCulture, out var major)
-            ? major
-            : null;
     }
 
     public async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
@@ -195,7 +177,7 @@ internal sealed class PostgresSession : IDescribeSession
             // With the describe's own token: a cancelled describe leaves the statement to die with its session,
             // because a cancelled run must not wait on a server, and the run closes the session next.  The error of
             // the call is never reported.
-            await DeallocateAsync(new PostgresDeallocateRequest(prepare.Statement), cancellationToken);
+            _ = await DeallocateAsync(new PostgresDeallocateRequest(prepare.Statement), cancellationToken);
         }
     }
 
@@ -212,7 +194,7 @@ internal sealed class PostgresSession : IDescribeSession
         CancellationToken cancellationToken
     )
     {
-        var parameterOids = ParameterOids(request, prepared);
+        var (parameterOids, arguments) = ParameterOids(request, prepared);
 
         // Behind a pooler in transaction mode this call can reach another backend: one that lacks the statement
         // answers no columns and no error, which "check" reports as SQLSRC231, and one that holds a statement of the
@@ -238,19 +220,14 @@ internal sealed class PostgresSession : IDescribeSession
         }
 
         // Another session may have dropped a table or a column since "columns": that is the server's change and not
-        // a bug, and ColumnOrigin.Find would throw for it.
-        if (
-            columns
-                .Select(column => ColumnOrigin.MissingFrom(column, tables.Value))
-                .OfType<string>()
-                .FirstOrDefault() is
-            { } gone
-        )
+        // a bug.
+        var found = ColumnOrigin.FindAll(columns, tables.Value);
+        if (!found.Succeeded)
         {
-            return Failed(PostgresErrors.SchemaChanged(request, DescribeStep.Catalog, gone));
+            return Failed(PostgresErrors.SchemaChanged(request, DescribeStep.Catalog, found.Failure));
         }
 
-        ColumnOrigin?[] origins = [.. columns.Select(column => ColumnOrigin.Find(column, tables.Value))];
+        var origins = found.Value;
 
         // After "tables": the type of an origin attribute is where a domain is found, so the one request of "types"
         // needs the catalog's answer.
@@ -267,18 +244,19 @@ internal sealed class PostgresSession : IDescribeSession
             return Failed(PostgresErrors.Types(rows.Failure, request));
         }
 
-        if (MissingType(request, parameterOids, columns, origins, rows.Value) is { } lost)
+        var types = CheckTypes(request, parameterOids, columns, origins, rows.Value);
+        if (!types.Succeeded)
         {
-            return Failed(PostgresErrors.SchemaChanged(request, DescribeStep.ResolveType, lost));
+            return Failed(PostgresErrors.SchemaChanged(request, DescribeStep.ResolveType, types.Failure));
         }
 
-        var spellings = await SpellingsOfAsync(parameterOids, columns, origins, rows.Value, cancellationToken);
+        var spellings = await SpellingsOfAsync(parameterOids, columns, origins, types.Value, cancellationToken);
         if (!spellings.Succeeded)
         {
             return Failed(PostgresErrors.Types(spellings.Failure, request));
         }
 
-        var parameters = TypeParameters(request, parameterOids, rows.Value, spellings.Value);
+        var parameters = TypeParameters(request, parameterOids, types.Value, spellings.Value);
         if (!parameters.Succeeded)
         {
             return Failed(parameters.Failure);
@@ -286,13 +264,13 @@ internal sealed class PostgresSession : IDescribeSession
 
         // A statement without rows has nothing a join could null-extend.
         var gated = columns.Count > 0 && OuterJoinGate.IsGated(request.Sql);
-        var built = BuildColumns(request, columns, origins, rows.Value, spellings.Value, gated);
+        var built = BuildColumns(request, columns, origins, types.Value, spellings.Value, gated);
         if (!built.Succeeded)
         {
             return Failed(built.Failure);
         }
 
-        if (await CheckAsync(request, parameters.Value, columns, rows.Value, cancellationToken) is { } differs)
+        if (await CheckAsync(request, parameters.Value, columns, types.Value, cancellationToken) is { } differs)
         {
             return Failed(differs);
         }
@@ -304,10 +282,7 @@ internal sealed class PostgresSession : IDescribeSession
         {
             var walk = await WalkAsync(
                 request,
-                statement,
-                ArgumentCount(prepared),
-                built.Value,
-                origins,
+                new WalkInput(statement, arguments, built.Value, origins),
                 new WalkScope(
                     gated,
                     OuterJoinGate.NamesOldOrNew(request.Sql),
@@ -336,37 +311,23 @@ internal sealed class PostgresSession : IDescribeSession
     private string? SettingOf(string name) =>
         Server.Settings.FirstOrDefault(setting => string.Equals(setting.Name, name, StringComparison.Ordinal))?.Value;
 
-    // The columns as they are recorded: the walk's when there was one, and else as they were built.
-    private static IReadOnlyList<SidecarColumn> RecordedColumns(
-        IReadOnlyList<SidecarColumn> built,
-        WalkOutcome? walked
-    ) => walked is null ? built : [.. walked.Columns.Select(static column => column.Column)];
-
-    // How many arguments an EXECUTE of the statement takes: a type for each parameter the server resolved, the
-    // query's own and any "$n" the server read where the tool's lexer did not.  The describe of "columns" takes any
-    // number, and EXPLAIN EXECUTE refuses any but this one.
-    private static int ArgumentCount(PostgresPrepareAnswer prepared) =>
-        prepared.ParameterTypes?.Count
-        ?? throw new InvalidOperationException("The answer to 'prepare' holds no types and no error.");
-
     // Asks for the generic plan of the statement, with a NULL for each of its arguments, and walks it.  A plan the
     // server will not give is no fault of the query: the error is logged and never reported, and the columns keep
     // the heuristic, as they do when the text is no plan.  The one error that is reported is 26000, a statement
     // that is gone: the connection does not keep a session, and the describe is no longer of this query.
     private async Task<Outcome<WalkOutcome, DescribeFailure>> WalkAsync(
         DescribeRequest request,
-        string statement,
-        int arguments,
-        IReadOnlyList<SidecarColumn> columns,
-        ColumnOrigin?[] origins,
+        WalkInput input,
         WalkScope scope,
         CancellationToken cancellationToken
     )
     {
-        var asked = new PostgresExplainRequest(statement, arguments, _explainSettings);
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("explain", asked, _live.ExplainAsync, cancellationToken);
-        PostgresEvents.Explain(_log, request.Name, asked, answer, ElapsedSince(started));
+        var (statement, arguments, columns, origins) = input;
+        var answer = await ExplainAsync(
+            request.Name,
+            new PostgresExplainRequest(statement, arguments, _explainSettings),
+            cancellationToken
+        );
 
         if (answer.Error is { SqlState: PostgresErrors.InvalidSqlStatementName } gone)
         {
@@ -415,10 +376,7 @@ internal sealed class PostgresSession : IDescribeSession
             return null;
         }
 
-        var asked = new PostgresPartitionsRequest(members);
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("partitions", asked, _live.PartitionsAsync, cancellationToken);
-        PostgresEvents.Partitions(_log, request.Name, asked, answer, ElapsedSince(started));
+        var answer = await PartitionsAsync(request.Name, new PostgresPartitionsRequest(members), cancellationToken);
         return (answer.Rows ?? []).ToDictionary(
             static row => new PostgresRelationName(row.Schema, row.Name),
             static row => row.Ancestors
@@ -452,10 +410,7 @@ internal sealed class PostgresSession : IDescribeSession
             return tables;
         }
 
-        var asked = new PostgresRelationsRequest(missing);
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("relations", asked, _live.RelationsAsync, cancellationToken);
-        PostgresEvents.Relations(_log, request.Name, asked, answer, ElapsedSince(started));
+        var answer = await RelationsAsync(request.Name, new PostgresRelationsRequest(missing), cancellationToken);
         var merged = new Dictionary<long, PostgresTableRow>(tables);
         foreach (var row in answer.Tables ?? [])
         {
@@ -480,61 +435,6 @@ internal sealed class PostgresSession : IDescribeSession
         var match = TableMatcher.Match(columns, origins);
         PostgresEvents.TableMatch(_log, request.Name, match.Table, match.Result);
         return match;
-    }
-
-    // The first type that was asked for and has no row, in the order of the request, or null: the parameters, the
-    // columns, the attributes of their origins.  A type that another session dropped since "tables" has none, and
-    // PostgresTypes.Build and the classes of a column would throw for it.  A type that the closure reaches by itself,
-    // the base of a domain or the element of an array, comes from the query of the row that reaches it, so it is
-    // never missing alone.
-    private static string? MissingType(
-        DescribeRequest request,
-        IReadOnlyList<long> parameterOids,
-        IReadOnlyList<PostgresColumnRow> columns,
-        ColumnOrigin?[] origins,
-        IReadOnlyDictionary<long, PostgresTypeRow> rows
-    )
-    {
-        for (var index = 0; index < parameterOids.Count; index++)
-        {
-            if (!rows.ContainsKey(parameterOids[index]))
-            {
-                var written = PostgresErrors.Written(request.Parameters[index]);
-                return $"the type of the parameter '{written}' no longer exists";
-            }
-        }
-
-        var column = columns.FirstOrDefault(column => !rows.ContainsKey(column.TypeOid));
-        if (column is not null)
-        {
-            return $"the type of the column '{column.Name}' no longer exists";
-        }
-
-        for (var index = 0; index < origins.Length; index++)
-        {
-            if (origins[index] is { } origin && !rows.ContainsKey(origin.Attribute.TypeOid))
-            {
-                return $"the type of the column '{columns[index].Name}' no longer exists in its table";
-            }
-        }
-
-        return null;
-    }
-
-    // The types the server resolved for the parameters of the query's list, which are the first of its types.  The SQL
-    // holds no "$n" of its own, so the server resolves no more; a text that the tool's lexer and the server read
-    // differently could still make it list more, and the extra are left out.
-    private static IReadOnlyList<long> ParameterOids(DescribeRequest request, PostgresPrepareAnswer prepared)
-    {
-        var count = request.Parameters.Count;
-        var resolved =
-            prepared.ParameterTypes
-            ?? throw new InvalidOperationException("The answer to 'prepare' holds no types and no error.");
-        return resolved.Count < count
-            ? throw new InvalidOperationException(
-                $"The server resolved {resolved.Count} types for the {count} parameters of '{request.Name}'."
-            )
-            : [.. resolved.Take(count)];
     }
 
     // The rows of every type asked for, by OID.  The request is sorted and holds each OID once, so that it is the
@@ -599,10 +499,11 @@ internal sealed class PostgresSession : IDescribeSession
         IReadOnlyList<long> parameterOids,
         IReadOnlyList<PostgresColumnRow> columns,
         ColumnOrigin?[] origins,
-        IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        CheckedTypes types,
         CancellationToken cancellationToken
     )
     {
+        var rows = types.Rows;
         PostgresTypmodPair[] pairs =
         [
             .. parameterOids
@@ -635,55 +536,18 @@ internal sealed class PostgresSession : IDescribeSession
             );
     }
 
-    // Each parameter of the query's list gets the type the server resolved for it.
-    private static Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure> TypeParameters(
-        DescribeRequest request,
-        IReadOnlyList<long> oids,
-        IReadOnlyDictionary<long, PostgresTypeRow> rows,
-        TypeSpellings spellings
-    )
-    {
-        var parameters = new List<DescribedParameter>(oids.Count);
-        for (var index = 0; index < oids.Count; index++)
-        {
-            var parameter = request.Parameters[index];
-            if (PostgresTypes.IsPseudo(oids[index], rows))
-            {
-                // The server accepts a pseudo-type, declared or inferred, and no value has one.
-                return Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure>.Failed(
-                    PostgresErrors.PseudoType(request, parameter, rows[oids[index]].FormatType)
-                );
-            }
-
-            // The protocol gives a parameter an OID and no modifier, so its own type has none: the base of a domain
-            // has the domain's.  The name it binds by is on its own type alone, and null when no name can say the
-            // type, which "check" refuses before it asks.
-            parameters.Add(
-                new DescribedParameter(
-                    parameter.Name,
-                    PostgresTypes.Build(oids[index], rows, TypeModifiers.NoModifier, spellings) with
-                    {
-                        BindName = PostgresBindNames.Of(oids[index], rows),
-                    },
-                    parameter.Type is null ? SidecarValues.TypeSource.Inferred : SidecarValues.TypeSource.Declared
-                )
-            );
-        }
-
-        return Outcome<IReadOnlyList<DescribedParameter>, DescribeFailure>.Of(parameters);
-    }
-
     // The columns in order.  The first of a pseudo-type ends the describe: no value has such a type.  A domain is
     // never over one, so the type the protocol reported is the one to ask.
     private Outcome<IReadOnlyList<SidecarColumn>, DescribeFailure> BuildColumns(
         DescribeRequest request,
         IReadOnlyList<PostgresColumnRow> columns,
         ColumnOrigin?[] origins,
-        IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        CheckedTypes types,
         TypeSpellings spellings,
         bool gated
     )
     {
+        var rows = types.Rows;
         var built = new List<SidecarColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
         {
@@ -711,7 +575,7 @@ internal sealed class PostgresSession : IDescribeSession
         DescribeRequest request,
         IReadOnlyList<DescribedParameter> parameters,
         IReadOnlyList<PostgresColumnRow> columns,
-        IReadOnlyDictionary<long, PostgresTypeRow> rows,
+        CheckedTypes types,
         CancellationToken cancellationToken
     )
     {
@@ -730,130 +594,25 @@ internal sealed class PostgresSession : IDescribeSession
                 ),
             [.. parameters.Select(CheckParameterOf)]
         );
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("check", asked, _live.CheckAsync, cancellationToken);
-        var verdict = NpgsqlCheck.Read(answer, columns, rows, request.Sql, request.Parameters);
-        PostgresEvents.Check(_log, request.Name, asked, verdict, ElapsedSince(started));
+        var (answer, durationMs) = await TimedAskAsync(
+            PostgresCallNames.Check,
+            asked,
+            _live.CheckAsync,
+            cancellationToken
+        );
+        var verdict = NpgsqlCheck.Read(answer, columns, types.Rows, request.Sql, request.Parameters);
+        PostgresEvents.Check(_log, request.Name, asked, verdict, durationMs);
         return PostgresErrors.Check(request, parameters, asked, answer, verdict);
-    }
-
-    // A parameter as generated code will bind it: by the name its type binds by, as the sidecar will record it.
-    private static PostgresCheckParameter CheckParameterOf(DescribedParameter parameter) =>
-        new(
-            parameter.Name,
-            parameter.Type?.BindName
-                ?? throw new InvalidOperationException(
-                    $"The parameter '{parameter.Name}' was given no name to bind by."
-                )
-        );
-
-    // A statement without rows has its parameters and nothing else: no columns, no table and no provenance.  One
-    // with rows says what became of its plan, "not-needed" when it was not gated and every column has an origin, and
-    // which table its result is, or the first check of the match that failed.
-    private static Outcome<QueryDescription, DescribeFailure> Described(
-        IReadOnlyList<DescribedParameter> parameters,
-        IReadOnlyList<SidecarColumn> columns,
-        string plan,
-        (SidecarTable? Table, string Result)? match
-    )
-    {
-        var typed = new EquatableArray<DescribedParameter>([.. parameters]);
-        return Outcome<QueryDescription, DescribeFailure>.Of(
-            match is { } found
-                ? new QueryDescription(
-                    SidecarResultKind.Rows,
-                    typed,
-                    new EquatableArray<SidecarColumn>([.. columns]),
-                    found.Table,
-                    plan,
-                    found.Result
-                )
-                : new QueryDescription(SidecarResultKind.None, typed, null, null, null, null)
-        );
     }
 
     public ValueTask DisposeAsync() => Connection.DisposeAsync();
 
-    private static Outcome<QueryDescription, DescribeFailure> Failed(DescribeFailure failure) =>
-        Outcome<QueryDescription, DescribeFailure>.Failed(failure);
-
-    private static ServerInfo ServerOf(PostgresOpenAnswer answer) =>
-        new(
-            answer.ServerVersion
-                ?? throw new InvalidOperationException("The answer to 'open' holds no version and no error."),
-            DriverName,
-            answer.DriverVersion,
-            new EquatableArray<ServerSetting>([
-                .. (answer.Settings ?? []).Select(static setting => new ServerSetting(setting.Name, setting.Value)),
-            ])
-        );
-
-    // Each call is asked through the exchange and written to the log where it happens, with how long it took by the
-    // run's clock.  Under a replay the event is written all the same.
-    private async Task<PostgresPrepareAnswer> PrepareAsync(
-        string query,
-        PostgresPrepareRequest request,
-        CancellationToken cancellationToken
-    )
-    {
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("prepare", request, _live.PrepareAsync, cancellationToken);
-        PostgresEvents.Prepare(_log, query, request, answer, ElapsedSince(started));
-        return answer;
-    }
-
-    private async Task<PostgresColumnsAnswer> ColumnsAsync(
-        string query,
-        PostgresColumnsRequest request,
-        CancellationToken cancellationToken
-    )
-    {
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("columns", request, _live.ColumnsAsync, cancellationToken);
-        PostgresEvents.Columns(_log, query, request, answer, ElapsedSince(started));
-        return answer;
-    }
-
-    private async Task<PostgresTablesAnswer> TablesAsync(
-        PostgresTablesRequest request,
-        CancellationToken cancellationToken
-    )
-    {
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("tables", request, _live.TablesAsync, cancellationToken);
-        PostgresEvents.Tables(_log, request, answer, ElapsedSince(started));
-        return answer;
-    }
-
-    private async Task<PostgresTypesAnswer> TypesAsync(
-        PostgresTypesRequest request,
-        CancellationToken cancellationToken
-    )
-    {
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("types", request, _live.TypesAsync, cancellationToken);
-        PostgresEvents.Types(_log, request, answer, ElapsedSince(started));
-        return answer;
-    }
-
-    private async Task<PostgresSpellingsAnswer> SpellingsAsync(
-        PostgresSpellingsRequest request,
-        CancellationToken cancellationToken
-    )
-    {
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("spellings", request, _live.SpellingsAsync, cancellationToken);
-        PostgresEvents.Spellings(_log, request, answer, ElapsedSince(started));
-        return answer;
-    }
-
-    // The error of the call is logged and never reported.
-    private async Task DeallocateAsync(PostgresDeallocateRequest request, CancellationToken cancellationToken)
-    {
-        var started = _time.GetTimestamp();
-        var answer = await _exchange.AskAsync("deallocate", request, _live.DeallocateAsync, cancellationToken);
-        PostgresEvents.Deallocate(_log, request, answer, ElapsedSince(started));
-    }
-
-    private long ElapsedSince(long started) => (long)_time.GetElapsedTime(started).TotalMilliseconds;
+    // What the walk is given of the statement: its name, how many arguments an EXECUTE of it takes, the columns as
+    // they were built and their origins.
+    private sealed record WalkInput(
+        string Statement,
+        int Arguments,
+        IReadOnlyList<SidecarColumn> Columns,
+        ColumnOrigin?[] Origins
+    );
 }

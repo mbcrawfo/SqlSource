@@ -13,6 +13,32 @@ namespace SqlSource.Tool.Describing.Postgres;
 internal sealed record ColumnOrigin(PostgresTableRow Table, PostgresAttributeRow Attribute)
 {
     /// <summary>
+    /// The origin of each column, in order, or the end of a sentence that says what the answer of <c>tables</c>
+    /// lacks of the first column whose origin it does not hold (<see cref="MissingFrom" />).  It asks
+    /// <see cref="Find" /> only of a column that <see cref="MissingFrom" /> passed, so nothing it gives throws.
+    /// </summary>
+    /// <param name="columns">The rows of <c>columns</c>.</param>
+    /// <param name="tables">The answer of <c>tables</c>, by OID.</param>
+    public static Outcome<ColumnOrigin?[], string> FindAll(
+        IReadOnlyList<PostgresColumnRow> columns,
+        IReadOnlyDictionary<long, PostgresTableRow> tables
+    )
+    {
+        var origins = new ColumnOrigin?[columns.Count];
+        for (var index = 0; index < columns.Count; index++)
+        {
+            if (MissingFrom(columns[index], tables) is { } missing)
+            {
+                return Outcome<ColumnOrigin?[], string>.Failed(missing);
+            }
+
+            origins[index] = Find(columns[index], tables);
+        }
+
+        return Outcome<ColumnOrigin?[], string>.Of(origins);
+    }
+
+    /// <summary>
     /// What the answer of <c>tables</c> lacks of the column's origin, or null: when <see cref="Find" /> would answer,
     /// with an origin or with none.  A table or a column goes when another session drops it between two calls of a
     /// describe, which is a failure of the describe and not a bug of the describer.

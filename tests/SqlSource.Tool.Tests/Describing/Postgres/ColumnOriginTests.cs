@@ -103,4 +103,42 @@ public sealed class ColumnOriginTests
         ColumnOrigin
             .MissingFrom(PostgresTables.ColumnOf(0, "x", PostgresRows.Int4.Oid, Users, 42), PostgresTables.Of(Users))
             .ShouldBe("the column 'x' no longer exists in its table 'public.users'");
+
+    // Every column's origin, in order, where the answer holds each: none for an expression or a system column.
+    [Fact]
+    public void FindAll_EveryColumnFound_IsEachOriginInOrder()
+    {
+        var origins = ColumnOrigin
+            .FindAll(
+                [
+                    PostgresTables.ColumnOf(0, "mail", PostgresRows.Varchar.Oid, Users, 3),
+                    PostgresTables.ExpressionOf(1, "n", PostgresRows.Int8.Oid),
+                    new PostgresColumnRow(2, "ctid", 27, Users.Oid, -1, null, null, null),
+                ],
+                PostgresTables.Of(Users)
+            )
+            .Value.ShouldNotBeNull();
+
+        origins.Length.ShouldBe(3);
+        origins[0].ShouldNotBeNull().Attribute.Name.ShouldBe("email");
+        origins[1].ShouldBeNull();
+        origins[2].ShouldBeNull();
+    }
+
+    // The first column whose origin the answer lacks, in column order, as MissingFrom says it.
+    [Fact]
+    public void FindAll_TwoColumnsMissing_IsTheFirstOnesMessage()
+    {
+        var found = ColumnOrigin.FindAll(
+            [
+                PostgresTables.ExpressionOf(0, "n", PostgresRows.Int8.Oid),
+                PostgresTables.ColumnOf(1, "x", PostgresRows.Int4.Oid, Users, 42),
+                PostgresTables.ColumnOf(2, "y", PostgresRows.Int4.Oid, PostgresTables.TableOf(16999, "gone"), 1),
+            ],
+            PostgresTables.Of(Users)
+        );
+
+        found.Succeeded.ShouldBeFalse();
+        found.Failure.ShouldBe("the column 'x' no longer exists in its table 'public.users'");
+    }
 }
