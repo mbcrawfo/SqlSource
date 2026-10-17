@@ -20,7 +20,7 @@ Each run of `build.yml` uploads two artifacts: `packages`, the two `.nupkg` file
 
 The `ci` job succeeds only when every other job in `ci.yml` succeeded or was skipped.  It is the one status check to require in the `main` ruleset.
 
-`coverage-comment.yml` always runs the version on `main`, never the one a pull request changes.  A change to it takes effect, and can first be tried, after it is merged.  `publish.yml` cannot be tried from a branch either: it is first exercised on `main`.
+`coverage-comment.yml` always runs the version on `main`, never the one a pull request changes.  A change to it takes effect, and can first be tried, after it is merged.  A manual run of `publish.yml` on a branch skips every job, because its `build` job runs only for a tag or `main`, so it is first exercised on `main`.
 
 ## Nightly
 

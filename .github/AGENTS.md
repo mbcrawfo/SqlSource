@@ -32,6 +32,6 @@ GitHub Actions workflows.  [`workflows/README.md`](workflows/README.md) says wha
 - **Version values reach MSBuild as the job-level environment variables `BuildNumber` and `VersionSuffix`**, not as `-p:` flags, so that the format check, build, test and pack steps cannot disagree.
 - **An expression cannot yield an empty string from the middle of `&&`/`||`.**  `cond && '' || x` always yields `x`.  Put the empty string last, as `publish.yml` does.
 - Files here are limited to 120 characters per line.  Fold long commands with `>-` or `\`.
-- Run `tools/actionlint.sh` after any change.  No run before merge runs the changed version of `publish.yml` or `coverage-comment.yml`, so actionlint and a careful read are the only checks; say in the pull request that the change is untried.
+- Run `tools/actionlint.sh` after any change.  Neither `publish.yml` nor `coverage-comment.yml` can run changed before merge: the `build` job of `publish.yml` skips every ref but a tag and `main`, and the changed `coverage-comment.yml` is never the one that runs.  Actionlint and a careful read are the only checks; say in the pull request that the change is untried.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.
