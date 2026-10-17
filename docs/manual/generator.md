@@ -32,7 +32,7 @@ public partial class UserRepository(DbConnection connection)
 }
 ```
 
-`Sql.GetUser` is a constant that holds the text of the first query, and `Sql.ListFrom` is a method that returns the text of the second with its tokens filled in.  The token defaults, `users` and `name`, are samples for [describing](concepts.md#describe) the query, and the method still takes both.  Both are plain strings: the calls above use Dapper, and ADO.NET or any other library can take them as well.  A query that is renamed or removed is a compile error where it is used.
+`Sql.GetUser` is a constant that holds the text of the first query, and `Sql.ListFrom` is a method that returns the text of the second with its tokens filled in.  The token defaults, `users` and `name`, are samples for [describing](concepts.md#describe) the query, and the method still takes both.  The constant and the method both give plain strings: the calls above use Dapper, and ADO.NET or any other library can take them as well.  A query that is renamed or removed is a compile error where it is used.
 
 <a id="attribute"></a>
 

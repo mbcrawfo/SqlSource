@@ -614,6 +614,8 @@ SELECT id FROM users {{paging:LIMIT 20 OFFSET @page}};
 ```
 
 ```sql error
+-- dialect: mssql
+
 -- name: FromStart
 -- param: @n
 DECLARE @n int = 1;

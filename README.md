@@ -2,15 +2,11 @@
 
 [![CI](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml?query=branch%3Amain) [![NuGet](https://img.shields.io/nuget/vpre/SqlSource.svg)](https://www.nuget.org/packages/SqlSource/)
 
-SqlSource keeps the SQL of a C# project in `.sql` files, out of your code files, and generates the C# that uses it.  Today each query in a `.sql` file becomes a constant that holds its SQL.
-
-SQL in a file of its own is cleaner than SQL in a C# string: your editor highlights it, SQL linters and formatters work on it, and it is easy to find when you search for a table or a column.  A query that is renamed or removed is a compile error where it is used, and your editor shows a query's SQL wherever it is used.  With PostgreSQL, the `sqlsource` tool also checks every query against your database's schema.
+SqlSource keeps the SQL of a C# project in `.sql` files, out of your code files, and generates the C# that uses it.  SQL in a file of its own is cleaner than SQL in a C# string: your editor highlights it, SQL linters and formatters work on it, and it is easy to find when you search for a table or a column.  A query that is renamed or removed is a compile error where it is used, and your editor shows a query's SQL wherever it is used.  With PostgreSQL, the `sqlsource` tool also checks every query against your database's schema.
 
 **Status:** SqlSource is in early development.  Today it generates a constant for each query, or a method for a query with a `{{token}}` chosen at run time, and its tool can ask a PostgreSQL database about each query's parameters and columns, which SqlSource calls describing the query.  Coming in a later release: a generated model for each query's parameters and rows, which will turn a column that does not match your code into a build error, and a generated method that runs each query.  [What works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today) has the full list.
 
-**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries works with PostgreSQL 14 or later today; SQL Server is coming, and other databases are not described.  See [database support](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#database-support).
-
-Steps 1 to 4 below work today with any database and give you a constant for each query.  Step 5 is optional and works with PostgreSQL only.  There are two other ways to use SqlSource: [only generating models](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models), and [only keeping your SQL out of code files](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files).
+**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries works with PostgreSQL 14 or later today; SQL Server is coming, and other databases are not described: see [database support](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#database-support).  So steps 1 to 4 below work today with any database and give you a constant for each query, and step 5 is optional and works with PostgreSQL only.  There are two other ways to use SqlSource: [only generating models](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models), and [only keeping your SQL out of code files](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files).
 
 ## Installation
 
@@ -27,7 +23,7 @@ $ dotnet new tool-manifest
 $ dotnet tool install SqlSource.Tool --prerelease
 ```
 
-- **`SqlSource`** is the generator.  Add it to each project whose queries you want generated.  It runs in the compiler when you build and adds no runtime dependency: no assembly of it ships with your application, and it is not a dependency of a package you build.  Only the code it generates, and the attribute that code needs, are compiled into your project.
+- **`SqlSource`** is the generator.  Add it to each project whose queries you want generated.  It runs in the compiler when you build and adds no runtime dependency: no assembly of it ships with your application, and it is not a dependency of a package you build.  Only the code it generates, and the attribute you mark your types with and its enums, are compiled into your project.
 - **`SqlSource.Tool`** adds the `sqlsource` command, which describes your queries ([step 5](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#5-describe-your-queries)).  Commit the `dotnet-tools.json` that `dotnet new tool-manifest` creates, and keep the tool at the version of the `SqlSource` package.  A project that only keeps its SQL out of code files does not need it.
 
 **Supported environments.**  A project that uses SqlSource targets .NET 8 or later and compiles C# 12 or later, the default for .NET 8.  It builds in the .NET 8 SDK or later, and in Visual Studio 2022 17.8 or later; older SDKs and IDEs are not supported, and the live analysis of the Visual Studio and Rider editors has not been checked: see [known issues](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md#known-issues).  The tool needs the .NET SDK, .NET 8 or later, and describes PostgreSQL 14 or later.
@@ -114,7 +110,10 @@ More: [constants](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/ge
 
 ### 5. Describe your queries
 
-This step is optional, and works with PostgreSQL only: for another database, skip it and set the output to `sql`, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  The tool asks your database what the parameters and columns of each query are, without running the query, and writes the answers into a sidecar file beside the `.sql` file: `Users.sql.json`.  Today that checks every query against your schema: a table or a column that does not exist, or a parameter whose type cannot be worked out, is an error now and not when the query runs.  Nothing in a build reads the sidecars yet: the generated models and query methods of a later release will be built from them, so that the build never needs a database.
+This step is optional, and works with PostgreSQL only: for another database, skip it and set the output to `sql`, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  The tool asks your database what the parameters and columns of each query are, without running the query, and writes the answers into a sidecar file beside the `.sql` file: `Users.sql.json`.
+
+- **Today** that checks every query against your schema: a table or a column that does not exist, or a parameter whose type cannot be worked out, is an error now and not when the query runs.
+- **Nothing in a build reads the sidecars yet.**  The generated models and query methods of a later release will be built from them, so that the build never needs a database.
 
 Run the tool from the folder of your project or solution, or name it, as in `dotnet sqlsource describe src/App/App.csproj`:
 

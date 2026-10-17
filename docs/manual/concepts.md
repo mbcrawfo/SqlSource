@@ -56,7 +56,7 @@ The tool's record of what the database said about each query's parameters and co
 
 #### Output
 
-The setting that says how much SqlSource produces for a query: its SQL alone, or models and a query method as well, which come in a later release.  Today it also decides which queries the tool describes.  See [the output setting](settings.md#setting-output).
+The setting that says how much SqlSource produces for a query: its SQL alone, models as well, or models and a query method, which come in a later release.  Today it also decides which queries the tool describes.  See [the output setting](settings.md#setting-output).
 
 <a id="token-method"></a>
 
