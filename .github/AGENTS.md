@@ -22,8 +22,8 @@ GitHub Actions workflows.  [`workflows/README.md`](workflows/README.md) says wha
 - **`workflows/publish.yml` keeps its file name, and its `publish` job keeps `environment: nuget`.**  The nuget.org trusted publishing policy names both; renaming either stops publishing.  The `NuGet/login` and push steps stay in that file, not in a reusable workflow.
 - **The check steps in `workflows/build.yml` mirror `pre-commit-validation.sh`.**  A check added to or removed from one is added to or removed from the other in the same commit.  A check that needs the .NET SDK goes in the `build` job; one that needs only Docker goes in the `lint` job.  The two jobs run side by side and neither `needs` the other, so the `packages` artifact can exist in a run whose lint failed.  Anything that consumes it must `needs` the whole `build.yml` call, as `publish.yml` does, never a single job inside it.  The step `Test on PostgreSQL 14` of `build.yml` is the one the script has no counterpart for; its image is pinned as rule 5 of the root `AGENTS.md` says.
 - **`workflows/nightly.yml` names each test project in its Test step.**  A new test project that needs no container is added there, or it never runs on Windows or macOS.
-- **The `ci` job in `workflows/ci.yml` keeps its name.**  Add every new job in `ci.yml` to its `needs`.  It must keep `if: ${{ always() }}`: a skipped required check counts as passing.
-- **`workflows/coverage-comment.yml` holds a write token and handles data a fork controls.**  It is triggered by `workflow_run`, so it runs for every pull request, forks included.
+- **The `ci` job in `workflows/ci.yml` is the required check, so it keeps its name.**  Add every new job in `ci.yml` to its `needs`.  It must keep `if: ${{ always() }}`: a skipped required check counts as passing.
+- **`workflows/coverage-comment.yml` holds a write token and handles data a fork controls.**  It is triggered by `workflow_run`, so it runs as it is on `main`, for every pull request, forks included.
   - Never add a checkout of the pull request's head to it, and never build, restore or run anything the pull request supplies.
   - It reads one file of the `coverage` artifact as text.  Keep it that way: do not extract the archive to disk, and do not drop the size and heading checks.
   - Pass every value from the event to the script through `env:`.  The head branch name is chosen by the fork; an expression inside `run:` would execute it.
@@ -32,6 +32,6 @@ GitHub Actions workflows.  [`workflows/README.md`](workflows/README.md) says wha
 - **Version values reach MSBuild as the job-level environment variables `BuildNumber` and `VersionSuffix`**, not as `-p:` flags, so that the format check, build, test and pack steps cannot disagree.
 - **An expression cannot yield an empty string from the middle of `&&`/`||`.**  `cond && '' || x` always yields `x`.  Put the empty string last, as `publish.yml` does.
 - Files here are limited to 120 characters per line.  Fold long commands with `>-` or `\`.
-- Run `tools/actionlint.sh` after any change.
+- Run `tools/actionlint.sh` after any change.  No run before merge exercises `publish.yml` or `coverage-comment.yml`, so actionlint and a careful read are the only checks; say in the pull request that the change is untried.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.
