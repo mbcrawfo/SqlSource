@@ -9,7 +9,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // One column of a sidecar from one row of "columns".
-public class PostgresColumnsTests
+public sealed class PostgresColumnsTests
 {
     [Fact]
     public void Build_Column_HasItsOrdinalItsNameAndItsTypeWithFacets() =>

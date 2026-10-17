@@ -27,7 +27,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         [.. columns.Select(static column => column.Type.Name)];
 
     [Fact]
-    public async Task Describe_Select_IsRowsWithItsColumnsInOrder()
+    public async Task DescribeAsync_Select_IsRowsWithItsColumnsInOrder()
     {
         var description = await ShouldDescribeAsync("SELECT code, at_local, span, label FROM samples WHERE id = @id");
 
@@ -40,7 +40,8 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     // A cast in a select list keeps its modifier in the row description.  Each name is what format_type gives the
-    // type, which Describe_EveryColumnOfATable_IsSpelledAsFormatTypeSpellsIt holds against the server for a column.
+    // type, which DescribeAsync_EveryColumnOfATable_IsSpelledAsFormatTypeSpellsIt holds against the server for a
+    // column.
     [Theory]
     [InlineData("numeric(18,2)", "numeric(18,2)")]
     [InlineData("numeric(18,0)", "numeric(18,0)")]
@@ -62,7 +63,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [InlineData("timestamptz", "timestamp with time zone")]
     [InlineData("interval(3)", "interval(3)")]
     [InlineData("interval", "interval")]
-    public async Task Describe_CastWithAModifier_IsSpelledAsFormatTypeSpellsIt(string type, string expected) =>
+    public async Task DescribeAsync_CastWithAModifier_IsSpelledAsFormatTypeSpellsIt(string type, string expected) =>
         (await ColumnsOfAsync($"SELECT NULL::{type} AS c")).ShouldHaveSingleItem().Type.Name.ShouldBe(expected);
 
     // The fields of an interval and the modifier of an array's element, which only the server's spelling of the
@@ -72,7 +73,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [InlineData("interval day to second(3)", "interval day to second(3)", null, 3, null)]
     [InlineData("varchar(10)[]", "character varying(10)[]", 10, null, null)]
     [InlineData("numeric(6,2)[]", "numeric(6,2)[]", null, 6, 2)]
-    public async Task Describe_CastWithFieldsOrAnArrayOfAModifier_IsSpelledWithTheModifier(
+    public async Task DescribeAsync_CastWithFieldsOrAnArrayOfAModifier_IsSpelledWithTheModifier(
         string type,
         string expected,
         int? length,
@@ -90,7 +91,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     // An expression has no origin: its modifier is the row description's alone.
     [Fact]
-    public async Task Describe_ExpressionOfAnIntervalWithFields_KeepsTheFields()
+    public async Task DescribeAsync_ExpressionOfAnIntervalWithFields_KeepsTheFields()
     {
         var column = (await ColumnsOfAsync("SELECT '1 day'::interval day to second(3) AS span")).ShouldHaveSingleItem();
 
@@ -104,7 +105,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // name is the tool's schema.name and the tail of the server's spelling, and it has no facets, which the tool
     // decodes for the types of pg_catalog alone.  An array of it is its element's name and [].
     [Fact]
-    public async Task Describe_ColumnOfATypeWithItsOwnModifier_IsTheSchemaNameAndTheTail()
+    public async Task DescribeAsync_ColumnOfATypeWithItsOwnModifier_IsTheSchemaNameAndTheTail()
     {
         var columns = await ColumnsOfAsync("SELECT tag, tags FROM modifiers");
 
@@ -129,7 +130,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // of pg_catalog's numeric binds by numeric, which does not depend on the session: it is returned as a column, so
     // a check that bound the domain, sent as text, would see a column of text.
     [Fact]
-    public async Task Describe_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpellingAndBindsByTheBareName()
+    public async Task DescribeAsync_BuiltInTypeHiddenOnTheSearchPath_IsStillTheCatalogsSpellingAndBindsByTheBareName()
     {
         var token = TestContext.Current.CancellationToken;
         await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
@@ -160,7 +161,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_NumericWithANegativeScale_HasIt()
+    public async Task DescribeAsync_NumericWithANegativeScale_HasIt()
     {
         postgres.SkipBelow(15, "PostgreSQL 14 has no negative scale.");
 
@@ -173,7 +174,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_Literals_AreTextAndNamedByTheServer()
+    public async Task DescribeAsync_Literals_AreTextAndNamedByTheServer()
     {
         var columns = await ColumnsOfAsync("SELECT 'x', NULL, 1");
 
@@ -182,7 +183,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_TwoColumnsWithOneName_KeepsBoth()
+    public async Task DescribeAsync_TwoColumnsWithOneName_KeepsBoth()
     {
         var columns = await ColumnsOfAsync("SELECT 1 AS id, 'a'::text AS id");
 
@@ -192,14 +193,14 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     // A suffix is the generator's to read: the describer records the name the server returned.
     [Fact]
-    public async Task Describe_SuffixNames_AreRecordedAsReturned() =>
+    public async Task DescribeAsync_SuffixNames_AreRecordedAsReturned() =>
         (await ColumnsOfAsync("SELECT deleted_at AS \"deleted_at!\", name AS \"name?\" FROM users"))
             .Select(column => column.Name)
             .ShouldBe(["deleted_at!", "name?"]);
 
     // The statement is described and never run.
     [Fact]
-    public async Task Describe_InsertReturning_IsRowsAndInsertsNothing()
+    public async Task DescribeAsync_InsertReturning_IsRowsAndInsertsNothing()
     {
         var description = await ShouldDescribeAsync(
             "INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING id, placed_at"
@@ -211,7 +212,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_UpdateWithoutReturning_IsNone()
+    public async Task DescribeAsync_UpdateWithoutReturning_IsNone()
     {
         var description = await ShouldDescribeAsync("UPDATE users SET name = @name WHERE id = @id");
 
@@ -223,7 +224,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_QueryWithoutATable_AsksColumnsAfterPrepareAndTypesOnce()
+    public async Task DescribeAsync_QueryWithoutATable_AsksColumnsAfterPrepareAndTypesOnce()
     {
         var (described, capture) = await Sessions.DescribeCapturedAsync(
             postgres.ConnectionString,
@@ -308,7 +309,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [InlineData("user_orders")]
     [InlineData("modifiers")]
     [InlineData("column_types")]
-    public async Task Describe_EveryColumnOfATable_IsSpelledAsFormatTypeSpellsIt(string table)
+    public async Task DescribeAsync_EveryColumnOfATable_IsSpelledAsFormatTypeSpellsIt(string table)
     {
         await MakeOwnTablesAsync();
 
@@ -318,7 +319,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_ColumnsOfATable_HaveTheirOrigin()
+    public async Task DescribeAsync_ColumnsOfATable_HaveTheirOrigin()
     {
         var columns = await ColumnsOfAsync("SELECT u.id AS user_id, email, amount FROM users u, billing.invoices");
 
@@ -329,7 +330,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     // ctid and xmin name their table with an attribute number below zero, and a table may have no column at all.
     [Fact]
-    public async Task Describe_SystemColumns_HaveNoOrigin()
+    public async Task DescribeAsync_SystemColumns_HaveNoOrigin()
     {
         await MakeOwnTablesAsync();
 
@@ -342,7 +343,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_IdentityAndGeneratedColumns_SayWhatTheyAre()
+    public async Task DescribeAsync_IdentityAndGeneratedColumns_SayWhatTheyAre()
     {
         var columns = await ColumnsOfAsync(
             "SELECT u.id, u.name, u.name_upper, o.id AS order_id FROM users u, orders o"
@@ -353,7 +354,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_ExpressionColumns_HaveNoOriginAndSayNothingOfIdentity()
+    public async Task DescribeAsync_ExpressionColumns_HaveNoOriginAndSayNothingOfIdentity()
     {
         var columns = await ColumnsOfAsync("SELECT count(*) AS n, upper(name) AS u FROM users GROUP BY name");
 
@@ -364,7 +365,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // The column is its domain.  An expression over it has no origin and says the base type; a cast to the domain
     // says the base type with the domain's modifier, as the protocol reports it.
     [Fact]
-    public async Task Describe_DomainColumnAndExpressionsOverIt_SayTheDomainOrItsBase()
+    public async Task DescribeAsync_DomainColumnAndExpressionsOverIt_SayTheDomainOrItsBase()
     {
         var columns = await ColumnsOfAsync(
             "SELECT email, COALESCE(email, 'x@y') AS c, NULL::email_t AS n, email::text AS t FROM users"
@@ -380,7 +381,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // The USING column of an inner join is the left table's; of a full join it is a COALESCE of both, and no
     // table's.
     [Fact]
-    public async Task Describe_UsingColumn_HasTheLeftOriginOfAnInnerJoinAndNoneOfAFullJoin()
+    public async Task DescribeAsync_UsingColumn_HasTheLeftOriginOfAnInnerJoinAndNoneOfAFullJoin()
     {
         var inner = await ColumnsOfAsync("SELECT user_id FROM orders JOIN bookings USING (user_id)");
         var full = await ColumnsOfAsync("SELECT user_id FROM orders FULL JOIN bookings USING (user_id)");
@@ -390,13 +391,13 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_Union_HasNoOrigin() =>
+    public async Task DescribeAsync_Union_HasNoOrigin() =>
         (await ColumnsOfAsync("SELECT id FROM users UNION ALL SELECT user_id FROM orders"))
             .ShouldHaveSingleItem()
             .Origin.ShouldBeNull();
 
     [Fact]
-    public async Task Describe_SubqueryAndCte_KeepOrigins()
+    public async Task DescribeAsync_SubqueryAndCte_KeepOrigins()
     {
         var columns = await ColumnsOfAsync(
             "WITH c AS (SELECT id, name FROM users) "
@@ -408,13 +409,13 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     // The origin of a view's column is the view: what stands behind it is the view's own business.
     [Fact]
-    public async Task Describe_ColumnOfAView_HasTheViewAsItsOrigin() =>
+    public async Task DescribeAsync_ColumnOfAView_HasTheViewAsItsOrigin() =>
         (await ColumnsOfAsync("SELECT name FROM active_users"))
             .ShouldHaveSingleItem()
             .Origin.ShouldBe(Origin("active_users", "name"));
 
     [Fact]
-    public async Task Describe_QueryOfATable_AsksTablesBetweenColumnsAndTypes()
+    public async Task DescribeAsync_QueryOfATable_AsksTablesBetweenColumnsAndTypes()
     {
         var (described, capture) = await Sessions.DescribeCapturedAsync(
             postgres.ConnectionString,
@@ -441,7 +442,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         """;
 
     [Fact]
-    public async Task Describe_NotNullThatIsNotValid_IsNullable()
+    public async Task DescribeAsync_NotNullThatIsNotValid_IsNullable()
     {
         postgres.SkipBelow(18, "Only PostgreSQL 18 has a NOT NULL that is NOT VALID.");
         await postgres.ExecuteAsync(NotValidTable);
@@ -469,7 +470,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // rows, so a NULL comes back for a column the parent says is NOT NULL.  18 refuses the drop, and the answer is
     // the same there: the rule does not depend on the version.
     [Fact]
-    public async Task Describe_ColumnsOfAnInheritanceParent_AreNullableByTheCatalog()
+    public async Task DescribeAsync_ColumnsOfAnInheritanceParent_AreNullableByTheCatalog()
     {
         var token = TestContext.Current.CancellationToken;
         await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
@@ -519,7 +520,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // A foreign partition inherits its parent's NOT NULL, which nothing enforces on the remote rows, and a query of
     // the parent reads them: both columns' origin is the parent, so both are nullable, on every version.
     [Fact]
-    public async Task Describe_ColumnsOfAPartitionedTableWithAForeignPartition_AreNullableByTheCatalog()
+    public async Task DescribeAsync_ColumnsOfAPartitionedTableWithAForeignPartition_AreNullableByTheCatalog()
     {
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
         await postgres.ExecuteAsync(ForeignPartitionTables(connection));
@@ -546,7 +547,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // PostgreSQL does not enforce a foreign table's NOT NULL on the remote rows, and a query reads them: the column
     // is unknown, and the source says why, in a gated query too, where only a join that extends it makes it nullable.
     [Fact]
-    public async Task Describe_ColumnOfAForeignTable_IsUnknownFromTheForeignTable()
+    public async Task DescribeAsync_ColumnOfAForeignTable_IsUnknownFromTheForeignTable()
     {
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
         await postgres.ExecuteAsync(ForeignTable(connection));
@@ -576,7 +577,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // alias, which the walk maps to the target's column and finds nothing extends.  Its constant is the rewritten
     // statement's, which the plan prints, and is never NULL.
     [Fact]
-    public async Task Describe_ReturningOfATableWithAnInsteadRule_IsNullableByTheCatalog()
+    public async Task DescribeAsync_ReturningOfATableWithAnInsteadRule_IsNullableByTheCatalog()
     {
         var token = TestContext.Current.CancellationToken;
         await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
@@ -607,7 +608,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // A query with no word of the gate.  Its count has no origin, so the plan is asked for it and answers it as an
     // expression, and the columns of the table keep the catalog's answer.
     [Fact]
-    public async Task Describe_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()
+    public async Task DescribeAsync_QueryWithoutAGateWord_TakesNullabilityFromTheCatalog()
     {
         var description = await ShouldDescribeAsync(
             "SELECT u.id, u.email, count(*) OVER () AS n FROM users u WHERE u.id = @id"
@@ -620,7 +621,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // A left join with a count over the window: the plan is walked, the columns of users keep the catalog's answer,
     // the extended orders.total is nullable by the join, and the count is not null as an expression.
     [Fact]
-    public async Task Describe_LeftJoin_IsWalkedAndOnlyTheExtendedSideIsNullableByTheJoin()
+    public async Task DescribeAsync_LeftJoin_IsWalkedAndOnlyTheExtendedSideIsNullableByTheJoin()
     {
         var description = await ShouldDescribeAsync(
             "SELECT u.id, u.email, o.total, count(*) OVER () AS n "
@@ -644,7 +645,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [InlineData("SELECT status, count(*) FROM users GROUP BY ROLLUP (status)")]
     [InlineData("SELECT status, count(*) FROM users GROUP BY CUBE (status)")]
     [InlineData("SELECT status, count(*) FROM users GROUP BY GROUPING SETS ((status), ())")]
-    public async Task Describe_GroupingSetsOverANotNullColumn_IsGated(string sql)
+    public async Task DescribeAsync_GroupingSetsOverANotNullColumn_IsGated(string sql)
     {
         var description = await ShouldDescribeAsync(sql);
 
@@ -658,7 +659,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // its origin, and the plan prints them as old.id and new.id, which name no relation instance, so both keep the
     // heuristic.
     [Fact]
-    public async Task Describe_ReturningOldAndNew_KeepsTheHeuristic()
+    public async Task DescribeAsync_ReturningOldAndNew_KeepsTheHeuristic()
     {
         postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
@@ -676,7 +677,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // as NULL, and the column keeps the source's table as its origin.  The MERGE plans as a join that extends the
     // source, and the row returned is the target's own.
     [Fact]
-    public async Task Describe_MergeReturning_ExtendsTheSourceAndNotTheTarget()
+    public async Task DescribeAsync_MergeReturning_ExtendsTheSourceAndNotTheTarget()
     {
         postgres.SkipBelow(17, "PostgreSQL before 17 has no RETURNING for MERGE.");
 
@@ -693,7 +694,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     // The gate reads words: a function named as one gates a query that has no join.
     [Fact]
-    public async Task Describe_FunctionNamedAsAGateWord_IsWalkedAndFindsNothing()
+    public async Task DescribeAsync_FunctionNamedAsAGateWord_IsWalkedAndFindsNothing()
     {
         var description = await ShouldDescribeAsync("SELECT id, left(name, 3) AS l FROM users");
 
@@ -702,7 +703,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_GateWordInAStringOrAComment_IsNotGated()
+    public async Task DescribeAsync_GateWordInAStringOrAComment_IsNotGated()
     {
         var description = await ShouldDescribeAsync("SELECT id FROM users WHERE name <> 'left join' -- outer");
 
@@ -713,7 +714,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  In a gated query a view's
     // column says "view" where no join extends it.
     [Fact]
-    public async Task Describe_ColumnsOfAViewAndOfAMaterializedView_SayView()
+    public async Task DescribeAsync_ColumnsOfAViewAndOfAMaterializedView_SayView()
     {
         await postgres.ExecuteAsync(
             "CREATE MATERIALIZED VIEW IF NOT EXISTS column_users AS SELECT id, name FROM users"
@@ -732,7 +733,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
     // A table's row selected whole is a column of the table's composite type, which is no pseudo-type.
     [Fact]
-    public async Task Describe_ColumnOfACompositeType_IsTheTablesRowTypeWithNoOrigin()
+    public async Task DescribeAsync_ColumnOfACompositeType_IsTheTablesRowTypeWithNoOrigin()
     {
         var column = (await ColumnsOfAsync("SELECT u FROM users u")).ShouldHaveSingleItem();
 
@@ -746,7 +747,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Theory]
     [InlineData("SELECT id, ROW(1, 2) FROM users", "row")]
     [InlineData("SELECT s FROM (SELECT 1 AS a, 2 AS b) AS s", "s")]
-    public async Task Describe_ColumnOfAPseudoType_IsSqlsrc229NamingItAndItsType(string sql, string column)
+    public async Task DescribeAsync_ColumnOfAPseudoType_IsSqlsrc229NamingItAndItsType(string sql, string column)
     {
         var described = await Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql));
 

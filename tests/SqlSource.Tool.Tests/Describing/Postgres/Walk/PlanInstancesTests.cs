@@ -10,7 +10,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // PlanInstances over plans a test writes: which nodes name a relation instance, which of them a join above
 // null-extends, and what makes a plan unusable.
-public class PlanInstancesTests
+public sealed class PlanInstancesTests
 {
     private static bool ExtendedIn(PlanInstances instances, string alias)
     {

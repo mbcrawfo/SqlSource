@@ -9,7 +9,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Capture;
 
 // The capture as a file: what CaptureJson writes, what it reads back, and what it says of a text that is none.
-public class CaptureJsonTests
+public sealed class CaptureJsonTests
 {
     // A capture of two calls as its file holds it.
     private const string Text =

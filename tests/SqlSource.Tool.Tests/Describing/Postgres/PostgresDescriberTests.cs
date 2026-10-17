@@ -12,7 +12,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The describer of PostgreSQL where no server is needed: what "open" answered becomes the session's server or the
 // failure, and a connection string the driver cannot read is a failure too.
-public class PostgresDescriberTests
+public sealed class PostgresDescriberTests
 {
     [Fact]
     public void Dialect_OfTheDescriber_IsPostgreSql() =>

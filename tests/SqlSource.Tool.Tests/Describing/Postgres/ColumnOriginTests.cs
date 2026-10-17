@@ -6,7 +6,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // Where a column comes from, by the table OID and the attribute number of its row description.
-public class ColumnOriginTests
+public sealed class ColumnOriginTests
 {
     private static readonly PostgresTableRow Users = PostgresTables.Users;
 

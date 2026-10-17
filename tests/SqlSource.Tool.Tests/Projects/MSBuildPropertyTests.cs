@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Projects;
 
-public class MSBuildPropertyTests
+public sealed class MSBuildPropertyTests
 {
     [Theory]
     [InlineData("/work/App", "/work/App")]

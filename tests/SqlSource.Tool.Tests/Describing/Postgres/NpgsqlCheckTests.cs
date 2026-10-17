@@ -9,7 +9,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 // What the answer of "check" says against the answer of "columns" and the tool's own rewrite: the two describes saw
 // one query when Npgsql placed each parameter where the lexer did, and the columns are equal in count, names and
 // types.
-public class CheckVerdictTests
+public sealed class NpgsqlCheckTests
 {
     private static readonly PostgresColumnRow[] Described =
     [

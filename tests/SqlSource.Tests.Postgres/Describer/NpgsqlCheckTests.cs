@@ -79,13 +79,14 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData("SELECT id FROM users WHERE id = @id; -- the end")]
     [InlineData("SELECT '$1' AS a, id FROM users WHERE id = @id")]
     [InlineData("SELECT '@id' AS a, id FROM users WHERE id = @id")]
-    public async Task Describe_QueryNpgsqlReadsAsTheLexerDoes_PassesTheCheck(string sql) => await ShouldPassAsync(sql);
+    public async Task DescribeAsync_QueryNpgsqlReadsAsTheLexerDoes_PassesTheCheck(string sql) =>
+        await ShouldPassAsync(sql);
 
     // Npgsql ignores a parameter that the SQL does not reference, and still resolves its type.
     [Theory]
     [InlineData("DELETE FROM samples WHERE flag")]
     [InlineData("SELECT id FROM users WHERE id = @id")]
-    public async Task Describe_DeclaredOnlyParameter_PassesTheCheck(string sql) =>
+    public async Task DescribeAsync_DeclaredOnlyParameter_PassesTheCheck(string sql) =>
         await ShouldPassAsync(sql, ("tenant", "int"));
 
     // The name the describer gives each kind of type to bind by is one Npgsql binds: an alias, a modifier that is
@@ -138,7 +139,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData("check_d2", "character varying")]
     [InlineData("\"char\"", "char")]
     [InlineData(LongTypeName + "[]", "public." + LongArrayName)]
-    public async Task Describe_ParameterOfEachKindOfType_IsBoundByItsBindName(string type, string bindName)
+    public async Task DescribeAsync_ParameterOfEachKindOfType_IsBoundByItsBindName(string type, string bindName)
     {
         await postgres.ExecuteAsync(OwnObjects);
 
@@ -160,7 +161,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "check_pair", "public.check_pair", "@p")]
     [InlineData("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", "users", "public.users", "@p")]
     [InlineData("SELECT c.relname FROM pg_catalog.pg_class AS c WHERE c.oid = @t::regclass", null, "regclass", "@t")]
-    public async Task Describe_ParameterNpgsqlCannotBind_IsSqlsrc232NamingIt(
+    public async Task DescribeAsync_ParameterNpgsqlCannotBind_IsSqlsrc232NamingIt(
         string sql,
         string? declared,
         string name,
@@ -182,7 +183,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
 
     // Npgsql resolves the type of a parameter it will not send.
     [Fact]
-    public async Task Describe_DeclaredOnlyParameterNpgsqlCannotBind_IsSqlsrc232NamingIt()
+    public async Task DescribeAsync_DeclaredOnlyParameterNpgsqlCannotBind_IsSqlsrc232NamingIt()
     {
         await postgres.ExecuteAsync(OwnObjects);
 
@@ -195,7 +196,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
 
     // Where it is not returned, an array of a domain is bound by its element's name and [], which Npgsql takes.
     [Fact]
-    public async Task Describe_ArrayOfADomainNotReturned_IsBoundByItsElementsNameAndBrackets()
+    public async Task DescribeAsync_ArrayOfADomainNotReturned_IsBoundByItsElementsNameAndBrackets()
     {
         var described = await DescribeAsync("SELECT 1 AS one FROM users WHERE @p IS NOT NULL", ("p", "email_t[]"));
 
@@ -209,7 +210,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     // Npgsql sends an array of a domain as an array of its base, and the server keeps the domain: the column the
     // parameter is returned as has two types.  The help is the cast of the column, not the help of a @.
     [Fact]
-    public async Task Describe_ArrayOfADomainReturnedAsAColumn_IsSqlsrc231NamingBothTypes()
+    public async Task DescribeAsync_ArrayOfADomainReturnedAsAColumn_IsSqlsrc231NamingBothTypes()
     {
         var described = await DescribeAsync("SELECT @p AS p", ("p", "email_t[]"));
 
@@ -238,7 +239,11 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         "the SQL with $n parts at character 45: '$1] IS NOT' for Npgsql and ':id] IS NO' for SqlSource",
         PostgresErrors.PlacementHelp
     )]
-    public async Task Describe_ColonParameterNpgsqlReadsInASlice_IsSqlsrc231(string sql, string differs, string help)
+    public async Task DescribeAsync_ColonParameterNpgsqlReadsInASlice_IsSqlsrc231(
+        string sql,
+        string differs,
+        string help
+    )
     {
         var described = await DescribeAsync(sql);
 

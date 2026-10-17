@@ -34,24 +34,25 @@ public sealed class TableMatchTests(PostgresContainer postgres)
     [Theory]
     [InlineData("SELECT * FROM users WHERE id = @id")]
     [InlineData("SELECT id, name, email, status, tags, balance, created_at, deleted_at, name_upper FROM users")]
-    public Task Describe_WholeTableByStarOrByItsListInOrder_MatchesTheTable(string sql) =>
+    public Task DescribeAsync_WholeTableByStarOrByItsListInOrder_MatchesTheTable(string sql) =>
         ShouldMatchAsync(sql, "users");
 
     [Fact]
-    public Task Describe_StarOfAView_MatchesTheView() => ShouldMatchAsync("SELECT * FROM active_users", "active_users");
+    public Task DescribeAsync_StarOfAView_MatchesTheView() =>
+        ShouldMatchAsync("SELECT * FROM active_users", "active_users");
 
     [Fact]
-    public Task Describe_StarOfATableInAnotherSchema_SaysItsSchema() =>
+    public Task DescribeAsync_StarOfATableInAnotherSchema_SaysItsSchema() =>
         ShouldMatchAsync("SELECT * FROM billing.invoices", "invoices", "billing");
 
     // A RETURNING list keeps the table's origins, so the row an INSERT gives back is the table's.
     [Fact]
-    public Task Describe_InsertReturningStar_MatchesTheTable() =>
+    public Task DescribeAsync_InsertReturningStar_MatchesTheTable() =>
         ShouldMatchAsync("INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING *", "orders");
 
     // The dropped attribute keeps its number and is not in the answer of "tables": the table's list is what is left.
     [Fact]
-    public async Task Describe_StarOfATableWithADroppedColumn_MatchesTheTable()
+    public async Task DescribeAsync_StarOfATableWithADroppedColumn_MatchesTheTable()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
@@ -99,7 +100,7 @@ public sealed class TableMatchTests(PostgresContainer postgres)
         "order-differs"
     )]
     [InlineData("SELECT u.* FROM orders AS o LEFT JOIN users AS u ON u.id = o.user_id", "nullability-differs")]
-    public async Task Describe_ResultThatIsNotATable_MatchesNothingAndSaysTheFirstCheckThatFailed(
+    public async Task DescribeAsync_ResultThatIsNotATable_MatchesNothingAndSaysTheFirstCheckThatFailed(
         string sql,
         string expected
     )

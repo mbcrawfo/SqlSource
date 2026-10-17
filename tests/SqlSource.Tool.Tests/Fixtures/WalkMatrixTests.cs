@@ -16,7 +16,7 @@ namespace SqlSource.Tool.Tests.Fixtures;
 // recording that says otherwise is a bug of the walk or of the case, never a reason to change this table without
 // knowing which.  DescriberFixtureTests replays the same cases, and tests/SqlSource.Tests.Postgres describes them on
 // PostgreSQL 14 and 18.
-public class WalkMatrixTests
+public sealed class WalkMatrixTests
 {
     // A NOT NULL column that nothing extends.
     private const string Kept = "false catalog";

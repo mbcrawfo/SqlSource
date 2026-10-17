@@ -14,7 +14,7 @@ namespace SqlSource.Tool.Tests.Describing.Capture;
 
 // The exchange that replays: it answers from a capture, in the capture's order for a question asked twice, never
 // asks the engine, and fails loudly on a question the capture does not hold.
-public class ReplayingExchangeTests
+public sealed class ReplayingExchangeTests
 {
     private int _live;
 

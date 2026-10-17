@@ -13,7 +13,7 @@ set -euo pipefail
 
 PROJECT='tests/SqlSource.Tests.Postgres'
 CASES='tests/SqlSource.Tests.Postgres/Realistic/Cases'
-TEST='*Describe_Case_IsItsRecordedDescription'
+TEST='*DescribeAsync_Case_IsItsRecordedDescription'
 
 if [[ $# -ne 0 ]]; then
     echo 'Usage: record-realistic.sh' >&2

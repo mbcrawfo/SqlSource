@@ -7,7 +7,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The reflection over what the pinned Npgsql sent for a command of a batch.  What it reads after a describe is in
 // tests/SqlSource.Tests.Postgres.
-public class BatchRewritesTests
+public sealed class BatchRewritesTests
 {
     // Fails on a bump of Npgsql that moves the text or the order of the parameters, before any session depends on
     // them.

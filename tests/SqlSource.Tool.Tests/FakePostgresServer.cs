@@ -60,8 +60,15 @@ internal sealed class FakePostgresServer : IDisposable
             {
                 client = await _listener.AcceptTcpClientAsync(_stop.Token);
             }
+            // Dispose may stop the listener between the loop's check and the accept, which then says it is not
+            // listening.
             catch (Exception exception)
-                when (exception is OperationCanceledException or ObjectDisposedException or SocketException)
+                when (exception
+                        is OperationCanceledException
+                            or ObjectDisposedException
+                            or SocketException
+                            or InvalidOperationException
+                )
             {
                 return;
             }

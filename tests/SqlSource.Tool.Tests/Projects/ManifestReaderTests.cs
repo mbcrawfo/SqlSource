@@ -5,7 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Projects;
 
-public class ManifestReaderTests
+public sealed class ManifestReaderTests
 {
     // The example of docs/superpowers/specs/2026-10-09-query-generation-phase-2-3-project-manifest-design.md, with
     // every line the target writes.

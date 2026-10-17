@@ -7,7 +7,7 @@ using static SqlSource.Tool.Tests.PostgresPlans;
 namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // Which relations a plan scans, for "relations" to be asked of them.
-public class PlanRelationsTests
+public sealed class PlanRelationsTests
 {
     private static PostgresRelationName Name(string schema, string name) => new(schema, name);
 
