@@ -17,7 +17,8 @@ public sealed class PostgresContainer : IAsyncLifetime
 {
     // The one place that names the image.  tools/record-fixtures.sh and tools/record-realistic.sh read it from this
     // line, by its shape.  It names a major and a minor, as every image of the tests does: the recorded fixtures
-    // carry the version they were recorded against, and a moving tag would run another.  See CONTRIBUTING.md.
+    // carry the version they were recorded against, and a moving tag would run another.
+    // See tests/SqlSource.Tests.Postgres/README.md.
     public const string DefaultImage = "postgres:18.6";
 
     // Names another image: CI runs the tests again on the oldest PostgreSQL that is supported.

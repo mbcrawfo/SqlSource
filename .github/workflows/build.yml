@@ -95,7 +95,8 @@ jobs:
           --report-github
 
       # The Test step ran the tests of the PostgreSQL describer on the default image.  This runs them again on the
-      # oldest PostgreSQL that is supported, pinned to its minor as every image of the tests is: see CONTRIBUTING.md.
+      # oldest PostgreSQL that is supported, pinned to its minor as every image of the tests is:
+      # see tests/SqlSource.Tests.Postgres/README.md.
       - name: Test on PostgreSQL 14
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         env:
