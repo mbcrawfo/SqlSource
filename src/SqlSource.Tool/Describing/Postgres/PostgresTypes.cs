@@ -65,8 +65,9 @@ internal static class PostgresTypes
     /// The rows lack a type that is reached, or the type is a pseudo-type, or of a kind this version does not know.
     /// </exception>
     /// <remarks>
-    /// It keeps a switch of its own and does not share <see cref="Walk{T}" />: a domain passes its facets down and an
-    /// array's element and a subtype get none, which the one modifier the walk carries cannot say.
+    /// It keeps a switch of its own and does not share <see cref="Walk{T}" />: an array gives its element no facets,
+    /// where the walk gives the element the array's modifier, and a domain passes its facets down unchanged, where the
+    /// walk gives its base <see cref="BaseModifierOf" />.
     /// </remarks>
     public static PostgresType Build(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows, PostgresFacets facets)
     {

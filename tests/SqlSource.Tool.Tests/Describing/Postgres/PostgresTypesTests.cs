@@ -388,6 +388,7 @@ public sealed class PostgresTypesTests
         };
         var emails = PostgresRows.ArrayOf(16386, "_email_t", PostgresRows.EmailT254);
         var emailRange = PostgresRows.RangeOf(16410, "email_range", PostgresRows.EmailT254);
+        var emailMultirange = PostgresRows.MultirangeOf(16411, "email_multirange", emailRange);
         var rows = PostgresRows.Of(
             PostgresRows.Int4,
             PostgresRows.Varchar,
@@ -402,7 +403,9 @@ public sealed class PostgresTypesTests
             PostgresRows.EmailT254,
             work,
             emails,
-            emailRange
+            emailRange,
+            emailMultirange,
+            PostgresRows.CheckPair
         );
         (long Oid, int Modifier, PostgresTypmodPair[] Pairs)[] cases =
         [
@@ -416,11 +419,13 @@ public sealed class PostgresTypesTests
             (work.Oid, -1, [new(1043, Typmods.Varchar254)]),
             (emails.Oid, Typmods.Varchar254, [new(1043, Typmods.Varchar254)]),
             (emailRange.Oid, -1, [new(1043, Typmods.Varchar254)]),
+            (emailMultirange.Oid, -1, [new(1043, Typmods.Varchar254)]),
             (23, -1, []),
             (1043, -1, []),
             (1015, -1, []),
             (PostgresRows.UserStatus.Oid, -1, []),
             (PostgresRows.Int4range.Oid, -1, []),
+            (PostgresRows.CheckPair.Oid, -1, []),
         ];
 
         foreach (var (oid, modifier, pairs) in cases)
@@ -435,6 +440,26 @@ public sealed class PostgresTypesTests
                 )),
             ]);
             _ = PostgresTypes.Build(oid, rows, modifier, spellings);
+        }
+    }
+
+    // Where the build throws, PairsOf gives no pair and throws nothing: it runs before the session refuses a
+    // pseudo-type, and the labels of an enum are no pair.
+    [Fact]
+    public void PairsOf_TypeTheBuildThrowsFor_IsNoPair()
+    {
+        var unlabelled = PostgresRows.UserStatus with { EnumLabels = null };
+        var unknown = PostgresRows.CompositeOf(16650, "strange") with { Typtype = "x" };
+        var rows = PostgresRows.Of(PostgresRows.Record, PostgresRows.RecordArray, unlabelled, unknown);
+
+        foreach (
+            var oid in new[] { PostgresRows.Record.Oid, PostgresRows.RecordArray.Oid, unlabelled.Oid, unknown.Oid }
+        )
+        {
+            PostgresTypes.PairsOf(oid, rows, Typmods.Varchar10).ShouldBeEmpty();
+            _ = Should.Throw<InvalidOperationException>(() =>
+                PostgresTypes.Build(oid, rows, Typmods.Varchar10, TypeSpellings.None)
+            );
         }
     }
 
