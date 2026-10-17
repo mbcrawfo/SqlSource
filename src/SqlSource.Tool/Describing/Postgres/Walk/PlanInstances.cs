@@ -178,12 +178,6 @@ internal sealed class PlanInstances
     /// </summary>
     public bool HasSetOperation { get; private set; }
 
-    /// <summary>
-    /// The instances of a whole plan, with no answer of <c>partitions</c>: an <c>Append</c> of a partitioned table's
-    /// partitions is read as a set operation.
-    /// </summary>
-    public static PlanInstances Find(PlanNode root) => new(root, root, NoPartitions);
-
     /// <summary>The instances of a plan, or of a plan inside another.</summary>
     /// <param name="root">The root of the plan whose instances are found.</param>
     /// <param name="tree">The root of the whole plan, where the <c>InitPlan</c> of a CTE is looked for.</param>

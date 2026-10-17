@@ -396,17 +396,9 @@ internal sealed class PostgresSession : IDescribeSession
         else if (answer.Plan is { } text && PlanNode.Read(text) is { } root)
         {
             var partitions = await PartitionsOfAsync(request, root, cancellationToken);
-            var relations = await RelationsOfAsync(request, root, partitions, origins, scope.Tables, cancellationToken);
-            outcome = NullabilityWalk.Run(
-                root,
-                columns,
-                origins,
-                scope with
-                {
-                    Partitions = partitions,
-                    Tables = relations,
-                }
-            );
+            var cache = new PlanInstancesCache(root, partitions);
+            var relations = await RelationsOfAsync(request, cache, origins, scope.Tables, cancellationToken);
+            outcome = NullabilityWalk.Run(cache, columns, origins, scope with { Tables = relations });
         }
         else
         {
@@ -448,20 +440,22 @@ internal sealed class PostgresSession : IDescribeSession
     // An error is logged and never reported: the walk goes on with the rows of "tables" alone.
     private async Task<IReadOnlyDictionary<long, PostgresTableRow>> RelationsOfAsync(
         DescribeRequest request,
-        PlanNode root,
-        IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? partitions,
+        PlanInstancesCache cache,
         ColumnOrigin?[] origins,
         IReadOnlyDictionary<long, PostgresTableRow> tables,
         CancellationToken cancellationToken
     )
     {
-        if (!origins.Any(static origin => origin is null) || !NullabilityWalk.MayAnswerFromBranches(root, partitions))
+        if (!origins.Any(static origin => origin is null) || !NullabilityWalk.MayAnswerFromBranches(cache))
         {
             return tables;
         }
 
         var answered = tables.Values.Select(static row => new PostgresRelationName(row.Schema, row.Name)).ToHashSet();
-        PostgresRelationName[] missing = [.. PlanRelations.Of(root).Where(relation => !answered.Contains(relation))];
+        PostgresRelationName[] missing =
+        [
+            .. PlanRelations.Of(cache.Tree).Where(relation => !answered.Contains(relation)),
+        ];
         if (missing.Length == 0)
         {
             return tables;

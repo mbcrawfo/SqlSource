@@ -20,23 +20,28 @@ public sealed class NullabilityWalkTests
     private static WalkOutcome Run(PlanNode root, bool oldAndNewMayBeNamed, params Asked[] asked)
     {
         var (columns, origins) = Built(asked);
-        return NullabilityWalk.Run(root, columns, origins, Scope(true, oldAndNewMayBeNamed));
+        return NullabilityWalk.Run(
+            new PlanInstancesCache(root, null),
+            columns,
+            origins,
+            Scope(true, oldAndNewMayBeNamed)
+        );
     }
 
     private static WalkScope Scope(bool gated, bool oldAndNewMayBeNamed = false, bool catalogFunctionsFirst = true) =>
-        new(gated, oldAndNewMayBeNamed, catalogFunctionsFirst, Tables);
+        new(gated, oldAndNewMayBeNamed, catalogFunctionsFirst, Tables, []);
 
     private static WalkOutcome RunAs(WalkScope scope, PlanNode root, params Asked[] asked)
     {
         var (columns, origins) = Built(scope.Gated, asked);
-        return NullabilityWalk.Run(root, columns, origins, scope);
+        return NullabilityWalk.Run(new PlanInstancesCache(root, null), columns, origins, scope);
     }
 
     // A query that is planned for a column with no origin, and has no word of the gate.
     private static WalkOutcome RunUngated(PlanNode root, params Asked[] asked)
     {
         var (columns, origins) = Built(false, asked);
-        return NullabilityWalk.Run(root, columns, origins, Scope(false));
+        return NullabilityWalk.Run(new PlanInstancesCache(root, null), columns, origins, Scope(false));
     }
 
     // "a" is the side a LEFT JOIN keeps and "b" the side it null-extends.
@@ -334,7 +339,12 @@ public sealed class NullabilityWalkTests
             gated: true
         );
 
-        var outcome = NullabilityWalk.Run(Scan("n", "id"), [column], [origin], Scope(true));
+        var outcome = NullabilityWalk.Run(
+            new PlanInstancesCache(Scan("n", "id"), null),
+            [column],
+            [origin],
+            Scope(true)
+        );
 
         AnswersOf(outcome).ShouldBe([NullableCatalog]);
     }
@@ -361,7 +371,12 @@ public sealed class NullabilityWalkTests
             gated: true
         );
 
-        var outcome = NullabilityWalk.Run(Scan("p", "id"), [column], [origin], Scope(true));
+        var outcome = NullabilityWalk.Run(
+            new PlanInstancesCache(Scan("p", "id"), null),
+            [column],
+            [origin],
+            Scope(true)
+        );
 
         AnswersOf(outcome).ShouldBe([NullableCatalog]);
     }
@@ -390,7 +405,12 @@ public sealed class NullabilityWalkTests
             gated: true
         );
 
-        var outcome = NullabilityWalk.Run(Scan("pt", "id"), [column], [origin], Scope(true));
+        var outcome = NullabilityWalk.Run(
+            new PlanInstancesCache(Scan("pt", "id"), null),
+            [column],
+            [origin],
+            Scope(true)
+        );
 
         AnswersOf(outcome).ShouldBe([NullableCatalog]);
     }
@@ -424,7 +444,7 @@ public sealed class NullabilityWalkTests
             Output = ["t3.id"],
         };
 
-        var outcome = NullabilityWalk.Run(plan, [column], [origin], Scope(true));
+        var outcome = NullabilityWalk.Run(new PlanInstancesCache(plan, null), [column], [origin], Scope(true));
 
         AnswersOf(outcome).ShouldBe([NullableCatalog]);
     }
@@ -625,7 +645,7 @@ public sealed class NullabilityWalkTests
         var (columns, origins) = Built(NotNull);
 
         var walked = NullabilityWalk
-            .Run(LeftJoin("a.id"), columns, origins, Scope(true))
+            .Run(new PlanInstancesCache(LeftJoin("a.id"), null), columns, origins, Scope(true))
             .Columns.ShouldHaveSingleItem()
             .Column;
 
@@ -801,7 +821,7 @@ public sealed class NullabilityWalkTests
     private static WalkOutcome RunWithPartitions(PlanNode root, params Asked[] asked)
     {
         var (columns, origins) = Built(asked);
-        return NullabilityWalk.Run(root, columns, origins, Scope(true) with { Partitions = Partitions });
+        return NullabilityWalk.Run(new PlanInstancesCache(root, Partitions), columns, origins, Scope(true));
     }
 
     [Fact]

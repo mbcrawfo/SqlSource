@@ -61,10 +61,10 @@ public sealed class NullabilityWalkSetOperationTests
     {
         var (columns, origins) = Built(false, [.. types.Select(static _ => Expression)]);
         return NullabilityWalk.Run(
-            root,
+            new PlanInstancesCache(root, null),
             columns,
             origins,
-            new WalkScope(false, false, true, SetTables) { ColumnTypes = types }
+            new WalkScope(false, false, true, SetTables, types)
         );
     }
 
@@ -612,14 +612,10 @@ public sealed class NullabilityWalkSetOperationTests
         };
 
         var outcome = NullabilityWalk.Run(
-            root,
+            new PlanInstancesCache(root, answered ? partitions : null),
             columns,
             origins,
-            new WalkScope(false, false, true, SetTables)
-            {
-                Partitions = answered ? partitions : null,
-                ColumnTypes = [Int4Oid, TextOid],
-            }
+            new WalkScope(false, false, true, SetTables, [Int4Oid, TextOid])
         );
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);
@@ -672,17 +668,17 @@ public sealed class NullabilityWalkSetOperationTests
             )
             .ShouldBe([UnknownNoOrigin]);
 
-    // Without the row description's types the walk answers no set operation.
+    // Without the row description's types, an empty list, the walk answers no set operation.
     [Fact]
     public void Run_SetOperationWithoutTheColumnsTypes_IsUnavailable()
     {
         var (columns, origins) = Built(false, Expression);
 
         var outcome = NullabilityWalk.Run(
-            AppendOf(Scan("u", "u.name"), Scan("o", "o.label")),
+            new PlanInstancesCache(AppendOf(Scan("u", "u.name"), Scan("o", "o.label")), null),
             columns,
             origins,
-            new WalkScope(false, false, true, SetTables)
+            new WalkScope(false, false, true, SetTables, [])
         );
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
@@ -696,10 +692,10 @@ public sealed class NullabilityWalkSetOperationTests
         var (columns, origins) = Built(true, NotNull, Expression);
 
         var outcome = NullabilityWalk.Run(
-            AppendOf(Scan("u", "u.id", "u.name"), Scan("o", "o.user_id", "o.label")),
+            new PlanInstancesCache(AppendOf(Scan("u", "u.id", "u.name"), Scan("o", "o.user_id", "o.label")), null),
             columns,
             origins,
-            new WalkScope(true, false, true, SetTables) { ColumnTypes = [Int4Oid, TextOid] }
+            new WalkScope(true, false, true, SetTables, [Int4Oid, TextOid])
         );
 
         outcome.Plan.ShouldBe(SidecarValues.Plan.Walked);

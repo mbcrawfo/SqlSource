@@ -79,42 +79,33 @@ internal static partial class NullabilityWalk
     /// Whether the walk may answer a column of no origin of the plan from a set operation's branches: the root reaches
     /// one, and prints no Output or its plan holds one that is no partitioned table's <c>Append</c>.
     /// </summary>
-    /// <param name="root">The root of the plan.</param>
-    /// <param name="partitions">The answer of <c>partitions</c>, or null when it was not asked.</param>
-    public static bool MayAnswerFromBranches(
-        PlanNode root,
-        IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? partitions
-    ) =>
-        ReachesSetOperation(root)
-        && (
-            root.Output is null
-            || PlanInstances.Find(root, root, partitions ?? PlanInstances.NoPartitions).HasSetOperation
-        );
+    /// <param name="cache">The instances of the plan's plans, whose tree is the plan.</param>
+    public static bool MayAnswerFromBranches(PlanInstancesCache cache) =>
+        ReachesSetOperation(cache.Tree) && (cache.Tree.Output is null || cache.Of(cache.Tree).HasSetOperation);
 
-    // The types to answer a set operation's columns with, when the walk takes that path: a column has no origin, the
-    // types are given, the root prints no Output or its plan holds a set operation, and the root reaches one.  A root
-    // that prints Output must print an entry for each column, and one of another statement's plan is read for none.
+    // The types to answer a set operation's columns with, when the walk takes that path: a column has no origin, there
+    // is a type for each column, the root prints no Output or its plan holds a set operation, and the root reaches
+    // one.  A root that prints Output must print an entry for each column, and one of another statement's plan is read
+    // for none.
     private static IReadOnlyList<long>? SetOperationTypesOf(
-        PlanNode root,
+        Plans plans,
         IReadOnlyList<SidecarColumn> columns,
         IReadOnlyList<ColumnOrigin?> origins,
-        WalkScope scope,
         PlanInstances instances
     ) =>
-        scope.ColumnTypes is { } types
-        && types.Count == columns.Count
+        plans.Scope.ColumnTypes.Count == columns.Count
         && origins.Any(static origin => origin is null)
         && instances.Reason is null
         && (
-            root.Output is null
+            plans.Tree.Output is null
             || (
                 instances.HasSetOperation
-                && root.Output.Count >= columns.Count
-                && OutputFits(root.Output, origins, instances)
+                && plans.Tree.Output.Count >= columns.Count
+                && OutputFits(plans.Tree.Output, origins, instances)
             )
         )
-        && ReachesSetOperation(root)
-            ? types
+        && ReachesSetOperation(plans.Tree)
+            ? plans.Scope.ColumnTypes
             : null;
 
     // Each column of no origin from the set operation's inputs, and each with an origin as the walk answers it: by
@@ -122,15 +113,15 @@ internal static partial class NullabilityWalk
     // table's (PlanPartitions), where the plan holds no set operation, is a union of its partitions all the same; its
     // answer is an expression's, since the SQL holds no set operation.
     private static WalkOutcome RunSetOperation(
-        PlanNode root,
+        Plans plans,
         IReadOnlyList<SidecarColumn> columns,
         IReadOnlyList<ColumnOrigin?> origins,
-        WalkScope scope,
-        Plans plans,
-        PlanInstances instances,
         IReadOnlyList<long> types
     )
     {
+        var root = plans.Tree;
+        var scope = plans.Scope;
+        var instances = plans.InstancesOf(root);
         var branches = new SetOperations(plans, scope);
         var onlyAlias = plans.OnlyAliasOf(root);
         var source = instances.HasSetOperation
