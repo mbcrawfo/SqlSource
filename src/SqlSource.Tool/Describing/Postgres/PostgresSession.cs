@@ -383,7 +383,7 @@ internal sealed class PostgresSession : IDescribeSession
                 PostgresErrors.SessionNotKept(
                     _database,
                     DescribeStep.Explain,
-                    PostgresErrors.ServerLines(gone with { Position = null }, 0)
+                    PostgresErrors.ServerLinesWithoutPosition(gone)
                 )
             );
         }

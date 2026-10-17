@@ -78,6 +78,10 @@ public sealed class OuterJoinGateTests
     [InlineData("SELECT renewal, older, newest, merged, new_value, old_id FROM t")]
     // Only OLD and NEW are names the server resolves when quoted: a quoted word of the others does not count.
     [InlineData("SELECT \"left\" FROM t")]
+    // PostgreSQL reads "$" and a character above U+007F as part of a name, so neither holds the word.
+    [InlineData("SELECT x$left FROM t")]
+    [InlineData("SELECT a AS €left FROM t")]
+    [InlineData("SELECT a AS left€ FROM t")]
     // A parameter is no word of the SQL.
     [InlineData("SELECT id FROM users WHERE id = @left")]
     // Nothing at all.

@@ -46,34 +46,25 @@ internal static class PostgresSearchPath
         var schemas = new List<(string Name, bool Quoted)>();
         var name = new StringBuilder();
         var quoted = false;
-        var inQuotes = false;
         var at = 0;
         while (at < searchPath.Length)
         {
             var character = searchPath[at];
-            at++;
-            if (inQuotes)
+            if (character == '"')
             {
-                if (character != '"')
+                if (!PostgresIdentifiers.SkipQuoted(searchPath, at, out var end))
                 {
-                    _ = name.Append(character);
+                    return null;
                 }
-                else if (at < searchPath.Length && searchPath[at] == '"')
-                {
-                    _ = name.Append('"');
-                    at++;
-                }
-                else
-                {
-                    inQuotes = false;
-                }
-            }
-            else if (character == '"')
-            {
-                inQuotes = true;
+
+                _ = name.Append(PostgresIdentifiers.Unquote(searchPath.AsSpan(at, end - at)));
                 quoted = true;
+                at = end;
+                continue;
             }
-            else if (character == ',')
+
+            at++;
+            if (character == ',')
             {
                 schemas.Add((name.ToString(), quoted));
                 _ = name.Clear();
@@ -83,11 +74,6 @@ internal static class PostgresSearchPath
             {
                 _ = name.Append(character);
             }
-        }
-
-        if (inQuotes)
-        {
-            return null;
         }
 
         schemas.Add((name.ToString(), quoted));

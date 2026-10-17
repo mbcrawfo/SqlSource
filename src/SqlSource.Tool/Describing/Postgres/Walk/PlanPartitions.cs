@@ -114,72 +114,49 @@ internal static class PlanPartitions
         return cut > 0 && cut < alias.Length - 1 && alias[(cut + 1)..].All(char.IsAsciiDigit) ? alias[..cut] : null;
     }
 
-    // The entry with each name of the alias that qualifies a column, bare or quoted, replaced by a mark no name
-    // holds: so that two members' entries compare the same when they differ by the alias alone.  A string constant
-    // is copied as it is.
-    private static string WithoutAlias(string entry, string alias)
+    /// <summary>
+    /// The entry with each name of the alias that qualifies a column, bare or quoted, replaced by a mark no name
+    /// holds: so that two members' entries compare the same when they differ by the alias alone.  A name qualifies
+    /// when a <c>.</c> directly follows it and none directly precedes it.  A string constant is copied as it is, and
+    /// an entry whose quotes or parentheses do not balance is returned unchanged.
+    /// </summary>
+    public static string WithoutAlias(string entry, string alias)
     {
+        if (PlanExpression.Tokens.Read(entry) is not { } tokens)
+        {
+            return entry;
+        }
+
         var text = new StringBuilder(entry.Length);
-        var at = 0;
-        while (at < entry.Length)
+        var copied = 0;
+        for (var index = 0; index < tokens.Count; index++)
         {
-            var start = at;
-            var character = entry[at];
+            var token = tokens[index];
             string? name = null;
-            if (character is '\'' or '"')
+            if (token.Kind == PlanExpression.Kind.Word)
             {
-                at = Closing(entry, at);
-                if (character == '"')
-                {
-                    name = entry[(start + 1)..(at - 1)].Replace("\"\"", "\"", StringComparison.Ordinal);
-                }
+                name = entry[token.Start..token.End];
             }
-            else if (char.IsAsciiLetter(character) || character == '_')
+            else if (token.Kind == PlanExpression.Kind.QuotedName)
             {
-                while (at < entry.Length && (char.IsAsciiLetterOrDigit(entry[at]) || entry[at] is '_' or '$'))
-                {
-                    at++;
-                }
-
-                name = entry[start..at];
-            }
-            else
-            {
-                at++;
+                name = PostgresIdentifiers.Unquote(entry.AsSpan(token.Start, token.End - token.Start));
             }
 
-            var qualifies = at < entry.Length && entry[at] == '.' && (start == 0 || entry[start - 1] != '.');
-            _ =
-                qualifies && string.Equals(name, alias, StringComparison.Ordinal)
-                    ? text.Append('\u0001')
-                    : text.Append(entry, start, at - start);
-        }
-
-        return text.ToString();
-    }
-
-    // The index after the quote that closes the one at the index, a doubled quote read as one; the end of the text
-    // when none does.
-    private static int Closing(string entry, int at)
-    {
-        var quote = entry[at];
-        at++;
-        while (at < entry.Length)
-        {
-            if (entry[at] != quote)
+            var qualifies =
+                index + 1 < tokens.Count
+                && IsDotAt(tokens[index + 1], token.End)
+                && (index == 0 || !IsDotAt(tokens[index - 1], token.Start - 1));
+            if (qualifies && string.Equals(name, alias, StringComparison.Ordinal))
             {
-                at++;
-            }
-            else if (at + 1 < entry.Length && entry[at + 1] == quote)
-            {
-                at += 2;
-            }
-            else
-            {
-                return at + 1;
+                _ = text.Append(entry, copied, token.Start - copied).Append('\u0001');
+                copied = token.End;
             }
         }
 
-        return at;
+        return text.Append(entry, copied, entry.Length - copied).ToString();
     }
+
+    // Whether the token is a "." that stands at the index.
+    private static bool IsDotAt(PlanExpression.Token token, int at) =>
+        token.Kind == PlanExpression.Kind.Dot && token.Start == at;
 }

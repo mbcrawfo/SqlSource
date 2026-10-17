@@ -30,6 +30,9 @@ public sealed class DeclaredTypeTextTests
     [InlineData("text[]")]
     [InlineData("int[][]")]
     [InlineData("email_t")]
+    // A name with "$", or with a character above U+007F that is no letter, is accepted quoted.
+    [InlineData("\"my$type\"")]
+    [InlineData("\"€type\"")]
     public void TryRead_TypeName_IsAccepted(string text)
     {
         DeclaredTypeText.TryRead(text, out var type).ShouldBeTrue(text);
@@ -76,6 +79,16 @@ public sealed class DeclaredTypeTextTests
     [InlineData("t.")]
     [InlineData("int\nfoo")]
     [InlineData("int\n")]
+    [InlineData("\"a\rb\"")]
+    [InlineData("\"a\r\nb\"")]
+    [InlineData("\"a\0b\"")]
+    // Stricter than PostgreSQL's rule for a word on purpose: a "$" would let "1$$" open a dollar quote in the
+    // PREPARE, and "1$1" be a parameter there.
+    [InlineData("$type")]
+    [InlineData("my$type")]
+    [InlineData("1$$")]
+    [InlineData("1$1")]
+    [InlineData("€type")]
     public void TryRead_AnythingElse_IsRefused(string text)
     {
         DeclaredTypeText.TryRead(text, out var type).ShouldBeFalse(text);

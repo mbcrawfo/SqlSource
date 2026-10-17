@@ -71,16 +71,8 @@ internal static class OuterJoinGate
     // form.
     private static bool HoldsAnyOf(string sql, string[] words)
     {
-        var lexed = SqlLexer.Lex(sql, SqlDialectRules.PostgreSql);
-        if (lexed.Error is not null)
-        {
-            throw new InvalidOperationException(
-                "The sample SQL of a query does not lex, and the plan's parser read it."
-            );
-        }
-
         SqlLexeme? before = null;
-        foreach (var lexeme in lexed.Lexemes)
+        foreach (var lexeme in PostgresSql.Lex(sql))
         {
             var text = sql.AsSpan(lexeme.Span.Start, lexeme.Span.Length);
             if (
@@ -141,7 +133,8 @@ internal static class OuterJoinGate
         return false;
     }
 
-    // Whether the character there continues an identifier, by the lexer's rule.  The edge of a lexeme does not.
+    // Whether the character there continues a word, as PostgreSQL reads one, so that "x$left" and "€left" hold no
+    // "left".  The edge of a lexeme does not.
     private static bool IsOfAName(ReadOnlySpan<char> text, int index) =>
-        index >= 0 && index < text.Length && SqlLexer.IsParameterNameCharacter(text[index]);
+        index >= 0 && index < text.Length && PostgresIdentifiers.IsWordPart(text[index]);
 }

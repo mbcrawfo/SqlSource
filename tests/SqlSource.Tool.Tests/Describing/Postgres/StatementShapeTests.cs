@@ -116,6 +116,15 @@ public sealed class StatementShapeTests
     public void RefusedKind_SelectInto_IsSelectInto(string sql) =>
         StatementShape.RefusedKind(sql).ShouldBe("SELECT INTO");
 
+    // PostgreSQL reads a character above U+007F as a letter of a word, so "CREATE€" is no CREATE and "€into" is a
+    // label, not the clause.
+    [Theory]
+    [InlineData("CREATE€ TABLE t (a int)")]
+    [InlineData("SELECT 1 AS €into")]
+    [InlineData("SELECT 1 €into t")]
+    public void RefusedKind_WordThatHoldsANonLetterAboveAscii_IsReadWhole(string sql) =>
+        StatementShape.RefusedKind(sql).ShouldBeNull();
+
     // INSERT and MERGE are followed by INTO as a rule of their grammar, with comments allowed between.
     [Theory]
     [InlineData("INSERT /* c */ INTO t VALUES (1)")]
@@ -131,6 +140,9 @@ public sealed class StatementShapeTests
     [InlineData("SELECT 1 WHERE (a=$3)", "$3")]
     [InlineData("SELECT a$1, $2 FROM t", "$2")]
     [InlineData("SELECT 1 FROM t WHERE a = $1", "$1")]
+    // A "$" after a number is no part of it: "1$1" is the number 1 and then $1.
+    [InlineData("SELECT 1$1", "$1")]
+    [InlineData("SELECT 12$3", "$3")]
     public void PositionalParameter_DollarAndDigits_IsItAsWritten(string sql, string written) =>
         StatementShape.PositionalParameter(sql).ShouldBe(written);
 
@@ -140,6 +152,14 @@ public sealed class StatementShapeTests
     [InlineData("SELECT a$1 FROM t")]
     [InlineData("SELECT 1 AS €$1 FROM t")]
     [InlineData("SELECT 1 AS §$1 FROM t")]
+    // A name that starts after a digit, as PostgreSQL 14 reads "1a$1": the number 1 and the label a$1.
+    [InlineData("SELECT 1a$1")]
+    [InlineData("SELECT _$1")]
+    [InlineData("SELECT 9_$1")]
+    // A "$" after another "$" opens a dollar quote for PostgreSQL, and is no parameter.
+    [InlineData("SELECT $$1")]
+    [InlineData("SELECT 1$$1")]
+    [InlineData("SELECT 1$$1$$")]
     [InlineData("SELECT '$1'")]
     [InlineData("SELECT E'cost $1'")]
     [InlineData("SELECT U&'$1'")]
