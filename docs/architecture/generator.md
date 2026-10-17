@@ -4,7 +4,7 @@ How `src/SqlSource` turns a project's `.sql` files into C#: the incremental pipe
 
 ## The pipeline
 
-[`SqlSourceGenerator`](../../src/SqlSource/SqlSourceGenerator.cs) is an `IIncrementalGenerator`, and its `Initialize` only wires the steps.  The logic it holds is the helpers at its end, which sort, join and search collected values.  The steps and their records are at the root of [`Generation/`](../../src/SqlSource/Generation), the path rules in `Paths/`, the readers of MSBuild properties and metadata in `MSBuild/`, and what writes a type's file in `Emitting/`.
+[`SqlSourceGenerator`](../../src/SqlSource/SqlSourceGenerator.cs) is an `IIncrementalGenerator`, and its `Initialize` only wires the steps.  Beyond the wiring it holds a few helpers, which sort, join and search collected values.  The steps and their records are at the root of [`Generation/`](../../src/SqlSource/Generation), the path rules in `Paths/`, the readers of MSBuild properties and metadata in `MSBuild/`, and what writes a type's file in `Emitting/`.
 
 Before any step runs, a post-initialization output adds `AttributeSource.Text` to the compilation as `SqlSourceGenerateAttribute.g.cs`.  It holds `[SqlSourceGenerate]` and the enums its properties take.
 
@@ -89,7 +89,7 @@ A type's `Path` is resolved by `PathResolver.Resolve` from the list of paths alo
 
 [`SqlPath`](../../src/SqlSource/Generation/Paths/SqlPath.cs) does every path operation as string work.  A generator may not touch the file system (analyzer rule RS1035), and a project must build the same on every operating system, so `SqlPath.Normalize` accepts both separators and resolves `.` and `..`, and `SqlPath.Comparer` compares ignoring case.  The lists of paths and of parsed files are sorted by that comparer, and `SqlPath.IndexOf`, `SqlPath.Contains` and `SqlPath.FindInFolder` search them in that order: the first two by halving, the third from the first path under the folder.  `PathResolver.Resolve` and `SelectFiles` run once for each type, so a linear pass over a list there would cost types times files.
 
-Because the lists are distinct ignoring case, a search may return either of two entries that compare equal, and a file whose path differs only by case from an earlier one is left out of them.  [`PathCollision`](../../src/SqlSource/Generation/Paths/PathCollision.cs) finds such a file in `CaseCollisions`, and it is reported as `SQLSRC013` when a type claims the path.  The generator cannot ask the file system, so two files on a case-sensitive file system look the same as one file listed under two spellings, and both are the same error.
+Because the lists are distinct ignoring case, a search may return either of two entries that compare equal, and a file whose path differs only by case from an earlier one is left out of them.  [`PathCollision`](../../src/SqlSource/Generation/Paths/PathCollision.cs) finds such a file in `CaseCollisions`, and it is reported as `SQLSRC013`, for a claimed path only.  The generator cannot ask the file system, so two files on a case-sensitive file system look the same as one file listed under two spellings, and both are the same error.
 
 A file that no type [claims](README.md#claim) is skipped before its text is read, so nothing about it is reported, its metadata included.  That lets a project hold `.sql` files that are not queries, such as migration scripts.
 
@@ -142,13 +142,13 @@ A `FileParseInput` holds the file's `AdditionalText`, which compares by referenc
 
 ## Parsing
 
-[`SqlFileParser.Parse`](../../src/SqlSource/Parsing/SqlFileParser.cs) turns the text of one `.sql` file into named SQL blocks, or into errors.  [`SqlFileReader`](../../src/SqlSource/Generation/SqlFileReader.cs), in `Generation/`, calls it with the file's text, name, dialect and `CommentsWanted`, and turns the result into a `ParsedSqlFile`: each block becomes a `SqlQuery`, each span a `LocationInfo`, and each error a `DiagnosticInfo` through `SqlDiagnostics.ForParseError`.
+[`SqlFileParser.Parse`](../../src/SqlSource/Parsing/SqlFileParser.cs) turns the text of one `.sql` file into named SQL blocks, or into errors.  [`SqlFileReader`](../../src/SqlSource/Generation/SqlFileReader.cs), in `Generation/`, calls it with the file's text, name, dialect and `CommentsWanted`, and turns the result into a `ParsedSqlFile`: each block becomes a `SqlQuery`, each span a `LocationInfo`, and each error a `DiagnosticInfo` through `SqlDiagnostics.ForParseError`.  [`Parsing/Tokens/`](../../src/SqlSource/Parsing/Tokens) holds a block's segments and tokens and `TokenScanner`, which finds them, and [`Parsing/Quoting/`](../../src/SqlSource/Parsing/Quoting) the readers of quoted regions.
 
 A parse has three parts:
 
 1. **The header.**  A `SqlLexer` starts with the rules of the dialect it is given, and `SqlDialectMarker.Apply` reads the comments at the top of the file, as described [below](#the-dialect-marker).
 2. **The lexemes.**  The lexer reads the rest of the text.  An unterminated quoted region or block comment stops it, and is the file's one error.
-3. **The blocks.**  The parser finds the `-- name:` markers.  A file with none is one query, named after the file without its extension.  Otherwise the comments before the first marker are the file's preamble, and each marker starts a block that runs to the next.
+3. **The blocks.**  The parser finds the `-- name:` markers.  Without one, `ReadUnnamedFile` reads the whole file as one block in a `WholeFile` scope ([a file with no `-- name:`](../manual/sql-files.md#a-file-with-no----name)).  Otherwise the comments before the first marker are the file's preamble, and each marker starts a block that runs to the next.
 
 Every error is added where it is found, and the result sorts them by position with a stable sort.  A result that holds any error holds no block.
 
@@ -158,7 +158,7 @@ Every error is added where it is found, and the result sorts them by position wi
 
 Nothing in the lexer is specific to one dialect.  It reads by the [`SqlDialectRules`](../../src/SqlSource/Parsing/SqlDialectRules.cs) it holds: a value there is a rule that dialects differ on by a setting, such as `ParameterPrefix`, `NestedComments` or `HashComments`, and a [`QuoteReader`](../../src/SqlSource/Parsing/Quoting/QuoteReader.cs) is one way a quoted region ends.  The static properties of `SqlDialectRules`, and the rules `SqlDialectRules.For` builds for `mysql` and `mariadb` under each set of options, are the whole table.  What each dialect reads differently is in the manual, [what each dialect changes](../manual/dialects.md#what-each-dialect-changes), and what is still misread is in [TD-0004](../tech-debt/TD-0004-lexer-misreads-dialect-specific-sql.md).
 
-One instance of each reader serves every file of every compilation, on any thread.  A reader is called at the character that opens its region, and may look at the characters before it for a prefix such as `E`, which stays in the text lexeme before the region.
+One instance of each reader serves every file of every compilation, on any thread.  A reader is called at the character that opens its region, and may look at the characters before it for a prefix such as `E`.
 
 A reader reads one part of a string.  Whether a string goes on after a gap is the lexer's decision, from `SqlDialectRules.StringContinuation` and from the reader that `QuoteReader.FindContinuation` names for the next part.  Each part is a quoted region of its own, and the gap between two parts is ordinary text and comments.  A quoted region is never searched for a marker, so a comment in the gap, which may be a marker, must not be part of one.
 
@@ -180,9 +180,9 @@ Since errors are sorted by position with a stable sort, the order of the steps d
 
 ### The dialect marker
 
-A file's `-- dialect:` marker is found before the text after it is lexed.  [`SqlDialectMarker.Apply`](../../src/SqlSource/Parsing/SqlDialectMarker.cs) reads the comments at the top of the file one at a time, with `SqlLexer.TryReadLeadingComment`, under the rules the lexer starts with.  At the first valid marker it switches the lexer's rules, which apply from the line after.  It stops at the first `-- name:` marker or the first thing that is not a comment, and returns where the header ends.
+[`SqlDialectMarker.Apply`](../../src/SqlSource/Parsing/SqlDialectMarker.cs) puts a file's dialect marker into effect before the rest of the text is lexed.  It reads the comments at the top of the file one at a time, with `SqlLexer.TryReadLeadingComment`, under the rules the lexer starts with.  At the first valid marker it switches the lexer's rules, which apply from the line after.  It stops at the first `-- name:` marker or the first thing that is not a comment, and returns where the header ends.
 
-`Apply` reports nothing.  The parser reports a marker that is not valid, one that names a second dialect, and one that starts at or after the header's end, when it reads the blocks.
+The parser reports three kinds of marker error when it reads the blocks: a marker that is not valid, one that names a second dialect, and one that starts at or after the header's end.
 
 The marker, the property and the metadata all read a dialect through [`SqlDialectName`](../../src/SqlSource/Parsing/SqlDialectName.cs), and each gives a `SqlDialectChoice`: a `SqlDialect` with its `SqlDialectOptions`.  [`SqlDescribableDialects`](../../src/SqlSource/Parsing/SqlDescribableDialects.cs) lists the dialects whose database can be asked to describe a query.  The tool reads it for `SQLSRC209`, and no step of the generator reads it.
 
@@ -196,7 +196,7 @@ The result is a `SqlBlockText`: the text, the runs it was copied from, and where
 
 `SqlLexer` gives each parameter as a lexeme of its own.  It finds `@name` by `SqlDialectRules.ParameterPrefix`, outside quoted regions, comments and hints, and `SqlTextBuilder` records where each lands in the built SQL.  [`SqlParameterList`](../../src/SqlSource/Parsing/SqlParameterList.cs) turns those, and the `-- param:` declarations of the scope, into a query's list: the parameters of the SQL outside every token, in order of first appearance, then those that only a declaration names, in marker order.  Names compare ignoring case.  A parameter inside a token's default is part of a sample, not of the SQL, so it must be in the SQL or declared, or it is `SQLSRC118`.
 
-Under `mssql`, where `SqlDialectRules.DeclaredVariables` is set, a name the query declares with `DECLARE` is a local variable and is left out of the list at every place, in a default too.  [`SqlDeclaredVariables`](../../src/SqlSource/Parsing/SqlDeclaredVariables.cs) works on the file's lexemes for the query rather than lexing it again, and walks the text only between a `DECLARE` and the end of its list, so a query without the word costs one search.  The parser asks for them only when the SQL has a parameter.  The lexer still gives such a name as a parameter lexeme.  The rules a user sees are in the manual, [parameters and tokens](../manual/parameters-and-tokens.md).
+Where `SqlDialectRules.DeclaredVariables` is set, `SqlParameterList` leaves out the names that [`SqlDeclaredVariables`](../../src/SqlSource/Parsing/SqlDeclaredVariables.cs) finds, at every place, in a default too ([variables declared with `DECLARE`](../manual/parameters-and-tokens.md#variables-declared-with-declare)).  It works on the file's lexemes for the query rather than lexing it again.  The parser asks for them only when the SQL has a parameter.
 
 ### A block has two forms of its SQL
 
@@ -249,7 +249,7 @@ A problem travels between steps as a [`DiagnosticInfo`](../../src/SqlSource/Diag
 - **A parse error** is a `SqlParseError` with a `SqlParseErrorKind`.  `SqlFileReader` maps the kind to a descriptor with `SqlDiagnostics.ForParseError`, and the error is reported once for each file, not once for each type that claims it.
 - **`SQLSRC013`** travels as a `PathCollision`, located at the start of the later file.
 
-The compiler does not say where an MSBuild property or the metadata of an item was set, so `SQLSRC011` and `SQLSRC014` cannot be located.  An invalid dialect travels as `DialectSetting.InvalidValue` for the property and `ParsedSqlFile.InvalidDialect` for a file, and an invalid setting as an `InvalidSetting` of `ProjectSettings` or `FileSettings`.  The output step reports each distinct value once, with `Location.None`, in ordinal order, so the errors of a build do not depend on the order of its files.  The metadata of a file that no type claims is not reported.
+The compiler does not say where an MSBuild property or the metadata of an item was set, so `SQLSRC011` and `SQLSRC014` cannot be located.  An invalid dialect travels as `DialectSetting.InvalidValue` for the property and `ParsedSqlFile.InvalidDialect` for a file, and an invalid setting as an `InvalidSetting` of `ProjectSettings` or `FileSettings`.  The output step gathers the values into a set and reports them with `Location.None`, in ordinal order, so the errors of a build do not depend on the order of its files.  The metadata of a file that no type claims is not reported.
 
 ### The suppressor
 
@@ -274,18 +274,18 @@ The model is `Sidecar`, its `SidecarEntry` for each query, and each entry's `Sid
 
 Reading a file the tool wrote costs two tokenizing passes.  The tool writes `formatVersion` before the queries, so finding it passes over nothing of them.  It writes `engine` before an entry's `parameters` and `columns`, so `ReadMembers` reads those where they stand, by the engine's type shape.  An array that comes before its entry's `engine` is passed over, and read once the entry ends.  The first error ends the read, and the `SidecarError` says where.
 
-The reader accepts more than the schema, [`schemas/sidecar-v1.schema.json`](../../schemas/sidecar-v1.schema.json), does.  It skips a key it does not know, at every level, reads an absent "always" key as null, keeps a provenance value and a PostgreSQL kind it does not know, and reads a type under an unknown engine as its name.  The schema says what this version of the tool writes.  `SidecarTypeReader` reads a type, with a list of a parameter's keys for each engine, because `bindName` is a key of a parameter's type alone and a type read anywhere else skips it.
+The reader follows the reader rules of the format design, [section 1.5](../superpowers/specs/2026-10-07-sidecar-format-design.md#15-reader-rules), and so accepts more than the schema, [`schemas/sidecar-v1.schema.json`](../../schemas/sidecar-v1.schema.json), which says what this version of the tool writes.  A type under an engine this version does not know is read as an `OtherEngineType`, with its name alone.  A provenance value or a PostgreSQL kind it does not know is kept as written, for a later stage to judge.  `SidecarTypeReader` reads a type, with a list of a parameter's keys for each engine, because `bindName` is a key of a parameter's type alone and a type read anywhere else skips it.
 
 ## Not built yet
 
 ### Reading sidecars
 
-> **Not built yet.**  How the generator pairs a `.sql` file with its sidecar and reports a stale, missing or orphaned one.  Delivered by phase 5 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md#phases).
+> **Not built yet.**  How the generator pairs a `.sql` file with its sidecar and reports a stale, missing or orphaned one.  Delivered by phase 5 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 
 ### Type map and models
 
-> **Not built yet.**  How the generator maps a described type to a C# type and emits the input and output types of a query.  Delivered by phase 5 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md#phases), and extended by the library maps of phase 7.
+> **Not built yet.**  How the generator maps a described type to a C# type and emits the input and output types of a query.  Delivered by phase 5 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md), and extended by the library maps of phase 7.
 
 ### Execution methods
 
-> **Not built yet.**  How the generator writes a method that runs a query and reads its rows into the output type.  Delivered by phase 8 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md#phases).
+> **Not built yet.**  How the generator writes a method that runs a query and reads its rows into the output type.  Delivered by phase 8 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
