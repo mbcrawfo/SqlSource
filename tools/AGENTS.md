@@ -1,6 +1,6 @@
 # AGENTS.md - tools
 
-The check scripts and the two recording scripts.  [`README.md`](README.md) says what each does and what `package-install/` is; this file is the traps.
+This file holds the rules for changing the check scripts, the consumer project in `package-install/` and the two recording scripts.  [`README.md`](README.md) says what each of them does.
 
 - **A check added here is added to both callers in the same commit**: `pre-commit-validation.sh` at the root and the `build` or `lint` job of `.github/workflows/build.yml`.  A check that needs the .NET SDK goes in `build`; one that needs only Docker goes in `lint`.
 - **A new version of a linter is a change to the tag and the digest of its image in the script, and nothing else.**
