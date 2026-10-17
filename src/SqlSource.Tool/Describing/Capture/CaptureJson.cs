@@ -39,15 +39,25 @@ internal static class CaptureJson
 
     /// <summary>
     /// How every request and every answer is written: camel-case names, every member, a null one included, and
-    /// no indentation.
+    /// no indentation.  Read-only, since a change to it would change every fixture.
     /// </summary>
     public static JsonSerializerOptions Options { get; } =
-        new()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            DefaultIgnoreCondition = JsonIgnoreCondition.Never,
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-        };
+        ReadOnly(
+            new()
+            {
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                DefaultIgnoreCondition = JsonIgnoreCondition.Never,
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            }
+        );
+
+    // The options made read-only.  A bare MakeReadOnly() throws when no TypeInfoResolver is set; this one sets the
+    // reflection-based resolver, the one the serializer would have used on its first call.
+    private static JsonSerializerOptions ReadOnly(JsonSerializerOptions options)
+    {
+        options.MakeReadOnly(populateMissingResolver: true);
+        return options;
+    }
 
     /// <summary>A request or an answer as a capture keeps it.</summary>
     public static JsonElement ToElement<T>(T value) => JsonSerializer.SerializeToElement(value, Options);

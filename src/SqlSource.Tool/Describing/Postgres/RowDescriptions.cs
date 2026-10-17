@@ -45,6 +45,10 @@ internal static class RowDescriptions
     /// Finds every member this class reads, or throws an <see cref="InvalidOperationException" />.  The search runs
     /// once, so a call after the first only reads its result.
     /// </summary>
+    /// <remarks>
+    /// Only <c>RowDescriptionsTests</c> calls it: it pins the reflection against the pinned Npgsql with no server
+    /// and no describe.  The tool finds the members on their first use instead.
+    /// </remarks>
     public static void Resolve() => _ = Found.Value;
 
     /// <summary>

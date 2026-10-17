@@ -182,7 +182,7 @@ internal static class PostgresEvents
                     )
                     : LogValue.Null
             ),
-            new("nullable", column.Nullable is { } nullable ? (LogValue)nullable : LogValue.Null),
+            new("nullable", LogValue.Of(column.Nullable)),
             new("nullableSource", column.NullableSource),
             new("gated", gated)
         );
@@ -310,7 +310,7 @@ internal static class PostgresEvents
                 new("column", walked.Reference?.Column),
                 new("mapped", walked.Mapped),
                 new("nullExtended", walked.NullExtended),
-                new("nullable", column.Nullable is { } nullable ? (LogValue)nullable : LogValue.Null),
+                new("nullable", LogValue.Of(column.Nullable)),
                 new("nullableSource", column.NullableSource)
             );
         }
@@ -385,9 +385,9 @@ internal static class PostgresEvents
             new("schema", table.Schema),
             new("name", table.Name),
             new("columns", LogValue.ListOf(table.Columns.Select(AttributeOf))),
-            new("relhassubclass", table.Relhassubclass is { } children ? (LogValue)children : LogValue.Null),
-            new("hasForeignPartition", table.HasForeignPartition is { } foreign ? (LogValue)foreign : LogValue.Null),
-            new("hasInsteadRule", table.HasInsteadRule is { } instead ? (LogValue)instead : LogValue.Null)
+            new("relhassubclass", LogValue.Of(table.Relhassubclass)),
+            new("hasForeignPartition", LogValue.Of(table.HasForeignPartition)),
+            new("hasInsteadRule", LogValue.Of(table.HasInsteadRule))
         );
 
     private static LogValue AttributeOf(PostgresAttributeRow attribute) =>
@@ -398,7 +398,7 @@ internal static class PostgresEvents
             new("identity", attribute.Identity),
             new("generated", attribute.Generated),
             new("typeOid", attribute.TypeOid),
-            new("notNullValidated", attribute.NotNullValidated is { } validated ? (LogValue)validated : LogValue.Null)
+            new("notNullValidated", LogValue.Of(attribute.NotNullValidated))
         );
 
     private static LogValue RowOf(PostgresTypeRow row) =>

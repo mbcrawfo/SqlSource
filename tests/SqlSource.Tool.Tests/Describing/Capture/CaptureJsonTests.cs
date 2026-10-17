@@ -173,6 +173,14 @@ public sealed class CaptureJsonTests
             );
     }
 
+    // A change to the options would change every fixture, so no caller can make one.
+    [Fact]
+    public void Options_AreReadOnly()
+    {
+        CaptureJson.Options.IsReadOnly.ShouldBeTrue();
+        _ = Should.Throw<InvalidOperationException>(() => CaptureJson.Options.WriteIndented = true);
+    }
+
     // A request that was read from a file must have the key of the request it was written from.
     [Fact]
     public void KeyOf_ElementReadFromAnIndentedFile_IsTheKeyOfTheRequestItWasWrittenFrom()

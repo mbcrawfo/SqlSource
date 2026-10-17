@@ -29,13 +29,16 @@ internal sealed class PostgresLive(PostgresConnection connection)
     // The settings of a session that change a description, in the order "open" answers them.
     private static readonly string[] SettingNames = ["search_path", "plan_cache_mode", "standard_conforming_strings"];
 
-    private const string OpenSql =
-        "SELECT pg_catalog.current_setting('server_version'), pg_catalog.current_setting('search_path'), "
-        + "pg_catalog.current_setting('plan_cache_mode'), pg_catalog.current_setting('standard_conforming_strings')";
+    // The server's version, then each setting of SettingNames in its order.
+    private static readonly string OpenSql =
+        "SELECT "
+        + string.Join(
+            ", ",
+            SettingNames.Prepend("server_version").Select(static name => $"pg_catalog.current_setting('{name}')")
+        );
 
     private const string ParameterTypesSql =
-        "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements "
-        + "WHERE name = @name AND statement = @statement";
+        "SELECT parameter_types::oid[] FROM pg_catalog.pg_prepared_statements WHERE name = $1 AND statement = $2";
 
     // Every relation asked for with its columns, in one query: by OID for "tables", and by schema and name for
     // "relations", whose text is the same but for the FROM and the WHERE of the first CTE, which are in TablesSql and
@@ -94,7 +97,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
     private const string TablesSql = $"""
         {TableRowsHead}
             FROM pg_catalog.pg_class AS c
-            WHERE c.oid = ANY (@oids)
+            WHERE c.oid = ANY ($1)
         {TableRowsTail}
         """;
 
@@ -138,7 +141,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
     // base, so an array is a base type of the category A.
     private const string TypesSql = """
         WITH RECURSIVE closure (oid) AS (
-            SELECT t.oid FROM pg_catalog.pg_type AS t WHERE t.oid = ANY (@oids)
+            SELECT t.oid FROM pg_catalog.pg_type AS t WHERE t.oid = ANY ($1)
             UNION
             SELECT link.oid
             FROM closure AS c
@@ -196,7 +199,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
             }
 
             return new PostgresOpenAnswer(
-                PostgresSession.VersionOf(reader.GetString(0)),
+                VersionOf(reader.GetString(0)),
                 PostgresConnection.DriverVersion,
                 [.. SettingNames.Select((name, index) => new PostgresSetting(name, reader.GetString(index + 1)))],
                 null
@@ -206,6 +209,15 @@ internal sealed class PostgresLive(PostgresConnection connection)
         {
             return new PostgresOpenAnswer(null, null, null, PostgresConnection.ErrorOf(exception));
         }
+    }
+
+    /// <summary>
+    /// <c>server_version</c> as a sidecar records it: <c>18.4 (Debian 18.4-1.pgdg13+1)</c> is <c>18.4</c>.
+    /// </summary>
+    public static string VersionOf(string serverVersion)
+    {
+        var space = serverVersion.IndexOf(' ', StringComparison.Ordinal);
+        return space < 0 ? serverVersion : serverVersion[..space];
     }
 
     /// <summary>Asks <c>prepare</c>.</summary>
@@ -228,8 +240,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
             await connection.ExecuteAsOneStatementAsync(text, token);
 
             await using var read = await connection.CommandAsync(ParameterTypesSql, token);
-            _ = read.Parameters.AddWithValue("name", asked.Statement);
-            _ = read.Parameters.AddWithValue("statement", text);
+            _ = read.Parameters.Add(new NpgsqlParameter { Value = asked.Statement });
+            _ = read.Parameters.Add(new NpgsqlParameter { Value = text });
             if (await read.ExecuteScalarAsync(token) is not uint[] types)
             {
                 return new PostgresPrepareAnswer(
@@ -295,12 +307,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         try
         {
             await using var command = await connection.CommandAsync(TablesSql, token);
-            _ = command.Parameters.Add(
-                new NpgsqlParameter("oids", asked.Oids.Select(static oid => (uint)oid).ToArray())
-                {
-                    DataTypeName = "oid[]",
-                }
-            );
+            _ = command.Parameters.Add(OidArray(asked.Oids));
             return new PostgresTablesAnswer(await TableRowsAsync(command, token), null);
         }
         catch (NpgsqlException exception)
@@ -318,26 +325,36 @@ internal sealed class PostgresLive(PostgresConnection connection)
         try
         {
             await using var command = await connection.CommandAsync(RelationsSql, token);
-            _ = command.Parameters.Add(
-                new NpgsqlParameter
-                {
-                    Value = asked.Relations.Select(static relation => relation.Schema).ToArray(),
-                    DataTypeName = "text[]",
-                }
-            );
-            _ = command.Parameters.Add(
-                new NpgsqlParameter
-                {
-                    Value = asked.Relations.Select(static relation => relation.Name).ToArray(),
-                    DataTypeName = "text[]",
-                }
-            );
+            AddRelations(command, asked.Relations);
             return new PostgresTablesAnswer(await TableRowsAsync(command, token), null);
         }
         catch (NpgsqlException exception)
         {
             return new PostgresTablesAnswer(null, PostgresConnection.ErrorOf(exception));
         }
+    }
+
+    // The OIDs as one positional oid[].
+    private static NpgsqlParameter OidArray(IEnumerable<long> oids) =>
+        new() { Value = oids.Select(static oid => (uint)oid).ToArray(), DataTypeName = "oid[]" };
+
+    // The schemas and the names of the relations as two positional text[], $1 and $2, which unnest pairs.
+    private static void AddRelations(NpgsqlCommand command, IReadOnlyList<PostgresRelationName> relations)
+    {
+        _ = command.Parameters.Add(
+            new NpgsqlParameter
+            {
+                Value = relations.Select(static relation => relation.Schema).ToArray(),
+                DataTypeName = "text[]",
+            }
+        );
+        _ = command.Parameters.Add(
+            new NpgsqlParameter
+            {
+                Value = relations.Select(static relation => relation.Name).ToArray(),
+                DataTypeName = "text[]",
+            }
+        );
     }
 
     // The rows of TablesSql and of RelationsSql: a table for each run of rows of one OID, with its columns.
@@ -395,20 +412,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         try
         {
             await using var command = await connection.CommandAsync(PartitionsSql, token);
-            _ = command.Parameters.Add(
-                new NpgsqlParameter
-                {
-                    Value = asked.Relations.Select(static relation => relation.Schema).ToArray(),
-                    DataTypeName = "text[]",
-                }
-            );
-            _ = command.Parameters.Add(
-                new NpgsqlParameter
-                {
-                    Value = asked.Relations.Select(static relation => relation.Name).ToArray(),
-                    DataTypeName = "text[]",
-                }
-            );
+            AddRelations(command, asked.Relations);
             await using var reader = await command.ExecuteReaderAsync(token);
             var rows = new List<PostgresPartitionRow>();
             while (await reader.ReadAsync(token))
@@ -449,12 +453,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         try
         {
             await using var command = await connection.CommandAsync(TypesSql, token);
-            _ = command.Parameters.Add(
-                new NpgsqlParameter("oids", asked.Oids.Select(static oid => (uint)oid).ToArray())
-                {
-                    DataTypeName = "oid[]",
-                }
-            );
+            _ = command.Parameters.Add(OidArray(asked.Oids));
             await using var reader = await command.ExecuteReaderAsync(token);
             var rows = new List<PostgresTypeRow>();
             while (await reader.ReadAsync(token))
@@ -493,13 +492,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         try
         {
             await using var command = await connection.CommandAsync(SpellingsSql, token);
-            _ = command.Parameters.Add(
-                new NpgsqlParameter
-                {
-                    Value = asked.Pairs.Select(static pair => (uint)pair.Oid).ToArray(),
-                    DataTypeName = "oid[]",
-                }
-            );
+            _ = command.Parameters.Add(OidArray(asked.Pairs.Select(static pair => pair.Oid)));
             _ = command.Parameters.Add(
                 new NpgsqlParameter
                 {
@@ -569,15 +562,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         {
             return new PostgresCheckAnswer(null, PostgresConnection.ErrorOf(exception), null, null, false);
         }
-        catch (NotSupportedException refused)
-        {
-            return await RefusedAsync(asked, refused.Message, token);
-        }
-        catch (InvalidCastException refused)
-        {
-            return await RefusedAsync(asked, refused.Message, token);
-        }
-        catch (ArgumentException refused)
+        catch (Exception refused) when (IsDriverRefusal(refused))
         {
             return await RefusedAsync(asked, refused.Message, token);
         }
@@ -625,19 +610,16 @@ internal sealed class PostgresLive(PostgresConnection connection)
             await using var reader = await command.ExecuteReaderAsync(CommandBehavior.SchemaOnly, token);
             return null;
         }
-        catch (NotSupportedException refused)
-        {
-            return refused.Message;
-        }
-        catch (InvalidCastException refused)
-        {
-            return refused.Message;
-        }
-        catch (ArgumentException refused)
+        catch (Exception refused) when (IsDriverRefusal(refused))
         {
             return refused.Message;
         }
     }
+
+    // What the driver throws when it refuses a command before it sends anything: a type name it cannot bind, a text
+    // with a ";" that something follows, a name that is too long.  An NpgsqlException is none of these.
+    private static bool IsDriverRefusal(Exception exception) =>
+        exception is NotSupportedException or InvalidCastException or ArgumentException;
 
     // A parameter with a type's name and no value, as a describe needs one.
     private static NpgsqlParameter Unvalued(string name, string dataTypeName) =>

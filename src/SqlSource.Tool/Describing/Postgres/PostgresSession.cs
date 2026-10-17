@@ -127,15 +127,6 @@ internal sealed class PostgresSession : IDescribeSession
     }
 
     /// <summary>
-    /// <c>server_version</c> as a sidecar records it: <c>18.4 (Debian 18.4-1.pgdg13+1)</c> is <c>18.4</c>.
-    /// </summary>
-    public static string VersionOf(string serverVersion)
-    {
-        var space = serverVersion.IndexOf(' ', StringComparison.Ordinal);
-        return space < 0 ? serverVersion : serverVersion[..space];
-    }
-
-    /// <summary>
     /// The major version of a version as a sidecar records it: its leading digits, so <c>13.12</c> is 13 and
     /// <c>18beta1</c> is 18.  Null when it starts with no digit, or with more of them than an <see cref="int" />
     /// holds: the tool cannot tell what it is.

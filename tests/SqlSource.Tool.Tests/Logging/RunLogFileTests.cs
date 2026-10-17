@@ -42,7 +42,7 @@ public sealed class RunLogFileTests : IDisposable
             new("list", LogValue.ListOfTexts(["b", "c"])),
             new(
                 "map",
-                LogValue.MapOf(new("inner", LogValue.Of(null)), new("deep", LogValue.ListOf([LogValue.MapOf()])))
+                LogValue.MapOf(new("inner", LogValue.Of((long?)null)), new("deep", LogValue.ListOf([LogValue.MapOf()])))
             )
         );
 
