@@ -1,6 +1,6 @@
 # Contributing to SqlSource
 
-How to set up a development environment, build, test and check the code, and what CI runs on a pull request.  Versioning and releasing are covered in [docs/publishing.md](docs/publishing.md).
+This repository holds SqlSource, a C# source generator that turns the `.sql` files of a project into typed code, and `sqlsource`, the command that describes those queries against a database.  This page is how to set up, build, test, check and pack them.  Each area has a readme with its procedures: [`tests/README.md`](tests/README.md), [`tools/README.md`](tools/README.md) and [`.github/workflows/README.md`](.github/workflows/README.md).  Versioning and releasing are covered in [docs/publishing.md](docs/publishing.md).
 
 ## Required tools
 
@@ -16,64 +16,35 @@ CSharpier and ReportGenerator are local .NET tools pinned in `dotnet-tools.json`
 dotnet tool restore
 ```
 
-## Build and test
+## Projects
+
+The two projects that ship are:
+
+- `src/SqlSource` is the source generator, and the package `SqlSource`.
+- `src/SqlSource.Tool` is the `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool`.
+
+The four test projects and the two libraries they share, which [`tests/README.md`](tests/README.md) describes:
+
+- `tests/SqlSource.Tests` runs every test of the generator.
+- `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
+- `tests/SqlSource.Tool.Tests` runs the tests of the tool.
+- `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server, and needs Docker.
+- `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
+
+## Build, test and run
 
 ```bash
 dotnet build SqlSource.slnx
-```
-
-```bash
 dotnet test --solution SqlSource.slnx
 ```
 
-The solution has two projects that ship and four test projects:
-
-| Project | Is |
-|----|----|
-| `src/SqlSource` | The source generator, and the package `SqlSource` |
-| `src/SqlSource.Tool` | The `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool` |
-
-| Project | Roslyn | Runs |
-|----|----|----|
-| `tests/SqlSource.Tests` | A current version | Every test of the generator |
-| `tests/SqlSource.Tests.RoslynFloor` | 4.8.0, the oldest supported | The generator driver tests: the files of `tests/SqlSource.Tests/Generator/`, compiled a second time |
-| `tests/SqlSource.Tool.Tests` | A current version | The tests of the tool, which run the whole command in process with their own output, working directory and environment.  `TerminationTests` alone starts the tool that was built in a process of its own: to send it a signal, where the system has signals, and to close its console on Windows, which only `nightly.yml` runs.  It references `tests/SqlSource.Testing` for the harness of the generator's driver tests, which `GeneratorParityTests` runs with the tool over the same sources, and `tests/SqlSource.Tool.Testing` for the helpers it shares with `tests/SqlSource.Tests.Postgres` |
-| `tests/SqlSource.Tests.Postgres` | A current version | The PostgreSQL describer and the `describe` command against a real server, which Testcontainers starts in Docker: one container for the run, with the database `fixtures` and the schema `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql`, and a second database, `realistic`, with the schema and seed of `tests/SqlSource.Tests.Postgres/Realistic/` for the realistic corpus.  It proves four things: each step of the describer, from its session to the walk, with what only a server answers; every fixture case of the describer, described live and compared with its `expected.json` by `FixtureCasesTests`, which `tools/record-fixtures.sh` also runs to record them; the whole `describe` command with the real describer, in process and as the built tool; and the realistic corpus, `Realistic/Cases/`, where each case is a query with a truth of which of its columns can be NULL, written by hand.  `Realistic/` holds the corpus and what reads it, and `Realistic/Describer/` the describer's checks over it: `RealisticDescriptionTests` compares each description with the `expected-pg14.txt` and `expected-pg18.txt` recorded of it, `RealisticNullabilitySafetyTests` checks its nullability against the truth and against the oracle that executes the query over the seed, and `RealisticNullabilityNoiseTests` holds the count of columns that are not null and that the describer answers as nullable or unknown to a budget for each recorded major, 14 and 18, in its `Budgets`.  It references `tests/SqlSource.Testing` for `RepositoryRoot`, and `tests/SqlSource.Tool.Testing` for the fixture harness, the command harness of the tool's tests, `CliRun` and what it needs, `Programs` and `FixtureProjects`, and copies the fixture project `Single` to its output with the package's MSBuild files and `global.json`: `DescribeCommandTests` runs the whole `describe` command in process against the container, over the fixture cases, `--check`, `--force` and `--log`, and `ToolProcessTests` starts the tool that was built in a process of its own and describes a copy of `Single` |
-
-A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both, so it may use only Roslyn API that 4.8.0 has, and the C# it hands to the compiler is C# 12 at most.  That folder is the only code a test project compiles of another; `tests/SqlSource.Tests/Generator/AGENTS.md` says why.
-
-The test projects share their helpers through two libraries, which are never run as tests.  `tests/SqlSource.Testing` holds the harness of the generator's driver tests, `TestSidecars` and `RepositoryRoot`, and stays on Roslyn 4.8.0, since RoslynFloor references it.  `tests/SqlSource.Tool.Testing` holds the helpers that the tool's tests and the PostgreSQL tests share: the command harness, the fakes of a process and a project, the start of the built tool and the fixture harness.
-
-`tests/SqlSource.Tests` also uses the generator the way a consumer does: the types in `EndToEnd/` are compiled with the generator loaded, and the project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  It gets them by path and the generator through a project reference; `tools/check-package-install.sh`, under Package below, is what installs the packed package.
-
-`tests/SqlSource.Tool.Tests/Fixtures/Projects/` holds small projects that are no part of the solution.  `ManifestTargetTests` and `FixtureProjectTests` copy one to a temporary folder outside the repository, with the package's two MSBuild files and `global.json` beside it, and run `dotnet msbuild` on it for real, the second through the tool's own code, so these tests need the SDK that `global.json` pins and take a second or two each.  MSBuild reads the environment for its properties, and the workflow has a variable named `CONFIGURATION`, so in CI a fixture is evaluated as `Release`: a test of a fixture expects no `Debug`, in a constant or in a path.  A fixture is never built or restored, and a test leaves nothing in the repository.  A file under that folder is copied to the test project's output as it is; add a project there as a folder with an `App.csproj` that imports `../build/SqlSource.props` and `../build/SqlSource.targets`.
-
-`tests/SqlSource.Tests.Postgres` needs Docker running, and its first run pulls the image.  The image is `postgres:18.6`, named in one place, `PostgresContainer.DefaultImage`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported, which CI runs as `postgres:14.24`:
+This runs every test project, `tests/SqlSource.Tests.Postgres` on the default PostgreSQL image.  CI also runs that project on PostgreSQL 14, the oldest supported:
 
 ```bash
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres
 ```
 
-Every database image the tests run is pinned to a major and a minor, such as `postgres:18.6`, and never to a bare major such as `postgres:18`.  The recorded fixtures carry the version of the server they were recorded against, and a bare major moves to each new minor without a word, so the tests would run a server the recordings never saw.  This holds for the default image, for the image CI runs on the oldest supported version, and for the image of any engine added later.  `PostgresContainerTests` fails on an image whose tag is not a major and a minor, or whose server reports another version, and `FixtureVersionTests` fails on a fixture case recorded against any version but the default image's.  Moving to a new minor is a change of its own: bump the tag, record the fixtures and the realistic corpus again on the new image, as below, and read the diff, all in the same pull request.
-
-`dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh`, runs it on the default image.
-
-The describer's fixtures are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/`: a folder for each case with its `query.sql`, the `capture.json` of describing it and the `expected.json` of its sidecar.  `tests/SqlSource.Tool.Tests` replays each from its capture with no database, and `tests/SqlSource.Tests.Postgres` describes each against the container and compares the entry, so a describer that asks something else fails the first and one that answers something else fails the second.  After a change to what the describer asks or answers, or to `schema.sql`, record them again and read the diff before it is committed:
-
-```bash
-tools/record-fixtures.sh
-```
-
-To add a case, add its folder with a `query.sql` and run the script.  A recorded file is never edited by hand.
-
-The realistic corpus is recorded by its own script, `tools/record-realistic.sh`, which writes the `expected-pg{major}.txt` of each case under `tests/SqlSource.Tests.Postgres/Realistic/Cases/` for the major version of the server it ran against, and never a `case.json`.  The expectations are those of PostgreSQL 18 and 14, so recording is two runs, the second on the older image; run it after a change to what the describer asks or answers, or to the schema, the seed or a case, and read the diff before it is committed:
-
-```bash
-tools/record-realistic.sh
-SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 tools/record-realistic.sh
-```
-
-To add a case, add its folder with a `query.sql` and a `case.json`, which holds the truth, written from the SQL and `schema.sql` and never from what the describer answers, and run both.  When a column of the truth can be `NULL` and no row of `seed.sql` makes it so, add such a row to `seed.sql`, which never removes one; `exempt` is for a `NULL` no seed can show.  The noise budget is lowered in the change that lowers the noise, the test says to, and raised only in a change that adds cases.
+The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) and [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus).  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
 
 To run the tool from its source:
 
@@ -81,45 +52,26 @@ To run the tool from its source:
 dotnet run --project src/SqlSource.Tool -- describe
 ```
 
-### Coverage
+To collect coverage and build its report:
 
 ```bash
 dotnet test --solution SqlSource.slnx --results-directory artifacts/test-results --coverage --coverage-output-format cobertura
-```
-
-```bash
 dotnet reportgenerator '-reports:artifacts/test-results/*.cobertura.xml' -targetdir:artifacts/coverage -reporttypes:Html '-assemblyfilters:+SqlSource;+SqlSource.Tool'
 ```
 
 Each test project writes its own Cobertura file, and the report merges them.  It is `artifacts/coverage/index.html`.
 
-### Package
+## Pack
 
 ```bash
 dotnet pack SqlSource.slnx --output artifacts/packages
 ```
 
-This builds in `Release` and writes two packages with one version, `artifacts/packages/SqlSource.<version>-dev.nupkg` and `artifacts/packages/SqlSource.Tool.<version>-dev.nupkg`.
+This builds in `Release` and writes two packages with one version, `artifacts/packages/SqlSource.<version>-dev.nupkg` and `artifacts/packages/SqlSource.Tool.<version>-dev.nupkg`.  Three scripts then check them, each with the folder as its argument, and [`tools/README.md`](tools/README.md#package-checks) says what each proves:
 
-```bash
-tools/check-package.sh artifacts/packages
-```
-
-This checks what the two packages hold.  `SqlSource`: the generator under `analyzers/`, `build/SqlSource.props` and `build/SqlSource.targets`, the readme, and nothing under `lib/`.  `SqlSource.Tool`: the tool under `tools/net8.0/any/` with the generator's assembly, Roslyn, the library that reads a solution and Npgsql beside it, `DotnetToolSettings.xml`, the readme, which is `src/SqlSource.Tool/README.md`, and no documentation file of an assembly.  It fails when the two have different versions.  Without an argument it packs both into a temporary folder first.
-
-```bash
-tools/check-package-install.sh artifacts/packages
-```
-
-This installs the package the way a consumer does.  It copies the project in `tools/package-install` to a temporary folder outside the repository, adds the package to it with `dotnet add package` from a feed that holds nothing else, builds and runs it, and compares what it prints with `tools/package-install/expected-output.txt`.  The project uses a constant, a method with tokens, `SqlSourceGeneratorParameters` and `SqlSourceDialect`, each as a property and as metadata of an item, `Parameters` on the attribute, and the two markers `-- generator:` and `-- dialect:`, so it fails when the generator or either MSBuild file does not reach a consumer.  Its `Directory.Build.targets` sets one of the two properties and has a target that adds a `.sql` file, each with its value on a line of its own, so it also fails when the package trims a value only where its targets are imported.  Two of its lists of generator parameters have one word on each line, with the word that shows as the second, and one item names its dialect on one line and an option of the dialect on the next, so it fails when a value reaches the compiler cut at a line break.  It then asks the project what the `sqlsource` tool asks one: `SqlSourceImported` must be `true`, which shows that NuGet imported the package's props, and the target `SqlSourceWriteManifest`, run by name, must write a manifest that starts with its version, lists a `.sql` file, holds a dialect and a property that the project writes over several lines, trimmed, and does not list the file that `Directory.Build.targets` adds from a hook of the build.  It then deletes a `.sql` file the project uses and builds again, and fails unless that build reports the missing member: an incremental build must notice that a file is gone.  Without an argument the script packs first, as the other does.
-
-A change to what the package gives a consumer through its MSBuild files adds a line to `tools/package-install/Program.cs` and to the expected output.
-
-```bash
-tools/check-tool-install.sh artifacts/packages
-```
-
-This installs the tool the way a user does: `dotnet tool install` into a temporary folder outside the repository, from a feed that holds nothing else.  It then runs `sqlsource --version` and compares it with the package's version, runs `sqlsource --help`, and runs `sqlsource describe` in an empty folder, which must exit with 1 and report `SQLSRC201`.  A tool's package carries everything the tool loads, so this is what shows that all of it is there.  The last run sets `DOTNET_ROLL_FORWARD` to `LatestMajor`, which starts the tool on the newest runtime the machine has: the tool targets .NET 8 and rolls forward on a machine that has only a later one, and this proves it wherever the script runs.  Without an argument the script packs first.
+- `tools/check-package.sh` checks what the two packages hold.
+- [`tools/check-package-install.sh`](tools/README.md#check-package-installsh) installs the generator's package into a consumer project, builds it and runs it.
+- `tools/check-tool-install.sh` installs the tool the way a user does and runs it.
 
 ## Checks
 
@@ -129,7 +81,7 @@ Run every check before committing:
 ./pre-commit-validation.sh
 ```
 
-It verifies formatting, runs the linters, builds the solution, runs the tests, checks the two packages, installs the generator's into a project and installs the tool.  It never rewrites files, runs every step even when one fails (the tests and the three package checks are skipped if the build fails), and ends with a summary of what passed and failed.
+It verifies formatting, runs the [linters](tools/README.md#linters), builds the solution, runs the tests, checks the two packages, installs the generator's into a project and installs the tool.  It never rewrites files, runs every step even when one fails (the tests and the three package checks are skipped if the build fails), and ends with a summary of what passed and failed.  `format.sh` rewrites C# and project files with `dotnet format style`, `dotnet format analyzers` and CSharpier, and `format.sh --check` reports what it would change and rewrites nothing.
 
 Both `pre-commit-validation.sh` and `format.sh --check` restore packages in locked mode, as CI does, so a `packages.lock.json` that no longer matches its project fails the check.  After changing a package reference or version, update the lock files and commit them:
 
@@ -137,41 +89,12 @@ Both `pre-commit-validation.sh` and `format.sh --check` restore packages in lock
 dotnet restore SqlSource.slnx
 ```
 
-| Script | Does |
-|----|----|
-| `format.sh` | Builds the generator, which `dotnet format` needs in order to compile the test project, then rewrites C# and project files: `dotnet format style`, `dotnet format analyzers`, then CSharpier |
-| `format.sh --check` | Reports what `format.sh` would change, and rewrites nothing |
-| `pre-commit-validation.sh` | `format.sh --check`, the four linters below, the build, the tests, `tools/check-package.sh`, `tools/check-package-install.sh` and `tools/check-tool-install.sh` |
-
-The scripts in `tools/` each run a linter from a pinned Docker image:
-
-| Script | Checks |
-|----|----|
-| `tools/editorconfig-checker.sh` | Every file against `.editorconfig` |
-| `tools/shellcheck.sh` | Shell scripts, with ShellCheck |
-| `tools/shfmt.sh --check` | Shell script formatting; without `--check` it rewrites the files |
-| `tools/actionlint.sh` | GitHub Actions workflows |
-
 ## Continuous integration
 
-| Workflow | Runs on | Does |
-|----|----|----|
-| `ci.yml` | Pull requests to `main`, pushes to `main` | Calls `build.yml` and ends with the `ci` job |
-| `build.yml` | Called by `ci.yml` and `publish.yml` | Every check in `pre-commit-validation.sh`, a `Release` build, the tests with coverage, the tests of `tests/SqlSource.Tests.Postgres` again on PostgreSQL 14, `dotnet pack`, and the three package checks |
-| `publish.yml` | `v*` tags, manual runs on `main` | Calls `build.yml`, pushes the two packages to nuget.org, and creates a GitHub release for a tag |
-| `coverage-comment.yml` | A successful `ci.yml` run for a pull request | Posts the coverage report as a comment on the pull request, or updates the comment it posted before |
-| `nightly.yml` | Every night, manual runs, pull requests that change the file | Restores, builds in `Release` and runs the tests of every project but `tests/SqlSource.Tests.Postgres` on `windows-latest` and `macos-latest` |
-
-Each run uploads two artifacts: `packages`, the two `.nupkg` files, and `coverage`, the HTML, Cobertura and markdown reports.  The test results and the coverage summary are also in the run's job summary.
-
-`coverage-comment.yml` always runs as it is on `main`, never as a pull request changes it.  A change to it takes effect, and can first be tried, after it is merged.
-
-The `ci` job succeeds only when every other job in `ci.yml` succeeded or was skipped.  It is the one status check to require in the `main` ruleset.
-
-`ci.yml` runs on Linux alone.  `nightly.yml` is what runs the tests on Windows and macOS, where paths, quoting, exit codes and the kill of a process differ.  It runs no check that needs Docker, not `tests/SqlSource.Tests.Postgres`, whose container its runners cannot start, and packs nothing, and it is no required check: a failure is mended in a pull request of its own.  To try a branch on both systems before it is merged, start the workflow by hand:
+CI runs the same checks as `pre-commit-validation.sh` on Linux, and the PostgreSQL tests again on PostgreSQL 14.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests on Windows and macOS every night, and by hand on a branch:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>
 ```
 
-GitHub sends the result of a scheduled run to whoever last changed the schedule, and turns the schedule of a public repository off after 60 days without activity in the repository; it is turned on again on the workflow's page under Actions.
+[`.github/workflows/README.md`](.github/workflows/README.md) has each workflow, its artifacts and [the nightly run](.github/workflows/README.md#nightly).

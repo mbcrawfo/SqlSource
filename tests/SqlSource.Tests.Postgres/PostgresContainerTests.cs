@@ -32,7 +32,7 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
     }
 
     // Every image the tests run, the default or the one the variable names, is pinned to a major and a minor.  A
-    // bare major moves to each new minor unseen; see CONTRIBUTING.md.
+    // bare major moves to each new minor unseen; see tests/SqlSource.Tests.Postgres/README.md.
     [Fact]
     public void Image_OfTheRun_IsPinnedToAMajorAndAMinor() =>
         PostgresContainer.TagOf(PostgresContainer.Image).ShouldMatch(@"^\d+\.\d+$");
