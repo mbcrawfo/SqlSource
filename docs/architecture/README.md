@@ -22,14 +22,16 @@ flowchart LR
     generator --> code["Constants and token methods"]
     project -->|"dotnet msbuild runs SqlSourceWriteManifest"| manifest["Manifest"]
     manifest --> tool["sqlsource describe"]
-    tool <-->|"describes against"| database[("Database")]
+    sql -->|"listed in the manifest"| tool
+    attribute -->|"read as syntax"| tool
+    tool -->|"describes against"| database[("Database")]
     tool --> sidecar[".sql.json sidecar"]
     sidecar -.->|"planned (phase 5)"| generator
 ```
 
 In a build, the compiler gives the generator the project's `.sql` files as additional files, its settings as MSBuild properties and item metadata, and the types that carry `[SqlSourceGenerate]`, an attribute the generator itself adds to the compilation.  The generator parses each file that a type claims and writes the type's file: a constant for each query, or a method for a query that has tokens.
 
-Outside a build, `sqlsource describe` finds the run unit and evaluates its projects with `dotnet msbuild`, which runs `SqlSourceWriteManifest`.  From the manifests it plans the run with the generator's own code, asks each query's database through a describer, and writes a sidecar beside each `.sql` file.
+Outside a build, `sqlsource describe` finds the run unit and evaluates its projects with `dotnet msbuild`, which runs `SqlSourceWriteManifest`.  It finds `[SqlSourceGenerate]` in a manifest's `Compile` files by syntax, with `AttributeReader`, and reads the manifest's `.sql` files that a type claims.  From those it plans the run with the generator's own code, asks each query's database through a describer, and writes a sidecar beside each `.sql` file.
 
 No step of the generator reads a sidecar yet.  Phase 5 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md) delivers that, which is why the edge is dashed.
 
