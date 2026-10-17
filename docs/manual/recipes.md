@@ -26,10 +26,11 @@ A project of PostgreSQL files keeps its reports for SQL Server in `Reporting/`. 
 </ItemGroup>
 ```
 
-For one file, a marker in its file header does the same:
+For one file, markers in its file header do the same:
 
 ```sql mssql
 -- dialect: mssql
+-- output: sql
 
 -- name: MonthlyTotals
 SELECT [month], SUM(total) AS total FROM invoices GROUP BY [month];
