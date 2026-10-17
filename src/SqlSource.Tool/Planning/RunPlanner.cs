@@ -317,9 +317,10 @@ internal static class RunPlanner
     }
 
     // The databases of the run, in the order the plan first holds a query of each.  Names are compared ignoring
-    // case, and every query gets the first spelling.  A database has the dialect of its first query in a file that
-    // can be described: a file that cannot gives it none, since SQLSRC209 is that file's error.  A query of the
-    // database in a file of another dialect has a problem, and its file's first such query is SQLSRC211.
+    // case, and every query gets the first spelling.  A database has the dialect of its first query in a ready
+    // file, and a file that is not ready neither decides it nor conflicts with it: SQLSRC209 or a parse error is
+    // that file's error.  A database that no ready file holds keeps the dialect of its first file.  A query of the
+    // database in a ready file of another dialect has a problem, and its file's first such query is SQLSRC211.
     private static EquatableArray<PlannedDatabase> AssignDatabases(
         List<PlannedFile> files,
         ImmutableArray<ToolDiagnostic>.Builder errors
