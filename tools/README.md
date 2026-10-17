@@ -1,0 +1,59 @@
+# Tools
+
+The scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, and two scripts that are no check.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+
+## Linters
+
+Each linter script runs its tool from a pinned Docker image, so they need Docker and nothing else:
+
+| Script | Checks |
+|----|----|
+| `tools/editorconfig-checker.sh` | Every file against `.editorconfig` |
+| `tools/shellcheck.sh` | Shell scripts, with ShellCheck |
+| `tools/shfmt.sh --check` | Shell script formatting; without `--check` it rewrites the files |
+| `tools/actionlint.sh` | GitHub Actions workflows |
+
+## Package checks
+
+The three package checks look at what `dotnet pack SqlSource.slnx --output artifacts/packages` wrote.  Each takes that folder as its argument, and packs into a temporary folder first when it has none.
+
+### `check-package.sh`
+
+```bash
+tools/check-package.sh artifacts/packages
+```
+
+This checks what the two packages hold.  `SqlSource`: the generator under `analyzers/`, `build/SqlSource.props` and `build/SqlSource.targets`, the readme, and nothing under `lib/`.  `SqlSource.Tool`: the tool under `tools/net8.0/any/` with the generator's assembly, Roslyn, the library that reads a solution and Npgsql beside it, `DotnetToolSettings.xml`, the readme, which is `src/SqlSource.Tool/README.md`, and no documentation file of an assembly.  It fails when the two have different versions.  Without an argument it packs both into a temporary folder first.
+
+### `check-package-install.sh`
+
+```bash
+tools/check-package-install.sh artifacts/packages
+```
+
+This installs the package the way a consumer does.  It copies the project in `tools/package-install` to a temporary folder outside the repository, adds the package to it with `dotnet add package` from a feed that holds nothing else, builds and runs it, and compares what it prints with `tools/package-install/expected-output.txt`.
+
+The project's files are these.  `Consumer.csproj` and `Directory.Build.targets` are its MSBuild files, `Queries.cs` has the two types that the generator fills from the `.sql` files of `Queries/`, and `Program.cs` prints one line for each thing it checks.  It uses a constant, a method with tokens, `SqlSourceGeneratorParameters` and `SqlSourceDialect`, each as a property and as metadata of an item, `Parameters` on the attribute, and the two markers `-- generator:` and `-- dialect:`, so it fails when the generator or either MSBuild file does not reach a consumer.
+
+Its `Directory.Build.targets` sets one of the two properties and has a target that adds a `.sql` file, each with its value on a line of its own, so it also fails when the package trims a value only where its targets are imported.  The SDK imports that file after the targets of a package.  Two of the project's lists of generator parameters have one word on each line, with the word that shows as the second, and one item names its dialect on one line and an option of the dialect on the next, so it fails when a value reaches the compiler cut at a line break.
+
+The script then asks the project what the `sqlsource` tool asks one.  `SqlSourceImported` must be `true`, which shows that NuGet imported the package's props.  The target `SqlSourceWriteManifest`, run by name, must write a manifest that starts with its version, lists a `.sql` file, holds a dialect and a property that the project writes over several lines, trimmed, and does not list `Queries/AddedByATarget.sql`, the file that `Directory.Build.targets` adds from a hook of the build.  A target that is run by name does not run that hook, which is [TD-0025](../docs/tech-debt/TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md); the build of the consumer compiled the file, and `expected-output.txt` has its query.
+
+It then deletes a `.sql` file the project uses and builds again, and fails unless that build reports the missing member: an incremental build must notice that a file is gone.  Without an argument the script packs first, as the other does.
+
+### `check-tool-install.sh`
+
+```bash
+tools/check-tool-install.sh artifacts/packages
+```
+
+This installs the tool the way a user does: `dotnet tool install` into a temporary folder outside the repository, from a feed that holds nothing else.  It then runs `sqlsource --version` and compares it with the package's version, runs `sqlsource --help`, and runs `sqlsource describe` in an empty folder, which must exit with 1 and report `SQLSRC201`.  A tool's package carries everything the tool loads, so this is what shows that all of it is there.
+
+The last run sets `DOTNET_ROLL_FORWARD` to `LatestMajor`, which starts the tool on the newest runtime the machine has.  The tool targets .NET 8 and rolls forward on a machine that has only a later one, and this proves it wherever the script runs.  Without an argument the script packs first.
+
+## Recording scripts
+
+Neither of these is a check.  A person runs one after a change to what the describer asks or answers, and reads the diff of what it wrote before committing it.
+
+- `tools/record-fixtures.sh` records the cases of the PostgreSQL describer's fixtures; [the describer's fixtures](../tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) has the procedure.
+- `tools/record-realistic.sh` records the expectations of the realistic corpus, once for each recorded major; [the realistic corpus](../tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus) has the procedure.
