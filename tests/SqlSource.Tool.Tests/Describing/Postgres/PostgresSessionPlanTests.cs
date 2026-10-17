@@ -184,17 +184,17 @@ public sealed class PostgresSessionPlanTests
     )
     {
         // The server gave no plan: the error is logged and never reported.
-        ["no-plan-and-an-error"] = (null, "canceling statement due to statement timeout"),
+        { "no-plan-and-an-error", (null, "canceling statement due to statement timeout") },
         // The text is no plan.
-        ["text-that-is-no-json"] = ("not json", null),
-        ["empty-list"] = ("[]", null),
+        { "text-that-is-no-json", ("not json", null) },
+        { "empty-list", ("[]", null) },
         // An answer that holds neither.
-        ["no-plan-and-no-error"] = (null, null),
+        { "no-plan-and-no-error", (null, null) },
         // A plan that is read and cannot be used.
-        ["plan-the-walk-cannot-use"] = (
-            Text(Join("Sideways", Scan("u"), Scan("o")) with { Output = ["u.id", "n"] }),
-            null
-        ),
+        {
+            "plan-the-walk-cannot-use",
+            (Text(Join("Sideways", Scan("u"), Scan("o")) with { Output = ["u.id", "n"] }), null)
+        },
     };
 
     public static TheoryData<string> PlansThatCannotBeUsed => [.. PlansThatCannotBeUsedRows.Keys];
@@ -282,6 +282,7 @@ public sealed class PostgresSessionPlanTests
             TestContext.Current.CancellationToken
         );
 
+        exchange.Unused.ShouldBeEmpty();
         described.Value.ShouldNotBeNull().Plan.ShouldBeNull();
     }
 }

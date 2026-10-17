@@ -110,29 +110,20 @@ public sealed class NullabilityWalkSetOperationTests
 
     private static readonly Dictionary<string, string> BranchesThatMayBeNullRows = new(StringComparer.Ordinal)
     {
-        ["null-constant"] = Text(
-            Scan("x", "NULL::text") with
-            {
-                NodeType = "Result",
-                Alias = null,
-                RelationName = null,
-            }
-        ),
-        ["nullable-column"] = Text(Scan("o", "o.note")),
-        ["side-a-left-join-extends"] = Text(
-            Join("Left", Scan("u", "u.id"), Scan("o", "o.label")) with
-            {
-                Output = ["o.label"],
-            }
-        ),
-        ["unanswered-relation"] = Text(Scan("w", "w.name")),
-        ["user-subquery-scan"] = Text(
-            Over("Subquery Scan", Scan("u", "u.name"), "Subquery") with
-            {
-                Alias = "s",
-                Output = ["s.name"],
-            }
-        ),
+        {
+            "null-constant",
+            Text(Scan("x", "NULL::text") with { NodeType = "Result", Alias = null, RelationName = null })
+        },
+        { "nullable-column", Text(Scan("o", "o.note")) },
+        {
+            "side-a-left-join-extends",
+            Text(Join("Left", Scan("u", "u.id"), Scan("o", "o.label")) with { Output = ["o.label"] })
+        },
+        { "unanswered-relation", Text(Scan("w", "w.name")) },
+        {
+            "user-subquery-scan",
+            Text(Over("Subquery Scan", Scan("u", "u.name"), "Subquery") with { Alias = "s", Output = ["s.name"] })
+        },
     };
 
     public static TheoryData<string> BranchesThatMayBeNull => [.. BranchesThatMayBeNullRows.Keys];
@@ -187,40 +178,46 @@ public sealed class NullabilityWalkSetOperationTests
     // NULLIF's, and by position it would be p2.sku.
     private static readonly Dictionary<string, string> AppendrelsRows = new(StringComparer.Ordinal)
     {
-        ["nullif-against-a-constant"] = Text(
-            AppendOf(
-                Scan("u", "u.name", "u.name"),
-                Select(
-                    2,
-                    Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, 'x'::text)")) with
-                    {
-                        Output = ["u_1.name", "(NULLIF(u_1.name, 'x'::text))"],
-                    },
-                    "\"*SELECT* 2\".\"nullif\"",
-                    "\"*SELECT* 2\".name"
-                )
-            )
-        ),
-        ["nullif-of-the-column-under-a-sort"] = Text(
-            Over(
-                "Sort",
+        {
+            "nullif-against-a-constant",
+            Text(
                 AppendOf(
                     Scan("u", "u.name", "u.name"),
                     Select(
                         2,
-                        Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, u_1.name)")) with
+                        Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, 'x'::text)")) with
                         {
-                            Output = ["u_1.name", "(NULLIF(u_1.name, u_1.name))"],
+                            Output = ["u_1.name", "(NULLIF(u_1.name, 'x'::text))"],
                         },
                         "\"*SELECT* 2\".\"nullif\"",
                         "\"*SELECT* 2\".name"
                     )
                 )
-            ) with
-            {
-                Output = ["u.name", "u.name"],
-            }
-        ),
+            )
+        },
+        {
+            "nullif-of-the-column-under-a-sort",
+            Text(
+                Over(
+                    "Sort",
+                    AppendOf(
+                        Scan("u", "u.name", "u.name"),
+                        Select(
+                            2,
+                            Over("Limit", Scan("u_1", "u_1.name", "NULLIF(u_1.name, u_1.name)")) with
+                            {
+                                Output = ["u_1.name", "(NULLIF(u_1.name, u_1.name))"],
+                            },
+                            "\"*SELECT* 2\".\"nullif\"",
+                            "\"*SELECT* 2\".name"
+                        )
+                    )
+                ) with
+                {
+                    Output = ["u.name", "u.name"],
+                }
+            )
+        },
     };
 
     public static TheoryData<string> Appendrels => [.. AppendrelsRows.Keys];
@@ -371,21 +368,21 @@ public sealed class NullabilityWalkSetOperationTests
         StringComparer.Ordinal
     )
     {
-        ["pg14-intersect-right-first"] = (
-            Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)),
-            true
-        ),
-        ["pg14-intersect-all"] = (Text(Flagged14("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true),
-        ["pg14-intersect-of-two-nullable-inputs"] = (
-            Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))),
-            false
-        ),
-        ["pg18-intersect"] = (Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.name"))), true),
-        ["pg18-intersect-all"] = (Text(Inputs18("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true),
-        ["pg18-intersect-of-two-nullable-inputs"] = (
-            Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))),
-            false
-        ),
+        {
+            "pg14-intersect-right-first",
+            (Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)), true)
+        },
+        { "pg14-intersect-all", (Text(Flagged14("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true) },
+        {
+            "pg14-intersect-of-two-nullable-inputs",
+            (Text(Flagged14("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))), false)
+        },
+        { "pg18-intersect", (Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.name"))), true) },
+        { "pg18-intersect-all", (Text(Inputs18("Intersect All", Scan("u", "u.name"), Scan("o", "o.note"))), true) },
+        {
+            "pg18-intersect-of-two-nullable-inputs",
+            (Text(Inputs18("Intersect", Scan("o", "o.note"), Scan("u", "u.email"))), false)
+        },
     };
 
     public static TheoryData<string> Intersects => [.. IntersectsRows.Keys];
@@ -403,24 +400,24 @@ public sealed class NullabilityWalkSetOperationTests
     // EXCEPT returns rows of its left input alone: on 14 the member flagged 0, on 18 the Outer child.
     private static readonly Dictionary<string, (string Plan, bool Answered)> ExceptsRows = new(StringComparer.Ordinal)
     {
-        ["pg14-except"] = (Text(Flagged14("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true),
-        ["pg14-except-all-right-first"] = (
-            Text(Flagged14("Except All", Scan("u", "u.name"), Scan("o", "o.note"), rightFirst: true)),
-            true
-        ),
-        ["pg14-except-of-a-nullable-left"] = (
-            Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"))),
-            false
-        ),
-        ["pg14-except-of-a-nullable-left-right-first"] = (
-            Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)),
-            false
-        ),
-        ["pg18-except"] = (Text(Inputs18("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true),
-        ["pg18-except-all-of-a-nullable-left"] = (
-            Text(Inputs18("Except All", Scan("o", "o.note"), Scan("u", "u.name"))),
-            false
-        ),
+        { "pg14-except", (Text(Flagged14("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true) },
+        {
+            "pg14-except-all-right-first",
+            (Text(Flagged14("Except All", Scan("u", "u.name"), Scan("o", "o.note"), rightFirst: true)), true)
+        },
+        {
+            "pg14-except-of-a-nullable-left",
+            (Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"))), false)
+        },
+        {
+            "pg14-except-of-a-nullable-left-right-first",
+            (Text(Flagged14("Except", Scan("o", "o.note"), Scan("u", "u.name"), rightFirst: true)), false)
+        },
+        { "pg18-except", (Text(Inputs18("Except", Scan("u", "u.name"), Scan("o", "o.note"))), true) },
+        {
+            "pg18-except-all-of-a-nullable-left",
+            (Text(Inputs18("Except All", Scan("o", "o.note"), Scan("u", "u.name"))), false)
+        },
     };
 
     public static TheoryData<string> Excepts => [.. ExceptsRows.Keys];
@@ -438,63 +435,76 @@ public sealed class NullabilityWalkSetOperationTests
     private static readonly Dictionary<string, string> SetOpsOfAnotherShapeRows = new(StringComparer.Ordinal)
     {
         // Two members flagged 0, three members, and none flagged.
-        ["two-members-flagged-0"] = Text(
-            SetOp(
-                "Except",
-                AppendOf(
-                    Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
-                    Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "0")
-                )
-            ) with
-            {
-                Output = ["\"*SELECT* 1\".c", "(0)"],
-            }
-        ),
-        ["three-members"] = Text(
-            SetOp(
-                "Intersect",
-                AppendOf(
-                    Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
-                    Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "1"),
-                    Select(3, Scan("u_2", "u_2.name"), "\"*SELECT* 3\".c", "1")
-                )
-            ) with
-            {
-                Output = ["\"*SELECT* 1\".c", "(0)"],
-            }
-        ),
-        ["no-member-flagged"] = Text(
-            SetOp("Except", AppendOf(Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c"), Scan("u_1", "u_1.name"))) with
-            {
-                Output = ["\"*SELECT* 1\".c"],
-            }
-        ),
+        {
+            "two-members-flagged-0",
+            Text(
+                SetOp(
+                    "Except",
+                    AppendOf(
+                        Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
+                        Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "0")
+                    )
+                ) with
+                {
+                    Output = ["\"*SELECT* 1\".c", "(0)"],
+                }
+            )
+        },
+        {
+            "three-members",
+            Text(
+                SetOp(
+                    "Intersect",
+                    AppendOf(
+                        Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c", "0"),
+                        Select(2, Scan("u_1", "u_1.name"), "\"*SELECT* 2\".c", "1"),
+                        Select(3, Scan("u_2", "u_2.name"), "\"*SELECT* 3\".c", "1")
+                    )
+                ) with
+                {
+                    Output = ["\"*SELECT* 1\".c", "(0)"],
+                }
+            )
+        },
+        {
+            "no-member-flagged",
+            Text(
+                SetOp(
+                    "Except",
+                    AppendOf(Select(1, Scan("u", "u.name"), "\"*SELECT* 1\".c"), Scan("u_1", "u_1.name"))
+                ) with
+                {
+                    Output = ["\"*SELECT* 1\".c"],
+                }
+            )
+        },
         // A command the walk does not know, and none.
-        ["unknown-command"] = Text(Inputs18("Merge", Scan("u", "u.name"), Scan("u_1", "u_1.name"))),
-        ["no-command"] = Text(
-            Inputs18("Intersect", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with
-            {
-                Command = null,
-            }
-        ),
+        { "unknown-command", Text(Inputs18("Merge", Scan("u", "u.name"), Scan("u_1", "u_1.name"))) },
+        {
+            "no-command",
+            Text(Inputs18("Intersect", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with { Command = null })
+        },
         // A recursive CTE's union.
-        ["recursive-union"] = Text(
-            Over(
-                "Sort",
-                AppendOf(
-                    Join("Inner", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with
-                    {
-                        NodeType = "Recursive Union",
-                        JoinType = null,
-                        Output = ["u.name"],
-                    },
-                    Scan("u_2", "u_2.name")
-                )
-            ) with
-            {
-                Output = ["u.name"],
-            }
-        ),
+        {
+            "recursive-union",
+            Text(
+                Over(
+                    "Sort",
+                    AppendOf(
+                        Join("Inner", Scan("u", "u.name"), Scan("u_1", "u_1.name")) with
+                        {
+                            NodeType = "Recursive Union",
+                            JoinType = null,
+                            Output = ["u.name"],
+                        },
+                        Scan("u_2", "u_2.name")
+                    )
+                ) with
+                {
+                    Output = ["u.name"],
+                }
+            )
+        },
     };
 
     public static TheoryData<string> SetOpsOfAnotherShape => [.. SetOpsOfAnotherShapeRows.Keys];

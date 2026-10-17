@@ -61,7 +61,13 @@ Work in that folder for the rest of this task.
 
 - [ ] **Step 2: Seal the classes**
 
-In each file that `grep -rlE '^(public|internal) (partial )?class ' tests/SqlSource.Tests tests/SqlSource.Tests.RoslynFloor --include='*.cs'` lists, replace `^public class ` with `public sealed class ` and `^public partial class ` with `public sealed partial class ` (and `internal` likewise).  Then `grep -rnE '^(public|internal) (partial )?class ' tests/SqlSource.Tests tests/SqlSource.Tests.RoslynFloor --include='*.cs'` prints nothing, and `git diff --stat` shows 69 files with one line each.
+In each file that `grep -rlE '^(public|internal) (partial )?class ' tests/SqlSource.Tests tests/SqlSource.Tests.RoslynFloor --include='*.cs'` lists, put `sealed` after the access modifier of a declaration that starts the line, before `partial` where there is one:
+
+```bash
+sed -i '' -E 's/^(public|internal) (partial )?class /\1 sealed \2class /' <file>
+```
+
+Then `grep -rnE '^(public|internal) (partial )?class ' tests/SqlSource.Tests tests/SqlSource.Tests.RoslynFloor --include='*.cs'` prints nothing, and `git diff --stat` shows 69 files with one line each.
 
 - [ ] **Step 3: Rewrite item 6 of TD-0054**
 
@@ -222,7 +228,7 @@ For each old class name (`CheckVerdictTests`, and `PostgresSessionTests`, `Postg
 
 - [ ] **Step 6: Run on both images, validate and commit**
 
-Run `SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres/SqlSource.Tests.Postgres.csproj`: no failure.  Then `./format.sh`, `./pre-commit-validation.sh`, and commit "Name each test for what it calls and seal the tool's test classes (TD-0054)".
+Run `SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres/SqlSource.Tests.Postgres.csproj`: every test passes or skips.  Then `./format.sh`, `./pre-commit-validation.sh`, and commit "Name each test for what it calls and seal the tool's test classes (TD-0054)".
 
 ### Task 7: Close TD-0054, compare, review, open the pull request
 

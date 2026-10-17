@@ -39,24 +39,28 @@ public sealed class PlanPartitionsTests
 
     private static readonly Dictionary<string, string> NoShapeRows = new(StringComparer.Ordinal)
     {
-        ["member-of-another-prefix"] = Text(Append(Member("e_1", "e_2024"), Member("f_2", "e_2025"))),
-        ["member-without-a-number"] = Text(Append(Member("e_1", "e_2024"), Member("e", "e_2025"))),
-        ["member-with-a-word-for-a-number"] = Text(Append(Member("e_1", "e_2024"), Member("e_x", "e_2025"))),
-        ["subquery-scan-member"] = Text(
-            Append(
-                Member("e_1", "e_2024"),
-                Over("Subquery Scan", Scan("s"), "Subquery") with
-                {
-                    ParentRelationship = "Member",
-                    Alias = "e_2",
-                }
+        { "member-of-another-prefix", Text(Append(Member("e_1", "e_2024"), Member("f_2", "e_2025"))) },
+        { "member-without-a-number", Text(Append(Member("e_1", "e_2024"), Member("e", "e_2025"))) },
+        { "member-with-a-word-for-a-number", Text(Append(Member("e_1", "e_2024"), Member("e_x", "e_2025"))) },
+        {
+            "subquery-scan-member",
+            Text(
+                Append(
+                    Member("e_1", "e_2024"),
+                    Over("Subquery Scan", Scan("s"), "Subquery") with
+                    {
+                        ParentRelationship = "Member",
+                        Alias = "e_2",
+                    }
+                )
             )
-        ),
-        ["outer-child"] = Text(
-            Append(Member("e_1", "e_2024"), Member("e_2", "e_2025") with { ParentRelationship = "Outer" })
-        ),
-        ["no-members"] = Text(Append()),
-        ["sort-over-a-member"] = Text(Over("Sort", Member("e_1", "e_2024"))),
+        },
+        {
+            "outer-child",
+            Text(Append(Member("e_1", "e_2024"), Member("e_2", "e_2025") with { ParentRelationship = "Outer" }))
+        },
+        { "no-members", Text(Append()) },
+        { "sort-over-a-member", Text(Over("Sort", Member("e_1", "e_2024"))) },
     };
 
     public static TheoryData<string> NoShape => [.. NoShapeRows.Keys];
@@ -104,11 +108,12 @@ public sealed class PlanPartitionsTests
 
     private static readonly Dictionary<string, string> NotOneTableRows = new(StringComparer.Ordinal)
     {
-        ["members-print-other-columns"] = Text(
-            Append(Member("e_1", "e_2024", "e_1.id"), Member("e_2", "e_2025", "e_2.kind"))
-        ),
-        ["member-prints-no-column"] = Text(Append(Member("e_1", "e_2024", "e_1.id"), Member("e_2", "e_2025"))),
-        ["member-not-answered"] = Text(Append(Member("e_1", "e_2024"), Member("e_2", "missing"))),
+        {
+            "members-print-other-columns",
+            Text(Append(Member("e_1", "e_2024", "e_1.id"), Member("e_2", "e_2025", "e_2.kind")))
+        },
+        { "member-prints-no-column", Text(Append(Member("e_1", "e_2024", "e_1.id"), Member("e_2", "e_2025"))) },
+        { "member-not-answered", Text(Append(Member("e_1", "e_2024"), Member("e_2", "missing"))) },
     };
 
     public static TheoryData<string> NotOneTable => [.. NotOneTableRows.Keys];

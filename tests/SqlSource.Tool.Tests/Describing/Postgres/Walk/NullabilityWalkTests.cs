@@ -220,42 +220,46 @@ public sealed class NullabilityWalkTests
 
     private static readonly Dictionary<string, string> SetOperationsRows = new(StringComparer.Ordinal)
     {
-        ["aggregate-over-an-append"] = Text(
-            Over(
-                "Aggregate",
-                Over("Append", Scan("a"), "Member") with
+        {
+            "aggregate-over-an-append",
+            Text(
+                Over(
+                    "Aggregate",
+                    Over("Append", Scan("a"), "Member") with
+                    {
+                        Plans =
+                        [
+                            Scan("a") with
+                            {
+                                ParentRelationship = "Member",
+                            },
+                            Scan("b") with
+                            {
+                                ParentRelationship = "Member",
+                            },
+                        ],
+                    }
+                ) with
                 {
-                    Plans =
-                    [
-                        Scan("a") with
-                        {
-                            ParentRelationship = "Member",
-                        },
-                        Scan("b") with
-                        {
-                            ParentRelationship = "Member",
-                        },
-                    ],
+                    Output = ["('a'::text)"],
                 }
-            ) with
-            {
-                Output = ["('a'::text)"],
-            }
-        ),
-        ["sort-over-an-append"] = Text(
-            Over("Sort", Over("Append", Scan("a"), "Member")) with
-            {
-                Output = ["('a'::text)"],
-            }
-        ),
-        ["set-op-over-two-scans"] = Text(
-            Join("Inner", Scan("a"), Scan("b")) with
-            {
-                NodeType = "SetOp",
-                JoinType = null,
-                Output = ["('a'::text)"],
-            }
-        ),
+            )
+        },
+        {
+            "sort-over-an-append",
+            Text(Over("Sort", Over("Append", Scan("a"), "Member")) with { Output = ["('a'::text)"] })
+        },
+        {
+            "set-op-over-two-scans",
+            Text(
+                Join("Inner", Scan("a"), Scan("b")) with
+                {
+                    NodeType = "SetOp",
+                    JoinType = null,
+                    Output = ["('a'::text)"],
+                }
+            )
+        },
     };
 
     public static TheoryData<string> SetOperations => [.. SetOperationsRows.Keys];
@@ -545,20 +549,23 @@ public sealed class NullabilityWalkTests
 
     private static readonly Dictionary<string, (string Reason, string Plan)> UnusableRows = new(StringComparer.Ordinal)
     {
-        ["no-output-of-an-append"] = ("no-output", Text(Over("Append", Scan("a"), "Member"))),
-        ["fewer-outputs-than-columns"] = ("no-output", Text(LeftJoin("a.id"))),
-        ["unknown-join-type"] = (
+        { "no-output-of-an-append", ("no-output", Text(Over("Append", Scan("a"), "Member"))) },
+        { "fewer-outputs-than-columns", ("no-output", Text(LeftJoin("a.id"))) },
+        {
             "unknown-join-type",
-            Text(Join("Sideways", Scan("a"), Scan("b")) with { Output = ["a.id", "a.opt"] })
-        ),
-        ["doubled-alias"] = (
+            ("unknown-join-type", Text(Join("Sideways", Scan("a"), Scan("b")) with { Output = ["a.id", "a.opt"] }))
+        },
+        {
             "doubled-alias",
-            Text(Join("Inner", Scan("a"), Scan("a")) with { Output = ["a.id", "a.opt"] })
-        ),
-        ["grouping-sets"] = (
+            ("doubled-alias", Text(Join("Inner", Scan("a"), Scan("a")) with { Output = ["a.id", "a.opt"] }))
+        },
+        {
             "grouping-sets",
-            Text(Over("Aggregate", Scan("a")) with { HasGroupingSets = true, Output = ["a.id", "a.opt"] })
-        ),
+            (
+                "grouping-sets",
+                Text(Over("Aggregate", Scan("a")) with { HasGroupingSets = true, Output = ["a.id", "a.opt"] })
+            )
+        },
     };
 
     public static TheoryData<string> Unusable => [.. UnusableRows.Keys];
@@ -701,15 +708,15 @@ public sealed class NullabilityWalkTests
     private static readonly Dictionary<string, string> UnresolvableChildrenRows = new(StringComparer.Ordinal)
     {
         // A LATERAL subquery's Output may name the query above, which is no instance of its plan.
-        ["lateral-names-the-query-above"] = Text(Scan("t", "t.id", "u.id")),
+        { "lateral-names-the-query-above", Text(Scan("t", "t.id", "u.id")) },
         // A bare name says nothing of which instance.
-        ["bare-name"] = Text(Join("Inner", Scan("t"), Scan("b")) with { Output = ["t.id", "id"] }),
+        { "bare-name", Text(Join("Inner", Scan("t"), Scan("b")) with { Output = ["t.id", "id"] }) },
         // A set operation prints its first branch.
-        ["set-operation"] = Text(Over("Sort", Over("Append", Scan("t"), "Member")) with { Output = ["t.id"] }),
+        { "set-operation", Text(Over("Sort", Over("Append", Scan("t"), "Member")) with { Output = ["t.id"] }) },
         // No entry is of the origin's table.
-        ["no-entry-of-the-origins-table"] = Text(Scan("b", "b.id")),
+        { "no-entry-of-the-origins-table", Text(Scan("b", "b.id")) },
         // No Output at all.
-        ["no-output"] = Text(Scan("t")),
+        { "no-output", Text(Scan("t")) },
     };
 
     public static TheoryData<string> UnresolvableChildren => [.. UnresolvableChildrenRows.Keys];
