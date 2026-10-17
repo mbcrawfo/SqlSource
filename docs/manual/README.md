@@ -25,6 +25,8 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Set up CI | [Check in CI](tool.md#check-in-ci), or the [recipe](recipes.md#check-sidecars-in-ci) |
 | Look up a command, an option or an exit code | [The command reference](tool.md#command-reference) |
 | Know what the tool needs of my PostgreSQL database | [PostgreSQL](postgresql.md#connecting) |
+| Know why a column is recorded as possibly null | [Which columns can be null](postgresql.md#nullability) |
+| Know which queries the tool cannot describe | [What can be described](postgresql.md#what-can-be-described) |
 | Look up a build error or a tool error | [Diagnostics](diagnostics.md) |
 | Find a problem that is not an error | The known issues of [`.sql` files](sql-files.md#known-issues), [settings](settings.md#known-issues), [parameters and tokens](parameters-and-tokens.md#known-issues), [dialects](dialects.md#known-issues), [the generator](generator.md#known-issues), [the tool](tool.md#known-issues) and [PostgreSQL](postgresql.md#known-issues) |
 
@@ -32,7 +34,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 
 ## What works today
 
-SqlSource is delivered in phases.  This table is the one list of what works in the current release and what is still to come.  Where a page for a coming feature exists, it marks the feature with a callout that links back here.
+SqlSource is in early development.  This table is the one list of what works in the current release and what is still to come.  Where a page for a coming feature exists, it marks the feature with a callout that links back here.
 
 | Feature | Status | Where documented |
 |----|----|----|
@@ -48,12 +50,12 @@ SqlSource is delivered in phases.  This table is the one list of what works in t
 | Describing SQL Server queries | Coming ([SQLSRC216](diagnostics.md#sqlsrc216) until then) | [SQL Server](sqlserver.md) |
 | Models for the parameters and rows of a query | Coming | [Models](generator.md#models) |
 | Generated query methods | Coming | [Query methods](generator.md#query-methods) |
-| Library maps for the types of libraries such as NodaTime | Coming | [NodaTime and other libraries](../../README.md#nodatime-and-other-libraries) |
-| Custom type mapping | Coming | [Custom type mapping](../../README.md#custom-type-mapping); for a type that cannot be bound, see [SQLSRC232](diagnostics.md#sqlsrc232) |
+| Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |
+| Custom type mapping | Coming | Not documented until it is delivered; for a PostgreSQL type that cannot be sent today, see [SQLSRC232](diagnostics.md#sqlsrc232) |
 | Build integration: the tool running in your build | Coming | Not documented until it is delivered; today you run the tool yourself: [install the tool](tool.md#install-the-tool) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |
 
-"Accepted; no effect yet" means SqlSource reads the setting and reports a value it does not take, and changes no generated code.
+"Accepted; no effect yet" means SqlSource checks the setting and reports an error for a value that is not valid, but the setting changes no generated code yet.
 
 ## The pages
 

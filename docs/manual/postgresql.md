@@ -13,7 +13,7 @@ $ dotnet sqlsource describe --connection postgres="Host=localhost;Database=app;U
 postgres (postgres): 12 described, 0 skipped, 0 failed
 ```
 
-The connection is given for the query's [logical database](tool.md#connections), which is `postgres` when you name none.
+The connection is given for the query's [logical database](tool.md#connections), which is `postgres` when you name none.  The summary names that database first, and its dialect in parentheses.
 
 <a id="connecting"></a>
 
@@ -77,7 +77,7 @@ FROM orders o
 LEFT JOIN customers c ON c.id = o.customer_id;
 ```
 
-For each column the tool records whether it can be null.  If `orders.id`, `orders.placed_at` and `customers.name` are all `NOT NULL`, `id` and `placed_at` above are never null, and `name` can be: the `LEFT JOIN` gives a null name to an order with no customer.
+For each column the tool records whether it can be null.  The usual reasons a column is recorded as possibly null are an outer join, a view, or an expression such as `sum()` or a function call; the lists below give every rule.  If `orders.id`, `orders.placed_at` and `customers.name` are all `NOT NULL`, `id` and `placed_at` above are never null, and `name` can be: the `LEFT JOIN` gives a null name to an order with no customer.
 
 SqlSource treats a column as possibly null unless it can show that it never is.  A column it treats as possibly null that never is costs a null check in your code.  When the tool connects directly to the server, it never gives you a wrong value; see [known issues](#known-issues) for a pooler.
 
@@ -102,7 +102,7 @@ SqlSource treats a column as possibly null when:
 - **It is `NULL`**, or an expression that is not in the list above, such as `price * quantity`, `sum(total)`, `count(note)`, `EXISTS (...)` or a function call.
 - **It is a column of a `UNION`, an `INTERSECT` or an `EXCEPT`** where a branch can give null, or where SqlSource cannot follow a branch.
 - **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  Every column of such a query is possibly null.
-- **The query has an outer join, `MERGE`, `OLD` or `NEW`, and the column comes through a subquery or a `WITH` query, or from an extension's own scan such as Citus's or TimescaleDB's.**  Such a column can be treated as possibly null even when its table column is `NOT NULL`.
+- **The query has an outer join, `MERGE`, `OLD` or `NEW`, and the column comes through a subquery or a `WITH` query, or from a table that an extension such as Citus or TimescaleDB manages.**  Such a column can be treated as possibly null even when its table column is `NOT NULL`.
 
 > **Coming in a later release.**  Generated models will make a property nullable for each column that can be null, and non-nullable for each that never is.  See [what works today](README.md#what-works-today).
 

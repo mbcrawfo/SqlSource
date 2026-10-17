@@ -1,6 +1,6 @@
 # Settings
 
-A setting is a choice you make for a whole project, for some of its files or for one query: which dialect the SQL is written in, which comments to keep, which database the tool asks about a query.  Every setting is documented here and nowhere else, with the places it can be written and the one place that wins when it is written in several.
+A setting is a choice you make for a whole project, for some of its files or for one query: which dialect the SQL is written in, which comments to keep, which database the tool asks about a query.  Every setting is defined here, with the places it can be written and the one place that wins when it is written in several.
 
 ```sql
 -- dialect: postgres
@@ -25,32 +25,41 @@ SELECT id, name FROM users;
 internal static partial class Reports;
 ```
 
-The first block writes settings as markers in a `.sql` file, the second as an MSBuild property and as item metadata, the third as properties of the attribute.  Which of the three a setting accepts is in the table.  To read one folder of a project differently from the rest, see [configure one folder differently](#configure-a-folder).
+The first block writes settings as markers in a `.sql` file, the second as an MSBuild property and as item metadata, the third as properties of the attribute.  Which of the three a setting accepts is in [the tables](#all-settings).  To read one folder of a project differently from the rest, see [configure one folder differently](#configure-a-folder).
 
 <a id="all-settings"></a>
 
 ## All settings
 
-Each name links to its section.  An empty cell says the setting cannot be written there.  **File header** is the part of a `.sql` file before its first `-- name:` line, and **In a query** is under a `-- name:` line: see [the marker index](sql-files.md#marker-index).
+Each name links to its section, which gives its values and its rules.  **Written as** lists every place the setting can be written: an MSBuild property of the project, item metadata of some files, a property of the attribute, a marker in the **file header** (the part of a `.sql` file before its first `-- name:` line), and a marker **inside a query** (under a `-- name:` line), as [the marker index](sql-files.md#marker-index) shows.  A place it does not list cannot hold it.
 
-| Setting | Values | MSBuild property | Item metadata | Attribute | File header | In a query | Status |
-|----|----|----|----|----|----|----|----|
-| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `SqlSourceOutput` | `SqlSourceOutput` | `Output` | `-- output:` | `-- output:` | Works today for the tool; [no effect yet](README.md#what-works-today) on generated code |
-| [Database](#setting-database) | A name of letters, digits, `-`, `_` and `.`.  Default: the name of the file's dialect | `SqlSourceDatabase` | `SqlSourceDatabase` | | `-- database:` | `-- database:` | Works today, for the tool alone |
-| [Dialect](#setting-dialect) | `ansi`, `mssql`, `postgres`, `cockroachdb`, `mysql`, `mariadb`, `sqlite`, `oracle`, and options for `mysql` and `mariadb`.  Default `ansi` | `SqlSourceDialect` | `SqlSourceDialect` | | `-- dialect:` | | Works today |
-| [Generator parameters](#setting-generator-parameters) | Words separated by spaces: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `default`.  Default: none | `SqlSourceGeneratorParameters` | `SqlSourceGeneratorParameters` | `Parameters` | `-- generator:` | `-- generator:` | Works today for `keep-comments` and `no-token-validation`; [accepted; no effect yet](README.md#what-works-today) for the other four |
-| [Input and output model suffix](#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix` | The same names | `InputModelSuffix`, `OutputModelSuffix` | `-- input-model-suffix:`, `-- output-model-suffix:` | | [Accepted; no effect yet](README.md#what-works-today) |
-| [Model namespace](#setting-model-namespace) | A namespace.  Default: the namespace of the type | `SqlSourceModelNamespace` | `SqlSourceModelNamespace` | `ModelNamespace` | `-- model-namespace:` | | [Accepted; no effect yet](README.md#what-works-today) |
-| [Input and output model type](#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `SqlSourceInputModelType`, `SqlSourceOutputModelType` | The same names | `InputModelType`, `OutputModelType` | `-- input-model-type:`, `-- output-model-type:` | The same markers | [Accepted; no effect yet](README.md#what-works-today) |
-| [One query's model name](#setting-model-name) | A type's name, or its full name | | | | | `-- input-model:`, `-- output-model:` | [Accepted; no effect yet](README.md#what-works-today) |
-| [Collection type](#setting-collection-type) | `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList`, `IImmutableList`.  Default `Array` | `SqlSourceCollectionType` | `SqlSourceCollectionType` | `CollectionType` | `-- collection-type:` | `-- collection-type:` | [Accepted; no effect yet](README.md#what-works-today) |
-| [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | | | `SqlLocation` | | | Works today |
-| [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | | | `MethodLocation` | | | [Accepted; no effect yet](README.md#what-works-today) |
-| [`Path`](#setting-path) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | | | `Path` | | | Works today |
+### Settings that work today
+
+| Setting | Values | Written as | Status |
+|----|----|----|----|
+| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `SqlSourceOutput` property and metadata; `Output` on the attribute; `-- output:` in the file header and inside a query | Works today for the tool; [no effect yet](README.md#what-works-today) on generated code |
+| [Database](#setting-database) | A name of letters, digits, `-`, `_` and `.`.  Default: the name of the file's dialect | `SqlSourceDatabase` property and metadata; `-- database:` in the file header and inside a query | Works today, for the tool alone |
+| [Dialect](#setting-dialect) | A dialect's name, with options for `mysql` and `mariadb`: see [the dialects page](dialects.md#choosing-a-dialect).  Default `ansi` | `SqlSourceDialect` property and metadata; `-- dialect:` in the file header | Works today |
+| [Generator parameters](#setting-generator-parameters) | Words separated by spaces: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `default`.  Default: none | `SqlSourceGeneratorParameters` property and metadata; `Parameters` on the attribute; `-- generator:` in the file header and inside a query | Works today for `keep-comments` and `no-token-validation`; [accepted; no effect yet](README.md#what-works-today) for the other four |
+| [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
+| [`Path`](#setting-path) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | `Path` on the attribute | Works today |
+
+### Settings for models and methods
+
+These are read and checked today, and change no generated code until models and query methods arrive.
+
+| Setting | Values | Written as | Status |
+|----|----|----|----|
+| [Input and output model suffix](#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix` property and metadata; `InputModelSuffix`, `OutputModelSuffix` on the attribute; `-- input-model-suffix:`, `-- output-model-suffix:` in the file header | [Accepted; no effect yet](README.md#what-works-today) |
+| [Model namespace](#setting-model-namespace) | A namespace.  Default: the namespace of the type | `SqlSourceModelNamespace` property and metadata; `ModelNamespace` on the attribute; `-- model-namespace:` in the file header | [Accepted; no effect yet](README.md#what-works-today) |
+| [Input and output model type](#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `SqlSourceInputModelType`, `SqlSourceOutputModelType` property and metadata; `InputModelType`, `OutputModelType` on the attribute; `-- input-model-type:`, `-- output-model-type:` in the file header and inside a query | [Accepted; no effect yet](README.md#what-works-today) |
+| [One query's model name](#setting-model-name) | A type's name, or its full name | `-- input-model:`, `-- output-model:` inside a query | [Accepted; no effect yet](README.md#what-works-today) |
+| [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`: see [its section](#setting-collection-type).  Default `Array` | `SqlSourceCollectionType` property and metadata; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | [Accepted; no effect yet](README.md#what-works-today) |
+| [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | [Accepted; no effect yet](README.md#what-works-today) |
 
 A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`.  On the attribute you write the member of the enum that the package adds to your project, as in `Output = GeneratorOutput.Sql`.
 
-"Accepted; no effect yet" means SqlSource reads the setting and reports a value it does not take, and changes no generated code.  Models and query methods come in a later release.
+"Accepted; no effect yet" means SqlSource checks the setting and reports an error for a value that is not valid, but the setting changes no generated code yet.  Models and query methods come in a later release.
 
 <a id="precedence"></a>
 
@@ -73,7 +82,7 @@ The rules:
 
 - **Each setting is decided on its own.**  A query that writes `-- output: sql` still takes its file header's `-- database:`.
 - **A place that gives no value is skipped.**  A property, metadata or attribute string that is empty or white space gives none.  `Path` is the exception: see [Path](#setting-path).
-- **A setting has only the places its row of [the table](#all-settings) lists.**  A property or item metadata that SqlSource does not list is not read.  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
+- **A setting has only the places its row of [the tables](#all-settings) lists.**  A property or item metadata that SqlSource does not list is not read.  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 - **The attribute belongs to one type.**  Two types that claim one file each use their own attribute, and each gets its own result.
 
 Three exceptions, stated plainly:
@@ -198,7 +207,7 @@ A [generator parameter](concepts.md#generator-parameter) is a word that changes 
 | `keep-comments` | Comments and blank lines stay in the generated SQL: see [what reaches the generated SQL](sql-files.md#generated-sql) | Works today |
 | `no-token-validation` | The method of a query with tokens does not check its arguments: see [validation](parameters-and-tokens.md#token-validation) | Works today |
 | `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` | None yet | [Accepted; no effect yet](README.md#what-works-today) |
-| `default` | The empty list: every default.  It stands alone, or repeated | Works today |
+| `default` | The empty list: every default.  `default` must be the only word in its list, though it may be repeated | Works today |
 
 Words are matched ignoring case.
 
@@ -405,7 +414,7 @@ Every file under `Legacy/` is read as `mysql`, keeps its comments, and skips the
 </ItemGroup>
 ```
 
-Only the settings with an item metadata column in [the table](#all-settings) can be given this way.  To change a setting for the files of one type, use the type's attribute.
+Only the settings whose row in [the tables](#all-settings) lists metadata can be given this way.  To change a setting for the files of one type, use the type's attribute.
 
 <a id="included-files"></a>
 
@@ -436,7 +445,7 @@ A file the project includes is only handed to the compiler.  Which of them belon
 
 ## Values written in MSBuild
 
-The package removes the white space around the value of each property and each item metadata in [the table](#all-settings), and makes one space of each run of white space inside it, a line break among it.  So a value may stand on a line of its own, and a value of several words may be written over several lines:
+The package removes the white space around the value of each property and each item metadata in [the tables](#all-settings), and makes one space of each run of white space inside it, a line break among it.  So a value may stand on a line of its own, and a value of several words may be written over several lines:
 
 ```xml
 <PropertyGroup>

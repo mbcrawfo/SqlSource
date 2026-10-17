@@ -100,6 +100,7 @@ jobs:
       postgres:
         image: postgres:18
         env:
+          POSTGRES_DB: app
           POSTGRES_PASSWORD: ci
         ports:
           - 5432:5432
@@ -114,7 +115,7 @@ jobs:
       - run: ./scripts/migrate.sh # creates your schema; replace with your own step
       - run: dotnet sqlsource describe --check
         env:
-          SQLSOURCE_CONNECTION: Host=localhost;Database=postgres;Username=postgres;Password=ci
+          SQLSOURCE_CONNECTION: Host=localhost;Database=app;Username=postgres;Password=ci
 ```
 
 Rules: [check in CI](tool.md#check-in-ci), [connections](tool.md#connections) for the variable, [exit codes](tool.md#exit-codes), [SQLSRC219](diagnostics.md#sqlsrc219).
@@ -141,6 +142,7 @@ Rules: [after a schema change](tool.md#after-a-schema-change), [describing again
 The members SqlSource generates are plain strings, so any library can run them.  Dapper is a separate package (`dotnet add package Dapper`); ADO.NET needs none:
 
 ```csharp
+using System.Data;
 using System.Data.Common;
 using Dapper;
 using SqlSource;
@@ -157,6 +159,11 @@ public partial class UserRepository(DbConnection connection)
     // ADO.NET
     public async Task<string?> GetName(int id)
     {
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
         await using var command = connection.CreateCommand();
         command.CommandText = Sql.GetUser;
 
@@ -166,12 +173,12 @@ public partial class UserRepository(DbConnection connection)
         command.Parameters.Add(parameter);
 
         await using var reader = await command.ExecuteReaderAsync();
-        return await reader.ReadAsync() ? reader.GetString(1) : null;
+        return await reader.ReadAsync() ? reader.GetString(reader.GetOrdinal("name")) : null;
     }
 }
 ```
 
-With `GetUser` as `SELECT id, name FROM users WHERE id = @id;`.  SqlSource never opens a connection or binds a value: you give the database the value of each `@name` yourself.
+With `GetUser` as `SELECT id, name FROM users WHERE id = @id;`.  SqlSource never opens a connection or binds a value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
 
 Rules: [constants](generator.md#constants), [query parameters](parameters-and-tokens.md#query-parameters).
 
@@ -181,7 +188,7 @@ Rules: [constants](generator.md#constants), [query parameters](parameters-and-to
 
 ```sql
 -- name: CountRows
-SELECT COUNT(*) FROM {{table}};
+SELECT COUNT(*) FROM {{table:orders}};
 ```
 
 ```csharp
@@ -190,7 +197,7 @@ var sql = Sql.CountRows(table);
 // SELECT COUNT(*) FROM orders_archive;
 ```
 
-A query with a token is a method that returns the SQL with the token replaced.  Pass only text that your own code chooses, as above, and never a value that a user typed: nothing is escaped.
+A query with a token is a method that returns the SQL with the token replaced.  The default after `:` is only a sample that the tool describes the query with, and the method still takes the table name; a query whose output is `sql` needs no default.  Pass only text that your own code chooses, as above, and never a value that a user typed: nothing is escaped.
 
 Rules: [tokens](parameters-and-tokens.md#tokens), [token methods](generator.md#token-methods), [defaults](parameters-and-tokens.md#token-defaults).
 

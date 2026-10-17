@@ -50,6 +50,20 @@ The tool's record of what the database said about each query's parameters and co
 
 > **Coming in a later release.**  The generator will read sidecars to give your queries typed models.  Nothing in a build reads one today.  See [what works today](README.md#what-works-today).
 
+### What a query gets
+
+<a id="output"></a>
+
+#### Output
+
+The setting that says how much SqlSource produces for a query: its SQL alone, or models and a query method as well, which come in a later release.  Today it also decides which queries the tool describes.  See [the output setting](settings.md#setting-output).
+
+<a id="token-method"></a>
+
+#### Token method
+
+What a query with a [token](#token) becomes in place of a constant: a static method that takes the text of each token and returns the SQL with the tokens filled in.  See [token methods](generator.md#token-methods).
+
 ### Three kinds of parameter
 
 SqlSource uses the word "parameter" for three different things.  The manual always says which.
@@ -101,3 +115,9 @@ The part of the `SqlSource` package that runs in the compiler and writes C# from
 #### Tool
 
 The `sqlsource` command of the `SqlSource.Tool` package.  Its `describe` command asks a database about your queries and writes the sidecars.  See [the tool](tool.md).
+
+<a id="describe"></a>
+
+#### Describe
+
+To ask a database, without running a query, what the query's parameters and columns are.  The tool does it and writes the answer to the query's [sidecar](#sidecar).  It needs your schema, not your data.  See [which queries are described](tool.md#which-queries).

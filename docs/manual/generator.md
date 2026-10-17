@@ -11,7 +11,7 @@ WHERE id = @id;
 
 -- name: ListFrom
 -- summary: Lists the rows of one table.
-SELECT id, name FROM {{table}} ORDER BY {{orderBy}};
+SELECT id, name FROM {{table:users}} ORDER BY {{orderBy:name}};
 ```
 
 ```csharp
@@ -32,7 +32,7 @@ public partial class UserRepository(DbConnection connection)
 }
 ```
 
-`Sql.GetUser` is a constant that holds the text of the first query, and `Sql.ListFrom` is a method that returns the text of the second with its tokens filled in.  Both are plain strings: the calls above use Dapper, and ADO.NET or any other library can take them as well.  A query that is renamed or removed is a compile error where it is used.
+`Sql.GetUser` is a constant that holds the text of the first query, and `Sql.ListFrom` is a method that returns the text of the second with its tokens filled in.  The token defaults, `users` and `name`, are samples for [describing](concepts.md#describe) the query, and the method still takes both.  Both are plain strings: the calls above use Dapper, and ADO.NET or any other library can take them as well.  A query that is renamed or removed is a compile error where it is used.
 
 <a id="attribute"></a>
 
@@ -123,7 +123,10 @@ A query without tokens is a `public const string` with the name of the query.  I
 Because it is a constant, it can be used wherever C# wants one, such as another `const` or an attribute argument:
 
 ```csharp
-public const string Prefix = UserQueries.GetUser;
+public const string LoadUser = UserQueries.GetUser;
+
+[Description(UserQueries.GetUser)]
+public User Load(int id) => throw new NotImplementedException();
 ```
 
 <a id="token-methods"></a>
@@ -161,7 +164,7 @@ public const string GetUser = "SELECT id, name\nFROM users\nWHERE id = @id;";
 
 The summary is the query's `-- summary:` ([summaries](sql-files.md#summaries)), or "The `GetUser` query from `Users.sql`." when it has none.  The remarks hold the SQL of the constant, so a reader sees what a query does without opening the `.sql` file.
 
-A token method adds a line for each token and one for the result, and shows its tokens as `{{table}}`:
+A token method adds a line for each token and one for the result, and shows its tokens as `{{table}}`, without their defaults:
 
 ```csharp
 /// <summary>

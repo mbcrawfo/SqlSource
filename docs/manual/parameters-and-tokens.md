@@ -120,7 +120,6 @@ Where the method goes is described on [the generator page](generator.md).
 - **A token is replaced wherever it is written**, including inside a string or a quoted identifier.
 - **Braces around anything that is not a name, or a name and a default, are not a token.**  `{{table-name}}`, `{{1st}}`, `{{order by}}` and `{{name:` with no closing `}}` stay in the SQL as written, and nothing is reported.
 - **Comments are removed before tokens are found**, so a `{{x}}` in a comment is not a token.  A query that keeps its comments (the `keep-comments` [generator parameter](settings.md#setting-generator-parameters)) is the exception: a kept comment is part of the SQL, and a token in it is replaced like any other.
-- **After its first call, the method allocates the string it returns and nothing else.**
 - **A query that gains its first token changes from a constant to a method**, so the code that uses it stops compiling until it passes the arguments.
 
 <a id="token-defaults"></a>

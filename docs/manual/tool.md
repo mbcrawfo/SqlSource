@@ -45,10 +45,10 @@ TRUNCATE TABLE audit_log;
 
 A query is described through its [dialect](concepts.md#dialect).  The tool can ask PostgreSQL today, which is the dialect `postgres`; the [database support table](dialects.md#database-support) lists every dialect.  A query that must be described and whose dialect cannot be is reported by the tool, and the build is not affected:
 
-- A file of a dialect that no version of the tool can describe, such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](diagnostics.md#sqlsrc209).  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.
+- A file of a dialect the tool does not describe, every row marked No in [database support](dialects.md#database-support), such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](diagnostics.md#sqlsrc209).  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.
 - A file of `mssql` passes that check, since SQL Server queries will be described, and each of its queries that must be described is [SQLSRC216](diagnostics.md#sqlsrc216) until then.  See [SQL Server](sqlserver.md).
 
-Either way, set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says.  For SQLSRC209 you can instead set the dialect, when the files are PostgreSQL.
+Either way, set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says; for SQL Server files too, though SQLSRC209's message also names `mssql`.  For SQLSRC209 you can instead set the dialect, when the files are PostgreSQL.
 
 The tool reads `[SqlSourceGenerate]` from your C# source without compiling it, which limits how `Path` and `Output` can be written there: see [the generator's known issues](generator.md#known-issues).
 
@@ -77,7 +77,7 @@ A connection is given in one of three ways.  The first that gives one wins:
 - **`SQLSOURCE_CONNECTION`** is for a project with one database.  With more than one database in the run it is used for none of them, though a database that is in the run only through queries with errors of their own does not count ([SQLSRC215](diagnostics.md#sqlsrc215)): set the variable of each name instead.
 - **A variable that is empty or holds only white space** is not set.
 - **A connection never goes in the project file**, since it holds credentials.
-- **Put the value of `--connection` in quotes.**  A shell splits it at a space.  On a command line that has `--connection`, an argument that holds `=` or `;` is refused, since it may be the rest of a connection string that the shell split.  Give the connection in its variable instead, or run the command from the folder of that path.
+- **Put the value of `--connection` in quotes.**  A shell splits it at a space.  On a command line that has `--connection`, any other argument that holds `=` or `;` is refused, since it may be the rest of a connection string that the shell split.  If it is a project or `.sql` path that holds `=` or `;`, run the command from that file's folder and give the name alone, or give the connection in its variable instead.
 - **A database that needs nothing described needs no connection.**  When every query of a database has a current sidecar entry, the tool asks the database nothing, and without a connection its summary line says `no connection`.  `--force` and `--check` describe every query, so every database of the run needs one then.
 - **A database with a query to describe and no connection** is [SQLSRC213](diagnostics.md#sqlsrc213).  Its `help:` line names the option and the variable to set, and lists any `--connection` names that matched no database of the run, so that a misspelt name is seen.
 
@@ -234,9 +234,9 @@ A run with `--project`, `--database` or a `.sql` path writes only the sidecars o
 | `SQLSOURCE_CONNECTION_<NAME>` | The connection of the database `<name>`: see [connections](#connections) |
 | `SQLSOURCE_CONNECTION` | The connection of a run with exactly one database |
 | `SQLSOURCE_LOG` | The path of the log, when `--log` is not given |
-| `SQLSOURCE_DEBUG` | Any value adds the stack trace to [SQLSRC200](diagnostics.md#sqlsrc200), for a bug report |
+| `SQLSOURCE_DEBUG` | Any value that is not empty adds the stack trace to [SQLSRC200](diagnostics.md#sqlsrc200), for a bug report |
 
-A variable that is empty or holds only white space is not set.
+A connection or log variable that is empty or holds only white space is not set.
 
 <a id="exit-codes"></a>
 
