@@ -163,9 +163,10 @@
         manifest only when that target hooks
         SqlSourceTrimMetadataOfFiles.  TD-0025.
 
-        The file is lines of key=value, and its format is a contract with the tool: see src/SqlSource/AGENTS.md.  The
-        tool names the file with SqlSourceManifestFile; without it the file is under obj, and is added to FileWrites.
-        That reaches "dotnet clean" only from inside a build, so it has no effect until a build runs this target.
+        The file is lines of key=value, and its format is a contract with the tool: the rules are in
+        src/SqlSource/AGENTS.md, and the reasons in docs/architecture/msbuild-and-manifest.md.  The tool names the
+        file with SqlSourceManifestFile; without it the file is under obj, and is added to FileWrites.  That reaches
+        "dotnet clean" only from inside a build, so it has no effect until a build runs this target.
 
         A property goes through Escape, or MSBuild would make an item of each part of a value that holds a
         semicolon, as DefineConstants does.  A property of the SDK is put on one line first, the way a trim does it:
