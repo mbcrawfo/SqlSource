@@ -3,7 +3,7 @@ using Xunit;
 
 namespace SqlSource.Tests;
 
-public class SqlIdentifierTests
+public sealed class SqlIdentifierTests
 {
     [Theory]
     [InlineData('a', true)]

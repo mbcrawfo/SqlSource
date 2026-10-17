@@ -5,7 +5,7 @@ using Xunit;
 namespace SqlSource.Tests.Settings;
 
 // Every setting resolves by one rule: the most specific level that has a value gives it.
-public class QuerySettingsTests
+public sealed class QuerySettingsTests
 {
     private static readonly SettingsLevel Keep = new() { Parameters = GeneratorParameters.KeepComments };
 

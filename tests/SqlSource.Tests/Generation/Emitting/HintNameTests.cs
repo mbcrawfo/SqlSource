@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
 
-public class HintNameTests
+public sealed class HintNameTests
 {
     [Fact]
     public void Create_Type_JoinsTheNamespaceAndTheTypeNamesWithTheArityOfEachGenericType()

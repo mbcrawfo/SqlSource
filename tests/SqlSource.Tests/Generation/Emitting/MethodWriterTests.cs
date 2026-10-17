@@ -8,7 +8,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
 
-public class MethodWriterTests
+public sealed class MethodWriterTests
 {
     [Fact]
     public void Append_SeveralTokensWithOneRepeated_WritesTheDocumentationAndTheMethod()

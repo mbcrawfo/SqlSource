@@ -14,7 +14,7 @@ namespace SqlSource.Tests.Documentation;
 // it says how it is read: a dialect (`sql postgres`, or `sql mysql,ansi-quotes`), `fragment` for a part of a file
 // that is not one whole, or `error` for SQL that shows a mistake.  A block with no second word is `ansi`.  GitHub
 // highlights by the first word alone, so each of them shows as SQL.
-public class UserDocsSamplesTests
+public sealed class UserDocsSamplesTests
 {
     private const string Fragment = "fragment";
     private const string Error = "error";

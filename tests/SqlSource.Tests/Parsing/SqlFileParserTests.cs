@@ -9,7 +9,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlFileParserTests
+public sealed class SqlFileParserTests
 {
     [Theory]
     [InlineData("SELECT 1;\n", "MySql", "MySql")]

@@ -8,7 +8,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlGeneratorParameterScopeTests
+public sealed class SqlGeneratorParameterScopeTests
 {
     [Fact]
     public void NewScope_HasNoList() => new SqlGeneratorParameterScope().Parameters.ShouldBeNull();

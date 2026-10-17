@@ -7,7 +7,7 @@ using Xunit;
 namespace SqlSource.Tests.Parsing;
 
 // An internal enum cannot be the parameter of a public test method, so a row gives the dialect's name.
-public class SqlDialectNameTests
+public sealed class SqlDialectNameTests
 {
     [Theory]
     [InlineData("ansi", nameof(SqlDialect.Ansi))]

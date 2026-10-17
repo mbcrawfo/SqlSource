@@ -9,7 +9,7 @@ namespace SqlSource.Tests.Generator;
 // Which dialect a file is read by: the -- dialect: marker at the top of the file decides, then the
 // SqlSourceDialect metadata of the file's item, then the project's SqlSourceDialect property, and without any of them
 // it is ANSI.
-public class DialectTests
+public sealed class DialectTests
 {
     private const string Source = """
         using SqlSource;

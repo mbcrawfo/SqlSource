@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing.Quoting;
 
-public class BackslashQuoteReaderTests
+public sealed class BackslashQuoteReaderTests
 {
     private static readonly BackslashQuoteReader Reader = new();
 

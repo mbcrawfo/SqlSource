@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Settings;
 
-public class GeneratorParameterListTests
+public sealed class GeneratorParameterListTests
 {
     [Theory]
     // An internal enum cannot be the parameter of a public test method, so a row gives the flags as a number.

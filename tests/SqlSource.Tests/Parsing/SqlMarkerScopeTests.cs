@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlMarkerScopeTests
+public sealed class SqlMarkerScopeTests
 {
     // Each row is a marker and whether a preamble and a query take it.  A file with no name marker is one query and
     // its own preamble, and takes what either takes.

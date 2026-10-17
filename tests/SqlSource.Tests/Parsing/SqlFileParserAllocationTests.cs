@@ -7,7 +7,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlFileParserAllocationTests
+public sealed class SqlFileParserAllocationTests
 {
     // The generator parses a file again each time it is edited in the IDE, so what a parse allocates is tracked here.
     // A parse of this file allocated 9.7 bytes for each character of input when the budget was set, the same in Debug,

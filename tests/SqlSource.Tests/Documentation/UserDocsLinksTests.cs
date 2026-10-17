@@ -7,7 +7,7 @@ namespace SqlSource.Tests.Documentation;
 
 // The links of the documents a user reads.  A link that goes to a file or an anchor that is not there leaves the
 // reader at the top of a long page, or on a page that is not found, so each is followed here.
-public class UserDocsLinksTests
+public sealed class UserDocsLinksTests
 {
     private const string Manual = "docs/manual/";
 

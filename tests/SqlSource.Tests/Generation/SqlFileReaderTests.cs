@@ -12,7 +12,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation;
 
-public class SqlFileReaderTests
+public sealed class SqlFileReaderTests
 {
     private const string Path = "/app/Repo/Users.sql";
 

@@ -6,7 +6,7 @@ namespace SqlSource.Tests.Documentation;
 
 // How UserDocs reads a document, on lines of its own: the other tests of this folder trust it, so a form it reads
 // wrongly would pass them without checking what it holds.
-public class UserDocsReadingTests
+public sealed class UserDocsReadingTests
 {
     [Fact]
     public void Anchors_RepeatedHeading_GetsASuffix() =>

@@ -7,7 +7,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
 
-public class SqlPathTests
+public sealed class SqlPathTests
 {
     [Theory]
     [InlineData("/app/Repo/Users.sql", "app/Repo/Users.sql")]

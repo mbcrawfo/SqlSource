@@ -10,7 +10,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Diagnostics;
 
-public class SqlDiagnosticsTests
+public sealed class SqlDiagnosticsTests
 {
     [Fact]
     public void All_EveryDescriptor_IsAnErrorThatCannotBeConfigured()
