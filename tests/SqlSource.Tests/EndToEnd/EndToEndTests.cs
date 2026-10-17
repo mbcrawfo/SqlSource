@@ -11,7 +11,7 @@ namespace SqlSource.Tests.EndToEnd;
 
 // The types of this folder are compiled by the build with the generator loaded, as a consumer's would be, and get
 // their .sql files through the MSBuild file that the package ships.
-public class EndToEndTests
+public sealed class EndToEndTests
 {
     [Fact]
     public void NestedLocation_DefaultFolder_HasAConstantForEachQueryOfEachFile()

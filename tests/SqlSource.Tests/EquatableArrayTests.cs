@@ -5,7 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tests;
 
-public class EquatableArrayTests
+public sealed class EquatableArrayTests
 {
     [Fact]
     public void Equals_SameItemsInSeparateInstances_ReturnsTrue()

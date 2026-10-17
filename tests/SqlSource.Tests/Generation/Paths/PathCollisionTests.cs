@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
 
-public class PathCollisionTests
+public sealed class PathCollisionTests
 {
     [Fact]
     public void Find_PathsThatDifferByMoreThanCase_IsEmpty() =>

@@ -6,7 +6,7 @@ using static SqlSource.Testing.Snapshot.TestSidecars;
 
 namespace SqlSource.Tests.Snapshot;
 
-public class SidecarModelTests
+public sealed class SidecarModelTests
 {
     // Phase 5 caches these records in the generator's pipeline, so two that hold the same values must be equal.
     [Fact]

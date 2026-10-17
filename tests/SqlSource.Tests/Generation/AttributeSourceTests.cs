@@ -11,7 +11,7 @@ namespace SqlSource.Tests.Generation;
 
 // The generator reads an enum argument of the attribute as a number and casts it to its own form of the enum.  The
 // two must agree member by member, or a value a user writes would mean another.
-public partial class AttributeSourceTests
+public sealed partial class AttributeSourceTests
 {
     // The generator's own forms are internal, so a public theory names them and the test looks them up.
     [Theory]

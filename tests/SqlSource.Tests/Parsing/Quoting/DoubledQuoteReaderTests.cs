@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing.Quoting;
 
-public class DoubledQuoteReaderTests
+public sealed class DoubledQuoteReaderTests
 {
     private static readonly DoubledQuoteReader Reader = new();
 

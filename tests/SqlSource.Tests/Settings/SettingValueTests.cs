@@ -5,7 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Settings;
 
-public class SettingValueTests
+public sealed class SettingValueTests
 {
     [Theory]
     [InlineData("many", "Many")]

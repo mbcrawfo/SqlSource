@@ -8,7 +8,7 @@ namespace SqlSource.Tests.Parsing;
 
 // What each dialect makes of each construct is pinned through the lexer, in SqlLexerTests.  These are about the table
 // itself.
-public class SqlDialectRulesTests
+public sealed class SqlDialectRulesTests
 {
     [Fact]
     public void For_EveryDialect_GivesItsOwnSharedInstance()

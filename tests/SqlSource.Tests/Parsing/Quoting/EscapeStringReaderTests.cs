@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing.Quoting;
 
-public class EscapeStringReaderTests
+public sealed class EscapeStringReaderTests
 {
     private static readonly EscapeStringReader Reader = new("Ee");
 

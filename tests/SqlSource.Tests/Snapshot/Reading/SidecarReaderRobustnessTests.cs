@@ -11,7 +11,7 @@ namespace SqlSource.Tests.Snapshot.Reading;
 
 // A sidecar is a committed file that people merge, reformat and cut short.  Nothing that happens to one may make
 // the reader throw: an exception in the generator costs every type its generated code.
-public partial class SidecarReaderRobustnessTests
+public sealed partial class SidecarReaderRobustnessTests
 {
     // The usual way a sidecar becomes unreadable.
     [Fact]

@@ -10,7 +10,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.MSBuild;
 
-public class DialectSettingTests
+public sealed class DialectSettingTests
 {
     private const string Path = "/app/Repo/Users.sql";
 

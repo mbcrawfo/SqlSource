@@ -10,7 +10,7 @@ using Xunit;
 namespace SqlSource.Tests.Generator;
 
 // The problems of the attributed type.  A type with any of them gets no generated file.
-public class TypeDiagnosticsTests
+public sealed class TypeDiagnosticsTests
 {
     private const string AttributeOnly = "SqlSourceGenerateAttribute.g.cs";
 

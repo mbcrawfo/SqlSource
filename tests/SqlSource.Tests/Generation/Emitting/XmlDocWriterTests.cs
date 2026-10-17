@@ -5,7 +5,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
 
-public class XmlDocWriterTests
+public sealed class XmlDocWriterTests
 {
     [Theory]
     [InlineData("SELECT 1", "SELECT 1")]
