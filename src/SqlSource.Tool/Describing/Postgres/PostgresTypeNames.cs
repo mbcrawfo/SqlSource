@@ -62,8 +62,9 @@ internal static class PostgresTypeNames
 
     // format_type(oid, -1) of char is "bpchar": only a char with a length is "character".  Of bit it is "bit" with
     // the quotes, since plain bit means bit(1): the tool writes the length form itself and keeps the server's
-    // spelling without one, as it does for bpchar.
-    private static string InCatalog(PostgresTypeRow row, PostgresFacets facets) =>
+    // spelling without one, as it does for bpchar.  Internal for BuiltInTypesTests, which checks that it spells every
+    // type of BuiltInTypes.WithModifier.
+    internal static string InCatalog(PostgresTypeRow row, PostgresFacets facets) =>
         row.Typname switch
         {
             "bpchar" when facets.Length is { } length => string.Create(

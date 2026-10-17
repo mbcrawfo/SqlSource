@@ -1,5 +1,6 @@
 using System.Collections.Frozen;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
 
@@ -25,22 +26,27 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// </remarks>
 internal static class SetOperationTypes
 {
-    // int2, int4, int8, numeric, float4, float8; text, varchar, bpchar; date, timestamp, timestamptz.
-    private static readonly FrozenDictionary<long, int> FamilyOf = new Dictionary<long, int>
-    {
-        [21] = 1,
-        [23] = 1,
-        [20] = 1,
-        [1700] = 1,
-        [700] = 1,
-        [701] = 1,
-        [25] = 2,
-        [1043] = 2,
-        [1042] = 2,
-        [1082] = 3,
-        [1114] = 3,
-        [1184] = 3,
-    }.ToFrozenDictionary();
+    /// <summary>
+    /// The families: number, text and time.  <c>Catalog_CastFamilies_AreBuiltInBothWays</c> reads them from here.
+    /// </summary>
+    internal static IReadOnlyList<IReadOnlyList<long>> Families { get; } =
+    [
+        [
+            BuiltInTypes.Int2,
+            BuiltInTypes.Int4,
+            BuiltInTypes.Int8,
+            BuiltInTypes.Numeric,
+            BuiltInTypes.Float4,
+            BuiltInTypes.Float8,
+        ],
+        [BuiltInTypes.Text, BuiltInTypes.Varchar, BuiltInTypes.Bpchar],
+        [BuiltInTypes.Date, BuiltInTypes.Timestamp, BuiltInTypes.Timestamptz],
+    ];
+
+    // Each type of a family, with the family's index.
+    private static readonly FrozenDictionary<long, int> FamilyOf = Families
+        .SelectMany(static (family, index) => family.Select(oid => (oid, index)))
+        .ToFrozenDictionary(static pair => pair.oid, static pair => pair.index);
 
     /// <summary>
     /// Whether a value of the type <paramref name="from" /> reaches a column of the type <paramref name="to" /> with

@@ -1,5 +1,6 @@
 using System;
 using Shouldly;
+using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
@@ -189,39 +190,39 @@ public sealed class PlanExpressionTests
     ) => PlanExpression.MayNameColumn(entry, column).ShouldBe(expected);
 
     [Theory]
-    [InlineData("'x'::text", 25)]
-    [InlineData("('x'::text)", 25)]
-    [InlineData("'x'::character varying", 1043)]
-    [InlineData("'x'::character varying(254)", 1043)]
-    [InlineData("'x'::bpchar", 1042)]
-    [InlineData("'x'::character(3)", 1042)]
-    [InlineData("'1'::smallint", 21)]
-    [InlineData("'-1'::integer", 23)]
-    [InlineData("0", 23)]
-    [InlineData("12", 23)]
-    [InlineData("1.5", 1700)]
-    [InlineData("'5'::bigint", 20)]
-    [InlineData("'1.5'::numeric(10,2)", 1700)]
-    [InlineData("'1.5'::real", 700)]
-    [InlineData("'1.5'::double precision", 701)]
-    [InlineData("'2024-01-01'::date", 1082)]
-    [InlineData("'2024-01-01'::timestamp without time zone", 1114)]
-    [InlineData("'2024-01-01'::timestamp(3) without time zone", 1114)]
-    [InlineData("'2024-01-01'::timestamp with time zone", 1184)]
-    [InlineData("true", 16)]
-    [InlineData("false", 16)]
-    [InlineData("(u.deleted_at IS NULL)", 16)]
-    [InlineData("((u.deleted_at IS NOT NULL))", 16)]
-    [InlineData("(NOT ((u.email)::text IS DISTINCT FROM (u.name)::text))", 16)]
-    [InlineData("count(*)", 20)]
-    [InlineData("(count(*) FILTER (WHERE (status = 'a'::user_status)))", 20)]
-    [InlineData("count(o.id)", 20)]
-    [InlineData("count(*) OVER (?)", 20)]
-    [InlineData("row_number() OVER w1", 20)]
-    [InlineData("(rank() OVER w2)", 20)]
-    [InlineData("dense_rank() OVER w2", 20)]
-    [InlineData("percent_rank() OVER (?)", 701)]
-    [InlineData("cume_dist() OVER w2", 701)]
+    [InlineData("'x'::text", BuiltInTypes.Text)]
+    [InlineData("('x'::text)", BuiltInTypes.Text)]
+    [InlineData("'x'::character varying", BuiltInTypes.Varchar)]
+    [InlineData("'x'::character varying(254)", BuiltInTypes.Varchar)]
+    [InlineData("'x'::bpchar", BuiltInTypes.Bpchar)]
+    [InlineData("'x'::character(3)", BuiltInTypes.Bpchar)]
+    [InlineData("'1'::smallint", BuiltInTypes.Int2)]
+    [InlineData("'-1'::integer", BuiltInTypes.Int4)]
+    [InlineData("0", BuiltInTypes.Int4)]
+    [InlineData("12", BuiltInTypes.Int4)]
+    [InlineData("1.5", BuiltInTypes.Numeric)]
+    [InlineData("'5'::bigint", BuiltInTypes.Int8)]
+    [InlineData("'1.5'::numeric(10,2)", BuiltInTypes.Numeric)]
+    [InlineData("'1.5'::real", BuiltInTypes.Float4)]
+    [InlineData("'1.5'::double precision", BuiltInTypes.Float8)]
+    [InlineData("'2024-01-01'::date", BuiltInTypes.Date)]
+    [InlineData("'2024-01-01'::timestamp without time zone", BuiltInTypes.Timestamp)]
+    [InlineData("'2024-01-01'::timestamp(3) without time zone", BuiltInTypes.Timestamp)]
+    [InlineData("'2024-01-01'::timestamp with time zone", BuiltInTypes.Timestamptz)]
+    [InlineData("true", BuiltInTypes.Bool)]
+    [InlineData("false", BuiltInTypes.Bool)]
+    [InlineData("(u.deleted_at IS NULL)", BuiltInTypes.Bool)]
+    [InlineData("((u.deleted_at IS NOT NULL))", BuiltInTypes.Bool)]
+    [InlineData("(NOT ((u.email)::text IS DISTINCT FROM (u.name)::text))", BuiltInTypes.Bool)]
+    [InlineData("count(*)", BuiltInTypes.Int8)]
+    [InlineData("(count(*) FILTER (WHERE (status = 'a'::user_status)))", BuiltInTypes.Int8)]
+    [InlineData("count(o.id)", BuiltInTypes.Int8)]
+    [InlineData("count(*) OVER (?)", BuiltInTypes.Int8)]
+    [InlineData("row_number() OVER w1", BuiltInTypes.Int8)]
+    [InlineData("(rank() OVER w2)", BuiltInTypes.Int8)]
+    [InlineData("dense_rank() OVER w2", BuiltInTypes.Int8)]
+    [InlineData("percent_rank() OVER (?)", BuiltInTypes.Float8)]
+    [InlineData("cume_dist() OVER w2", BuiltInTypes.Float8)]
     public void TypeOf_ConstantOrKnownForm_IsItsTypeOid(string entry, long expected) =>
         PlanExpression.TypeOf(entry, catalogFunctions: true).ShouldBe(expected);
 
@@ -244,9 +245,9 @@ public sealed class PlanExpressionTests
         PlanExpression.TypeOf(entry, catalogFunctions: false).ShouldBeNull();
 
     [Theory]
-    [InlineData("1", 23)]
-    [InlineData("true", 16)]
-    [InlineData("(u.deleted_at IS NULL)", 16)]
+    [InlineData("1", BuiltInTypes.Int4)]
+    [InlineData("true", BuiltInTypes.Bool)]
+    [InlineData("(u.deleted_at IS NULL)", BuiltInTypes.Bool)]
     public void TypeOf_FormWithoutATypeName_IsItsTypeWhateverThePath(string entry, long expected) =>
         PlanExpression.TypeOf(entry, catalogFunctions: false).ShouldBe(expected);
 

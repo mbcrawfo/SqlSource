@@ -56,9 +56,5 @@ internal static class PostgresColumns
 
     // The facets are read by the type the protocol reported, which is the one whose modifier they decode.
     private static PostgresFacets FacetsOf(PostgresColumnRow column, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>
-        rows.TryGetValue(column.TypeOid, out var row)
-            ? ColumnFacets.Of(row.Typname, column)
-            : throw new InvalidOperationException(
-                $"The answer to 'types' holds no row for the type {column.TypeOid} of the column '{column.Name}'."
-            );
+        ColumnFacets.Of(PostgresTypes.Row(column.TypeOid, rows, $"the column '{column.Name}'").Typname, column);
 }
