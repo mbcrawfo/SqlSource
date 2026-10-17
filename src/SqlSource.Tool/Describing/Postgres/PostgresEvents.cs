@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres.Walk;
@@ -293,7 +294,7 @@ internal static class PostgresEvents
                         ? LogValue.MapOf(new("schema", node.Schema), new("table", relation))
                         : LogValue.Null
                 ),
-                new("nullExtends", visited.NullExtends)
+                new("nullExtends", TextOf(visited.NullExtends))
             );
         }
 
@@ -330,6 +331,20 @@ internal static class PostgresEvents
             new(Error, answer.Error is { } error ? ErrorOf(error) : LogValue.Null),
             new(Duration, durationMs)
         );
+
+    /// <summary>
+    /// The <c>nullExtends</c> of <c>postgres.walk.node</c>: <c>none</c>, <c>inner</c>, <c>outer</c> or <c>both</c>.
+    /// Spelled here and not from the member's name, so that renaming a member cannot change the log.
+    /// </summary>
+    public static string TextOf(NullExtension extension) =>
+        extension switch
+        {
+            NullExtension.None => "none",
+            NullExtension.Inner => "inner",
+            NullExtension.Outer => "outer",
+            NullExtension.Both => "both",
+            _ => throw new InvalidOperationException($"Unknown null extension {extension}."),
+        };
 
     private static LogValue ErrorOf(PostgresServerError error) =>
         LogValue.MapOf(

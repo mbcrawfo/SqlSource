@@ -25,10 +25,6 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// </remarks>
 internal static class PlanPartitions
 {
-    private const string Member = "Member";
-
-    private static readonly HashSet<string> Appends = [with(StringComparer.Ordinal), "Append", "Merge Append"];
-
     /// <summary>
     /// The relations the members scan of every <c>Append</c> of the shape, anywhere in the plan, in schema and name
     /// order, each once: empty when there is none, and <c>partitions</c> is not asked.
@@ -51,7 +47,7 @@ internal static class PlanPartitions
     /// </summary>
     public static string? ShapeOf(PlanNode node)
     {
-        if (!Appends.Contains(node.NodeType) || node.Plans.Count == 0)
+        if (!PlanNodeTypes.Appends.Contains(node.NodeType) || node.Plans.Count == 0)
         {
             return null;
         }
@@ -60,7 +56,7 @@ internal static class PlanPartitions
         foreach (var member in node.Plans)
         {
             if (
-                member.ParentRelationship != Member
+                member.ParentRelationship != PlanRelationships.Member
                 || !PlanInstances.ScansARelation(member)
                 || member.Schema is null
                 || member.RelationName is null

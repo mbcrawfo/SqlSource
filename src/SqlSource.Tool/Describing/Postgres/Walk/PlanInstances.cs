@@ -20,14 +20,27 @@ internal static class WalkReasons
     public const string OutputDiffers = "output-differs";
 }
 
+/// <summary>Which side of a join is null-extended.</summary>
+internal enum NullExtension
+{
+    /// <summary>Neither: a node that is no join, or a join that extends nothing.</summary>
+    None,
+
+    /// <summary>The <c>Inner</c> child.</summary>
+    Inner,
+
+    /// <summary>The <c>Outer</c> child.</summary>
+    Outer,
+
+    /// <summary>Both children.</summary>
+    Both,
+}
+
 /// <summary>A node the walk visited, as the log says it.</summary>
 /// <param name="Depth">How far under the root, which is at zero.</param>
 /// <param name="Node">The node.</param>
-/// <param name="NullExtends">
-/// Which side the node null-extends: <c>inner</c>, <c>outer</c>, <c>both</c>, or <c>none</c> for a node that is no
-/// join or a join that extends nothing.
-/// </param>
-internal sealed record VisitedNode(int Depth, PlanNode Node, string NullExtends);
+/// <param name="NullExtends">Which side the node null-extends.</param>
+internal sealed record VisitedNode(int Depth, PlanNode Node, NullExtension NullExtends);
 
 /// <summary>What an alias of a plan names.</summary>
 internal enum InstanceKind
@@ -87,11 +100,8 @@ internal sealed record PlanInstance(
 /// </remarks>
 internal sealed class PlanInstances
 {
-    private const string Outer = "Outer";
-    private const string Inner = "Inner";
-    private const string Both = "both";
-    private const string None = "none";
-    private const string ModifyTable = "ModifyTable";
+    // A CTE's InitPlan is named for it: "CTE" and the CTE's name.
+    private const string CtePlanPrefix = "CTE ";
 
     private static readonly IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> NoPartitions =
         new Dictionary<PostgresRelationName, IReadOnlyList<long>>();
@@ -101,23 +111,23 @@ internal sealed class PlanInstances
     private static readonly HashSet<string> SetOperations =
     [
         with(StringComparer.Ordinal),
-        "Append",
-        "Merge Append",
-        "SetOp",
-        "Recursive Union",
+        PlanNodeTypes.Append,
+        PlanNodeTypes.MergeAppend,
+        PlanNodeTypes.SetOp,
+        PlanNodeTypes.RecursiveUnion,
     ];
 
     private static readonly HashSet<string> RelationScans =
     [
         with(StringComparer.Ordinal),
-        "Seq Scan",
-        "Index Scan",
-        "Index Only Scan",
-        "Bitmap Heap Scan",
-        "Tid Scan",
-        "Tid Range Scan",
-        "Sample Scan",
-        "Foreign Scan",
+        PlanNodeTypes.SeqScan,
+        PlanNodeTypes.IndexScan,
+        PlanNodeTypes.IndexOnlyScan,
+        PlanNodeTypes.BitmapHeapScan,
+        PlanNodeTypes.TidScan,
+        PlanNodeTypes.TidRangeScan,
+        PlanNodeTypes.SampleScan,
+        PlanNodeTypes.ForeignScan,
     ];
 
     private readonly Dictionary<string, PlanInstance> _instances = [with(StringComparer.Ordinal)];
@@ -136,7 +146,7 @@ internal sealed class PlanInstances
     {
         _tree = tree;
         _partitions = partitions;
-        _target = root.NodeType == ModifyTable ? root.Alias : null;
+        _target = root.NodeType == PlanNodeTypes.ModifyTable ? root.Alias : null;
         Visit(root, 0, extended: false);
         BareAlias = BareAliasOf(root);
     }
@@ -190,8 +200,10 @@ internal sealed class PlanInstances
     /// Whether a join at the node or under it, through <c>Outer</c> and <c>Inner</c> children, null-extends a side.
     /// </summary>
     public static bool ExtendsUnder(PlanNode node) =>
-        ExtendsOf(node) != None
-        || node.Plans.Any(static child => child.ParentRelationship is Outer or Inner && ExtendsUnder(child));
+        ExtendsOf(node) != NullExtension.None
+        || node.Plans.Any(static child =>
+            child.ParentRelationship is PlanRelationships.Outer or PlanRelationships.Inner && ExtendsUnder(child)
+        );
 
     /// <summary>Whether the alias names an instance, and which.</summary>
     public bool TryFind(string alias, [NotNullWhen(true)] out PlanInstance? instance) =>
@@ -201,26 +213,28 @@ internal sealed class PlanInstances
     public bool IsExtended(PlanNode node) => _extended.TryGetValue(node, out var extended) && extended;
 
     private static bool NamesARelation(PlanNode node, bool isRoot) =>
-        node.Alias is not null && (RelationScans.Contains(node.NodeType) || (isRoot && node.NodeType == ModifyTable));
+        node.Alias is not null
+        && (RelationScans.Contains(node.NodeType) || (isRoot && node.NodeType == PlanNodeTypes.ModifyTable));
 
-    // Which side a join extends, "none" for a node that is no join, and null for a join type that is not known.  An
+    // Which side a join extends, None for a node that is no join, and null for a join type that is not known.  An
     // anti join extends too: the planner makes one of a LEFT JOIN b ... WHERE b.x IS NULL and returns b's columns NULL.
-    private static string? ExtendsOf(PlanNode node) =>
+    private static NullExtension? ExtendsOf(PlanNode node) =>
         node.JoinType switch
         {
-            null => None,
-            "Left" or "Anti" => "inner",
-            "Right" or "Right Anti" => "outer",
-            "Full" => Both,
-            "Inner" or "Semi" or "Right Semi" => None,
+            null => NullExtension.None,
+            PlanJoinTypes.Left or PlanJoinTypes.Anti => NullExtension.Inner,
+            PlanJoinTypes.Right or PlanJoinTypes.RightAnti => NullExtension.Outer,
+            PlanJoinTypes.Full => NullExtension.Both,
+            PlanJoinTypes.Inner or PlanJoinTypes.Semi or PlanJoinTypes.RightSemi => NullExtension.None,
             _ => null,
         };
 
     private string? BareAliasOf(PlanNode root)
     {
-        if (root.NodeType == ModifyTable)
+        if (root.NodeType == PlanNodeTypes.ModifyTable)
         {
-            return root.Alias is not null && _nodes.TrueForAll(static visited => visited.NullExtends == None)
+            return
+                root.Alias is not null && _nodes.TrueForAll(static visited => visited.NullExtends == NullExtension.None)
                 ? root.Alias
                 : null;
         }
@@ -228,8 +242,8 @@ internal sealed class PlanInstances
         var node = root;
         while (
             !RelationScans.Contains(node.NodeType)
-            && node.NodeType != ModifyTable
-            && node.Plans is [{ ParentRelationship: Outer } only]
+            && node.NodeType != PlanNodeTypes.ModifyTable
+            && node.Plans is [{ ParentRelationship: PlanRelationships.Outer } only]
         )
         {
             node = only;
@@ -241,7 +255,7 @@ internal sealed class PlanInstances
     private void Visit(PlanNode node, int depth, bool extended)
     {
         var extends = ExtendsOf(node);
-        _nodes.Add(new VisitedNode(depth, node, extends ?? None));
+        _nodes.Add(new VisitedNode(depth, node, extends ?? NullExtension.None));
         _extended[node] = extended;
         if (extends is null)
         {
@@ -275,15 +289,19 @@ internal sealed class PlanInstances
                 new PlanInstance(InstanceKind.Relation, extended, node.Schema, node.RelationName, [], null)
             );
         }
-        else if (node.Alias is { } scan && node.NodeType is "Subquery Scan" or "CTE Scan")
+        else if (node.Alias is { } scan && node.NodeType is PlanNodeTypes.SubqueryScan or PlanNodeTypes.CteScan)
         {
             Add(scan, depth, new PlanInstance(InstanceKind.Plan, extended, null, null, [], ChildOf(node)));
         }
 
-        foreach (var child in node.Plans.Where(static child => child.ParentRelationship is Outer or Inner))
+        foreach (
+            var child in node.Plans.Where(static child =>
+                child.ParentRelationship is PlanRelationships.Outer or PlanRelationships.Inner
+            )
+        )
         {
-            var side = child.ParentRelationship == Inner ? "inner" : "outer";
-            Visit(child, depth + 1, extended || extends == Both || extends == side);
+            var side = child.ParentRelationship == PlanRelationships.Inner ? NullExtension.Inner : NullExtension.Outer;
+            Visit(child, depth + 1, extended || extends == NullExtension.Both || extends == side);
         }
     }
 
@@ -299,19 +317,21 @@ internal sealed class PlanInstances
     // nothing.
     private PlanNode? ChildOf(PlanNode node)
     {
-        if (node.NodeType == "Subquery Scan")
+        if (node.NodeType == PlanNodeTypes.SubqueryScan)
         {
-            return node.Plans.Where(static child => child.ParentRelationship == "Subquery").ToArray() is [var only]
+            return
+                node.Plans.Where(static child => child.ParentRelationship == PlanRelationships.Subquery).ToArray()
+                    is [var only]
                 ? only
                 : null;
         }
 
-        var name = "CTE " + node.CteName;
+        var name = CtePlanPrefix + node.CteName;
         return
             node.CteName is not null
             && All(_tree)
                 .Where(child =>
-                    child.ParentRelationship == "InitPlan"
+                    child.ParentRelationship == PlanRelationships.InitPlan
                     && string.Equals(child.SubplanName, name, StringComparison.Ordinal)
                 )
                 .Take(2)

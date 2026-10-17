@@ -338,22 +338,22 @@ public sealed class PlanInstancesTests
                 $"{visited.Depth} {visited.Node.NodeType} {visited.Node.Alias} {visited.NullExtends}"
             )
             .ShouldBe([
-                "0 Sort  none",
-                "1 Hash Join  inner",
-                "2 Seq Scan u none",
-                "2 Hash Join  both",
-                "3 Seq Scan o none",
-                "3 Seq Scan i none",
+                "0 Sort  None",
+                "1 Hash Join  Inner",
+                "2 Seq Scan u None",
+                "2 Hash Join  Both",
+                "3 Seq Scan o None",
+                "3 Seq Scan i None",
             ]);
     }
 
     [Fact]
     public void Find_RightJoin_SaysItExtendsItsOuterSide() =>
-        PlanInstances.Find(Join("Right", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe("outer");
+        PlanInstances.Find(Join("Right", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe(NullExtension.Outer);
 
     [Fact]
     public void Find_AntiJoin_SaysItExtendsItsInnerSide() =>
-        PlanInstances.Find(Join("Anti", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe("inner");
+        PlanInstances.Find(Join("Anti", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe(NullExtension.Inner);
 
     // A set operation prints its first branch at the root: an Append under a UNION's Aggregate or under a Sort, and a
     // SetOp over an Append on 14 or over its two branches as Outer and Inner on 18.

@@ -320,7 +320,9 @@ internal static partial class NullabilityWalk
     {
         private const int MaxDepth = 256;
 
-        private readonly bool _nothingExtends = instances.Nodes.All(static visited => visited.NullExtends == "none");
+        private readonly bool _nothingExtends = instances.Nodes.All(static visited =>
+            visited.NullExtends == NullExtension.None
+        );
 
         public bool? NullableOf(string entry) =>
             _nothingExtends
@@ -341,7 +343,11 @@ internal static partial class NullabilityWalk
                 return null;
             }
 
-            var children = node.Plans.Where(static child => child.ParentRelationship is "Outer" or "Inner").ToArray();
+            var children = node
+                .Plans.Where(static child =>
+                    child.ParentRelationship is PlanRelationships.Outer or PlanRelationships.Inner
+                )
+                .ToArray();
             if (children.Any(OpaqueAndNotPreserved))
             {
                 return null;
@@ -383,7 +389,11 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            var children = node.Plans.Where(static child => child.ParentRelationship is "Outer" or "Inner").ToArray();
+            var children = node
+                .Plans.Where(static child =>
+                    child.ParentRelationship is PlanRelationships.Outer or PlanRelationships.Inner
+                )
+                .ToArray();
             if (children.Any(OpaqueAndNotPreserved))
             {
                 return false;
@@ -530,7 +540,7 @@ internal static partial class NullabilityWalk
         // The one alias a qualified reference may name at a ModifyTable that may return the old or the new row, or
         // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
         public string? OnlyAliasOf(PlanNode root) =>
-            scope.OldAndNewMayBeNamed && root.NodeType == "ModifyTable" ? root.Alias ?? string.Empty : null;
+            scope.OldAndNewMayBeNamed && root.NodeType == PlanNodeTypes.ModifyTable ? root.Alias ?? string.Empty : null;
 
         // The column of the origin in the plan of the child, as the entries of its root's Output that it can be say.
         public Resolution Resolve(PlanNode? child, ColumnOrigin origin, int depth)
