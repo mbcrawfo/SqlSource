@@ -110,7 +110,7 @@ internal static class StatementShape
         // The "(" before the first word: the statement's own depth.
         var leading = 0;
         string? previous = null;
-        foreach (var lexeme in Lexemes(sql))
+        foreach (var lexeme in PostgresSql.Lex(sql))
         {
             if (lexeme.Kind is SqlLexemeKind.LineComment or SqlLexemeKind.BlockComment or SqlLexemeKind.Hint)
             {
@@ -134,10 +134,10 @@ internal static class StatementShape
             while (index < text.Length)
             {
                 var c = text[index];
-                if (IsWordCharacter(c))
+                if (PostgresIdentifiers.IsWordPart(c))
                 {
                     var start = index;
-                    while (index < text.Length && IsWordCharacter(text[index]))
+                    while (index < text.Length && PostgresIdentifiers.IsWordPart(text[index]))
                     {
                         index++;
                     }
@@ -195,16 +195,17 @@ internal static class StatementShape
 
     /// <summary>
     /// The first positional parameter that the SQL writes itself, <c>$</c> and its digits as written (<c>$2</c>), or
-    /// null.  A <c>$</c> and an ASCII digit in a <c>Text</c> lexeme is one unless the character before the <c>$</c>
-    /// can continue a name (<c>a$1</c>); a <c>$</c> that starts a lexeme is never part of a name.  A string, a quoted
-    /// identifier, a dollar-quoted string and a comment are lexemes of their own and are not read.
+    /// null.  A <c>$</c> and an ASCII digit in a <c>Text</c> lexeme is one unless the <c>$</c> continues a name
+    /// (<c>a$1</c>, <c>€$1</c>, <c>1a$1</c>), as PostgreSQL reads one; after a number it is one (<c>1$1</c>).  A
+    /// <c>$</c> that starts a lexeme is never part of a name.  A string, a quoted identifier, a dollar-quoted string
+    /// and a comment are lexemes of their own and are not read.
     /// </summary>
     /// <exception cref="InvalidOperationException">
     /// The SQL does not lex: a bug of the plan, whose parser read the same text.
     /// </exception>
     public static string? PositionalParameter(string sql)
     {
-        foreach (var lexeme in Lexemes(sql))
+        foreach (var lexeme in PostgresSql.Lex(sql))
         {
             if (lexeme.Kind != SqlLexemeKind.Text)
             {
@@ -219,8 +220,7 @@ internal static class StatementShape
                     continue;
                 }
 
-                // PostgreSQL reads a character above U+007F as part of a name, as the lexer does, so "€$1" is one name.
-                if (index > 0 && (IsWordCharacter(text[index - 1]) || text[index - 1] > '\u007F'))
+                if (ContinuesAName(text, index))
                 {
                     continue;
                 }
@@ -254,18 +254,18 @@ internal static class StatementShape
             || string.Equals(previous, "MERGE", StringComparison.OrdinalIgnoreCase)
         );
 
-    private static bool IsWordCharacter(char c) => char.IsLetterOrDigit(c) || c is '_' or '$';
-
-    private static EquatableArray<SqlLexeme> Lexemes(string sql)
+    // Whether the "$" at the index continues a name: the run of word characters before it holds one that starts a
+    // word.  A run of digits alone is a number, after which the "$" stands apart.
+    private static bool ContinuesAName(ReadOnlySpan<char> text, int index)
     {
-        var lexed = SqlLexer.Lex(sql, SqlDialectRules.PostgreSql);
-        if (lexed.Error is not null)
+        for (var at = index - 1; at >= 0 && PostgresIdentifiers.IsWordPart(text[at]); at--)
         {
-            throw new InvalidOperationException(
-                "The sample SQL of a query does not lex, and the plan's parser read it."
-            );
+            if (PostgresIdentifiers.IsWordStart(text[at]))
+            {
+                return true;
+            }
         }
 
-        return lexed.Lexemes;
+        return false;
     }
 }

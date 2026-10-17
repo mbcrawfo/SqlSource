@@ -27,6 +27,8 @@ public sealed class PostgresSearchPathTests
     [InlineData("pg_temp, pg_catalog")]
     [InlineData("\"a,b\", \"pg_catalog\"")]
     [InlineData("\"unclosed, pg_catalog")]
+    // A quoted and a bare piece of one element are one schema: pg_catalog, named second.
+    [InlineData("public, \"pg_\"catalog")]
     [InlineData(null)]
     public void PutsCatalogFirst_PathThatNamesAnotherSchemaFirstOrCannotBeRead_IsFalse(string? searchPath) =>
         PostgresSearchPath.PutsCatalogFirst(searchPath).ShouldBeFalse();

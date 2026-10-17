@@ -149,6 +149,13 @@ internal static class PostgresErrors
         );
 
     /// <summary>
+    /// The <c>server:</c> lines of an error whose position is in the tool's own text, not in the user's SQL: with no
+    /// <c>at character</c> line.
+    /// </summary>
+    public static EquatableArray<string> ServerLinesWithoutPosition(PostgresServerError error) =>
+        ServerLines(error with { Position = null }, 0);
+
+    /// <summary>
     /// The <c>server:</c> lines, verbatim and in this order: the SQLSTATE and the message, the detail, the hint, and
     /// the character the error is at.
     /// </summary>
@@ -254,11 +261,7 @@ internal static class PostgresErrors
             || (error.SqlState is null && error.Message == PostgresLive.StatementNotListed)
         )
         {
-            return SessionNotKept(
-                database,
-                DescribeStep.DescribeParameters,
-                ServerLines(error with { Position = null }, 0)
-            );
+            return SessionNotKept(database, DescribeStep.DescribeParameters, ServerLinesWithoutPosition(error));
         }
 
         var head = ParameterPlaceholders.HeadLength(prepare.Statement, prepare.Types);
@@ -300,7 +303,7 @@ internal static class PostgresErrors
         // A parameter with no declared type takes the type of its first use, and a type error may be the fault of that,
         // unless a cast fixes its type at every use.
         var undeclared = error.SqlState is UndefinedFunction or DatatypeMismatch or AmbiguousFunction
-            ? Undeclared(query)
+            ? UncastParameters.Of(query)
             : [];
         return Rejected(
             error,
@@ -336,108 +339,6 @@ internal static class PostgresErrors
             + $"declare its type with -- param: {first} <type>";
     }
 
-    // The parameters of no declared type that the SQL uses at least once without a cast that fixes the type there,
-    // in the order of the query.  A SQL that does not lex, which the plan's parser read, names every one of them:
-    // the help is no place to fail.
-    private static List<SqlQueryParameter> Undeclared(DescribeRequest query)
-    {
-        var lexed = SqlLexer.Lex(query.Sql, SqlDialectRules.PostgreSql);
-        var uncast = lexed.Error is null ? Uncast(query.Sql, lexed.Lexemes) : null;
-        return
-        [
-            .. query.Parameters.Where(parameter =>
-                parameter.Type is null && (uncast is null || uncast.Contains(parameter.Name))
-            ),
-        ];
-    }
-
-    // The names, ignoring case as the plan matches them, of the parameters with a use that is not "@x::t" or
-    // "CAST(@x AS t)": white space and comments may stand between any two of the pieces, and a string, a quoted
-    // name or a comment holds no piece.  The name is the parameter's text after its one-character prefix.
-    private static HashSet<string> Uncast(string sql, EquatableArray<SqlLexeme> lexemes)
-    {
-        var pieces = Pieces(sql, lexemes);
-        var uncast = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        for (var index = 0; index < pieces.Count; index++)
-        {
-            if (pieces[index] is not { Parameter: true } parameter)
-            {
-                continue;
-            }
-
-            var cast =
-                PieceAt(pieces, index + 1) == "::"
-                || (
-                    IsWord(PieceAt(pieces, index - 2), "CAST")
-                    && PieceAt(pieces, index - 1) == "("
-                    && IsWord(PieceAt(pieces, index + 1), "AS")
-                );
-            if (!cast)
-            {
-                _ = uncast.Add(parameter.Text[1..]);
-            }
-        }
-
-        return uncast;
-    }
-
-    // The SQL as a list of pieces, without white space or comments: a word, a "::", any other character, a string or
-    // a quoted name whole, and a parameter.
-    private static List<(string Text, bool Parameter)> Pieces(string sql, EquatableArray<SqlLexeme> lexemes)
-    {
-        var pieces = new List<(string Text, bool Parameter)>();
-        foreach (var lexeme in lexemes)
-        {
-            var text = sql.Substring(lexeme.Span.Start, lexeme.Span.Length);
-            if (lexeme.Kind == SqlLexemeKind.Text)
-            {
-                TextPieces(text, pieces);
-            }
-            else if (lexeme.Kind is SqlLexemeKind.Parameter or SqlLexemeKind.Quoted)
-            {
-                pieces.Add((text, lexeme.Kind == SqlLexemeKind.Parameter));
-            }
-        }
-
-        return pieces;
-    }
-
-    private static void TextPieces(string text, List<(string Text, bool Parameter)> pieces)
-    {
-        var index = 0;
-        while (index < text.Length)
-        {
-            var start = index;
-            if (char.IsWhiteSpace(text[index]))
-            {
-                index++;
-                continue;
-            }
-
-            if (IsWordCharacter(text[index]))
-            {
-                while (index < text.Length && IsWordCharacter(text[index]))
-                {
-                    index++;
-                }
-            }
-            else
-            {
-                index += text[index] == ':' && index + 1 < text.Length && text[index + 1] == ':' ? 2 : 1;
-            }
-
-            pieces.Add((text[start..index], false));
-        }
-    }
-
-    private static string? PieceAt(List<(string Text, bool Parameter)> pieces, int index) =>
-        index >= 0 && index < pieces.Count && !pieces[index].Parameter ? pieces[index].Text : null;
-
-    private static bool IsWord(string? piece, string word) =>
-        string.Equals(piece, word, StringComparison.OrdinalIgnoreCase);
-
-    private static bool IsWordCharacter(char c) => char.IsLetterOrDigit(c) || c is '_' or '$';
-
     /// <summary>
     /// A parameter as the SQL writes one: the server names it <c>$1</c>, and the user wrote <c>@id</c>.
     /// </summary>
@@ -449,7 +350,7 @@ internal static class PostgresErrors
     /// a position the server gives is in the tool's own query of the catalog, and not in the user's SQL.
     /// </summary>
     public static DescribeFailure Types(PostgresServerError error, DescribeRequest query) =>
-        Rejected(error, query, DescribeStep.ResolveType, ServerLines(error with { Position = null }, 0), null);
+        Rejected(error, query, DescribeStep.ResolveType, ServerLinesWithoutPosition(error), null);
 
     /// <summary>
     /// <c>SQLSRC225</c> at the step <c>describe columns</c>: the prepared statement could not be described.  There
@@ -459,7 +360,7 @@ internal static class PostgresErrors
     /// </summary>
     public static DescribeFailure Columns(PostgresServerError error, DescribeRequest query, string database)
     {
-        var lines = ServerLines(error with { Position = null }, 0);
+        var lines = ServerLinesWithoutPosition(error);
         return error.SqlState == InvalidSqlStatementName
             ? SessionNotKept(database, DescribeStep.DescribeColumns, lines)
             : Rejected(error, query, DescribeStep.DescribeColumns, lines, null);
@@ -470,7 +371,7 @@ internal static class PostgresErrors
     /// position line: a position the server gives is in the tool's own query of the catalog.
     /// </summary>
     public static DescribeFailure Tables(PostgresServerError error, DescribeRequest query) =>
-        Rejected(error, query, DescribeStep.Catalog, ServerLines(error with { Position = null }, 0), null);
+        Rejected(error, query, DescribeStep.Catalog, ServerLinesWithoutPosition(error), null);
 
     /// <summary>
     /// A parameter whose type is a pseudo-type.  The server accepts one and says nothing, so there is no server
@@ -551,9 +452,7 @@ internal static class PostgresErrors
             return CannotBind(query, parameters, asked, unbound);
         }
 
-        var lines = answer.Error is { } error
-            ? ServerLines(error with { Position = null }, 0)
-            : EquatableArray<string>.Empty;
+        var lines = answer.Error is { } error ? ServerLinesWithoutPosition(error) : EquatableArray<string>.Empty;
         if (verdict.Result == NpgsqlCheck.Error && answer.Error is { } failed)
         {
             return Rejected(failed, query, DescribeStep.CheckParameters, lines, null);
@@ -703,25 +602,12 @@ internal static class PostgresErrors
         var dollar = message.IndexOf('$', StringComparison.Ordinal);
         while (dollar >= 0)
         {
-            var end = dollar + 1;
-            while (end < message.Length && char.IsAsciiDigit(message[end]))
-            {
-                end++;
-            }
-
-            if (
-                int.TryParse(
-                    message.AsSpan(dollar + 1, end - dollar - 1),
-                    NumberStyles.None,
-                    CultureInfo.InvariantCulture,
-                    out var ordinal
-                )
-            )
+            if (PostgresIdentifiers.ParameterNumberAt(message, dollar) is { } ordinal)
             {
                 return ordinal >= 1 && ordinal <= query.Parameters.Count ? query.Parameters[ordinal - 1] : null;
             }
 
-            dollar = message.IndexOf('$', end);
+            dollar = message.IndexOf('$', dollar + 1);
         }
 
         return null;
