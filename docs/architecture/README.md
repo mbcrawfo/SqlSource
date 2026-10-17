@@ -47,7 +47,7 @@ Each page uses these terms in the sense given here.  The words a user meets are 
 
 ### Capture
 
-A `DescribeCapture`: every call a describer made to an engine, with each request and answer, in the order it made them.  `CapturingExchange` records one, and `ReplayingExchange` answers from one without asking the engine.
+A `DescribeCapture`: every call a describer made to an engine that answered, with each request and answer, in the order it made them.  `CapturingExchange` records one, and `ReplayingExchange` answers from one without asking the engine.
 
 ### Claim
 
@@ -55,7 +55,7 @@ A type claims the `.sql` files that the `Path` of its `[SqlSourceGenerate]` reso
 
 ### Describer
 
-An `IQueryDescriber`: the code that asks the databases of one dialect what a query's parameters and columns are, through a session it opens with each database.  `DescriberRegistry` holds one for each dialect, and the released tool registers only `PostgresDescriber`.
+An `IQueryDescriber`: the code that asks the databases of one dialect what a query's parameters and columns are, through a session it opens with each database.  `DescriberRegistry` holds one for each dialect, and which the released tool registers is [the host](tool.md#the-host).
 
 ### Dialect
 

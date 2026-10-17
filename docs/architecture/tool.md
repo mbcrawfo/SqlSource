@@ -8,7 +8,7 @@ How `src/SqlSource.Tool` runs `sqlsource describe`: how a command line is read a
 
 ### The host
 
-[`ToolHost`](../../src/SqlSource.Tool/ToolHost.cs) is a record of everything the tool takes from outside itself: standard output and standard error, the working directory, the environment, the runner of processes, the temporary directory, the number of processors, the describers by [dialect](README.md#dialect), the exchange of each database, and the clock, a `TimeProvider`.  `ToolHost.Create` makes the host of a real run from the console, the current directory and the machine, with a `DescriberRegistry` that holds `PostgresDescriber` and an exchange that is `LiveExchange` for every database.  How a describer calls through its exchange is [the describer contract](postgres-describer.md#the-describer-contract).
+[`ToolHost`](../../src/SqlSource.Tool/ToolHost.cs) is a record of everything the tool takes from outside itself: standard output and standard error, the working directory, the environment, the runner of processes, the temporary directory, the number of processors, the describers by [dialect](README.md#dialect), the exchange of each database, and the clock, a `TimeProvider`.  `ToolHost.Create` makes the host of a real run from the console, the current directory and the machine, with a `DescriberRegistry` that holds `PostgresDescriber` alone, the one describer the released tool registers, and an exchange that is `LiveExchange` for every database.  How a describer calls through its exchange is [the describer contract](postgres-describer.md#the-describer-contract).
 
 `ToolHost.Create` asks for the current directory, which throws when it was deleted.  `Cli.Run` catches that, writes the `SQLSRC200` to standard error with a reporter of its own, and returns `1`, since there is no host to report to.
 
@@ -112,7 +112,7 @@ For each project it reads, in this order:
 - **The listed files**, with [`ListedFiles`](../../src/SqlSource.Tool/Planning/ListedFiles.cs): the manifest's `.sql` files, normalised and each once ignoring case, as the generator lists them.  `PathResolver.FindFiles` gives the files each claim's `Path` resolves to.  A file that no claim takes is skipped, its metadata unread.
 - **The invalid values**, after the project's `SQLSRC208`s: each dialect that is not valid as one `SQLSRC011`, then each value of `SqlSourceOutput` or `SqlSourceDatabase` as one `SQLSRC014`, at the project file, as the generator reports them.
 
-A file that two projects claim is planned once, under the first.  It is read through `SqlFileText`, an `AdditionalText` over the file on the disk, and parsed by `SqlFileReader.Read` with the dialect of `FileParseInput.Resolve` and no comments, since the hash covers the SQL without them.  A file with parse errors has those errors, and no queries.
+A file that two projects claim is planned once, under the first.  It is read through `SqlFileText`, an `AdditionalText` over the file on the disk, and parsed by `SqlFileReader.Read` with the dialect of `FileParseInput.Resolve` and no comments, since the hash covers the SQL without them.  A file with parse errors has those errors, and no queries.  Each planned file has a `PlannedFileState`: `HasParseErrors` then, `NotDescribable` when a query of it needs an entry under a dialect that cannot be described, as below, and `Ready` otherwise.
 
 For each query the planner resolves the output of every claim of every project with `QuerySettings.Resolve` and takes the greatest.  A query whose output is `Sql` needs no entry and has no database and no hash.  Any other gets the database of its marker, its file's metadata, its project's property, or else the dialect's name, and the hash of `SqlQueryHash.Compute`.  A token without a default is `SQLSRC210` and a `QueryProblems` flag.  The first query of a file that needs an entry under a dialect outside `SqlDescribableDialects` makes the file `NotDescribable`, with one `SQLSRC209`.
 
@@ -124,7 +124,7 @@ Last, the filters of `RunFilters` select queries, by `PlannedQuery.IsSelected`. 
 
 ### Deciding
 
-[`RunDecisions.Decide`](../../src/SqlSource.Tool/Describing/RunDecisions.cs) reads the sidecar of each file that is `Ready` and has a selected query that needs an entry, with `SidecarOnDisk.Read`, and gives each query a `QueryWork` with its `QueryState`:
+[`RunDecisions.Decide`](../../src/SqlSource.Tool/Describing/RunDecisions.cs) reads the sidecar of each file that is `Ready` and has a selected query that needs an entry, with `SidecarOnDisk.Read`, and gives each query a `QueryWork` with its `QueryState`, by the first row that holds:
 
 | State | When |
 |----|----|

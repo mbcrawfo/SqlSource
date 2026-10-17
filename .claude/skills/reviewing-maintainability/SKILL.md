@@ -21,7 +21,8 @@ Dispatch these at once, each as a read-only subagent with the brief in [sweeps.m
 |----|----|
 | A cohesive group of four or more files in a large folder | Move now, if the cost below allows |
 | A folder whose traps no AGENTS.md covers | Add one, under 250 lines, traps only, with the maintenance footer |
-| A name in an AGENTS.md that does not exist, or a claim the code contradicts | Fix the line now |
+| A name in an AGENTS.md, an architecture page or a readme that does not exist, or a claim the code contradicts | Fix the line now |
+| A placeholder for a phase that has shipped | Write the section from the code in the review's pull request, or record a `TD-` item if that is more than a fix |
 | A comment that is wrong, stale, or restates its own code | Fix or delete now |
 | Duplicated logic, uneven conventions, over-long methods, dead members | One grouped `TD-` item per area (`src/`, tests), numbered, with the file links; do not refactor |
 | A test that depends on the process, the clock or the repository | Its own `TD-` item: it is fragility, not duplication |
