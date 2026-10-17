@@ -1,4 +1,4 @@
-using System.Text;
+using System;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
 
@@ -50,47 +50,31 @@ internal sealed record OutputReference(string? Alias, string Column)
         return entry[at] == '"' ? Quoted(entry, ref at) : Bare(entry, ref at);
     }
 
+    // The text up to the next "." or the end, when it is a name PostgreSQL prints bare.
     private static string? Bare(string entry, ref int at)
     {
-        var start = at;
-        if (!IsLowerOrUnderscore(entry[at]))
+        var end = entry.IndexOf('.', at);
+        end = end < 0 ? entry.Length : end;
+        if (!PostgresIdentifiers.IsBareName(entry.AsSpan(at, end - at)))
         {
             return null;
         }
 
-        while (at < entry.Length && (IsLowerOrUnderscore(entry[at]) || char.IsAsciiDigit(entry[at])))
-        {
-            at++;
-        }
-
-        return entry[start..at];
+        var name = entry[at..end];
+        at = end;
+        return name;
     }
 
+    // A quoted name, or null when its quote does not close or it is empty.
     private static string? Quoted(string entry, ref int at)
     {
-        var name = new StringBuilder();
-        var index = at + 1;
-        while (index < entry.Length)
+        if (!PostgresIdentifiers.SkipQuoted(entry, at, out var end))
         {
-            if (entry[index] != '"')
-            {
-                _ = name.Append(entry[index]);
-                index++;
-            }
-            else if (index + 1 < entry.Length && entry[index + 1] == '"')
-            {
-                _ = name.Append('"');
-                index += 2;
-            }
-            else
-            {
-                at = index + 1;
-                return name.Length > 0 ? name.ToString() : null;
-            }
+            return null;
         }
 
-        return null;
+        var name = PostgresIdentifiers.Unquote(entry.AsSpan(at, end - at));
+        at = end;
+        return name.Length > 0 ? name : null;
     }
-
-    private static bool IsLowerOrUnderscore(char character) => char.IsAsciiLetterLower(character) || character == '_';
 }

@@ -53,5 +53,9 @@ public sealed class OutputReferenceTests
     [InlineData("'u.id'")]
     [InlineData("u.id ")]
     [InlineData(" u.id")]
+    // An upper-case word is a keyword a plan prints, never a column it need not quote.
+    [InlineData("CURRENT_DATE")]
+    [InlineData("CURRENT_USER")]
+    [InlineData("LOCALTIMESTAMP")]
     public void Parse_Expression_IsNoReference(string entry) => OutputReference.Parse(entry).ShouldBeNull();
 }

@@ -167,7 +167,7 @@ internal static class PlanExpression
             }
             else if (token.Kind == Kind.QuotedName)
             {
-                named = text[1..^1].Replace("\"\"", "\"", StringComparison.Ordinal);
+                named = PostgresIdentifiers.Unquote(text);
             }
 
             if (
@@ -211,7 +211,7 @@ internal static class PlanExpression
         return groups;
     }
 
-    private enum Kind
+    internal enum Kind
     {
         Word,
         QuotedName,
@@ -227,11 +227,11 @@ internal static class PlanExpression
         Other,
     }
 
-    private readonly record struct Token(Kind Kind, int Start, int End);
+    internal readonly record struct Token(Kind Kind, int Start, int End);
 
     // The entry as tokens, or null when a quote does not close or a parenthesis or a bracket does not balance.  A
     // string is '...' with '' for a quote, and a quoted name "..." with "" for a quote; a space only separates.
-    private static class Tokens
+    internal static class Tokens
     {
         public static List<Token>? Read(string entry)
         {
@@ -251,16 +251,16 @@ internal static class PlanExpression
                 Kind kind;
                 if (character is '\'' or '"')
                 {
-                    if (!SkipQuoted(entry, ref at))
+                    if (!PostgresIdentifiers.SkipQuoted(entry, at, out at))
                     {
                         return null;
                     }
 
                     kind = character == '\'' ? Kind.String : Kind.QuotedName;
                 }
-                else if (IsNameStart(character))
+                else if (PostgresIdentifiers.IsWordStart(character))
                 {
-                    while (at < entry.Length && IsNamePart(entry[at]))
+                    while (at < entry.Length && PostgresIdentifiers.IsWordPart(entry[at]))
                     {
                         at++;
                     }
@@ -302,30 +302,6 @@ internal static class PlanExpression
             return depth.Count == 0 ? tokens : null;
         }
 
-        private static bool SkipQuoted(string entry, ref int at)
-        {
-            var quote = entry[at];
-            at++;
-            while (at < entry.Length)
-            {
-                if (entry[at] != quote)
-                {
-                    at++;
-                }
-                else if (at + 1 < entry.Length && entry[at + 1] == quote)
-                {
-                    at += 2;
-                }
-                else
-                {
-                    at++;
-                    return true;
-                }
-            }
-
-            return false;
-        }
-
         // Digits with an optional fraction; one that runs on into a letter is no number this class reads.
         private static Kind Number(string entry, ref int at)
         {
@@ -343,9 +319,9 @@ internal static class PlanExpression
                 }
             }
 
-            if (at < entry.Length && (IsNamePart(entry[at]) || entry[at] == '.'))
+            if (at < entry.Length && (PostgresIdentifiers.IsWordPart(entry[at]) || entry[at] == '.'))
             {
-                while (at < entry.Length && (IsNamePart(entry[at]) || entry[at] == '.'))
+                while (at < entry.Length && (PostgresIdentifiers.IsWordPart(entry[at]) || entry[at] == '.'))
                 {
                     at++;
                 }
@@ -385,15 +361,12 @@ internal static class PlanExpression
                 _ => null,
             };
 
-        private static bool IsNameStart(char character) => char.IsAsciiLetter(character) || character == '_';
-
-        private static bool IsNamePart(char character) =>
-            char.IsAsciiLetterOrDigit(character) || character is '_' or '$';
-
+        // A "$" is one, as in "+$1"; a character that starts a word is not.
         private static bool IsSymbol(char character) =>
             !char.IsWhiteSpace(character)
-            && !char.IsAsciiLetterOrDigit(character)
-            && character is not ('_' or '\'' or '"' or ':')
+            && !PostgresIdentifiers.IsWordStart(character)
+            && !char.IsAsciiDigit(character)
+            && character is not ('\'' or '"' or ':')
             && Punctuation(character) is null;
     }
 

@@ -183,9 +183,9 @@ internal static class NpgsqlCheck
         EquatableArray<SqlQueryParameter> parameters
     )
     {
-        var where = Invariant($"the SQL with $n parts at character {at + 1}");
+        var where = string.Create(CultureInfo.InvariantCulture, $"the SQL with $n parts at character {at + 1}");
         if (
-            NumberAt(theirs, at) is { } number
+            PostgresIdentifiers.ParameterNumberAt(theirs, at) is { } number
             && number >= 1
             && number <= order.Count
             && !parameters.Contains(order[number - 1])
@@ -196,30 +196,6 @@ internal static class NpgsqlCheck
         }
 
         return $"{where}: '{Quote(theirs, at)}' for Npgsql and '{Quote(ours, at)}' for SqlSource";
-    }
-
-    // The n of a "$n" that starts at the index, or null.
-    private static int? NumberAt(string text, int at)
-    {
-        if (at >= text.Length || text[at] != '$')
-        {
-            return null;
-        }
-
-        var end = at + 1;
-        while (end < text.Length && char.IsAsciiDigit(text[end]))
-        {
-            end++;
-        }
-
-        return int.TryParse(
-            text.AsSpan(at + 1, end - at - 1),
-            NumberStyles.None,
-            CultureInfo.InvariantCulture,
-            out var number
-        )
-            ? number
-            : null;
     }
 
     private static string Quote(string text, int from) => text.Substring(from, Math.Min(Quoted, text.Length - from));
@@ -236,7 +212,10 @@ internal static class NpgsqlCheck
         {
             return new CheckVerdict(
                 Differ,
-                Invariant($"the result has {seen.Count} columns for Npgsql and {described.Count} for SqlSource")
+                string.Create(
+                    CultureInfo.InvariantCulture,
+                    $"the result has {seen.Count} columns for Npgsql and {described.Count} for SqlSource"
+                )
             );
         }
 
@@ -247,7 +226,10 @@ internal static class NpgsqlCheck
             {
                 return new CheckVerdict(
                     Differ,
-                    Invariant($"column {index + 1} is named '{theirs.Name}' for Npgsql and '{ours.Name}' for SqlSource")
+                    string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"column {index + 1} is named '{theirs.Name}' for Npgsql and '{ours.Name}' for SqlSource"
+                    )
                 );
             }
 
@@ -256,7 +238,10 @@ internal static class NpgsqlCheck
                 var oursNamed = NameOf(ours.TypeOid, rows);
                 return new CheckVerdict(
                     Differ,
-                    Invariant($"column {index + 1} is {theirs.DataTypeName} for Npgsql and {oursNamed} for SqlSource"),
+                    string.Create(
+                        CultureInfo.InvariantCulture,
+                        $"column {index + 1} is {theirs.DataTypeName} for Npgsql and {oursNamed} for SqlSource"
+                    ),
                     TypeDiffers: true
                 );
             }
@@ -267,6 +252,4 @@ internal static class NpgsqlCheck
 
     private static string NameOf(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>
         rows.TryGetValue(oid, out var row) ? row.FormatType : oid.ToString(CultureInfo.InvariantCulture);
-
-    private static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
 }

@@ -36,7 +36,7 @@ internal abstract class QuoteReader
     /// True for a character that can be part of a name as PostgreSQL and MySQL read it: an identifier character, or
     /// any character above U+007F, which they read as a letter.
     /// </summary>
-    protected static bool IsNameCharacterOfPostgreSql(char value) => IsIdentifierCharacter(value) || value > '\u007F';
+    internal static bool IsNameCharacterOfPostgreSql(char value) => IsIdentifierCharacter(value) || value > '\u007F';
 
     /// <summary>
     /// The end of a region that closes with the character it opens with, where that character doubled stands for

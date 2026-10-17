@@ -56,18 +56,11 @@ internal static class ParameterPlaceholders
     // The one statement of the SQL, with "$n" for each parameter when it is given the list.
     private static string? Statement(string sql, EquatableArray<SqlQueryParameter>? parameters)
     {
-        var lexed = SqlLexer.Lex(sql, SqlDialectRules.PostgreSql);
-        if (lexed.Error is not null)
-        {
-            throw new InvalidOperationException(
-                "The sample SQL of a query does not lex, and the plan's parser read it."
-            );
-        }
-
+        var lexemes = PostgresSql.Lex(sql);
         var rewritten = new StringBuilder(sql.Length);
-        for (var index = 0; index < lexed.Lexemes.Count; index++)
+        for (var index = 0; index < lexemes.Count; index++)
         {
-            var lexeme = lexed.Lexemes[index];
+            var lexeme = lexemes[index];
             var text = sql.AsSpan(lexeme.Span.Start, lexeme.Span.Length);
             if (lexeme.Kind == SqlLexemeKind.Parameter && parameters is { } list)
             {
@@ -83,7 +76,7 @@ internal static class ParameterPlaceholders
             }
 
             // The first ";" of the SQL.  It is the trailing one when nothing but white space and comments follows.
-            return text[(end + 1)..].IsWhiteSpace() && OnlyCommentsFollow(sql, lexed.Lexemes, index + 1)
+            return text[(end + 1)..].IsWhiteSpace() && OnlyCommentsFollow(sql, lexemes, index + 1)
                 ? rewritten.Append(text[..end]).ToString()
                 : null;
         }

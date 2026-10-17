@@ -127,4 +127,33 @@ public sealed class PlanPartitionsTests
     [Fact]
     public void ParentsOf_MembersOfTwoTablesUnderOneAncestor_AreThatAncestor() =>
         PlanPartitions.ParentsOf(Append(Member("e_1", "e_2024"), Member("e_2", "other")), Partitions).ShouldBe([200]);
+
+    // A name of the alias that qualifies a column is marked, so that two members compare the same; the mark is
+    // \u0001, which no name holds.
+    [Theory]
+    [InlineData("e_1.id", "e_1", "\u0001.id")]
+    [InlineData("(e_1.id + e_1.n)", "e_1", "(\u0001.id + \u0001.n)")]
+    [InlineData("\"E_1\".id", "E_1", "\u0001.id")]
+    [InlineData("\"E\"\"1\".id", "E\"1", "\u0001.id")]
+    [InlineData("e_1.id = 'e_1.id'", "e_1", "\u0001.id = 'e_1.id'")]
+    public void WithoutAlias_AliasThatQualifiesAColumn_IsMarked(string entry, string alias, string marked) =>
+        PlanPartitions.WithoutAlias(entry, alias).ShouldBe(marked);
+
+    // A name that no "." directly follows, or that one directly precedes, qualifies nothing.
+    [Theory]
+    [InlineData("e_1")]
+    [InlineData("x.e_1.id")]
+    [InlineData("e_1 .id")]
+    [InlineData("f_1.id")]
+    [InlineData("\"e_1\"")]
+    public void WithoutAlias_NameThatQualifiesNothing_IsKept(string entry) =>
+        PlanPartitions.WithoutAlias(entry, "e_1").ShouldBe(entry);
+
+    [Theory]
+    [InlineData("(e_1.id")]
+    [InlineData("e_1.id)")]
+    [InlineData("e_1.id = 'open")]
+    [InlineData("\"e_1.id")]
+    public void WithoutAlias_EntryThatDoesNotRead_IsUnchanged(string entry) =>
+        PlanPartitions.WithoutAlias(entry, "e_1").ShouldBe(entry);
 }

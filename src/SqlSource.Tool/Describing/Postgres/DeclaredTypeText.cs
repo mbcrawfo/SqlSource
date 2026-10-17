@@ -169,33 +169,22 @@ internal static class DeclaredTypeText
     // A quoted identifier, with "" for a quote.  It ends on its line.
     private static bool TryReadQuoted(string text, ref int position)
     {
-        var index = position + 1;
-        while (index < text.Length)
+        if (
+            !PostgresIdentifiers.SkipQuoted(text, position, out var end)
+            || text.AsSpan(position, end - position).IndexOfAny('\r', '\n', '\0') >= 0
+        )
         {
-            var value = text[index];
-            if (value is '\r' or '\n' or '\0')
-            {
-                return false;
-            }
-
-            if (value != '"')
-            {
-                index++;
-            }
-            else if (index + 1 < text.Length && text[index + 1] == '"')
-            {
-                index += 2;
-            }
-            else
-            {
-                position = index + 1;
-                return true;
-            }
+            return false;
         }
 
-        return false;
+        position = end;
+        return true;
     }
 
+    // Stricter than PostgreSQL's word rule (PostgresIdentifiers.IsWordPart) on purpose, and not to be replaced by it:
+    // the text goes into a PREPARE, and with "$" a type of "1$$" would open a dollar quote there and "1$1" would be
+    // a parameter.  A type whose name holds "$", or a character above U+007F that is no letter or digit, is written
+    // quoted.
     private static bool IsBare(char value) => char.IsLetterOrDigit(value) || value == '_';
 
     private static void SkipSpaces(string text, ref int position)

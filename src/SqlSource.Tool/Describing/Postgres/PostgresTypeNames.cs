@@ -1,6 +1,5 @@
 using System;
 using System.Globalization;
-using System.Linq;
 
 namespace SqlSource.Tool.Describing.Postgres;
 
@@ -14,7 +13,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// it when a user type of the same name stands before <c>pg_catalog</c> on the <c>search_path</c> (TD-0050).  An
 /// identifier is quoted unless it is lower-case letters, digits and <c>_</c>.  A reserved word is not
 /// quoted, as in <c>user.status</c>: the <c>name</c> has been spelled so since phase 3, and the container test
-/// <c>Describe_TypeOfASchemaNamedByAReservedWord_IsSpelledBare</c> pins it.  The name that Npgsql binds is the
+/// <c>DescribeAsync_TypeOfASchemaNamedByAReservedWord_IsSpelledBare</c> pins it.  The name that Npgsql binds is the
 /// <c>bindName</c> (<see cref="PostgresBindNames" />), not this one.
 /// </remarks>
 internal static class PostgresTypeNames
@@ -59,7 +58,7 @@ internal static class PostgresTypeNames
     /// a digit, else in double quotes with a quote doubled.
     /// </summary>
     public static string Identifier(string name) =>
-        IsBare(name) ? name : $"\"{name.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
+        PostgresIdentifiers.IsBareName(name) ? name : $"\"{name.Replace("\"", "\"\"", StringComparison.Ordinal)}\"";
 
     // format_type(oid, -1) of char is "bpchar": only a char with a length is "character".  Of bit it is "bit" with
     // the quotes, since plain bit means bit(1): the tool writes the length form itself and keeps the server's
@@ -67,18 +66,31 @@ internal static class PostgresTypeNames
     private static string InCatalog(PostgresTypeRow row, PostgresFacets facets) =>
         row.Typname switch
         {
-            "bpchar" when facets.Length is { } length => Invariant($"character({length})"),
-            "varchar" or "varbit" when facets.Length is { } length => Invariant($"{row.FormatType}({length})"),
-            "bit" when facets.Length is { } length => Invariant($"bit({length})"),
-            "numeric" when facets is { Precision: { } precision, Scale: { } scale } => Invariant(
+            "bpchar" when facets.Length is { } length => string.Create(
+                CultureInfo.InvariantCulture,
+                $"character({length})"
+            ),
+            "varchar" or "varbit" when facets.Length is { } length => string.Create(
+                CultureInfo.InvariantCulture,
+                $"{row.FormatType}({length})"
+            ),
+            "bit" when facets.Length is { } length => string.Create(CultureInfo.InvariantCulture, $"bit({length})"),
+            "numeric" when facets is { Precision: { } precision, Scale: { } scale } => string.Create(
+                CultureInfo.InvariantCulture,
                 $"numeric({precision},{scale})"
             ),
-            "numeric" when facets.Precision is { } precision => Invariant($"numeric({precision})"),
+            "numeric" when facets.Precision is { } precision => string.Create(
+                CultureInfo.InvariantCulture,
+                $"numeric({precision})"
+            ),
             "time" or "timetz" or "timestamp" or "timestamptz" when facets.Precision is { } precision => AfterFirstWord(
                 row.FormatType,
                 precision
             ),
-            "interval" when facets.Precision is { } precision => Invariant($"interval({precision})"),
+            "interval" when facets.Precision is { } precision => string.Create(
+                CultureInfo.InvariantCulture,
+                $"interval({precision})"
+            ),
             _ => row.FormatType,
         };
 
@@ -87,14 +99,7 @@ internal static class PostgresTypeNames
     {
         var space = name.IndexOf(' ', StringComparison.Ordinal);
         return space < 0
-            ? Invariant($"{name}({precision})")
-            : Invariant($"{name[..space]}({precision}){name[space..]}");
+            ? string.Create(CultureInfo.InvariantCulture, $"{name}({precision})")
+            : string.Create(CultureInfo.InvariantCulture, $"{name[..space]}({precision}){name[space..]}");
     }
-
-    private static bool IsBare(string name) =>
-        name.Length > 0
-        && !char.IsAsciiDigit(name[0])
-        && name.All(static value => char.IsAsciiLetterLower(value) || char.IsAsciiDigit(value) || value == '_');
-
-    private static string Invariant(FormattableString text) => text.ToString(CultureInfo.InvariantCulture);
 }
