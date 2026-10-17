@@ -9,7 +9,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing;
 
 // Where the connection of a database comes from: the command line, its own variable, or the variable with no name.
-public class ConnectionTests
+public sealed class ConnectionTests
 {
     // Every selected database can be described.
     private static Connections Resolve(

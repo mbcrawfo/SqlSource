@@ -15,7 +15,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Describers;
 
 // The seam a describer is written against: the registry, the exchange, and the describer of the tests itself.
-public class DescriberTests
+public sealed class DescriberTests
 {
     [Fact]
     public void Find_DialectWithADescriber_GivesIt()

@@ -12,7 +12,7 @@ namespace SqlSource.Tool.Tests.Processes;
 // The variables that a program gets from the real runner.  A program gets the ones of this process, so a test
 // gives this process some, and is of the collection that runs alone for that.
 [Collection(nameof(ChangesTheEnvironment))]
-public class ProcessRunnerEnvironmentTests
+public sealed class ProcessRunnerEnvironmentTests
 {
     private const string Removed = "SQLSOURCE_TEST_REMOVED";
 

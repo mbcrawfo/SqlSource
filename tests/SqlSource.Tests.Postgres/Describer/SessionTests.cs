@@ -154,7 +154,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     // closed before it read that, so its lines are not compared.  Every call after it has the tool's own text: the
     // driver would throw what is no error of a server.
     [Fact]
-    public async Task Describe_AfterTheServerEndedTheSession_IsSqlsrc225EachTimeAndNoThrow()
+    public async Task DescribeAsync_AfterTheServerEndedTheSession_IsSqlsrc225EachTimeAndNoThrow()
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
@@ -173,7 +173,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     // is reported, and "deallocate", which is asked whatever became of the describe, answers one too and replaces
     // nothing.
     [Fact]
-    public async Task Describe_ServerEndsTheSessionBetweenPrepareAndColumns_IsSqlsrc225AndNoThrow()
+    public async Task DescribeAsync_ServerEndsTheSessionBetweenPrepareAndColumns_IsSqlsrc225AndNoThrow()
     {
         PostgresSession? ending = null;
         var exchange = new AfterLiveExchange(
@@ -200,7 +200,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     // is SQLSRC225 at the catalog and not a throw, "types" and "check" are not asked, the statement is freed, and the
     // session describes another query afterwards.
     [Fact]
-    public async Task Describe_TableDroppedBetweenColumnsAndTables_IsSqlsrc225AtCatalogAndNoThrow()
+    public async Task DescribeAsync_TableDroppedBetweenColumnsAndTables_IsSqlsrc225AtCatalogAndNoThrow()
     {
         await postgres.ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
         var dropped = false;
@@ -244,7 +244,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     [InlineData("\r\n  SELECT id\r\nFROM users\r\nWHERE id = @id  \r\n")]
     [InlineData("DELETE FROM samples WHERE flag; -- all of them\n")]
     [InlineData("SELECT '\U0001F600 é' AS face WHERE @n::int = 1 /* trailing */  ")]
-    public async Task Describe_StatementPrepared_IsListedWithTheTextAsSentAndDescribed(string sql)
+    public async Task DescribeAsync_StatementPrepared_IsListedWithTheTextAsSentAndDescribed(string sql)
     {
         PostgresSession? reading = null;
         PostgresPrepareRequest? sent = null;

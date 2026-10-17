@@ -6,7 +6,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The text of a -- param: type is put into SQL the tool sends, so it is read against the grammar of a type name
 // first: a name, PostgreSQL's own type words, one modifier, and array marks.  Anything else never leaves the tool.
-public class DeclaredTypeTextTests
+public sealed class DeclaredTypeTextTests
 {
     [Theory]
     [InlineData("int")]

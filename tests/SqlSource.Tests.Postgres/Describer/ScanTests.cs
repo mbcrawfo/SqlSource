@@ -30,7 +30,7 @@ public sealed class ScanTests(PostgresContainer postgres)
 
     // The row-number dedupe: the subquery is planned apart, under a Subquery Scan, and its LEFT JOIN extends orders.
     [Fact]
-    public async Task Describe_ColumnsThroughASubqueryScan_AreAnsweredByTheirOrigins() =>
+    public async Task DescribeAsync_ColumnsThroughASubqueryScan_AreAnsweredByTheirOrigins() =>
         (
             await WalkedAsync(
                 "SELECT s.id, s.name, s.total FROM (SELECT u.id, u.name, o.total, "
@@ -41,7 +41,7 @@ public sealed class ScanTests(PostgresContainer postgres)
 
     // Matched by name, a column renamed to another's name would be read as the other.
     [Fact]
-    public async Task Describe_SubqueryColumnsRenamedToEachOthersNames_AreNotReadCrossed() =>
+    public async Task DescribeAsync_SubqueryColumnsRenamedToEachOthersNames_AreNotReadCrossed() =>
         (
             await WalkedAsync(
                 "SELECT s.total, s.note FROM (SELECT o.note AS total, o.total AS note, row_number() OVER () AS n "
@@ -52,7 +52,7 @@ public sealed class ScanTests(PostgresContainer postgres)
     // Both columns are users.id, of the side the join keeps and of the side it extends: which is which through the
     // scan cannot be told.
     [Fact]
-    public async Task Describe_SubqueryColumnsOfASelfJoin_KeepTheHeuristic() =>
+    public async Task DescribeAsync_SubqueryColumnsOfASelfJoin_KeepTheHeuristic() =>
         (
             await WalkedAsync(
                 "SELECT s.a, s.b FROM (SELECT u.id AS a, v.id AS b, row_number() OVER () AS n "
@@ -62,7 +62,7 @@ public sealed class ScanTests(PostgresContainer postgres)
 
     // One plan of the CTE, and two scans of it, the second on the side the join extends.
     [Fact]
-    public async Task Describe_ColumnsOfACteUsedTwice_AreAnsweredForEachScan() =>
+    public async Task DescribeAsync_ColumnsOfACteUsedTwice_AreAnsweredForEachScan() =>
         (
             await WalkedAsync(
                 "WITH recent AS MATERIALIZED (SELECT o.id, o.user_id, o.note FROM orders o) "
@@ -73,7 +73,7 @@ public sealed class ScanTests(PostgresContainer postgres)
 
     // A condition on a parameter prunes at executor start, so the plan keeps the Append of every partition.
     [Fact]
-    public async Task Describe_PartitionedTableOnEachSideOfALeftJoin_IsAnsweredByItsSide()
+    public async Task DescribeAsync_PartitionedTableOnEachSideOfALeftJoin_IsAnsweredByItsSide()
     {
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
@@ -91,7 +91,7 @@ public sealed class ScanTests(PostgresContainer postgres)
 
     // A partitioned table is no set operation: an aggregate over it is answered.
     [Fact]
-    public async Task Describe_AggregateOverAPartitionedTable_IsAnswered()
+    public async Task DescribeAsync_AggregateOverAPartitionedTable_IsAnswered()
     {
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
@@ -112,7 +112,7 @@ public sealed class ScanTests(PostgresContainer postgres)
         "SELECT greatest(y.v, y.w) FROM (SELECT x.kind AS v, x.id AS w FROM scratch_parts_1 x "
             + "UNION ALL SELECT NULL::integer, NULL::integer FROM scratch_parts_2 x) y"
     )]
-    public async Task Describe_UnionAllOfTwoPartitionsWithOtherBranches_StaysUnknown(string sql)
+    public async Task DescribeAsync_UnionAllOfTwoPartitionsWithOtherBranches_StaysUnknown(string sql)
     {
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
@@ -122,7 +122,7 @@ public sealed class ScanTests(PostgresContainer postgres)
     // A foreign table's scan is an instance: unknown where nothing extends it, nullable where a join does.  The
     // foreign table, scan_foreign, is orders, read back through postgres_fdw from this very server.
     [Fact]
-    public async Task Describe_ForeignTableOnEachSideOfALeftJoin_IsAnsweredByItsSide()
+    public async Task DescribeAsync_ForeignTableOnEachSideOfALeftJoin_IsAnsweredByItsSide()
     {
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
         await postgres.ExecuteAsync(
@@ -149,7 +149,7 @@ public sealed class ScanTests(PostgresContainer postgres)
 
     // A plan of one relation prints bare names at a Limit over a Sort over the scan.  The function's name gates it.
     [Fact]
-    public async Task Describe_BareNamesAtARootOverOneScan_AreTheRelations() =>
+    public async Task DescribeAsync_BareNamesAtARootOverOneScan_AreTheRelations() =>
         (
             await WalkedAsync(
                 "SELECT id, name, deleted_at FROM users WHERE left(name, 1) = @initial ORDER BY name LIMIT 10"
@@ -160,7 +160,7 @@ public sealed class ScanTests(PostgresContainer postgres)
     // a RIGHT JOIN keeps, whose table a plain column names, and a constant.  A constant of a subquery pulled up from
     // the side a LEFT JOIN extends is computed at its scan, and stays unknown.
     [Fact]
-    public async Task Describe_ExpressionTheRootComputesOverAnOuterJoin_IsAnswered() =>
+    public async Task DescribeAsync_ExpressionTheRootComputesOverAnOuterJoin_IsAnswered() =>
         (
             await WalkedAsync(
                 "SELECT o.id, coalesce(a.id, o.user_id) AS uid, 'k' AS k, s.c FROM users a "
@@ -195,7 +195,7 @@ public sealed class ScanTests(PostgresContainer postgres)
             + "CROSS JOIN LATERAL (SELECT u.id AS y, u2.id AS z FROM users u2 WHERE u2.id = o.user_id LIMIT 5) s "
             + "WHERE s.z > 0"
     )]
-    public async Task Describe_SubqueryColumnThatTheScannedPlanPrintsInParentheses_IsNeverFalse(string sql) =>
+    public async Task DescribeAsync_SubqueryColumnThatTheScannedPlanPrintsInParentheses_IsNeverFalse(string sql) =>
         (await DescribedAsync(sql)).Answers[0].Nullable.ShouldNotBe(false);
 
     // A relation the planner proves empty under an outer join is a Result, whose columns print bare in a plan of
@@ -215,6 +215,6 @@ public sealed class ScanTests(PostgresContainer postgres)
         "UPDATE orders o SET note = o.note FROM (SELECT 1 AS one) x LEFT JOIN users b ON false "
             + "RETURNING coalesce(b.id, b.id) AS bid, o.id"
     )]
-    public async Task Describe_ExpressionOfARelationProvedEmpty_IsNeverFalse(string sql) =>
+    public async Task DescribeAsync_ExpressionOfARelationProvedEmpty_IsNeverFalse(string sql) =>
         (await DescribedAsync(sql)).Answers[0].Nullable.ShouldNotBe(false);
 }

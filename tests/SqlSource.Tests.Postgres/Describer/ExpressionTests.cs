@@ -19,7 +19,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_ExpressionsOfOneTable_AreAnsweredFromThePlan() =>
+    public async Task DescribeAsync_ExpressionsOfOneTable_AreAnsweredFromThePlan() =>
         (
             await AnswersAsync(
                 "SELECT a.id, coalesce(a.email, 'none') AS contact, "
@@ -41,7 +41,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
         ]);
 
     [Fact]
-    public async Task Describe_CountsAndRankings_AreAnsweredFromThePlan() =>
+    public async Task DescribeAsync_CountsAndRankings_AreAnsweredFromThePlan() =>
         (
             await AnswersAsync(
                 "SELECT id, count(*) AS n, count(*) FILTER (WHERE status = 'active') AS active, "
@@ -62,7 +62,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     // An aggregate of another schema whose argument's type is exact beats pg_catalog.count("any") whatever the path's
     // order, and the plan prints it bare: only count(*) is the catalog's by its text.
     [Fact]
-    public async Task Describe_CountOfAnArgumentThatAnotherSchemaTakes_StaysUnknown()
+    public async Task DescribeAsync_CountOfAnArgumentThatAnotherSchemaTakes_StaysUnknown()
     {
         await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
 
@@ -82,7 +82,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
         "WITH RECURSIVE r(k, n) AS (SELECT 'a'::text, 1 UNION ALL SELECT NULL, n + 1 FROM r WHERE n < 3) "
             + "SELECT k, n FROM r"
     )]
-    public async Task Describe_ConstantFirstBranchOfASetOperation_StaysUnknown(string sql) =>
+    public async Task DescribeAsync_ConstantFirstBranchOfASetOperation_StaysUnknown(string sql) =>
         (await AnswersAsync(sql))[0].ShouldBe(UnknownNoOrigin);
 
     // An INTERSECT returns rows that both inputs hold, and an EXCEPT rows of its left input: the constant of the
@@ -90,7 +90,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Theory]
     [InlineData("SELECT 'a'::text AS k FROM users INTERSECT SELECT note FROM orders")]
     [InlineData("SELECT 'a'::text AS k FROM users EXCEPT SELECT note FROM orders")]
-    public async Task Describe_ConstantFirstBranchOfAnIntersectOrAnExcept_IsAnsweredFromIt(string sql) =>
+    public async Task DescribeAsync_ConstantFirstBranchOfAnIntersectOrAnExcept_IsAnsweredFromIt(string sql) =>
         (await AnswersAsync(sql))[0].ShouldBe(NotNullSetOperation);
 
     // A value computed on the side a LEFT JOIN extends prints at the root as the same text, and is NULL for a row the
@@ -104,13 +104,13 @@ public sealed class ExpressionTests(PostgresContainer postgres)
         "SELECT u.id, c.n, c.n FROM users u "
             + "LEFT JOIN LATERAL (SELECT count(*) AS n FROM orders o WHERE o.user_id = u.id) c ON true"
     )]
-    public async Task Describe_ExpressionFromTheSideALeftJoinExtends_StaysUnknown(string sql) =>
+    public async Task DescribeAsync_ExpressionFromTheSideALeftJoinExtends_StaysUnknown(string sql) =>
         (await AnswersAsync(sql)).Skip(1).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
 
     // A view brings a LEFT JOIN ... IS NULL into a query without a word of the gate, and the anti join it plans as
     // returns the pulled-up constant NULL.
     [Fact]
-    public async Task Describe_ExpressionUnderAnAntiJoinOfAView_StaysUnknown()
+    public async Task DescribeAsync_ExpressionUnderAnAntiJoinOfAView_StaysUnknown()
     {
         await postgres.ExecuteAsync(
             "CREATE OR REPLACE VIEW expression_lonely AS SELECT u.id, s.k FROM users u "
@@ -129,7 +129,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     // A NOT EXISTS plans as an anti join too, which the text cannot tell from the view's.
     // The root computes the constant over the anti join, which no join above it extends.
     [Fact]
-    public async Task Describe_ExpressionBesideNotExists_IsAnswered() =>
+    public async Task DescribeAsync_ExpressionBesideNotExists_IsAnswered() =>
         (
             await AnswersAsync(
                 "SELECT u.id, 'k' AS k FROM users u WHERE NOT EXISTS (SELECT 1 FROM orders o WHERE o.user_id = u.id)"
@@ -138,7 +138,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
 
     // A partitioned table plans as an Append, which "partitions" tells from a UNION's.
     [Fact]
-    public async Task Describe_PartitionedTableAggregate_IsAnswered()
+    public async Task DescribeAsync_PartitionedTableAggregate_IsAnswered()
     {
         await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
@@ -147,7 +147,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
 
     // A count the path finds before pg_catalog's may be another schema's, which can return NULL.
     [Fact]
-    public async Task Describe_CountShadowedOnTheSearchPath_StaysUnknown()
+    public async Task DescribeAsync_CountShadowedOnTheSearchPath_StaysUnknown()
     {
         await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
 

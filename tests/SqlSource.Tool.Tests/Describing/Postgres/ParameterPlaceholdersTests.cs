@@ -9,7 +9,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // What is sent for a query: its one statement with $n where the lexer finds a parameter, and the type list of the
 // PREPARE.  A text in which the lexer finds several statements is never sent.
-public class ParameterPlaceholdersTests
+public sealed class ParameterPlaceholdersTests
 {
     private static EquatableArray<SqlQueryParameter> List(params SqlQueryParameter[] parameters) =>
         new([.. parameters]);

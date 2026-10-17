@@ -6,7 +6,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // The plan as EXPLAIN (VERBOSE, FORMAT JSON) writes it, read into the keys the walk uses.
-public class PlanNodeTests
+public sealed class PlanNodeTests
 {
     // A LEFT JOIN the planner swapped, as PostgreSQL 18 wrote it, cut to a few keys and one that no reader knows.
     private const string Swapped = /*lang=json,strict*/

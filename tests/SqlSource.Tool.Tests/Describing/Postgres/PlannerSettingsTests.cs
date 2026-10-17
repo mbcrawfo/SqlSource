@@ -7,7 +7,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The settings of the planner that a request of "explain" may carry: a closed list, so that nothing else reaches a
 // SET LOCAL.
-public class PlannerSettingsTests
+public sealed class PlannerSettingsTests
 {
     [Theory]
     [InlineData("enable_hashjoin")]

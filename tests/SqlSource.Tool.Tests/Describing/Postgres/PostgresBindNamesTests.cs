@@ -5,7 +5,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The name that check binds a parameter by, from the rows of the types alone.
-public class PostgresBindNamesTests
+public sealed class PostgresBindNamesTests
 {
     // numeric as a session shows it when a user type of the same name stands before pg_catalog on the search_path.
     private static readonly PostgresTypeRow HiddenNumeric = PostgresRows.BaseOf(

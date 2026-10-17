@@ -15,7 +15,7 @@ namespace SqlSource.Tool.Tests.Describing.Capture;
 // integers, booleans, nullable ones, lists of them and records of the same kind, which is the same text after a
 // round trip through the options of a capture.  A record is found by its name, which ends in Request or Answer, in
 // the namespace of an engine's describer or of the describer of the tests.
-public class CallRecordTests
+public sealed class CallRecordTests
 {
     // A namespace of an engine's describer, with every namespace under it.
     private static readonly string[] Under = ["SqlSource.Tool.Describing.Postgres"];

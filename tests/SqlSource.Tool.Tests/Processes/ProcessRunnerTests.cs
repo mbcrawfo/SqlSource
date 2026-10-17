@@ -14,7 +14,7 @@ namespace SqlSource.Tool.Tests.Processes;
 // The runner of a real run, with real programs: "dotnet", and ones that every operating system has.  A test of one
 // of those is skipped where the program is not on the path.  ProcessRunnerEnvironmentTests has the test of the
 // variables that a program gets.
-public class ProcessRunnerTests
+public sealed class ProcessRunnerTests
 {
     private static readonly ProcessRunner Runner = new();
 

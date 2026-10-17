@@ -9,7 +9,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // The six checks of the table match, in the format's order: the first that fails is the answer.
-public class TableMatcherTests
+public sealed class TableMatcherTests
 {
     // Attribute 3 was dropped: the answer of "tables" leaves a dropped attribute out, so the numbers have a gap.
     private static readonly PostgresTableRow Items = PostgresTables.TableOf(

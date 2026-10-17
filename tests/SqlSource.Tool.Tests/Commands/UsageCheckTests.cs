@@ -9,7 +9,7 @@ namespace SqlSource.Tool.Tests.Commands;
 
 // Most tests give UsageCheck a command built here, apart from the tool's, so that a change to the tool's options
 // does not move them; the tests at the end run the same checks over the tool's own commands.
-public class UsageCheckTests
+public sealed class UsageCheckTests
 {
     private static Command Root()
     {

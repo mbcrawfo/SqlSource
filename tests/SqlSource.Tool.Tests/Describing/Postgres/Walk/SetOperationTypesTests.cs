@@ -6,7 +6,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
 // Whether a branch's value of one type reaches the set operation's column of another through a cast the server ships,
 // which tests/SqlSource.Tests.Postgres/Describer/PlanOutputTests.cs pins in both directions for every pair of a family.
-public class SetOperationTypesTests
+public sealed class SetOperationTypesTests
 {
     [Theory]
     [InlineData(23, 20)]

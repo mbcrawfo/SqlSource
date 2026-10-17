@@ -28,7 +28,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     private static string[] MethodsOf(DescribeCapture capture) => [.. capture.Calls.Select(call => call.Method)];
 
     [Fact]
-    public async Task Describe_TwoStatements_IsSqlsrc230AndSendsNothing()
+    public async Task DescribeAsync_TwoStatements_IsSqlsrc230AndSendsNothing()
     {
         var (described, capture) = await Sessions.DescribeCapturedAsync(
             postgres.ConnectionString,
@@ -47,7 +47,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [InlineData("SELECT @a::int AS a INTO TEMP t", "SELECT INTO")]
     [InlineData("SELECT 1. INTO TEMP t", "SELECT INTO")]
     [InlineData("(SELECT 1 INTO TEMP t)", "SELECT INTO")]
-    public async Task Describe_StatementPrepareDoesNotTake_IsSqlsrc233AndSendsNothing(string sql, string kind)
+    public async Task DescribeAsync_StatementPrepareDoesNotTake_IsSqlsrc233AndSendsNothing(string sql, string kind)
     {
         var (described, capture) = await Sessions.DescribeCapturedAsync(postgres.ConnectionString, Requests.Of(sql));
 
@@ -58,7 +58,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_DeclaredTypeThatIsNoTypeName_IsSqlsrc228AndSendsNothing()
+    public async Task DescribeAsync_DeclaredTypeThatIsNoTypeName_IsSqlsrc228AndSendsNothing()
     {
         var (described, capture) = await Sessions.DescribeCapturedAsync(
             postgres.ConnectionString,
@@ -126,7 +126,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
 
     // The server checks a declared type against every use of its parameter.  The hint's words differ by version.
     [Fact]
-    public async Task Describe_DeclaredTypeThatAUseRejects_IsSqlsrc225WithTheServersLines()
+    public async Task DescribeAsync_DeclaredTypeThatAUseRejects_IsSqlsrc225WithTheServersLines()
     {
         var failure = await ShouldFailAsync(
             Requests.Of("SELECT 1 FROM users WHERE name = @p", ("p", "int")),
@@ -142,7 +142,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_ParameterThatNoUseTypes_IsSqlsrc226()
+    public async Task DescribeAsync_ParameterThatNoUseTypes_IsSqlsrc226()
     {
         var failure = await ShouldFailAsync(Requests.Of("SELECT @p IS NULL"), "SQLSRC226");
 
@@ -151,7 +151,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_FirstUseThatDoesNotFixTheType_IsSqlsrc227AtTheUse()
+    public async Task DescribeAsync_FirstUseThatDoesNotFixTheType_IsSqlsrc227AtTheUse()
     {
         var failure = await ShouldFailAsync(
             Requests.Of("SELECT 1 FROM users WHERE (@name IS NULL OR name = @name)"),
@@ -165,7 +165,10 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [Theory]
     [InlineData("SELECT 1 FROM users WHERE (name = @name OR @name IS NULL)", null)]
     [InlineData("SELECT 1 FROM users WHERE (@name IS NULL OR name = @name)", "varchar")]
-    public async Task Describe_OptionalFilterWithTheTypingUseFirstOrADeclaration_IsDescribed(string sql, string? type)
+    public async Task DescribeAsync_OptionalFilterWithTheTypingUseFirstOrADeclaration_IsDescribed(
+        string sql,
+        string? type
+    )
     {
         var request = type is null ? Requests.Of(sql) : Requests.Of(sql, ("name", type));
 
@@ -173,7 +176,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_DeclaredTypeTheDatabaseLacks_IsSqlsrc228NamingItAndItsParameter()
+    public async Task DescribeAsync_DeclaredTypeTheDatabaseLacks_IsSqlsrc228NamingItAndItsParameter()
     {
         var failure = await ShouldFailAsync(
             Requests.Of("SELECT 1 FROM users WHERE id = @id", ("p", "nope_t")),
@@ -193,7 +196,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
         "42P01: relation \"nope\" does not exist",
         "at character 19"
     )]
-    public async Task Describe_QueryTheServerRejects_IsSqlsrc225AtTheCharacterOfTheUsersSql(
+    public async Task DescribeAsync_QueryTheServerRejects_IsSqlsrc225AtTheCharacterOfTheUsersSql(
         string sql,
         string message,
         string position
@@ -206,7 +209,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
 
     // A rejected PREPARE leaves no statement, and the session goes on with the next name.
     [Fact]
-    public async Task Describe_AfterAQueryTheServerRejected_DescribesTheNextOne()
+    public async Task DescribeAsync_AfterAQueryTheServerRejected_DescribesTheNextOne()
     {
         var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString);
         await using var session = opened;
@@ -226,7 +229,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
 
     // A run that is cancelled ends as cancelled, and never as a failure that quotes the driver.
     [Fact]
-    public async Task Describe_CancelledToken_ThrowsAndIsNoFailure()
+    public async Task DescribeAsync_CancelledToken_ThrowsAndIsNoFailure()
     {
         await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         using var cancelled = new CancellationTokenSource();
@@ -238,7 +241,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Describe_StatementWithATrailingSemicolonAndNoParameter_IsDescribed() =>
+    public async Task DescribeAsync_StatementWithATrailingSemicolonAndNoParameter_IsDescribed() =>
         (await DescribeAsync(Requests.Of("DELETE FROM samples WHERE flag; -- all of them"))).Value.ShouldNotBeNull();
 
     private static readonly PostgresType CharacterVarying = TestSidecars.Postgres(
@@ -283,7 +286,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
 
     // The server gives a parameter the type of the column it is compared with.
     [Fact]
-    public async Task Describe_ParametersComparedWithColumns_AreInferredFromThem()
+    public async Task DescribeAsync_ParametersComparedWithColumns_AreInferredFromThem()
     {
         var parameters = await ShouldDescribeAsync(
             Requests.Of("SELECT id FROM users WHERE id = @id AND status = @status")
@@ -313,7 +316,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [InlineData("users", "name", "character varying", "varchar")]
     [InlineData("users", "balance", "numeric", "numeric")]
     [InlineData("users", "created_at", "timestamp with time zone", "timestamptz")]
-    public async Task Describe_BaseTypeInferredFromAnAssignment_IsSpelledAsTheServerSpellsIt(
+    public async Task DescribeAsync_BaseTypeInferredFromAnAssignment_IsSpelledAsTheServerSpellsIt(
         string table,
         string column,
         string name,
@@ -327,7 +330,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
 
     // A parameter keeps its domain; a column is flattened to its base by the protocol.
     [Fact]
-    public async Task Describe_DomainEnumArrayRangeAndMultirangeInferred_HaveTheirParts()
+    public async Task DescribeAsync_DomainEnumArrayRangeAndMultirangeInferred_HaveTheirParts()
     {
         var users = await ShouldDescribeAsync(
             Requests.Of("UPDATE users SET email = @email, status = @status, tags = @tags")
@@ -363,14 +366,14 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [InlineData("SELECT 1 FROM users WHERE name = @p")]
     [InlineData("SELECT 1 FROM users WHERE email = @p")]
     [InlineData("SELECT 1 FROM users WHERE (name = @p OR @p IS NULL)")]
-    public async Task Describe_ParameterComparedWithATextualColumn_IsText(string sql) =>
+    public async Task DescribeAsync_ParameterComparedWithATextualColumn_IsText(string sql) =>
         (await ShouldDescribeAsync(Requests.Of(sql))).ShouldBe([
             Inferred("p", TestSidecars.Postgres("text", internalName: "text")),
         ]);
 
     // The server parses each declared type: int is integer, varchar(50) loses its length, a domain stays a domain.
     [Fact]
-    public async Task Describe_DeclaredTypes_AreResolvedByTheServer()
+    public async Task DescribeAsync_DeclaredTypes_AreResolvedByTheServer()
     {
         var parameters = await ShouldDescribeAsync(
             Requests.Of(
@@ -395,7 +398,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     // The domain's own type has no modifier, and its base has the domain's, decoded into a precision and a scale.
     // email_t's base, with its length, is in the tests of declared and inferred domains above.
     [Fact]
-    public async Task Describe_ParameterOfADomain_HasItsBaseWithTheDomainsModifier() =>
+    public async Task DescribeAsync_ParameterOfADomain_HasItsBaseWithTheDomainsModifier() =>
         (await ShouldDescribeAsync(Requests.Of("UPDATE modifiers SET amount = @amount"))).ShouldBe([
             Inferred(
                 "amount",
@@ -410,7 +413,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
         ]);
 
     [Fact]
-    public async Task Describe_OptionalFilterWithADeclaration_IsTypedAsDeclared() =>
+    public async Task DescribeAsync_OptionalFilterWithADeclaration_IsTypedAsDeclared() =>
         (
             await ShouldDescribeAsync(
                 Requests.Of("SELECT 1 FROM users WHERE (@name IS NULL OR name = @name)", ("name", "varchar"))
@@ -420,13 +423,13 @@ public sealed class ParameterTests(PostgresContainer postgres)
     // The declared parameter is not in the SQL: it stands at the end of the list, and the server accepts a list
     // longer than the placeholders used.
     [Fact]
-    public async Task Describe_ParameterThatOnlyAMarkerDeclares_IsTypedAsDeclared() =>
+    public async Task DescribeAsync_ParameterThatOnlyAMarkerDeclares_IsTypedAsDeclared() =>
         (
             await ShouldDescribeAsync(Requests.Of("DELETE FROM users WHERE status = @status", ("tenant", "int")))
         ).ShouldBe([Inferred("status", UserStatus), Declared("tenant", TestSidecars.Postgres())]);
 
     [Fact]
-    public async Task Describe_ParameterUsedTwice_IsOneParameter() =>
+    public async Task DescribeAsync_ParameterUsedTwice_IsOneParameter() =>
         (await ShouldDescribeAsync(Requests.Of("SELECT 1 FROM users WHERE id = @id OR id = @ID + 1"))).ShouldBe([
             Inferred("id", TestSidecars.Postgres()),
         ]);
@@ -436,7 +439,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [Theory]
     [InlineData("SELECT 1 FROM pg_index WHERE indkey = @k", "k", "int2vector")]
     [InlineData("SELECT 1 FROM pg_proc WHERE proargtypes = @a", "a", "oidvector")]
-    public async Task Describe_ParameterComparedWithInt2vectorOrOidvector_IsABaseType(
+    public async Task DescribeAsync_ParameterComparedWithInt2vectorOrOidvector_IsABaseType(
         string sql,
         string name,
         string type
@@ -448,7 +451,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     // The name is spelled bare, and so is the name it binds by: Npgsql takes user.status bare and refuses it quoted.
     // The describe succeeds only when Npgsql binds the name.
     [Fact]
-    public async Task Describe_TypeOfASchemaNamedByAReservedWord_IsSpelledBare()
+    public async Task DescribeAsync_TypeOfASchemaNamedByAReservedWord_IsSpelledBare()
     {
         var token = TestContext.Current.CancellationToken;
         await using var own = NpgsqlDataSource.Create(postgres.ConnectionString);
@@ -488,7 +491,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     [InlineData("SELECT @p", "record", "SQLSRC228")]
     [InlineData("SELECT @p", "anyelement", "SQLSRC228")]
     [InlineData("SELECT @p", "cstring[]", "SQLSRC228")]
-    public async Task Describe_ParameterOfAPseudoType_IsAFailureAndNoThrow(string sql, string? declared, string id)
+    public async Task DescribeAsync_ParameterOfAPseudoType_IsAFailureAndNoThrow(string sql, string? declared, string id)
     {
         var request = declared is null ? Requests.Of(sql) : Requests.Of(sql, ("p", declared));
 
@@ -503,7 +506,7 @@ public sealed class ParameterTests(PostgresContainer postgres)
     // "$2" is no parameter of SqlSource, and generated code binds by name: the tool refuses it, and asks the server
     // nothing.
     [Fact]
-    public async Task Describe_SqlWithAPlaceholderOfItsOwn_IsSqlsrc234AndSendsNothing()
+    public async Task DescribeAsync_SqlWithAPlaceholderOfItsOwn_IsSqlsrc234AndSendsNothing()
     {
         var (described, capture) = await Sessions.DescribeCapturedAsync(
             postgres.ConnectionString,

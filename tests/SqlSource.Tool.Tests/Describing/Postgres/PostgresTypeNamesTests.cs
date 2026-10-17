@@ -7,7 +7,7 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // A type's name as the sidecar records it: as PostgreSQL spells a type of its catalog, with its facets, and the
 // schema and the name as identifiers for any other.
-public class PostgresTypeNamesTests
+public sealed class PostgresTypeNamesTests
 {
     // format_type(oid, -1) of char is "bpchar", and of a char with a length "character(n)".
     [Theory]

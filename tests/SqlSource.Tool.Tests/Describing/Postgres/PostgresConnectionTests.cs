@@ -10,7 +10,7 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
 // What the driver threw, as the answer of a call holds it.
-public class PostgresConnectionTests
+public sealed class PostgresConnectionTests
 {
     [Fact]
     public void ErrorOf_ExceptionOfTheDriver_IsItsMessageAlone() =>
