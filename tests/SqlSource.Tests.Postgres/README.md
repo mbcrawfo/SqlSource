@@ -38,7 +38,7 @@ To add a case, add its folder with a `query.sql` and run the script.  A recorded
 
 ## The realistic corpus
 
-`tests/SqlSource.Tests.Postgres/Realistic/` holds the corpus and what reads it: the cases in `Realistic/Cases/`, each a folder with four files: `query.sql`, `case.json` (the truth), and `expected-pg14.txt` and `expected-pg18.txt` (the recorded expectations).  The `realistic` database is built from the `schema.sql` and `seed.sql` beside them.  `Realistic/Describer/` holds the describer's checks over it:
+`tests/SqlSource.Tests.Postgres/Realistic/` holds the corpus and what reads it: the cases in `Realistic/Cases/`, each a folder with four files: `query.sql`, `case.json` (the truth), and `expected-pg14.txt` and `expected-pg18.txt` (the recorded expectations).  The `realistic` database is built from `tests/SqlSource.Tests.Postgres/Realistic/schema.sql` and `tests/SqlSource.Tests.Postgres/Realistic/seed.sql`.  `Realistic/Describer/` holds the describer's checks over it:
 
 - `RealisticDescriptionTests` compares each description with the `expected-pg14.txt` and `expected-pg18.txt` recorded of it;
 - `RealisticNullabilitySafetyTests` checks its nullability against the truth and against the oracle that executes the query over the seed;
