@@ -1,9 +1,12 @@
+using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Reflection;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
+using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
@@ -294,19 +297,21 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
 
     // A branch's value counts for the result's type where the two are in one family of built-in types, every ordered
     // pair of which has a cast that the server ships: no user can add another, and none returns NULL for a value that
-    // is not.
+    // is not.  The families are SetOperationTypes' own.
     [Fact]
     public async Task Catalog_CastFamilies_AreBuiltInBothWays()
     {
+        (int Family, uint Type)[] members =
+        [
+            .. SetOperationTypes.Families.SelectMany(
+                static (family, index) => family.Select(oid => (index, (uint)oid))
+            ),
+        ];
         await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
         await using var command = source.CreateCommand(
             """
             WITH family (id, type) AS (
-                VALUES
-                    (1, 'int2'::regtype), (1, 'int4'::regtype), (1, 'int8'::regtype), (1, 'numeric'::regtype),
-                    (1, 'float4'::regtype), (1, 'float8'::regtype),
-                    (2, 'text'::regtype), (2, 'varchar'::regtype), (2, 'bpchar'::regtype),
-                    (3, 'date'::regtype), (3, 'timestamp'::regtype), (3, 'timestamptz'::regtype)
+                SELECT * FROM unnest($1::int4[], $2::oid[])
             ),
             pair AS (
                 SELECT a.type AS source, b.type AS target
@@ -323,13 +328,78 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
             FROM pair p
             """
         );
+        _ = command.Parameters.Add(new NpgsqlParameter { Value = members.Select(static m => m.Family).ToArray() });
+        _ = command.Parameters.Add(
+            new NpgsqlParameter { Value = members.Select(static m => m.Type).ToArray(), DataTypeName = "oid[]" }
+        );
         var token = TestContext.Current.CancellationToken;
         await using var reader = await command.ExecuteReaderAsync(token);
         (await reader.ReadAsync(token)).ShouldBeTrue();
 
         // Six types and three, three, make 30, 6 and 6 ordered pairs.
+        reader
+            .GetInt64(0)
+            .ShouldBe(SetOperationTypes.Families.Sum(static family => family.Count * (family.Count - 1)));
         reader.GetInt64(0).ShouldBe(42);
         reader.GetInt64(1).ShouldBe(0);
+    }
+
+    // Each OID the describer names is the catalog's type of the constant's name, compared upper-cased.
+    [Fact]
+    public async Task Catalog_BuiltInTypes_AreNamedSo()
+    {
+        var expected = typeof(BuiltInTypes)
+            .GetFields(BindingFlags.Public | BindingFlags.Static)
+            .Where(static field => field.IsLiteral && field.FieldType == typeof(long))
+            .ToDictionary(
+                static field => (uint)(long)field.GetRawConstantValue().ShouldNotBeNull(),
+                static field => field.Name.ToUpperInvariant()
+            );
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand(
+            """
+            SELECT t.oid, upper(t.typname::text), n.nspname::text
+            FROM pg_catalog.pg_type AS t
+            JOIN pg_catalog.pg_namespace AS n ON n.oid = t.typnamespace
+            WHERE t.oid = ANY ($1)
+            """
+        );
+        _ = command.Parameters.Add(new NpgsqlParameter { Value = expected.Keys.ToArray(), DataTypeName = "oid[]" });
+        var token = TestContext.Current.CancellationToken;
+        var found = new Dictionary<uint, string>();
+        await using var reader = await command.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+        {
+            reader.GetString(2).ShouldBe("pg_catalog");
+            found.Add(await reader.GetFieldValueAsync<uint>(0, token), reader.GetString(1));
+        }
+
+        expected.Count.ShouldBe(15);
+        found.ShouldBe(expected, ignoreOrder: true);
+    }
+
+    // The types that carry a modifier are every type of the catalog with a typmod input, but the arrays, whose
+    // element carries it.
+    [Fact]
+    public async Task Catalog_TypesWithAModifier_AreTheBuiltInOnesWithATypmodInput()
+    {
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand(
+            """
+            SELECT t.typname::text
+            FROM pg_catalog.pg_type AS t
+            WHERE t.typnamespace = 'pg_catalog'::regnamespace AND t.typmodin <> 0 AND t.typcategory <> 'A'
+            """
+        );
+        var token = TestContext.Current.CancellationToken;
+        var found = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+        {
+            found.Add(reader.GetString(0));
+        }
+
+        found.ShouldBe(BuiltInTypes.WithModifier, ignoreOrder: true);
     }
 
     // A function the path finds before the catalog's prints as the catalog's would: the reason a bare name is the

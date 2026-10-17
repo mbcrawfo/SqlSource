@@ -30,7 +30,7 @@ internal static class ColumnTypes
         }
 
         var oid = origin.Attribute.TypeOid;
-        while (RowOf(oid, rows) is { Typtype: "d" } domain)
+        while (PostgresTypes.Row(oid, rows) is { Typtype: "d" } domain)
         {
             oid = domain.Typbasetype;
             if (oid == column.TypeOid)
@@ -41,9 +41,4 @@ internal static class ColumnTypes
 
         return column.TypeOid;
     }
-
-    private static PostgresTypeRow RowOf(long oid, IReadOnlyDictionary<long, PostgresTypeRow> rows) =>
-        rows.TryGetValue(oid, out var row)
-            ? row
-            : throw new InvalidOperationException($"The answer to 'types' holds no row for the type {oid}.");
 }

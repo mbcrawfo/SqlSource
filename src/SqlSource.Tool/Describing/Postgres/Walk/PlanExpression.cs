@@ -54,20 +54,20 @@ internal static class PlanExpression
     // The built-in types of a quoted literal's cast, as the plan spells them without a modifier.
     private static readonly Dictionary<string, long> TypesByName = new(StringComparer.Ordinal)
     {
-        ["text"] = 25,
-        ["character varying"] = 1043,
-        ["bpchar"] = 1042,
-        ["character"] = 1042,
-        ["smallint"] = 21,
-        ["integer"] = 23,
-        ["bigint"] = 20,
-        ["numeric"] = 1700,
-        ["real"] = 700,
-        ["double precision"] = 701,
-        ["date"] = 1082,
-        ["timestamp without time zone"] = 1114,
-        ["timestamp with time zone"] = 1184,
-        ["boolean"] = 16,
+        ["text"] = BuiltInTypes.Text,
+        ["character varying"] = BuiltInTypes.Varchar,
+        ["bpchar"] = BuiltInTypes.Bpchar,
+        ["character"] = BuiltInTypes.Bpchar,
+        ["smallint"] = BuiltInTypes.Int2,
+        ["integer"] = BuiltInTypes.Int4,
+        ["bigint"] = BuiltInTypes.Int8,
+        ["numeric"] = BuiltInTypes.Numeric,
+        ["real"] = BuiltInTypes.Float4,
+        ["double precision"] = BuiltInTypes.Float8,
+        ["date"] = BuiltInTypes.Date,
+        ["timestamp without time zone"] = BuiltInTypes.Timestamp,
+        ["timestamp with time zone"] = BuiltInTypes.Timestamptz,
+        ["boolean"] = BuiltInTypes.Bool,
     };
 
     private static readonly HashSet<string> Variadic = [with(StringComparer.Ordinal), "COALESCE", "GREATEST", "LEAST"];
@@ -460,14 +460,14 @@ internal static class PlanExpression
 
             if (IsGroup(from, to))
             {
-                return IsTest(from + 1, to - 1) ? TypesByName["boolean"] : TypeOid(from + 1, to - 1);
+                return IsTest(from + 1, to - 1) ? BuiltInTypes.Bool : TypeOid(from + 1, to - 1);
             }
 
             if (to - from == 1)
             {
                 if (IsWord(from, "true") || IsWord(from, "false"))
                 {
-                    return TypesByName["boolean"];
+                    return BuiltInTypes.Bool;
                 }
 
                 // A number the plan prints bare is an integer without a point and a numeric with one: a bigint or a
@@ -477,7 +477,7 @@ internal static class PlanExpression
                     return null;
                 }
 
-                return TypesByName[Text(from).Contains('.', StringComparison.Ordinal) ? "numeric" : "integer"];
+                return Text(from).Contains('.', StringComparison.Ordinal) ? BuiltInTypes.Numeric : BuiltInTypes.Int4;
             }
 
             // The plan prints a type's name bare whenever the search path finds it, text and date as any other: a
@@ -495,7 +495,7 @@ internal static class PlanExpression
 
             if (_catalogFunctions && IsCountOrRanking(from, to, anyArgument: true))
             {
-                return TypesByName[Text(from) is "percent_rank" or "cume_dist" ? "double precision" : "bigint"];
+                return Text(from) is "percent_rank" or "cume_dist" ? BuiltInTypes.Float8 : BuiltInTypes.Int8;
             }
 
             return null;

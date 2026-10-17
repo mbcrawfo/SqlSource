@@ -1,4 +1,5 @@
 using Shouldly;
+using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
 
@@ -9,37 +10,37 @@ namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 public sealed class SetOperationTypesTests
 {
     [Theory]
-    [InlineData(23, 20)]
-    [InlineData(20, 23)]
-    [InlineData(21, 1700)]
-    [InlineData(700, 701)]
-    [InlineData(701, 21)]
-    [InlineData(25, 1043)]
-    [InlineData(1042, 25)]
-    [InlineData(1043, 1042)]
-    [InlineData(1082, 1184)]
-    [InlineData(1114, 1082)]
-    [InlineData(1184, 1114)]
+    [InlineData(BuiltInTypes.Int4, BuiltInTypes.Int8)]
+    [InlineData(BuiltInTypes.Int8, BuiltInTypes.Int4)]
+    [InlineData(BuiltInTypes.Int2, BuiltInTypes.Numeric)]
+    [InlineData(BuiltInTypes.Float4, BuiltInTypes.Float8)]
+    [InlineData(BuiltInTypes.Float8, BuiltInTypes.Int2)]
+    [InlineData(BuiltInTypes.Text, BuiltInTypes.Varchar)]
+    [InlineData(BuiltInTypes.Bpchar, BuiltInTypes.Text)]
+    [InlineData(BuiltInTypes.Varchar, BuiltInTypes.Bpchar)]
+    [InlineData(BuiltInTypes.Date, BuiltInTypes.Timestamptz)]
+    [InlineData(BuiltInTypes.Timestamp, BuiltInTypes.Date)]
+    [InlineData(BuiltInTypes.Timestamptz, BuiltInTypes.Timestamp)]
     public void Carries_TwoTypesOfOneFamily_IsTrue(long from, long to) =>
         SetOperationTypes.Carries(from, to).ShouldBeTrue();
 
     // The same type needs no cast, whichever it is: a domain, an enum, a type that no family holds.
     [Theory]
-    [InlineData(16)]
-    [InlineData(23)]
+    [InlineData(BuiltInTypes.Bool)]
+    [InlineData(BuiltInTypes.Int4)]
     [InlineData(2950)]
     [InlineData(16999)]
     public void Carries_TypeToItself_IsTrue(long oid) => SetOperationTypes.Carries(oid, oid).ShouldBeTrue();
 
     [Theory]
-    [InlineData(23, 25)]
-    [InlineData(25, 23)]
-    [InlineData(1043, 16)]
-    [InlineData(1082, 25)]
-    [InlineData(1700, 1184)]
-    [InlineData(16, 23)]
-    [InlineData(23, 16999)]
-    [InlineData(16999, 25)]
+    [InlineData(BuiltInTypes.Int4, BuiltInTypes.Text)]
+    [InlineData(BuiltInTypes.Text, BuiltInTypes.Int4)]
+    [InlineData(BuiltInTypes.Varchar, BuiltInTypes.Bool)]
+    [InlineData(BuiltInTypes.Date, BuiltInTypes.Text)]
+    [InlineData(BuiltInTypes.Numeric, BuiltInTypes.Timestamptz)]
+    [InlineData(BuiltInTypes.Bool, BuiltInTypes.Int4)]
+    [InlineData(BuiltInTypes.Int4, 16999)]
+    [InlineData(16999, BuiltInTypes.Text)]
     [InlineData(16999, 17000)]
     public void Carries_TypesOfTwoFamiliesOrOfNone_IsFalse(long from, long to) =>
         SetOperationTypes.Carries(from, to).ShouldBeFalse();
@@ -49,7 +50,7 @@ public sealed class SetOperationTypesTests
     public void Carries_DomainAndItsBase_IsFalse()
     {
         const long Domain = 16500;
-        const long Text = 25;
+        const long Text = BuiltInTypes.Text;
 
         SetOperationTypes.Carries(Domain, Text).ShouldBeFalse();
         SetOperationTypes.Carries(Text, Domain).ShouldBeFalse();

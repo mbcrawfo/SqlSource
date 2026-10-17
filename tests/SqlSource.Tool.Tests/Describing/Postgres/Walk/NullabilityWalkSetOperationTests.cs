@@ -18,9 +18,9 @@ public sealed class NullabilityWalkSetOperationTests
 {
     // Every column of a set operation is of no origin, and its type is the row description's.  "u" and "o" are two
     // tables whose columns are of the types the type rule reads; "u_1" and "u_2" are partitions of a table like "u".
-    private const long Int4Oid = 23;
-    private const long Int8Oid = 20;
-    private const long TextOid = 25;
+    private const long Int4Oid = BuiltInTypes.Int4;
+    private const long Int8Oid = BuiltInTypes.Int8;
+    private const long TextOid = BuiltInTypes.Text;
     private const long DomainOid = 16800;
 
     private static readonly PostgresTableRow SetU = PostgresTables.TableOf(

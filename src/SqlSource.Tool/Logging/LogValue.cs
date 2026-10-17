@@ -24,6 +24,9 @@ internal abstract record LogValue
     /// <summary>A number, or <c>null</c> when there is none.</summary>
     public static LogValue Of(long? number) => number is { } value ? new Number(value) : Null;
 
+    /// <summary>A flag, or <c>null</c> when there is none.</summary>
+    public static LogValue Of(bool? flag) => flag is { } value ? new Flag(value) : Null;
+
     public static LogValue ListOf(IEnumerable<LogValue> items) => new Items(new EquatableArray<LogValue>([.. items]));
 
     public static LogValue ListOfTexts(IEnumerable<string> texts) =>
