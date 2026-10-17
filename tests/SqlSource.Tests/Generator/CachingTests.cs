@@ -14,7 +14,7 @@ namespace SqlSource.Tests.Generator;
 
 // The generator runs again on every edit in the IDE.  These tests pin what an edit makes it redo: each step of the
 // pipeline reports, for each of its outputs, whether it was taken from the previous run.
-public class CachingTests
+public sealed class CachingTests
 {
     private const string UsersSourcePath = "/app/Users/UserQueries.cs";
 

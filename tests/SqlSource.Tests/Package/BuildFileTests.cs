@@ -12,7 +12,7 @@ namespace SqlSource.Tests.Package;
 // build/SqlSource.props and build/SqlSource.targets are the MSBuild files that the package puts into every project
 // that references it.  The end-to-end tests show them working for this project; these read the files for what this
 // project cannot show.
-public partial class BuildFileTests
+public sealed partial class BuildFileTests
 {
     private const string Prefix = "SqlSource";
 

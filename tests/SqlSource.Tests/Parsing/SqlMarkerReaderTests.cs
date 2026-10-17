@@ -7,7 +7,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlMarkerReaderTests
+public sealed class SqlMarkerReaderTests
 {
     [Theory]
     [InlineData("-- name: GetUser", "Name:GetUser")]

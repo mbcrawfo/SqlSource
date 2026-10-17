@@ -4,7 +4,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing.Quoting;
 
-public class BracketReaderTests
+public sealed class BracketReaderTests
 {
     private static readonly BracketReader SqlServer = new(doubledCloserEscapes: true);
 

@@ -7,7 +7,7 @@ using static SqlSource.Testing.Snapshot.TestSidecars;
 
 namespace SqlSource.Tests.Snapshot;
 
-public class SidecarWriterTests
+public sealed class SidecarWriterTests
 {
     // The examples of the format design are the oracle of the layout.
     [Theory]

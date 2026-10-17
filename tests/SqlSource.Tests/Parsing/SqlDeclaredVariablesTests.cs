@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlDeclaredVariablesTests
+public sealed class SqlDeclaredVariablesTests
 {
     [Theory]
     [InlineData("DECLARE @n int", new[] { "n" })]

@@ -13,7 +13,7 @@ namespace SqlSource.Tests.Diagnostics;
 
 // docs/diagnostics.md is the list of diagnostics a user reads.  These tests keep it complete: a descriptor that is
 // added, removed or renamed fails the build of this project's tests until the document says the same.
-public class DiagnosticsDocumentTests
+public sealed class DiagnosticsDocumentTests
 {
     private const string HeadingPrefix = "## ";
 

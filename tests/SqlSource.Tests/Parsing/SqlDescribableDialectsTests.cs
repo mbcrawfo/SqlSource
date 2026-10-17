@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-public class SqlDescribableDialectsTests
+public sealed class SqlDescribableDialectsTests
 {
     // SQLSRC209 names these two in its message.
     [Fact]

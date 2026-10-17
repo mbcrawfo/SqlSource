@@ -9,7 +9,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing.Tokens;
 
-public class TokenScannerTests
+public sealed class TokenScannerTests
 {
     [Fact]
     public void Scan_EmptySql_ReturnsNoSegments() => Scan(string.Empty).ShouldBeEmpty();

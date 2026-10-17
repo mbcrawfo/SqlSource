@@ -8,7 +8,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
 
-public class PathResolverAllocationTests
+public sealed class PathResolverAllocationTests
 {
     // The generator resolves every attributed type again whenever the list of .sql files changes, so what resolving
     // one type allocates must not grow with the files of the rest of the project.  For a type with five files in a

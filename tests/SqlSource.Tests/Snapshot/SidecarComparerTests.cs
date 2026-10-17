@@ -7,7 +7,7 @@ using static SqlSource.Testing.Snapshot.TestSidecars;
 
 namespace SqlSource.Tests.Snapshot;
 
-public class SidecarComparerTests
+public sealed class SidecarComparerTests
 {
     private static readonly PostgresType Text = Postgres("text", internalName: "text");
 

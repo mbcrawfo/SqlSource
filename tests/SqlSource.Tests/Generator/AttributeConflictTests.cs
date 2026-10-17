@@ -13,7 +13,7 @@ namespace SqlSource.Tests.Generator;
 // A project that sees the internals of another one that uses SqlSource, as a test project sees the project it tests.
 // Both hold the generated attribute and enum, and the compiler warns (CS0436) at every use of either name in this
 // project's own code.  The package turns that warning off, for the generated types only.
-public class AttributeConflictTests
+public sealed class AttributeConflictTests
 {
     private const string InternalsVisible =
         "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n";

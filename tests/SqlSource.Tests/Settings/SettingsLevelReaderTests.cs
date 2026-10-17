@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tests.Settings;
 
-public class SettingsLevelReaderTests
+public sealed class SettingsLevelReaderTests
 {
     // The settings that are a text, each with the member of the level it sets.
     private static readonly Dictionary<SettingId, Func<SettingsLevel, string?>> Texts = new()
