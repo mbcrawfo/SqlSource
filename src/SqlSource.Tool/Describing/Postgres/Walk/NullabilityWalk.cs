@@ -115,7 +115,7 @@ internal static partial class NullabilityWalk
         var instances = plans.InstancesOf(root);
 
         // A column of no origin of a set operation that the root reaches is answered from the operation's inputs.
-        if (SetOperationTypesOf(plans, columns, origins, instances) is { } types)
+        if (SetOperationTypesOf(plans, columns, origins) is { } types)
         {
             return RunSetOperation(plans, columns, origins, types);
         }

@@ -43,8 +43,12 @@ public sealed class PlanInstancesCacheTests
     }
 
     [Fact]
-    public void Of_PartitionsNotAsked_ReadsAnAppendAsASetOperation() =>
-        new PlanInstancesCache(PartsAppend(), null).Of(PartsAppend()).HasSetOperation.ShouldBeTrue();
+    public void Of_PartitionsNotAsked_ReadsAnAppendAsASetOperation()
+    {
+        var plan = PartsAppend();
+
+        new PlanInstancesCache(plan, null).Of(plan).HasSetOperation.ShouldBeTrue();
+    }
 
     [Fact]
     public void Of_PartitionsAnswered_ReadsAnAppendOfPartitionsAsTheirTable()

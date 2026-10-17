@@ -196,8 +196,9 @@ public sealed class PlanNodeTests
     [Fact]
     public void SelfAndDescendants_ChildOfEveryRelationship_IsIncluded()
     {
-        var root = Over("Result", Scan("i"), "InitPlan") with
+        var root = Scan("r") with
         {
+            NodeType = "Result",
             Plans =
             [
                 Scan("i") with
@@ -219,7 +220,7 @@ public sealed class PlanNodeTests
             ],
         };
 
-        root.SelfAndDescendants().Select(static node => node.Alias).ShouldBe([null, "i", "s", "m", "q"]);
+        root.SelfAndDescendants().Select(static node => node.Alias).ShouldBe(["r", "i", "s", "m", "q"]);
     }
 
     [Fact]

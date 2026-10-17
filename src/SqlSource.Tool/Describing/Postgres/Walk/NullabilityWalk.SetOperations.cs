@@ -90,23 +90,28 @@ internal static partial class NullabilityWalk
     private static IReadOnlyList<long>? SetOperationTypesOf(
         Plans plans,
         IReadOnlyList<SidecarColumn> columns,
-        IReadOnlyList<ColumnOrigin?> origins,
-        PlanInstances instances
-    ) =>
-        plans.Scope.ColumnTypes.Count == columns.Count
-        && origins.Any(static origin => origin is null)
-        && instances.Reason is null
-        && (
-            plans.Tree.Output is null
-            || (
-                instances.HasSetOperation
-                && plans.Tree.Output.Count >= columns.Count
-                && OutputFits(plans.Tree.Output, origins, instances)
+        IReadOnlyList<ColumnOrigin?> origins
+    )
+    {
+        var root = plans.Tree;
+        var types = plans.Scope.ColumnTypes;
+        var instances = plans.InstancesOf(root);
+        return
+            types.Count == columns.Count
+            && origins.Any(static origin => origin is null)
+            && instances.Reason is null
+            && (
+                root.Output is null
+                || (
+                    instances.HasSetOperation
+                    && root.Output.Count >= columns.Count
+                    && OutputFits(root.Output, origins, instances)
+                )
             )
-        )
-        && ReachesSetOperation(plans.Tree)
-            ? plans.Scope.ColumnTypes
+            && ReachesSetOperation(root)
+            ? types
             : null;
+    }
 
     // Each column of no origin from the set operation's inputs, and each with an origin as the walk answers it: by
     // its entry at a root that prints one in a gated query, and kept otherwise.  A root Append that is a partitioned
@@ -122,7 +127,7 @@ internal static partial class NullabilityWalk
         var root = plans.Tree;
         var scope = plans.Scope;
         var instances = plans.InstancesOf(root);
-        var branches = new SetOperations(plans, scope);
+        var branches = new SetOperations(plans);
         var onlyAlias = plans.OnlyAliasOf(root);
         var source = instances.HasSetOperation
             ? SidecarValues.NullableSource.SetOperation
@@ -215,7 +220,7 @@ internal static partial class NullabilityWalk
 
     // The answer of a set operation's column at a node: whether every row the node returns holds a value at the
     // ordinal that is never NULL and of a type that carries to the column's.  False means unknown, never nullable.
-    private sealed class SetOperations(Plans plans, WalkScope scope)
+    private sealed class SetOperations(Plans plans)
     {
         public bool NotNullAt(PlanNode root, int ordinal, long type) => ColumnAt(root, ordinal, type, Reach.Root, 0);
 
@@ -402,7 +407,7 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            var expressions = new Expressions(scope, node, instances, plans.OnlyAliasOf(node));
+            var expressions = new Expressions(plans.Scope, node, instances, plans.OnlyAliasOf(node));
             var entry = output[ordinal];
             if (OutputReference.Parse(entry) is { } reference)
             {
@@ -411,7 +416,7 @@ internal static partial class NullabilityWalk
             }
 
             return expressions.NullableOf(entry) == false
-                && PlanExpression.TypeOf(entry, scope.CatalogFunctionsFirst) is { } constant
+                && PlanExpression.TypeOf(entry, plans.Scope.CatalogFunctionsFirst) is { } constant
                 && SetOperationTypes.Carries(constant, type);
         }
     }
