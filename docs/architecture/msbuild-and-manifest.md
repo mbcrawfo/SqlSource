@@ -93,7 +93,8 @@ Three things keep each value on its own line:
 - A key the reader does not know is passed over, and so is an empty line: both are how a later package adds to the format.  A name under `Property.` or `File.` is kept by its name, whatever it is, and only the names the generator's readers ask for are ever looked up.
 - A value is the rest of the line as it is.  An empty value of a property or a metadata is one that is not set, and is left out.
 - `DefineConstants` is split at `;`, `,`, a space and a tab, which is where the compiler separates constants.
-- Apart from the version line, the order of the lines does not matter, except that a `File.` line belongs to the nearest `File` line above it.  An empty text, a line without `=`, a `File.` line before any `File` line, and a manifest that names no project are not manifests.
+- The reader needs the version line first, and reads a `File.` line as belonging to the nearest `File` line above it.  It keeps the `File` and `Compile` lines in their order, which is the order of the items, and the tool relies on it for a file listed twice: [`Planning/ListedFiles.cs`](../../src/SqlSource.Tool/Planning/ListedFiles.cs) takes the metadata of the last of its items that has any, as a build does.
+- An empty text, a line without `=`, a `File.` line before any `File` line, and a manifest that names no project are not manifests.
 
 So an addition to the format keeps its version: a new key, and a new name under `Property.` or `File.`, are passed over or never looked up by a tool that does not know them.  A change to what an existing key means, or to how a line is read, would be misread by such a tool without a word, so it raises the version, and then a reader of another version reads nothing and says why.
 
