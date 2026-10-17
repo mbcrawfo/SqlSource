@@ -7,14 +7,14 @@ How the tool asks a database about a query: the contract every [describer](READM
 [`Describing/Describers/`](../../src/SqlSource.Tool/Describing/Describers) holds what a describer implements and what the run hands it.  It uses `Outcome`, the tool's `Reporting/` and `Logging/` and the generator's types, and nothing of the run's steps, so a describer depends on no step of a run.
 
 - An [`IQueryDescriber`](../../src/SqlSource.Tool/Describing/Describers/IQueryDescriber.cs) has a `SqlDialect` and opens an `IDescribeSession` for one database from an `OpenRequest` and a log.  [`DescriberRegistry`](../../src/SqlSource.Tool/Describing/Describers/DescriberRegistry.cs) holds one describer for each dialect, and refuses two for one.
-- An [`OpenRequest`](../../src/SqlSource.Tool/Describing/Describers/OpenRequest.cs) holds the database's name, the connection's value, the exchange and the clock.  It is the one thing that holds the value, which its `ToString` leaves out.  The log is beside it and not in it for that reason.
+- An [`OpenRequest`](../../src/SqlSource.Tool/Describing/Describers/OpenRequest.cs) holds the database's name, the connection's value, the exchange of `ToolHost.Exchange` and the clock.  Its `ToString` leaves out the value, and the log is beside it and not in it, for that reason.  How the value reaches it and goes nowhere else is the tool's [where a connection's value goes](tool.md#where-a-connections-value-goes).
 - An [`IDescribeSession`](../../src/SqlSource.Tool/Describing/Describers/IDescribeSession.cs) has the `ServerInfo` of its server and describes one `DescribeRequest` at a time: the query's name, its sample SQL as text, and its parameter list.  It is used by one thread and closed when the run is done with its database.
 - A [`QueryDescription`](../../src/SqlSource.Tool/Describing/Describers/QueryDescription.cs) is what the database said: whether there are rows, the parameters it typed, the columns, the table the result matches and the provenance of the plan and of the match.  Its types are the sidecar's own records, so a describer's answer and an entry say a type one way.  A parameter's ordinal and nullability are not the describer's: the run takes them from the query's list.
 - A [`DescribeFailure`](../../src/SqlSource.Tool/Describing/Describers/DescribeFailure.cs) is why a session could not be opened or a query described: a descriptor and its arguments, the `DescribeStep` that failed, what the server said a line each, and a help.  The run reports it at the query, as [describing](tool.md#describing) says.
 
-Every result is an `Outcome` of a `DescribeFailure`, so what a server or a user can cause comes back as data.  An exception from a describer is a bug of the describer: the run's guard makes it a `DescriberFaultException`, which ends the run with `SQLSRC200`.  A describer measures time with `OpenRequest.Time`, which `DatabaseRuns` sets from the host's clock, so that a test can hold it still.
+Every result is an `Outcome` of a `DescribeFailure`, so what a server or a user can cause comes back as data.  An exception from a describer is a bug of the describer, and what the run does with one is the tool's [describing](tool.md#describing).  A describer measures time with `OpenRequest.Time`, which `DatabaseRuns` sets from the host's clock, so that a test can hold it still.
 
-The released tool registers one describer: `ToolHost.Create` gives `new DescriberRegistry([new PostgresDescriber()])`.  A query of another dialect that must be described is `SQLSRC216`.
+The released tool registers one describer: `ToolHost.Create` gives `new DescriberRegistry([new PostgresDescriber()])`.  What a run does for a dialect with none is [describing](tool.md#describing) too.
 
 ### The exchange
 
@@ -62,13 +62,13 @@ An answer's record may gain a member, which is nullable: an older capture is rea
 
 ### Fixtures and test describers
 
-A describer's fixtures, and how to record them, are in the PostgreSQL tests' readme, [the describer's fixtures](../../tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures).  The harness is in `tests/SqlSource.Tool.Testing/Fixtures/`: `FixtureCases` finds the cases in the output folder of the tests that run them, and `FixtureReplay` describes one through a `ReplayingExchange`, with the connection `replay`, and gives the sidecar's text.  A case's `expected.json` has the `toolVersion` `fixture`, so a new version of the tool touches no fixture, and a case may hold an `issue.md`.  A case may also hold an `explain-settings.txt`, one `name=value` on a line, which `FixtureCase.ExplainSettings` reads and both harnesses give the describer: the cases whose names end in `-hash`, `-merge` and `-nestloop` turn the other two join methods off with it.  The files are compared byte for byte and the SQL of `query.sql` is in a request, which is why the folder has its own line ends and `.editorconfig` section.  The schema the container applies is `postgres/schema.sql` beside the cases, and the captures hold the OIDs it makes.
+What a case holds, and how to record and add one, are the PostgreSQL tests' readme, [the describer's fixtures](../../tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures).  The harness is in `tests/SqlSource.Tool.Testing/Fixtures/`: `FixtureCases` finds the cases in the output folder of the tests that run them, and `FixtureReplay` describes one through a `ReplayingExchange`, with the connection `replay`, and gives the sidecar's text.  `FixtureCase.ExplainSettings` reads a case's `explain-settings.txt`, and both harnesses, `DescriberFixtureTests` replaying and `FixtureCasesTests` live, construct `PostgresDescriber` with those settings, so every `explain` of the case carries them in its request.
 
 [`FakeDescriber`](../../tests/SqlSource.Tool.Tests/FakeDescriber.cs) is a describer written by the contract, with its records in `FakeDescriberCalls.cs` and its maps in `FakeCalls.cs`, and the tests of the exchanges and of the fixture harness run through it.  Its `live` functions are what a replay skips, so under a replay it keeps nothing in `Opened` and `Described`, and `OnOpen`, `OnDescribe`, `BeforeDescribe`, `OpenException` and `Exceptions` do nothing; what it does outside `live` still holds, the results of a describer with a bug, `CloseException` and `Closed`.  It carries `PostgresType` and `OtherEngineType` and throws for a `SqlServerType`.  Its one descriptor, `SQLSRC999`, exists in the tests only, and `FakeDescriber.RejectedWith` makes one from a text, whose id is no constant and has no row in `AnalyzerReleases.Unshipped.md`.  Every run of `CliRun` records through a `CapturingExchange` into `CliRun.Capture`.
 
 [`PostgresScript`](../../tests/SqlSource.Tool.Tests/PostgresScript.cs) answers a `PostgresSession` with no server.  A test writes each call the session is to make, with its answer, and a `ReplayingExchange` plays them, so a request the session asks otherwise is a `CaptureMissException` and the test holds what is asked as well as what is made of the answers.  `PostgresRows` gives rows of `types` as a server gives them, `PostgresTables` tables of `tables` and columns that name them, and `PostgresPlans` a plan as a server would answer `explain`.  What only a server can show, the types it infers, its errors and their positions, is tested in `tests/SqlSource.Tests.Postgres/Describer/`.  The other helpers are listed in [the tests' readme](../../tests/README.md#the-projects).
 
-Only `ToolHostTests` of `tests/SqlSource.Tool.Tests` sees the registry of `ToolHost.Create`: `Hosts.Create` and `CliRun` keep their own, and `SecretTests` adds the describer to a `CliRun` itself, with a connection that no server answers.  In `tests/SqlSource.Tests.Postgres`, `DescribeCommandTests` gives a `CliRun` the describer, whose exchange asks the container, and `ToolProcessTests` runs the built tool, which registers it as the released one does.
+Only `ToolHostTests` of `tests/SqlSource.Tool.Tests` sees the registry of `ToolHost.Create`: `Hosts.Create` and `CliRun` keep their own, and `SecretTests` adds the describer to a `CliRun` itself, with a connection that no server answers.  How `tests/SqlSource.Tests.Postgres` runs the whole command with the real describer is its readme's [running](../../tests/SqlSource.Tests.Postgres/README.md#running).
 
 ## One describe, step by step
 
@@ -85,11 +85,15 @@ flowchart TD
     types --> spellings
     spellings --> check
     check -->|"rows, and gated or a column of no origin"| explain
-    explain --> partitions
-    partitions --> relations
-    relations --> match["Table match, nothing asked"]
-    check -->|"otherwise"| match
+    check -->|"otherwise"| match["Table match, nothing asked"]
+    explain -->|"a plan"| partitions["partitions, when needed"]
+    partitions --> relations["relations, when needed"]
+    relations --> walk["The walk"]
+    walk --> match
+    explain -->|"an error: logged, the heuristic stands"| match
+    explain -->|"26000"| gone["SQLSRC236"]
     match --> deallocate
+    gone --> deallocate
     prepare -.->|"finally"| deallocate
 ```
 

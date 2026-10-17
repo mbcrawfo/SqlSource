@@ -63,7 +63,7 @@ A `SqlDialect`: the rules by which the parser reads a `.sql` file, resolved for 
 
 ### Gated query
 
-A query that the PostgreSQL describer's `OuterJoinGate` lets in: one whose SQL holds a word that can make a `NOT NULL` column of a table come back `NULL`, such as `LEFT` or `ROLLUP`.  A gated query's columns of a table are nullable by a heuristic until the [plan walk](#plan-walk) proves otherwise.
+A statement with rows in whose SQL the PostgreSQL describer's `OuterJoinGate.IsGated` finds a word that can make a `NOT NULL` column of a table come back `NULL`, such as `LEFT` or `ROLLUP`.  A statement without rows is never gated.  A gated query's columns of a table are nullable by a heuristic until the [plan walk](#plan-walk) proves otherwise.
 
 ### Hint name
 
