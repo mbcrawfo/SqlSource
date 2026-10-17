@@ -27,6 +27,10 @@ public sealed class PlanInstancesTests
         [new PostgresRelationName("public", "plain")] = [],
     };
 
+    // The instances of a whole plan, with no answer of "partitions": an Append of a partitioned table's partitions is
+    // read as a set operation.
+    private static PlanInstances Find(PlanNode root) => PlanInstances.Find(root, root, PlanInstances.NoPartitions);
+
     private static PlanInstances WithPartitions(PlanNode root) => PlanInstances.Find(root, root, Partitions);
 
     // "a" is the outer side and "b" the inner one.
@@ -41,7 +45,7 @@ public sealed class PlanInstancesTests
     [InlineData("Right Anti", true, false)]
     public void Find_JoinOfTwoScans_ExtendsTheSidesItsTypeSays(string joinType, bool outer, bool inner)
     {
-        var instances = PlanInstances.Find(Join(joinType, Scan("a"), Scan("b")));
+        var instances = Find(Join(joinType, Scan("a"), Scan("b")));
 
         instances.Reason.ShouldBeNull();
         ExtendedIn(instances, "a").ShouldBe(outer);
@@ -52,7 +56,7 @@ public sealed class PlanInstancesTests
     [Fact]
     public void Find_SwappedLeftJoin_ExtendsTheOuterChild()
     {
-        var instances = PlanInstances.Find(Join("Right", Scan("o"), Over("Hash", Scan("u"), Inner)));
+        var instances = Find(Join("Right", Scan("o"), Over("Hash", Scan("u"), Inner)));
 
         ExtendedIn(instances, "o").ShouldBeTrue();
         ExtendedIn(instances, "u").ShouldBeFalse();
@@ -64,7 +68,7 @@ public sealed class PlanInstancesTests
     {
         var plan = Join("Left", Join("Left", Scan("a"), Scan("b")), Scan("c"));
 
-        var instances = PlanInstances.Find(plan);
+        var instances = Find(plan);
 
         ExtendedIn(instances, "a").ShouldBeFalse();
         ExtendedIn(instances, "b").ShouldBeTrue();
@@ -77,7 +81,7 @@ public sealed class PlanInstancesTests
     {
         var plan = Join("Left", Scan("a"), Join("Inner", Scan("b"), Scan("c")));
 
-        var instances = PlanInstances.Find(plan);
+        var instances = Find(plan);
 
         ExtendedIn(instances, "a").ShouldBeFalse();
         ExtendedIn(instances, "b").ShouldBeTrue();
@@ -95,7 +99,7 @@ public sealed class PlanInstancesTests
     [InlineData("Foreign Scan")]
     public void Find_ScanOfARelation_NamesAnInstance(string nodeType)
     {
-        var instances = PlanInstances.Find(Scan("u") with { NodeType = nodeType });
+        var instances = Find(Scan("u") with { NodeType = nodeType });
 
         ExtendedIn(instances, "u").ShouldBeFalse();
         instances.TryFind("u", out var instance).ShouldBeTrue();
@@ -110,7 +114,7 @@ public sealed class PlanInstancesTests
     [InlineData("Result")]
     public void Find_NodeThatIsNoScanOfARelation_NamesNone(string nodeType)
     {
-        var instances = PlanInstances.Find(Scan("s") with { NodeType = nodeType });
+        var instances = Find(Scan("s") with { NodeType = nodeType });
 
         instances.TryFind("s", out _).ShouldBeFalse();
         instances.BareAlias.ShouldBeNull();
@@ -121,14 +125,7 @@ public sealed class PlanInstancesTests
     [Fact]
     public void Find_ForeignScanOfAPushedDownJoin_NamesNone()
     {
-        var instances = PlanInstances.Find(
-            Scan("f") with
-            {
-                NodeType = "Foreign Scan",
-                Alias = null,
-                RelationName = null,
-            }
-        );
+        var instances = Find(Scan("f") with { NodeType = "Foreign Scan", Alias = null, RelationName = null });
 
         instances.Nodes.Count.ShouldBe(1);
         instances.BareAlias.ShouldBeNull();
@@ -141,7 +138,7 @@ public sealed class PlanInstancesTests
         var child = Join("Left", Scan("u"), Scan("o"));
         var plan = Over("Sort", Over("Subquery Scan", child, "Subquery") with { Alias = "s" });
 
-        var instances = PlanInstances.Find(plan);
+        var instances = Find(plan);
 
         instances.TryFind("s", out var scan).ShouldBeTrue();
         scan.Kind.ShouldBe(InstanceKind.Plan);
@@ -172,7 +169,7 @@ public sealed class PlanInstancesTests
         );
         var plan = Over("Sort", scans) with { Plans = [cte, .. Over("Sort", scans).Plans] };
 
-        var instances = PlanInstances.Find(plan);
+        var instances = Find(plan);
 
         instances.TryFind("r", out var r).ShouldBeTrue();
         instances.TryFind("n", out var n).ShouldBeTrue();
@@ -192,7 +189,7 @@ public sealed class PlanInstancesTests
             Plans = [cte, cte with { Alias = "o2" }, scan with { ParentRelationship = "Outer" }],
         };
 
-        PlanInstances.Find(plan).TryFind("r", out var r).ShouldBeTrue();
+        Find(plan).TryFind("r", out var r).ShouldBeTrue();
         r.Child.ShouldBeNull();
     }
 
@@ -206,7 +203,7 @@ public sealed class PlanInstancesTests
     {
         var plan = Over("CTE Scan", Join("Bogus", Scan("u"), Scan("o")), relationship);
 
-        var instances = PlanInstances.Find(plan);
+        var instances = Find(plan);
 
         instances.TryFind("u", out _).ShouldBeFalse();
         instances.TryFind("o", out _).ShouldBeFalse();
@@ -216,18 +213,18 @@ public sealed class PlanInstancesTests
 
     [Fact]
     public void Find_JoinTypeTheWalkDoesNotKnow_IsUnusable() =>
-        PlanInstances.Find(Join("Sideways", Scan("a"), Scan("b"))).Reason.ShouldBe(WalkReasons.UnknownJoinType);
+        Find(Join("Sideways", Scan("a"), Scan("b"))).Reason.ShouldBe(WalkReasons.UnknownJoinType);
 
     [Fact]
     public void Find_AliasFoundTwice_IsUnusable() =>
-        PlanInstances.Find(Join("Inner", Scan("a"), Scan("a"))).Reason.ShouldBe(WalkReasons.DoubledAlias);
+        Find(Join("Inner", Scan("a"), Scan("a"))).Reason.ShouldBe(WalkReasons.DoubledAlias);
 
     [Fact]
     public void Find_NodeWithGroupingSets_IsUnusable()
     {
         var plan = Over("Aggregate", Scan("u")) with { HasGroupingSets = true };
 
-        PlanInstances.Find(plan).Reason.ShouldBe(WalkReasons.GroupingSets);
+        Find(plan).Reason.ShouldBe(WalkReasons.GroupingSets);
     }
 
     // The grouping sets of a subquery's own plan are found too, when the planner flattened the scan away.
@@ -236,7 +233,7 @@ public sealed class PlanInstancesTests
     {
         var grouped = Over("Aggregate", Scan("o")) with { HasGroupingSets = true };
 
-        PlanInstances.Find(Join("Left", Scan("u"), grouped)).Reason.ShouldBe(WalkReasons.GroupingSets);
+        Find(Join("Left", Scan("u"), grouped)).Reason.ShouldBe(WalkReasons.GroupingSets);
     }
 
     // An UPDATE or a DELETE scans its target under the ModifyTable with the ModifyTable's own alias: one instance,
@@ -246,7 +243,7 @@ public sealed class PlanInstancesTests
     {
         var plan = Over("ModifyTable", Join("Full", Scan("t"), Scan("s"))) with { Alias = "t" };
 
-        var instances = PlanInstances.Find(plan);
+        var instances = Find(plan);
 
         instances.Reason.ShouldBeNull();
         instances.BareAlias.ShouldBeNull();
@@ -269,7 +266,7 @@ public sealed class PlanInstancesTests
     {
         var plan = Over("ModifyTable", Join(joinType, Scan("t"), Scan("a"))) with { Alias = "t" };
 
-        var instances = PlanInstances.Find(plan);
+        var instances = Find(plan);
 
         instances.BareAlias.ShouldBe(bare);
         ExtendedIn(instances, "t").ShouldBeFalse();
@@ -279,11 +276,11 @@ public sealed class PlanInstancesTests
     // child each names it.
     [Fact]
     public void BareAlias_RootOverOneScanThroughSingleChildren_IsTheScans() =>
-        PlanInstances.Find(Over("Limit", Over("Sort", Over("Aggregate", Scan("u"))))).BareAlias.ShouldBe("u");
+        Find(Over("Limit", Over("Sort", Over("Aggregate", Scan("u"))))).BareAlias.ShouldBe("u");
 
     [Fact]
     public void BareAlias_RootOverAJoin_IsNull() =>
-        PlanInstances.Find(Over("Sort", Join("Inner", Scan("a"), Scan("b")))).BareAlias.ShouldBeNull();
+        Find(Over("Sort", Join("Inner", Scan("a"), Scan("b")))).BareAlias.ShouldBeNull();
 
     // A node of two children, an InitPlan beside the one input, is no chain.
     [Fact]
@@ -292,7 +289,7 @@ public sealed class PlanInstancesTests
         var sort = Over("Sort", Scan("u"));
         var plan = sort with { Plans = [Scan("i") with { ParentRelationship = "InitPlan" }, .. sort.Plans] };
 
-        PlanInstances.Find(plan).BareAlias.ShouldBeNull();
+        Find(plan).BareAlias.ShouldBeNull();
     }
 
     // An INSERT has a Result under it and no scan of its target.
@@ -301,7 +298,7 @@ public sealed class PlanInstancesTests
     {
         var plan = Over("ModifyTable", Scan("x") with { NodeType = "Result", Alias = null }) with { Alias = "orders" };
 
-        ExtendedIn(PlanInstances.Find(plan), "orders").ShouldBeFalse();
+        ExtendedIn(Find(plan), "orders").ShouldBeFalse();
     }
 
     [Fact]
@@ -309,7 +306,7 @@ public sealed class PlanInstancesTests
     {
         var plan = Over("ModifyTable", Join("Inner", Scan("t"), Scan("t"))) with { Alias = "t" };
 
-        PlanInstances.Find(plan).Reason.ShouldBe(WalkReasons.DoubledAlias);
+        Find(plan).Reason.ShouldBe(WalkReasons.DoubledAlias);
     }
 
     // Only the root's ModifyTable is a target: one further down is no scan of a relation.
@@ -318,7 +315,7 @@ public sealed class PlanInstancesTests
     {
         var plan = Over("Result", Over("ModifyTable", Scan("t")) with { Alias = "t" });
 
-        var instances = PlanInstances.Find(plan);
+        var instances = Find(plan);
 
         instances.Reason.ShouldBeNull();
         ExtendedIn(instances, "t").ShouldBeFalse();
@@ -331,29 +328,29 @@ public sealed class PlanInstancesTests
     {
         var plan = Over("Sort", Join("Left", Scan("u"), Join("Full", Scan("o"), Scan("i"))));
 
-        var nodes = PlanInstances.Find(plan).Nodes;
+        var nodes = Find(plan).Nodes;
 
         nodes
             .Select(static visited =>
                 $"{visited.Depth} {visited.Node.NodeType} {visited.Node.Alias} {visited.NullExtends}"
             )
             .ShouldBe([
-                "0 Sort  none",
-                "1 Hash Join  inner",
-                "2 Seq Scan u none",
-                "2 Hash Join  both",
-                "3 Seq Scan o none",
-                "3 Seq Scan i none",
+                "0 Sort  None",
+                "1 Hash Join  Inner",
+                "2 Seq Scan u None",
+                "2 Hash Join  Both",
+                "3 Seq Scan o None",
+                "3 Seq Scan i None",
             ]);
     }
 
     [Fact]
     public void Find_RightJoin_SaysItExtendsItsOuterSide() =>
-        PlanInstances.Find(Join("Right", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe("outer");
+        Find(Join("Right", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe(NullExtension.Outer);
 
     [Fact]
     public void Find_AntiJoin_SaysItExtendsItsInnerSide() =>
-        PlanInstances.Find(Join("Anti", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe("inner");
+        Find(Join("Anti", Scan("a"), Scan("b"))).Nodes[0].NullExtends.ShouldBe(NullExtension.Inner);
 
     // A set operation prints its first branch at the root: an Append under a UNION's Aggregate or under a Sort, and a
     // SetOp over an Append on 14 or over its two branches as Outer and Inner on 18.
@@ -376,23 +373,23 @@ public sealed class PlanInstancesTests
         };
         var setOp = Join("Inner", Scan("a"), Scan("b")) with { NodeType = "SetOp", JoinType = null };
 
-        PlanInstances.Find(Over("Aggregate", append)).HasSetOperation.ShouldBeTrue();
-        PlanInstances.Find(Over("Sort", append)).HasSetOperation.ShouldBeTrue();
-        PlanInstances.Find(setOp).HasSetOperation.ShouldBeTrue();
-        PlanInstances.Find(Over("Recursive Union", Scan("a"))).HasSetOperation.ShouldBeTrue();
-        PlanInstances.Find(Over("Merge Append", Scan("a"))).HasSetOperation.ShouldBeTrue();
+        Find(Over("Aggregate", append)).HasSetOperation.ShouldBeTrue();
+        Find(Over("Sort", append)).HasSetOperation.ShouldBeTrue();
+        Find(setOp).HasSetOperation.ShouldBeTrue();
+        Find(Over("Recursive Union", Scan("a"))).HasSetOperation.ShouldBeTrue();
+        Find(Over("Merge Append", Scan("a"))).HasSetOperation.ShouldBeTrue();
     }
 
     [Fact]
     public void HasSetOperation_JoinOfTwoScans_IsFalse() =>
-        PlanInstances.Find(Join("Inner", Scan("a"), Scan("b"))).HasSetOperation.ShouldBeFalse();
+        Find(Join("Inner", Scan("a"), Scan("b"))).HasSetOperation.ShouldBeFalse();
 
     [Fact]
     public void IsExtended_NodeUnderTheSideAJoinExtends_IsTrue()
     {
         var plan = Join("Left", Scan("a"), Over("Hash", Scan("b"), Inner));
 
-        var instances = PlanInstances.Find(plan);
+        var instances = Find(plan);
 
         instances.IsExtended(plan).ShouldBeFalse();
         instances.IsExtended(plan.Plans[0]).ShouldBeFalse();
@@ -455,6 +452,6 @@ public sealed class PlanInstancesTests
             instances.TryFind("p", out _).ShouldBeFalse();
         }
 
-        PlanInstances.Find(Append(Member("p_1", "parts_1"), Member("p_2", "parts_2"))).HasSetOperation.ShouldBeTrue();
+        Find(Append(Member("p_1", "parts_1"), Member("p_2", "parts_2"))).HasSetOperation.ShouldBeTrue();
     }
 }

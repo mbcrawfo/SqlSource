@@ -51,21 +51,16 @@ internal sealed record WalkOutcome(
 /// The answer of <c>tables</c>, by OID, where the column of a reference inside an expression is looked up.  A
 /// relation it does not hold leaves the reference unproved.
 /// </param>
-/// <param name="Partitions">
-/// The answer of <c>partitions</c>, the ancestors of each relation the members of the plan's <c>Append</c>s scan, or
-/// null when it was not asked: every <c>Append</c> is then read as a set operation.
-/// </param>
 /// <param name="ColumnTypes">
-/// The type of each column as the row description gives it, by OID, in the order of the columns; null when the walk is
-/// to answer no column of a set operation from its branches.
+/// The type of each column as the row description gives it, by OID, in the order of the columns.  A list of another
+/// length, an empty one for a walk that is to answer no column of a set operation from its branches, answers none.
 /// </param>
 internal sealed record WalkScope(
     bool Gated,
     bool OldAndNewMayBeNamed,
     bool CatalogFunctionsFirst,
     IReadOnlyDictionary<long, PostgresTableRow> Tables,
-    IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? Partitions = null,
-    IReadOnlyList<long>? ColumnTypes = null
+    IReadOnlyList<long> ColumnTypes
 );
 
 /// <summary>
@@ -101,7 +96,7 @@ internal sealed record WalkScope(
 internal static partial class NullabilityWalk
 {
     /// <summary>Walks a plan that was read.</summary>
-    /// <param name="root">The root of the plan.</param>
+    /// <param name="cache">The instances of the plan's plans, whose tree is the plan.</param>
     /// <param name="columns">
     /// The columns as they were built: for a gated query with the heuristic's answer, and for one that is not with the
     /// catalog's.
@@ -109,19 +104,20 @@ internal static partial class NullabilityWalk
     /// <param name="origins">Where each column comes from, or null, in the order of the columns.</param>
     /// <param name="scope">What the walk is asked to answer.</param>
     public static WalkOutcome Run(
-        PlanNode root,
+        PlanInstancesCache cache,
         IReadOnlyList<SidecarColumn> columns,
         IReadOnlyList<ColumnOrigin?> origins,
         WalkScope scope
     )
     {
-        var plans = new Plans(root, scope);
+        var plans = new Plans(cache, scope);
+        var root = plans.Tree;
         var instances = plans.InstancesOf(root);
 
         // A column of no origin of a set operation that the root reaches is answered from the operation's inputs.
-        if (SetOperationTypesOf(root, columns, origins, scope, instances) is { } types)
+        if (SetOperationTypesOf(plans, columns, origins) is { } types)
         {
-            return RunSetOperation(root, columns, origins, scope, plans, instances, types);
+            return RunSetOperation(plans, columns, origins, types);
         }
 
         // PostgreSQL prints the target list first and what a sort or a group added after it, so the entry of a
@@ -320,7 +316,9 @@ internal static partial class NullabilityWalk
     {
         private const int MaxDepth = 256;
 
-        private readonly bool _nothingExtends = instances.Nodes.All(static visited => visited.NullExtends == "none");
+        private readonly bool _nothingExtends = instances.Nodes.All(static visited =>
+            visited.NullExtends == NullExtension.None
+        );
 
         public bool? NullableOf(string entry) =>
             _nothingExtends
@@ -336,13 +334,7 @@ internal static partial class NullabilityWalk
         // ('x'::text) inside a CASE the root computes, proves nothing, while a COALESCE with a constant still does.
         private bool? NullableAt(PlanNode node, string entry, int depth)
         {
-            if (depth > MaxDepth)
-            {
-                return null;
-            }
-
-            var children = node.Plans.Where(static child => child.ParentRelationship is "Outer" or "Inner").ToArray();
-            if (children.Any(OpaqueAndNotPreserved))
+            if (FollowedChildrenOf(node, depth) is not { } children)
             {
                 return null;
             }
@@ -378,13 +370,7 @@ internal static partial class NullabilityWalk
         // computed from, followed as NullableAt follows it.
         private bool Preserved(PlanNode node, string entry, int depth)
         {
-            if (depth > MaxDepth)
-            {
-                return false;
-            }
-
-            var children = node.Plans.Where(static child => child.ParentRelationship is "Outer" or "Inner").ToArray();
-            if (children.Any(OpaqueAndNotPreserved))
+            if (FollowedChildrenOf(node, depth) is not { } children)
             {
                 return false;
             }
@@ -401,6 +387,19 @@ internal static partial class NullabilityWalk
                     .All(group =>
                         Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1))
                     );
+        }
+
+        // The children an entry of the node is followed into, its Outer and Inner ones; or null, which NullableAt and
+        // Preserved read as unknown, when the walk is too deep or a child that prints no Output is not preserved.
+        private PlanNode[]? FollowedChildrenOf(PlanNode node, int depth)
+        {
+            if (depth > MaxDepth)
+            {
+                return null;
+            }
+
+            PlanNode[] children = [.. node.JoinChildren];
+            return children.Any(OpaqueAndNotPreserved) ? null : children;
         }
 
         // A child that prints no Output, and is extended or has a join under it that extends.
@@ -499,38 +498,30 @@ internal static partial class NullabilityWalk
         Extended,
     }
 
-    // The plans of a walk: the root's, and the plan of each scan of another plan, each walked as a plan of its own.
+    // The plans of a walk, with what the walk is asked: the root's, and the plan of each scan of another plan, each
+    // walked as a plan of its own.
     // A column through a scan is resolved by its origin, as the class's remarks say.  A column with an origin is a
     // plain reference to that column in the subquery, so its entry of the child plan's Output is among the
     // references to a relation instance of the origin's table and column; when every such reference agrees, the
     // column is what they are.
-    private sealed class Plans(PlanNode tree, WalkScope scope)
+    private sealed class Plans(PlanInstancesCache cache, WalkScope scope)
     {
         /// <summary>
         /// How many plans deep the walk follows a column: a scan of another plan, or a set operation's input.
         /// </summary>
         public const int MaxDepth = 16;
 
-        private static readonly IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> NoPartitions =
-            new Dictionary<PostgresRelationName, IReadOnlyList<long>>();
+        // The root of the whole plan.
+        public PlanNode Tree => cache.Tree;
 
-        private readonly Dictionary<PlanNode, PlanInstances> _instances = [with(ReferenceEqualityComparer.Instance)];
+        public WalkScope Scope => scope;
 
-        public PlanInstances InstancesOf(PlanNode root)
-        {
-            if (!_instances.TryGetValue(root, out var found))
-            {
-                found = PlanInstances.Find(root, tree, scope.Partitions ?? NoPartitions);
-                _instances[root] = found;
-            }
-
-            return found;
-        }
+        public PlanInstances InstancesOf(PlanNode root) => cache.Of(root);
 
         // The one alias a qualified reference may name at a ModifyTable that may return the old or the new row, or
         // null when any alias may be mapped.  A ModifyTable without an alias leaves none: no reference is empty.
         public string? OnlyAliasOf(PlanNode root) =>
-            scope.OldAndNewMayBeNamed && root.NodeType == "ModifyTable" ? root.Alias ?? string.Empty : null;
+            scope.OldAndNewMayBeNamed && root.NodeType == PlanNodeTypes.ModifyTable ? root.Alias ?? string.Empty : null;
 
         // The column of the origin in the plan of the child, as the entries of its root's Output that it can be say.
         public Resolution Resolve(PlanNode? child, ColumnOrigin origin, int depth)

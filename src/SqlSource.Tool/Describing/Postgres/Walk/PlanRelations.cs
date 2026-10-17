@@ -16,16 +16,23 @@ internal static class PlanRelations
     /// and name order, each once: empty when no scan prints both.
     /// </summary>
     public static IReadOnlyList<PostgresRelationName> Of(PlanNode root) =>
-        [
-            .. All(root)
+        InOrder(
+            root.SelfAndDescendants()
                 .Where(static node =>
                     PlanInstances.ScansARelation(node) && node.Schema is not null && node.RelationName is not null
                 )
                 .Select(static node => new PostgresRelationName(node.Schema!, node.RelationName!))
+        );
+
+    /// <summary>
+    /// The relations each once, in order of schema and then of name, each compared by ordinal: the order of what
+    /// <c>relations</c> and <c>partitions</c> are asked.
+    /// </summary>
+    public static IReadOnlyList<PostgresRelationName> InOrder(IEnumerable<PostgresRelationName> relations) =>
+        [
+            .. relations
                 .Distinct()
                 .OrderBy(static relation => relation.Schema, StringComparer.Ordinal)
                 .ThenBy(static relation => relation.Name, StringComparer.Ordinal),
         ];
-
-    private static IEnumerable<PlanNode> All(PlanNode node) => node.Plans.SelectMany(All).Prepend(node);
 }

@@ -25,24 +25,17 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// </remarks>
 internal static class PlanPartitions
 {
-    private const string Member = "Member";
-
-    private static readonly HashSet<string> Appends = [with(StringComparer.Ordinal), "Append", "Merge Append"];
-
     /// <summary>
     /// The relations the members scan of every <c>Append</c> of the shape, anywhere in the plan, in schema and name
     /// order, each once: empty when there is none, and <c>partitions</c> is not asked.
     /// </summary>
     public static IReadOnlyList<PostgresRelationName> MembersOf(PlanNode root) =>
-        [
-            .. All(root)
+        PlanRelations.InOrder(
+            root.SelfAndDescendants()
                 .Where(static node => ShapeOf(node) is not null)
                 .SelectMany(static node => node.Plans)
                 .Select(static member => new PostgresRelationName(member.Schema!, member.RelationName!))
-                .Distinct()
-                .OrderBy(static relation => relation.Schema, StringComparer.Ordinal)
-                .ThenBy(static relation => relation.Name, StringComparer.Ordinal),
-        ];
+        );
 
     /// <summary>
     /// The alias the nodes above an <c>Append</c> print for its members, when the node is an <c>Append</c> or a
@@ -51,7 +44,7 @@ internal static class PlanPartitions
     /// </summary>
     public static string? ShapeOf(PlanNode node)
     {
-        if (!Appends.Contains(node.NodeType) || node.Plans.Count == 0)
+        if (!PlanNodeTypes.Appends.Contains(node.NodeType) || node.Plans.Count == 0)
         {
             return null;
         }
@@ -60,7 +53,7 @@ internal static class PlanPartitions
         foreach (var member in node.Plans)
         {
             if (
-                member.ParentRelationship != Member
+                member.ParentRelationship != PlanRelationships.Member
                 || !PlanInstances.ScansARelation(member)
                 || member.Schema is null
                 || member.RelationName is null
@@ -166,6 +159,4 @@ internal static class PlanPartitions
     // Whether the token is a "." that stands at the index.
     private static bool IsDotAt(PlanExpression.Token token, int at) =>
         token.Kind == PlanExpression.Kind.Dot && token.Start == at;
-
-    private static IEnumerable<PlanNode> All(PlanNode node) => node.Plans.SelectMany(All).Prepend(node);
 }

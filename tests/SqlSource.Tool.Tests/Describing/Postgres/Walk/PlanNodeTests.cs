@@ -2,6 +2,7 @@ using System.Linq;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
+using static SqlSource.Tool.Tests.PostgresPlans;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres.Walk;
 
@@ -176,4 +177,127 @@ public sealed class PlanNodeTests
     // Past the limit the text is no plan the walk can use, and nothing is thrown.
     [Fact]
     public void Read_PlanNestedPastTheLimit_IsNull() => PlanNode.Read(Nested(400)).ShouldBeNull();
+
+    [Fact]
+    public void SelfAndDescendants_Tree_IsTheNodeThenEachChildAndAllUnderItInOrder()
+    {
+        var a = Scan("a");
+        var b = Scan("b");
+        var sort = Over("Sort", b);
+        var join = Join("Inner", a, sort);
+
+        join.SelfAndDescendants()
+            .Select(static node => node.Alias ?? node.NodeType)
+            .ShouldBe(["Hash Join", "a", "Sort", "b"]);
+        join.SelfAndDescendants().First().ShouldBeSameAs(join);
+    }
+
+    // Every relationship is followed: an InitPlan, a SubPlan, a Member and a Subquery as well as the sides.
+    [Fact]
+    public void SelfAndDescendants_ChildOfEveryRelationship_IsIncluded()
+    {
+        var root = Scan("r") with
+        {
+            NodeType = "Result",
+            Plans =
+            [
+                Scan("i") with
+                {
+                    ParentRelationship = "InitPlan",
+                },
+                Scan("s") with
+                {
+                    ParentRelationship = "SubPlan",
+                },
+                Scan("m") with
+                {
+                    ParentRelationship = "Member",
+                },
+                Scan("q") with
+                {
+                    ParentRelationship = "Subquery",
+                },
+            ],
+        };
+
+        root.SelfAndDescendants().Select(static node => node.Alias).ShouldBe(["r", "i", "s", "m", "q"]);
+    }
+
+    [Fact]
+    public void SelfAndDescendants_Leaf_IsTheNodeAlone()
+    {
+        var scan = Scan("a");
+
+        scan.SelfAndDescendants().ShouldHaveSingleItem().ShouldBeSameAs(scan);
+    }
+
+    [Fact]
+    public void SubqueryChild_SubqueryScanWithOneSubqueryChild_IsThatChild()
+    {
+        var scan = Over("Subquery Scan", Scan("u"), "Subquery");
+
+        scan.SubqueryChild.ShouldBeSameAs(scan.Plans[0]);
+    }
+
+    // An InitPlan beside the Subquery child is no second one.
+    [Fact]
+    public void SubqueryChild_SubqueryScanWithAnInitPlanBeside_IsTheSubqueryChild()
+    {
+        var scan = Over("Subquery Scan", Scan("u"), "Subquery");
+        var cte = Scan("c") with { ParentRelationship = "InitPlan" };
+
+        (scan with { Plans = [cte, .. scan.Plans] }).SubqueryChild.ShouldBeSameAs(scan.Plans[0]);
+    }
+
+    [Fact]
+    public void SubqueryChild_SubqueryScanWithNoSubqueryChild_IsNull() =>
+        Over("Subquery Scan", Scan("u"), "InitPlan").SubqueryChild.ShouldBeNull();
+
+    [Fact]
+    public void SubqueryChild_SubqueryScanWithTwoSubqueryChildren_IsNull()
+    {
+        var scan = Over("Subquery Scan", Scan("u"), "Subquery");
+
+        (scan with { Plans = [.. scan.Plans, .. scan.Plans] }).SubqueryChild.ShouldBeNull();
+    }
+
+    // Read on each call: a copy of another node type has none, though its original had one.
+    [Fact]
+    public void SubqueryChild_CopyOfAnotherNodeType_IsNull() =>
+        (Over("Subquery Scan", Scan("u"), "Subquery") with { NodeType = "CTE Scan" }).SubqueryChild.ShouldBeNull();
+
+    [Fact]
+    public void JoinChildren_NodeWithChildrenOfEveryRelationship_IsItsOuterAndInnerOnesInOrder()
+    {
+        var node = Join("Inner", Scan("o"), Scan("i"));
+        node = node with
+        {
+            Plans =
+            [
+                Scan("x") with
+                {
+                    ParentRelationship = "InitPlan",
+                },
+                node.Plans[0],
+                Scan("s") with
+                {
+                    ParentRelationship = "SubPlan",
+                },
+                Scan("m") with
+                {
+                    ParentRelationship = "Member",
+                },
+                node.Plans[1],
+                Scan("q") with
+                {
+                    ParentRelationship = "Subquery",
+                },
+            ],
+        };
+
+        node.JoinChildren.Select(static child => child.Alias).ShouldBe(["o", "i"]);
+    }
+
+    [Fact]
+    public void JoinChildren_Leaf_IsEmpty() => Scan("a").JoinChildren.ShouldBeEmpty();
 }

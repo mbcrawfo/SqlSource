@@ -1,9 +1,11 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresEventCases;
@@ -224,4 +226,13 @@ public sealed class PostgresEventsPlanTests
         var scan = log.Events.Last(written => written.Name == "postgres.walk.node").Members;
         Member(scan, "nodeType").ShouldBe((LogValue)"***");
     }
+
+    // The words of nullExtends are the log's contract, spelled apart from the members' names.
+    [Theory]
+    [InlineData(nameof(NullExtension.None), "none")]
+    [InlineData(nameof(NullExtension.Inner), "inner")]
+    [InlineData(nameof(NullExtension.Outer), "outer")]
+    [InlineData(nameof(NullExtension.Both), "both")]
+    public void TextOf_NullExtension_IsTheWordTheLogWrites(string member, string text) =>
+        PostgresEvents.TextOf(Enum.Parse<NullExtension>(member)).ShouldBe(text);
 }

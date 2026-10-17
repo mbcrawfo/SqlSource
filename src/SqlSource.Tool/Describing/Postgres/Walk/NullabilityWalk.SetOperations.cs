@@ -42,10 +42,6 @@ internal static partial class NullabilityWalk
     // set operation under a join, or one that a node above computes over, keeps its answer: the node is walked as a
     // plan, which holds a set operation.
 
-    private const string Outer = "Outer";
-    private const string Inner = "Inner";
-    private const string Member = "Member";
-    private const string SetOp = "SetOp";
     private const string LeafScanPrefix = "*SELECT* ";
     private const string LeftFlag = "0";
     private const string RightFlag = "1";
@@ -54,14 +50,12 @@ internal static partial class NullabilityWalk
     private static readonly HashSet<string> NeverProject =
     [
         with(StringComparer.Ordinal),
-        "Sort",
-        "Incremental Sort",
-        "Limit",
-        "Unique",
-        "Materialize",
+        PlanNodeTypes.Sort,
+        PlanNodeTypes.IncrementalSort,
+        PlanNodeTypes.Limit,
+        PlanNodeTypes.Unique,
+        PlanNodeTypes.Materialize,
     ];
-
-    private static readonly HashSet<string> Appends = [with(StringComparer.Ordinal), "Append", "Merge Append"];
 
     /// <summary>
     /// Whether the root reaches an <c>Append</c>, a <c>Merge Append</c> or a <c>SetOp</c> through nodes that may pass
@@ -72,7 +66,7 @@ internal static partial class NullabilityWalk
     {
         for (var node = root; node is not null; node = OnlyChildOf(node))
         {
-            if (Appends.Contains(node.NodeType) || node.NodeType == SetOp)
+            if (PlanNodeTypes.Appends.Contains(node.NodeType) || node.NodeType == PlanNodeTypes.SetOp)
             {
                 return true;
             }
@@ -85,61 +79,55 @@ internal static partial class NullabilityWalk
     /// Whether the walk may answer a column of no origin of the plan from a set operation's branches: the root reaches
     /// one, and prints no Output or its plan holds one that is no partitioned table's <c>Append</c>.
     /// </summary>
-    /// <param name="root">The root of the plan.</param>
-    /// <param name="partitions">The answer of <c>partitions</c>, or null when it was not asked.</param>
-    public static bool MayAnswerFromBranches(
-        PlanNode root,
-        IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>>? partitions
-    ) =>
-        ReachesSetOperation(root)
-        && (
-            root.Output is null
-            || PlanInstances
-                .Find(root, root, partitions ?? new Dictionary<PostgresRelationName, IReadOnlyList<long>>())
-                .HasSetOperation
-        );
+    /// <param name="cache">The instances of the plan's plans, whose tree is the plan.</param>
+    public static bool MayAnswerFromBranches(PlanInstancesCache cache) =>
+        ReachesSetOperation(cache.Tree) && (cache.Tree.Output is null || cache.Of(cache.Tree).HasSetOperation);
 
-    // The types to answer a set operation's columns with, when the walk takes that path: a column has no origin, the
-    // types are given, the root prints no Output or its plan holds a set operation, and the root reaches one.  A root
-    // that prints Output must print an entry for each column, and one of another statement's plan is read for none.
+    // The types to answer a set operation's columns with, when the walk takes that path: a column has no origin, there
+    // is a type for each column, the root prints no Output or its plan holds a set operation, and the root reaches
+    // one.  A root that prints Output must print an entry for each column, and one of another statement's plan is read
+    // for none.
     private static IReadOnlyList<long>? SetOperationTypesOf(
-        PlanNode root,
+        Plans plans,
         IReadOnlyList<SidecarColumn> columns,
-        IReadOnlyList<ColumnOrigin?> origins,
-        WalkScope scope,
-        PlanInstances instances
-    ) =>
-        scope.ColumnTypes is { } types
-        && types.Count == columns.Count
-        && origins.Any(static origin => origin is null)
-        && instances.Reason is null
-        && (
-            root.Output is null
-            || (
-                instances.HasSetOperation
-                && root.Output.Count >= columns.Count
-                && OutputFits(root.Output, origins, instances)
+        IReadOnlyList<ColumnOrigin?> origins
+    )
+    {
+        var root = plans.Tree;
+        var types = plans.Scope.ColumnTypes;
+        var instances = plans.InstancesOf(root);
+        return
+            types.Count == columns.Count
+            && origins.Any(static origin => origin is null)
+            && instances.Reason is null
+            && (
+                root.Output is null
+                || (
+                    instances.HasSetOperation
+                    && root.Output.Count >= columns.Count
+                    && OutputFits(root.Output, origins, instances)
+                )
             )
-        )
-        && ReachesSetOperation(root)
+            && ReachesSetOperation(root)
             ? types
             : null;
+    }
 
     // Each column of no origin from the set operation's inputs, and each with an origin as the walk answers it: by
     // its entry at a root that prints one in a gated query, and kept otherwise.  A root Append that is a partitioned
     // table's (PlanPartitions), where the plan holds no set operation, is a union of its partitions all the same; its
     // answer is an expression's, since the SQL holds no set operation.
     private static WalkOutcome RunSetOperation(
-        PlanNode root,
+        Plans plans,
         IReadOnlyList<SidecarColumn> columns,
         IReadOnlyList<ColumnOrigin?> origins,
-        WalkScope scope,
-        Plans plans,
-        PlanInstances instances,
         IReadOnlyList<long> types
     )
     {
-        var branches = new SetOperations(plans, scope);
+        var root = plans.Tree;
+        var scope = plans.Scope;
+        var instances = plans.InstancesOf(root);
+        var branches = new SetOperations(plans);
         var onlyAlias = plans.OnlyAliasOf(root);
         var source = instances.HasSetOperation
             ? SidecarValues.NullableSource.SetOperation
@@ -180,15 +168,19 @@ internal static partial class NullabilityWalk
 
     // The children of a node that hold its rows: every one but an InitPlan or a SubPlan.
     private static PlanNode[] RowChildrenOf(PlanNode node) =>
-        [.. node.Plans.Where(static child => child.ParentRelationship is not ("InitPlan" or "SubPlan"))];
+        [
+            .. node.Plans.Where(static child =>
+                child.ParentRelationship is not (PlanRelationships.InitPlan or PlanRelationships.SubPlan)
+            ),
+        ];
 
     // The one child of a node that may pass it on: one Outer child, no join type, no grouping set, which puts NULL
     // in a key, and no ModifyTable, whose RETURNING list is of the row it wrote.
     private static PlanNode? OnlyChildOf(PlanNode node) =>
         node.JoinType is null
         && !node.HasGroupingSets
-        && node.NodeType != "ModifyTable"
-        && RowChildrenOf(node) is [{ ParentRelationship: Outer } child]
+        && node.NodeType != PlanNodeTypes.ModifyTable
+        && RowChildrenOf(node) is [{ ParentRelationship: PlanRelationships.Outer } child]
             ? child
             : null;
 
@@ -197,17 +189,19 @@ internal static partial class NullabilityWalk
         NeverProject.Contains(node.NodeType) ? OnlyChildOf(node) : null;
 
     // The members of an Append, or none when a child is anything else.
-    private static PlanNode[] MembersOf(PlanNode append)
+    private static PlanNode[] MemberNodesOf(PlanNode append)
     {
         var children = RowChildrenOf(append);
-        return children.All(static child => child.ParentRelationship == Member) ? children : [];
+        return children.All(static child => child.ParentRelationship == PlanRelationships.Member) ? children : [];
     }
 
     // What the node prints: its Output, or for an Append without one its first member's.
     private static IReadOnlyList<string>? PrintedBy(PlanNode node, int depth) =>
         node.Output
         ?? (
-            Appends.Contains(node.NodeType) && depth < Plans.MaxDepth && MembersOf(node) is [var first, ..]
+            PlanNodeTypes.Appends.Contains(node.NodeType)
+            && depth < Plans.MaxDepth
+            && MemberNodesOf(node) is [var first, ..]
                 ? PrintedBy(first, depth + 1)
                 : null
         );
@@ -226,7 +220,7 @@ internal static partial class NullabilityWalk
 
     // The answer of a set operation's column at a node: whether every row the node returns holds a value at the
     // ordinal that is never NULL and of a type that carries to the column's.  False means unknown, never nullable.
-    private sealed class SetOperations(Plans plans, WalkScope scope)
+    private sealed class SetOperations(Plans plans)
     {
         public bool NotNullAt(PlanNode root, int ordinal, long type) => ColumnAt(root, ordinal, type, Reach.Root, 0);
 
@@ -237,18 +231,18 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            if (Appends.Contains(node.NodeType))
+            if (PlanNodeTypes.Appends.Contains(node.NodeType))
             {
-                return MembersOf(node) is [_, ..] members
+                return MemberNodesOf(node) is [_, ..] members
                     && members.All(member => ColumnAt(member, ordinal, type, Reach.Branch, depth + 1));
             }
 
-            if (node.NodeType == SetOp)
+            if (node.NodeType == PlanNodeTypes.SetOp)
             {
                 return SetOpAt(node, ordinal, type, reach, depth);
             }
 
-            if (node.NodeType == "Recursive Union")
+            if (node.NodeType == PlanNodeTypes.RecursiveUnion)
             {
                 return false;
             }
@@ -274,8 +268,8 @@ internal static partial class NullabilityWalk
         // INTERSECT: an input that proves it; EXCEPT: its left input.  Below another set operation, every input.
         private bool SetOpAt(PlanNode node, int ordinal, long type, Reach reach, int depth)
         {
-            var intersect = node.Command is "Intersect" or "Intersect All";
-            if (!intersect && node.Command is not ("Except" or "Except All"))
+            var intersect = node.Command is SetOperationCommands.Intersect or SetOperationCommands.IntersectAll;
+            if (!intersect && node.Command is not (SetOperationCommands.Except or SetOperationCommands.ExceptAll))
             {
                 return false;
             }
@@ -303,14 +297,16 @@ internal static partial class NullabilityWalk
             var children = RowChildrenOf(node);
             if (
                 children is [_, _]
-                && children.FirstOrDefault(static child => child.ParentRelationship == Outer) is { } outer
-                && children.FirstOrDefault(static child => child.ParentRelationship == Inner) is { } inner
+                && children.FirstOrDefault(static child => child.ParentRelationship == PlanRelationships.Outer)
+                    is { } outer
+                && children.FirstOrDefault(static child => child.ParentRelationship == PlanRelationships.Inner)
+                    is { } inner
             )
             {
                 return ([outer, inner], outer, false);
             }
 
-            if (children is not [{ ParentRelationship: Outer } only])
+            if (children is not [{ ParentRelationship: PlanRelationships.Outer } only])
             {
                 return null;
             }
@@ -321,7 +317,7 @@ internal static partial class NullabilityWalk
                 append = under;
             }
 
-            if (append.NodeType != "Append" || MembersOf(append) is not [var first, var second])
+            if (append.NodeType != PlanNodeTypes.Append || MemberNodesOf(append) is not [var first, var second])
             {
                 return null;
             }
@@ -381,14 +377,13 @@ internal static partial class NullabilityWalk
         // The branch of a flagged member that is a set operation's own leaf scan, when its entry at the ordinal is a
         // reference to its own alias.
         private static PlanNode? LeafBranchOf(PlanNode node, int ordinal) =>
-            node.NodeType == "Subquery Scan"
-            && node.Alias is { } alias
+            node.Alias is { } alias
             && IsLeafAlias(alias)
             && node.Output is { } output
             && ordinal < output.Count
             && OutputReference.Parse(output[ordinal]) is { Alias: { } named }
             && string.Equals(named, alias, StringComparison.Ordinal)
-            && node.Plans.Where(static child => child.ParentRelationship == "Subquery").ToArray() is [var branch]
+            && node.SubqueryChild is { } branch
                 ? branch
                 : null;
 
@@ -412,7 +407,7 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            var expressions = new Expressions(scope, node, instances, plans.OnlyAliasOf(node));
+            var expressions = new Expressions(plans.Scope, node, instances, plans.OnlyAliasOf(node));
             var entry = output[ordinal];
             if (OutputReference.Parse(entry) is { } reference)
             {
@@ -421,7 +416,7 @@ internal static partial class NullabilityWalk
             }
 
             return expressions.NullableOf(entry) == false
-                && PlanExpression.TypeOf(entry, scope.CatalogFunctionsFirst) is { } constant
+                && PlanExpression.TypeOf(entry, plans.Scope.CatalogFunctionsFirst) is { } constant
                 && SetOperationTypes.Carries(constant, type);
         }
     }
