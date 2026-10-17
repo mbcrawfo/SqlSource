@@ -19,13 +19,8 @@ public sealed class TableMatchTests(PostgresContainer postgres)
         ALTER TABLE match_dropped DROP COLUMN IF EXISTS gone;
         """;
 
-    private async Task<QueryDescription> ShouldDescribeAsync(string sql)
-    {
-        var described = await Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql));
-
-        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-        return described.Value.ShouldNotBeNull();
-    }
+    private Task<QueryDescription> ShouldDescribeAsync(string sql) =>
+        Sessions.ShouldDescribeAsync(postgres.ConnectionString, sql);
 
     private async Task ShouldMatchAsync(string sql, string table, string schema = "public")
     {

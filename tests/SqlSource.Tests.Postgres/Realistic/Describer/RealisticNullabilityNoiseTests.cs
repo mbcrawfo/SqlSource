@@ -18,16 +18,14 @@ public sealed class RealisticNullabilityNoiseTests(PostgresContainer postgres)
 
     [Fact]
     public void Budgets_RecordedMajors_EachHoldOneAndNoOtherDoes() =>
-        Budgets.Keys.Order().ShouldBe(RealisticCase.RecordedMajors.Order(), "a recorded major and a budget differ");
+        Budgets.Keys.Order().ShouldBe(PostgresContainer.RecordedMajors.Order(), "a recorded major and a budget differ");
 
     [Fact]
     public async Task Noise_OverTheCorpus_IsTheBudget()
     {
+        postgres.SkipUnlessRecordedMajor("The budgets");
         var major = postgres.Major;
-        if (!Budgets.TryGetValue(major, out var held))
-        {
-            Assert.Skip("The budget is held for PostgreSQL 14 and 18 alone.");
-        }
+        var held = Budgets[major];
 
         var count = 0;
         foreach (var found in RealisticCases.All.Where(candidate => candidate.Refusal is null))

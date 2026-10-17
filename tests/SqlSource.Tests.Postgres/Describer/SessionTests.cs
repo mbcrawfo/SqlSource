@@ -18,14 +18,11 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class SessionTests(PostgresContainer postgres)
 {
-    private const string Marker = "s3cret-marker";
-
     [Fact]
     public async Task OpenAsync_Container_GivesTheVersionTheDriverAndTheThreeSettings()
     {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
 
-        await using var session = opened.Value.ShouldNotBeNull();
         var server = session.Server;
         server.Version.ShouldNotContain(" ");
         char.IsAsciiDigit(server.Version[0]).ShouldBeTrue(server.Version);
@@ -41,14 +38,9 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task OpenAsync_ThroughACapturingExchange_KeepsAnEmptyRequestAndNothingOfTheConnection()
     {
-        var capture = new DescribeCapture("postgres");
+        var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString);
 
-        var opened = await Sessions.OpenAsync(
-            postgres.ConnectionString,
-            new CapturingExchange(LiveExchange.Instance, capture)
-        );
-
-        await using var session = opened.Value.ShouldNotBeNull();
+        await using var session = opened;
         var call = capture.Calls.ShouldHaveSingleItem();
         call.Method.ShouldBe("open");
         CaptureJson.TextOf(call.Request).ShouldBe("{}");
@@ -58,7 +50,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task OpenAsync_WrongPassword_IsSqlsrc224WithTheServersMessage()
     {
-        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { Password = Marker };
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { Password = Secrets.Marker };
 
         var failure = await ShouldNotOpenAsync(connection.ConnectionString);
 
@@ -79,13 +71,12 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task OpenAsync_UnreachableHost_IsSqlsrc224WithTheDriversMessage()
     {
-        var failure = await ShouldNotOpenAsync("Host=127.0.0.1;Port=1;Timeout=5;Username=app;Password=" + Marker);
+        var failure = await ShouldNotOpenAsync(
+            "Host=127.0.0.1;Port=1;Timeout=5;Username=app;Password=" + Secrets.Marker
+        );
 
         failure.ServerLines.ShouldBe(["Failed to connect to 127.0.0.1:1"]);
     }
-
-    // The driver takes PGPASSWORD before it reads a password file, so with the variable set it never reads one.
-    private const string PasswordSetSkip = "PGPASSWORD is set, and the driver takes it before a password file.";
 
     // The server asks for a password and the string names a password file instead of a password: the driver reads
     // the file then, and for one that is not there it throws what is no NpgsqlException and quotes the path.  The
@@ -93,7 +84,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task OpenAsync_PasswordFileThatIsNotThere_IsSqlsrc224WithTheFixedLine()
     {
-        Assert.SkipWhen(Environment.GetEnvironmentVariable("PGPASSWORD") is not null, PasswordSetSkip);
+        PasswordFiles.SkipUnlessRead();
         using var folder = new TempFolder();
         var path = folder.PathOf("passfile-that-is-not-there");
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString)
@@ -166,8 +157,7 @@ public sealed class SessionTests(PostgresContainer postgres)
     public async Task Describe_AfterTheServerEndedTheSession_IsSqlsrc225EachTimeAndNoThrow()
     {
         var token = TestContext.Current.CancellationToken;
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         _ = (await session.DescribeAsync(Requests.Of(Sql), token)).Value.ShouldNotBeNull();
 
         await Sessions.EndBackendAsync(session, postgres.ConnectionString);
@@ -185,11 +175,19 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ServerEndsTheSessionBetweenPrepareAndColumns_IsSqlsrc225AndNoThrow()
     {
-        var capture = new DescribeCapture("postgres");
-        var exchange = new EndsTheBackendAfterPrepare(postgres.ConnectionString);
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString, new CapturingExchange(exchange, capture));
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
-        exchange.Session = session;
+        PostgresSession? ending = null;
+        var exchange = new AfterLiveExchange(
+            async (method, _, _) =>
+            {
+                if (method == "prepare" && ending is { } open)
+                {
+                    await Sessions.EndBackendAsync(open, postgres.ConnectionString);
+                }
+            }
+        );
+        var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString, exchange);
+        await using var session = opened;
+        ending = session;
 
         var described = await session.DescribeAsync(Requests.Of(Sql), TestContext.Current.CancellationToken);
 
@@ -204,11 +202,20 @@ public sealed class SessionTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_TableDroppedBetweenColumnsAndTables_IsSqlsrc225AtCatalogAndNoThrow()
     {
-        await ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
-        var capture = new DescribeCapture("postgres");
-        var exchange = new DropsTheTableAfterColumns(postgres.ConnectionString);
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString, new CapturingExchange(exchange, capture));
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await postgres.ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
+        var dropped = false;
+        var exchange = new AfterLiveExchange(
+            async (method, _, _) =>
+            {
+                if (method == "columns" && !dropped)
+                {
+                    dropped = true;
+                    await postgres.ExecuteAsync("DROP TABLE session_gone");
+                }
+            }
+        );
+        var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString, exchange);
+        await using var session = opened;
         var token = TestContext.Current.CancellationToken;
 
         var described = await session.DescribeAsync(Requests.Of("SELECT id FROM session_gone"), token);
@@ -239,23 +246,32 @@ public sealed class SessionTests(PostgresContainer postgres)
     [InlineData("SELECT '\U0001F600 é' AS face WHERE @n::int = 1 /* trailing */  ")]
     public async Task Describe_StatementPrepared_IsListedWithTheTextAsSentAndDescribed(string sql)
     {
-        var exchange = new ReadsTheListedText();
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString, exchange);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
-        exchange.Session = session;
+        PostgresSession? reading = null;
+        PostgresPrepareRequest? sent = null;
+        string? listed = null;
+        var exchange = new AfterLiveExchange(
+            async (method, request, token) =>
+            {
+                if (request is PostgresPrepareRequest prepare && reading is { } open)
+                {
+                    sent = prepare;
+                    await using var read = await open.Connection.CommandAsync(
+                        "SELECT statement FROM pg_catalog.pg_prepared_statements WHERE name = @name",
+                        token
+                    );
+                    _ = read.Parameters.AddWithValue("name", prepare.Statement);
+                    listed = (string?)await read.ExecuteScalarAsync(token);
+                }
+            }
+        );
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString, exchange);
+        reading = session;
 
         var described = await session.DescribeAsync(Requests.Of(sql), TestContext.Current.CancellationToken);
 
         described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-        var sent = exchange.Sent.ShouldNotBeNull();
-        exchange.Listed.ShouldBe(ParameterPlaceholders.PrepareText(sent.Statement, sent.Types, sent.Sql));
-    }
-
-    private async Task ExecuteAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
+        var prepared = sent.ShouldNotBeNull();
+        listed.ShouldBe(ParameterPlaceholders.PrepareText(prepared.Statement, prepared.Types, prepared.Sql));
     }
 
     private static DescribeFailure ShouldBeRejected(
@@ -270,11 +286,10 @@ public sealed class SessionTests(PostgresContainer postgres)
         return failure;
     }
 
-    // Asks the server, and ends the session's backend when "prepare" has answered.
-    private sealed class EndsTheBackendAfterPrepare(string connection) : IDescribeExchange
+    // Asks the server, and then runs the test's hook with the call's method and request.  The hook also runs after
+    // "open", before the test holds its session, so a hook that needs the session acts only once it is set.
+    private sealed class AfterLiveExchange(Func<string, object?, CancellationToken, Task> after) : IDescribeExchange
     {
-        public PostgresSession? Session { get; set; }
-
         public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
             string method,
             TRequest request,
@@ -283,69 +298,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         )
         {
             var answer = await LiveExchange.Instance.AskAsync(method, request, live, cancellationToken);
-            if (method == "prepare" && Session is { } session)
-            {
-                await Sessions.EndBackendAsync(session, connection);
-            }
-
-            return answer;
-        }
-    }
-
-    // Asks the server, and when "prepare" has answered keeps what was sent and the text the server lists for the
-    // statement's name, read on the session's connection.
-    private sealed class ReadsTheListedText : IDescribeExchange
-    {
-        public PostgresSession? Session { get; set; }
-
-        public PostgresPrepareRequest? Sent { get; private set; }
-
-        public string? Listed { get; private set; }
-
-        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
-            string method,
-            TRequest request,
-            Func<TRequest, CancellationToken, Task<TAnswer>> live,
-            CancellationToken cancellationToken
-        )
-        {
-            var answer = await LiveExchange.Instance.AskAsync(method, request, live, cancellationToken);
-            if (request is PostgresPrepareRequest prepare && Session is { } session)
-            {
-                Sent = prepare;
-                await using var read = await session.Connection.CommandAsync(
-                    "SELECT statement FROM pg_catalog.pg_prepared_statements WHERE name = @name",
-                    cancellationToken
-                );
-                _ = read.Parameters.AddWithValue("name", prepare.Statement);
-                Listed = (string?)await read.ExecuteScalarAsync(cancellationToken);
-            }
-
-            return answer;
-        }
-    }
-
-    // Asks the server, and drops session_gone from a connection of its own when "columns" has answered, once.
-    private sealed class DropsTheTableAfterColumns(string connection) : IDescribeExchange
-    {
-        private bool _dropped;
-
-        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
-            string method,
-            TRequest request,
-            Func<TRequest, CancellationToken, Task<TAnswer>> live,
-            CancellationToken cancellationToken
-        )
-        {
-            var answer = await LiveExchange.Instance.AskAsync(method, request, live, cancellationToken);
-            if (method == "columns" && !_dropped)
-            {
-                _dropped = true;
-                await using var source = NpgsqlDataSource.Create(connection);
-                await using var command = source.CreateCommand("DROP TABLE session_gone");
-                _ = await command.ExecuteNonQueryAsync(cancellationToken);
-            }
-
+            await after(method, request, cancellationToken);
             return answer;
         }
     }
@@ -383,7 +336,8 @@ public sealed class SessionTests(PostgresContainer postgres)
         Sessions
             .TextsOf(failure)
             .ShouldAllBe(text =>
-                !text.Contains(connection, StringComparison.Ordinal) && !text.Contains(Marker, StringComparison.Ordinal)
+                !text.Contains(connection, StringComparison.Ordinal)
+                && !text.Contains(Secrets.Marker, StringComparison.Ordinal)
             );
         return failure;
     }

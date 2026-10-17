@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Testing.Fixtures;
 
 namespace SqlSource.Tests.Postgres.Realistic;
@@ -29,12 +30,13 @@ internal sealed record RealisticCase(
     // The truth and the sample values, written by hand.  Recording never writes it.
     public const string CaseFile = "case.json";
 
-    // The majors that a case's description and the noise budget are recorded on, as CI runs them.
-    public static IReadOnlyList<int> RecordedMajors { get; } = [14, 18];
-
     // The files of the case's folder: its query, its truth, and the description of each recorded major it runs on.
     public IReadOnlyList<string> Files =>
-        [QueryFile, CaseFile, .. RecordedMajors.Where(RunsOn).Select(major => Path.GetFileName(ExpectedPath(major)))];
+        [
+            QueryFile,
+            CaseFile,
+            .. PostgresContainer.RecordedMajors.Where(RunsOn).Select(major => Path.GetFileName(ExpectedPath(major))),
+        ];
 
     // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
     public bool RunsOn(int major) => MinimumMajor is not { } minimum || minimum <= major;
@@ -44,7 +46,7 @@ internal sealed record RealisticCase(
         Path.Combine(Folder, string.Create(CultureInfo.InvariantCulture, $"expected-pg{major}.txt"));
 
     // The case as FixtureReplay plans one.
-    public FixtureCase AsFixture => new("postgres", Name, Folder);
+    public FixtureCase AsFixture => new(SidecarValues.Engine.Postgres, Name, Folder);
 
     // How a failure names a case, by the name of its folder: the one spelling, which the reader uses before it has
     // a case.
