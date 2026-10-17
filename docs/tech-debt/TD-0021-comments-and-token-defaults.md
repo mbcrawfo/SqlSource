@@ -8,7 +8,7 @@ The default of a token, `{{name:default}}`, is read from the SQL of a query, and
 2. **A `-- token:` marker's default is taken as written, and an inline default is taken from the SQL without comments.**  So `-- token: {{f:a /* c */ b}}` beside an identical inline `{{f:a /* c */ b}}` is `SQLSRC112`, a conflict between two defaults, and editing a comment inside a marker's default changes the query's hash.
 3. **The SQL with comments is built and scanned wherever comments may be wanted for the file.**  [`FileParseInput.CommentsWanted`](../../src/SqlSource/Generation/FileParseInput.cs) is true when the file's metadata says `keep-comments`, and a type's attribute (`Parameters`) can override it, so it can be true where no type ends up keeping comments.  A `{{class}}` inside a comment is then `SQLSRC114` for SQL that nothing emits.
 
-The README tells users not to put a `--` comment inside a default (Defaults, under Tokens).  The other two are not documented.
+The known issues of [`docs/manual/parameters-and-tokens.md`](../manual/parameters-and-tokens.md#known-issues) document all three, each by its effect and what to do.
 
 ## Why it exists
 

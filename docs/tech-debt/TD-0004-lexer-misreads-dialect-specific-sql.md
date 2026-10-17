@@ -15,7 +15,7 @@ A file is read by the rules of its dialect and of the dialect's options: [`SqlDi
 | A parameter after a comma, outside parentheses, in a statement that follows a `DECLARE` with no `;` and starts with a word that [`SqlDeclaredVariables`](../../src/SqlSource/Parsing/SqlDeclaredVariables.cs) does not know, such as `SEND` or a label | SQL Server | As a local variable, so not as a parameter.  A `-- param:` marker with the type makes it one again. |
 | A parameter inside a hint, `/*+ ... @p ... */` or `/*! ... @p ... */` | Every dialect | Not as a parameter: a hint is copied whole and is not searched. |
 
-The default dialect, `ansi`, is one set of rules for every database.  By design it also misreads what the table in `README.md` says it does not read: backslash escapes in plain strings, `[...]` identifiers, `q'...'` strings, `#` comments, `--` that needs whitespace, comments that do not nest, and a local variable that T-SQL declares with `DECLARE`, which it reads as a parameter.  Setting the dialect fixes those, and only those: each construct in the table above is still misread under its own dialect.
+The default dialect, `ansi`, is one set of rules for every database.  By design it also misreads what the table "What each dialect changes" in [`docs/manual/dialects.md`](../manual/dialects.md#what-a-dialect-changes) says it does not read: backslash escapes in plain strings, `[...]` identifiers, `q'...'` strings, `#` comments, `--` that needs whitespace, comments that do not nest, and a local variable that T-SQL declares with `DECLARE`, which it reads as a parameter.  Setting the dialect fixes those, and only those: each construct in the table above is still misread under its own dialect.
 
 A misread has one of two outcomes:
 
@@ -34,7 +34,7 @@ In [`SqlLexerTests`](../../tests/SqlSource.Tests/Parsing/SqlLexerTests.cs), the 
 
 ## Impact
 
-Low: the constructs are rare.  A user of one gets either an error that names an unterminated quote or comment in valid SQL (`SQLSRC101`, `SQLSRC102`), or a generated constant that is missing part of the query.  The second is silent at build time, though the truncated SQL will almost always fail when it runs.  `README.md` lists the constructs.  The parameter rows matter from the phase that generates a type for each parameter; until then a parameter list has no effect.  From that phase the tool can compare a query's list with what SQL Server reports as undeclared, which catches the last row.
+Low: the constructs are rare.  A user of one gets either an error that names an unterminated quote or comment in valid SQL (`SQLSRC101`, `SQLSRC102`), or a generated constant that is missing part of the query.  The second is silent at build time, though the truncated SQL will almost always fail when it runs.  [`docs/manual/dialects.md`](../manual/dialects.md#still-read-differently) lists the constructs, and [`docs/manual/parameters-and-tokens.md`](../manual/parameters-and-tokens.md) the parameter rows, in its sections on query parameters and in its known issues.  The parameter rows matter from the phase that generates a type for each parameter; until then a parameter list has no effect.  From that phase the tool can compare a query's list with what SQL Server reports as undeclared, which catches the last row.
 
 ## Proposed fix
 

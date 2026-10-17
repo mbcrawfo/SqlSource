@@ -18,13 +18,13 @@ None where the suppressor runs.  It was checked in three ways:
 - `dotnet build` of two such projects with `TreatWarningsAsErrors`, on the .NET SDKs 8.0.409 and 10.0.401, fails without the suppressor and succeeds with it.
 - The same builds succeed with `RunAnalyzers` set to `false`: the compiler runs a suppressor even then.
 
-It was not checked in a build on the first .NET 8 SDK, 8.0.100, whose compiler is Roslyn 4.8.0, nor in the live analysis of Visual Studio or Rider.  Where it does not run, the workaround is `<NoWarn>$(NoWarn);CS0436</NoWarn>` in the second project, which also hides the warning for genuine conflicts.  `README.md` says that the warning is turned off and does not give the workaround.
+It was not checked in a build on the first .NET 8 SDK, 8.0.100, whose compiler is Roslyn 4.8.0, nor in the live analysis of Visual Studio or Rider.  Where it does not run, the workaround is `<NoWarn>$(NoWarn);CS0436</NoWarn>` in the second project, which also hides the warning for genuine conflicts.  The known issues of [`docs/manual/generator.md`](../manual/generator.md#known-issues) give the workaround.
 
 The suppressor is also code that exists only for this: it binds the name at each CS0436 in a project, and a type that is added to `AttributeSource` has to be added to `GeneratedTypes`, which it reads.
 
 ## Proposed fix
 
-When the floor reaches Roslyn 4.14, call `AddEmbeddedAttributeDefinition` in the post-initialization step and mark every generated type with `[Microsoft.CodeAnalysis.Embedded]`.  Then delete `AttributeConflictSuppressor`, the `#pragma` in the generated file, the paragraph on `SQLSRC901` in `docs/diagnostics.md` and the section "Projects that share internals" in `README.md`.  Keep the tests of `AttributeConflictTests` that expect no CS0436, and make them pass with no analyzer loaded.
+When the floor reaches Roslyn 4.14, call `AddEmbeddedAttributeDefinition` in the post-initialization step and mark every generated type with `[Microsoft.CodeAnalysis.Embedded]`.  Then delete `AttributeConflictSuppressor` and the `#pragma` in the generated file.  In the user documentation, delete the paragraph on `SQLSRC901` in `docs/manual/diagnostics.md` and the known issue on CS0436 in `docs/manual/generator.md`, and rewrite the section "Projects that share internals" there, the recipe "test-project-sees-internals" in `docs/manual/recipes.md` and the FAQ item "My test project sees the internals of my main project" in `README.md` to say only that the two projects do not conflict.  Keep the tests of `AttributeConflictTests` that expect no CS0436, and make them pass with no analyzer loaded.
 
 ## Trigger
 

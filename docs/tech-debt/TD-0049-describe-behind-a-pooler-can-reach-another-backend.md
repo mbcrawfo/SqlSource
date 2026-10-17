@@ -2,16 +2,16 @@
 
 ## Problem
 
-The PostgreSQL describer prepares a statement and asks about it in later calls, each a transaction of its own ([`PostgresSession.DescribePreparedAsync`](../../src/SqlSource.Tool/Describing/Postgres/PostgresSession.cs)).  Behind a pooler in transaction mode, such as PgBouncer, each call can reach another backend.  The read of `prepare` matches the statement by its name and the text of the `PREPARE`, so a backend that lacks it, or holds a statement of the same name that an earlier run left there, is [`SQLSRC236`](../diagnostics.md#sqlsrc236) at `describe parameters`.  What remains is `columns` and `explain`:
+The PostgreSQL describer prepares a statement and asks about it in later calls, each a transaction of its own ([`PostgresSession.DescribePreparedAsync`](../../src/SqlSource.Tool/Describing/Postgres/PostgresSession.cs)).  Behind a pooler in transaction mode, such as PgBouncer, each call can reach another backend.  The read of `prepare` matches the statement by its name and the text of the `PREPARE`, so a backend that lacks it, or holds a statement of the same name that an earlier run left there, is [`SQLSRC236`](../manual/diagnostics.md#sqlsrc236) at `describe parameters`.  What remains is `columns` and `explain`:
 
-- `columns` describes `EXECUTE sqlsource_<n>`.  On a backend that lacks the statement the server answers no row description and no error, so the describe goes on with no columns, and `check`, which describes the SQL itself, reports [`SQLSRC231`](../diagnostics.md#sqlsrc231): `the result has 1 columns for Npgsql and 0 for SqlSource`.  On a backend that holds a statement of the same name from an earlier run, it describes that statement's columns.  `check` compares their count, names and types, so a different statement is `SQLSRC231` too, but one with the same names and types and other origins would give the columns the other statement's nullability.
+- `columns` describes `EXECUTE sqlsource_<n>`.  On a backend that lacks the statement the server answers no row description and no error, so the describe goes on with no columns, and `check`, which describes the SQL itself, reports [`SQLSRC231`](../manual/diagnostics.md#sqlsrc231): `the result has 1 columns for Npgsql and 0 for SqlSource`.  On a backend that holds a statement of the same name from an earlier run, it describes that statement's columns.  `check` compares their count, names and types, so a different statement is `SQLSRC231` too, but one with the same names and types and other origins would give the columns the other statement's nullability.
 - `explain` plans `EXECUTE sqlsource_<n>` and can reach the same kind of backend.  `26000` is `SQLSRC236`; a stale statement of the same name gives the plan of that statement, which the walk reads for this one.
 
 A try against PgBouncer 1.26 in transaction mode, with eight clients of `pgbench` sharing the pool, saw both cases of `columns` in about one of four failing runs, beside `SQLSRC236` for the other queries of the run, and never saw `26000` at `columns`.
 
 ## Why it exists
 
-The describer needs one session, and the readme and `SQLSRC236` say to connect directly.  `columns` cannot tell an empty answer from a statement without rows, and nothing short of asking the backend again before each call says which backend a call reached.  What can be told is refused as `SQLSRC236`: `Multiplexing=true` at `open`, a statement that is not listed, `42P05` and `26000`.
+The describer needs one session, and [`docs/manual/postgresql.md`](../manual/postgresql.md#connecting) and `SQLSRC236` say to connect directly.  `columns` cannot tell an empty answer from a statement without rows, and nothing short of asking the backend again before each call says which backend a call reached.  What can be told is refused as `SQLSRC236`: `Multiplexing=true` at `open`, a statement that is not listed, `42P05` and `26000`.
 
 ## Impact
 

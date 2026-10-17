@@ -6,7 +6,7 @@ The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.m
 
 ## Delivered instead
 
-[`SQLSRC233`](../diagnostics.md#sqlsrc233), raised by [`StatementShape`](../../src/SqlSource.Tool/Describing/Postgres/StatementShape.cs) before anything is sent, and `-- output: sql` as the way to keep such a query: its SQL is still a string constant, or a method where the query has tokens, with no types, so the tool does not describe it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker.
+[`SQLSRC233`](../manual/diagnostics.md#sqlsrc233), raised by [`StatementShape`](../../src/SqlSource.Tool/Describing/Postgres/StatementShape.cs) before anything is sent, and `-- output: sql` as the way to keep such a query: its SQL is still a string constant, or a method where the query has tokens, with no types, so the tool does not describe it.  The error still fails the query, so the file's sidecar is held back until the query is mended or given the marker.
 
 ## Why deferred
 

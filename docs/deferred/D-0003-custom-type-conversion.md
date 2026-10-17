@@ -6,7 +6,7 @@ The [epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.m
 
 ## Delivered instead
 
-[`SQLSRC232`](../diagnostics.md#sqlsrc232), raised by [`PostgresErrors`](../../src/SqlSource.Tool/Describing/Postgres/PostgresErrors.cs) for a parameter whose type Npgsql cannot bind: a composite type, a table's row type, `regclass` and the other types of the system catalogs that Npgsql does not load, and a type whose schema or name holds a `.`.  The workaround is a `text` parameter with a cast in the SQL.  The tool never rewrites a user's SQL to make a parameter bindable.
+[`SQLSRC232`](../manual/diagnostics.md#sqlsrc232), raised by [`PostgresErrors`](../../src/SqlSource.Tool/Describing/Postgres/PostgresErrors.cs) for a parameter whose type Npgsql cannot bind: a composite type, a table's row type, `regclass` and the other types of the system catalogs that Npgsql does not load, and a type whose schema or name holds a `.`.  The workaround is a `text` parameter with a cast in the SQL.  The tool never rewrites a user's SQL to make a parameter bindable.
 
 ## Why deferred
 
@@ -20,7 +20,7 @@ A way for a project to declare a conversion for a database type, applied consist
 - **models**: what C# type a column of that type maps to;
 - **generated query code**: how a value is bound and read.
 
-It must work per engine, and say what the tool's `check` binds by when a conversion applies.  The types it would cover today on PostgreSQL are the ones still refused by `SQLSRC232`, listed in [`docs/diagnostics.md`](../diagnostics.md#sqlsrc232).
+It must work per engine, and say what the tool's `check` binds by when a conversion applies.  The types it would cover today on PostgreSQL are the ones still refused by `SQLSRC232`, listed in [`docs/manual/diagnostics.md`](../manual/diagnostics.md#sqlsrc232).
 
 ## Trigger
 

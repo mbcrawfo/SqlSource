@@ -5,10 +5,11 @@ namespace SqlSource.Diagnostics;
 
 /// <summary>
 /// Every error that only the <c>sqlsource</c> tool reports.  The generator reports none of them: they are here so
-/// that the release tracking and the tests of <c>docs/diagnostics.md</c> cover them with the generator's own.
+/// that the release tracking and the tests of <c>docs/manual/diagnostics.md</c> cover them with the generator's own.
 /// </summary>
 /// <remarks>
-/// Adding, removing or changing one also changes <c>AnalyzerReleases.Unshipped.md</c> and <c>docs/diagnostics.md</c>.
+/// Adding, removing or changing one also changes <c>AnalyzerReleases.Unshipped.md</c> and
+/// <c>docs/manual/diagnostics.md</c>.
 /// </remarks>
 internal static class ToolDiagnostics
 {

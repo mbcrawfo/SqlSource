@@ -373,7 +373,7 @@ Decided:
 
 Recommended:
 
-- The diagnostic ids are a new range, `SQLSRC2xx`, for the generator's and the tool's conditions alike: a stale, missing or orphaned snapshot entry; a sidecar whose engine is not the file's dialect; version mismatches; an unmapped type; an unsupported type; a parameter with no type and no marker; a column with no name; two columns with one name; a name that is not an identifier; the server's errors; the lexer-versus-Npgsql disagreement.  The tool uses the generator's ids where the condition is shared.  `docs/diagnostics.md` gains each one in the phase that adds it.  The tool's descriptors live in the generator assembly beside the generator's, so the diagnostics document test and `AnalyzerReleases` cover both; a parse error phase 1 adds takes the next `SQLSRC1xx` id, as the parser's errors do today.  Phase 2 uses `SQLSRC200` to `SQLSRC223` and phase 3 `SQLSRC224` to `SQLSRC232`, each assigned to its sub-phases in its section below, and the later phases take ids from `SQLSRC237`.
+- The diagnostic ids are a new range, `SQLSRC2xx`, for the generator's and the tool's conditions alike: a stale, missing or orphaned snapshot entry; a sidecar whose engine is not the file's dialect; version mismatches; an unmapped type; an unsupported type; a parameter with no type and no marker; a column with no name; two columns with one name; a name that is not an identifier; the server's errors; the lexer-versus-Npgsql disagreement.  The tool uses the generator's ids where the condition is shared.  `docs/manual/diagnostics.md` gains each one in the phase that adds it.  The tool's descriptors live in the generator assembly beside the generator's, so the diagnostics document test and `AnalyzerReleases` cover both; a parse error phase 1 adds takes the next `SQLSRC1xx` id, as the parser's errors do today.  Phase 2 uses `SQLSRC200` to `SQLSRC223` and phase 3 `SQLSRC224` to `SQLSRC232`, each assigned to its sub-phases in its section below, and the later phases take ids from `SQLSRC237`.
 - Fixtures live under `tests/SqlSource.Tool.Tests/Fixtures/Describers/<engine>/<case>/` as `query.sql`, `capture.json`, `expected.json` and an optional `issue.md`, with `capture.json` byte for byte the bundle's, beside the engine's `schema.sql`.  A `captureVersion` and `tools/record-fixtures.sh`, phase 3's, which re-records the unobfuscated fixtures against the containers, mitigate the coupling of captures to the interface's shape; an obfuscated fixture that outlives its interface version is deleted and its case re-tested by hand.  `expected.json` is a sidecar with the one entry, its `toolVersion` fixed to `fixture`, so that the whole entry is compared and a version bump touches no fixture.
 - `--log` without `--verbose` keeps the console quiet; `--verbose` without `--log` writes nothing to disk.  There is no `--diagnostics <dir>`; the bundle is the directory-shaped output.
 
@@ -418,11 +418,12 @@ Recommended:
 
 Each phase keeps the documents current, by the rules in `AGENTS.md`:
 
-- `README.md`'s installation section changes with phase 5: add the package and the tool, set the dialect, run `describe`, commit the sidecar; and a one-line note that a project wanting only the constants sets `SqlSourceOutput=Sql` and can keep the default dialect.  It gains a section on models: running `describe`, committing the sidecar, the overrides, the type map and its option, the Dapper settings a user who stays with Dapper needs, and what is unsupported.  Phase 5 writes it for PostgreSQL; phase 6 adds SQL Server; phase 7 the library maps; phase 8 the generated methods; phase 9 the online mode.
+- The user documentation is `README.md`, for the average user, who should not need to read further, and the manual in `docs/manual/`, for a user with a specific need ([user documentation overhaul](2026-10-16-user-documentation-overhaul-design.md)).  It describes what works today and marks what is coming with a "Coming in a later release" callout.  Each phase flips its rows of the manual's "What works today" table and its Status cells in `docs/manual/settings.md`, replaces its callouts with documentation, and adds or removes its known issues, in the pages that the phase map of `docs/manual/AGENTS.md` names.  That map is the list of record; the scope items below name some of its pages as examples.
+- What the README's installation and models sections were to hold goes to those pages: running `describe` and committing the sidecar to the README's getting started, which already shows both; the type map, its option and what is unsupported to the database page; the overrides to `settings.md`; the Dapper settings a user who stays with Dapper needs to `recipes.md`.  Where a decision below says that the README says something, it is said on the page the phase map names, and in the README too only when it is on the common path.
 - `CONTRIBUTING.md` gains the tool project, the end-to-end projects and their images, and the new package check.
 - `docs/publishing.md` covers the second package from phase 2.
 - `docs/tech-debt` gains the tool's syntax-level attribute reader in phase 2.
-- `docs/diagnostics.md` gains each diagnostic in the phase that adds it.
+- `docs/manual/diagnostics.md` gains each diagnostic in the phase that adds it.
 
 ## Phase 0 - names
 
@@ -430,7 +431,7 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 
 1. `SqlQueriesAttribute` becomes `SqlSourceGenerateAttribute`, used as `[SqlSourceGenerate]`; `SqlQueriesMode` becomes `SqlLocation`, and so does the attribute's `Mode` property.  The values `Nested` and `Direct` and the `Path` property are unchanged.
 2. `-- SqlSource:` becomes `-- generator:`, and its `dialect=` directive becomes the marker `-- dialect: postgres`.  What a `-- generator:` line holds is called a generator parameter, not a directive, in the code and the documents.
-3. Every place that names them: the generator's emitted source, the suppressor, the parser, the README, `docs/diagnostics.md`, the tests, and `tools/package-install`.
+3. Every place that names them: the generator's emitted source, the suppressor, the parser, the README, `docs/manual/diagnostics.md`, the tests, and `tools/package-install`.
 
 ### Decided
 
@@ -442,7 +443,7 @@ Each phase keeps the documents current, by the rules in `AGENTS.md`:
 
 ### Technical notes
 
-- The diagnostics that mention the directive form, the invalid dialect in a file and the misplaced dialect, are reworded, keep their ids, and their sections in `docs/diagnostics.md` follow.
+- The diagnostics that mention the directive form, the invalid dialect in a file and the misplaced dialect, are reworded, keep their ids, and their sections in `docs/manual/diagnostics.md` follow.
 - The parser's names for the directive scope and the preamble dialect follow the rename, so that later phases do not read "directive" in code and "marker" in the documents.
 
 ### Testing
@@ -476,7 +477,7 @@ The existing tests, under the new names and markers.  The package-install check 
 - A value from a fixed list is matched ignoring case and ignoring hyphens and spaces inside it, in a marker, a property, the metadata and the attribute alike.
 - `SQLSRC006` covers every invalid attribute value and `SQLSRC014` every invalid MSBuild value, property or metadata, with no position.
 - The metadata that the compiler reads is on items of the type `SqlSourceSettingsFile`, and one target trims every metadata.
-- Nothing a user sees changes beyond the attribute's new properties, which are accepted and have no effect yet, `SqlSourceTokenValidation` giving way to `SqlSourceGeneratorParameters`, `token-ignore` becoming a marker, and a query's generator parameters replacing the preamble's instead of merging.  No member is generated from the parameter list, and the only diagnostics added are invalid setting values and whatever the new markers need, with the next `SQLSRC1xx` ids for parse errors and `SQLSRC0xx` for setting values, as today; `SQLSRC010` is removed with `SqlSourceTokenValidation`, and `docs/diagnostics.md` and `AnalyzerReleases.Unshipped.md` follow.
+- Nothing a user sees changes beyond the attribute's new properties, which are accepted and have no effect yet, `SqlSourceTokenValidation` giving way to `SqlSourceGeneratorParameters`, `token-ignore` becoming a marker, and a query's generator parameters replacing the preamble's instead of merging.  No member is generated from the parameter list, and the only diagnostics added are invalid setting values and whatever the new markers need, with the next `SQLSRC1xx` ids for parse errors and `SQLSRC0xx` for setting values, as today; `SQLSRC010` is removed with `SqlSourceTokenValidation`, and `docs/manual/diagnostics.md` and `AnalyzerReleases.Unshipped.md` follow.
 
 ### Recommended
 
@@ -604,7 +605,7 @@ Phase 3 is six sub-phases, each with a spec, a plan and a pull request of its ow
 5. **3.5.**  The generic plan through the prepared statement, the plan model, the walk with its safety nets, `plan` and the walk's provenance, and the matrix recorded as fixtures under each join method.
 6. **3.6.**  Npgsql's logger into the run's log, the describer registered in `ToolHost.Create`, the command proven whole against the container, the tool's readme, and the close of the phase.
 
-Each sub-phase adds the log events of the step it adds, as phase 2 did, and the diagnostics of the step with their sections in `docs/diagnostics.md`.
+Each sub-phase adds the log events of the step it adds, as phase 2 did, and the diagnostics of the step with their sections in `docs/manual/diagnostics.md`.
 
 ### Decided
 
@@ -640,7 +641,7 @@ By a spike against PostgreSQL 14 and 18 through Npgsql 10, run before the sub-ph
 - **`format_type(oid, -1)` of `bit` is `"bit"`, quoted, since plain `bit` means `bit(1)`.**  A bit with a length is written `bit(n)` by the tool, and one without keeps the server's spelling, which is how every bit parameter is spelled.
 - **The columns come from Npgsql's `GetColumnSchema` without `KeyInfo`, with three decodings.**  Sub-phase 3.3's spike found that the schema is filled from the row description alone and that the server is asked nothing more.  Npgsql gives no scale for a `numeric` whose scale is zero, a negative scale 2048 too high, and the precision 65535 for an interval with fields and no precision; and it gives an array the numbers of its element, which are dropped.  `EXECUTE` is described whatever the number of its arguments, and a statement described so, an `INSERT ... RETURNING` for one, is not run.
 - **An array of a domain is not flattened by the protocol**, and a domain is, to the base at the end of its chain.  So a column of `email_t[]` is recorded as it is with no help from its origin, and a column of `email_t` is the domain only through its origin.
-- **The check tells a type Npgsql cannot bind from a text it will not send by asking again.**  Npgsql throws a `NotSupportedException`, an `InvalidCastException` or, for a name that is too long, an `ArgumentException` for both and sends nothing, so 3.3 asks for each parameter alone with a text of its own.  Some kinds of type are refused by their spelled name, and `docs/diagnostics.md` lists them under `SQLSRC232`: one that needs quotes, `"char"`, a domain over a domain, a composite type, a table's row type, a type of the system catalogs that Npgsql does not load, an array of a type whose name is 63 characters long, and the bit type, spelled `"bit"`; `SQLSRC232` is therefore reachable from a `.sql` file, and phase 8 decides how generated code names a type to Npgsql.
+- **The check tells a type Npgsql cannot bind from a text it will not send by asking again.**  Npgsql throws a `NotSupportedException`, an `InvalidCastException` or, for a name that is too long, an `ArgumentException` for both and sends nothing, so 3.3 asks for each parameter alone with a text of its own.  Some kinds of type are refused by their spelled name, and `docs/manual/diagnostics.md` lists them under `SQLSRC232`: one that needs quotes, `"char"`, a domain over a domain, a composite type, a table's row type, a type of the system catalogs that Npgsql does not load, an array of a type whose name is 63 characters long, and the bit type, spelled `"bit"`; `SQLSRC232` is therefore reachable from a `.sql` file, and phase 8 decides how generated code names a type to Npgsql.
 - **The check does not see a `$n` that the SQL writes itself**: both describes accept it.  It compares columns, and nothing gives the placeholders Npgsql found.
 - **A connection string Npgsql cannot read is `SQLSRC224`** with one fixed line and nothing of the driver's text, whose inner exception quotes the value.
 - **The diagnostics**, in `Diagnostics/ToolDiagnostics.cs`:
@@ -694,7 +695,7 @@ The server's errors and what the tool says, as settled:
 
 ### Documentation
 
-`CONTRIBUTING.md` for the fourth test project, Docker serving the tests, the images and the variable.  `src/SqlSource.Tool/README.md` in 3.6, when the describer is registered.  `docs/diagnostics.md` in the sub-phase that adds each id.  `docs/tech-debt` for the limits the spike found.  The README of the repository waits for phase 5.
+`CONTRIBUTING.md` for the fourth test project, Docker serving the tests, the images and the variable.  `src/SqlSource.Tool/README.md` in 3.6, when the describer is registered.  `docs/manual/diagnostics.md` in the sub-phase that adds each id.  `docs/tech-debt` for the limits the spike found.  The README of the repository waits for phase 5.
 
 ## Phase 4 - defaults
 
@@ -721,7 +722,7 @@ The existing suites pass unchanged in behaviour; the only edits are settings.
 4. Emission of the input and output types with documentation, once per full name from the collected set; table models; the override suffix stripped from names.
 5. The `DependentUpon` nesting in the targets, with its spike.
 6. The end-to-end `.sql` files, schemas and committed sidecars in `tests/SqlSource.Tests.Postgres`, which phase 3 created, and `tools/describe-end-to-end.sh`.  The realistic corpus under `Realistic/` is the project's realistic queries, by the decisions on it under Testing: its cases that are not refused become `Models` queries with committed sidecars, and its truth, oracle and noise budget stay as they are.
-7. The README's installation section and its section on models.
+7. The user documentation of models for PostgreSQL, in the pages that the phase map of `docs/manual/AGENTS.md` names, among them the README's getting started, `docs/manual/generator.md`, `docs/manual/postgresql.md` and the model settings' status in `docs/manual/settings.md`.
 
 ### Decided
 
@@ -751,7 +752,7 @@ Generator tests over sidecars: every row of the state table, the type map, namin
 1. The SQL Server describer over Microsoft.Data.SqlClient.
 2. The SQL Server type map, every type SqlClient reads, and its driver probe.  The library maps are phase 7's.
 3. `tests/SqlSource.Tests.SqlServer`, with the describer's container tests, the end-to-end files, `tools/describe-end-to-end.sh` and the CI matrix extended for it.
-4. The README's SQL Server additions.
+4. The user documentation of SQL Server, in the pages that the phase map of `docs/manual/AGENTS.md` names, among them `docs/manual/sqlserver.md` as a page like `postgresql.md`, the database support table of `docs/manual/dialects.md`, and every page that says PostgreSQL alone can be described, the README's status line and supported environments among them.
 
 ### Decided
 
@@ -791,7 +792,7 @@ The describer against a SQL Server container, recorded as fixtures for `SqlSourc
 2. NetTopologySuite: through `Npgsql.NetTopologySuite` and `NetTopologySuite.IO.SqlServerBytes`.
 3. `JsonDocument` and `JsonElement`: built into Npgsql, by parsing on SQL Server.  `SqlJson` on SqlClient 6.0 and later, gated on its flag.
 4. Detection from the compilation keyed on the plugin assembly, a property per library, and the three map-row shapes under Types in C#.
-5. The README's section on libraries, with the `Use...()` call each plugin needs.
+5. The user documentation of the library maps, in the pages that the phase map of `docs/manual/AGENTS.md` names, among them the README's "NodaTime and other libraries" section, with the `Use...()` call each plugin needs; the Types section of each database page in `docs/manual/`; and a row in `docs/manual/settings.md` for each library's property.
 
 ### Decided
 
@@ -846,7 +847,7 @@ The end-to-end projects run every query through its generated method and assert 
 2. The `.env` file as a connection source in the tool.
 3. `sqlsource describe --watch`.
 4. The packed tool in `tools/check-package-install.sh`.
-5. The README's online-mode section, `.env` and `.gitignore` guidance, and `CONTRIBUTING.md`.
+5. The user documentation of build integration, in the pages that the phase map of `docs/manual/AGENTS.md` names, among them the online mode, `.env` and `.gitignore` guidance and watch mode in `docs/manual/tool.md`, `SqlSourceOnline` in `docs/manual/settings.md`, step 5 of the README's getting started, and `CONTRIBUTING.md`.
 
 ### Decided
 
@@ -872,7 +873,7 @@ The end-to-end projects run every query through its generated method and assert 
 1. `sqlsource diagnose --query <file>:<name>`: re-describe one query with logging, obfuscate, write the bundle and the mapping file.
 2. The obfuscation: keyed hashing per identifier class, dictionary-based replacement over the structured plan fields, the plan's expression strings, the SQL and the catalog rows, and a `--scrub` that obfuscates a bundle made with `--no-obfuscate`.
 3. `sqlsource replay <bundle>`: run the pipeline from the capture, print every walk and table-match decision, diff the entry.
-4. The README's bug-report section and the issue template that asks for a bundle.
+4. The user documentation of bug reports, in the pages that the phase map of `docs/manual/AGENTS.md` names, among them making and sharing a bundle and the two commands in `docs/manual/tool.md`; and the issue template that asks for a bundle.
 
 ### Decided
 

@@ -25,8 +25,9 @@ Packages go to nuget.org through [trusted publishing](https://learn.microsoft.co
 
 1. Set `VersionPrefix` in `Directory.Build.props` to the version being released.
 2. In the same pull request, record the diagnostics the release ships.  Move every entry of `src/SqlSource/AnalyzerReleases.Unshipped.md` to `src/SqlSource/AnalyzerReleases.Shipped.md`, under a new `## Release <version>` heading, keeping the `### New Rules`, `### Removed Rules` and `### Changed Rules` tables as they are.  Leave the unshipped file with its two header lines only.  Skip this when the unshipped file has no entries.  Nothing checks that it was done, and a release that skips it makes the next removal or change of a diagnostic impossible to record correctly.
-3. Merge that to `main`.
-4. Tag the merged commit and push the tag:
+3. For the first stable release only, in the same pull request, take the `--prerelease` flags and the sentences that explain them out of `README.md`, `src/SqlSource.Tool/README.md` and `docs/manual/` (`git grep -- --prerelease` finds them), and switch the NuGet badge of `README.md` from `nuget/vpre` to `nuget/v` if it should show releases alone.
+4. Merge that to `main`.
+5. Tag the merged commit and push the tag:
 
    ```bash
    git tag v0.2.0
@@ -36,8 +37,8 @@ Packages go to nuget.org through [trusted publishing](https://learn.microsoft.co
    git push origin v0.2.0
    ```
 
-5. `publish.yml` builds the tag, fails unless the build gave exactly `SqlSource.0.2.0.nupkg` and `SqlSource.Tool.0.2.0.nupkg`, which it does when the tag is `v<VersionPrefix>`, pushes both to nuget.org and creates the GitHub release with both attached.  If the push of the second fails, run the workflow again: `--skip-duplicate` passes over the first.
-6. Raise `VersionPrefix` in the next pull request.  Until then, betas built from `main` sort below the release just published.
+6. `publish.yml` builds the tag, fails unless the build gave exactly `SqlSource.0.2.0.nupkg` and `SqlSource.Tool.0.2.0.nupkg`, which it does when the tag is `v<VersionPrefix>`, pushes both to nuget.org and creates the GitHub release with both attached.  If the push of the second fails, run the workflow again: `--skip-duplicate` passes over the first.
+7. Raise `VersionPrefix` in the next pull request.  Until then, betas built from `main` sort below the release just published.
 
 ### Beta
 

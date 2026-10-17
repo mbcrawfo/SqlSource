@@ -9,13 +9,14 @@ namespace SqlSource.Diagnostics;
 /// Every diagnostic the generator reports.  Each is an error that a consumer cannot turn off.
 /// </summary>
 /// <remarks>
-/// Adding, removing or changing one also changes <c>AnalyzerReleases.Unshipped.md</c> and <c>docs/diagnostics.md</c>.
+/// Adding, removing or changing one also changes <c>AnalyzerReleases.Unshipped.md</c> and
+/// <c>docs/manual/diagnostics.md</c>.
 /// </remarks>
 internal static class SqlDiagnostics
 {
     internal const string Category = "SqlSource";
 
-    internal const string HelpLinkBase = "https://github.com/mbcrawfo/SqlSource/blob/main/docs/diagnostics.md#";
+    internal const string HelpLinkBase = "https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/diagnostics.md#";
 
     public static readonly DiagnosticDescriptor TypeNotPartial = new(
         id: "SQLSRC001",

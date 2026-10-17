@@ -25,7 +25,7 @@ The nullability walk needs a plan, and planning folds immutable functions; nothi
 
 ## Impact
 
-Low.  Only a function that the user's own database marks immutable wrongly can run, and only for a query that is planned and calls it with constant arguments.  Since part A of the [nullability noise design](../superpowers/specs/2026-10-15-postgresql-nullability-noise-design.md) that is a gated query and any query with a column that comes from no table, so most queries with an expression are planned, and a call of such a function in the select list is itself such a column.  The released tool describes `postgres` since sub-phase 3.6, and [its readme](../../src/SqlSource.Tool/README.md) says that planning a query runs such a function.
+Low.  Only a function that the user's own database marks immutable wrongly can run, and only for a query that is planned and calls it with constant arguments.  Since part A of the [nullability noise design](../superpowers/specs/2026-10-15-postgresql-nullability-noise-design.md) that is a gated query and any query with a column that comes from no table, so most queries with an expression are planned, and a call of such a function in the select list is itself such a column.  The released tool describes `postgres` since sub-phase 3.6, and [the manual's PostgreSQL page](../manual/postgresql.md#what-describing-does) says that describing a query can run such a function.
 
 ## Proposed fix
 
