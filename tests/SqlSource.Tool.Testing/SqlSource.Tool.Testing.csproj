@@ -1,7 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         The helpers of the tool's tests that tests/SqlSource.Tool.Tests and tests/SqlSource.Tests.Postgres share, the
-        ones that tests/AGENTS.md lists.  A library of the tests, never a test project of its own.  It is apart from
+        ones that tests/README.md lists.  A library of the tests, never a test project of its own.  It is apart from
         tests/SqlSource.Testing because it references the tool, which would raise the Roslyn of
         tests/SqlSource.Tests.RoslynFloor.
     -->
