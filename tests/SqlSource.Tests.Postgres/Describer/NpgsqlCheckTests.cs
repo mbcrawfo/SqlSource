@@ -1,5 +1,4 @@
 using System.Threading.Tasks;
-using Npgsql;
 using Shouldly;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing.Describers;
@@ -50,13 +49,6 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         $do$;
         CREATE TABLE IF NOT EXISTS check_canary (id int);
         """;
-
-    private async Task<object?> ScalarAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
-    }
 
     private Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         string sql,
@@ -148,7 +140,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData(LongTypeName + "[]", "public." + LongArrayName)]
     public async Task Describe_ParameterOfEachKindOfType_IsBoundByItsBindName(string type, string bindName)
     {
-        _ = await ScalarAsync(OwnObjects);
+        await postgres.ExecuteAsync(OwnObjects);
 
         var described = await DescribeAsync("SELECT @p AS p", ("p", type));
 
@@ -175,7 +167,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         string written
     )
     {
-        _ = await ScalarAsync(OwnObjects);
+        await postgres.ExecuteAsync(OwnObjects);
 
         var described = declared is null ? await DescribeAsync(sql) : await DescribeAsync(sql, ("p", declared));
 
@@ -192,7 +184,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_DeclaredOnlyParameterNpgsqlCannotBind_IsSqlsrc232NamingIt()
     {
-        _ = await ScalarAsync(OwnObjects);
+        await postgres.ExecuteAsync(OwnObjects);
 
         var described = await DescribeAsync("SELECT id FROM users WHERE id = @id", ("unused", "check_pair"));
 
@@ -261,8 +253,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [Fact]
     public async Task CheckAsync_QueryWithParameters_AnswersNpgsqlsText()
     {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var live = new PostgresLive(session.Connection);
 
         var answer = await live.CheckAsync(
@@ -288,9 +279,8 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData(false)]
     public async Task CheckAsync_TextNpgsqlWouldSplit_AnswersAnErrorAndRunsNothing(bool withAParameter)
     {
-        _ = await ScalarAsync(OwnObjects);
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await postgres.ExecuteAsync(OwnObjects);
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var live = new PostgresLive(session.Connection);
 
         var answer = await live.CheckAsync(
@@ -308,7 +298,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         var error = answer.Error.ShouldNotBeNull();
         error.SqlState.ShouldBe(withAParameter ? null : "42601");
         answer.TextRefused.ShouldBe(withAParameter);
-        (await ScalarAsync("SELECT to_regclass('check_canary') IS NOT NULL")).ShouldBe(true);
+        (await postgres.ScalarAsync("SELECT to_regclass('check_canary') IS NOT NULL")).ShouldBe(true);
     }
 
     // A type that cannot be bound is found before the text is read, and is named with its parameter whichever
@@ -316,8 +306,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [Fact]
     public async Task CheckAsync_SecondParameterCannotBeBound_AnswersItAsTheDriverError()
     {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var live = new PostgresLive(session.Connection);
 
         var answer = await live.CheckAsync(
@@ -337,8 +326,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [Fact]
     public async Task CheckAsync_SqlTheServerRejects_AnswersItsError()
     {
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var live = new PostgresLive(session.Connection);
 
         var answer = await live.CheckAsync(

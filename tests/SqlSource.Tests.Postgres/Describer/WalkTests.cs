@@ -1,13 +1,11 @@
 using System;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
-using Npgsql;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Describing.Postgres;
 using Xunit;
+using static SqlSource.Tool.Testing.NullabilityAnswers;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
@@ -16,35 +14,16 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class WalkTests(PostgresContainer postgres)
 {
-    private async Task<QueryDescription> ShouldDescribeAsync(string sql)
-    {
-        var described = await Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql));
-
-        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-        return described.Value.ShouldNotBeNull();
-    }
+    private Task<QueryDescription> ShouldDescribeAsync(string sql) =>
+        Sessions.ShouldDescribeAsync(postgres.ConnectionString, sql);
 
     private async Task<(bool? Nullable, string? Source)[]> WalkedAsync(string sql)
     {
         var description = await ShouldDescribeAsync(sql);
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        return
-        [
-            .. description.Columns.ShouldNotBeNull().Select(static column => (column.Nullable, column.NullableSource)),
-        ];
+        return Of(description.Columns.ShouldNotBeNull());
     }
-
-    // One value from the server, on a connection of the test's own.
-    private async Task<object?> ScalarAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
-    }
-
-    private async Task<int> ServerMajorAsync() =>
-        int.Parse((string)(await ScalarAsync("SHOW server_version_num"))!, CultureInfo.InvariantCulture) / 10000;
 
     // A left join: the side it keeps is not null by the catalog, and the side it extends is nullable by the join.
     [Fact]
@@ -54,7 +33,7 @@ public sealed class WalkTests(PostgresContainer postgres)
                 "SELECT u.id, u.name, o.id AS order_id, o.total "
                     + "FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = @id"
             )
-        ).ShouldBe([(false, "catalog"), (false, "catalog"), (true, "outer-join"), (true, "outer-join")]);
+        ).ShouldBe([NotNullCatalog, NotNullCatalog, NullableOuterJoin, NullableOuterJoin]);
 
     // With a condition on the nullable side the planner makes the join inner, which the text does not show.
     [Fact]
@@ -64,7 +43,7 @@ public sealed class WalkTests(PostgresContainer postgres)
                 "SELECT u.id, u.name, o.id AS order_id, o.total "
                     + "FROM users u LEFT JOIN orders o ON o.user_id = u.id WHERE u.id = @id AND o.total > @min"
             )
-        ).ShouldBe([(false, "catalog"), (false, "catalog"), (false, "catalog"), (false, "catalog")]);
+        ).ShouldBe([NotNullCatalog, NotNullCatalog, NotNullCatalog, NotNullCatalog]);
 
     // A column with no origin is answered from the plan, so a query without a word of the gate is planned for it,
     // and its column of a table keeps the catalog's answer.
@@ -75,7 +54,7 @@ public sealed class WalkTests(PostgresContainer postgres)
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         var id = description.Columns.ShouldNotBeNull()[0];
-        (id.Nullable, id.NullableSource).ShouldBe((false, "catalog"));
+        (id.Nullable, id.NullableSource).ShouldBe(NotNullCatalog);
     }
 
     [Fact]
@@ -87,8 +66,8 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_TableWithColumnAliases_IsWalked() =>
         (await WalkedAsync("SELECT u.a, o.total FROM users u(a, b) LEFT JOIN orders o ON o.user_id = u.a")).ShouldBe([
-            (false, "catalog"),
-            (true, "outer-join"),
+            NotNullCatalog,
+            NullableOuterJoin,
         ]);
 
     // The tool leaves the database as it found it: no statement, and the settings as "open" read them.
@@ -96,8 +75,7 @@ public sealed class WalkTests(PostgresContainer postgres)
     public async Task Describe_GatedQuery_LeavesNoStatementAndThePlanCacheModeAsOpenReadIt()
     {
         var token = TestContext.Current.CancellationToken;
-        var opened = await Sessions.OpenAsync(postgres.ConnectionString);
-        await using var session = opened.Value.ShouldBeOfType<PostgresSession>();
+        await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var read = session.Server.Settings.Single(static setting => setting.Name == "plan_cache_mode").Value;
 
         var described = await session.DescribeAsync(
@@ -119,14 +97,14 @@ public sealed class WalkTests(PostgresContainer postgres)
                 "UPDATE users u SET name = @name FROM orders o LEFT JOIN billing.invoices i ON i.order_id = o.id "
                     + "WHERE o.user_id = u.id RETURNING u.id, o.total, i.amount"
             )
-        ).ShouldBe([(false, "catalog"), (false, "catalog"), (true, "outer-join")]);
+        ).ShouldBe([NotNullCatalog, NotNullCatalog, NullableOuterJoin]);
 
     // A DELETE of one table prints bare names, which are its target's.  The function's name is what gates it.
     [Fact]
     public async Task Describe_DeleteReturningBareNames_GivesTheTargetTheCatalogsAnswer() =>
         (await WalkedAsync("DELETE FROM orders WHERE left(note, 1) = @initial RETURNING id, note")).ShouldBe([
-            (false, "catalog"),
-            (true, "catalog"),
+            NotNullCatalog,
+            NullableCatalog,
         ]);
 
     // The gate lets the query in for the word, and here the word is a table's alias.  The plan prints a table
@@ -138,20 +116,20 @@ public sealed class WalkTests(PostgresContainer postgres)
             await WalkedAsync(
                 "UPDATE users u SET name = @name FROM orders old WHERE old.user_id = u.id RETURNING old.total, u.id"
             )
-        ).ShouldBe([(true, "heuristic"), (false, "catalog")]);
+        ).ShouldBe([NullableHeuristic, NotNullCatalog]);
 
     // An alias of an inner scope reaches the plan under its own name: the SELECT of an INSERT ... SELECT aliases
     // users old, and the old row of the RETURNING list prints as old.id too, NULL on every row an INSERT returns.
     [Fact]
     public async Task Describe_InsertSelectFromATableAliasedOld_KeepsTheHeuristicForOld()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         (
             await WalkedAsync(
                 "INSERT INTO orders (user_id, total) SELECT old.id, 0 FROM users old RETURNING old.id, new.id"
             )
-        ).ShouldBe([(true, "heuristic"), (true, "heuristic")]);
+        ).ShouldBe([NullableHeuristic, NullableHeuristic]);
     }
 
     // PostgreSQL 18 resolves the old and the new row written as quoted identifiers too, and an inner scope's alias
@@ -159,32 +137,32 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_InsertSelectFromATableQuotedOld_KeepsTheHeuristicForOld()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         (
             await WalkedAsync(
                 "INSERT INTO orders (user_id, total) SELECT \"old\".id, 0 FROM users \"old\" "
                     + "RETURNING \"old\".id, \"new\".id"
             )
-        ).ShouldBe([(true, "heuristic"), (true, "heuristic")]);
+        ).ShouldBe([NullableHeuristic, NullableHeuristic]);
     }
 
     // The quoted old row of an INSERT is NULL on every row, and the statement has no other word of the gate.
     [Fact]
     public async Task Describe_ReturningQuotedOldWithNoOtherGateWord_IsGatedAndKeepsTheHeuristic()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         (
             await WalkedAsync("INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING \"old\".id")
-        ).ShouldBe([(true, "heuristic")]);
+        ).ShouldBe([NullableHeuristic]);
     }
 
     // PostgreSQL 18's old row cannot be given the name of a table of the statement: the server refuses it.
     [Fact]
     public async Task Describe_OldAliasThatIsAlsoATablesAlias_IsRefusedByTheServer()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         var described = await Sessions.DescribeAsync(
             postgres.ConnectionString,
@@ -207,13 +185,13 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_JoinConditionTheNewerPlannerProvesFalse_IsNullableOnEveryVersion()
     {
-        var proved = await ServerMajorAsync() >= 17;
+        var proved = postgres.Major >= 17;
 
         var columns = await WalkedAsync(
             "SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id AND o.id IS NULL"
         );
 
-        columns.ShouldBe([(false, "catalog"), (true, proved ? "heuristic" : "outer-join")]);
+        columns.ShouldBe([NotNullCatalog, proved ? NullableHeuristic : NullableOuterJoin]);
     }
 
     // A relation the planner proved empty under an outer join is a Result, and a RETURNING list prints its column
@@ -227,7 +205,7 @@ public sealed class WalkTests(PostgresContainer postgres)
         );
 
         columns[0].Nullable.ShouldBe(true);
-        columns[1].ShouldBe((false, "catalog"));
+        columns[1].ShouldBe(NotNullCatalog);
     }
 
     // A partitioned table scans as an Append of its partitions, whose aliases are the table's and a number: the walk
@@ -235,15 +213,11 @@ public sealed class WalkTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_PartitionedTable_IsAnsweredByItsSide()
     {
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        await using (var create = source.CreateCommand(ScratchSchema.Partitioned))
-        {
-            _ = await create.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-        }
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
 
         (await WalkedAsync("SELECT p.id, u.name FROM scratch_parts p LEFT JOIN users u ON u.id = p.id")).ShouldBe([
-            (false, "catalog"),
-            (true, "outer-join"),
+            NotNullCatalog,
+            NullableOuterJoin,
         ]);
     }
 }

@@ -1,15 +1,14 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
-using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using Xunit;
+using static SqlSource.Tool.Testing.NullabilityAnswers;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
@@ -18,30 +17,14 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class ColumnTests(PostgresContainer postgres)
 {
-    private async Task<QueryDescription> ShouldDescribeAsync(string sql, IDescribeExchange? exchange = null)
-    {
-        var described = await Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql), exchange);
-
-        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-        return described.Value.ShouldNotBeNull();
-    }
+    private Task<QueryDescription> ShouldDescribeAsync(string sql) =>
+        Sessions.ShouldDescribeAsync(postgres.ConnectionString, sql);
 
     private async Task<SidecarColumn[]> ColumnsOfAsync(string sql) =>
         [.. (await ShouldDescribeAsync(sql)).Columns.ShouldNotBeNull()];
 
     private static string[] TypeNamesOf(IEnumerable<SidecarColumn> columns) =>
         [.. columns.Select(static column => column.Type.Name)];
-
-    // One value from the server, on a connection of the test's own.
-    private async Task<object?> ScalarAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        return await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
-    }
-
-    private async Task<int> ServerMajorAsync() =>
-        int.Parse((string)(await ScalarAsync("SHOW server_version_num"))!, CultureInfo.InvariantCulture) / 10000;
 
     [Fact]
     public async Task Describe_Select_IsRowsWithItsColumnsInOrder()
@@ -157,13 +140,11 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         try
         {
-            var described = await Sessions.DescribeAsync(
+            var description = await Sessions.ShouldDescribeAsync(
                 $"{postgres.ConnectionString};Search Path=public,pg_catalog",
                 Requests.Of("SELECT NULL::pg_catalog.numeric(10,2) AS n, @p AS p", ("p", "pg_catalog.numeric"))
             );
 
-            described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
-            var description = described.Value.ShouldNotBeNull();
             description
                 .Columns.ShouldNotBeNull()[0]
                 .Type.ShouldBe(
@@ -181,7 +162,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_NumericWithANegativeScale_HasIt()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 15, "PostgreSQL 14 has no negative scale.");
+        postgres.SkipBelow(15, "PostgreSQL 14 has no negative scale.");
 
         var column = (await ColumnsOfAsync("SELECT NULL::numeric(2,-3) AS c")).ShouldHaveSingleItem();
 
@@ -226,7 +207,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         description.ResultKind.ShouldBe(SidecarResultKind.Rows);
         description.Columns.ShouldNotBeNull().Select(column => column.Name).ShouldBe(["id", "placed_at"]);
-        (await ScalarAsync("SELECT count(*) FROM orders")).ShouldBe(0L);
+        (await postgres.ScalarAsync("SELECT count(*) FROM orders")).ShouldBe(0L);
     }
 
     [Fact]
@@ -244,12 +225,12 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_QueryWithoutATable_AsksColumnsAfterPrepareAndTypesOnce()
     {
-        var capture = new DescribeCapture("postgres");
-
-        _ = await ShouldDescribeAsync(
-            "SELECT @p::int AS a, 'x' AS b",
-            new CapturingExchange(LiveExchange.Instance, capture)
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
+            postgres.ConnectionString,
+            Requests.Of("SELECT @p::int AS a, 'x' AS b")
         );
+
+        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
 
         capture
             .Calls.Select(call => call.Method)
@@ -294,12 +275,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         ORDER BY a.attnum
         """;
 
-    private async Task MakeOwnTablesAsync()
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(OwnTables);
-        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-    }
+    private Task MakeOwnTablesAsync() => postgres.ExecuteAsync(OwnTables);
 
     private async Task<List<string>> FormatTypesOfAsync(string table)
     {
@@ -440,17 +416,17 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_QueryOfATable_AsksTablesBetweenColumnsAndTypes()
     {
-        var capture = new DescribeCapture("postgres");
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
+            postgres.ConnectionString,
+            Requests.Of("SELECT id FROM users")
+        );
 
-        _ = await ShouldDescribeAsync("SELECT id FROM users", new CapturingExchange(LiveExchange.Instance, capture));
+        described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
 
         capture
             .Calls.Select(call => call.Method)
             .ShouldBe(["open", "prepare", "columns", "tables", "types", "check", "deallocate"]);
     }
-
-    private static (bool? Nullable, string? Source)[] NullabilityOf(IEnumerable<SidecarColumn> columns) =>
-        [.. columns.Select(static column => (column.Nullable, column.NullableSource))];
 
     // PostgreSQL 18 holds a NOT NULL constraint that is NOT VALID: it sets attnotnull, and rows that were there
     // before may hold NULL.  The table is made by SQL that can be run again.
@@ -467,16 +443,12 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_NotNullThatIsNotValid_IsNullable()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "Only PostgreSQL 18 has a NOT NULL that is NOT VALID.");
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        {
-            await using var command = source.CreateCommand(NotValidTable);
-            _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-        }
+        postgres.SkipBelow(18, "Only PostgreSQL 18 has a NOT NULL that is NOT VALID.");
+        await postgres.ExecuteAsync(NotValidTable);
 
         // The premise: the server sets attnotnull for a constraint that is not validated.
         (
-            await ScalarAsync(
+            await postgres.ScalarAsync(
                 "SELECT attnotnull FROM pg_catalog.pg_attribute "
                     + "WHERE attrelid = 'column_not_valid'::regclass AND attname = 'id'"
             )
@@ -484,7 +456,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         var columns = await ColumnsOfAsync("SELECT id, name FROM column_not_valid");
 
-        NullabilityOf(columns).ShouldBe([(true, "catalog"), (false, "catalog")]);
+        Of(columns).ShouldBe([NullableCatalog, NotNullCatalog]);
     }
 
     // A legacy inheritance parent and its child, of this test alone, made by SQL that can be run again.
@@ -504,7 +476,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         {
             await using var made = source.CreateCommand(InheritanceTables);
             _ = await made.ExecuteNonQueryAsync(token);
-            if (await ServerMajorAsync() < 18)
+            if (postgres.Major < 18)
             {
                 await using var dropped = source.CreateCommand("ALTER TABLE inh_child ALTER COLUMN v DROP NOT NULL");
                 _ = await dropped.ExecuteNonQueryAsync(token);
@@ -513,7 +485,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
 
         var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM inh_parent p");
 
-        NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
+        Of(columns).ShouldBe([NullableCatalog, NullableCatalog]);
     }
 
     // A partitioned table, of this test alone, with a foreign partition through postgres_fdw over a loopback server
@@ -549,21 +521,15 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ColumnsOfAPartitionedTableWithAForeignPartition_AreNullableByTheCatalog()
     {
-        var token = TestContext.Current.CancellationToken;
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        {
-            await using var made = source.CreateCommand(
-                ForeignPartitionTables(new NpgsqlConnectionStringBuilder(postgres.ConnectionString))
-            );
-            _ = await made.ExecuteNonQueryAsync(token);
-        }
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
+        await postgres.ExecuteAsync(ForeignPartitionTables(connection));
 
         // The premise: a query of the parent returns the remote row's NULL.
-        (await ScalarAsync("SELECT p.v IS NULL FROM fp_parted p WHERE p.id = 1")).ShouldBe(true);
+        (await postgres.ScalarAsync("SELECT p.v IS NULL FROM fp_parted p WHERE p.id = 1")).ShouldBe(true);
 
         var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM fp_parted p");
 
-        NullabilityOf(columns).ShouldBe([(true, "catalog"), (true, "catalog")]);
+        Of(columns).ShouldBe([NullableCatalog, NullableCatalog]);
     }
 
     // A foreign table of this test alone, through the same loopback server, whose remote row holds NULL in v, which
@@ -582,23 +548,17 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ColumnOfAForeignTable_IsUnknownFromTheForeignTable()
     {
-        var token = TestContext.Current.CancellationToken;
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        {
-            await using var made = source.CreateCommand(
-                ForeignTable(new NpgsqlConnectionStringBuilder(postgres.ConnectionString))
-            );
-            _ = await made.ExecuteNonQueryAsync(token);
-        }
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
+        await postgres.ExecuteAsync(ForeignTable(connection));
 
         // The premise: a query of the foreign table returns the remote row's NULL.
-        (await ScalarAsync("SELECT f.v IS NULL FROM ft_foreign f WHERE f.id = 1")).ShouldBe(true);
+        (await postgres.ScalarAsync("SELECT f.v IS NULL FROM ft_foreign f WHERE f.id = 1")).ShouldBe(true);
 
         var plain = await ColumnsOfAsync("SELECT f.id, f.v FROM ft_foreign f");
         var gated = await ColumnsOfAsync("SELECT f.id, j.id AS jid FROM ft_foreign f LEFT JOIN users j ON j.id = f.id");
 
-        NullabilityOf(plain).ShouldBe([(null, "foreign-table"), (null, "foreign-table")]);
-        NullabilityOf(gated).ShouldBe([(null, "foreign-table"), (true, "outer-join")]);
+        Of(plain).ShouldBe([UnknownForeignTable, UnknownForeignTable]);
+        Of(gated).ShouldBe([UnknownForeignTable, NullableOuterJoin]);
     }
 
     // A table with a DO INSTEAD rule on INSERT, and the table the rule writes to instead, of this test alone, made by
@@ -639,9 +599,9 @@ public sealed class ColumnTests(PostgresContainer postgres)
         );
 
         plain.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
-        NullabilityOf(plain.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog")]);
+        Of(plain.Columns.ShouldNotBeNull()).ShouldBe([NullableCatalog]);
         gated.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        NullabilityOf(gated.Columns.ShouldNotBeNull()).ShouldBe([(true, "catalog"), (false, "expression")]);
+        Of(gated.Columns.ShouldNotBeNull()).ShouldBe([NullableCatalog, NotNullExpression]);
     }
 
     // A query with no word of the gate.  Its count has no origin, so the plan is asked for it and answers it as an
@@ -654,8 +614,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         );
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        NullabilityOf(description.Columns.ShouldNotBeNull())
-            .ShouldBe([(false, "catalog"), (true, "catalog"), (false, "expression")]);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, NullableCatalog, NotNullExpression]);
     }
 
     // A left join with a count over the window: the plan is walked, the columns of users keep the catalog's answer,
@@ -673,8 +632,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         description.MatchesTable.ShouldBeNull();
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);
         TypeNamesOf(columns).ShouldBe(["integer", "public.email_t", "numeric(18,2)", "bigint"]);
-        NullabilityOf(columns)
-            .ShouldBe([(false, "catalog"), (true, "catalog"), (true, "outer-join"), (false, "expression")]);
+        Of(columns).ShouldBe([NotNullCatalog, NullableCatalog, NullableOuterJoin, NotNullExpression]);
         columns
             .Select(column => column.Origin)
             .ShouldBe([Origin("users", "id"), Origin("users", "email"), Origin("orders", "total"), null]);
@@ -693,7 +651,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
         var status = description.Columns.ShouldNotBeNull()[0];
         status.Origin.ShouldBe(Origin("users", "status"));
-        (status.Nullable, status.NullableSource).ShouldBe((true, "heuristic"));
+        (status.Nullable, status.NullableSource).ShouldBe(NullableHeuristic);
     }
 
     // PostgreSQL 18's old row of a RETURNING list is NULL for a row an INSERT adds.  Each column keeps its table as
@@ -702,7 +660,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ReturningOldAndNew_KeepsTheHeuristic()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 18, "PostgreSQL before 18 has no old and new in RETURNING.");
+        postgres.SkipBelow(18, PostgresContainer.NoOldAndNewInReturning);
 
         var description = await ShouldDescribeAsync(
             "INSERT INTO orders (user_id, total) VALUES (@user_id, @total) RETURNING old.id, new.id"
@@ -711,7 +669,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         var columns = description.Columns.ShouldNotBeNull();
         columns.Select(column => column.Origin).ShouldBe([Origin("orders", "id"), Origin("orders", "id")]);
-        NullabilityOf(columns).ShouldBe([(true, "heuristic"), (true, "heuristic")]);
+        Of(columns).ShouldBe([NullableHeuristic, NullableHeuristic]);
     }
 
     // A MERGE of PostgreSQL 17 that deletes the rows of the target the source lacks returns the source's columns
@@ -720,7 +678,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_MergeReturning_ExtendsTheSourceAndNotTheTarget()
     {
-        Assert.SkipWhen(await ServerMajorAsync() < 17, "PostgreSQL before 17 has no RETURNING for MERGE.");
+        postgres.SkipBelow(17, "PostgreSQL before 17 has no RETURNING for MERGE.");
 
         var description = await ShouldDescribeAsync(
             "MERGE INTO orders AS o USING users AS u ON o.user_id = u.id "
@@ -730,7 +688,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         var columns = description.Columns.ShouldNotBeNull();
         columns[0].Origin.ShouldBe(Origin("users", "id"));
-        NullabilityOf(columns).ShouldBe([(true, "outer-join"), (false, "catalog")]);
+        Of(columns).ShouldBe([NullableOuterJoin, NotNullCatalog]);
     }
 
     // The gate reads words: a function named as one gates a query that has no join.
@@ -740,7 +698,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         var description = await ShouldDescribeAsync("SELECT id, left(name, 3) AS l FROM users");
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
-        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(false, "catalog"), (null, "no-origin")]);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
     }
 
     [Fact]
@@ -749,7 +707,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         var description = await ShouldDescribeAsync("SELECT id FROM users WHERE name <> 'left join' -- outer");
 
         description.Plan.ShouldBe(SidecarValues.Plan.NotNeeded);
-        NullabilityOf(description.Columns.ShouldNotBeNull()).ShouldBe([(false, "catalog")]);
+        Of(description.Columns.ShouldNotBeNull()).ShouldBe([NotNullCatalog]);
     }
 
     // PostgreSQL records no NOT NULL for a column of a view, plain or materialized.  In a gated query a view's
@@ -757,15 +715,9 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task Describe_ColumnsOfAViewAndOfAMaterializedView_SayView()
     {
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        await using (
-            var create = source.CreateCommand(
-                "CREATE MATERIALIZED VIEW IF NOT EXISTS column_users AS SELECT id, name FROM users"
-            )
-        )
-        {
-            _ = await create.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-        }
+        await postgres.ExecuteAsync(
+            "CREATE MATERIALIZED VIEW IF NOT EXISTS column_users AS SELECT id, name FROM users"
+        );
 
         var view = await ColumnsOfAsync("SELECT id, name, email, status FROM active_users");
         var materialized = await ColumnsOfAsync("SELECT id FROM column_users");
@@ -773,9 +725,9 @@ public sealed class ColumnTests(PostgresContainer postgres)
             "SELECT v.id, o.total FROM active_users v LEFT JOIN orders o ON o.user_id = v.id"
         );
 
-        NullabilityOf(view).ShouldAllBe(found => found.Nullable == null && found.Source == "view");
-        NullabilityOf(materialized).ShouldBe([(null, "view")]);
-        NullabilityOf(gated).ShouldBe([(null, "view"), (true, "outer-join")]);
+        Of(view).ShouldBe([UnknownView, UnknownView, UnknownView, UnknownView]);
+        Of(materialized).ShouldBe([UnknownView]);
+        Of(gated).ShouldBe([UnknownView, NullableOuterJoin]);
     }
 
     // A table's row selected whole is a column of the table's composite type, which is no pseudo-type.

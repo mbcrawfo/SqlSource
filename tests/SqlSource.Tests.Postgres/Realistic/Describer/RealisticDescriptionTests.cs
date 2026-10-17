@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Threading.Tasks;
 using Shouldly;
@@ -18,8 +17,6 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
     private const string KnownCase = "aggregate-cte-left-joined";
 
     private const string RecordScript = "tools/record-realistic.sh";
-
-    private static bool Recording => !string.IsNullOrEmpty(Environment.GetEnvironmentVariable(RecordVariable));
 
     [Fact]
     public async Task DescribeAsync_KnownCase_IsDescribedAndRendered()
@@ -56,16 +53,14 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
     {
         var found = RealisticDescribe.Start(name, postgres.Major);
         var path = found.ExpectedPath(postgres.Major);
-        var expectation = RealisticDescribe.ExpectationOn(Recording, postgres.Major);
-        if (expectation == Expectation.Skip)
-        {
-            Assert.Skip(RealisticDescribe.SkipMessage);
-        }
-
+        var expectation = RealisticDescribe.ExpectationOn(Recording.IsAsked(RecordVariable), postgres.Major);
+        // A recording on a major that is not recorded fails before the skip, which would hide it.
         if (expectation == Expectation.Refuse)
         {
             Assert.Fail(RealisticDescribe.RefuseMessage);
         }
+
+        postgres.SkipUnlessRecordedMajor("The expectations");
 
         var rendered = RealisticDescribe.Render(
             await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString)

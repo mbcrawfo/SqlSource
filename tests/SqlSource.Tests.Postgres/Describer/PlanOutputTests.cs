@@ -83,13 +83,6 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         return PlanNode.Read(plan).ShouldNotBeNull();
     }
 
-    private async Task RunAsync(string sql)
-    {
-        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using var command = source.CreateCommand(sql);
-        _ = await command.ExecuteNonQueryAsync(TestContext.Current.CancellationToken);
-    }
-
     [Theory]
     [InlineData(Constants, 0, "count(*)", "count(*)", false)]
     [InlineData(
@@ -174,16 +167,8 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         bool? expected
     )
     {
-        var printed = postgres.Major switch
-        {
-            14 => printedOn14,
-            18 => printedOn18,
-            _ => null,
-        };
-        if (printed is null)
-        {
-            Assert.Skip("The printed forms are pinned for PostgreSQL 14 and 18 alone.");
-        }
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+        var printed = postgres.Major == 14 ? printedOn14 : printedOn18;
 
         var root = await ExplainAsync(sql);
 
@@ -253,10 +238,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     [InlineData("EXCEPT ALL", "Except All")]
     public async Task Explain_SetOp_HasFlaggedMembersOn14AndTwoInputsOn18(string keyword, string command)
     {
-        if (postgres.Major is not (14 or 18))
-        {
-            Assert.Skip("The set operations are pinned for PostgreSQL 14 and 18 alone.");
-        }
+        postgres.SkipUnlessRecordedMajor("The set operations");
 
         var text = await ExplainTextAsync($"SELECT id FROM users {keyword} SELECT id FROM orders");
 
@@ -289,10 +271,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     [Fact]
     public async Task Explain_Except_KeepsItsLeftInputFirst()
     {
-        if (postgres.Major is not (14 or 18))
-        {
-            Assert.Skip("The set operations are pinned for PostgreSQL 14 and 18 alone.");
-        }
+        postgres.SkipUnlessRecordedMajor("The set operations");
 
         var root = await ExplainAsync(
             "SELECT id FROM users WHERE id < 3 EXCEPT SELECT g FROM generate_series(1, 100000) g"
@@ -358,7 +337,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     [Fact]
     public async Task Explain_CountShadowedOnTheSearchPath_PrintsUnqualified()
     {
-        await RunAsync(ScratchSchema.ShadowCount);
+        await postgres.ExecuteAsync(ScratchSchema.ShadowCount);
         var connection = $"{postgres.ConnectionString};Search Path=shadow,pg_catalog,public";
 
         var root = await ExplainAsync("SELECT count(*) FROM users", connection);
@@ -409,7 +388,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     [Fact]
     public async Task Explain_PartitionedTableWithoutPruning_PrintsEveryMember()
     {
-        await RunAsync(ScratchSchema.Partitioned);
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
         const string Sql = "SELECT p.id, p.kind FROM scratch_parts p WHERE p.kind = $1 ORDER BY p.id";
 
         var pruned = await ExplainExecuteAsync(Sql, "integer", pruning: true);

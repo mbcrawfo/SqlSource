@@ -7,11 +7,10 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SqlSource.Snapshot;
+using SqlSource.Tests.Postgres.Describer;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Describing.Postgres;
-using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -33,9 +32,11 @@ public enum Expectation
 // are here too: that the server runs the case, and that a description has the columns of the truth.
 internal static class RealisticDescribe
 {
-    public const string SkipMessage = "The expectations are recorded on PostgreSQL 14 and 18 alone.";
-
-    public const string RefuseMessage = "Record on PostgreSQL 14 or 18.";
+    public static string RefuseMessage { get; } =
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"Record on PostgreSQL {string.Join(" or ", PostgresContainer.RecordedMajors)}."
+        );
 
     // What is not there, in a rendered line.
     private const string None = "-";
@@ -47,7 +48,7 @@ internal static class RealisticDescribe
     );
 
     public static Expectation ExpectationOn(bool recording, int major) =>
-        (recording, RealisticCase.RecordedMajors.Contains(major)) switch
+        (recording, PostgresContainer.RecordedMajors.Contains(major)) switch
         {
             (true, true) => Expectation.Record,
             (true, false) => Expectation.Refuse,
@@ -145,16 +146,7 @@ internal static class RealisticDescribe
     {
         var token = TestContext.Current.CancellationToken;
         var request = RequestOf(found);
-        var opened = await new PostgresDescriber().OpenAsync(
-            new OpenRequest(
-                PostgresContainer.RealisticDatabase,
-                connection,
-                LiveExchange.Instance,
-                TimeProvider.System
-            ),
-            NullRunLog.Instance,
-            token
-        );
+        var opened = await Sessions.OpenAsync(connection, database: PostgresContainer.RealisticDatabase);
         if (!opened.Succeeded)
         {
             throw new InvalidOperationException(
