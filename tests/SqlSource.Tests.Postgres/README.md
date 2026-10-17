@@ -38,7 +38,7 @@ To add a case, add its folder with a `query.sql` and run the script.  A recorded
 
 ## The realistic corpus
 
-`tests/SqlSource.Tests.Postgres/Realistic/` holds the corpus and what reads it: the cases in `Realistic/Cases/`, each a folder with four files: `query.sql`, `case.json` (the truth), and `expected-pg14.txt` and `expected-pg18.txt` (the recorded expectations).  The `realistic` database is built from `tests/SqlSource.Tests.Postgres/Realistic/schema.sql` and `tests/SqlSource.Tests.Postgres/Realistic/seed.sql`.  `Realistic/Describer/` holds the describer's checks over it:
+`tests/SqlSource.Tests.Postgres/Realistic/` holds the corpus and what reads it: the cases in `Realistic/Cases/`, each a folder with four files: `query.sql`, `case.json` (the truth), and `expected-pg14.txt` and `expected-pg18.txt` (the recorded expectations).  The `realistic` database is built from `tests/SqlSource.Tests.Postgres/Realistic/schema.sql` and `tests/SqlSource.Tests.Postgres/Realistic/seed.sql`.  The root of `Realistic/` holds what every layer shares: `RealisticCase`, `RealisticCases`, `RealisticSamples` and `RealisticDatabase`.  `Realistic/Describer/` holds the describer's checks over it, the description whole in `RealisticDescriptionTests` and its nullability in the classes named `RealisticNullability*`:
 
 - `RealisticDescriptionTests` compares each description with the `expected-pg14.txt` and `expected-pg18.txt` recorded of it;
 - `RealisticNullabilitySafetyTests` checks its nullability against the truth and against the oracle that executes the query over the seed;
@@ -50,5 +50,13 @@ The corpus is recorded by its own script, `tools/record-realistic.sh`, which wri
 tools/record-realistic.sh
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 tools/record-realistic.sh
 ```
+
+A `case.json` can also say:
+
+- `minimumMajor`, when the case needs a later server than 14.  The case then has no expectation for an earlier major.
+- `samples`, a SQL literal for each parameter.  A check that executes the query runs it over the seed with them.
+- `refusal`, the id of the failure, when the describer refuses the case.  The case then has no columns.
+
+A column that can be `NULL` says why, and an `exempt` says why the seed cannot show it, so it needs a reason and belongs only on a column that can be `NULL`.  `RealisticCases` refuses a `case.json` that breaks either.  Every folder of `Cases/` is a case.
 
 To add a case, add its folder with a `query.sql` and a `case.json`, which holds the truth, written from the SQL and `schema.sql` and never from what the describer answers, and run both.  When a column of the truth can be `NULL` and no row of `seed.sql` makes it so, add such a row to `seed.sql`, which never removes one; `exempt` is for a `NULL` no seed can show.  The noise budget is lowered in the change that lowers the noise, the test says to, and raised only in a change that adds cases.

@@ -1,6 +1,6 @@
 # Tests
 
-SqlSource has four test projects and two libraries that they share.  `dotnet test --solution SqlSource.slnx` runs every test project, and [`CONTRIBUTING.md`](../CONTRIBUTING.md) has the commands to build and test.  `tests/SqlSource.Tests.Postgres` needs Docker running.  The rest need nothing but the SDK that `global.json` pins.
+SqlSource has four test projects and two libraries that they share.  `dotnet test --solution SqlSource.slnx` runs every test project, and [`CONTRIBUTING.md`](../CONTRIBUTING.md) has the commands to build and test.  `tests/SqlSource.Tests.Postgres` needs Docker running.
 
 ## The projects
 
@@ -15,7 +15,7 @@ The test projects:
 
 `TerminationTests` of `tests/SqlSource.Tool.Tests` alone starts the tool that was built in a process of its own: to send it a signal, where the system has signals, and to close its console on Windows, which only `nightly.yml` runs.  `tests/SqlSource.Tests.Postgres` is the one project that `nightly.yml` leaves out, since the runners cannot start its container.  Its procedures are in [`SqlSource.Tests.Postgres/README.md`](SqlSource.Tests.Postgres/README.md): Docker and the image, the describer's fixtures and the realistic corpus.
 
-A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both `tests/SqlSource.Tests` and `tests/SqlSource.Tests.RoslynFloor`, so it may use only Roslyn API that 4.8.0 has, and the C# it hands to the compiler is C# 12 at most.  That folder is the only code a test project compiles of another; [`SqlSource.Tests/Generator/AGENTS.md`](SqlSource.Tests/Generator/AGENTS.md) says why.
+A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both of those projects; [`SqlSource.Tests/Generator/AGENTS.md`](SqlSource.Tests/Generator/AGENTS.md) says what that asks of it, and why that folder is the only code a test project compiles of another.
 
 The libraries are never run as tests, hold no tests and are never packed:
 
@@ -36,7 +36,7 @@ The libraries are never run as tests, hold no tests and are never packed:
 
 The two libraries are apart because the tool raises Roslyn to a current version, which would reach RoslynFloor through one library.  Their types stay `internal`: `src/SqlSource` and `src/SqlSource.Tool` grant them `InternalsVisibleTo`, and each library grants it to the projects that reference it.
 
-The tests mirror the source folders: a test of `src/SqlSource/<Folder>/<Type>.cs` is `tests/SqlSource.Tests/<Folder>/<Type>Tests.cs`, and a test of the tool's `<Folder>/` is in `tests/SqlSource.Tool.Tests/<Folder>/`.  `tests/SqlSource.Tool.Tests/Commands/` holds the tests that run a whole command line, and `tests/SqlSource.Tool.Tests/Fixtures/` the tests of the fixtures' harness, which is in `tests/SqlSource.Tool.Testing/Fixtures/`.  The fakes and helpers that only the tool's tests use are at the root of `tests/SqlSource.Tool.Tests`.  Among them, for the tests of `Describing/Postgres/`:
+Where a test goes is a rule of [`AGENTS.md`](AGENTS.md): the tests mirror the source folders.  `tests/SqlSource.Tool.Tests/Commands/` holds the tests that run a whole command line, and `tests/SqlSource.Tool.Tests/Fixtures/` the tests of the fixtures' harness, which is in `tests/SqlSource.Tool.Testing/Fixtures/`.  The fakes and helpers that only the tool's tests use are at the root of `tests/SqlSource.Tool.Tests`.  Among them, for the tests of `Describing/Postgres/`:
 
 - `PostgresScript.cs`, `PostgresRows.cs`, `PostgresTables.cs`, `PostgresPlans.cs`, `PostgresRequests.cs` and `FakePostgresServer.cs` are the helpers;
 - `PostgresSessionCases.cs`, `PostgresEventCases.cs` and `PostgresWalkColumns.cs` hold what the classes split from one share, those named `PostgresSession*`, `PostgresEvents*` and `NullabilityWalk*`, through a static helper and no base class;
@@ -88,6 +88,6 @@ What each test project takes from the libraries:
 
 MSBuild reads the environment for its properties, and the workflow has a variable named `CONFIGURATION`, so in CI a fixture is evaluated as `Release`.  A test of a fixture expects no `Debug`, in a constant or in a path.
 
-A fixture is never built or restored, and a test leaves nothing in the repository.  A file under that folder is copied to the test project's output as it is.  `FixtureProjects` of `tests/SqlSource.Tool.Testing` copies a fixture out of the repository for a test; [the PostgreSQL tests' readme](SqlSource.Tests.Postgres/README.md#running) says how that project gets `Single`.
+A fixture project is no part of the solution, so nothing builds or restores it, and a test leaves nothing in the repository.  A file under that folder is copied to the test project's output as it is.  `FixtureProjects` of `tests/SqlSource.Tool.Testing` copies a fixture out of the repository for a test; [the PostgreSQL tests' readme](SqlSource.Tests.Postgres/README.md#running) says how that project gets `Single`.
 
 To add a fixture project, add a folder to `tests/SqlSource.Tool.Tests/Fixtures/Projects/` with an `App.csproj` that imports `../build/SqlSource.props` and `../build/SqlSource.targets`.
