@@ -4,13 +4,15 @@ This project runs the PostgreSQL describer and the `describe` command against a 
 
 ## Running
 
-The project needs Docker running, and its first run pulls the image.  It starts one container for the run, with the database `fixtures` and the schema `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql`, and a second database, `realistic`, with the schema and seed of `tests/SqlSource.Tests.Postgres/Realistic/` for the realistic corpus.
+The project needs Docker running, and its first run pulls the image.  It starts one container for the run, with the database `fixtures` and the schema `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql`, and a second database, `realistic`, for the realistic corpus below.
 
 ```bash
 dotnet test --project tests/SqlSource.Tests.Postgres
 ```
 
 `dotnet test --solution SqlSource.slnx`, and so `pre-commit-validation.sh`, runs it on the default image.
+
+The project copies the fixture project `Single` to its output, with the package's MSBuild files and `global.json`.  `DescribeCommandTests` runs the whole `describe` command in process against the container, over the fixture cases, `--check`, `--force` and `--log`, and `ToolProcessTests` starts the tool that was built in a process of its own and describes a copy of `Single`.
 
 ## The image
 
@@ -36,7 +38,7 @@ To add a case, add its folder with a `query.sql` and run the script.  A recorded
 
 ## The realistic corpus
 
-`tests/SqlSource.Tests.Postgres/Realistic/` holds the corpus and what reads it: the cases in `Realistic/Cases/`, each a folder with its `query.sql`, the `case.json` that holds its truth and the expectations recorded of it, and the `schema.sql` and `seed.sql` of the `realistic` database.  `Realistic/Describer/` holds the describer's checks over it:
+`tests/SqlSource.Tests.Postgres/Realistic/` holds the corpus and what reads it: the cases in `Realistic/Cases/`, each a folder with four files: `query.sql`, `case.json` (the truth), and `expected-pg14.txt` and `expected-pg18.txt` (the recorded expectations).  The `realistic` database is built from the `schema.sql` and `seed.sql` beside them.  `Realistic/Describer/` holds the describer's checks over it:
 
 - `RealisticDescriptionTests` compares each description with the `expected-pg14.txt` and `expected-pg18.txt` recorded of it;
 - `RealisticNullabilitySafetyTests` checks its nullability against the truth and against the oracle that executes the query over the seed;
