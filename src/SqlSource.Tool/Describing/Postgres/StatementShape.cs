@@ -196,7 +196,8 @@ internal static class StatementShape
     /// <summary>
     /// The first positional parameter that the SQL writes itself, <c>$</c> and its digits as written (<c>$2</c>), or
     /// null.  A <c>$</c> and an ASCII digit in a <c>Text</c> lexeme is one unless the <c>$</c> continues a name
-    /// (<c>a$1</c>, <c>€$1</c>, <c>1a$1</c>), as PostgreSQL reads one; after a number it is one (<c>1$1</c>).  A
+    /// (<c>a$1</c>, <c>€$1</c>, <c>1a$1</c>), as PostgreSQL reads one, or follows another <c>$</c> in the same run
+    /// (<c>$$1</c>); after a number it is one (<c>1$1</c>).  A
     /// <c>$</c> that starts a lexeme is never part of a name.  A string, a quoted identifier, a dollar-quoted string
     /// and a comment are lexemes of their own and are not read.
     /// </summary>
@@ -254,13 +255,14 @@ internal static class StatementShape
             || string.Equals(previous, "MERGE", StringComparison.OrdinalIgnoreCase)
         );
 
-    // Whether the "$" at the index continues a name: the run of word characters before it holds one that starts a
-    // word.  A run of digits alone is a number, after which the "$" stands apart.
+    // Whether the "$" at the index stands in a run of word characters that is no number: one holds a character that
+    // starts a word, and the "$" continues that name, or holds another "$", as "$$1" and "1$$1" do, which PostgreSQL
+    // reads as a dollar quote.  A run of digits alone is a number, after which the "$" stands apart.
     private static bool ContinuesAName(ReadOnlySpan<char> text, int index)
     {
         for (var at = index - 1; at >= 0 && PostgresIdentifiers.IsWordPart(text[at]); at--)
         {
-            if (PostgresIdentifiers.IsWordStart(text[at]))
+            if (text[at] == '$' || PostgresIdentifiers.IsWordStart(text[at]))
             {
                 return true;
             }

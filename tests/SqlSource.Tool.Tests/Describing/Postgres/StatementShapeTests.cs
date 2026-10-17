@@ -156,6 +156,10 @@ public sealed class StatementShapeTests
     [InlineData("SELECT 1a$1")]
     [InlineData("SELECT _$1")]
     [InlineData("SELECT 9_$1")]
+    // A "$" after another "$" opens a dollar quote for PostgreSQL, and is no parameter.
+    [InlineData("SELECT $$1")]
+    [InlineData("SELECT 1$$1")]
+    [InlineData("SELECT 1$$1$$")]
     [InlineData("SELECT '$1'")]
     [InlineData("SELECT E'cost $1'")]
     [InlineData("SELECT U&'$1'")]

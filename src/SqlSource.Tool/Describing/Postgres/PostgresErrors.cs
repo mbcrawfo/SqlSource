@@ -149,8 +149,8 @@ internal static class PostgresErrors
         );
 
     /// <summary>
-    /// The <c>server:</c> lines of an error whose position is in the tool's own text, not in the user's SQL: with no
-    /// <c>at character</c> line.
+    /// The <c>server:</c> lines of an error with no <c>at character</c> line: for a call where any position the server
+    /// gives is not one in the user's SQL as written.
     /// </summary>
     public static EquatableArray<string> ServerLinesWithoutPosition(PostgresServerError error) =>
         ServerLines(error with { Position = null }, 0);

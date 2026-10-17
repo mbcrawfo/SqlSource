@@ -7,7 +7,7 @@ namespace SqlSource.Tool.Describing.Postgres;
 
 /// <summary>
 /// How PostgreSQL writes a name: a quoted name, the bare name it leaves unquoted, the characters of a word of SQL, and
-/// a <c>$n</c>.  Every reader of the describer that reads one of them calls this class.
+/// a <c>$n</c>.  Each rule has its one definition here.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -16,8 +16,11 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// what PostgreSQL's lexer reads as one, in the user's SQL.
 /// </para>
 /// <para>
-/// <see cref="DeclaredTypeText" /> keeps a rule of its own, stricter than the word rule, since it guards what is put
-/// into a <c>PREPARE</c>.
+/// Some readers keep a rule of their own on purpose.  <see cref="DeclaredTypeText" />'s is stricter than the word rule,
+/// since it guards what is put into a <c>PREPARE</c>.  <see cref="PostgresSearchPath" /> reads a bare element as
+/// anything up to a comma or white space, as the server does.  <see cref="OuterJoinGate" /> compares a quoted name
+/// without unescaping it.  <see cref="StatementShape.PositionalParameter" /> and <c>NpgsqlCheck</c>'s <c>PartAt</c>
+/// find a <c>$n</c> without reading its number.
 /// </para>
 /// </remarks>
 internal static class PostgresIdentifiers
