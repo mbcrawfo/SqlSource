@@ -103,7 +103,8 @@ internal sealed class PlanInstances
     // A CTE's InitPlan is named for it: "CTE" and the CTE's name.
     private const string CtePlanPrefix = "CTE ";
 
-    private static readonly IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> NoPartitions =
+    /// <summary>The answer of <c>partitions</c> when it was not asked: no relation is a partition.</summary>
+    public static readonly IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> NoPartitions =
         new Dictionary<PostgresRelationName, IReadOnlyList<long>>();
 
     // The nodes of a set operation, whose root prints its first branch: a UNION's Append, ordered or not, the SetOp of
@@ -200,10 +201,7 @@ internal sealed class PlanInstances
     /// Whether a join at the node or under it, through <c>Outer</c> and <c>Inner</c> children, null-extends a side.
     /// </summary>
     public static bool ExtendsUnder(PlanNode node) =>
-        ExtendsOf(node) != NullExtension.None
-        || node.Plans.Any(static child =>
-            child.ParentRelationship is PlanRelationships.Outer or PlanRelationships.Inner && ExtendsUnder(child)
-        );
+        ExtendsOf(node) != NullExtension.None || node.JoinChildren.Any(ExtendsUnder);
 
     /// <summary>Whether the alias names an instance, and which.</summary>
     public bool TryFind(string alias, [NotNullWhen(true)] out PlanInstance? instance) =>
@@ -294,11 +292,7 @@ internal sealed class PlanInstances
             Add(scan, depth, new PlanInstance(InstanceKind.Plan, extended, null, null, [], ChildOf(node)));
         }
 
-        foreach (
-            var child in node.Plans.Where(static child =>
-                child.ParentRelationship is PlanRelationships.Outer or PlanRelationships.Inner
-            )
-        )
+        foreach (var child in node.JoinChildren)
         {
             var side = child.ParentRelationship == PlanRelationships.Inner ? NullExtension.Inner : NullExtension.Outer;
             Visit(child, depth + 1, extended || extends == NullExtension.Both || extends == side);
@@ -319,17 +313,14 @@ internal sealed class PlanInstances
     {
         if (node.NodeType == PlanNodeTypes.SubqueryScan)
         {
-            return
-                node.Plans.Where(static child => child.ParentRelationship == PlanRelationships.Subquery).ToArray()
-                    is [var only]
-                ? only
-                : null;
+            return node.SubqueryChild;
         }
 
         var name = CtePlanPrefix + node.CteName;
         return
             node.CteName is not null
-            && All(_tree)
+            && _tree
+                .SelfAndDescendants()
                 .Where(child =>
                     child.ParentRelationship == PlanRelationships.InitPlan
                     && string.Equals(child.SubplanName, name, StringComparison.Ordinal)
@@ -355,6 +346,4 @@ internal sealed class PlanInstances
             Reason ??= WalkReasons.DoubledAlias;
         }
     }
-
-    private static IEnumerable<PlanNode> All(PlanNode node) => node.Plans.SelectMany(All).Prepend(node);
 }

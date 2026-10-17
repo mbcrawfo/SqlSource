@@ -88,9 +88,7 @@ internal static partial class NullabilityWalk
         ReachesSetOperation(root)
         && (
             root.Output is null
-            || PlanInstances
-                .Find(root, root, partitions ?? new Dictionary<PostgresRelationName, IReadOnlyList<long>>())
-                .HasSetOperation
+            || PlanInstances.Find(root, root, partitions ?? PlanInstances.NoPartitions).HasSetOperation
         );
 
     // The types to answer a set operation's columns with, when the walk takes that path: a column has no origin, the
@@ -195,7 +193,7 @@ internal static partial class NullabilityWalk
         NeverProject.Contains(node.NodeType) ? OnlyChildOf(node) : null;
 
     // The members of an Append, or none when a child is anything else.
-    private static PlanNode[] MembersOf(PlanNode append)
+    private static PlanNode[] MemberNodesOf(PlanNode append)
     {
         var children = RowChildrenOf(append);
         return children.All(static child => child.ParentRelationship == PlanRelationships.Member) ? children : [];
@@ -207,7 +205,7 @@ internal static partial class NullabilityWalk
         ?? (
             PlanNodeTypes.Appends.Contains(node.NodeType)
             && depth < Plans.MaxDepth
-            && MembersOf(node) is [var first, ..]
+            && MemberNodesOf(node) is [var first, ..]
                 ? PrintedBy(first, depth + 1)
                 : null
         );
@@ -239,7 +237,7 @@ internal static partial class NullabilityWalk
 
             if (PlanNodeTypes.Appends.Contains(node.NodeType))
             {
-                return MembersOf(node) is [_, ..] members
+                return MemberNodesOf(node) is [_, ..] members
                     && members.All(member => ColumnAt(member, ordinal, type, Reach.Branch, depth + 1));
             }
 
@@ -323,7 +321,7 @@ internal static partial class NullabilityWalk
                 append = under;
             }
 
-            if (append.NodeType != PlanNodeTypes.Append || MembersOf(append) is not [var first, var second])
+            if (append.NodeType != PlanNodeTypes.Append || MemberNodesOf(append) is not [var first, var second])
             {
                 return null;
             }
@@ -383,15 +381,13 @@ internal static partial class NullabilityWalk
         // The branch of a flagged member that is a set operation's own leaf scan, when its entry at the ordinal is a
         // reference to its own alias.
         private static PlanNode? LeafBranchOf(PlanNode node, int ordinal) =>
-            node.NodeType == PlanNodeTypes.SubqueryScan
-            && node.Alias is { } alias
+            node.Alias is { } alias
             && IsLeafAlias(alias)
             && node.Output is { } output
             && ordinal < output.Count
             && OutputReference.Parse(output[ordinal]) is { Alias: { } named }
             && string.Equals(named, alias, StringComparison.Ordinal)
-            && node.Plans.Where(static child => child.ParentRelationship == PlanRelationships.Subquery).ToArray()
-                is [var branch]
+            && node.SubqueryChild is { } branch
                 ? branch
                 : null;
 

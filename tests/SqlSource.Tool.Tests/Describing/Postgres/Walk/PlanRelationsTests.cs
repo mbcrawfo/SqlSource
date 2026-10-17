@@ -74,4 +74,14 @@ public sealed class PlanRelationsTests
         PlanRelations
             .Of(Append(Member("a", "b"), Member("b", "B"), Member("c", "a")))
             .ShouldBe([Name("public", "B"), Name("public", "a"), Name("public", "b")]);
+
+    // The one sort of what "relations" and "partitions" are asked: each once, by schema and then by name, by ordinal.
+    [Fact]
+    public void InOrder_Relations_AreEachOnceBySchemaThenNameByOrdinal() =>
+        PlanRelations
+            .InOrder([Name("b", "x"), Name("a", "y"), Name("a", "x"), Name("b", "x"), Name("B", "x"), Name("a", "X")])
+            .ShouldBe([Name("B", "x"), Name("a", "X"), Name("a", "x"), Name("a", "y"), Name("b", "x")]);
+
+    [Fact]
+    public void InOrder_NoRelation_IsEmpty() => PlanRelations.InOrder([]).ShouldBeEmpty();
 }

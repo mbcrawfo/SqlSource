@@ -338,17 +338,7 @@ internal static partial class NullabilityWalk
         // ('x'::text) inside a CASE the root computes, proves nothing, while a COALESCE with a constant still does.
         private bool? NullableAt(PlanNode node, string entry, int depth)
         {
-            if (depth > MaxDepth)
-            {
-                return null;
-            }
-
-            var children = node
-                .Plans.Where(static child =>
-                    child.ParentRelationship is PlanRelationships.Outer or PlanRelationships.Inner
-                )
-                .ToArray();
-            if (children.Any(OpaqueAndNotPreserved))
+            if (FollowedChildrenOf(node, depth) is not { } children)
             {
                 return null;
             }
@@ -384,17 +374,7 @@ internal static partial class NullabilityWalk
         // computed from, followed as NullableAt follows it.
         private bool Preserved(PlanNode node, string entry, int depth)
         {
-            if (depth > MaxDepth)
-            {
-                return false;
-            }
-
-            var children = node
-                .Plans.Where(static child =>
-                    child.ParentRelationship is PlanRelationships.Outer or PlanRelationships.Inner
-                )
-                .ToArray();
-            if (children.Any(OpaqueAndNotPreserved))
+            if (FollowedChildrenOf(node, depth) is not { } children)
             {
                 return false;
             }
@@ -411,6 +391,19 @@ internal static partial class NullabilityWalk
                     .All(group =>
                         Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1))
                     );
+        }
+
+        // The children an entry of the node is followed into, its Outer and Inner ones; or null, which NullableAt and
+        // Preserved read as unknown, when the walk is too deep or a child that prints no Output is not preserved.
+        private PlanNode[]? FollowedChildrenOf(PlanNode node, int depth)
+        {
+            if (depth > MaxDepth)
+            {
+                return null;
+            }
+
+            PlanNode[] children = [.. node.JoinChildren];
+            return children.Any(OpaqueAndNotPreserved) ? null : children;
         }
 
         // A child that prints no Output, and is extended or has a join under it that extends.
@@ -521,16 +514,13 @@ internal static partial class NullabilityWalk
         /// </summary>
         public const int MaxDepth = 16;
 
-        private static readonly IReadOnlyDictionary<PostgresRelationName, IReadOnlyList<long>> NoPartitions =
-            new Dictionary<PostgresRelationName, IReadOnlyList<long>>();
-
         private readonly Dictionary<PlanNode, PlanInstances> _instances = [with(ReferenceEqualityComparer.Instance)];
 
         public PlanInstances InstancesOf(PlanNode root)
         {
             if (!_instances.TryGetValue(root, out var found))
             {
-                found = PlanInstances.Find(root, tree, scope.Partitions ?? NoPartitions);
+                found = PlanInstances.Find(root, tree, scope.Partitions ?? PlanInstances.NoPartitions);
                 _instances[root] = found;
             }
 

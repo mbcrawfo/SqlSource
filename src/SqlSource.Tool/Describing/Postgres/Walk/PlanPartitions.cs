@@ -30,15 +30,12 @@ internal static class PlanPartitions
     /// order, each once: empty when there is none, and <c>partitions</c> is not asked.
     /// </summary>
     public static IReadOnlyList<PostgresRelationName> MembersOf(PlanNode root) =>
-        [
-            .. All(root)
+        PlanRelations.InOrder(
+            root.SelfAndDescendants()
                 .Where(static node => ShapeOf(node) is not null)
                 .SelectMany(static node => node.Plans)
                 .Select(static member => new PostgresRelationName(member.Schema!, member.RelationName!))
-                .Distinct()
-                .OrderBy(static relation => relation.Schema, StringComparer.Ordinal)
-                .ThenBy(static relation => relation.Name, StringComparer.Ordinal),
-        ];
+        );
 
     /// <summary>
     /// The alias the nodes above an <c>Append</c> print for its members, when the node is an <c>Append</c> or a
@@ -185,6 +182,4 @@ internal static class PlanPartitions
 
         return at;
     }
-
-    private static IEnumerable<PlanNode> All(PlanNode node) => node.Plans.SelectMany(All).Prepend(node);
 }

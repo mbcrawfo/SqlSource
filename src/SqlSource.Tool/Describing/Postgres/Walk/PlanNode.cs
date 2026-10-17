@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
@@ -45,6 +46,54 @@ internal sealed record PlanNode(
 {
     // Each node is two levels of the text, and the reader's own limit of 64 would refuse a plan of thirty.
     private const int MaxDepth = 512;
+
+    /// <summary>
+    /// The root of the plan a <c>Subquery Scan</c> scans, its one child whose <c>Parent Relationship</c> is
+    /// <c>Subquery</c>; null for any other node, and for a scan with none or with several.
+    /// </summary>
+    /// <remarks>Read each time and never kept, so that a copy made with <c>with</c> has its own.</remarks>
+    public PlanNode? SubqueryChild
+    {
+        get
+        {
+            if (NodeType != PlanNodeTypes.SubqueryScan)
+            {
+                return null;
+            }
+
+            PlanNode? only = null;
+            foreach (var child in Plans)
+            {
+                if (child.ParentRelationship != PlanRelationships.Subquery)
+                {
+                    continue;
+                }
+
+                if (only is not null)
+                {
+                    return null;
+                }
+
+                only = child;
+            }
+
+            return only;
+        }
+    }
+
+    /// <summary>
+    /// The children whose <c>Parent Relationship</c> is <c>Outer</c> or <c>Inner</c>, in order: the sides of a join,
+    /// or the one input of any other node.
+    /// </summary>
+    public IEnumerable<PlanNode> JoinChildren =>
+        Plans.Where(static child => child.ParentRelationship is PlanRelationships.Outer or PlanRelationships.Inner);
+
+    /// <summary>
+    /// The node and every node under it, through every <c>Parent Relationship</c>: the node first, then each child
+    /// and all under it before the next child.
+    /// </summary>
+    public IEnumerable<PlanNode> SelfAndDescendants() =>
+        Plans.SelectMany(static child => child.SelfAndDescendants()).Prepend(this);
 
     /// <summary>
     /// The root of a plan's text, or null: the text is an array of one object whose <c>Plan</c> is the root, and
