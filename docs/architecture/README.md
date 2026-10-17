@@ -89,3 +89,4 @@ The `<file>.sql.json` file that `sqlsource describe` writes beside a `.sql` file
 
 - [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a `.sql` file is parsed, what is written for a type, how diagnostics travel, and the sidecar model the assembly holds.
 - [The MSBuild files and the manifest](msbuild-and-manifest.md): what the props and targets hand the compiler, how they trim each value, and the manifest, whose format is the contract between the package and the tool, with its known limits.
+- [The tool](tool.md): how `sqlsource` reads a command line and ends a run, the steps of a `describe` run from the run unit to the sidecars, what each folder does and uses of the generator, and how a run reports and logs.
