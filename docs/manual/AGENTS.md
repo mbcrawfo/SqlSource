@@ -80,8 +80,8 @@ Every phase of query generation (`docs/superpowers/specs/2026-10-07-query-genera
 2. **Replaces its callouts with documentation**, example first.  `git grep -n "Coming in a later release" -- README.md src/SqlSource.Tool/README.md docs/manual` lists them all.  A callout for a part still to come stays, and one that covers two phases, such as the README's step 4, is narrowed to the part still to come.
 3. **Rewrites the sentences that say it is missing or still to come**, such as "Nothing in a build reads them today" or "It takes effect when generated models arrive".  This finds most of them, among many lines to read past; it is not exhaustive, so read each page the table below names:
 
-   ```console
-   $ git grep -n -i -E "no effect yet|today|coming|arrive|later release|until|growing|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md docs/manual
+   ```bash
+   git grep -n -i -E "no effect yet|today|coming|arrive|later release|until|growing|(^|[^[:alnum:]_])(yet|will)([^[:alnum:]_]|$)" -- README.md src/SqlSource.Tool/README.md docs/manual
    ```
 
 4. **Adds or removes its known issues** as its `docs/tech-debt` and `docs/deferred` items open and close.
@@ -101,8 +101,8 @@ Which pages each phase touches, besides those six steps:
 
 The phase 6 finder, kept out of the table because its pipes would split the row:
 
-```console
-$ git grep -n -i -E "SQLSRC216|cannot describe|can be described|PostgreSQL" -- README.md src/SqlSource.Tool/README.md docs/manual
+```bash
+git grep -n -i -E "SQLSRC216|cannot describe|can be described|PostgreSQL" -- README.md src/SqlSource.Tool/README.md docs/manual
 ```
 
 A database that becomes describable gets its own page, a row in the support table of `dialects.md`, and the README's supported environments.  A dialect that is added gets its row in `dialects.md` and in `settings.md`'s Dialect row.
