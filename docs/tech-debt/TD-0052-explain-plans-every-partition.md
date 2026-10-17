@@ -6,7 +6,7 @@
 
 ## Why it exists
 
-The describer plans the prepared statement with a `NULL` for each parameter, under `force_generic_plan`.  The executor prunes partitions for the parameters' values when it starts, which `EXPLAIN` of an `EXECUTE` shows: a condition on the partition key and a parameter, `at >= $1`, prunes every partition for the `NULL`, and the plan prints an `Append` with no member, `Subplans Removed: 2`.  The walk tells a partitioned table's `Append` from a set operation's by its members, which must be partitions of one table (`PlanPartitions`), so an `Append` with none is read as a set operation, and every column through it keeps the heuristic.  Without pruning every member shows, on PostgreSQL 14 and 18 alike.  `EXPLAIN (GENERIC_PLAN)` of PostgreSQL 16 prints the plan without the executor's pruning, but 14 and 15 do not have it, and the describer does not use it for the reason its `AGENTS.md` gives.
+The describer plans the prepared statement with a `NULL` for each parameter, under `force_generic_plan`.  The executor prunes partitions for the parameters' values when it starts, which `EXPLAIN` of an `EXECUTE` shows: a condition on the partition key and a parameter, `at >= $1`, prunes every partition for the `NULL`, and the plan prints an `Append` with no member, `Subplans Removed: 2`.  The walk tells a partitioned table's `Append` from a set operation's by its members, which must be partitions of one table (`PlanPartitions`), so an `Append` with none is read as a set operation, and every column through it keeps the heuristic.  Without pruning every member shows, on PostgreSQL 14 and 18 alike.  `EXPLAIN (GENERIC_PLAN)` of PostgreSQL 16 prints the plan without the executor's pruning, but 14 and 15 do not have it, and the describer does not use it for the reason [the plan](../architecture/postgres-nullability.md#the-plan) gives.
 
 ## Impact
 
@@ -14,7 +14,7 @@ Low.  A describe is slower for a query over a table of many partitions, and only
 
 ## Proposed fix
 
-Ask for the plan with pruning only when the plan without it is not needed: plan once as today, and again without pruning only when the plan holds an `Append` with `Subplans Removed` and no member.  That costs a second `EXPLAIN` for those queries and none for the rest, and changes the capture of the queries that need both.  Or, on PostgreSQL 16 and later, read `EXPLAIN (GENERIC_PLAN)` of the SQL with its `$n` for the members, once the folding that `AGENTS.md` records is understood.
+Ask for the plan with pruning only when the plan without it is not needed: plan once as today, and again without pruning only when the plan holds an `Append` with `Subplans Removed` and no member.  That costs a second `EXPLAIN` for those queries and none for the rest, and changes the capture of the queries that need both.  Or, on PostgreSQL 16 and later, read `EXPLAIN (GENERIC_PLAN)` of the SQL with its `$n` for the members, once the folding that [the plan](../architecture/postgres-nullability.md#the-plan) records is understood.
 
 ## Trigger
 

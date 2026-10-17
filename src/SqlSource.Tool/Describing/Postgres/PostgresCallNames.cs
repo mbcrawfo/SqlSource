@@ -6,7 +6,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </summary>
 /// <remarks>
 /// A value never changes: every capture records the name of each call it holds, and a recorded answer is found by it
-/// (<c>src/SqlSource.Tool/AGENTS.md</c>).  A call is added and never renamed.
+/// (<c>docs/architecture/postgres-describer.md</c>).  A call is added and never renamed, as
+/// <c>src/SqlSource.Tool/AGENTS.md</c> says.
 /// </remarks>
 internal static class PostgresCallNames
 {

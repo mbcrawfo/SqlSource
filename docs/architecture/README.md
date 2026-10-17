@@ -61,6 +61,10 @@ An `IQueryDescriber`: the code that asks the databases of one dialect what a que
 
 A `SqlDialect`: the rules by which the parser reads a `.sql` file, resolved for each file before the parse.  The tool also chooses a database's describer by its dialect.
 
+### Gated query
+
+A query that the PostgreSQL describer's `OuterJoinGate` lets in: one whose SQL holds a word that can make a `NOT NULL` column of a table come back `NULL`, such as `LEFT` or `ROLLUP`.  A gated query's columns of a table are nullable by a heuristic until the [plan walk](#plan-walk) proves otherwise.
+
 ### Hint name
 
 The name of a type's generated file, which `HintName` builds from the type's namespace and names, as `<namespace>.<type>.g.cs`.  The compiler compares hint names ignoring case and throws on a clash, so a name that would clash gets a hash added.
@@ -68,6 +72,10 @@ The name of a type's generated file, which `HintName` builds from the type's nam
 ### Manifest
 
 What the compiler is given for one project, which the target `SqlSourceWriteManifest` writes to a file for the tool: the project's `.sql` files with their metadata, the package's properties, the `Compile` files and a few properties of the SDK.  The tool reads it with `ManifestReader` into a `ProjectManifest`.
+
+### Origin
+
+The column of a relation that a column of a result comes from, a `ColumnOrigin`, as the PostgreSQL describer finds it from the row description and the catalog.  An expression, a column of a set operation and a system column have none.
 
 ### Plan walk
 
@@ -90,3 +98,5 @@ The `<file>.sql.json` file that `sqlsource describe` writes beside a `.sql` file
 - [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a `.sql` file is parsed, what is written for a type, how diagnostics travel, and the sidecar model the assembly holds.
 - [The MSBuild files and the manifest](msbuild-and-manifest.md): what the props and targets hand the compiler, how they trim each value, and the manifest, whose format is the contract between the package and the tool, with its known limits.
 - [The tool](tool.md): how `sqlsource` reads a command line and ends a run, the steps of a `describe` run from the run unit to the sidecars, what each folder does and uses of the generator, and how a run reports and logs.
+- [The PostgreSQL describer](postgres-describer.md): the contract every describer implements, the exchange its calls go through and how a capture is recorded and replayed, then how the PostgreSQL describer describes one query, builds its parameters and columns, matches a table and chooses each error, and why no query can make it run a statement.
+- [PostgreSQL nullability](postgres-nullability.md): how the describer decides whether a column can be null, from the catalog, the outer-join gate and the generic plan, and how the plan walk reads a plan's joins, outputs, expressions and set operations.
