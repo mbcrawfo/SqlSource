@@ -44,6 +44,17 @@ internal static class SqlPath
             : null;
 
     /// <summary>
+    /// Whether <paramref name="sidecarPath" />, normalised, is <paramref name="normalizedSqlPath" /> with
+    /// <c>.json</c> after it, spelled exactly so: the path at which the tool reads and writes the sidecar of that
+    /// file.
+    /// </summary>
+    public static bool IsSidecarPathOf(string sidecarPath, string normalizedSqlPath) =>
+        Normalize(sidecarPath) is { } normalized
+        && normalized.Length == normalizedSqlPath.Length + JsonExtension.Length
+        && normalized.StartsWith(normalizedSqlPath, StringComparison.Ordinal)
+        && normalized.EndsWith(JsonExtension, StringComparison.Ordinal);
+
+    /// <summary>
     /// The paths, each once ignoring case and in the order of <see cref="Comparer" />, which is also the order of a
     /// type's members.  Of two paths that differ only by case, the first is kept.  The generator and the
     /// <c>sqlsource</c> tool both make a project's list of <c>.sql</c> files with this.

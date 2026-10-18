@@ -12,7 +12,7 @@ namespace SqlSource.Generation.Sidecars;
 /// The entries that passed every check, in the order of their queries in the file: the only entries a later step may
 /// read.
 /// </param>
-internal sealed record SidecarCheck(
+internal sealed record SidecarCheckResult(
     string NormalizedPath,
     EquatableArray<DiagnosticInfo> Diagnostics,
     EquatableArray<SidecarEntry> UsableEntries

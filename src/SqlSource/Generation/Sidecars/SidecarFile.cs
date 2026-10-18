@@ -23,4 +23,11 @@ internal sealed record SidecarFile(
     LocationInfo Start,
     LocationInfo? ErrorLocation,
     EquatableArray<LocationInfo> EntryLocations
-);
+)
+{
+    /// <summary>
+    /// Whether the sidecar's path is spelled exactly as its <c>.sql</c> file's with <c>.json</c> after it: the path
+    /// the tool reads and writes.
+    /// </summary>
+    public bool IsSpelledAsItsSqlFile => Paths.SqlPath.IsSidecarPathOf(Path, SqlPath);
+}

@@ -97,7 +97,7 @@ Queries/
 
 **Commit the sidecars with the project.**  The build reads them in place of a database, so that every developer and every build server builds without a connection.  A copy of the project without them reports [SQLSRC241](diagnostics.md#sqlsrc241) for each query that must be described.  Only the person who changes a query, or the schema, needs a database to describe it again.
 
-To show each sidecar under its `.sql` file in Visual Studio Code, which nests files by a setting of its own, add this to your settings:
+Rider shows each sidecar under its `.sql` file, with nothing to set.  To show each sidecar under its `.sql` file in Visual Studio Code, which nests files by a setting of its own, add this to your settings:
 
 ```json
 {

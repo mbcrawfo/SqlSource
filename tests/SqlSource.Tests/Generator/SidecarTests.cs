@@ -391,7 +391,7 @@ public sealed class SidecarTests
         var run = Run(OutputKind.Sql, Users);
 
         run.Diagnostics.ShouldBeEmpty();
-        Outputs<SidecarCheck>(run, TrackingNames.SidecarCheck).ShouldAllBe(check => check.Diagnostics.Count == 0);
+        Outputs<SidecarCheckResult>(run, TrackingNames.SidecarCheck).ShouldAllBe(check => check.Diagnostics.Count == 0);
         run.Sources.Keys.ShouldContain("App.Sample.g.cs");
     }
 
@@ -567,9 +567,10 @@ public sealed class SidecarTests
         UsableEntries(run).ShouldBe(["GetUser"]);
     }
 
-    // The later of two paths that differ only by case is left out, as the later of two such .sql files is.
+    // Of two paths that differ only by case, the one spelled as the .sql file's path with .json after it is read,
+    // whichever the project lists first: it is the file the tool reads and writes.
     [Fact]
-    public void Run_TwoSidecarsThatDifferOnlyByCase_ReadTheFirst()
+    public void Run_TwoSidecarsThatDifferOnlyByCase_ReadTheOneSpelledAsItsFile()
     {
         var current = Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser");
         var other = new SqlFile("/app/Repo/users.sql.json", "{");
@@ -579,8 +580,28 @@ public sealed class SidecarTests
 
         run.Diagnostics.ShouldBeEmpty();
         UsableEntries(run).ShouldBe(["GetUser"]);
+        reversed.Diagnostics.ShouldBeEmpty();
+        UsableEntries(reversed).ShouldBe(["GetUser"]);
+    }
+
+    // With neither spelled as the .sql file's path, the first the project lists is read, as the first of two such
+    // .sql files is.
+    [Fact]
+    public void Run_TwoSidecarsNeitherSpelledAsItsFile_ReadTheFirst()
+    {
+        var current = new SqlFile(
+            "/app/Repo/users.sql.json",
+            Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser").Text
+        );
+        var other = new SqlFile("/app/Repo/USERS.sql.json", "{");
+
+        var run = Run(OutputKind.Models, Users, current, other);
+        var reversed = Run(OutputKind.Models, Users, other, current);
+
+        run.Diagnostics.ShouldBeEmpty();
+        UsableEntries(run).ShouldBe(["GetUser"]);
         reversed.Diagnostics.ShouldBe([
-            "SQLSRC237 /app/Repo/users.sql.json(1,2)-(1,2): The sidecar cannot be read, because it is not one JSON "
+            "SQLSRC237 /app/Repo/USERS.sql.json(1,2)-(1,2): The sidecar cannot be read, because it is not one JSON "
                 + "object.  Run 'sqlsource describe' to write it again.",
         ]);
         UsableEntries(reversed).ShouldBeEmpty();
@@ -659,7 +680,7 @@ public sealed class SidecarTests
     // The names of the usable entries of every file, from what the step of the checks gave.
     private static string[] UsableEntries(GeneratorRun run) =>
         [
-            .. Outputs<SidecarCheck>(run, TrackingNames.SidecarCheck)
+            .. Outputs<SidecarCheckResult>(run, TrackingNames.SidecarCheck)
                 .SelectMany(check => check.UsableEntries)
                 .Select(entry => entry.Name),
         ];

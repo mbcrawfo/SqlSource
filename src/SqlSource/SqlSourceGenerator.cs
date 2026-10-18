@@ -194,7 +194,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, cancellationToken) => SidecarFileReader.Read(input!, cancellationToken))
             .WithTrackingName(TrackingNames.SidecarFile)
             .Collect()
-            .Select(static (files, _) => ToSorted(files, static file => file.SqlPath))
+            .Select(static (files, _) => ToSortedSidecars(files))
             .WithTrackingName(TrackingNames.Sidecars);
 
         // Stage two of the settings: the metadata of the files that have any, which are few.  It never reaches the
@@ -309,6 +309,23 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .GroupBy(pathOf, SqlPath.Comparer)
                 .Select(static group => group.First())
                 .OrderBy(pathOf, SqlPath.Comparer)
+                .ToImmutableArray()
+        );
+
+    // One sidecar for each .sql file, in the order of SqlPath.Comparer.  Of two whose paths differ only by case, the
+    // one spelled as its .sql file's path with .json after it is kept, since that is the file the tool reads and
+    // writes, and the first the project lists when neither is.  A path almost always has one sidecar, which is kept
+    // without a look at its spelling.
+    private static EquatableArray<SidecarFile> ToSortedSidecars(ImmutableArray<SidecarFile> files) =>
+        new(
+            files
+                .GroupBy(static file => file.SqlPath, SqlPath.Comparer)
+                .Select(static group =>
+                    group.Skip(1).Any()
+                        ? group.FirstOrDefault(static file => file.IsSpelledAsItsSqlFile) ?? group.First()
+                        : group.First()
+                )
+                .OrderBy(static file => file.SqlPath, SqlPath.Comparer)
                 .ToImmutableArray()
         );
 

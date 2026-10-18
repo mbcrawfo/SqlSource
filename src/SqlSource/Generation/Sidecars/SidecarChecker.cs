@@ -14,24 +14,25 @@ namespace SqlSource.Generation.Sidecars;
 /// number of its types, and gives the entries that passed every check.
 /// </summary>
 /// <remarks>
-/// The checks run in a fixed order.  A dialect the tool cannot describe, or one this version has no type map for,
-/// stops every check of the file's queries.  A token without a default is reported whatever the dialect and the
-/// sidecar, as the tool reports it, and stops the check of its query.  A sidecar that cannot be read, or is of another
-/// format, has no usable entry and stops the checks of the queries and of the orphans.  A file with parse errors has
-/// no queries, so only the checks of the sidecar itself run for it: every entry would otherwise be an orphan until the
-/// file parses.  Each query that needs an entry then has none, one of another engine, a stale one, or a usable one, in
-/// that order.  A query stopped by a check is still an entry's query, so its entry is no orphan.
+/// The checks run in a fixed order.  A dialect the tool cannot describe, or one this version has no type map for, stops
+/// the check of each query against the sidecar, while the tokens of the queries are still checked.  A token without a
+/// default is reported whatever the dialect and the sidecar, as the tool reports it, and stops the check of its query.
+/// A sidecar that cannot be read, or is of another format, has no usable entry and stops the checks of the queries and
+/// of the orphans.  A file with parse errors has no queries, so only the checks of the sidecar itself run for it: every
+/// entry would otherwise be an orphan until the file parses.  Each query that needs an entry then has none, one of
+/// another engine, a stale one, or a usable one, in that order.  A query stopped by a check is still an entry's query,
+/// so its entry is no orphan.
 /// </remarks>
 internal static class SidecarChecker
 {
     private static readonly EquatableArray<SidecarEntry> NoEntries = EquatableArray<SidecarEntry>.Empty;
 
-    public static SidecarCheck Check(SidecarCheckInput input)
+    public static SidecarCheckResult Check(SidecarCheckInput input)
     {
         var file = input.File;
         if (input.Sidecar is null && input.Needs is null)
         {
-            return new SidecarCheck(file.NormalizedPath, EquatableArray<DiagnosticInfo>.Empty, NoEntries);
+            return new SidecarCheckResult(file.NormalizedPath, EquatableArray<DiagnosticInfo>.Empty, NoEntries);
         }
 
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
@@ -54,7 +55,7 @@ internal static class SidecarChecker
         return Finish(file, diagnostics, usable);
     }
 
-    private static SidecarCheck Finish(
+    private static SidecarCheckResult Finish(
         ParsedSqlFile file,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics,
         EquatableArray<SidecarEntry> usable

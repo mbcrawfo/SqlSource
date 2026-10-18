@@ -911,6 +911,31 @@ public sealed class CachingTests
         result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC244");
     }
 
+    // TD-0019: the check of each file is a node of its own, but the nodes are matched by their place in the sorted
+    // list of parsed files, not by path.  So a claimed file added to the list checks again every file sorted after
+    // it, and none before it: Payments takes the place Users had, and Users is checked as a new node after it.
+    [Fact]
+    public void Run_ClaimedSqlFileAdded_ChecksTheFilesSortedAfterIt()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+        var payments = new InMemoryAdditionalText("/app/Orders/Payments.sql", "-- name: GetPayment\nSELECT 3;\n");
+
+        var result = Run(driver.AddAdditionalTexts([payments, CurrentSidecar(payments, "GetPayment")]), compilation);
+
+        Checks(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Orders/Payments.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.New,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
     // The attribute changes the type, so its needs are found again, and they are the same.
     [Fact]
     public void Run_AttributeEditedWithoutChangingTheOutput_ChecksNothing()
@@ -971,7 +996,7 @@ public sealed class CachingTests
             (EquatableArray<FileNeeds>)Outputs(result, TrackingNames.FileNeeds).ShouldHaveSingleItem().Value
         ).ShouldBeEmpty();
         Outputs(result, TrackingNames.SidecarCheck)
-            .Select(output => (SidecarCheck)output.Value)
+            .Select(output => (SidecarCheckResult)output.Value)
             .ShouldAllBe(check => check.Diagnostics.Count == 0 && check.UsableEntries.Count == 0);
     }
 
@@ -1042,7 +1067,7 @@ public sealed class CachingTests
 
     // Why the check of each file ran, by the file's path.
     private static Dictionary<string, IncrementalStepRunReason> Checks(GeneratorDriverRunResult result) =>
-        Reasons<SidecarCheck>(result, TrackingNames.SidecarCheck, check => check.NormalizedPath);
+        Reasons<SidecarCheckResult>(result, TrackingNames.SidecarCheck, check => check.NormalizedPath);
 
     // What one type needs, named by the path of its one file.
     private static string NeedsKey(EquatableArray<FileNeeds> needs) => needs.ShouldHaveSingleItem().NormalizedPath;
