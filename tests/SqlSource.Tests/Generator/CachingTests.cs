@@ -11,6 +11,7 @@ using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
 using SqlSource.Testing.Generator;
+using SqlSource.Testing.Snapshot;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 
@@ -167,6 +168,8 @@ public sealed class CachingTests
             TrackingNames.SidecarCheck,
             TrackingNames.UsesPostgresEntries,
             TrackingNames.MappedTypeNames,
+            TrackingNames.FileTypesInput,
+            TrackingNames.FileTypes,
         ];
         foreach (var step in steps)
         {
@@ -1009,6 +1012,10 @@ public sealed class CachingTests
         AllReasons(result, TrackingNames.SidecarCheckInput)
             .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
         Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+
+        // The types read the property's type override alone, which did not change.
+        AllReasons(result, TrackingNames.FileTypesInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 
     // A project at Sql with no sidecar: no query needs an entry, so no check has anything to do and no hash is
@@ -1098,6 +1105,121 @@ public sealed class CachingTests
         ]);
     }
 
+    // The probe and the resolution run on the new compilation and give equal values, so no file is typed again.
+    [Fact]
+    public void Run_CSharpEdit_TypesNoQuery()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var driver = FirstRunWithTypes(compilation, OptionsWithTypeOverrides(null));
+        Outputs(driver.GetRunResult(), TrackingNames.FileTypes)
+            .Select(output => (FileTypes)output.Value)
+            .ShouldAllBe(types => types.Queries.Count == 1);
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        AllReasons(result, TrackingNames.FileTypesInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    // The edit makes the entry of Users stale, so Users has no types now, and Orders is not typed again.
+    [Fact]
+    public void Run_SqlFileEdited_TypesOnlyThatFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var driver = FirstRunWithTypes(compilation, OptionsWithTypeOverrides(null));
+
+        var edited = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1, 2;\n");
+        var result = Run(driver.ReplaceAdditionalText(_users, edited), compilation);
+
+        // Every file gathered its input again, since the parsed files changed, and Orders' is equal.
+        Reasons<FileTypesInput>(result, TrackingNames.FileTypesInput, input => input.Check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        TypesOf(result, "app/Users/Users.sql").Queries.ShouldBeEmpty();
+    }
+
+    // The new entry of Users has a column of text, and Orders is not typed again.
+    [Fact]
+    public void Run_SidecarEdited_TypesOnlyItsFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var usersSidecar = TypedSidecar(_users, "GetUser", "int4");
+        var driver = FirstRunWithTypes(compilation, OptionsWithTypeOverrides(null), usersSidecar);
+
+        var edited = TypedSidecar(_users, "GetUser", "text");
+        var result = Run(driver.ReplaceAdditionalText(usersSidecar, edited), compilation);
+
+        // Orders' check was taken from the previous run, and so was every other input of its types.
+        Reasons<FileTypesInput>(result, TrackingNames.FileTypesInput, input => input.Check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        TypesOf(result, "app/Users/Users.sql")
+            .Queries.ShouldHaveSingleItem()
+            .Columns.ShouldNotBeNull()
+            .ShouldHaveSingleItem()
+            .Text.ShouldBe("string");
+    }
+
+    // Each file's map of overrides comes from the property, so every file is typed again, and each column of int4
+    // now has the property's type.
+    [Fact]
+    public void Run_TypeOverridesPropertyChanged_TypesEveryFileAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var driver = FirstRunWithTypes(compilation, OptionsWithTypeOverrides(null));
+
+        var result = Run(driver.WithUpdatedAnalyzerConfigOptions(OptionsWithTypeOverrides("int4=long")), compilation);
+
+        AllReasons(result, TrackingNames.FileTypesInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Modified,
+                },
+                ignoreOrder: true
+            );
+        TypesOf(result, "app/Orders/Orders.sql")
+            .Queries.ShouldHaveSingleItem()
+            .Columns.ShouldNotBeNull()
+            .ShouldHaveSingleItem()
+            .Text.ShouldBe("long");
+    }
+
     private GeneratorDriver FirstRun(OutputKind? output, Compilation compilation) =>
         FirstRun(compilation, _users, new TestOptionsProvider(output, null));
 
@@ -1122,6 +1244,68 @@ public sealed class CachingTests
         driver.GetRunResult().Diagnostics.ShouldBeEmpty();
         return driver;
     }
+
+    // Both types at Models under postgres, and each file with a current sidecar whose entry has a column of int4,
+    // Users with this one when it is given.
+    private GeneratorDriver FirstRunWithTypes(
+        Compilation compilation,
+        TestOptionsProvider options,
+        InMemoryAdditionalText? usersSidecar = null
+    )
+    {
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [
+                    _users,
+                    _orders,
+                    usersSidecar ?? TypedSidecar(_users, "GetUser", "int4"),
+                    TypedSidecar(_orders, "GetOrder", "int4"),
+                ],
+                options
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return driver;
+    }
+
+    private static TestOptionsProvider OptionsWithTypeOverrides(string? overrides) =>
+        new(
+            OutputKind.Models,
+            null,
+            "postgres",
+            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = overrides }
+        );
+
+    // A current sidecar whose entry has one column, of the type of pg_catalog.
+    private static InMemoryAdditionalText TypedSidecar(
+        InMemoryAdditionalText sqlFile,
+        string queryName,
+        string internalName
+    )
+    {
+        var file = ToSqlFile(sqlFile);
+        var sidecar = Sidecars.Of(
+            file,
+            TestSidecars.Entry(
+                queryName,
+                Sidecars.HashOf(file, queryName, SqlDialect.PostgreSql),
+                "postgres",
+                "main",
+                "18.0",
+                columns:
+                [
+                    TestSidecars.Column(0, "value", TestSidecars.Postgres(internalName, internalName: internalName)),
+                ]
+            )
+        );
+        return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
+    }
+
+    // The types of the file of the path.
+    private static FileTypes TypesOf(GeneratorDriverRunResult result, string path) =>
+        Outputs(result, TrackingNames.FileTypes)
+            .Select(output => (FileTypes)output.Value)
+            .Single(types => types.NormalizedPath == path);
 
     private static InMemoryAdditionalText CurrentSidecar(InMemoryAdditionalText sqlFile, string queryName)
     {

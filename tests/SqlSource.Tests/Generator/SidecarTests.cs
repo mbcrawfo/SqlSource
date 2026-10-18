@@ -1,7 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using System;
-using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
 using Shouldly;
@@ -57,7 +56,7 @@ public sealed class SidecarTests
             "SQLSRC237 /app/Repo/Users.sql.json(2,20)-(2,25): The sidecar cannot be read, because 'formatVersion' has "
                 + "a value of the wrong type.  Run 'sqlsource describe' to write it again.",
         ]);
-        SeverityOf(run, "SQLSRC237").ShouldBe(DiagnosticSeverity.Error);
+        run.SeverityOf("SQLSRC237").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
     }
 
@@ -74,7 +73,7 @@ public sealed class SidecarTests
             $"SQLSRC238 {SidecarStart}: The sidecar has format 2, and this version of SqlSource reads format 1.  "
                 + "Update the SqlSource package.",
         ]);
-        SeverityOf(run, "SQLSRC238").ShouldBe(DiagnosticSeverity.Error);
+        run.SeverityOf("SQLSRC238").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
     }
 
@@ -91,7 +90,7 @@ public sealed class SidecarTests
             $"SQLSRC239 {SidecarStart}: The sidecar has format 0, and this version of SqlSource reads format 1.  Run "
                 + "'sqlsource describe' to write it again.",
         ]);
-        SeverityOf(run, "SQLSRC239").ShouldBe(DiagnosticSeverity.Error);
+        run.SeverityOf("SQLSRC239").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
     }
 
@@ -109,7 +108,7 @@ public sealed class SidecarTests
                 + $"SqlSource {PackageVersion.Prefix}.  Bring the tool and the package to one version, and run "
                 + "'sqlsource describe'.",
         ]);
-        SeverityOf(run, "SQLSRC240").ShouldBe(DiagnosticSeverity.Warning);
+        run.SeverityOf("SQLSRC240").ShouldBe(DiagnosticSeverity.Warning);
         UsableEntries(run).ShouldBe(["GetUser"]);
     }
 
@@ -124,7 +123,7 @@ public sealed class SidecarTests
         var withoutEntry = Run(OutputKind.Models, Users, Sidecars.Of(Users));
 
         withoutSidecar.Diagnostics.ShouldBe([Expected]);
-        SeverityOf(withoutSidecar, "SQLSRC241").ShouldBe(DiagnosticSeverity.Error);
+        withoutSidecar.SeverityOf("SQLSRC241").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(withoutSidecar).ShouldBeEmpty();
         withoutEntry.Diagnostics.ShouldBe([Expected]);
         UsableEntries(withoutEntry).ShouldBeEmpty();
@@ -144,7 +143,7 @@ public sealed class SidecarTests
             $"SQLSRC242 {GetUserName}: The entry of the query 'GetUser' was described for '{engine}', and the dialect "
                 + "of this file is 'postgres'.  Run 'sqlsource describe'.",
         ]);
-        SeverityOf(run, "SQLSRC242").ShouldBe(DiagnosticSeverity.Error);
+        run.SeverityOf("SQLSRC242").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
     }
 
@@ -160,7 +159,7 @@ public sealed class SidecarTests
             $"SQLSRC243 {GetUserName}: This version of SqlSource has no type map for the dialect 'mssql', so no query "
                 + "of this file can have models.  Set the output to 'sql'.",
         ]);
-        SeverityOf(run, "SQLSRC243").ShouldBe(DiagnosticSeverity.Error);
+        run.SeverityOf("SQLSRC243").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
     }
 
@@ -219,7 +218,7 @@ public sealed class SidecarTests
         );
 
         run.Diagnostics.ShouldBe([NotDescribable]);
-        SeverityOf(run, "SQLSRC209").ShouldBe(DiagnosticSeverity.Error);
+        run.SeverityOf("SQLSRC209").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
         withEntries.Diagnostics.ShouldBe([NotDescribable]);
         UsableEntries(withEntries).ShouldBeEmpty();
@@ -251,7 +250,7 @@ public sealed class SidecarTests
             NoDefault.Replace("{0}", "order", StringComparison.Ordinal),
         ];
         withoutSidecar.Diagnostics.ShouldBe(noDefaults);
-        SeverityOf(withoutSidecar, "SQLSRC210").ShouldBe(DiagnosticSeverity.Error);
+        withoutSidecar.SeverityOf("SQLSRC210").ShouldBe(DiagnosticSeverity.Error);
         withStaleEntry.Diagnostics.ShouldBe(noDefaults);
         UsableEntries(withStaleEntry).ShouldBeEmpty();
         defaulted.Diagnostics.ShouldBe([
@@ -303,7 +302,7 @@ public sealed class SidecarTests
             $"SQLSRC244 {GetUserName}: The query 'GetUser' has changed since its entry was written.  Run 'sqlsource "
                 + "describe'.",
         ]);
-        SeverityOf(run, "SQLSRC244").ShouldBe(DiagnosticSeverity.Error);
+        run.SeverityOf("SQLSRC244").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
     }
 
@@ -320,7 +319,7 @@ public sealed class SidecarTests
             "SQLSRC245 /app/Repo/Users.sql.json(15,5)-(15,11): The entry 'Gone' names no query of the file that needs "
                 + "one.  Run 'sqlsource describe', which removes it.",
         ]);
-        SeverityOf(run, "SQLSRC245").ShouldBe(DiagnosticSeverity.Warning);
+        run.SeverityOf("SQLSRC245").ShouldBe(DiagnosticSeverity.Warning);
         UsableEntries(run).ShouldBe(["GetUser"]);
     }
 
@@ -366,7 +365,7 @@ public sealed class SidecarTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        Outputs<SidecarFile>(run, TrackingNames.SidecarFile).Select(file => file.Path).ShouldBe([SidecarPath]);
+        StepOutputs.Of<SidecarFile>(run, TrackingNames.SidecarFile).Select(file => file.Path).ShouldBe([SidecarPath]);
     }
 
     [Fact]
@@ -391,7 +390,9 @@ public sealed class SidecarTests
         var run = Run(OutputKind.Sql, Users);
 
         run.Diagnostics.ShouldBeEmpty();
-        Outputs<SidecarCheckResult>(run, TrackingNames.SidecarCheck).ShouldAllBe(check => check.Diagnostics.Count == 0);
+        StepOutputs
+            .Of<SidecarCheckResult>(run, TrackingNames.SidecarCheck)
+            .ShouldAllBe(check => check.Diagnostics.Count == 0);
         run.Sources.Keys.ShouldContain("App.Sample.g.cs");
     }
 
@@ -669,24 +670,12 @@ public sealed class SidecarTests
     private static SidecarEntry CurrentEntry(SqlFile file, string name) =>
         Sidecars.Entry(name, Sidecars.HashOf(file, name, SqlDialect.PostgreSql));
 
-    // The one severity of every diagnostic of the id.
-    private static DiagnosticSeverity SeverityOf(GeneratorRun run, string id) =>
-        run
-            .Result.Diagnostics.Where(diagnostic => diagnostic.Id == id)
-            .Select(diagnostic => diagnostic.Severity)
-            .Distinct()
-            .Single();
-
     // The names of the usable entries of every file, from what the step of the checks gave.
     private static string[] UsableEntries(GeneratorRun run) =>
         [
-            .. Outputs<SidecarCheckResult>(run, TrackingNames.SidecarCheck)
+            .. StepOutputs
+                .Of<SidecarCheckResult>(run, TrackingNames.SidecarCheck)
                 .SelectMany(check => check.UsableEntries)
                 .Select(entry => entry.Name),
         ];
-
-    private static IEnumerable<T> Outputs<T>(GeneratorRun run, string step) =>
-        run.Result.Results.Single().TrackedSteps.TryGetValue(step, out var runs)
-            ? runs.SelectMany(stepRun => stepRun.Outputs).Select(output => (T)output.Value)
-            : [];
 }

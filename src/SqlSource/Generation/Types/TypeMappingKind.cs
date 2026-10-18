@@ -12,6 +12,13 @@ internal enum TypeMappingKind
     /// <summary>Npgsql cannot read the type as an object, and a cast to <c>oid</c> reads it.</summary>
     CastToOid,
 
+    /// <summary>
+    /// A type that the tool never writes in a sidecar: <c>record</c>, <c>unknown</c>, <c>void</c>, a kind this version
+    /// does not know, or an array or a domain without its element or base.  Only a sidecar edited by hand, or written
+    /// by a newer tool, has one, and describing the query again mends it.
+    /// </summary>
+    NotWrittenByTheTool,
+
     /// <summary>A range of a subtype the map does not list, or a multirange of such a range.</summary>
     UserDefinedRange,
 

@@ -105,12 +105,14 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC244](#sqlsrc244) | Entry is stale |
 | [SQLSRC245](#sqlsrc245) | Entry names no query |
 
-**The Npgsql of a project**
+**The C# types of a PostgreSQL query**
 
 | Id | Title |
 |----|----|
+| [SQLSRC246](#sqlsrc246) | Type has no C# type |
 | [SQLSRC247](#sqlsrc247) | Npgsql is older than 8.0 |
 | [SQLSRC248](#sqlsrc248) | Npgsql is newer than SqlSource knows |
+| [SQLSRC249](#sqlsrc249) | Type needs Npgsql |
 
 **The type override**
 
@@ -126,9 +128,11 @@ The ids from `SQLSRC224` to `SQLSRC236` are the errors of describing a query aga
 
 The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` dialect every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209), [SQLSRC210](#sqlsrc210) or [SQLSRC243](#sqlsrc243) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 119, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
 
-The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
+The ids `SQLSRC246` and `SQLSRC249` are reported by the build, about the C# types of a query whose output is `models` or `codegen` under the `postgres` dialect and whose entry in its sidecar is current.  Each column and parameter of the entry gets the C# type that Npgsql reads it as, which can depend on the version of Npgsql that the project references, or the type the type override maps its database type to.  Each is reported at the query's name, once for a query: for its first column or parameter that has no C# type, parameters before columns.
 
 The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version of the `Npgsql` package that the project references, directly or through another package.  The C# types of a PostgreSQL query depend on it.  Each is reported once for the project, with no file and line, and only when a query needs an entry in its sidecar under the `postgres` dialect.
+
+The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -1543,6 +1547,29 @@ This is a warning, since an entry that nothing uses changes no generated code.  
 
 See: [Sidecar files](tool.md#sidecar-files)
 
+## SQLSRC246
+
+**Type has no C# type**
+
+A column or a parameter of the query has a database type that Npgsql cannot read as a C# value, so SqlSource can give it no C# type.  The message names the column or parameter, its type, and what to do.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC246: The column 'relation' has the type 'regclass', which SqlSource cannot give a C# type.  Cast it to oid in the query.
+```
+
+What to do depends on the type:
+
+- **`regclass`, `regproc`, `regprocedure`, `regoper`, `regoperator`, `regrole`, `regnamespace`, `regcollation` and `regdictionary`.**  Cast the column to `oid` in the query, `SELECT 'users'::regclass::oid AS relation`, which Npgsql reads as a `uint`.  Cast an array of one to `oid[]`, as the message says.
+- **A composite type, which includes a table's row type, and a base type of an extension that SqlSource does not know.**  Map it with the type override to the C# type that your application reads it as, `public.address=MyApp.Address` for a type that the data source maps, or select its fields as columns of their own.
+- **A range of a subtype that SqlSource does not know, and a multirange of one.**  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.
+- **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`, or cast the column to `text` in the query.
+- **`pg_snapshot`, `txid_snapshot` and `pg_node_tree`.**  Cast the column to `text` in the query.
+- **A parameter with no type, `record`, `unknown`, `void`, or a kind of type that this version of SqlSource does not know.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand or written by a newer tool.  Run `dotnet sqlsource describe`.
+
+The help of the message names the key of the type to map: its name for a type of `pg_catalog` and for a type of an extension that SqlSource knows, and its schema and name otherwise.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  The query's constant or method is still generated.
+
+See: [Types](postgresql.md#type-map)
+
 ## SQLSRC247
 
 **Npgsql is older than 8.0**
@@ -1578,6 +1605,20 @@ Update the `SqlSource` package when a version that knows the driver is released.
 It has no file and line, and is reported once for the project, only while a query's output is `models` or `codegen` under the `postgres` dialect.
 
 See: [PostgreSQL](postgresql.md)
+
+## SQLSRC249
+
+**Type needs Npgsql**
+
+The project does not reference Npgsql, and a column or a parameter of the query has a type whose C# type depends on it.  It is either a type that Npgsql reads as a type of its own `NpgsqlTypes` namespace, such as `point`, `tsvector` or `int4range`, or a type that Npgsql 8 and 9 read as one C# type and Npgsql 10 as another: `date`, `time`, `cidr`, `daterange` and `datemultirange`, and an array or a domain of one of them.  Without a reference, SqlSource cannot tell which Npgsql the application runs on.  The message names the column or parameter and its type.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC249: The column 'born' has the type 'date', whose C# type depends on Npgsql, and this project does not reference it.  Reference Npgsql, or map it with the type override for the Npgsql the application runs on: date=System.DateTime on Npgsql 8 and 9, date=System.DateOnly on Npgsql 10.
+```
+
+Reference the `Npgsql` package from the project, at the version the application runs on: every type then gets the C# type of that version.  A project that keeps its queries apart from the driver can map each type that differs with the type override instead, for the version the application runs on, as the message says: `<SqlSourceTypeOverrides>date=System.DateOnly time=System.TimeOnly</SqlSourceTypeOverrides>` for Npgsql 10.  An entry for `date` maps an array or a domain of `date` too.  The message offers only C# types that a project without Npgsql can name: for `cidr`, `System.Net.IPNetwork` on Npgsql 10, since Npgsql 8 and 9 read it as a type of `NpgsqlTypes`.  `daterange` and `datemultirange` are read as a type of `NpgsqlTypes` on every version, so for them, as for every other type of the `NpgsqlTypes` namespace, the message says to reference Npgsql, which they need.  Every other type has the same C# type on every version of Npgsql, and needs neither.  The query's constant or method is still generated.
+
+See: [Types](postgresql.md#type-map)
 
 ## SQLSRC250
 

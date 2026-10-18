@@ -6,12 +6,18 @@ namespace SqlSource.Generation.Types;
 /// The key that answered or failed: the type's own, or that of the element or base it was found by.
 /// </param>
 /// <param name="Text">
-/// The C# type as a model writes it, a keyword or <c>global::</c>-qualified, or null when the type has none.
+/// The C# type as a model writes it, a keyword or <c>global::</c>-qualified, or null when the type has none.  A
+/// failure of a type the override names keeps that type here, for its message.
 /// </param>
 /// <param name="IsValueType">Whether the C# type is a value type.</param>
 /// <param name="IsPublic">Whether the C# type is accessible from any assembly.</param>
 /// <param name="IsObsolete">Whether the C# type is marked <c>[Obsolete]</c>.</param>
-/// <param name="Detail">What a failure's message adds, or null.</param>
+/// <param name="Detail">
+/// What a failure's message adds, or null: for <see cref="TypeMappingKind.CastToOid" />, the type to cast to, an
+/// array of <c>oid</c> for an array; for <see cref="TypeMappingKind.DiffersByDriver" />, the entry of the type
+/// override for each driver whose C# type is not of <c>NpgsqlTypes</c>, or null when neither is; and for a failure
+/// of a type the override names, the place that wrote the entry.
+/// </param>
 internal sealed record TypeMapping(
     TypeMappingKind Kind,
     string Key,

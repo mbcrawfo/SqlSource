@@ -300,9 +300,28 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             )
             .WithTrackingName(TrackingNames.MappedTypes);
 
-        // Nothing reports on the mapped types yet.  A step that no output reads never runs, so this one makes the
-        // resolution run, and its caching testable, until the types of the queries read it.
-        context.RegisterSourceOutput(mappedTypes, static (_, _) => { });
+        // The property's type override alone, so that a change to another property types no file again.
+        var projectTypeOverrides = projectLevel.Select(static (level, _) => FileTypesInput.TypeOverridesOf(level));
+
+        // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
+        // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.
+        var fileTypes = sidecarChecks
+            .Combine(parsedFiles.Combine(filesSettings))
+            .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(mappedTypes)))
+            .Select(
+                static (input, _) =>
+                    FileTypesInput.Gather(
+                        input.Left.Left,
+                        input.Left.Right.Left,
+                        input.Left.Right.Right,
+                        input.Right.Left,
+                        input.Right.Right.Left,
+                        input.Right.Right.Right
+                    )
+            )
+            .WithTrackingName(TrackingNames.FileTypesInput)
+            .Select(static (input, _) => QueryTyper.Type(input))
+            .WithTrackingName(TrackingNames.FileTypes);
 
         // Whether a query of the project needs an entry of postgres, whose types the driver decides.  Without one, the
         // driver is not reported on.
@@ -344,6 +363,18 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             static (output, check) =>
             {
                 foreach (var diagnostic in check.Diagnostics)
+                {
+                    output.ReportDiagnostic(diagnostic.ToDiagnostic());
+                }
+            }
+        );
+
+        // Beside the checks' output, so that a change to the types alone reports the checks of no file again.
+        context.RegisterSourceOutput(
+            fileTypes,
+            static (output, types) =>
+            {
+                foreach (var diagnostic in types.Diagnostics)
                 {
                     output.ReportDiagnostic(diagnostic.ToDiagnostic());
                 }

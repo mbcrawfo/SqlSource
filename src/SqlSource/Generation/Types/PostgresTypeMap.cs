@@ -21,6 +21,7 @@ internal static class PostgresTypeMap
     private const string DateTime = "global::System.DateTime";
     private const string DateOnly = "global::System.DateOnly";
     private const string StringKeyword = "string";
+    private const string NpgsqlTypesNamespace = "global::NpgsqlTypes.";
 
     private static readonly string[] BitKeys = ["bit", "varbit"];
 
@@ -64,17 +65,17 @@ internal static class PostgresTypeMap
         var key = KeyOf(type);
         if (!type.TryGetKind(out var kind))
         {
-            return TypeMapping.Failed(TypeMappingKind.Unreadable, key);
+            return TypeMapping.Failed(TypeMappingKind.NotWrittenByTheTool, key);
         }
 
         return kind switch
         {
             PostgresTypeKind.Array => type.Element is { } element
                 ? ArrayOf(Map(element, column, overrideOf))
-                : TypeMapping.Failed(TypeMappingKind.Unreadable, key),
+                : TypeMapping.Failed(TypeMappingKind.NotWrittenByTheTool, key),
             PostgresTypeKind.Domain => type.Base is { } baseType
                 ? Map(baseType, column, overrideOf)
-                : TypeMapping.Failed(TypeMappingKind.Unreadable, key),
+                : TypeMapping.Failed(TypeMappingKind.NotWrittenByTheTool, key),
             PostgresTypeKind.Enum => TypeMapping.Mapped(key, StringKeyword, false),
             PostgresTypeKind.Range or PostgresTypeKind.Multirange => TypeMapping.Failed(
                 TypeMappingKind.UserDefinedRange,
@@ -101,14 +102,16 @@ internal static class PostgresTypeMap
 
     private static bool IsSystemType(PostgresType type) => type.Schema.Equals(SystemSchema, StringComparison.Ordinal);
 
-    private static TypeMapping ArrayOf(TypeMapping element) =>
-        element.Kind == TypeMappingKind.Mapped
-            ? element with
-            {
-                Text = element.Text + "[]",
-                IsValueType = false,
-            }
-            : element;
+    // An array of a type that a cast to oid reads is read by a cast to an array of oid, of the same rank.
+    private static TypeMapping ArrayOf(TypeMapping element)
+    {
+        if (element.Kind == TypeMappingKind.Mapped)
+        {
+            return element with { Text = element.Text + "[]", IsValueType = false };
+        }
+
+        return element.Kind == TypeMappingKind.CastToOid ? element with { Detail = element.Detail + "[]" } : element;
+    }
 
     private static Dictionary<string, Row> BuildRows()
     {
@@ -183,15 +186,8 @@ internal static class PostgresTypeMap
             "regcollation",
             "regdictionary"
         );
-        Add(
-            Row.Refused(TypeMappingKind.Unreadable),
-            "pg_snapshot",
-            "txid_snapshot",
-            "pg_node_tree",
-            "record",
-            "unknown",
-            "void"
-        );
+        Add(Row.Refused(TypeMappingKind.Unreadable), "pg_snapshot", "txid_snapshot", "pg_node_tree");
+        Add(Row.Refused(TypeMappingKind.NotWrittenByTheTool), "record", "unknown", "void");
         return rows;
     }
 
@@ -223,17 +219,18 @@ internal static class PostgresTypeMap
             new(RangeOf(subtype) + "[]", subtypeOn10 is null ? null : RangeOf(subtypeOn10) + "[]", false, true, null);
 
         // With no driver, a type whose two cells are both C# types differs between the drivers, which wins over
-        // needing the driver: only the override can say which one the project runs on.
+        // needing the driver: only the override can say which one the project runs on, and the failure's detail
+        // gives the entry for each.
         public TypeMapping Under(DriverColumn column, string key)
         {
             if (Refusal is { } refusal)
             {
-                return TypeMapping.Failed(refusal, key);
+                return TypeMapping.Failed(refusal, key, refusal == TypeMappingKind.CastToOid ? "oid" : null);
             }
 
             if (column == DriverColumn.None && Npgsql8 is not null && Npgsql10 is not null)
             {
-                return TypeMapping.Failed(TypeMappingKind.DiffersByDriver, key);
+                return TypeMapping.Failed(TypeMappingKind.DiffersByDriver, key, EntriesFor(key, Npgsql8, Npgsql10));
             }
 
             if (column == DriverColumn.None && IsOfNpgsql)
@@ -248,5 +245,26 @@ internal static class PostgresTypeMap
         }
 
         private static string RangeOf(string subtype) => "global::NpgsqlTypes.NpgsqlRange<" + subtype + ">";
+
+        // The type override's entry for each driver whose C# type a project without Npgsql can name, as a user
+        // writes it, without global::.  A type of NpgsqlTypes cannot be found without the driver, so it is left
+        // out, and null when both are.
+        private static string? EntriesFor(string key, string npgsql8, string npgsql10)
+        {
+            var eight = IsOfNpgsqlTypes(npgsql8) ? null : key + "=" + AsWritten(npgsql8) + " on Npgsql 8 and 9";
+            var ten = IsOfNpgsqlTypes(npgsql10) ? null : key + "=" + AsWritten(npgsql10) + " on Npgsql 10";
+            if (eight is null || ten is null)
+            {
+                return eight ?? ten;
+            }
+
+            return eight + ", " + ten;
+        }
+
+        private static bool IsOfNpgsqlTypes(string text) =>
+            text.StartsWith(NpgsqlTypesNamespace, StringComparison.Ordinal);
+
+        // A C# type as a user writes it in the type override, without global::.
+        private static string AsWritten(string text) => text.Replace("global::", string.Empty);
     }
 }

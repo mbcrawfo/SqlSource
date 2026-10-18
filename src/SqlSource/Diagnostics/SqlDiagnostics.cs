@@ -485,6 +485,20 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc245"
     );
 
+    // {0} is the column or parameter, as "column 'id'", {1} its type as the database spells it, and {2} the help,
+    // without its period: the cast for a type Npgsql reads once it is cast, and otherwise the type override's entry
+    // for its key.
+    public static readonly DiagnosticDescriptor TypeHasNoCSharpType = new(
+        id: "SQLSRC246",
+        title: "Type has no C# type",
+        messageFormat: "The {0} has the type '{1}', which SqlSource cannot give a C# type.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc246",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     public static readonly DiagnosticDescriptor NpgsqlTooOld = new(
         id: "SQLSRC247",
         title: "Npgsql is older than 8.0",
@@ -509,6 +523,21 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Info,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc248"
+    );
+
+    // {0} is the column or parameter, as "column 'id'", {1} its type as the database spells it, and {2} the help,
+    // without its period: to reference Npgsql, and for a type whose C# type differs between the drivers, the type
+    // override's entry for each.
+    public static readonly DiagnosticDescriptor TypeNeedsNpgsql = new(
+        id: "SQLSRC249",
+        title: "Type needs Npgsql",
+        messageFormat: "The {0} has the type '{1}', whose C# type depends on Npgsql, and this project does not "
+            + "reference it.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc249",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
     // {0} is the column or parameter, as "column 'id'", {1} the key, {2} the C# type and {3} the place that wrote the
@@ -598,8 +627,10 @@ internal static class SqlDiagnostics
             EngineHasNoTypeMap,
             EntryIsStale,
             OrphanEntry,
+            TypeHasNoCSharpType,
             NpgsqlTooOld,
             NpgsqlNewerThanKnown,
+            TypeNeedsNpgsql,
             MappedTypeNotFound,
             MappedTypeNotAccessible,
             MappedTypeNotAPropertyType

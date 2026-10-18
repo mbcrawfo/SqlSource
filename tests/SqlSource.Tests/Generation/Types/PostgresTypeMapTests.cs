@@ -66,7 +66,12 @@ public sealed class PostgresTypeMapTests
             "public.floatmultirange"
         ),
         ["composite"] = new(User("users", SidecarValues.Kind.Composite), "!Unreadable", false, "public.users"),
-        ["kind this version does not know"] = new(User("users", "table"), "!Unreadable", false, "public.users"),
+        ["kind this version does not know"] = new(
+            User("users", "table"),
+            "!NotWrittenByTheTool",
+            false,
+            "public.users"
+        ),
         ["base type of public that is no extension"] = new(
             User("geometry", SidecarValues.Kind.Base),
             "!Unreadable",
@@ -221,9 +226,9 @@ public sealed class PostgresTypeMapTests
             { "pg_snapshot", "!Unreadable", "!Unreadable", "!Unreadable", false },
             { "txid_snapshot", "!Unreadable", "!Unreadable", "!Unreadable", false },
             { "pg_node_tree", "!Unreadable", "!Unreadable", "!Unreadable", false },
-            { "record", "!Unreadable", "!Unreadable", "!Unreadable", false },
-            { "unknown", "!Unreadable", "!Unreadable", "!Unreadable", false },
-            { "void", "!Unreadable", "!Unreadable", "!Unreadable", false },
+            { "record", "!NotWrittenByTheTool", "!NotWrittenByTheTool", "!NotWrittenByTheTool", false },
+            { "unknown", "!NotWrittenByTheTool", "!NotWrittenByTheTool", "!NotWrittenByTheTool", false },
+            { "void", "!NotWrittenByTheTool", "!NotWrittenByTheTool", "!NotWrittenByTheTool", false },
         };
 
     public static TheoryData<string> KindCases
@@ -329,6 +334,27 @@ public sealed class PostgresTypeMapTests
             false,
             "date"
         );
+    }
+
+    // The detail is the type override's entry for each driver, as a user writes it, with the key the failure has.  A
+    // type of NpgsqlTypes cannot be named without Npgsql, so it is left out, and a type with only such types has none.
+    [Theory]
+    [InlineData("date", "date=System.DateTime on Npgsql 8 and 9, date=System.DateOnly on Npgsql 10")]
+    [InlineData("cidr", "cidr=System.Net.IPNetwork on Npgsql 10")]
+    [InlineData("daterange", null)]
+    [InlineData("datemultirange", null)]
+    public void Map_TypeThatDiffersWithoutTheDriver_NamesTheEntryForEachDriver(string internalName, string? detail) =>
+        PostgresTypeMap.Map(Catalog(internalName), DriverColumn.None).Detail.ShouldBe(detail);
+
+    // The cast reads an array of the type as an array of oid.
+    [Fact]
+    public void Map_TypeReadByACastToOid_NamesTheCastOfItsRank()
+    {
+        PostgresTypeMap.Map(Catalog("regclass"), DriverColumn.Npgsql10).Detail.ShouldBe("oid");
+        PostgresTypeMap.Map(ArrayOf(Catalog("regclass")), DriverColumn.Npgsql10).Detail.ShouldBe("oid[]");
+        PostgresTypeMap
+            .Map(ArrayOf(DomainOf("relation", Catalog("regclass"))), DriverColumn.Npgsql10)
+            .Detail.ShouldBe("oid[]");
     }
 
     [Fact]
