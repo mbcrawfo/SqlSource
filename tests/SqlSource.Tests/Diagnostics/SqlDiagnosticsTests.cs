@@ -12,15 +12,32 @@ namespace SqlSource.Tests.Diagnostics;
 
 public sealed class SqlDiagnosticsTests
 {
+    // The warnings a project may configure, each with a comment on its descriptor that says why.  Every other
+    // diagnostic is an error that a project cannot turn off.
+    private static readonly string[] Configurable = ["SQLSRC240", "SQLSRC245"];
+
     [Fact]
-    public void All_EveryDescriptor_IsAnErrorThatCannotBeConfigured()
+    public void All_EveryDescriptor_IsAnErrorThatCannotBeConfiguredButTheListedWarnings()
     {
         foreach (var descriptor in SqlDiagnostics.All)
         {
-            descriptor.DefaultSeverity.ShouldBe(DiagnosticSeverity.Error, descriptor.Id);
             descriptor.IsEnabledByDefault.ShouldBeTrue(descriptor.Id);
             descriptor.Category.ShouldBe("SqlSource", descriptor.Id);
-            descriptor.CustomTags.ShouldContain(WellKnownDiagnosticTags.NotConfigurable, descriptor.Id);
+            if (Configurable.Contains(descriptor.Id))
+            {
+                descriptor.DefaultSeverity.ShouldBe(DiagnosticSeverity.Warning, descriptor.Id);
+                descriptor.CustomTags.ShouldNotContain(WellKnownDiagnosticTags.NotConfigurable, descriptor.Id);
+            }
+            else
+            {
+                descriptor.DefaultSeverity.ShouldBe(DiagnosticSeverity.Error, descriptor.Id);
+                descriptor.CustomTags.ShouldContain(WellKnownDiagnosticTags.NotConfigurable, descriptor.Id);
+            }
+        }
+
+        foreach (var id in Configurable)
+        {
+            SqlDiagnostics.All.ShouldContain(descriptor => descriptor.Id == id, id);
         }
     }
 
@@ -69,6 +86,73 @@ public sealed class SqlDiagnosticsTests
             .ShouldEndWith("SqlSourceDialect accepts " + SqlDialectName.Accepted + ".");
 
     [Fact]
+    public void SidecarMalformed_Message_HoldsTheReason() =>
+        Format(SqlDiagnostics.SidecarMalformed, "'hash' is missing")
+            .ShouldBe(
+                "The sidecar cannot be read, because 'hash' is missing.  Run 'sqlsource describe' to write it again."
+            );
+
+    [Fact]
+    public void SidecarFormatTooNew_Message_HoldsBothVersions() =>
+        Format(SqlDiagnostics.SidecarFormatTooNew, "2", "1")
+            .ShouldBe(
+                "The sidecar has format 2, and this version of SqlSource reads format 1.  Update the SqlSource package."
+            );
+
+    [Fact]
+    public void SidecarFormatTooOld_Message_HoldsBothVersions() =>
+        Format(SqlDiagnostics.SidecarFormatTooOld, "0", "1")
+            .ShouldBe(
+                "The sidecar has format 0, and this version of SqlSource reads format 1.  Run 'sqlsource describe' to "
+                    + "write it again."
+            );
+
+    [Fact]
+    public void SidecarToolVersionDiffers_Message_HoldsBothVersions() =>
+        Format(SqlDiagnostics.SidecarToolVersionDiffers, "0.2.0-dev", "0.1.0")
+            .ShouldBe(
+                "The sidecar was written by sqlsource 0.2.0-dev, and this project uses SqlSource 0.1.0.  Bring the "
+                    + "tool and the package to one version, and run 'sqlsource describe'."
+            );
+
+    [Fact]
+    public void QueryHasNoEntry_Message_HoldsTheQueryAndTheOutput() =>
+        Format(SqlDiagnostics.QueryHasNoEntry, "GetUser", "models")
+            .ShouldBe(
+                "The query 'GetUser' has no entry in the sidecar of its file, and its output 'models' needs one.  Run "
+                    + "'sqlsource describe'."
+            );
+
+    [Fact]
+    public void EntryEngineDiffers_Message_HoldsTheQueryTheEngineAndTheDialect() =>
+        Format(SqlDiagnostics.EntryEngineDiffers, "GetUser", "mssql", "postgres")
+            .ShouldBe(
+                "The entry of the query 'GetUser' was described for 'mssql', and the dialect of this file is "
+                    + "'postgres'.  Run 'sqlsource describe'."
+            );
+
+    [Fact]
+    public void EngineHasNoTypeMap_Message_HoldsTheDialect() =>
+        Format(SqlDiagnostics.EngineHasNoTypeMap, "mssql")
+            .ShouldBe(
+                "This version of SqlSource has no type map for the dialect 'mssql', so no query of this file can have "
+                    + "models.  Set the output to 'sql'."
+            );
+
+    [Fact]
+    public void EntryIsStale_Message_HoldsTheQuery() =>
+        Format(SqlDiagnostics.EntryIsStale, "GetUser")
+            .ShouldBe("The query 'GetUser' has changed since its entry was written.  Run 'sqlsource describe'.");
+
+    [Fact]
+    public void OrphanEntry_Message_HoldsTheEntry() =>
+        Format(SqlDiagnostics.OrphanEntry, "GetUser")
+            .ShouldBe(
+                "The entry 'GetUser' names no query of the file that needs one.  Run 'sqlsource describe', which "
+                    + "removes it."
+            );
+
+    [Fact]
     public void ForParseError_UndefinedKind_Throws() =>
         Should.Throw<ArgumentOutOfRangeException>(() => SqlDiagnostics.ForParseError((SqlParseErrorKind)(-1)));
 
@@ -113,4 +197,11 @@ public sealed class SqlDiagnosticsTests
         Create(text).ShouldBe(Create(text));
         Create(text).GetHashCode().ShouldBe(Create(text).GetHashCode());
     }
+
+    private static string Format(DiagnosticDescriptor descriptor, params object[] arguments) =>
+        string.Format(
+            CultureInfo.InvariantCulture,
+            descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
+            arguments
+        );
 }

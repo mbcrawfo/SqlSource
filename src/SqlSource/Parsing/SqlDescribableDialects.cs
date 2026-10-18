@@ -4,7 +4,7 @@ namespace SqlSource.Parsing;
 
 /// <summary>
 /// The dialects whose database can be asked to describe a query.  An output of <c>Models</c> or <c>CodeGen</c> needs
-/// one of them.  The <c>sqlsource</c> tool reads this list, and the generator will.
+/// one of them.  The <c>sqlsource</c> tool reads this list, and so does the generator.
 /// </summary>
 internal static class SqlDescribableDialects
 {

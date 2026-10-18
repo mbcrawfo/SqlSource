@@ -197,10 +197,6 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (files, _) => ToSorted(files, static file => file.SqlPath))
             .WithTrackingName(TrackingNames.Sidecars);
 
-        // The checks of the sidecars will report from here.  Until then it reports nothing, and keeps the steps above
-        // tracked: the driver tracks a step only when what it gives reaches an output.
-        context.RegisterSourceOutput(sidecars, static (_, _) => { });
-
         // Stage two of the settings: the metadata of the files that have any, which are few.  It never reaches the
         // parse of a file.
         var filesSettings = fileMetadata
@@ -240,17 +236,53 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (names, _) => HintName.FindAmbiguous(names))
             .WithTrackingName(TrackingNames.AmbiguousHintNames);
 
-        // The properties join after a type's queries are selected, so that they never reach the parse of a file.
-        var typeOutputs = typeFiles
+        var typeQueries = typeFiles
             .Combine(parsedFiles)
             .Combine(ambiguousHintNames.Combine(filesSettings))
             .Select(
                 static (input, _) => SelectFiles(input.Left.Left, input.Left.Right, input.Right.Left, input.Right.Right)
             )
-            .WithTrackingName(TrackingNames.TypeQueries)
-            .Combine(projectSettings.Select(static (settings, _) => settings.Level))
+            .WithTrackingName(TrackingNames.TypeQueries);
+
+        // The properties join after a type's queries are selected, so that they never reach the parse of a file.
+        var projectLevel = projectSettings.Select(static (settings, _) => settings.Level);
+
+        var typeOutputs = typeQueries
+            .Combine(projectLevel)
             .Select(static (input, _) => TypeEmitter.Emit(input.Left, input.Right))
             .WithTrackingName(TrackingNames.TypeOutput);
+
+        // What every type needs of each file, merged and sorted by path, so that a file finds its needs with a search.
+        // A change to a type that leaves what it needs alone gives an equal value and checks nothing again.
+        var fileNeeds = typeQueries
+            .Combine(projectLevel)
+            .Select(static (input, _) => SidecarNeeds.OfType(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.TypeNeeds)
+            .SelectMany(static (files, _) => files)
+            .Collect()
+            .Select(static (files, _) => SidecarNeeds.Merge(files))
+            .WithTrackingName(TrackingNames.FileNeeds);
+
+        // One check for each claimed file, whatever the number of its types, so that each problem is reported once.
+        // Each file gathers its own sidecar and needs, so an edit to one file or one sidecar checks that file alone.
+        var sidecarChecks = parsedFiles
+            .SelectMany(static (files, _) => files)
+            .Combine(fileNeeds.Combine(sidecars))
+            .Select(static (input, _) => SidecarCheckInput.Gather(input.Left, input.Right.Left, input.Right.Right))
+            .WithTrackingName(TrackingNames.SidecarCheckInput)
+            .Select(static (input, _) => SidecarChecker.Check(input))
+            .WithTrackingName(TrackingNames.SidecarCheck);
+
+        context.RegisterSourceOutput(
+            sidecarChecks,
+            static (output, check) =>
+            {
+                foreach (var diagnostic in check.Diagnostics)
+                {
+                    output.ReportDiagnostic(diagnostic.ToDiagnostic());
+                }
+            }
+        );
 
         context.RegisterSourceOutput(
             typeOutputs,

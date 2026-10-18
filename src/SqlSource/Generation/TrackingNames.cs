@@ -46,4 +46,12 @@ internal static class TrackingNames
     public const string SidecarFile = nameof(SidecarFile);
 
     public const string Sidecars = nameof(Sidecars);
+
+    public const string TypeNeeds = nameof(TypeNeeds);
+
+    public const string FileNeeds = nameof(FileNeeds);
+
+    public const string SidecarCheckInput = nameof(SidecarCheckInput);
+
+    public const string SidecarCheck = nameof(SidecarCheck);
 }

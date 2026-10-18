@@ -37,8 +37,12 @@ public sealed class ToolDiagnosticsTests
     }
 
     [Fact]
-    public void All_Ids_ComeAfterEveryIdOfTheGenerator() =>
-        string.CompareOrdinal(SqlDiagnostics.All[^1].Id, ToolDiagnostics.All[0].Id).ShouldBeLessThan(0);
+    public void All_Ids_AreUniqueAcrossBothClasses()
+    {
+        var ids = SqlDiagnostics.All.Concat(ToolDiagnostics.All).Select(descriptor => descriptor.Id).ToArray();
+
+        ids.ShouldBeUnique();
+    }
 
     [Fact]
     public void All_HelpLinks_PointAtTheDescriptorsSectionOfTheDiagnosticsDocument()

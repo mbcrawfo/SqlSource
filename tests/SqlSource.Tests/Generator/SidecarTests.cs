@@ -1,0 +1,567 @@
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Microsoft.CodeAnalysis;
+using Shouldly;
+using SqlSource.Generation;
+using SqlSource.Generation.Sidecars;
+using SqlSource.Parsing;
+using SqlSource.Snapshot;
+using SqlSource.Testing.Generator;
+using Xunit;
+using OutputKind = SqlSource.Settings.OutputKind;
+
+namespace SqlSource.Tests.Generator;
+
+// The checks of each claimed file's sidecar against what the types that claim the file need: each diagnostic, where
+// it is, and which entries the checks leave usable.  The usable entries are read from what the step of the checks
+// gave, since nothing of the generator reads them yet.
+public sealed class SidecarTests
+{
+    private const string UsersPath = "/app/Repo/Users.sql";
+
+    private const string SidecarPath = UsersPath + ".json";
+
+    // The name of GetUser in Users.
+    private const string GetUserName = "/app/Repo/Users.sql(1,10)-(1,17)";
+
+    // The start of the sidecar of Users.
+    private const string SidecarStart = "/app/Repo/Users.sql.json(1,1)-(1,1)";
+
+    private const string Source = """
+        using SqlSource;
+
+        namespace App;
+
+        [SqlSourceGenerate]
+        public partial class Sample;
+        """;
+
+    private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT 1;\n");
+
+    [Fact]
+    public void Run_MalformedSidecar_IsSqlsrc237AtTheError()
+    {
+        var run = Run(
+            OutputKind.Models,
+            Users,
+            Sidecars.Raw(
+                Users, /*lang=json,strict*/
+                "{\n  \"formatVersion\": \"one\"\n}\n"
+            )
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC237 /app/Repo/Users.sql.json(2,20)-(2,25): The sidecar cannot be read, because 'formatVersion' has "
+                + "a value of the wrong type.  Run 'sqlsource describe' to write it again.",
+        ]);
+        SeverityOf(run, "SQLSRC237").ShouldBe(DiagnosticSeverity.Error);
+        UsableEntries(run).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_SidecarOfANewerFormat_IsSqlsrc238AtTheStart()
+    {
+        var run = Run(
+            OutputKind.Models,
+            Users,
+            Sidecars.Of(Users, SidecarFormat.Version + 1, PackageVersion.Prefix, CurrentEntry(Users, "GetUser"))
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC238 {SidecarStart}: The sidecar has format 2, and this version of SqlSource reads format 1.  "
+                + "Update the SqlSource package.",
+        ]);
+        SeverityOf(run, "SQLSRC238").ShouldBe(DiagnosticSeverity.Error);
+        UsableEntries(run).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_SidecarOfAnOlderFormat_IsSqlsrc239AtTheStart()
+    {
+        var run = Run(
+            OutputKind.Models,
+            Users,
+            Sidecars.Of(Users, SidecarFormat.Version - 1, PackageVersion.Prefix, CurrentEntry(Users, "GetUser"))
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC239 {SidecarStart}: The sidecar has format 0, and this version of SqlSource reads format 1.  Run "
+                + "'sqlsource describe' to write it again.",
+        ]);
+        SeverityOf(run, "SQLSRC239").ShouldBe(DiagnosticSeverity.Error);
+        UsableEntries(run).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_SidecarOfAnotherToolVersion_IsAWarningAndTheEntryIsUsed()
+    {
+        var run = Run(
+            OutputKind.Models,
+            Users,
+            Sidecars.Of(Users, SidecarFormat.Version, "99.0.0-dev", CurrentEntry(Users, "GetUser"))
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC240 {SidecarStart}: The sidecar was written by sqlsource 99.0.0-dev, and this project uses "
+                + $"SqlSource {PackageVersion.Prefix}.  Bring the tool and the package to one version, and run "
+                + "'sqlsource describe'.",
+        ]);
+        SeverityOf(run, "SQLSRC240").ShouldBe(DiagnosticSeverity.Warning);
+        UsableEntries(run).ShouldBe(["GetUser"]);
+    }
+
+    [Fact]
+    public void Run_QueryWithoutAnEntry_IsSqlsrc241AtTheQuery()
+    {
+        const string Expected =
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+            + "'models' needs one.  Run 'sqlsource describe'.";
+
+        var withoutSidecar = Run(OutputKind.Models, Users);
+        var withoutEntry = Run(OutputKind.Models, Users, Sidecars.Of(Users));
+
+        withoutSidecar.Diagnostics.ShouldBe([Expected]);
+        SeverityOf(withoutSidecar, "SQLSRC241").ShouldBe(DiagnosticSeverity.Error);
+        UsableEntries(withoutSidecar).ShouldBeEmpty();
+        withoutEntry.Diagnostics.ShouldBe([Expected]);
+        UsableEntries(withoutEntry).ShouldBeEmpty();
+    }
+
+    // An engine nobody knows is not a crash, and is never usable.
+    [Theory]
+    [InlineData("mssql")]
+    [InlineData("oracle")]
+    public void Run_EntryOfAnotherEngine_IsSqlsrc242(string engine)
+    {
+        var entry = Sidecars.Entry("GetUser", Sidecars.HashOf(Users, "GetUser", SqlDialect.PostgreSql), engine);
+
+        var run = Run(OutputKind.Models, Users, Sidecars.Of(Users, entry));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC242 {GetUserName}: The entry of the query 'GetUser' was described for '{engine}', and the dialect "
+                + "of this file is 'postgres'.  Run 'sqlsource describe'.",
+        ]);
+        SeverityOf(run, "SQLSRC242").ShouldBe(DiagnosticSeverity.Error);
+        UsableEntries(run).ShouldBeEmpty();
+    }
+
+    // The tool cannot give such a file an entry yet, so its queries get no error of their own.
+    [Fact]
+    public void Run_MssqlFileAtModels_IsOneSqlsrc243AndNoSqlsrc241()
+    {
+        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n");
+
+        var run = Run(OutputKind.Models, [users], "mssql");
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC243 {GetUserName}: This version of SqlSource has no type map for the dialect 'mssql', so no query "
+                + "of this file can have models.  Set the output to 'sql'.",
+        ]);
+        SeverityOf(run, "SQLSRC243").ShouldBe(DiagnosticSeverity.Error);
+        UsableEntries(run).ShouldBeEmpty();
+    }
+
+    // An entry that would pass under another type map is still not usable, and the checks of the sidecar itself and
+    // of its orphans still run.
+    [Fact]
+    public void Run_MssqlFileAtModelsWithASidecar_IsSqlsrc243AndTheSidecarsOwnErrors()
+    {
+        var current = Sidecars.Entry("GetUser", Sidecars.HashOf(Users, "GetUser", SqlDialect.SqlServer), "mssql");
+        const string NoTypeMap =
+            $"SQLSRC243 {GetUserName}: This version of SqlSource has no type map for the dialect 'mssql', so no query "
+            + "of this file can have models.  Set the output to 'sql'.";
+
+        var withEntries = Run(
+            OutputKind.Models,
+            [Users, Sidecars.Of(Users, current, Sidecars.Entry("Gone", "h", "mssql"))],
+            "mssql"
+        );
+        var malformed = Run(OutputKind.Models, [Users, Sidecars.Raw(Users, "")], "mssql");
+
+        withEntries.Diagnostics.ShouldBe([
+            NoTypeMap,
+            "SQLSRC245 /app/Repo/Users.sql.json(15,5)-(15,11): The entry 'Gone' names no query of the file that needs "
+                + "one.  Run 'sqlsource describe', which removes it.",
+        ]);
+        UsableEntries(withEntries).ShouldBeEmpty();
+        malformed.Diagnostics.ShouldBe([
+            NoTypeMap,
+            $"SQLSRC237 {SidecarStart}: The sidecar cannot be read, because it is not one JSON object.  Run "
+                + "'sqlsource describe' to write it again.",
+        ]);
+        UsableEntries(malformed).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_StaleEntry_IsSqlsrc244()
+    {
+        var run = Run(OutputKind.Models, Users, Sidecars.Of(Users, Sidecars.Entry("GetUser", "stale")));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC244 {GetUserName}: The query 'GetUser' has changed since its entry was written.  Run 'sqlsource "
+                + "describe'.",
+        ]);
+        SeverityOf(run, "SQLSRC244").ShouldBe(DiagnosticSeverity.Error);
+        UsableEntries(run).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_OrphanEntry_IsAWarningAtItsKey()
+    {
+        var run = Run(
+            OutputKind.Models,
+            Users,
+            Sidecars.Of(Users, CurrentEntry(Users, "GetUser"), Sidecars.Entry("Gone", "h"))
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC245 /app/Repo/Users.sql.json(15,5)-(15,11): The entry 'Gone' names no query of the file that needs "
+                + "one.  Run 'sqlsource describe', which removes it.",
+        ]);
+        SeverityOf(run, "SQLSRC245").ShouldBe(DiagnosticSeverity.Warning);
+        UsableEntries(run).ShouldBe(["GetUser"]);
+    }
+
+    // A file with parse errors has no queries, so every entry would be an orphan on each keystroke that leaves a
+    // typo.  Only the checks of the sidecar itself run.
+    [Fact]
+    public void Run_FileWithParseErrors_GetsNoOrphanAndNoQueryError()
+    {
+        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1;\n\n-- name: GetUser\nSELECT 2;\n");
+        const string DuplicateName =
+            "SQLSRC104 /app/Repo/Users.sql(4,10)-(4,17): The query name 'GetUser' is used more than once in this file";
+
+        var withEntry = Run(OutputKind.Models, users, Sidecars.Of(users, Sidecars.Entry("GetUser", "h")));
+        var malformed = Run(OutputKind.Models, users, Sidecars.Raw(users, ""));
+
+        withEntry.Diagnostics.ShouldBe([DuplicateName]);
+        UsableEntries(withEntry).ShouldBeEmpty();
+        malformed.Diagnostics.ShouldBe(
+            [
+                DuplicateName,
+                $"SQLSRC237 {SidecarStart}: The sidecar cannot be read, because it is not one JSON object.  Run "
+                    + "'sqlsource describe' to write it again.",
+            ],
+            ignoreOrder: true
+        );
+    }
+
+    [Fact]
+    public void Run_SidecarOfAFileNoTypeClaims_IsNotRead()
+    {
+        var source = Source.Replace(
+            "[SqlSourceGenerate]",
+            "[SqlSourceGenerate(Path = \"Users.sql\")]",
+            StringComparison.Ordinal
+        );
+        var orders = new SqlFile("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
+
+        var run = GeneratorHarness.Run(
+            OutputKind.Models,
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [Users, Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser"), orders, Sidecars.Raw(orders, "{")],
+            dialect: "postgres"
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        Outputs<SidecarFile>(run, TrackingNames.SidecarFile).Select(file => file.Path).ShouldBe([SidecarPath]);
+    }
+
+    [Fact]
+    public void Run_SidecarWithoutItsSqlFile_IsIgnored()
+    {
+        var gone = new SqlFile("/app/Repo/Gone.sql", null);
+
+        var run = Run(
+            OutputKind.Models,
+            Users,
+            Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser"),
+            Sidecars.Raw(gone, "{")
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        UsableEntries(run).ShouldBe(["GetUser"]);
+    }
+
+    [Fact]
+    public void Run_FileAtSqlWithoutASidecar_GetsNothing()
+    {
+        var run = Run(OutputKind.Sql, Users);
+
+        run.Diagnostics.ShouldBeEmpty();
+        Outputs<SidecarCheck>(run, TrackingNames.SidecarCheck).ShouldAllBe(check => check.Diagnostics.Count == 0);
+        run.Sources.Keys.ShouldContain("App.Sample.g.cs");
+    }
+
+    // Every sidecar of a claimed file is read, whatever its queries need.
+    [Fact]
+    public void Run_MalformedSidecarOfAFileAtSql_IsSqlsrc237()
+    {
+        var run = Run(
+            OutputKind.Sql,
+            Users,
+            Sidecars.Raw(
+                Users, /*lang=json,strict*/
+                "{\n  \"formatVersion\": \"one\"\n}\n"
+            )
+        );
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC237 /app/Repo/Users.sql.json(2,20)-(2,25): The sidecar cannot be read, because 'formatVersion' has "
+                + "a value of the wrong type.  Run 'sqlsource describe' to write it again.",
+        ]);
+    }
+
+    [Fact]
+    public void Run_EmptySidecar_IsSqlsrc237AtTheStart()
+    {
+        var run = Run(OutputKind.Models, Users, Sidecars.Raw(Users, ""));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC237 {SidecarStart}: The sidecar cannot be read, because it is not one JSON object.  Run "
+                + "'sqlsource describe' to write it again.",
+        ]);
+        UsableEntries(run).ShouldBeEmpty();
+    }
+
+    // Names are compared ordinally, as C# compares the members they become.
+    [Fact]
+    public void Run_EntryNamedByAnotherCase_IsMissingAndAnOrphan()
+    {
+        var entry = Sidecars.Entry("getuser", Sidecars.HashOf(Users, "GetUser", SqlDialect.PostgreSql));
+
+        var run = Run(OutputKind.Models, Users, Sidecars.Of(Users, entry));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                + "'models' needs one.  Run 'sqlsource describe'.",
+            "SQLSRC245 /app/Repo/Users.sql.json(7,5)-(7,14): The entry 'getuser' names no query of the file that needs "
+                + "one.  Run 'sqlsource describe', which removes it.",
+        ]);
+        UsableEntries(run).ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Run_QueryAtModelsAndQueryAtSql_OnlyTheFirstNeedsAnEntry()
+    {
+        var users = new SqlFile(
+            UsersPath,
+            "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\n-- output: sql\nSELECT 2;\n"
+        );
+
+        var withoutSidecar = Run(OutputKind.Models, users);
+        var run = Run(
+            OutputKind.Models,
+            users,
+            Sidecars.Of(users, CurrentEntry(users, "GetUser"), CurrentEntry(users, "CountUsers"))
+        );
+
+        withoutSidecar.Diagnostics.ShouldBe([
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                + "'models' needs one.  Run 'sqlsource describe'.",
+        ]);
+        run.Diagnostics.ShouldBe([
+            "SQLSRC245 /app/Repo/Users.sql.json(15,5)-(15,17): The entry 'CountUsers' names no query of the file that "
+                + "needs one.  Run 'sqlsource describe', which removes it.",
+        ]);
+        UsableEntries(run).ShouldBe(["GetUser"]);
+    }
+
+    // The first type needs nothing, and the second every query: the file needs what the second needs, and is checked
+    // once.
+    [Fact]
+    public void Run_TwoTypesClaimingOneFile_ReportOnceAndNeedTheUnion()
+    {
+        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n");
+
+        var run = RunTwoTypes(
+            "Output = GeneratorOutput.Sql",
+            "Output = GeneratorOutput.Models",
+            users,
+            Sidecars.Of(users, CurrentEntry(users, "CountUsers"))
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                + "'models' needs one.  Run 'sqlsource describe'.",
+        ]);
+        UsableEntries(run).ShouldBe(["CountUsers"]);
+        run.Sources.Keys.ShouldContain("App.First.g.cs");
+        run.Sources.Keys.ShouldContain("App.Second.g.cs");
+    }
+
+    // Both types need the entry: one error, which names the greater of the two outputs.
+    [Fact]
+    public void Run_TwoTypesThatNeedOneEntry_ReportItOnceWithTheGreatestOutput()
+    {
+        var run = RunTwoTypes("Output = GeneratorOutput.Models", "Output = GeneratorOutput.CodeGen", Users);
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                + "'codegen' needs one.  Run 'sqlsource describe'.",
+        ]);
+    }
+
+    // A type with an error of its own gets no code, but the tool describes its files all the same, so what it needs
+    // counts: its entry is no orphan, and a missing one is reported.
+    [Fact]
+    public void Run_TypeWithAnErrorOfItsOwn_StillNeedsItsEntries()
+    {
+        var source = Source.Replace("public partial class", "public class", StringComparison.Ordinal);
+        const string NotPartial =
+            "SQLSRC001 /app/Repo/Sample.cs(6,14)-(6,20): 'Sample' must be declared partial so that SqlSource can add "
+            + "members to it";
+
+        var withEntry = GeneratorHarness.Run(
+            OutputKind.Models,
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [Users, Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser")],
+            dialect: "postgres"
+        );
+        var withoutEntry = GeneratorHarness.Run(
+            OutputKind.Models,
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
+            [Users, Sidecars.Of(Users)],
+            dialect: "postgres"
+        );
+
+        withEntry.Diagnostics.ShouldBe([NotPartial]);
+        UsableEntries(withEntry).ShouldBe(["GetUser"]);
+        withoutEntry.Diagnostics.ShouldBe(
+            [
+                NotPartial,
+                $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                    + "'models' needs one.  Run 'sqlsource describe'.",
+            ],
+            ignoreOrder: true
+        );
+    }
+
+    [Fact]
+    public void Run_ToolVersionWithASuffix_MatchesThePrefix()
+    {
+        var run = Run(
+            OutputKind.Models,
+            Users,
+            Sidecars.Of(Users, SidecarFormat.Version, PackageVersion.Prefix + "-dev", CurrentEntry(Users, "GetUser"))
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        UsableEntries(run).ShouldBe(["GetUser"]);
+    }
+
+    // The positions are those of the file as it is, the byte order mark included.
+    [Fact]
+    public void Run_SidecarWithAByteOrderMark_IsRead()
+    {
+        var sidecar = Sidecars.Of(Users, CurrentEntry(Users, "GetUser"), Sidecars.Entry("Gone", "h"));
+
+        var run = Run(OutputKind.Models, Users, Sidecars.Raw(Users, "﻿" + sidecar.Text));
+
+        run.Diagnostics.ShouldBe([
+            "SQLSRC245 /app/Repo/Users.sql.json(15,5)-(15,11): The entry 'Gone' names no query of the file that needs "
+                + "one.  Run 'sqlsource describe', which removes it.",
+        ]);
+        UsableEntries(run).ShouldBe(["GetUser"]);
+    }
+
+    // The later of two paths that differ only by case is left out, as the later of two such .sql files is.
+    [Fact]
+    public void Run_TwoSidecarsThatDifferOnlyByCase_ReadTheFirst()
+    {
+        var current = Sidecars.Current(Users, SqlDialect.PostgreSql, "GetUser");
+        var other = new SqlFile("/app/Repo/users.sql.json", "{");
+
+        var run = Run(OutputKind.Models, Users, current, other);
+        var reversed = Run(OutputKind.Models, Users, other, current);
+
+        run.Diagnostics.ShouldBeEmpty();
+        UsableEntries(run).ShouldBe(["GetUser"]);
+        reversed.Diagnostics.ShouldBe([
+            "SQLSRC237 /app/Repo/users.sql.json(1,2)-(1,2): The sidecar cannot be read, because it is not one JSON "
+                + "object.  Run 'sqlsource describe' to write it again.",
+        ]);
+        UsableEntries(reversed).ShouldBeEmpty();
+    }
+
+    // The anti-goal: whatever a sidecar holds, an entry that failed a check is never usable.
+    [Fact]
+    public void Run_EveryCheck_GivesNoUsableEntryThatFailedOne()
+    {
+        var users = new SqlFile(
+            UsersPath,
+            "-- name: Current\nSELECT 1;\n\n-- name: Stale\nSELECT 2;\n\n-- name: Missing\nSELECT 3;\n\n"
+                + "-- name: OtherEngine\nSELECT 4;\n"
+        );
+        var orders = new SqlFile("/app/Repo/Orders.sql", "-- name: GetOrder\nSELECT 5;\n");
+        var items = new SqlFile("/app/Repo/Items.sql", "-- name: GetItem\nSELECT 6;\n");
+        var otherEngine = Sidecars.Entry(
+            "OtherEngine",
+            Sidecars.HashOf(users, "OtherEngine", SqlDialect.PostgreSql),
+            "mssql"
+        );
+
+        var run = Run(
+            OutputKind.Models,
+            users,
+            Sidecars.Of(users, CurrentEntry(users, "Current"), Sidecars.Entry("Stale", "stale"), otherEngine),
+            orders,
+            Sidecars.Raw(orders, WithHashAsANumber(Sidecars.Of(orders, CurrentEntry(orders, "GetOrder")).Text!)),
+            items,
+            Sidecars.Of(items, SidecarFormat.Version + 1, PackageVersion.Prefix, CurrentEntry(items, "GetItem"))
+        );
+
+        run.Diagnostics.Select(diagnostic => diagnostic[..9])
+            .ShouldBe(["SQLSRC238", "SQLSRC237", "SQLSRC244", "SQLSRC241", "SQLSRC242"], ignoreOrder: true);
+        UsableEntries(run).ShouldBe(["Current"]);
+    }
+
+    private static GeneratorRun Run(OutputKind output, params SqlFile[] files) => Run(output, files, "postgres");
+
+    private static GeneratorRun Run(OutputKind output, SqlFile[] files, string dialect) =>
+        GeneratorHarness.Run(output, [new SourceFile(GeneratorHarness.SourcePath, Source)], files, dialect: dialect);
+
+    // Two types in one folder, which both claim its files, each with the arguments of its attribute.  The project is
+    // at Sql, so the attributes decide.
+    private static GeneratorRun RunTwoTypes(string first, string second, params SqlFile[] files) =>
+        GeneratorHarness.Run(
+            OutputKind.Sql,
+            [
+                new SourceFile(
+                    GeneratorHarness.SourcePath,
+                    $"using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate({first})]\n"
+                        + "public partial class First;\n\n"
+                        + $"[SqlSourceGenerate({second})]\npublic partial class Second;\n"
+                ),
+            ],
+            files,
+            dialect: "postgres"
+        );
+
+    // The text of a sidecar whose hash is a number, which makes it malformed: every other key is as it was.
+    private static string WithHashAsANumber(string text) =>
+        text.Replace("\"hash\": ", "\"hash\": 1, \"was\": ", StringComparison.Ordinal);
+
+    // A current entry of the query under postgres.
+    private static SidecarEntry CurrentEntry(SqlFile file, string name) =>
+        Sidecars.Entry(name, Sidecars.HashOf(file, name, SqlDialect.PostgreSql));
+
+    private static DiagnosticSeverity SeverityOf(GeneratorRun run, string id) =>
+        run.Result.Diagnostics.Single(diagnostic => diagnostic.Id == id).Severity;
+
+    // The names of the usable entries of every file, from what the step of the checks gave.
+    private static string[] UsableEntries(GeneratorRun run) =>
+        [
+            .. Outputs<SidecarCheck>(run, TrackingNames.SidecarCheck)
+                .SelectMany(check => check.UsableEntries)
+                .Select(entry => entry.Name),
+        ];
+
+    private static IEnumerable<T> Outputs<T>(GeneratorRun run, string step) =>
+        run.Result.Results.Single().TrackedSteps.TryGetValue(step, out var runs)
+            ? runs.SelectMany(stepRun => stepRun.Outputs).Select(output => (T)output.Value)
+            : [];
+}

@@ -2,7 +2,7 @@ namespace SqlSource;
 
 /// <summary>
 /// The version of the package, as <c>major.minor.patch</c>: what the tool writes as a sidecar's <c>toolVersion</c>
-/// and compares a committed sidecar's with.
+/// and compares a committed sidecar's with, and what the generator compares the prefix of a sidecar's with.
 /// </summary>
 internal static class PackageVersion
 {

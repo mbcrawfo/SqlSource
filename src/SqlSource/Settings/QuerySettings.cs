@@ -4,7 +4,9 @@ namespace SqlSource.Settings;
 /// The settings in effect for one query, for one type that claims its file.
 /// </summary>
 /// <param name="Parameters">The list of generator parameters.</param>
-/// <param name="Output">What is generated for the query.  It has no effect yet.</param>
+/// <param name="Output">
+/// What is generated for the query.  So far it decides only whether the query needs an entry in its file's sidecar.
+/// </param>
 /// <param name="InputModelSuffix">What ends the name of the type of the query's parameters.</param>
 /// <param name="OutputModelSuffix">What ends the name of the type of a row of the query's result.</param>
 /// <param name="ModelNamespace">The namespace of the query's models, or null for the namespace of the type.</param>
@@ -37,7 +39,7 @@ internal readonly record struct QuerySettings(
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
     /// the attribute, then the metadata of the file's item, then the project's property, then the default.  Only
-    /// <see cref="Parameters" /> has an effect yet.
+    /// <see cref="Parameters" /> and <see cref="Output" /> have an effect yet.
     /// </summary>
     public static QuerySettings Resolve(
         SettingsLevel markers,
