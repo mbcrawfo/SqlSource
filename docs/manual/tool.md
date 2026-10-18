@@ -7,9 +7,9 @@ $ dotnet sqlsource describe --connection billing="Host=localhost;Database=billin
 billing (postgres): 4 described, 0 skipped, 0 failed
 ```
 
-The tool is optional.  The generator writes a constant or a token method for every query without it.  The tool is for queries that will get types: their models and query methods, which come in a later release, are built from the sidecars.
+The generator writes a constant or a token method for every query, with the tool or without it.  The tool is for the queries that must be described, those whose [output](settings.md#setting-output) is `models` or `codegen`, the default: the build checks each of them against its file's sidecar, and reports one that has no current entry there.  A project whose queries all have the output `sql` needs no tool.
 
-> **Coming in a later release.**  The generator will read the sidecars that the tool writes to generate typed models and query methods.  Nothing in a build reads one today.  See [what works today](README.md#what-works-today).
+> **Coming in a later release.**  The generator will build typed models and query methods from the sidecars that the tool writes.  See [what works today](README.md#what-works-today).
 
 This page has two parts: [the workflow](#install-the-tool), from installing the tool to checking the sidecars in CI, and [the command reference](#command-reference).
 
@@ -95,7 +95,18 @@ Queries/
     Users.sql.json      written by sqlsource describe
 ```
 
-**Commit the sidecars with the project.**  The build will read them in place of a database, so that every developer and every build server gets the same generated code without a connection.  Only the person who changes a query, or the schema, needs a database to describe it again.
+**Commit the sidecars with the project.**  The build reads them in place of a database, so that every developer and every build server builds without a connection.  A copy of the project without them reports [SQLSRC241](diagnostics.md#sqlsrc241) for each query that must be described.  Only the person who changes a query, or the schema, needs a database to describe it again.
+
+To show each sidecar under its `.sql` file in Visual Studio Code, which nests files by a setting of its own, add this to your settings:
+
+```json
+{
+    "explorer.fileNesting.enabled": true,
+    "explorer.fileNesting.patterns": {
+        "*.sql": "${capture}.sql.json"
+    }
+}
+```
 
 **Never edit a sidecar by hand.**  The tool writes it whole.  To change what a sidecar says, change the query or the schema and run `describe` again.  A sidecar with a merge conflict is no exception: run `describe` after the merge, and it writes the file again.
 
@@ -108,6 +119,8 @@ To keep the sidecars current:
 | You update the tool | `dotnet sqlsource describe`, which describes every query again |
 | On a build server, to catch a sidecar that someone forgot | `dotnet sqlsource describe --check`: see [check in CI](#check-in-ci) |
 
+The build tells you when a sidecar is not current.  A query without an entry is [SQLSRC241](diagnostics.md#sqlsrc241), and one that changed since its entry was written is [SQLSRC244](diagnostics.md#sqlsrc244).  An entry that names no query that must be described is the warning [SQLSRC245](diagnostics.md#sqlsrc245), and a sidecar that another version of the tool wrote the warning [SQLSRC240](diagnostics.md#sqlsrc240).  Each of the first three goes away when you run `describe` and commit what it writes.  SQLSRC240 goes away once the tool and the `SqlSource` package have one version and `describe` has run with that tool.  A sidecar with a merge conflict in it is [SQLSRC237](diagnostics.md#sqlsrc237).
+
 The format of a sidecar is described by its JSON Schema, [`sidecar-v1.schema.json`](../../schemas/sidecar-v1.schema.json), for the curious.  Nothing in this manual depends on it.
 
 <a id="describing-again"></a>
@@ -119,7 +132,7 @@ The format of a sidecar is described by its JSON Schema, [`sidecar-v1.schema.jso
 - The query's SQL.  A change to a comment alone does not count.
 - A `-- param:` marker of the query, or the default of one of its tokens.
 - The query's dialect, or its [logical database](#connections).
-- The version of the tool: a sidecar written by another version is described again whole.
+- The version of the tool: a sidecar written by another version is described again whole.  Until it is, the build warns of it ([SQLSRC240](diagnostics.md#sqlsrc240)).
 
 The tool cannot see a change to the schema, so a query whose SQL is as it was is skipped even when its table changed.  That is what `--force` is for.
 
@@ -156,7 +169,7 @@ $ SQLSOURCE_CONNECTION_BILLING="$BILLING_CONNECTION" dotnet sqlsource describe -
 billing (postgres): 15 same, 1 differ, 0 failed
 ```
 
-`--check` is the command for a build server.  It describes every query of the run, as `--force` does, compares what the database says with the sidecars in the repository, and changes no file.  A sidecar that is missing or out of date is [SQLSRC219](diagnostics.md#sqlsrc219), which names the query and what differs, and its `help:` line names the command that fixes it.  For a whole GitHub Actions job, see [the recipe](recipes.md#check-sidecars-in-ci).
+`--check` is the command for a build server.  It describes every query of the run, as `--force` does, compares what the database says with the sidecars in the repository, and changes no file.  A sidecar that is missing or out of date is [SQLSRC219](diagnostics.md#sqlsrc219), which names the query and what differs, and its `help:` line names the command that fixes it.  The build already reports an entry that is missing or older than its query; `--check` also finds one that a change to the schema made wrong, which the build cannot see.  For a whole GitHub Actions job, see [the recipe](recipes.md#check-sidecars-in-ci).
 
 - **It needs a database with your schema**, such as one the job creates and migrates, and a connection for every database of the run.
 - **It compares what changes generated code**: the queries, their parameters and columns, their types and whether they can be null.  It does not compare the versions of the tool or of the server, so a sidecar that a developer wrote passes against a server of another patch release.
@@ -303,8 +316,8 @@ $ dotnet sqlsource describe --log sqlsource.log
 ## Known issues
 
 - **A project path or a `.sql` path through a symbolic link is not found.**  When the current folder is reached through a symbolic link and you give a full path that goes through the link, the tool compares it with the real path and finds no match: `--project` reports [SQLSRC207](diagnostics.md#sqlsrc207), and a `.sql` path [SQLSRC212](diagnostics.md#sqlsrc212), though the file is there.  The message shows both spellings.  Give the path relative to the current folder, or the full real path.
-- **A project with several target frameworks is read for its first framework alone.**  A `.sql` file or a C# file that the project includes only for another framework, and a `[SqlSourceGenerate]` under an `#if` that only another framework defines, are not seen, and their queries are not described.  A project that references SqlSource for a later framework only is left out of a solution's run without a word, and is [SQLSRC204](diagnostics.md#sqlsrc204) when you name it.  Include the `.sql` files and the attributed types for every framework, or for the first one listed.
+- **A project with several target frameworks is read for its first framework alone.**  A `.sql` file or a C# file that the project includes only for another framework, and a `[SqlSourceGenerate]` under an `#if` that only another framework defines, are not seen, and their queries are not described: the build for that framework reports [SQLSRC241](diagnostics.md#sqlsrc241) for each that must be.  A project that references SqlSource for a later framework only is left out of a solution's run without a word, and is [SQLSRC204](diagnostics.md#sqlsrc204) when you name it; its build reports SQLSRC241 in the same way.  Include the `.sql` files and the attributed types for every framework, or for the first one listed.
 - **A `.sql` file that one of your own build targets adds is not described.**  See [the known issues of settings](settings.md#known-issues) for what goes wrong and the one line that fixes it.
 - **A `.sql` file that two projects list** is described with the settings of the first project that claims it.  See [the known issues of `.sql` files](sql-files.md#known-issues).
 - **A connection string can appear in the output or a log when it is not there whole.**  The tool writes a connection value as `***` only where it finds the whole value.  A message of the database driver that quotes part of it, such as one keyword or the value with a space trimmed, is printed and logged as it is, and in rare cases so is a whole value that an error message builds from two pieces.  A connection string typed where a path or a `--project` goes, or a password typed after `--database`, can be printed and logged as typed, and a connection string given to `--connection` without its `name=` has its start printed and logged as a name.  A secret typed as an option, such as `-pS3cret`, is printed as an unknown option, though not logged.  Give each connection as `--connection <name>="..."` or in its variable, and search what you share, a log above all, for your password first.
-- **`--check --database` can pass a sidecar that `describe --database` would still rewrite.**  When a sidecar holds an entry for a query that was removed from its file, or whose output is now `sql`, and that entry is not of a database the filter names (it is another database's, or it names no database), `--check --database billing` does not report it, while `describe --database billing` rewrites the file to drop it.  Run `--check` without `--database` in CI, which reports the entry; the next `describe` that writes the file drops it.
+- **`--check --database` can pass a sidecar that `describe --database` would still rewrite.**  When a sidecar holds an entry for a query that was removed from its file, or whose output is now `sql`, and that entry is not of a database the filter names (it is another database's, or it names no database), `--check --database billing` does not report it, while `describe --database billing` rewrites the file to drop it.  The build warns of such an entry ([SQLSRC245](diagnostics.md#sqlsrc245)).  Run `--check` without `--database` in CI, which reports the entry; the next `describe` that writes the file drops it.

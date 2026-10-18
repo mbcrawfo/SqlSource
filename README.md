@@ -6,7 +6,7 @@ SqlSource keeps the SQL of a C# project in `.sql` files, out of your code files,
 
 **Status:** SqlSource is in early development.  Today it generates a constant for each query, or a method for a query with a `{{token}}` chosen at run time, and its tool can ask a PostgreSQL database about each query's parameters and columns, which SqlSource calls describing the query.  Coming in a later release: a generated model for each query's parameters and rows, which will turn a column that does not match your code into a build error, and a generated method that runs each query.  [What works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today) has the full list.
 
-**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries works with PostgreSQL 14 or later today; SQL Server is coming, and other databases are not described: see [database support](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#database-support).  So steps 1 to 4 below work today with any database and give you a constant for each query, and step 5 is optional and works with PostgreSQL only.  There are two other ways to use SqlSource: [only generating models](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models), and [only keeping your SQL out of code files](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files).
+**Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries works with PostgreSQL 14 or later today; SQL Server is coming, and other databases are not described: see [database support](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#database-support).  So with PostgreSQL, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 4 and set the output to `sql`, which gives you a constant for each query and needs no description, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  There are two other ways to use SqlSource: [only generating models](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models), and [only keeping your SQL out of code files](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files).
 
 ## Installation
 
@@ -68,7 +68,7 @@ using SqlSource;
 public partial class UserRepository;
 ```
 
-The type gets every `.sql` file in the folder of its C# file.  When you build, SqlSource adds a private class `Sql` to it, with a constant for each query: `Sql.GetUser` and `Sql.FindUsers`.  More: [the generator](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md), for another folder, one file, or members the rest of your code can use.
+The type gets every `.sql` file in the folder of its C# file.  When you build, SqlSource adds a private class `Sql` to it, with a constant for each query: `Sql.GetUser` and `Sql.FindUsers`.  The build also reports errors until you set the dialect in step 3 and describe the queries in step 5, or set the output to `sql`: by default each query must be described by its database.  More: [the generator](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md), for another folder, one file, or members the rest of your code can use.
 
 ### 3. Set the dialect
 
@@ -110,10 +110,10 @@ More: [constants](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/ge
 
 ### 5. Describe your queries
 
-This step is optional, and works with PostgreSQL only: for another database, skip it and set the output to `sql`, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  The tool asks your database what the parameters and columns of each query are, without running the query, and writes the answers into a sidecar file beside the `.sql` file: `Users.sql.json`.
+This step works with PostgreSQL only: for another database, or for queries that want only their SQL, skip it and set the output to `sql`, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  The tool asks your database what the parameters and columns of each query are, without running the query, and writes the answers into a sidecar file beside the `.sql` file: `Users.sql.json`.
 
 - **Today** that checks every query against your schema: a table or a column that does not exist, or a parameter whose type cannot be worked out, is an error now and not when the query runs.
-- **Nothing in a build reads the sidecars yet.**  The generated models and query methods of a later release will be built from them, so that the build never needs a database.
+- **The build reads the sidecars**, and reports an error for a query that has no entry in its sidecar, or whose entry is older than the query: run `describe` again after you change a query.  The generated models and query methods of a later release will be built from them, so that the build never needs a database.
 
 Run the tool from the folder of your project or solution, or name it, as in `dotnet sqlsource describe src/App/App.csproj`:
 
@@ -124,7 +124,7 @@ postgres (postgres): 2 described, 0 skipped, 0 failed
 $ git add Queries/Users.sql.json
 ```
 
-`postgres`, in the variable's name and first in the summary, is the name SqlSource gives the database your queries belong to: the dialect's name, until you [name your databases](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).  The name in parentheses is its dialect.  `--connection postgres="..."` gives the connection on the command line instead, though the variable keeps your password out of the shell's history.  The tool needs your schema, not your data.  Commit the sidecars with the project.
+`postgres`, in the variable's name and first in the summary, is the name SqlSource gives the database your queries belong to: the dialect's name, until you [name your databases](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#use-several-databases).  The name in parentheses is its dialect.  `--connection postgres="..."` gives the connection on the command line instead, though the variable keeps your password out of the shell's history.  The tool needs your schema, not your data.  Commit the sidecars with the project: every build reads them, and a copy of the project without them reports an error for each query.  A project that sets `SqlSourceIncludeFiles` to `false` lists its sidecars itself, beside its `.sql` files: see [which `.sql` files are included](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#included-files).
 
 Run `describe` again when you change a query, `describe --force` after a change to the schema, and `describe --check` on a build server to catch a sidecar that is out of date.  Never edit a sidecar by hand.  More: [the tool](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md), [connections](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/tool.md#connections), [PostgreSQL](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md).
 
@@ -153,7 +153,7 @@ Follow steps 1 to 4, set the output to `sql`, and skip the tool.  For a SQL Serv
 </PropertyGroup>
 ```
 
-- **`sql` asks for each query's SQL and nothing else**: its constant, or, for a query with a `{{token}}`, a method that fills it in.  It needs no database, no tool and no sidecar.  Today it tells the tool to leave these queries out, so a run on the project reports nothing for them; when generated models arrive, it also keeps these queries to their SQL alone.
+- **`sql` asks for each query's SQL and nothing else**: its constant, or, for a query with a `{{token}}`, a method that fills it in.  It needs no database, no tool and no sidecar.  Today it tells the tool to leave these queries out, so a run on the project reports nothing for them, and the build to need no sidecar for them; when generated models arrive, it also keeps these queries to their SQL alone.  Without it the default output, `codegen`, asks for every query to be described, and the build reports an error for each file or query that is not.
 - **Any dialect works**: `mssql` for SQL Server, `mysql`, `sqlite`, the default `ansi` and the others.  Set the one named for your database, so that SqlSource reads your comments and strings as your database does.
 
 More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-output), [database support](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#database-support).

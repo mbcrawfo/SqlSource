@@ -31,7 +31,7 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- token:` | Gives a token a default | no | yes | [Defaults](parameters-and-tokens.md#token-marker) |
 | `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Text that looks like a token](parameters-and-tokens.md#token-ignore) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](settings.md#setting-database) |
-| `-- output:` | What is generated for a query.  Today it decides which queries the tool describes (`models` or `codegen`); its effect on generated code comes later | yes | yes | [Output](settings.md#setting-output) |
+| `-- output:` | What is generated for a query.  Today it decides which queries must be described (`models` or `codegen`), by the tool and in the build's check of the sidecars; its effect on generated code comes later | yes | yes | [Output](settings.md#setting-output) |
 | `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model (no effect yet) | yes | no | [Suffix of a model's name](settings.md#setting-model-suffix) |
 | `-- model-namespace:` | The namespace of the models (no effect yet) | yes | no | [Namespace of the models](settings.md#setting-model-namespace) |
 | `-- input-model-type:`, `-- output-model-type:` | The shape of a model (no effect yet) | yes | yes | [Shape of a model](settings.md#setting-model-type) |
@@ -184,11 +184,11 @@ Writing a marker twice in one place is fine when the value is the same, and the 
 
 A comment of yours that happens to start with one of the words and a colon, such as `-- summary: see the ticket`, is read as a marker.  Reword it.
 
-An error in a `.sql` file is reported at its line and column in that file, and the file produces no members until it is fixed.
+An error in how a `.sql` file is written, such as a marker in the wrong place, is reported at its line and column in that file, and the file produces no members until it is fixed.  An error about describing a query or about its sidecar leaves its members in place: see [diagnostics](diagnostics.md).
 
 <a id="known-issues"></a>
 
 ## Known issues
 
-- **A file that is not saved as UTF-8.**  Save your `.sql` files as UTF-8, which current editors write.  A file in another encoding, such as Windows-1252, that has a character outside ASCII in its SQL (comments do not count), is read one way by the tool and another by the compiler.  The query then has two different texts.  Nothing compares them today; when the generator starts to read sidecars, it will always find the sidecar of such a query out of date.  Saving the file as UTF-8 fixes it.
-- **A `.sql` file that two projects list.**  When two projects of one solution include the same `.sql` file, each with a type that claims it, the file has one sidecar.  The tool describes it with the dialect and database of the first project in the run that claims it, and ignores what the second project says.  A run on only one of the two projects does not see what the other needs: it can write a sidecar that lacks entries the other project needs, or delete a sidecar that the other project needs.  Give the file the same dialect and database in both projects, and describe the whole solution in one run.
+- **A file that is not saved as UTF-8.**  Save your `.sql` files as UTF-8, which current editors write.  A file in another encoding, such as Windows-1252, that has a character outside ASCII in its SQL (comments do not count), is read one way by the tool and another by the compiler.  The query then has two different texts, so the build reports its entry in the sidecar as out of date ([SQLSRC244](diagnostics.md#sqlsrc244)) however often you describe it.  Saving the file as UTF-8 fixes it.
+- **A `.sql` file that two projects list.**  When two projects of one solution include the same `.sql` file, each with a type that claims it, the file has one sidecar.  The tool describes it with the dialect and database of the first project in the run that claims it, and ignores what the second project says.  A run on only one of the two projects does not see what the other needs: it can write a sidecar that lacks entries the other project needs, or delete a sidecar that the other project needs, and the other project's build then reports [SQLSRC241](diagnostics.md#sqlsrc241) for them.  Each project's build checks the sidecar against what its own types need, so a project in which a query has the output `sql` warns of the entry that the other project needs ([SQLSRC245](diagnostics.md#sqlsrc245)).  Give the file the same dialect, database and output in both projects, and describe the whole solution in one run.

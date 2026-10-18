@@ -4,7 +4,7 @@
 
 The `sqlsource` tool learns what the compiler is given from the project manifest, which the target `SqlSourceWriteManifest` in [`build/SqlSource.targets`](../../src/SqlSource/build/SqlSource.targets) writes.  The tool runs that target by name, so nothing of a build runs before it but what it depends on: the package's two trims.
 
-A `.sql` file that a target of the project adds as an `AdditionalFiles` item is therefore in the manifest only when that target hooks `SqlSourceTrimMetadataOfFiles`.  One that hooks `BeforeBuild`, or any other target of a build, has not run.  The build compiles the file, and the tool does not know it: it describes none of its queries.  From phase 5 of query generation the generator needs a sidecar entry for each of them, and reports each as missing.
+A `.sql` file that a target of the project adds as an `AdditionalFiles` item is therefore in the manifest only when that target hooks `SqlSourceTrimMetadataOfFiles`.  One that hooks `BeforeBuild`, or any other target of a build, has not run.  The build compiles the file, and the tool does not know it: it describes none of its queries.  The generator needs a sidecar entry for each of them whose output is not `Sql`, so the build reports each as missing, `SQLSRC241`.
 
 The same holds for a `Compile` item that a target adds: a `[SqlSourceGenerate]` in such a file is not read.  Every project of the SDK has such items, the files it writes under `obj` for the assembly's attributes and for the global usings.  None holds the attribute, but a global `using` alias that names it is in one of them, and the tool's reader of attributes, in sub-phase 2.4, does not see that alias.
 
@@ -16,7 +16,7 @@ Depending on `BeforeBuild` would run whatever a project hangs on it, a code gene
 
 ## Impact
 
-Low.  It takes a target that adds `.sql` files while the build runs.  The failure is loud from phase 5: the build says which queries have no entry.
+Low.  It takes a target that adds `.sql` files while the build runs.  The failure is loud: the build says which queries have no entry.
 
 ## Proposed fix
 
