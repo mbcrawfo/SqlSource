@@ -18,7 +18,7 @@ The epic's decisions on the corpus are kept whole: the truth, the oracle and the
 2. A refused case stays the describer's alone, with no model and no sidecar.
 3. `--check` over the corpus's sidecars on PostgreSQL 14 and 18.
 4. Each property of each generated output model is as nullable as the case's truth says, or wider.
-5. Each query runs through Dapper into its generated model over the seed, with each of the case's samples, and reads every row without an error.
+5. Each query that the run does not leave out runs through Dapper into its generated model over the seed, with each of the case's samples, and reads every row without an error.  The run leaves out a case on a server older than its `minimumMajor`, and a case whose `case.json` has a `dapper` member, below: a parameter Dapper cannot bind.
 6. The rule for a case that needs a later major, and for one that an earlier planner describes otherwise.
 
 ## Non-goals

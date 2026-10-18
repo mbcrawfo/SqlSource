@@ -135,7 +135,7 @@ One `Select` over `CompilationProvider`, giving a value-equal record:
 
 The epic named `NpgsqlDataSourceBuilder.EnableUnmappedTypes` as the marker of 8; the research confirmed it and found `NpgsqlSlimDataSourceBuilder`, also first in 8.0, which is one type lookup rather than a type and a member.  Either is right; the type is the one taken.  `NpgsqlTypes.NpgsqlCidr`, also new in 8, is avoided, since it is obsolete in 10.
 
-The map is chosen by the probe: the 10 column when `AtLeast10`, the 8/9 column otherwise.  A project that does not reference Npgsql gets the 10 column, the newest the generator knows, since a project that runs its models through another driver or none has no older driver to match; the manual says so.
+The map is chosen by the probe: the 10 column when `AtLeast10`, the 8/9 column otherwise.  A project that does not reference Npgsql has no driver to choose by, and is never given either column silently: its models may be read by an application on any of the three, and a `DateOnly` model read on Npgsql 9, which boxes a `DateTime`, fails at run time.  So, without Npgsql, a type whose row has a cell in the 10 column, `date`, `time`, `cidr`, `daterange`, `datemultirange`, and an array, a domain or a range whose type comes from one of them, has a C# type only when the type override names its key, which is the project's statement of the driver it runs on: `date=System.DateOnly` or `date=System.DateTime`.  Without one it is `SQLSRC249` at the query.  Every other row is the same on the three and is mapped as the table says.
 
 It runs on every compilation, as `SupportedFramework` does, and costs three type lookups and one reference's identity; its value is equal from one edit to the next, so nothing after it runs again.
 
@@ -147,7 +147,7 @@ From the epic, as it applies to a phase with models and no methods:
 |----|----|----|
 | Npgsql is referenced, and is older than 8 | `SQLSRC247`, error: names the version found and the floor | No position, once for the project, when a query of the project needs a `postgres` entry |
 | Npgsql is referenced, and its assembly's major is above 10 | `SQLSRC248`, information, not a warning, since `TreatWarningsAsErrors` is common: the generator maps by what it knows of 10 | No position, once, as above |
-| Npgsql is not referenced, and a parameter's or a column's type is one of the `NpgsqlTypes` namespace | `SQLSRC249`, error: names the column or parameter, its type, and the driver to reference | At the query |
+| Npgsql is not referenced, and a parameter's or a column's type is one of the `NpgsqlTypes` namespace, or one whose C# type differs between Npgsql 8 and 9 and Npgsql 10, with no override for its key | `SQLSRC249`, error: names the column or parameter and its type, and says to reference the driver or, for a type that differs between versions, to map it with the override | At the query |
 
 Under `SQLSRC247` the models are still emitted, with the 8/9 column, as the epic decides.  Under `SQLSRC249` the query has no types, and so no models.  `CodeGen` needs the driver whatever the types: that is phase 8's error, since until phase 8 `CodeGen` behaves as `Models`.
 
@@ -256,7 +256,7 @@ A parameter whose `type` is `null`, which no engine in scope writes, is `SQLSRC2
 | `SQLSRC246` | Error | The query | A type the map cannot give a C# type, naming the column or parameter and the type; the help gives the override, or the cast where the table says |
 | `SQLSRC247` | Error | None, once | Npgsql older than the floor |
 | `SQLSRC248` | Information, configurable as sub-phase 5.1's two warnings are | None, once | Npgsql newer than the generator knows |
-| `SQLSRC249` | Error | The query | A type of `NpgsqlTypes` with no Npgsql referenced |
+| `SQLSRC249` | Error | The query | With no Npgsql referenced, a type of `NpgsqlTypes`, or one that differs between Npgsql versions and has no override |
 | `SQLSRC250` | Error | The query | A mapped type that is not found or is ambiguous |
 | `SQLSRC251` | Error | The query | A mapped type that is not accessible |
 | `SQLSRC252` | Error | The query | A mapped type that cannot be a property's type |
@@ -272,7 +272,7 @@ The ids follow sub-phase 5.1's, which end at `SQLSRC245`.  If 5.1 merged with mo
 | Where | Cases |
 |----|----|
 | `PostgresTypeMapTests` | Every row of the base map, under each of the probe's three states, with its C# text and value-type flag.  Each kind: an array of a mapped type, of an array's own row, of a domain and of an enum; a domain over a domain; a range of a subtype the map lists and one it does not; a multirange; a composite; an unknown kind.  `bit(1)`, `bit(8)`, `bit` with no length, `varbit(1)` |
-| `NpgsqlProbeTests` | The probe against metadata references to Npgsql 8, 9 and 10, which `tests/SqlSource.Tests` downloads as packages without referencing them, and against none.  Each of `SQLSRC247`, `SQLSRC248` and `SQLSRC249` |
+| `NpgsqlProbeTests` | The probe against metadata references to Npgsql 8, 9 and 10, which `tests/SqlSource.Tests` downloads as packages without referencing them, and against none.  Each of `SQLSRC247`, `SQLSRC248` and `SQLSRC249`.  With no Npgsql, each type that differs between versions is `SQLSRC249` without an override and its override's type with one, its array and its domain alike, and a type that is the same on all three is mapped |
 | `TypeOverrideGrammarTests` | Every form of the grammar, valid and invalid: keywords, generics, nested types, ranks, `?` inside and at the end, `global::`, aliases, a qualified and an unqualified key, `default`, white space and line breaks |
 | `TypeOverrideLevelTests` | The merge per key at each level; `default` at each level; the last of two in one MSBuild value; `SQLSRC112` for two in one marker scope; the array, domain and range lookup rules |
 | `MappedTypeTests` | A keyword; a type of the project; a type of a reference; a nested type; a generic of each; not found; ambiguous; internal in a reference; a static class; a `ref struct`; an open generic |
@@ -317,7 +317,7 @@ One pull request, one commit for each step:
 Not decided with the owner, and open to the review of this spec:
 
 - The marker of Npgsql 8 is `NpgsqlSlimDataSourceBuilder`, not `NpgsqlDataSourceBuilder.EnableUnmappedTypes`.
-- A project without Npgsql is mapped by the 10 column.
+- A project without Npgsql maps every type that is the same on the three drivers, and needs the override for one that differs, which the review of this spec asked for in place of mapping it by the 10 column.
 - A user-defined range is `SQLSRC246`, with the override as its help, since the type Npgsql boxes for it exists only after an opt-in.
 - The extension types are matched by their name in any schema, by the base map and by an unqualified key alike.
 - An `[Obsolete]` mapped type is accepted, and the model's file disables the two obsolete warnings.
