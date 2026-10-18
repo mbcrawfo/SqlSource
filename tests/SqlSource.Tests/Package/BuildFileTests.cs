@@ -144,12 +144,12 @@ public sealed partial class BuildFileTests
         lines[1].Attribute("Condition")!.Value.ShouldBe("'$(TargetFramework)' != ''");
         lines[1].Value.ShouldBe("$(SqlSourceManifestDependsOn);AddImplicitDefineConstants");
 
-        // The item types are the two an IDE may nest on.  Update changes the items that are already there and adds
-        // none, so a project without a sidecar is not given one.
+        // The item types an IDE may nest on: the SDK lists a sidecar under None, and the Web SDK under Content.  Update
+        // changes the items that are already there and adds none, so a project without a sidecar is not given one.
         var nesting = outside[1];
         nesting.Attributes().ShouldBeEmpty();
         var items = nesting.Elements().ToList();
-        items.Select(item => item.Name.LocalName).ShouldBe(["AdditionalFiles", "None"]);
+        items.Select(item => item.Name.LocalName).ShouldBe(["AdditionalFiles", "None", "Content"]);
         foreach (var item in items)
         {
             item.Attributes()

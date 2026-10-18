@@ -30,7 +30,7 @@ The two trims are described under [Trimming](#trimming), and the manifest target
 
 ### Nesting a sidecar
 
-The `ItemGroup` sets `DependentUpon="%(Filename)"` on every `**/*.sql.json` item, with `Update`, so that an IDE can show `Users.sql.json` under `Users.sql`.  `Update` changes the items that are listed and adds none.  It is on `AdditionalFiles`, and on `None`, the item type under which the SDK lists every file of the project, since an IDE may nest on either.  The IDEs nest from evaluated items, so the group is outside every target.  It is in the targets and not in the props, so that it also reaches a sidecar that a project lists itself when `SqlSourceIncludeFiles` is `false`.  `SqlSourceWriteManifest` lists `.sql` files alone, so the manifest does not change.
+The `ItemGroup` sets `DependentUpon="%(Filename)"` on every `**/*.sql.json` item, with `Update`, so that an IDE can show `Users.sql.json` under `Users.sql`.  `Update` changes the items that are listed and adds none.  It is on `AdditionalFiles`, on `None`, the item type under which the SDK lists every file of the project, and on `Content`, under which the Web SDK lists a `.json` file in place of `None`, since an IDE may nest on any of them.  The IDEs nest from evaluated items, so the group is outside every target.  It is in the targets and not in the props, so that it also reaches a sidecar that a project lists itself when `SqlSourceIncludeFiles` is `false`.  `SqlSourceWriteManifest` lists `.sql` files alone, so the manifest does not change.
 
 ### `SqlSourceSettingsFile`
 

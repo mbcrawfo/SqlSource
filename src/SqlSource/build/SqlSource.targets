@@ -161,12 +161,14 @@
         Nests a sidecar under its .sql file in the solution explorer of an IDE: Users.sql.json under Users.sql.  The
         IDEs nest from the evaluated items, so this is outside every target.  It is in this file, and not in the
         props, so that it reaches a sidecar that a project lists itself when SqlSourceIncludeFiles is off.  It is on
-        None too, since an IDE may nest on either item type; the SDK lists every file of the project there.  Update
-        changes the items that are already listed and adds none.
+        None and Content too, since an IDE may nest on any of them: the SDK lists every file of the project under
+        None, and the Web SDK lists a .json file under Content instead.  Update changes the items that are already
+        listed and adds none.
     -->
     <ItemGroup>
         <AdditionalFiles Update="**/*.sql.json" DependentUpon="%(Filename)" />
         <None Update="**/*.sql.json" DependentUpon="%(Filename)" />
+        <Content Update="**/*.sql.json" DependentUpon="%(Filename)" />
     </ItemGroup>
     <!--
         Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
