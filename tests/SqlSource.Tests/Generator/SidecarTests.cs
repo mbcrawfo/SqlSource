@@ -195,6 +195,105 @@ public sealed class SidecarTests
         UsableEntries(malformed).ShouldBeEmpty();
     }
 
+    // At the first query that needs an entry, as the tool reports it: one setting mends the file, so its queries get
+    // no error of their own, and its constants are generated as before.  The entries of those queries are not used,
+    // and are no orphans.
+    [Fact]
+    public void Run_AnsiFileAtModels_IsOneSqlsrc209AtItsFirstQueryThatNeedsAnEntry()
+    {
+        var users = new SqlFile(
+            UsersPath,
+            "-- name: GetUser\n-- output: sql\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n\n"
+                + "-- name: ListUsers\nSELECT 3;\n"
+        );
+        const string NotDescribable =
+            "SQLSRC209 /app/Repo/Users.sql(5,10)-(5,20): The output 'models' needs each query described by its "
+            + "database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or "
+            + "the output to 'sql'.";
+
+        var run = Run(OutputKind.Models, [users], "ansi");
+        var withEntries = Run(
+            OutputKind.Models,
+            [users, Sidecars.Of(users, CurrentEntry(users, "CountUsers"), CurrentEntry(users, "ListUsers"))],
+            "ansi"
+        );
+
+        run.Diagnostics.ShouldBe([NotDescribable]);
+        SeverityOf(run, "SQLSRC209").ShouldBe(DiagnosticSeverity.Error);
+        UsableEntries(run).ShouldBeEmpty();
+        withEntries.Diagnostics.ShouldBe([NotDescribable]);
+        UsableEntries(withEntries).ShouldBeEmpty();
+        var generated = run.Sources["App.Sample.g.cs"];
+        generated.ShouldContain("GetUser =");
+        generated.ShouldContain("CountUsers =");
+        generated.ShouldContain("ListUsers =");
+    }
+
+    // A query whose token has no default cannot be described, so it is not checked against the sidecar, and its
+    // entry is neither used nor an orphan.  A token with a default, even an empty one, is no error.
+    [Fact]
+    public void Run_TokenWithoutADefault_IsSqlsrc210AtTheQueryAndItIsNotChecked()
+    {
+        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1 {{where}} {{order}} {{tail:}};\n");
+        var withDefaults = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1 {{where:WHERE true}};\n");
+        const string NoDefault =
+            $"SQLSRC210 {GetUserName}: The token '{{0}}' has no default, which a query whose output is 'models' "
+            + "needs.  Give it a default, or set the output to 'sql'.";
+
+        var withoutSidecar = Run(OutputKind.Models, users);
+        var withStaleEntry = Run(OutputKind.Models, users, Sidecars.Of(users, Sidecars.Entry("GetUser", "stale")));
+        var defaulted = Run(OutputKind.Models, withDefaults);
+        var ansi = Run(OutputKind.Models, [users], "ansi");
+
+        string[] noDefaults =
+        [
+            NoDefault.Replace("{0}", "where", StringComparison.Ordinal),
+            NoDefault.Replace("{0}", "order", StringComparison.Ordinal),
+        ];
+        withoutSidecar.Diagnostics.ShouldBe(noDefaults);
+        SeverityOf(withoutSidecar, "SQLSRC210").ShouldBe(DiagnosticSeverity.Error);
+        withStaleEntry.Diagnostics.ShouldBe(noDefaults);
+        UsableEntries(withStaleEntry).ShouldBeEmpty();
+        defaulted.Diagnostics.ShouldBe([
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                + "'models' needs one.  Run 'sqlsource describe'.",
+        ]);
+        ansi.Diagnostics.ShouldBe([
+            $"SQLSRC209 {GetUserName}: The output 'models' needs each query described by its database, and the "
+                + "dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to "
+                + "'sql'.",
+            .. noDefaults,
+        ]);
+        ansi.Sources["App.Sample.g.cs"].ShouldContain("GetUser");
+    }
+
+    // The tool reports a token without a default whatever the file's sidecar and dialect, and so does the build:
+    // beside an error of the sidecar itself, and beside an error for the whole file.
+    [Fact]
+    public void Run_TokenWithoutADefault_IsSqlsrc210WhateverTheSidecarAndTheDialect()
+    {
+        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1 {{where}};\n");
+        const string NoDefault =
+            $"SQLSRC210 {GetUserName}: The token 'where' has no default, which a query whose output is 'models' "
+            + "needs.  Give it a default, or set the output to 'sql'.";
+
+        var malformed = Run(OutputKind.Models, users, Sidecars.Raw(users, ""));
+        var mssql = Run(OutputKind.Models, [users], "mssql");
+
+        malformed.Diagnostics.ShouldBe([
+            NoDefault,
+            $"SQLSRC237 {SidecarStart}: The sidecar cannot be read, because it is not one JSON object.  Run "
+                + "'sqlsource describe' to write it again.",
+        ]);
+        UsableEntries(malformed).ShouldBeEmpty();
+        mssql.Diagnostics.ShouldBe([
+            $"SQLSRC243 {GetUserName}: This version of SqlSource has no type map for the dialect 'mssql', so no query "
+                + "of this file can have models.  Set the output to 'sql'.",
+            NoDefault,
+        ]);
+        UsableEntries(mssql).ShouldBeEmpty();
+    }
+
     [Fact]
     public void Run_StaleEntry_IsSqlsrc244()
     {
@@ -549,8 +648,13 @@ public sealed class SidecarTests
     private static SidecarEntry CurrentEntry(SqlFile file, string name) =>
         Sidecars.Entry(name, Sidecars.HashOf(file, name, SqlDialect.PostgreSql));
 
+    // The one severity of every diagnostic of the id.
     private static DiagnosticSeverity SeverityOf(GeneratorRun run, string id) =>
-        run.Result.Diagnostics.Single(diagnostic => diagnostic.Id == id).Severity;
+        run
+            .Result.Diagnostics.Where(diagnostic => diagnostic.Id == id)
+            .Select(diagnostic => diagnostic.Severity)
+            .Distinct()
+            .Single();
 
     // The names of the usable entries of every file, from what the step of the checks gave.
     private static string[] UsableEntries(GeneratorRun run) =>

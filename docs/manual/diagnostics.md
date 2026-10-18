@@ -105,11 +105,11 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC244](#sqlsrc244) | Entry is stale |
 | [SQLSRC245](#sqlsrc245) | Entry names no query |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` on are the errors of describing a query against PostgreSQL, which this version of the tool does for the `postgres` dialect.  It reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
 
-The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` dialect every query needs an entry unless the project, the type or the file sets the output to `sql`.  A sidecar that exists is checked even when no query of its file needs an entry.  A `.sql` file with an error gets only the errors and the warning about its sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), until it is fixed.
+The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` dialect every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209), [SQLSRC210](#sqlsrc210) or [SQLSRC243](#sqlsrc243) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  A `.sql` file with an error gets only the errors and the warning about its sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), until it is fixed.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -808,7 +808,7 @@ internal static partial class Queries;
 /work/App/Queries.cs(3,27): error SQLSRC208: 'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here
 ```
 
-Write the value where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended; the build is not affected.
+Write the value where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect the tool cannot describe, the build reports [SQLSRC209](#sqlsrc209) instead.
 
 See: [Known issues](generator.md#known-issues)
 
@@ -816,13 +816,13 @@ See: [Known issues](generator.md#known-issues)
 
 **Output needs a dialect that can be described**
 
-A query whose output is `models` or `codegen` is described by a database, and the dialect the tool can describe today is `postgres`.  The dialect `mssql` passes this check, since describing SQL Server queries comes in a later release, and its queries get [SQLSRC216](#sqlsrc216) until then.  This file has a query with such an output and another dialect.  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
+A query whose output is `models` or `codegen` is described by a database, and the dialect the tool can describe today is `postgres`.  The dialect `mssql` passes this check, since describing SQL Server queries comes in a later release, and its queries get [SQLSRC216](#sqlsrc216) from the tool, and the file [SQLSRC243](#sqlsrc243) in the build, until then.  This file has a query with such an output and another dialect.  The build reports this error, and so does the tool.  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'codegen' needs a dialect that can be described, and the dialect of this file is 'ansi'.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
+/work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'codegen' needs each query described by its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
 ```
 
-For PostgreSQL files, set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` at the top of the file.  **For SQL Server files, set the output to `sql`**, though the message names `mssql`, which gives SQLSRC216 until SQL Server queries can be described.  For any other database, and for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types, and no query of the file is described until it is mended.
+For PostgreSQL files, set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` at the top of the file.  **For SQL Server files, set the output to `sql`**, though the message names `mssql`, which gives SQLSRC216 and SQLSRC243 until SQL Server queries can be described.  For any other database, and for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; the file's constants and methods are generated as before.
 
 See: [Database support](dialects.md#database-support)
 
@@ -830,7 +830,7 @@ See: [Database support](dialects.md#database-support)
 
 **Token has no default**
 
-A query with a `{{token}}` cannot be sent to a database as it is written.  To describe it, the tool puts a sample in the token's place: the token's default.  This query's output is `models` or `codegen`, and the token the message names has none.
+A query with a `{{token}}` cannot be sent to a database as it is written.  To describe it, the tool puts a sample in the token's place: the token's default.  This query's output is `models` or `codegen`, so it must be described, and the token the message names has none.  The build reports this error, and so does the tool, which prints the `help:` line under it.
 
 ```sql
 -- name: FindUsers
@@ -838,11 +838,11 @@ SELECT id, name FROM users {{where}};
 ```
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC210: The token 'where' has no default.  A query whose output is 'codegen' is described with a sample in its place.
+/work/App/Queries/Users.sql(1,10): error SQLSRC210: The token 'where' has no default, which a query whose output is 'codegen' needs.  Give it a default, or set the output to 'sql'.
     help: write the token with a default, {{where:default}}, or give one in a marker of the query: -- token: {{where:default}}
 ```
 
-Give the token a default where it stands, `{{where:WHERE deleted_at IS NULL}}`, or once for the query with a marker, `-- token: {{where:WHERE deleted_at IS NULL}}`.  An empty default, `{{where:}}`, describes the query with nothing there.  The default is a sample for describing and nothing else: the generated method still takes the token as an argument.  The error is reported once for each token without a default, at the name of its query.
+Give the token a default where it stands, `{{where:WHERE deleted_at IS NULL}}`, or once for the query with a marker, `-- token: {{where:WHERE deleted_at IS NULL}}`.  An empty default, `{{where:}}`, describes the query with nothing there.  The default is a sample for describing and nothing else: the generated method still takes the token as an argument.  A query that only wants its SQL can instead have the output `sql`, which needs no default.  The error is reported once for each token without a default, at the name of its query.  Until it is mended, the query is not described and gets no error about its entry in the sidecar; its constant or method is generated as before.
 
 See: [Defaults](parameters-and-tokens.md#token-defaults)
 

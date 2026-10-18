@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Settings;
@@ -14,10 +15,12 @@ namespace SqlSource.Generation.Sidecars;
 /// </summary>
 /// <remarks>
 /// The checks run in a fixed order.  A dialect the tool cannot describe, or one this version has no type map for,
-/// stops every check of the file's queries.  A sidecar that cannot be read, or is of another format, has no usable
-/// entry and stops the checks of the queries and of the orphans.  A file with parse errors has no queries, so only the
-/// checks of the sidecar itself run for it: every entry would otherwise be an orphan until the file parses.  Each
-/// query that needs an entry then has none, one of another engine, a stale one, or a usable one, in that order.
+/// stops every check of the file's queries.  A token without a default is reported whatever the dialect and the
+/// sidecar, as the tool reports it, and stops the check of its query.  A sidecar that cannot be read, or is of another
+/// format, has no usable entry and stops the checks of the queries and of the orphans.  A file with parse errors has
+/// no queries, so only the checks of the sidecar itself run for it: every entry would otherwise be an orphan until the
+/// file parses.  Each query that needs an entry then has none, one of another engine, a stale one, or a usable one, in
+/// that order.  A query stopped by a check is still an entry's query, so its entry is no orphan.
 /// </remarks>
 internal static class SidecarChecker
 {
@@ -34,6 +37,7 @@ internal static class SidecarChecker
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
         var needing = FindNeeding(file, input.Needs);
         var checksQueries = needing.Count > 0 && CanCheckQueries(file.Dialect, needing, diagnostics);
+        var stopped = FindTokensWithoutDefault(needing, diagnostics);
         var sidecarFile = input.Sidecar;
         var sidecar = sidecarFile is null ? null : SidecarFileChecks.Read(sidecarFile, diagnostics);
         if (sidecarFile is not null && sidecar is null)
@@ -41,7 +45,7 @@ internal static class SidecarChecker
             return Finish(file, diagnostics, NoEntries);
         }
 
-        var usable = checksQueries ? CheckQueries(file.Dialect, needing, sidecar, diagnostics) : NoEntries;
+        var usable = checksQueries ? CheckQueries(file.Dialect, needing, stopped, sidecar, diagnostics) : NoEntries;
         if (sidecarFile is not null && sidecar is not null && file.Errors.Count == 0)
         {
             FindOrphans(sidecarFile, sidecar, needing, diagnostics);
@@ -83,16 +87,25 @@ internal static class SidecarChecker
     }
 
     // Whether the queries that need an entry are checked against the sidecar.  They are not when no sqlsource
-    // describe can give them an entry, and the file then gets one error, at its first query that needs an entry.
+    // describe can give them an entry, and the file then gets one error, at its first query that needs an entry,
+    // where the tool reports it: one setting mends the file.
     private static bool CanCheckQueries(
         SqlDialect dialect,
         List<(SqlQuery Query, OutputKind Output)> needing,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics
     )
     {
+        var (first, output) = needing[0];
         if (!SqlDescribableDialects.Contains(dialect))
         {
-            // The generator does not report SQLSRC209 yet.  It goes here, at the first query of needing.
+            diagnostics.Add(
+                DiagnosticInfo.Create(
+                    ToolDiagnostics.OutputNeedsDescribableDialect,
+                    first.NameLocation,
+                    SettingValue.NameOf(output),
+                    SqlDialectName.Canonical(dialect)
+                )
+            );
             return false;
         }
 
@@ -101,7 +114,7 @@ internal static class SidecarChecker
             diagnostics.Add(
                 DiagnosticInfo.Create(
                     SqlDiagnostics.EngineHasNoTypeMap,
-                    needing[0].Query.NameLocation,
+                    first.NameLocation,
                     SqlDialectName.Canonical(dialect)
                 )
             );
@@ -114,11 +127,40 @@ internal static class SidecarChecker
     // The dialects whose types this version can map.  Phase 6 adds mssql.
     private static bool HasTypeMap(SqlDialect dialect) => dialect == SqlDialect.PostgreSql;
 
+    // One error for each token without a default of a query that needs an entry, at the query, in file order: no
+    // sqlsource describe can give the query an entry until it has one.  An empty default is one.  Gives the names of
+    // the queries it stopped.
+    private static HashSet<string> FindTokensWithoutDefault(
+        List<(SqlQuery Query, OutputKind Output)> needing,
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+    )
+    {
+        var stopped = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (query, output) in needing)
+        {
+            foreach (var token in query.Tokens.Where(static token => token.Default is null))
+            {
+                _ = stopped.Add(query.Name);
+                diagnostics.Add(
+                    DiagnosticInfo.Create(
+                        ToolDiagnostics.TokenHasNoDefault,
+                        query.NameLocation,
+                        token.Name,
+                        SettingValue.NameOf(output)
+                    )
+                );
+            }
+        }
+
+        return stopped;
+    }
+
     // Each query that needs an entry against its entry.  The hash is computed here and nowhere else in the generator,
     // so that a query that needs no entry never pays for it.
     private static EquatableArray<SidecarEntry> CheckQueries(
         SqlDialect dialect,
         List<(SqlQuery Query, OutputKind Output)> needing,
+        HashSet<string> stopped,
         Sidecar? sidecar,
         ImmutableArray<DiagnosticInfo>.Builder diagnostics
     )
@@ -127,8 +169,12 @@ internal static class SidecarChecker
         var usable = ImmutableArray.CreateBuilder<SidecarEntry>();
         foreach (var (query, output) in needing)
         {
-            // The generator does not report SQLSRC210 yet.  A query with a token whose default is null gets it here,
-            // and is not checked against its entry.
+            if (stopped.Contains(query.Name))
+            {
+                // Its tokens are SQLSRC210, and its entry is neither checked nor used.
+                continue;
+            }
+
             if (sidecar?.Find(query.Name) is not { } entry)
             {
                 diagnostics.Add(

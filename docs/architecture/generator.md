@@ -184,7 +184,7 @@ Since errors are sorted by position with a stable sort, the order of the steps d
 
 The parser reports three kinds of marker error when it reads the blocks: a marker that is not valid, one that names a second dialect, and one that starts at or after the header's end.
 
-The marker, the property and the metadata all read a dialect through [`SqlDialectName`](../../src/SqlSource/Parsing/SqlDialectName.cs), and each gives a `SqlDialectChoice`: a `SqlDialect` with its `SqlDialectOptions`.  [`SqlDescribableDialects`](../../src/SqlSource/Parsing/SqlDescribableDialects.cs) lists the dialects whose database can be asked to describe a query.  The tool reads it for `SQLSRC209`, and no step of the generator reads it.
+The marker, the property and the metadata all read a dialect through [`SqlDialectName`](../../src/SqlSource/Parsing/SqlDialectName.cs), and each gives a `SqlDialectChoice`: a `SqlDialect` with its `SqlDialectOptions`.  [`SqlDescribableDialects`](../../src/SqlSource/Parsing/SqlDescribableDialects.cs) lists the dialects whose database can be asked to describe a query.  The tool reads it for `SQLSRC209`, and so does the generator's check of each claimed file's sidecar, in [`SidecarChecker`](../../src/SqlSource/Generation/Sidecars/SidecarChecker.cs), which reports `SQLSRC209` and `SQLSRC210` where the tool does.
 
 ### Building a query's SQL
 
@@ -238,7 +238,7 @@ An exception thrown in the generator costs every type its generated code: the co
 
 ## Diagnostics
 
-Each diagnostic is a `DiagnosticDescriptor`.  The generator's are in [`SqlDiagnostics`](../../src/SqlSource/Diagnostics/SqlDiagnostics.cs).  The errors that only the tool reports are in [`ToolDiagnostics`](../../src/SqlSource/Diagnostics/ToolDiagnostics.cs), with an `All` of their own.  The generator reports none of them; they are in this assembly so that the release tracking of `AnalyzerReleases.Unshipped.md` and the tests of the diagnostics document cover them with the generator's own.  What each id means is in the manual, [diagnostics](../manual/diagnostics.md).
+Each diagnostic is a `DiagnosticDescriptor`.  The generator's are in [`SqlDiagnostics`](../../src/SqlSource/Diagnostics/SqlDiagnostics.cs).  The errors of the tool that are not the generator's own are in [`ToolDiagnostics`](../../src/SqlSource/Diagnostics/ToolDiagnostics.cs), with an `All` of their own.  The generator reports two of them too, `SQLSRC209` and `SQLSRC210`, from its check of each claimed file's sidecar.  The others are here only so that the release tracking of `AnalyzerReleases.Unshipped.md` and the tests of the diagnostics document cover them with the generator's own.  What each id means is in the manual, [diagnostics](../manual/diagnostics.md).
 
 ### How a problem travels
 

@@ -128,7 +128,7 @@ On the attribute: `[SqlSourceGenerate(Output = GeneratorOutput.Sql)]`.  As a mar
 
 **Today, `Output` decides which queries the tool describes.**  `sqlsource describe` asks a database about the queries whose output is `models` or `codegen`.  A query whose output is `sql` needs no description, belongs to no [logical database](#setting-database) and needs no connection.  On the attribute, write the value out literally, as in `Output = GeneratorOutput.Models`, so that the tool can read it; a constant or an expression there is [SQLSRC208](diagnostics.md#sqlsrc208).  Details are under [the generator's known issues](generator.md#known-issues).  A file claimed by two types, or listed by two projects, is described when either needs it.
 
-The tool can describe only some dialects: see [the database support table](dialects.md#database-support).  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](diagnostics.md#sqlsrc209) from the tool for every file.  Set the dialect, or set the output to `sql` for queries that want only their SQL.
+The tool can describe only some dialects: see [the database support table](dialects.md#database-support).  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](diagnostics.md#sqlsrc209) for every file, in its build and from the tool.  Set the dialect, or set the output to `sql` for queries that want only their SQL.
 
 > **Coming in a later release.**  `models` and `codegen` will generate types for a query's parameters and result, and a method that runs it.  Today every query gets its constant or token method whatever its output.  See [what works today](README.md#what-works-today).
 

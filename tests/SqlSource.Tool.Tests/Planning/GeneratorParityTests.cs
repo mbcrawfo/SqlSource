@@ -1,21 +1,26 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.Text;
 using Shouldly;
+using SqlSource.Diagnostics;
 using SqlSource.Generation;
+using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
 using SqlSource.Tool.Testing;
 using Xunit;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tool.Tests.Planning;
 
 // The plan must agree with the generator on which type claims which file with which output: a query the tool does
 // not describe is a build error from phase 5, and one it describes for nothing costs a description.  The generator
 // reads symbols and the tool reads syntax, so each case runs both over the same sources and file list and compares
-// what they find.
+// what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text.
 public sealed class GeneratorParityTests : IDisposable
 {
     private const string Using = "using SqlSource;\n";
@@ -154,9 +159,53 @@ public sealed class GeneratorParityTests : IDisposable
         ),
     };
 
+    // The errors that both report for a file: one query or more that needs an entry under a dialect that cannot
+    // give one, and tokens without a default.  Each case has one type at the project's root, which claims every file.
+    private static readonly Dictionary<string, ErrorCase> ErrorCases = new()
+    {
+        ["an ansi file at models"] = new(
+            "ansi",
+            OutputKind.Models,
+            [
+                ("One.sql", "-- name: First\nSELECT 1;\n\n-- name: Second\nSELECT 2;\n"),
+                ("Two.sql", "-- name: Third\nSELECT 3;\n"),
+            ]
+        ),
+        ["an ansi file whose first query is at sql"] = new(
+            "ansi",
+            OutputKind.CodeGen,
+            [("One.sql", "-- name: First\n-- output: sql\nSELECT 1;\n\n-- name: Second\nSELECT 2;\n")]
+        ),
+        ["tokens without a default under postgres"] = new(
+            "postgres",
+            OutputKind.Models,
+            [
+                (
+                    "Find.sql",
+                    "-- name: Find\nSELECT id FROM users {{where}} {{order}} {{limit:LIMIT 10}} {{tail:}};\n\n"
+                        + "-- name: Plain\n-- output: sql\nSELECT {{columns}} FROM users;\n\n"
+                        + "-- name: Later\n-- token: {{order:ORDER BY id}}\nSELECT id FROM users {{order}} {{page}};\n"
+                ),
+            ]
+        ),
+        ["both in one file"] = new(
+            "sqlite",
+            OutputKind.CodeGen,
+            [
+                (
+                    "Find.sql",
+                    "-- name: Plain\n-- output: sql\nSELECT {{columns}};\n\n-- name: Find\nSELECT 1 {{where}};\n\n"
+                        + "-- name: Count\nSELECT 2 {{where}} {{group}};\n"
+                ),
+            ]
+        ),
+    };
+
     private readonly TempFolder _folder = new();
 
     public static TheoryData<string> CaseNames => [with(Cases.Keys)];
+
+    public static TheoryData<string> ErrorCaseNames => [with(ErrorCases.Keys)];
 
     public void Dispose() => _folder.Dispose();
 
@@ -181,6 +230,73 @@ public sealed class GeneratorParityTests : IDisposable
         // A case in which neither finds a type would prove nothing.
         expected.Length.ShouldBe(types);
     }
+
+    [Theory]
+    [MemberData(nameof(ErrorCaseNames))]
+    public void Errors_OfTheSameSourcesAndFiles_AreTheGeneratorsSqlsrc209And210(string name)
+    {
+        var (dialect, output, sqlFiles) = ErrorCases[name];
+        var project = new TestProject(_folder) { LangVersion = "12.0" };
+        project.Properties["SqlSourceDialect"] = dialect;
+        project.Properties["SqlSourceOutput"] = SettingValue.NameOf(output);
+        var source = new SourceFile(project.AddSource("Queries.cs", Plans.Type), Plans.Type);
+        var listed = sqlFiles.Select(file => new SqlFile(project.AddSql(file.Path, file.Text), file.Text)).ToArray();
+
+        var run = GeneratorHarness.Run(output, [source], listed, dialect: dialect);
+        var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
+
+        // A diagnostic of the compiler keeps its arguments to itself, so each side is compared by its message: the
+        // one descriptor's format with each side's arguments.
+        var expected = InOrder(
+            run.Result.Diagnostics.Where(IsCompared)
+                .Select(diagnostic =>
+                {
+                    var span = diagnostic.Location.GetLineSpan();
+                    return new Reported(
+                        diagnostic.Id,
+                        span.Path,
+                        span.StartLinePosition,
+                        diagnostic.GetMessage(CultureInfo.InvariantCulture)
+                    );
+                })
+        );
+        var actual = InOrder(
+            plan.Errors.Where(error => IsCompared(error.Descriptor))
+                .Select(error => new Reported(
+                    error.Descriptor.Id,
+                    error.Path,
+                    error.Position,
+                    string.Format(
+                        CultureInfo.InvariantCulture,
+                        error.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                        [.. error.Arguments]
+                    )
+                ))
+        );
+
+        actual.ShouldBe(expected);
+        // A case in which neither reports an error would prove nothing, and each case has one of the two ids.
+        expected.ShouldNotBeEmpty();
+        // Only the two errors are compared; neither side has another for these files.
+        run.Diagnostics.Count.ShouldBe(expected.Length);
+        plan.Errors.Count.ShouldBe(actual.Length);
+    }
+
+    private static bool IsCompared(Diagnostic diagnostic) => IsCompared(diagnostic.Descriptor);
+
+    private static bool IsCompared(DiagnosticDescriptor descriptor) =>
+        descriptor.Id == ToolDiagnostics.OutputNeedsDescribableDialect.Id
+        || descriptor.Id == ToolDiagnostics.TokenHasNoDefault.Id;
+
+    private static Reported[] InOrder(IEnumerable<Reported> reported) =>
+        [
+            .. reported
+                .OrderBy(error => error.Path, StringComparer.Ordinal)
+                .ThenBy(error => error.Position?.Line)
+                .ThenBy(error => error.Position?.Character)
+                .ThenBy(error => error.Id, StringComparer.Ordinal)
+                .ThenBy(error => error.Message, StringComparer.Ordinal),
+        ];
 
     // What the generator's own step gives for each attributed type.  The output is left unset, as the tool's side
     // sets no property.
@@ -238,6 +354,11 @@ public sealed class GeneratorParityTests : IDisposable
     // One type as each side sees it: the file and the line of its attribute, what the attribute sets, and the .sql
     // files it claims, in member order.
     private sealed record Claimed(string SourcePath, int Line, string? Path, string? Output, string Files);
+
+    // One error as either side reports it: the id, the file, where in it, counted from zero, and the message.
+    private sealed record Reported(string Id, string? Path, LinePosition? Position, string Message);
+
+    private sealed record ErrorCase(string Dialect, OutputKind Output, (string Path, string Text)[] SqlFiles);
 
     private sealed record Case(
         int Types,
