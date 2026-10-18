@@ -44,7 +44,8 @@ internal static class GeneratorHarness
         new LoadedAssembly()
     ).GetAnalyzers(LanguageNames.CSharp);
 
-    // Every run states its output, the project's SqlSourceOutput: null leaves it unset, for a test of the default.
+    // Every run states its output, the project's SqlSourceOutput: null leaves it unset, for a test that needs the
+    // project not to set it, of the default or of the output's levels.
     public static GeneratorRun Run(OutputKind? output, string source, params SqlFile[] sqlFiles) =>
         Run(output, [new SourceFile(SourcePath, source)], sqlFiles);
 

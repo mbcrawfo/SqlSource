@@ -1,3 +1,5 @@
+// Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
+
 using System;
 using System.Collections.Generic;
 using Shouldly;
@@ -6,7 +8,7 @@ using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
 
-namespace SqlSource.Tests.Generation.MSBuild;
+namespace SqlSource.Tests.Generator;
 
 // The output that a test of the generator states is the project's SqlSourceOutput, as the compiler hands it over.
 // The key is spelled out, as the provider spells out its own.

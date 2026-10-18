@@ -12,7 +12,8 @@ namespace SqlSource.Testing.Generator;
 // listed is a file without metadata.  A property or a metadata is named as MSBuild names it: SqlSourceOutput.
 //
 // The output is the project's SqlSourceOutput, and every test that builds a provider states it: a null output is a
-// project that does not set it, for a test of the default.  An entry of the same name in the properties wins.
+// project that does not set it, for a test that needs that, of the default, of the output's levels or of a reader.
+// An entry of the same name in the properties wins.
 //
 // The keys are spelled out here, not taken from the generator, so that a change to the generator's spelling fails a
 // test.
