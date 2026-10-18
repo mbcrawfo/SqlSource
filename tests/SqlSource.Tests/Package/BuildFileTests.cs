@@ -118,15 +118,19 @@ public sealed partial class BuildFileTests
     }
 
     // A target's DependsOnTargets is read before the target runs, so the list that the manifest target depends on
-    // is a property set where the file is imported.  Nothing else is outside a target, and the file has no other
-    // condition outside one: a second such element would be read by every project, in every build.
+    // is a property set where the file is imported.  The nesting of a sidecar under its .sql file is read from the
+    // evaluated items by the IDEs, so it is outside every target too: see the comment in the file.  Nothing else is
+    // outside a target, and the file has no other condition outside one: a second such element would be read by
+    // every project, in every build.
     [Fact]
-    public void Targets_Root_HoldsTargetsAndTheListThatTheManifestTargetDependsOn()
+    public void Targets_Root_HoldsTargetsTheManifestsListAndTheNesting()
     {
         var root = Targets.Root.ShouldNotBeNull();
 
-        var group = root.Elements().Where(element => element.Name.LocalName != "Target").ShouldHaveSingleItem();
-        group.Name.LocalName.ShouldBe("PropertyGroup");
+        var outside = root.Elements().Where(element => element.Name.LocalName != "Target").ToList();
+        outside.Select(element => element.Name.LocalName).ShouldBe(["PropertyGroup", "ItemGroup"]);
+
+        var group = outside[0];
         group.Attributes().ShouldBeEmpty();
 
         var lines = group.Elements().ToList();
@@ -139,6 +143,22 @@ public sealed partial class BuildFileTests
         lines[1].Attributes().ShouldHaveSingleItem().Name.LocalName.ShouldBe("Condition");
         lines[1].Attribute("Condition")!.Value.ShouldBe("'$(TargetFramework)' != ''");
         lines[1].Value.ShouldBe("$(SqlSourceManifestDependsOn);AddImplicitDefineConstants");
+
+        // The item types are the two an IDE may nest on.  Update changes the items that are already there and adds
+        // none, so a project without a sidecar is not given one.
+        var nesting = outside[1];
+        nesting.Attributes().ShouldBeEmpty();
+        var items = nesting.Elements().ToList();
+        items.Select(item => item.Name.LocalName).ShouldBe(["AdditionalFiles", "None"]);
+        foreach (var item in items)
+        {
+            item.Attributes()
+                .ToDictionary(attribute => attribute.Name.LocalName, attribute => attribute.Value)
+                .ShouldBe(
+                    new Dictionary<string, string> { ["Update"] = "**/*.sql.json", ["DependentUpon"] = "%(Filename)" }
+                );
+            item.HasElements.ShouldBeFalse();
+        }
     }
 
     // The tool runs the target by name.  A hook would make every build write the manifest, and a condition would
@@ -280,7 +300,8 @@ public sealed partial class BuildFileTests
     public void Targets_MetadataOfEverySqlFile_IsTrimmed()
     {
         var names = Settings.Concat(TrimmedOnly).ToList();
-        var item = Targets.Descendants("AdditionalFiles").ShouldHaveSingleItem();
+        // The nesting outside every target is an AdditionalFiles item too.
+        var item = Targets.Descendants("Target").Descendants("AdditionalFiles").ShouldHaveSingleItem();
         var target = item.Ancestors("Target").ShouldHaveSingleItem();
 
         target.Attribute("Name").ShouldNotBeNull().Value.ShouldBe("SqlSourceTrimMetadataOfFiles");
@@ -350,13 +371,21 @@ public sealed partial class BuildFileTests
     public void Targets_ItemMetadata_IsNeverTheArgumentOfAPropertyFunction() =>
         Values(Targets).ShouldAllBe(value => !MetadataInAPropertyFunction().IsMatch(value));
 
+    // A .sql file's sidecar goes to the compiler with it.
     [Fact]
-    public void Props_SqlFilesOfTheProject_AreLeftOutWhenSqlSourceIncludeFilesIsFalse()
+    public void Props_SqlFilesAndSidecarsOfTheProject_AreLeftOutWhenSqlSourceIncludeFilesIsFalse()
     {
-        var item = Props.Descendants("AdditionalFiles").ShouldHaveSingleItem();
+        var items = Props.Descendants("AdditionalFiles").ToList();
 
-        item.Attribute("Condition").ShouldBeNull();
-        item.Parent.ShouldNotBeNull()
+        items.Select(item => item.Attribute("Include").ShouldNotBeNull().Value).ShouldBe(["**/*.sql", "**/*.sql.json"]);
+        items.ShouldAllBe(item =>
+            item.Attribute("Exclude")!.Value == "$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)"
+        );
+        items.ShouldAllBe(item => item.Attribute("Condition") == null);
+        items
+            .Select(item => item.Parent.ShouldNotBeNull())
+            .Distinct()
+            .ShouldHaveSingleItem()
             .Attribute("Condition")
             .ShouldNotBeNull()
             .Value.ShouldBe("'$(SqlSourceIncludeFiles)' != 'false'");

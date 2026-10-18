@@ -143,9 +143,10 @@
     </Target>
     <!--
         What SqlSourceWriteManifest depends on.  A target's DependsOnTargets is read before the target runs, so the
-        list is a property and is set here, where the file is imported: this is the one element of the file that is
-        not a target, and its second line holds the file's one condition.  The trims make the manifest hold trimmed
-        values, and make a target of a project that hooks SqlSourceTrimMetadataOfFiles to add a .sql file run first.
+        list is a property and is set here, where the file is imported: this and the nesting below are the elements of
+        the file that are not a target, and the second line here holds the file's one condition.  The trims make the
+        manifest hold trimmed values, and make a target of a project that hooks SqlSourceTrimMetadataOfFiles to add a
+        .sql file run first.
 
         AddImplicitDefineConstants is a target of the SDK and not a contract: TD-0027.  It adds the constants of the
         framework, NET10_0 and NET8_0_OR_GREATER among them, which the SDK otherwise adds only on the way to a
@@ -156,6 +157,17 @@
         <SqlSourceManifestDependsOn Condition="'$(TargetFramework)' != ''"
             >$(SqlSourceManifestDependsOn);AddImplicitDefineConstants</SqlSourceManifestDependsOn>
     </PropertyGroup>
+    <!--
+        Nests a sidecar under its .sql file in the solution explorer of an IDE: Users.sql.json under Users.sql.  The
+        IDEs nest from the evaluated items, so this is outside every target.  It is in this file, and not in the
+        props, so that it reaches a sidecar that a project lists itself when SqlSourceIncludeFiles is off.  It is on
+        None too, since an IDE may nest on either item type; the SDK lists every file of the project there.  Update
+        changes the items that are already listed and adds none.
+    -->
+    <ItemGroup>
+        <AdditionalFiles Update="**/*.sql.json" DependentUpon="%(Filename)" />
+        <None Update="**/*.sql.json" DependentUpon="%(Filename)" />
+    </ItemGroup>
     <!--
         Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
         name.  It hooks nothing on purpose, so no build runs it, and nothing of a build runs before it but the two

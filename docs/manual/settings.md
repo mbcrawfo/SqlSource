@@ -420,7 +420,9 @@ Only the settings whose row in [the tables](#all-settings) lists metadata can be
 
 ## Which `.sql` files are included
 
-The package hands every `.sql` file under the project's folder to the compiler, as an `AdditionalFiles` item: that is how a source generator sees a file that is not C#.  The output and intermediate folders are left out, and so are folders whose names start with a dot, as the SDK leaves them out of your C# files.  The `sqlsource` tool reads the same list.  A `.sql` file outside the project's folder is not included; list it yourself.
+The package hands every `.sql` file under the project's folder to the compiler, as an `AdditionalFiles` item: that is how a source generator sees a file that is not C#.  The output and intermediate folders are left out, and so are folders whose names start with a dot, as the SDK leaves them out of your C# files.  The `sqlsource` tool reads the same list of `.sql` files.  A `.sql` file outside the project's folder is not included; list it yourself.
+
+The package hands the [sidecar](concepts.md#sidecar) beside a `.sql` file to the compiler too, the file `Users.sql.json` for `Users.sql`, under the same rules.  Nothing in a build reads one yet.
 
 To leave some files out:
 
@@ -438,10 +440,11 @@ To turn the default off and list the files yourself:
 </PropertyGroup>
 <ItemGroup>
     <AdditionalFiles Include="Queries/**/*.sql" />
+    <AdditionalFiles Include="Queries/**/*.sql.json" />
 </ItemGroup>
 ```
 
-A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Path`](#setting-path), and a file no type claims is ignored.
+Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Path`](#setting-path), and a file no type claims is ignored.
 
 ## Values written in MSBuild
 
