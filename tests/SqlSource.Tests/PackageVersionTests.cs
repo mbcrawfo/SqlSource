@@ -16,4 +16,12 @@ public sealed class PackageVersionTests
             .Version.ShouldNotBeNull()
             .ToString()
             .ShouldStartWith(PackageVersion.Prefix + ".");
+
+    [Theory]
+    [InlineData("0.1.0-dev")]
+    [InlineData("0.1.0-pr-42")]
+    [InlineData("0.1.0+abc")]
+    [InlineData("0.1.0")]
+    public void PrefixOf_Version_IsTheTextBeforeTheFirstDashOrPlus(string version) =>
+        PackageVersion.PrefixOf(version).ShouldBe("0.1.0");
 }

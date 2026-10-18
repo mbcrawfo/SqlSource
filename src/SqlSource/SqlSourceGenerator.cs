@@ -10,6 +10,7 @@ using SqlSource.Generation;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
+using SqlSource.Generation.Sidecars;
 using SqlSource.Settings;
 
 namespace SqlSource;
@@ -181,6 +182,24 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 }
             }
         );
+
+        // The sidecars are an input of their own, so that an edit to one reads nothing that a .sql file feeds.  A
+        // sidecar whose .sql file no type claims is never read, and no step after the read holds its text.
+        var sidecars = context
+            .AdditionalTextsProvider.Where(static file => SqlPath.IsSidecarFile(file.Path))
+            .Combine(claimedPaths)
+            .Select(static (input, _) => SidecarInput.Create(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.SidecarInput)
+            .Where(static input => input is not null)
+            .Select(static (input, cancellationToken) => SidecarFileReader.Read(input!, cancellationToken))
+            .WithTrackingName(TrackingNames.SidecarFile)
+            .Collect()
+            .Select(static (files, _) => ToSorted(files, static file => file.SqlPath))
+            .WithTrackingName(TrackingNames.Sidecars);
+
+        // The checks of the sidecars will report from here.  Until then it reports nothing, and keeps the steps above
+        // tracked: the driver tracks a step only when what it gives reaches an output.
+        context.RegisterSourceOutput(sidecars, static (_, _) => { });
 
         // Stage two of the settings: the metadata of the files that have any, which are few.  It never reaches the
         // parse of a file.

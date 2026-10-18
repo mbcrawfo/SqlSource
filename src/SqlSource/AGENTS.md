@@ -22,6 +22,7 @@ The source generator.  It is loaded into the C# compiler of whoever consumes it,
 - **Every `Collect()` has a `Select` after it that gives an `EquatableArray<T>`**, or the step after runs on every edit.  The listed paths that `CaseCollisions` takes are the one exception.
 - **Resolving a type's `Path` must not depend on the text of any file**, only on the list of paths.
 - **A `.sql` file that no type claims is never read**, and its errors are never reported.
+- **A sidecar is read only when its `.sql` file is claimed, and no step after `SidecarFile` holds its text.**
 - **Compare paths with `SqlPath.Comparer`, after `SqlPath.Normalize`; find one with `SqlPath.IndexOf`, `SqlPath.Contains` or `SqlPath.FindInFolder`.**  Never compare a raw path, call `System.IO.Path` or touch the file system (RS1035), and never search a list with a pass over it.  See [paths](../../docs/architecture/generator.md#paths).
 - **The lists of paths and of parsed files stay distinct ignoring case.**  A later file whose path differs only by case is left out, and `Generation/Paths/PathCollision.cs` reports it as `SQLSRC013` when a type claims the path.
 - **The `sqlsource` tool plans a run with this code.**  A change to a member that `src/SqlSource.Tool/Planning/` calls changes what the tool describes ([the list](../../docs/architecture/generator.md#the-tool-runs-the-same-code)); `tests/SqlSource.Tool.Tests/Planning/GeneratorParityTests.cs` compares the claims of the two.
