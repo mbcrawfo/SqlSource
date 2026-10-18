@@ -6,7 +6,8 @@ using SqlSource.Parsing;
 namespace SqlSource.Diagnostics;
 
 /// <summary>
-/// Every diagnostic the generator reports.  Each is an error that a consumer cannot turn off.
+/// Every diagnostic the generator reports.  Each is an error that a consumer cannot turn off, unless its descriptor
+/// says why it is a warning a project may configure; <c>SqlDiagnosticsTests</c> lists those by id.
 /// </summary>
 /// <remarks>
 /// Adding, removing or changing one also changes <c>AnalyzerReleases.Unshipped.md</c> and
@@ -375,6 +376,115 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor SidecarMalformed = new(
+        id: "SQLSRC237",
+        title: "Sidecar cannot be read",
+        messageFormat: "The sidecar cannot be read, because {0}.  Run 'sqlsource describe' to write it again.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc237",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SidecarFormatTooNew = new(
+        id: "SQLSRC238",
+        title: "Sidecar has a newer format",
+        messageFormat: "The sidecar has format {0}, and this version of SqlSource reads format {1}.  Update the "
+            + "SqlSource package.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc238",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor SidecarFormatTooOld = new(
+        id: "SQLSRC239",
+        title: "Sidecar has an older format",
+        messageFormat: "The sidecar has format {0}, and this version of SqlSource reads format {1}.  Run "
+            + "'sqlsource describe' to write it again.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc239",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // A warning a project may configure: a sidecar of another version of the tool is still read and used, since the
+    // format is the same.  An error would break every build after the package is updated until the tool runs.  A
+    // project that commits its sidecars and treats warnings as errors may list it in WarningsNotAsErrors.
+    public static readonly DiagnosticDescriptor SidecarToolVersionDiffers = new(
+        id: "SQLSRC240",
+        title: "Sidecar was written by another version of the tool",
+        messageFormat: "The sidecar was written by sqlsource {0}, and this project uses SqlSource {1}.  Bring the tool "
+            + "and the package to one version, and run 'sqlsource describe'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc240"
+    );
+
+    public static readonly DiagnosticDescriptor QueryHasNoEntry = new(
+        id: "SQLSRC241",
+        title: "Query has no entry in the sidecar",
+        messageFormat: "The query '{0}' has no entry in the sidecar of its file, and its output '{1}' needs one.  "
+            + "Run 'sqlsource describe'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc241",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor EntryEngineDiffers = new(
+        id: "SQLSRC242",
+        title: "Entry is of another database",
+        messageFormat: "The entry of the query '{0}' was described for '{1}', and the dialect of this file is "
+            + "'{2}'.  Run 'sqlsource describe'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc242",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor EngineHasNoTypeMap = new(
+        id: "SQLSRC243",
+        title: "No type map for the dialect",
+        messageFormat: "This version of SqlSource has no type map for the dialect '{0}', so no query of this file "
+            + "can have models.  Set the output to 'sql'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc243",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor EntryIsStale = new(
+        id: "SQLSRC244",
+        title: "Entry is stale",
+        messageFormat: "The query '{0}' has changed since its entry was written.  Run 'sqlsource describe'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc244",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // A warning a project may configure: an entry that nothing reads generates nothing wrong.  An error would break
+    // every build after a query is removed, or set to the output sql, until the tool runs.
+    public static readonly DiagnosticDescriptor OrphanEntry = new(
+        id: "SQLSRC245",
+        title: "Entry names no query",
+        messageFormat: "The entry '{0}' names no query of the file that needs one.  Run 'sqlsource describe', which "
+            + "removes it.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Warning,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc245"
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -411,7 +521,16 @@ internal static class SqlDiagnostics
             MarkerNotAllowedHere,
             MissingParameterType,
             UndeclaredParameter,
-            InputModelWithoutParameters
+            InputModelWithoutParameters,
+            SidecarMalformed,
+            SidecarFormatTooNew,
+            SidecarFormatTooOld,
+            SidecarToolVersionDiffers,
+            QueryHasNoEntry,
+            EntryEngineDiffers,
+            EngineHasNoTypeMap,
+            EntryIsStale,
+            OrphanEntry
         );
 
     /// <summary>

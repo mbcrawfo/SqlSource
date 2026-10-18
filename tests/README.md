@@ -21,7 +21,7 @@ The libraries are never run as tests, hold no tests and are never packed:
 
 | Project | Roslyn | Holds |
 |----|----|----|
-| `tests/SqlSource.Testing` | 4.8.0, since RoslynFloor references it | The harness of the generator's driver tests (`Generator/`), `TestSidecars` (`Snapshot/`) and `RepositoryRoot` |
+| `tests/SqlSource.Testing` | 4.8.0, since RoslynFloor references it | The harness of the generator's driver tests (`Generator/`, with `Sidecars`, which hands the generator a sidecar), `TestSidecars` (`Snapshot/`) and `RepositoryRoot` |
 | `tests/SqlSource.Tool.Testing` | A current version, the tool's | The helpers that the tool's tests and the PostgreSQL tests share |
 
 `tests/SqlSource.Tool.Testing` holds:

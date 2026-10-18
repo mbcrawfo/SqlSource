@@ -74,3 +74,12 @@ SQLSRC233 | SqlSource | Error | Statement cannot be described
 SQLSRC234 | SqlSource | Error | Query writes a positional parameter
 SQLSRC235 | SqlSource | Error | Server version is not supported
 SQLSRC236 | SqlSource | Error | Connection does not keep a session
+SQLSRC237 | SqlSource | Error | Sidecar cannot be read
+SQLSRC238 | SqlSource | Error | Sidecar has a newer format
+SQLSRC239 | SqlSource | Error | Sidecar has an older format
+SQLSRC240 | SqlSource | Warning | Sidecar was written by another version of the tool
+SQLSRC241 | SqlSource | Error | Query has no entry in the sidecar
+SQLSRC242 | SqlSource | Error | Entry is of another database
+SQLSRC243 | SqlSource | Error | No type map for the dialect
+SQLSRC244 | SqlSource | Error | Entry is stale
+SQLSRC245 | SqlSource | Warning | Entry names no query

@@ -17,10 +17,11 @@ public sealed class DiagnosticsDocumentTests
 {
     private const string HeadingPrefix = "## ";
 
-    // The generator's descriptors and then the tool's, which is the order of their ids.
-    private static readonly ImmutableArray<DiagnosticDescriptor> Descriptors = SqlDiagnostics.All.AddRange(
-        ToolDiagnostics.All
-    );
+    // The generator's descriptors and the tool's together, in the order of their ids, which is the document's.
+    private static readonly ImmutableArray<DiagnosticDescriptor> Descriptors =
+    [
+        .. SqlDiagnostics.All.Concat(ToolDiagnostics.All).OrderBy(descriptor => descriptor.Id, StringComparer.Ordinal),
+    ];
 
     private static readonly string[] Lines = File.ReadAllLines(
         Path.Combine(AppContext.BaseDirectory, "docs", "manual", "diagnostics.md")

@@ -14,6 +14,11 @@ internal static class SqlPath
 {
     private const string SqlExtension = ".sql";
 
+    private const string SidecarExtension = ".sql.json";
+
+    // What a sidecar's path has after the path of its .sql file.
+    private const string JsonExtension = ".json";
+
     private const char Separator = '/';
 
     private static readonly char[] Separators = [Separator, '\\'];
@@ -24,6 +29,30 @@ internal static class SqlPath
     public static StringComparer Comparer => StringComparer.OrdinalIgnoreCase;
 
     public static bool IsSqlFile(string path) => path.EndsWith(SqlExtension, StringComparison.OrdinalIgnoreCase);
+
+    public static bool IsSidecarFile(string path) =>
+        path.EndsWith(SidecarExtension, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// The normalised path of the <c>.sql</c> file whose sidecar is at <paramref name="sidecarPath" />: the
+    /// sidecar's normalised path without <c>.json</c>.  Null when <see cref="Normalize" /> is, or when the
+    /// normalised path is not a sidecar's.
+    /// </summary>
+    public static string? SqlPathOfSidecar(string sidecarPath) =>
+        Normalize(sidecarPath) is { } normalized && IsSidecarFile(normalized)
+            ? normalized.Substring(0, normalized.Length - JsonExtension.Length)
+            : null;
+
+    /// <summary>
+    /// Whether <paramref name="sidecarPath" />, normalised, is <paramref name="normalizedSqlPath" /> with
+    /// <c>.json</c> after it, spelled exactly so: the path at which the tool reads and writes the sidecar of that
+    /// file.
+    /// </summary>
+    public static bool IsSidecarPathOf(string sidecarPath, string normalizedSqlPath) =>
+        Normalize(sidecarPath) is { } normalized
+        && normalized.Length == normalizedSqlPath.Length + JsonExtension.Length
+        && normalized.StartsWith(normalizedSqlPath, StringComparison.Ordinal)
+        && normalized.EndsWith(JsonExtension, StringComparison.Ordinal);
 
     /// <summary>
     /// The paths, each once ignoring case and in the order of <see cref="Comparer" />, which is also the order of a

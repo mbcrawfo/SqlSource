@@ -37,7 +37,7 @@ Each name links to its section, which gives its values and its rules.  **Written
 
 | Setting | Values | Written as | Status |
 |----|----|----|----|
-| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `SqlSourceOutput` property and metadata; `Output` on the attribute; `-- output:` in the file header and inside a query | Works today for the tool; [no effect yet](README.md#what-works-today) on generated code |
+| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `SqlSourceOutput` property and metadata; `Output` on the attribute; `-- output:` in the file header and inside a query | Works today: it decides which queries the tool describes and the build checks against their sidecar; [no effect yet](README.md#what-works-today) on generated code |
 | [Database](#setting-database) | A name of letters, digits, `-`, `_` and `.`.  Default: the name of the file's dialect | `SqlSourceDatabase` property and metadata; `-- database:` in the file header and inside a query | Works today, for the tool alone |
 | [Dialect](#setting-dialect) | A dialect's name, with options for `mysql` and `mariadb`: see [the dialects page](dialects.md#choosing-a-dialect).  Default `ansi` | `SqlSourceDialect` property and metadata; `-- dialect:` in the file header | Works today |
 | [Generator parameters](#setting-generator-parameters) | Words separated by spaces: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `default`.  Default: none | `SqlSourceGeneratorParameters` property and metadata; `Parameters` on the attribute; `-- generator:` in the file header and inside a query | Works today for `keep-comments` and `no-token-validation`; [accepted; no effect yet](README.md#what-works-today) for the other four |
@@ -126,9 +126,9 @@ TRUNCATE TABLE audit_log;
 
 On the attribute: `[SqlSourceGenerate(Output = GeneratorOutput.Sql)]`.  As a marker it stands in the file header, for every query of the file, and inside a query.
 
-**Today, `Output` decides which queries the tool describes.**  `sqlsource describe` asks a database about the queries whose output is `models` or `codegen`.  A query whose output is `sql` needs no description, belongs to no [logical database](#setting-database) and needs no connection.  On the attribute, write the value out literally, as in `Output = GeneratorOutput.Models`, so that the tool can read it; a constant or an expression there is [SQLSRC208](diagnostics.md#sqlsrc208).  Details are under [the generator's known issues](generator.md#known-issues).  A file claimed by two types, or listed by two projects, is described when either needs it.
+**Today, `Output` decides which queries must be described.**  `sqlsource describe` asks a database about the queries whose output is `models` or `codegen`, and the build checks that each of them has a current entry in its file's [sidecar](concepts.md#sidecar): a query that has none is [SQLSRC241](diagnostics.md#sqlsrc241), and one that changed since it was described is [SQLSRC244](diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry, no connection, and belongs to no [logical database](#setting-database).  On the attribute, write the value out literally, as in `Output = GeneratorOutput.Models`, so that the tool can read it; a constant or an expression there is [SQLSRC208](diagnostics.md#sqlsrc208).  Details are under [the generator's known issues](generator.md#known-issues).  A file claimed by two types, or listed by two projects, is described when either needs it, and the build of a project checks the entries that any of its types needs, once for the file.
 
-The tool can describe only some dialects: see [the database support table](dialects.md#database-support).  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](diagnostics.md#sqlsrc209) from the tool for every file.  Set the dialect, or set the output to `sql` for queries that want only their SQL.
+The tool can describe only some dialects: see [the database support table](dialects.md#database-support).  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](diagnostics.md#sqlsrc209) for every file, in its build and from the tool.  A file of `mssql` whose queries must be described is [SQLSRC243](diagnostics.md#sqlsrc243) in the build, until SQL Server queries can be described.  Set the dialect and describe the queries, or set the output to `sql` for queries that want only their SQL.
 
 > **Coming in a later release.**  `models` and `codegen` will generate types for a query's parameters and result, and a method that runs it.  Today every query gets its constant or token method whatever its output.  See [what works today](README.md#what-works-today).
 
@@ -183,7 +183,7 @@ The [dialect](concepts.md#dialect) is the set of rules by which SqlSource reads 
 - **A file has one dialect.**  The marker goes in the file header, before the first SQL, and not inside a query: anywhere else it is [SQLSRC115](diagnostics.md#sqlsrc115).  It takes effect on the line after it, so comments above it are read by the dialect that the metadata or the property gives.
 - **A value replaces the one below it whole.**  A file with `-- dialect: mysql` in a project that sets `mysql,ansi-quotes` is read as plain `mysql`.
 - **A value that is not a dialect** is [SQLSRC111](diagnostics.md#sqlsrc111) in a marker and [SQLSRC011](diagnostics.md#sqlsrc011) in a property or item metadata.  A file whose property or metadata is wrong is read as `ansi` meanwhile.
-- **The tool reads the dialect too.**  It decides which queries the tool can describe: `postgres` today.  A query of `mssql` that must be described is [SQLSRC216](diagnostics.md#sqlsrc216), since describing SQL Server queries is coming.  See [database support](dialects.md#database-support).
+- **The tool reads the dialect too.**  It decides which queries the tool can describe: `postgres` today.  A query of `mssql` that must be described is [SQLSRC216](diagnostics.md#sqlsrc216) from the tool, and its file [SQLSRC243](diagnostics.md#sqlsrc243) in the build, since describing SQL Server queries is coming.  See [database support](dialects.md#database-support).
 
 <a id="setting-generator-parameters"></a>
 
@@ -420,7 +420,9 @@ Only the settings whose row in [the tables](#all-settings) lists metadata can be
 
 ## Which `.sql` files are included
 
-The package hands every `.sql` file under the project's folder to the compiler, as an `AdditionalFiles` item: that is how a source generator sees a file that is not C#.  The output and intermediate folders are left out, and so are folders whose names start with a dot, as the SDK leaves them out of your C# files.  The `sqlsource` tool reads the same list.  A `.sql` file outside the project's folder is not included; list it yourself.
+The package hands every `.sql` file under the project's folder to the compiler, as an `AdditionalFiles` item: that is how a source generator sees a file that is not C#.  The output and intermediate folders are left out, and so are folders whose names start with a dot, as the SDK leaves them out of your C# files.  The `sqlsource` tool reads the same list of `.sql` files.  A `.sql` file outside the project's folder is not included; list it, and its sidecar, yourself.
+
+The package hands the [sidecar](concepts.md#sidecar) beside a `.sql` file to the compiler too, the file `Users.sql.json` for `Users.sql`, under the same rules.  The build reads the sidecar of each `.sql` file that a type claims, and reports a query that must be described and has no current entry in it: see [Output](#setting-output).
 
 To leave some files out:
 
@@ -438,10 +440,11 @@ To turn the default off and list the files yourself:
 </PropertyGroup>
 <ItemGroup>
     <AdditionalFiles Include="Queries/**/*.sql" />
+    <AdditionalFiles Include="Queries/**/*.sql.json" />
 </ItemGroup>
 ```
 
-A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Path`](#setting-path), and a file no type claims is ignored.
+Turning the default off turns it off for sidecars too, so list them as well, as the example does.  A file the project includes is only handed to the compiler.  Which of them belong to a type is the type's [`Path`](#setting-path), and a file no type claims is ignored.
 
 ## Values written in MSBuild
 
@@ -464,7 +467,7 @@ A line break inside one word puts a space there.  `App.` and `Models` on two lin
 
 ## Known issues
 
-- **A `.sql` file that one of your own build targets adds is not fully seen.**  This is about a target in your project that adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as one that writes a file or copies it in.  The build compiles the file, and nothing is reported, but two things go wrong.  `sqlsource` leaves out the file's queries, so it describes none of them.  And the settings you gave the file as item metadata, its dialect for one, are dropped when the target runs late in the build, so the file is read with the project's settings.  To make both work, tell your target to run before the package reads its settings, wherever the target is declared:
+- **A `.sql` file that one of your own build targets adds is not fully seen.**  This is about a target in your project that adds a `.sql` file to the `AdditionalFiles` items while the build runs, such as one that writes a file or copies it in.  The build compiles the file, but two things go wrong.  `sqlsource` leaves out the file's queries, so it describes none of them, and the build reports [SQLSRC241](diagnostics.md#sqlsrc241) for each that must be described.  And the settings you gave the file as item metadata, its dialect for one, are dropped when the target runs late in the build, so the file is read with the project's settings.  To make both work, tell your target to run before the package reads its settings, wherever the target is declared:
 
   ```xml
   <Target Name="AddGeneratedSql" BeforeTargets="SqlSourceTrimMetadataOfFiles">

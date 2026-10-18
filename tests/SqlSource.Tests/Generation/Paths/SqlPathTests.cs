@@ -73,6 +73,41 @@ public sealed class SqlPathTests
     public void IsSqlFile_Path_ChecksTheExtensionIgnoringCase(string path, bool expected) =>
         SqlPath.IsSqlFile(path).ShouldBe(expected);
 
+    [Theory]
+    [InlineData("Users.sql.json", true)]
+    [InlineData("USERS.SQL.JSON", true)]
+    [InlineData("Users.json", false)]
+    [InlineData("Users.sql", false)]
+    public void IsSidecarFile_Path_ChecksTheExtensionIgnoringCase(string path, bool expected) =>
+        SqlPath.IsSidecarFile(path).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("/app/Users.sql.json", "app/Users.sql")]
+    [InlineData("C:\\app\\.\\Users.SQL.JSON", "C:/app/Users.SQL")]
+    public void SqlPathOfSidecar_Path_IsTheNormalizedPathWithoutJson(string path, string expected) =>
+        SqlPath.SqlPathOfSidecar(path).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("../Users.sql.json")]
+    [InlineData("app/Users.json")]
+    public void SqlPathOfSidecar_PathThatIsNoSidecarOnceNormalized_IsNull(string path) =>
+        SqlPath.SqlPathOfSidecar(path).ShouldBeNull();
+
+    [Theory]
+    [InlineData("/app/Users.sql.json", "app/Users.sql")]
+    [InlineData("C:\\app\\.\\Users.sql.json", "C:/app/Users.sql")]
+    public void IsSidecarPathOf_PathSpelledAsTheSqlPathWithJson_IsTrue(string path, string sqlPath) =>
+        SqlPath.IsSidecarPathOf(path, sqlPath).ShouldBeTrue();
+
+    [Theory]
+    [InlineData("/app/users.sql.json", "app/Users.sql")]
+    [InlineData("/app/Users.sql.JSON", "app/Users.sql")]
+    [InlineData("/app/Users.sql", "app/Users.sql")]
+    [InlineData("/app/Other.sql.json", "app/Users.sql")]
+    [InlineData("../Users.sql.json", "Users.sql")]
+    public void IsSidecarPathOf_PathSpelledOtherwise_IsFalse(string path, string sqlPath) =>
+        SqlPath.IsSidecarPathOf(path, sqlPath).ShouldBeFalse();
+
     [Fact]
     public void Contains_SortedPaths_FindsEachPathIgnoringCaseAndNothingElse()
     {

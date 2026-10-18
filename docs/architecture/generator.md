@@ -1,14 +1,14 @@
 # The generator
 
-How `src/SqlSource` turns a project's `.sql` files into C#: the incremental pipeline, how the settings are read and resolved, how a file is parsed, what is written for a type, how problems travel to the compiler, and the model of a sidecar that the assembly holds.  What a user writes and gets is in the manual's [generator page](../manual/generator.md) and [`.sql` files page](../manual/sql-files.md).  The terms are the [glossary's](README.md#glossary).
+How `src/SqlSource` turns a project's `.sql` files into C#: the incremental pipeline, how the settings are read and resolved, how a file is parsed, how a file's sidecar is read and checked, what is written for a type, how problems travel to the compiler, and the model of a sidecar that the assembly holds.  What a user writes and gets is in the manual's [generator page](../manual/generator.md) and [`.sql` files page](../manual/sql-files.md).  The terms are the [glossary's](README.md#glossary).
 
 ## The pipeline
 
-[`SqlSourceGenerator`](../../src/SqlSource/SqlSourceGenerator.cs) is an `IIncrementalGenerator`, and its `Initialize` only wires the steps.  Beyond the wiring it holds a few helpers, which sort, join and search collected values.  The steps and their records are at the root of [`Generation/`](../../src/SqlSource/Generation), the path rules in `Paths/`, the readers of MSBuild properties and metadata in `MSBuild/`, and what writes a type's file in `Emitting/`.
+[`SqlSourceGenerator`](../../src/SqlSource/SqlSourceGenerator.cs) is an `IIncrementalGenerator`, and its `Initialize` only wires the steps.  Beyond the wiring it holds a few helpers, which sort, join and search collected values.  The steps and their records are at the root of [`Generation/`](../../src/SqlSource/Generation), the path rules in `Paths/`, the readers of MSBuild properties and metadata in `MSBuild/`, the reading and checking of sidecars in `Sidecars/`, and what writes a type's file in `Emitting/`.
 
 Before any step runs, a post-initialization output adds `AttributeSource.Text` to the compilation as `SqlSourceGenerateAttribute.g.cs`.  It holds `[SqlSourceGenerate]` and the enums its properties take.
 
-The compiler hands the pipeline five inputs: the declarations that carry the attribute, the additional files whose path ends in `.sql`, the compilation, the parse options, and the analyzer config options, which hold the project's properties and each file's metadata.  Each named step below is a constant of [`TrackingNames`](../../src/SqlSource/Generation/TrackingNames.cs).  The unnamed boxes are a `Select` or a `Collect` between two named steps.
+The compiler hands the pipeline five inputs: the declarations that carry the attribute, the additional files, the compilation, the parse options, and the analyzer config options, which hold the project's properties and each file's metadata.  The additional files are filtered twice, into the `.sql` files, by `SqlPath.IsSqlFile`, and the [sidecars](README.md#sidecar), whose path ends in `.sql.json` ignoring case, by `SqlPath.IsSidecarFile`, so that each kind is an input of its own.  Each named step below is a constant of [`TrackingNames`](../../src/SqlSource/Generation/TrackingNames.cs).  The unnamed boxes are a `Select` or a `Collect` between two named steps.
 
 ```mermaid
 flowchart TD
@@ -45,6 +45,17 @@ flowchart TD
     FilesSettings --> TypeQueries
     TypeQueries --> TypeOutput
     ProjectSettings --> TypeOutput
+    sidecarTexts[".sql.json additional files"] --> SidecarInput
+    ClaimedPaths --> SidecarInput
+    SidecarInput --> SidecarFile
+    SidecarFile --> Sidecars
+    TypeQueries --> TypeNeeds
+    ProjectSettings --> TypeNeeds
+    TypeNeeds --> FileNeeds
+    ParsedFiles -->|"each file"| SidecarCheckInput
+    FileNeeds --> SidecarCheckInput
+    Sidecars --> SidecarCheckInput
+    SidecarCheckInput --> SidecarCheck
     CaseCollisions --> out13(["SQLSRC013"])
     ClaimedPaths --> out13
     ParsedFiles --> outParse(["Parse errors and SQLSRC011"])
@@ -52,6 +63,7 @@ flowchart TD
     ProjectSettings --> out14(["SQLSRC014"])
     FilesSettings --> out14
     ClaimedPaths --> out14
+    SidecarCheck --> outSidecar(["Sidecar checks, SQLSRC209 and SQLSRC210"])
     TypeOutput --> outType(["A type's file and its diagnostics"])
 ```
 
@@ -70,18 +82,22 @@ What each step gives:
 - **`AmbiguousHintNames`**: the [hint names](README.md#hint-name) that would clash ignoring case.
 - **`TypeQueries`**: a type with its own parsed files, the metadata of each and its unique hint name, from `SelectFiles`.  It compares equal until the type, one of its files or the metadata of one changes.
 - **`TypeOutput`**: the type's file, or none, with its diagnostics, from `TypeEmitter.Emit`.
+- **`SidecarInput`**: a `SidecarInput` for each sidecar whose `.sql` file a type claims, from `SidecarInput.Create`: the file and the path of its `.sql` file as `ClaimedPaths` spells it.  Any other sidecar gives null and is never read.
+- **`SidecarFile`**: the sidecar read, a `SidecarFile`, from `SidecarFileReader.Read`.  **`Sidecars`**: those, collected and sorted by the path of their `.sql` file.
+- **`TypeNeeds`**: what a type needs of each of its files, from `SidecarNeeds.OfType`.  **`FileNeeds`**: the needs of every type merged, one `FileNeeds` for each file, from `SidecarNeeds.Merge`.
+- **`SidecarCheckInput`**: each parsed file with its sidecar and its needs, from `SidecarCheckInput.Gather`.  **`SidecarCheck`**: what the checks of the file's sidecar gave, a `SidecarCheckResult`, from `SidecarChecker.Check`.  [Sidecars](#sidecars) describes these steps.
 
-There are four source outputs.  `TypeOutput` gives each type's file and its diagnostics.  The other three report what belongs to no one type: `CaseCollisions` with `ClaimedPaths` gives `SQLSRC013`, `ParsedFiles` with `ProjectDialect` gives each file's parse errors and `SQLSRC011`, and `ProjectSettings` with `FilesSettings` and `ClaimedPaths` gives `SQLSRC014`.  A file's errors are reported from the collected files, so a file the project lists twice is reported once.
+There are five source outputs.  `TypeOutput` gives each type's file and its diagnostics.  The other four report what belongs to no one type: `CaseCollisions` with `ClaimedPaths` gives `SQLSRC013`, `ParsedFiles` with `ProjectDialect` gives each file's parse errors and `SQLSRC011`, `ProjectSettings` with `FilesSettings` and `ClaimedPaths` gives `SQLSRC014`, and `SidecarCheck` gives what the checks of each claimed file's sidecar found, `SQLSRC209` and `SQLSRC210` among them.  A file's errors are reported from the collected files, and its sidecar's from one check for the file, so a file the project lists twice, or two types claim, is reported once.
 
 ### Records between the steps
 
-The pipeline caches a step's output and compares it with the last run's, so every value that flows between steps has value equality.  Each is a record, and holds its collections in [`EquatableArray<T>`](../../src/SqlSource/EquatableArray.cs), because `ImmutableArray<T>` compares by reference.  Roslyn's own objects have no value equality, and they keep a compilation alive, so none of them flows between steps.  A position travels as a `LocationInfo` and a problem as a `DiagnosticInfo`, and an output step turns them into Roslyn objects.
+The pipeline caches a step's output and compares it with the last run's, so every value that flows between steps has value equality.  Each is a record, and holds its collections in [`EquatableArray<T>`](../../src/SqlSource/EquatableArray.cs), because `ImmutableArray<T>` compares by reference.  Roslyn's own objects have no value equality, and they keep a compilation alive, so none of them flows between steps, with one exception: `FileParseInput` and `SidecarInput` each carry the file's `AdditionalText` into the step that reads it.  That object compares by reference, and the compiler hands out the same one until the file changes, so it caches as well as a value, and no step after the read holds it.  A position travels as a `LocationInfo` and a problem as a `DiagnosticInfo`, and an output step turns them into Roslyn objects.
 
 Only two steps look at the compilation.  `TargetTypes` reads the symbol and syntax of each declaration, and `SupportedFramework` reads one `bool`.  Everything after them works on records.
 
-A `Collect()` gives an `ImmutableArray<T>`, so each `Collect()` in `SqlSourceGenerator` has a `Select` after it that gives an `EquatableArray<T>`: `SqlPath.ToSortedSet` for paths, `HintName.FindAmbiguous` for hint names, and the `ToSorted` helper for parsed files and file settings.  Without it the step after would run on every edit.  Only `CaseCollisions` takes a collected value as it is, the listed paths.  That step is cheap, and its answer is almost always "none", so the steps after it are taken from the last run.
+A `Collect()` gives an `ImmutableArray<T>`, so each `Collect()` in `SqlSourceGenerator` has a `Select` after it that gives an `EquatableArray<T>`: `SqlPath.ToSortedSet` for paths, `HintName.FindAmbiguous` for hint names, the `ToSorted` helper for parsed files and file settings, `ToSortedSidecars` for sidecars, and `SidecarNeeds.Merge` for what the types need.  Without it the step after would run on every edit.  Only `CaseCollisions` takes a collected value as it is, the listed paths.  That step is cheap, and its answer is almost always "none", so the steps after it are taken from the last run.
 
-Some values are kept apart because they change less often than their inputs.  `CommentPaths` and `AmbiguousHintNames` are almost always empty, and whether the property's list has `keep-comments` is a value of its own, so that an edit to another part of the list parses no file.
+Some values are kept apart because they change less often than their inputs.  `CommentPaths` and `AmbiguousHintNames` are almost always empty, and whether the property's list has `keep-comments` is a value of its own, so that an edit to another part of the list parses no file.  `TypeNeeds` is a step of its own beside `TypeOutput`, so that a change to a type, or to a property, that leaves what it needs alone gives an equal value and checks no file again.
 
 ### Paths
 
@@ -93,9 +109,31 @@ Because the lists are distinct ignoring case, a search may return either of two 
 
 A file that no type [claims](README.md#claim) is skipped before its text is read, so nothing about it is reported, its metadata included.  That lets a project hold `.sql` files that are not queries, such as migration scripts.
 
+### Sidecars
+
+[`Generation/Sidecars/`](../../src/SqlSource/Generation/Sidecars) reads the sidecar of each claimed file and checks it against what the types that claim the file need.  The checks run once for each file, whatever the number of its types, so that a problem is reported once, and they give the entries that passed every check, `SidecarCheckResult.UsableEntries`, the only entries a later step may read.  What each diagnostic means to a user is in the manual's [diagnostics](../manual/diagnostics.md).
+
+**Pairing.**  A sidecar is an additional file whose path ends in `.sql.json`, ignoring case, and its `.sql` file is its normalised path without `.json`, from `SqlPath.SqlPathOfSidecar`.  `SidecarInput.Create` searches `ClaimedPaths` for that path and keeps the claimed spelling, so a sidecar whose path differs by case from its `.sql` file's is still paired with it.  A sidecar whose `.sql` file no type claims, or that has no `.sql` file beside it, gives null and is never read, as a `.sql` file that no type claims is never read.  Two sidecars whose paths differ only by case are both read, and `Sidecars` keeps the one spelled exactly as its `.sql` file's path with `.json` after it, compared ordinally by `SidecarFile.IsSpelledAsItsSqlFile`, since that is the file the tool reads and writes.  When neither is spelled so, it keeps the first the project lists, as `ParsedFiles` keeps the first of two `.sql` files.  A sidecar listed by two items is two inputs, and `Sidecars` keeps it once.
+
+**Reading.**  `SidecarFileReader.Read` hands the file's text to `SidecarReader.Read`, the reader the tool uses, which never throws: see [reading a sidecar](#reading-a-sidecar).  A file whose text cannot be had is read as malformed at its start.  The reader takes a text without a byte order mark, so one is left out of what it reads, and every position is moved past it again.  The `SidecarFile` holds the read result and each position a check reports at, made into a `LocationInfo` while the text is in hand: the start of the file, the error of a malformed one, and the key of each entry.  It holds no text, so no step after it needs the file.
+
+**What a file needs.**  A query needs an entry when its output, resolved by `QuerySettings.Resolve` for some type that claims its file, is not `Sql`.  The output is resolved for each type, so `SidecarNeeds.OfType` gives, for each file of a type, the queries that need an entry with the output that type gives them.  A type with problems of its own counts as well, since the tool describes its files all the same.  `SidecarNeeds.Merge` makes one `FileNeeds` of every type's for each file: each query once, with the greatest of its outputs, in the ordinal order of the names, so that the value does not depend on the order of the types.  A file in which no query needs an entry has none.  A file with parse errors has no queries, so it needs nothing.
+
+**The checks.**  `SidecarCheckInput.Gather` finds the sidecar and the needs of a parsed file with two searches, and `SidecarChecker.Check` checks the file.  A file with neither is done at once, so a project at `Sql` that has no sidecars pays for nothing more.  Otherwise the checks run in this order, and each of the first three says which of the checks after it it stops:
+
+1. **The dialect**, for a file with a query that needs an entry.  A dialect that `SqlDescribableDialects` does not list is `SQLSRC209`, and one that this version has no type map for, which `SidecarChecker.HasTypeMap` decides and which is `mssql` until phase 6, is `SQLSRC243`.  Each is reported once for the file, at its first query that needs an entry, which is where the tool reports `SQLSRC209`.  Each stops the check of every query against the sidecar, the fourth below, while the tokens of the queries are still checked.
+2. **The tokens.**  Each token without a default of a query that needs an entry is `SQLSRC210`, at the query, whatever the dialect and the sidecar, as the tool reports it.  It stops the check of that query.
+3. **The sidecar itself**, in `SidecarFileChecks.Read`.  A malformed file is `SQLSRC237`, at the reader's error, and a format other than `SidecarFormat.Version` is `SQLSRC238` or `SQLSRC239`, at the start of the file.  Each leaves the file no usable entry and stops every check after it.  A `toolVersion` whose prefix, from `PackageVersion.PrefixOf`, is not `PackageVersion.Prefix` is the warning `SQLSRC240`, and the file is used.
+4. **Each query that needs an entry**, in file order.  No sidecar, or no entry of its name, names compared ordinally, is `SQLSRC241`.  An entry whose `engine` is not the canonical name of the file's dialect is `SQLSRC242`.  An entry whose `hash` is not the query's is `SQLSRC244`.  Otherwise the entry is usable.  The hash is computed here, and only for a query that needs an entry.
+5. **The orphans.**  Each entry that names no query that needs one is the warning `SQLSRC245`, at its key.  A query stopped by an earlier check still needs its entry, so that entry is no orphan.  The check does not run for a file with parse errors, whose every entry would otherwise be an orphan until the file parses.
+
+The diagnostics are reported from `SidecarCheck`, a source output of its own, once for each file.  A position is in the `.sql` file, at a query's name, or in the sidecar, at the reader's error, an entry's key or the start of the file, and both are additional files, whose positions the compiler accepts.  Nothing of a sidecar reaches a type's file, so a query that a check stops keeps its constant or method.  [`tests/SqlSource.Tests/Generator/SidecarTests.cs`](../../tests/SqlSource.Tests/Generator/SidecarTests.cs) holds each check, and reads the usable entries from the step's output to hold that an entry that failed a check is never one of them.
+
+`SidecarCheckInput` is gathered again for every file when `FileNeeds` or `Sidecars` changes, which costs two searches for each, and `SidecarCheck` runs again only for a file whose input changed.  So an edit to the text of one `.sql` file or one sidecar checks that file alone.  A claimed file added, removed or renamed is not: the compiler matches the nodes after the `SelectMany` of `ParsedFiles` by their place in the list, so every file whose place moved is checked again, as [TD-0019](../tech-debt/TD-0019-change-to-claimed-files-reads-every-claimed-file-again.md) records.  A file added or removed moves every claimed file sorted after it, and a file renamed moves those sorted between its old path and its new one.
+
 ### Caching tests
 
-[`tests/SqlSource.Tests/Generator/CachingTests.cs`](../../tests/SqlSource.Tests/Generator/CachingTests.cs) reads each step's run reasons by its tracking name, and pins what each kind of edit redoes: an edit to one file parses that file and emits the types that use it, a change to a property that is not an input of the parse parses no file, and so on.
+[`tests/SqlSource.Tests/Generator/CachingTests.cs`](../../tests/SqlSource.Tests/Generator/CachingTests.cs) reads each step's run reasons by its tracking name, and pins what each kind of edit redoes: an edit to one file parses that file and emits the types that use it, a change to a property that is not an input of the parse parses no file, and so on.  For the sidecars it pins that an edit to a sidecar reads that sidecar alone, parses no file and checks only its file; that an edit to a `.sql` file reads no sidecar and checks only that file; that an edit to C# that changes no attribute reads no sidecar and checks nothing, and an attribute or a property that changes no output checks nothing; that a sidecar of a file no type claims is not read, and one listed twice is kept once; that a project at `Sql` computes no hash; and, in `Run_ClaimedSqlFileAdded_ChecksTheFilesSortedAfterIt`, that a claimed file added checks again the files sorted after it and none before it, the cost that TD-0019 records.
 
 ### The tool runs the same code
 
@@ -128,11 +166,11 @@ Resolving a query's settings has two stages, and only the first is an input of t
 
 Stage one is [`FileParseInput`](../../src/SqlSource/Generation/FileParseInput.cs), the step of the same name: what must be known before a file is parsed.  That is the file's dialect, described [below](#how-the-dialect-reaches-the-parse), and `CommentsWanted`, whether a level the parser cannot see may ask for `keep-comments`.  It is true when the list of generator parameters in the file's metadata has `keep-comments`, or, when the metadata gives no list, the property's list has it, or when the file is in `CommentPaths`.  It may be true where no query ends up keeping its comments, and is never false where one does.  The one exception is two paths that differ only by case with the metadata on the later one, which is `SQLSRC013`, and the emitter then falls back to the form without comments.
 
-Stage two is everything else.  `ProjectSettings` reads the properties, `FileSettings` the metadata of each file's item and `TargetTypeReader` the attribute, and these join after a type's queries are selected: the file settings in `TypeQueries` and the project's level in `TypeOutput`.  `TypeEmitter` then resolves each query's settings with `QuerySettings.Resolve`, from the query's markers, the attribute, the file's metadata and the property.
+Stage two is everything else.  `ProjectSettings` reads the properties, `FileSettings` the metadata of each file's item and `TargetTypeReader` the attribute, and these join after a type's queries are selected: the file settings in `TypeQueries` and the project's level in `TypeOutput` and `TypeNeeds`.  `TypeEmitter` then resolves each query's settings with `QuerySettings.Resolve`, from the query's markers, the attribute, the file's metadata and the property, and `SidecarNeeds` resolves them the same way.
 
-So a property that is not an input of the parse changes only the `TypeOutput` of each type, and the parse of every file is taken from the last run.
+So a property that is not an input of the parse changes only the `TypeOutput` and the `TypeNeeds` of each type, and the parse of every file is taken from the last run.
 
-Of the resolved settings, `TypeEmitter` uses two: whether the query keeps its comments, and whether its method checks its arguments.
+Of the resolved settings, `TypeEmitter` uses two: whether the query keeps its comments, and whether its method checks its arguments.  `SidecarNeeds` uses one, the output, which decides whether the query [needs an entry](#sidecars) in its file's sidecar.
 
 ### How the dialect reaches the parse
 
@@ -184,7 +222,7 @@ Since errors are sorted by position with a stable sort, the order of the steps d
 
 The parser reports three kinds of marker error when it reads the blocks: a marker that is not valid, one that names a second dialect, and one that starts at or after the header's end.
 
-The marker, the property and the metadata all read a dialect through [`SqlDialectName`](../../src/SqlSource/Parsing/SqlDialectName.cs), and each gives a `SqlDialectChoice`: a `SqlDialect` with its `SqlDialectOptions`.  [`SqlDescribableDialects`](../../src/SqlSource/Parsing/SqlDescribableDialects.cs) lists the dialects whose database can be asked to describe a query.  The tool reads it for `SQLSRC209`, and no step of the generator reads it.
+The marker, the property and the metadata all read a dialect through [`SqlDialectName`](../../src/SqlSource/Parsing/SqlDialectName.cs), and each gives a `SqlDialectChoice`: a `SqlDialect` with its `SqlDialectOptions`.  [`SqlDescribableDialects`](../../src/SqlSource/Parsing/SqlDescribableDialects.cs) lists the dialects whose database can be asked to describe a query.  The tool reads it for `SQLSRC209`, and so does the generator's check of each claimed file's sidecar, in [`SidecarChecker`](../../src/SqlSource/Generation/Sidecars/SidecarChecker.cs), which reports `SQLSRC209` and `SQLSRC210` where the tool does.
 
 ### Building a query's SQL
 
@@ -206,7 +244,7 @@ The parser cannot see the attribute, the metadata or the property, and two types
 
 ### The hash
 
-[`SqlQueryHash.Compute`](../../src/SqlSource/Parsing/SqlQueryHash.cs) is the one definition of a query's hash, and its remarks give the input.  It is computed from the dialect's canonical name, the form without comments with its tokens, and the declared parameters, and every file that stores a hash depends on that input.  Nothing computes it during a parse: the tool computes it when it plans a run, and a query that needs no description never pays for it.
+[`SqlQueryHash.Compute`](../../src/SqlSource/Parsing/SqlQueryHash.cs) is the one definition of a query's hash, and its remarks give the input.  It is computed from the dialect's canonical name, the form without comments with its tokens, and the declared parameters, and every file that stores a hash depends on that input.  Nothing computes it during a parse: the tool computes it when it plans a run, and the generator when it [checks a sidecar](#sidecars), each for a query that needs an entry alone, so a query that needs no description never pays for it.
 
 ## Emitting
 
@@ -238,7 +276,7 @@ An exception thrown in the generator costs every type its generated code: the co
 
 ## Diagnostics
 
-Each diagnostic is a `DiagnosticDescriptor`.  The generator's are in [`SqlDiagnostics`](../../src/SqlSource/Diagnostics/SqlDiagnostics.cs).  The errors that only the tool reports are in [`ToolDiagnostics`](../../src/SqlSource/Diagnostics/ToolDiagnostics.cs), with an `All` of their own.  The generator reports none of them; they are in this assembly so that the release tracking of `AnalyzerReleases.Unshipped.md` and the tests of the diagnostics document cover them with the generator's own.  What each id means is in the manual, [diagnostics](../manual/diagnostics.md).
+Each diagnostic is a `DiagnosticDescriptor`.  The generator's are in [`SqlDiagnostics`](../../src/SqlSource/Diagnostics/SqlDiagnostics.cs).  The errors of the tool that are not the generator's own are in [`ToolDiagnostics`](../../src/SqlSource/Diagnostics/ToolDiagnostics.cs), with an `All` of their own.  The generator reports two of them too, `SQLSRC209` and `SQLSRC210`, from its check of each claimed file's sidecar.  The others are here only so that the release tracking of `AnalyzerReleases.Unshipped.md` and the tests of the diagnostics document cover them with the generator's own.  What each id means is in the manual, [diagnostics](../manual/diagnostics.md).
 
 ### How a problem travels
 
@@ -248,6 +286,7 @@ A problem travels between steps as a [`DiagnosticInfo`](../../src/SqlSource/Diag
 - **A problem of a query that only the type can see**, such as two files of a type with one query name, is found by `TypeEmitter` and reported with the type's output.
 - **A parse error** is a `SqlParseError` with a `SqlParseErrorKind`.  `SqlFileReader` maps the kind to a descriptor with `SqlDiagnostics.ForParseError`, and the error is reported once for each file, not once for each type that claims it.
 - **`SQLSRC013`** travels as a `PathCollision`, located at the start of the later file.
+- **A problem of a file's sidecar**, and `SQLSRC209` and `SQLSRC210`, is found by `SidecarChecker` and reported from `SidecarCheck`, once for each file, not once for each type that claims it.  `SQLSRC240` and `SQLSRC245` are warnings a project may configure, and every other diagnostic is an error that cannot be configured.
 
 The compiler does not say where an MSBuild property or the metadata of an item was set, so `SQLSRC011` and `SQLSRC014` cannot be located.  An invalid dialect travels as `DialectSetting.InvalidValue` for the property and `ParsedSqlFile.InvalidDialect` for a file, and an invalid setting as an `InvalidSetting` of `ProjectSettings` or `FileSettings`.  The output step gathers the values into a set and reports them with `Location.None`, in ordinal order, so the errors of a build do not depend on the order of its files.  The metadata of a file that no type claims is not reported.
 
@@ -257,11 +296,11 @@ The compiler does not say where an MSBuild property or the metadata of an item w
 
 ## Snapshot
 
-[`Snapshot/`](../../src/SqlSource/Snapshot) holds the model of a [sidecar](README.md#sidecar), the writer and the comparer, and [`Snapshot/Reading/`](../../src/SqlSource/Snapshot/Reading) the reader, with its tokenizer and cursor.  The format itself is recorded in the [sidecar format design](../superpowers/specs/2026-10-07-sidecar-format-design.md).  The tool reads, compares and writes sidecars with this code.  No step of the generator reads a sidecar yet.
+[`Snapshot/`](../../src/SqlSource/Snapshot) holds the model of a [sidecar](README.md#sidecar), the writer and the comparer, and [`Snapshot/Reading/`](../../src/SqlSource/Snapshot/Reading) the reader, with its tokenizer and cursor.  The format itself is recorded in the [sidecar format design](../superpowers/specs/2026-10-07-sidecar-format-design.md).  The tool reads, compares and writes sidecars with this code, and the generator reads them with the same reader, as [sidecars](#sidecars) describes.
 
 The model is `Sidecar`, its `SidecarEntry` for each query, and each entry's `SidecarParameter` and `SidecarColumn` values with a `SidecarType` for each type: `PostgresType`, `SqlServerType`, or `OtherEngineType` for an engine this version does not know.  The reader, the writer and the comparer name each key through `SidecarKeys`.  `Snapshot/` depends on no other folder of the assembly, so the names of the two engines are written both in `SidecarValues.Engine` and in `SqlDialectName`.
 
-[`SidecarWriter`](../../src/SqlSource/Snapshot/SidecarWriter.cs) writes a sidecar as its file's text, in the layout and key order of the format design.  It writes a key when the format's condition for it holds, whatever the model has: an entry without rows has no `columns`.  `PackageVersion.Prefix` is the version the tool records in a sidecar: the first three parts of the assembly's version, so that no prerelease suffix reaches a committed file.
+[`SidecarWriter`](../../src/SqlSource/Snapshot/SidecarWriter.cs) writes a sidecar as its file's text, in the layout and key order of the format design.  It writes a key when the format's condition for it holds, whatever the model has: an entry without rows has no `columns`.  `PackageVersion.Prefix` is the version the tool records in a sidecar: the first three parts of the assembly's version, so that no prerelease suffix reaches a committed file.  The generator compares it with the `toolVersion` of a sidecar up to its first `-` or `+`, `PackageVersion.PrefixOf`, which matters only for a `toolVersion` that carries a suffix, as a file edited by hand or written by something other than the tool can.
 
 [`SidecarComparer.FindDifference`](../../src/SqlSource/Snapshot/SidecarComparer.cs) gives the first difference between a committed entry and a described one, over what `describe --check` compares.  A parameter's or a column's `type` is compared whole, so a key of a type object is compared as soon as it is added to the model.
 
@@ -277,10 +316,6 @@ Reading a file the tool wrote costs two tokenizing passes.  The tool writes `for
 The reader follows the reader rules of the format design, [section 1.5](../superpowers/specs/2026-10-07-sidecar-format-design.md#15-reader-rules), and so accepts more than the schema, [`schemas/sidecar-v1.schema.json`](../../schemas/sidecar-v1.schema.json), which says what this version of the tool writes.  A type under an engine this version does not know is read as an `OtherEngineType`, with its name alone.  A provenance value or a PostgreSQL kind it does not know is kept as written, for a later stage to judge.  `SidecarTypeReader` reads a type, with a list of a parameter's keys for each engine, because `bindName` is a key of a parameter's type alone and a type read anywhere else skips it.
 
 ## Not built yet
-
-### Reading sidecars
-
-> **Not built yet.**  How the generator pairs a `.sql` file with its sidecar and reports a stale, missing or orphaned one.  Delivered by phase 5 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 
 ### Type map and models
 

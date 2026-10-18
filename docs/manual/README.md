@@ -42,10 +42,11 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Methods for queries with tokens | Available | [Token methods](generator.md#token-methods) |
 | Reading `.sql` files by the rules of your database's dialect | Available | [Dialects](dialects.md) |
 | Settings, and an error for a value that is wrong | Available | [Settings](settings.md#all-settings) |
-| The `Output` setting | Works today for the tool; no effect yet on generated code | [Output](settings.md#setting-output) |
+| The `Output` setting | Works today: it decides which queries the tool describes and the build checks against their sidecar; no effect yet on generated code | [Output](settings.md#setting-output) |
 | The settings for models and methods: model suffixes, namespace, shape and name, collection type, `MethodLocation`, and the generator parameters `sort-input`, `sort-output`, `no-table-models` and `async-method-suffix` | Accepted; no effect yet | [All settings](settings.md#all-settings) |
 | Result shapes (`-- name: GetUser -> one`), and `null` or `not null` in a `-- param:` marker | Accepted; no effect yet: both are checked, and the tool records a parameter's `null` in the sidecar | [Result shapes](sql-files.md#result-shapes), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
+| An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
 | Describing PostgreSQL queries | Available | [PostgreSQL](postgresql.md) |
 | Describing SQL Server queries | Coming ([SQLSRC216](diagnostics.md#sqlsrc216) until then) | [SQL Server](sqlserver.md) |
 | Models for the parameters and rows of a query | Coming | [Models](generator.md#models) |

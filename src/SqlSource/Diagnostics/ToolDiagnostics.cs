@@ -4,7 +4,9 @@ using Microsoft.CodeAnalysis;
 namespace SqlSource.Diagnostics;
 
 /// <summary>
-/// Every error that only the <c>sqlsource</c> tool reports.  The generator reports none of them: they are here so
+/// The errors of the <c>sqlsource</c> tool that are not the generator's own; the tool reports some of
+/// <see cref="SqlDiagnostics" /> too.  The generator reports two of these, where the tool reports them:
+/// <see cref="OutputNeedsDescribableDialect" /> and <see cref="TokenHasNoDefault" />.  The others are here only so
 /// that the release tracking and the tests of <c>docs/manual/diagnostics.md</c> cover them with the generator's own.
 /// </summary>
 /// <remarks>
@@ -116,8 +118,8 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor OutputNeedsDescribableDialect = new(
         id: "SQLSRC209",
         title: "Output needs a dialect that can be described",
-        messageFormat: "The output '{0}' needs a dialect that can be described, and the dialect of this file is "
-            + "'{1}'.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.",
+        messageFormat: "The output '{0}' needs each query described by its database, and the dialect '{1}' has no "
+            + "database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -128,8 +130,8 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor TokenHasNoDefault = new(
         id: "SQLSRC210",
         title: "Token has no default",
-        messageFormat: "The token '{0}' has no default.  A query whose output is '{1}' is described with a sample in "
-            + "its place.",
+        messageFormat: "The token '{0}' has no default, which a query whose output is '{1}' needs.  Give it a default, "
+            + "or set the output to 'sql'.",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

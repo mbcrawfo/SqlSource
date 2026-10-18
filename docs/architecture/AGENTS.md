@@ -9,7 +9,7 @@ Each page is in this folder.
 | Folder | Page | Sections |
 |----|----|----|
 | `src/SqlSource`, its root | `generator.md` | `## The pipeline` |
-| `src/SqlSource/Generation`, with `Paths/` | `generator.md` | `## The pipeline` |
+| `src/SqlSource/Generation`, with `Paths/` and `Sidecars/` | `generator.md` | `## The pipeline` |
 | `src/SqlSource/Generation/MSBuild` | `generator.md` | `## Settings` |
 | `src/SqlSource/Generation/Emitting` | `generator.md` | `## Emitting` |
 | `src/SqlSource/Settings` | `generator.md` | `## Settings` |
@@ -43,9 +43,9 @@ A new page gets its rows here and its line in the reading guide of `README.md`, 
 A part of query generation that is not built yet has a placeholder under `## Not built yet` of the page it will extend.  It is exactly this: a heading, one sentence on what will go there, and the phase with a link to the epic.  Nothing else.
 
 ```markdown
-### Reading sidecars
+### Execution methods
 
-> **Not built yet.**  How the generator pairs a `.sql` file with its sidecar and reports a stale, missing or orphaned one.  Delivered by phase 5 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
+> **Not built yet.**  How the generator writes a method that runs a query and reads its rows into the output type.  Delivered by phase 8 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 ```
 
 - **The work that delivers a phase fills its placeholders**, in the same pull request: it replaces each one with a description of what was built, written from the code it wrote.

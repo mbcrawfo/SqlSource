@@ -10,15 +10,17 @@
     </PropertyGroup>
     <!--
         Hands every .sql file of the project to the compiler, which is the only way a source generator can see one.
+        A .sql file's sidecar, the .sql.json file beside it, goes to the compiler too.
         NuGet imports this file into each project that references the package, before the project's own content, so a
         project can remove files with <AdditionalFiles Remove="..." />.  A project that sets SqlSourceIncludeFiles to
-        false lists its .sql files as AdditionalFiles itself.
+        false lists its .sql files and its sidecars as AdditionalFiles itself.
 
         Items are evaluated after every property, so DefaultItemExcludes already holds the output and intermediate
         folders here, whatever the project sets them to.
     -->
     <ItemGroup Condition="'$(SqlSourceIncludeFiles)' != 'false'">
         <AdditionalFiles Include="**/*.sql" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
+        <AdditionalFiles Include="**/*.sql.json" Exclude="$(DefaultItemExcludes);$(DefaultExcludesInProjectFolder)" />
     </ItemGroup>
     <!--
         A source generator sees only the MSBuild properties and the item metadata that are listed here: the properties

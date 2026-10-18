@@ -8,7 +8,7 @@ For a project with `TargetFrameworks`, the `sqlsource` tool passes the first of 
 - An attribute under `#if` for a constant that only another framework defines is not read.
 - A project that references SqlSource for another framework alone does not use SqlSource at all, as the tool sees it: in a solution it is left out and nothing is said.
 
-The queries those bring are never described.  The generator compiles for every framework, so from phase 5 the build of the other framework reports each as having no entry.
+The queries those bring are never described.  The generator compiles for every framework, so the build of the other framework reports each of them whose output is not `Sql` as having no entry, `SQLSRC241`.
 
 `tests/SqlSource.Tool.Tests/Projects/ManifestTargetTests.cs` and `tests/SqlSource.Tool.Tests/Projects/FixtureProjectTests.cs` pin the first two with the fixture `Multi`, and the third with `SecondOnly`.
 
@@ -18,7 +18,7 @@ The queries those bring are never described.  The generator compiles for every f
 
 ## Impact
 
-Low.  The gap is loud from phase 5 for a file or an attribute, and silent only for the project that uses SqlSource in a later framework alone.
+Low.  The gap is loud in the build, which reports each query that was not described: for a file or an attribute of another framework, and for the project that uses SqlSource in a later framework alone, of which the tool itself says nothing.
 
 ## Proposed fix
 

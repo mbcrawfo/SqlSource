@@ -1,6 +1,6 @@
 # The generator
 
-The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# beside your own code: a string constant for each query, or a method where the query has [tokens](concepts.md#token).  It needs no database and no setup beyond the package and one attribute, in a project that targets .NET 8 or later with C# 12 or later ([SQLSRC003](diagnostics.md#sqlsrc003), [SQLSRC012](diagnostics.md#sqlsrc012)).
+The generator is the part of the `SqlSource` package that runs in the compiler.  It reads the `.sql` files of your project and writes C# beside your own code: a string constant for each query, or a method where the query has [tokens](concepts.md#token).  It needs no database, in a project that targets .NET 8 or later with C# 12 or later ([SQLSRC003](diagnostics.md#sqlsrc003), [SQLSRC012](diagnostics.md#sqlsrc012)).  It needs the package, one attribute, and one choice: a query whose [output](settings.md#setting-output) is `models` or `codegen`, the default, must be described by the [tool](tool.md), and the build reports one that has no current entry in its sidecar, while a query whose output is `sql` needs nothing more.
 
 ```sql
 -- name: GetUser
@@ -63,7 +63,7 @@ Every property of the attribute is a [setting](settings.md), documented there wi
 | `CollectionType` | The type that holds many rows: [Collection type](settings.md#setting-collection-type) |
 | `MethodLocation` | Where the methods that run the queries go: [Where the methods go](settings.md#setting-method-location) |
 
-`Path`, `SqlLocation` and `Parameters` change what the generator writes today.  `Output` is read by the tool today and changes no generated code, and the properties for models and methods (the last five rows) are read and checked and change none: see [what works today](README.md#what-works-today).
+`Path`, `SqlLocation` and `Parameters` change what the generator writes today.  `Output` decides today which queries the tool describes and the build checks against their sidecar, and changes no generated code, and the properties for models and methods (the last five rows) are read and checked and change none: see [what works today](README.md#what-works-today).
 
 <a id="files-of-a-type"></a>
 
@@ -83,7 +83,7 @@ A type gets the files that its [`Path`](settings.md#setting-path) names, by the 
 - **A type's files are one set.**  A query name is used once across all of them: a second use is [SQLSRC008](diagnostics.md#sqlsrc008), and the file with the second one gets no members for that type.
 - **Two types may claim one file**, and each gets its own members from it.  They can ask for different things: each type's attribute applies to its own members only.
 - **A `.sql` file that no type claims is ignored**: see [Path](settings.md#setting-path).
-- **A file with an error produces no members** until it is fixed: see [`.sql` files](sql-files.md).  The other files of the type are unaffected.
+- **A file with an error in how it is written produces no members** until it is fixed: see [`.sql` files](sql-files.md).  The other files of the type are unaffected.  An error about describing a query or about its sidecar, such as [SQLSRC241](diagnostics.md#sqlsrc241), leaves the members in place.
 
 <a id="locations"></a>
 
@@ -209,6 +209,6 @@ SqlSource turns that warning off for these types and for nothing else, as the su
 
 ## Known issues
 
-- **The tool reads the attribute without compiling your code.**  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text, so `Path` and `Output` must be written out where the attribute is: `Path = "Queries"` and `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation or a cast there compiles, and the tool reports [SQLSRC208](diagnostics.md#sqlsrc208) and describes nothing for the type.  The build is not affected.  Two more things follow from the same reading.  An alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`) works in the build and is not seen by the tool, so the type's queries are not described.  An attribute inside `#if` is read with the compilation constants the tool gets from your project, which may not be those of the configuration you build.  Write the attribute under its own name, and outside `#if` where you can.
+- **The tool reads the attribute without compiling your code.**  `sqlsource describe` finds `[SqlSourceGenerate]` by reading your C# files as text, so `Path` and `Output` must be written out where the attribute is: `Path = "Queries"` and `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation or a cast there compiles, and the tool reports [SQLSRC208](diagnostics.md#sqlsrc208) and describes nothing for the type.  The build then reports [SQLSRC241](diagnostics.md#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none, or, for the file, [SQLSRC209](diagnostics.md#sqlsrc209) under a dialect that has no database to ask, such as `ansi`, and [SQLSRC243](diagnostics.md#sqlsrc243) under `mssql`.  Two more things follow from the same reading.  An alias of the attribute (`using Gen = SqlSource.SqlSourceGenerateAttribute;` and `[Gen]`) works in the build and is not seen by the tool, so the type's queries are not described, and the build reports SQLSRC241 for them in the same way.  An attribute inside `#if` is read with the compilation constants the tool gets from your project, which may not be those of the configuration you build.  Write the attribute under its own name, and outside `#if` where you can.
 - **Under `Direct`, a query named like a member that the type declares is a compiler error.**  A query `Get` in a type that declares a method `Get` gives the compiler's CS0102, in the generated code, and no SQLSRC error.  Rename the query, or use `Nested`.
 - **Where the suppression of CS0436 does not run, the warning is shown.**  The suppression is part of the package's analyzers.  A compiler or an editor that does not run it still reports CS0436 in a project that sees the internals of another one that uses SqlSource, and a project that treats warnings as errors then fails to build there.  SqlSource has not been checked in the live analysis of Visual Studio or Rider.  If you see the warning, add `<NoWarn>$(NoWarn);CS0436</NoWarn>` to the project that sees the other's internals.  That also hides a conflict between two types of your own.

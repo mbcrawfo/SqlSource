@@ -7,6 +7,8 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Sidecars;
+using SqlSource.Parsing;
 using SqlSource.Testing.Generator;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -50,6 +52,18 @@ public sealed class CachingTests
     private readonly InMemoryAdditionalText _users = new("/app/Users/Users.sql", "-- name: GetUser\nSELECT 1;\n");
 
     private readonly InMemoryAdditionalText _orders = new("/app/Orders/Orders.sql", "-- name: GetOrder\nSELECT 2;\n");
+
+    // The fixture of the tests of sidecars: a current sidecar beside each file, which a run at Models under postgres
+    // reads.
+    private readonly InMemoryAdditionalText _usersSidecar;
+
+    private readonly InMemoryAdditionalText _ordersSidecar;
+
+    public CachingTests()
+    {
+        _usersSidecar = CurrentSidecar(_users, "GetUser");
+        _ordersSidecar = CurrentSidecar(_orders, "GetOrder");
+    }
 
     [Fact]
     public void Run_SqlFileEdited_ParsesOnlyThatFileAndEmitsOnlyTheTypeThatUsesIt()
@@ -118,17 +132,7 @@ public sealed class CachingTests
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var driver = FirstRun(OutputKind.Sql, compilation);
 
-        var tree = compilation.SyntaxTrees.Single(tree => tree.FilePath == UsersSourcePath);
-        var edited = compilation.ReplaceSyntaxTree(
-            tree,
-            CSharpSyntaxTree.ParseText(
-                UsersSource.Replace("=> Sql.GetUser;", "=> Sql.GetUser + \" \";", StringComparison.Ordinal),
-                GeneratorHarness.ParseOptions,
-                UsersSourcePath,
-                cancellationToken: TestContext.Current.CancellationToken
-            )
-        );
-        var result = Run(driver, edited);
+        var result = Run(driver, WithMethodBodyEdited(compilation));
 
         // The run saw the new compilation: the framework check ran again and gave the same answer.  The declaration
         // was read again too, and gave an equal value, so nothing after it ran.
@@ -151,6 +155,13 @@ public sealed class CachingTests
             TrackingNames.FilesSettings,
             TrackingNames.TypeQueries,
             TrackingNames.TypeOutput,
+            TrackingNames.SidecarInput,
+            TrackingNames.SidecarFile,
+            TrackingNames.Sidecars,
+            TrackingNames.TypeNeeds,
+            TrackingNames.FileNeeds,
+            TrackingNames.SidecarCheckInput,
+            TrackingNames.SidecarCheck,
         ];
         foreach (var step in steps)
         {
@@ -674,6 +685,321 @@ public sealed class CachingTests
             .ShouldContain("SELECT 1; -- c");
     }
 
+    [Fact]
+    public void Run_SidecarEdited_ReadsOnlyThatSidecarAndParsesNoFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+
+        var stale = Sidecars.Of(ToSqlFile(_users), Sidecars.Entry("GetUser", "stale"));
+        var edited = new InMemoryAdditionalText(stale.Path, stale.Text);
+        var result = Run(driver.ReplaceAdditionalText(_usersSidecar, edited), compilation);
+
+        Reasons<SidecarFile>(result, TrackingNames.SidecarFile, file => file.SqlPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.Sidecars).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.FileParseInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    [Fact]
+    public void Run_SqlFileEdited_ReadsNoSidecar()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+
+        var edited = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1, 2;\n");
+        var result = Run(driver.ReplaceAdditionalText(_users, edited), compilation);
+
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)["Users.sql"]
+            .ShouldBe(IncrementalStepRunReason.Modified);
+        Reasons<SidecarInput>(result, TrackingNames.SidecarInput, input => input.SqlPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<SidecarFile>(result, TrackingNames.SidecarFile, file => file.SqlPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.Sidecars).ShouldBe([IncrementalStepRunReason.Cached]);
+    }
+
+    [Fact]
+    public void Run_MethodBodyEdited_ReadsNoSidecar()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        Reasons<SidecarInput>(result, TrackingNames.SidecarInput, input => input.SqlPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<SidecarFile>(result, TrackingNames.SidecarFile, file => file.SqlPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.Sidecars).ShouldBe([IncrementalStepRunReason.Cached]);
+        Reasons<EquatableArray<FileNeeds>>(result, TrackingNames.TypeNeeds, NeedsKey)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    // A sidecar with no .sql file beside it, which no type can claim.
+    [Fact]
+    public void Run_SidecarAddedForAFileNoTypeClaims_ReadsNothing()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+
+        var result = Run(
+            driver.AddAdditionalTexts([new InMemoryAdditionalText("/app/Migrations/001_init.sql.json", "{\n")]),
+            compilation
+        );
+
+        // The new sidecar is not listed, here or under SidecarFile: its input is null, so nothing is read for it, and
+        // the driver tracks a step only when something it gave reaches an output.  The others are the inputs they
+        // were.
+        Reasons<SidecarInput>(result, TrackingNames.SidecarInput, input => input.SqlPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        Reasons<SidecarFile>(result, TrackingNames.SidecarFile, file => file.SqlPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.Sidecars).ShouldBe([IncrementalStepRunReason.Cached]);
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    // Two items of one path, as a project that lists a sidecar itself beside the package's glob would give.  Each
+    // item is an input of its own, and the collected value keeps the first, so every step after it sees the file once.
+    [Fact]
+    public void Run_SameSidecarListedTwice_KeepsOneSidecar()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var again = new InMemoryAdditionalText(
+            _usersSidecar.Path,
+            _usersSidecar.GetText(TestContext.Current.CancellationToken)!.ToString()
+        );
+
+        var result = GeneratorHarness
+            .CreateDriver(
+                [_users, _orders, _usersSidecar, _ordersSidecar, again],
+                new TestOptionsProvider(OutputKind.Models, null, "postgres")
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken)
+            .GetRunResult();
+
+        var sidecars =
+            (EquatableArray<SidecarFile>)Outputs(result, TrackingNames.Sidecars).ShouldHaveSingleItem().Value;
+        sidecars.Select(file => file.SqlPath).ShouldBe(["app/Orders/Orders.sql", "app/Users/Users.sql"]);
+    }
+
+    [Fact]
+    public void Run_SqlFileEdited_ChecksOnlyThatFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+
+        var edited = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1, 2;\n");
+        var result = Run(driver.ReplaceAdditionalText(_users, edited), compilation);
+
+        // The type's needs were found again and are the same, so only the edited file was checked, and its entry is
+        // now stale.
+        Reasons<EquatableArray<FileNeeds>>(result, TrackingNames.TypeNeeds, NeedsKey)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Unchanged,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.FileNeeds).ShouldBe([IncrementalStepRunReason.Cached]);
+        Checks(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC244");
+    }
+
+    [Fact]
+    public void Run_SidecarEdited_ChecksOnlyItsFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+
+        var stale = Sidecars.Of(ToSqlFile(_users), Sidecars.Entry("GetUser", "stale"));
+        var edited = new InMemoryAdditionalText(stale.Path, stale.Text);
+        var result = Run(driver.ReplaceAdditionalText(_usersSidecar, edited), compilation);
+
+        // Every file gathered its input again, and only the one whose sidecar changed has another.
+        Reasons<SidecarCheckInput>(result, TrackingNames.SidecarCheckInput, input => input.File.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Checks(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC244");
+    }
+
+    // TD-0019: the check of each file is a node of its own, but the nodes are matched by their place in the sorted
+    // list of parsed files, not by path.  So a claimed file added to the list checks again every file sorted after
+    // it, and none before it: Payments takes the place Users had, and Users is checked as a new node after it.
+    [Fact]
+    public void Run_ClaimedSqlFileAdded_ChecksTheFilesSortedAfterIt()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+        var payments = new InMemoryAdditionalText("/app/Orders/Payments.sql", "-- name: GetPayment\nSELECT 3;\n");
+
+        var result = Run(driver.AddAdditionalTexts([payments, CurrentSidecar(payments, "GetPayment")]), compilation);
+
+        Checks(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Orders/Payments.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.New,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    // The attribute changes the type, so its needs are found again, and they are the same.
+    [Fact]
+    public void Run_AttributeEditedWithoutChangingTheOutput_ChecksNothing()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+
+        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "ModelNamespace = \"App.Models\""));
+
+        Reasons<TypeQueries>(result, TrackingNames.TypeQueries, type => type.HintName)["App.Users.UserQueries.g.cs"]
+            .ShouldBe(IncrementalStepRunReason.Modified);
+        Reasons<EquatableArray<FileNeeds>>(result, TrackingNames.TypeNeeds, NeedsKey)["app/Users/Users.sql"]
+            .ShouldBe(IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.FileNeeds)
+            .ShouldAllBe(reason =>
+                reason == IncrementalStepRunReason.Unchanged || reason == IncrementalStepRunReason.Cached
+            );
+        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    [Fact]
+    public void Run_ModelSuffixPropertyChanged_ChecksNothing()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRunWithSidecars(compilation);
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(
+                    OutputKind.Models,
+                    null,
+                    "postgres",
+                    properties: new Dictionary<string, string?> { ["SqlSourceOutputModelSuffix"] = "Row" }
+                )
+            ),
+            compilation
+        );
+
+        // Every type's needs were found again, under the new property, and are the same.
+        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.TypeNeeds).ShouldAllBe(reason => reason == IncrementalStepRunReason.Unchanged);
+        AllReasons(result, TrackingNames.FileNeeds).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.SidecarCheckInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        Checks(result).Values.ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    // A project at Sql with no sidecar: no query needs an entry, so no check has anything to do and no hash is
+    // computed.
+    [Fact]
+    public void Run_ProjectAtSql_ComputesNoHash()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+
+        var result = FirstRun(OutputKind.Sql, compilation).GetRunResult();
+
+        (
+            (EquatableArray<FileNeeds>)Outputs(result, TrackingNames.FileNeeds).ShouldHaveSingleItem().Value
+        ).ShouldBeEmpty();
+        Outputs(result, TrackingNames.SidecarCheck)
+            .Select(output => (SidecarCheckResult)output.Value)
+            .ShouldAllBe(check => check.Diagnostics.Count == 0 && check.UsableEntries.Count == 0);
+    }
+
     private GeneratorDriver FirstRun(OutputKind? output, Compilation compilation) =>
         FirstRun(compilation, _users, new TestOptionsProvider(output, null));
 
@@ -686,14 +1012,51 @@ public sealed class CachingTests
         return driver;
     }
 
+    // Both types at Models under postgres, and each file with its current sidecar.
+    private GeneratorDriver FirstRunWithSidecars(Compilation compilation)
+    {
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [_users, _orders, _usersSidecar, _ordersSidecar],
+                new TestOptionsProvider(OutputKind.Models, null, "postgres")
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return driver;
+    }
+
+    private static InMemoryAdditionalText CurrentSidecar(InMemoryAdditionalText sqlFile, string queryName)
+    {
+        var sidecar = Sidecars.Current(ToSqlFile(sqlFile), SqlDialect.PostgreSql, queryName);
+        return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
+    }
+
+    private static SqlFile ToSqlFile(InMemoryAdditionalText file) => new(file.Path, file.GetText()!.ToString());
+
+    // The compilation with the body of UserQueries.Get changed, and its attribute left alone.
+    private static Compilation WithMethodBodyEdited(Compilation compilation) =>
+        compilation.ReplaceSyntaxTree(
+            compilation.SyntaxTrees.Single(tree => tree.FilePath == UsersSourcePath),
+            CSharpSyntaxTree.ParseText(
+                UsersSource.Replace("=> Sql.GetUser;", "=> Sql.GetUser + \" \";", StringComparison.Ordinal),
+                GeneratorHarness.ParseOptions,
+                UsersSourcePath,
+                cancellationToken: TestContext.Current.CancellationToken
+            )
+        );
+
     // The compilation with a list of generator parameters on the attribute of UserQueries.
     private static Compilation WithParametersOnUserQueries(Compilation compilation, string parameters) =>
+        WithArgumentsOnUserQueries(compilation, "Parameters = \"" + parameters + "\"");
+
+    // The compilation with these arguments on the attribute of UserQueries.
+    private static Compilation WithArgumentsOnUserQueries(Compilation compilation, string arguments) =>
         compilation.ReplaceSyntaxTree(
             compilation.SyntaxTrees.Single(tree => tree.FilePath == UsersSourcePath),
             CSharpSyntaxTree.ParseText(
                 UsersSource.Replace(
                     "[SqlSourceGenerate]",
-                    "[SqlSourceGenerate(Parameters = \"" + parameters + "\")]",
+                    "[SqlSourceGenerate(" + arguments + ")]",
                     StringComparison.Ordinal
                 ),
                 GeneratorHarness.ParseOptions,
@@ -702,8 +1065,21 @@ public sealed class CachingTests
             )
         );
 
+    // Why the check of each file ran, by the file's path.
+    private static Dictionary<string, IncrementalStepRunReason> Checks(GeneratorDriverRunResult result) =>
+        Reasons<SidecarCheckResult>(result, TrackingNames.SidecarCheck, check => check.NormalizedPath);
+
+    // What one type needs, named by the path of its one file.
+    private static string NeedsKey(EquatableArray<FileNeeds> needs) => needs.ShouldHaveSingleItem().NormalizedPath;
+
     private static GeneratorDriverRunResult Run(GeneratorDriver driver, Compilation compilation) =>
         driver.RunGenerators(compilation, TestContext.Current.CancellationToken).GetRunResult();
+
+    // Every output of a step, with its value and why it ran.
+    private static (object Value, IncrementalStepRunReason Reason)[] Outputs(
+        GeneratorDriverRunResult result,
+        string step
+    ) => [.. result.Results.Single().TrackedSteps[step].SelectMany(run => run.Outputs)];
 
     // Why each output of a step ran, keyed by something that names the output.
     private static Dictionary<string, IncrementalStepRunReason> Reasons<T>(
@@ -723,13 +1099,21 @@ public sealed class CachingTests
     private static Dictionary<string, IncrementalStepRunReason> ParseInputs(GeneratorDriverRunResult result) =>
         Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path);
 
-    // A step that is not among the tracked steps fails the test: it has lost its name.  FileSettings is the one
-    // exception, as it gives nothing, and so is not tracked, in a run where no file has metadata.
-    // Run_MetadataOfOneFileGainsAParameter_ParsesNoFileAndEmitsOnlyItsType reads it in a run where one has.
+    // A step that is not among the tracked steps fails the test: it has lost its name.  The exceptions are the steps
+    // that give nothing, and so are not tracked, in a run without what they read: FileSettings where no file has
+    // metadata, SidecarInput and SidecarFile where there is no sidecar, and TypeNeeds where no query needs an entry.
+    // Run_MetadataOfOneFileGainsAParameter_ParsesNoFileAndEmitsOnlyItsType reads the first in a run where a file has
+    // metadata, and Run_MethodBodyEdited_ReadsNoSidecar, with the other tests of sidecars, the other three.
     private static IncrementalStepRunReason[] AllReasons(GeneratorDriverRunResult result, string step)
     {
         var steps = result.Results.Single().TrackedSteps;
-        return step == TrackingNames.FileSettings && !steps.ContainsKey(step)
+        return
+            step
+                is TrackingNames.FileSettings
+                    or TrackingNames.SidecarInput
+                    or TrackingNames.SidecarFile
+                    or TrackingNames.TypeNeeds
+            && !steps.ContainsKey(step)
             ? []
             : [.. steps[step].SelectMany(run => run.Outputs).Select(output => output.Reason)];
     }

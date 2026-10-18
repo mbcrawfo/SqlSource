@@ -1,31 +1,61 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System;
 using System.Collections.Generic;
+using System.Linq;
 using Shouldly;
 using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// The settings that have no effect yet are accepted at every level they have, and a value none of them takes is
-// reported where it was written.
+// The settings that have no effect yet on generated code are accepted at every level they have, and a value none of
+// them takes is reported where it was written.  The output's levels change only the diagnostics so far.
 //
-// Every run leaves the output unset, since the output's levels are among what these tests compare.
+// Every run leaves the output unset, since the output's levels are among what these tests compare.  The project
+// sets no dialect either, so a query whose output is the default, codegen, is SQLSRC209 at its name.
 public sealed class SettingLevelTests
 {
     private const string Sql = "-- name: Q\nSELECT 1;\n";
 
+    // The single query of Sql under the defaults, Q at its first line.
+    private static readonly string[] Default = [NotDescribable("codegen", 1)];
+
+    public static TheoryData<string, string, string[], string[]> MarkersWithoutAnEffect =>
+        new()
+        {
+            {
+                "-- name: Q\nSELECT id FROM users WHERE id = @id;\n",
+                "-- database: main\n-- output: models\n-- input-model-suffix: Args\n-- output-model-suffix: Row\n"
+                    + "-- model-namespace: App.Models\n-- input-model-type: sealed record\n"
+                    + "-- output-model-type: class\n-- collection-type: ImmutableArray\n\n"
+                    + "-- name: Q -> one\n-- param: @id int not null\n-- database: other\n-- output: codegen\n"
+                    + "-- input-model: QueryArgs\n-- output-model: App.Models.QueryRow\n-- collection-type: List\n"
+                    + "SELECT id FROM users WHERE id = @id;\n",
+                Default,
+                [NotDescribable("codegen", 10)]
+            },
+            {
+                "-- name: Q\nSELECT id FROM {{table}} WHERE {{filter}};\n",
+                "-- output: models\n\n-- name: Q -> many\n-- param: @since timestamptz not null\n"
+                    + "-- param: @page int\n-- token: {{filter:created_at > @since}}\n"
+                    + "SELECT id FROM {{table:users}} WHERE {{filter}};\n",
+                [NotDescribable("codegen", 1), NoDefault("table"), NoDefault("filter")],
+                [NotDescribable("models", 3)]
+            },
+        };
+
     [Theory]
-    [InlineData("SqlSourceOutput", "models")]
-    [InlineData("SqlSourceOutput", " Code-Gen ")]
-    [InlineData("SqlSourceDatabase", "not read by the generator, so never wrong")]
-    [InlineData("SqlSourceInputModelSuffix", "Args")]
-    [InlineData("SqlSourceOutputModelSuffix", "Row")]
-    [InlineData("SqlSourceModelNamespace", "App.Models")]
-    [InlineData("SqlSourceInputModelType", "sealed record")]
-    [InlineData("SqlSourceOutputModelType", "Class")]
-    [InlineData("SqlSourceCollectionType", "IReadOnlyList")]
-    public void Run_ValidSettingAsPropertyAndAsMetadata_ChangesNothing(string name, string value)
+    [InlineData("SqlSourceOutput", "models", "models")]
+    [InlineData("SqlSourceOutput", " Code-Gen ", "codegen")]
+    [InlineData("SqlSourceDatabase", "not read by the generator, so never wrong", "codegen")]
+    [InlineData("SqlSourceInputModelSuffix", "Args", "codegen")]
+    [InlineData("SqlSourceOutputModelSuffix", "Row", "codegen")]
+    [InlineData("SqlSourceModelNamespace", "App.Models", "codegen")]
+    [InlineData("SqlSourceInputModelType", "sealed record", "codegen")]
+    [InlineData("SqlSourceOutputModelType", "Class", "codegen")]
+    [InlineData("SqlSourceCollectionType", "IReadOnlyList", "codegen")]
+    public void Run_ValidSettingAsPropertyAndAsMetadata_ChangesNoGeneratedCode(string name, string value, string output)
     {
         var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", Sql));
 
@@ -36,7 +66,8 @@ public sealed class SettingLevelTests
             properties: new Dictionary<string, string?> { [name] = value }
         );
 
-        run.Diagnostics.ShouldBeEmpty();
+        plain.Diagnostics.ShouldBe(Default);
+        run.Diagnostics.ShouldBe([NotDescribable(output, 1)]);
         run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
     }
 
@@ -58,27 +89,35 @@ public sealed class SettingLevelTests
             properties: new Dictionary<string, string?> { [name] = value }
         );
 
-        run.Diagnostics.ShouldBe(["SQLSRC014 (1,1)-(1,1): '" + value + "' is not a valid value of " + name]);
+        // A value that is not valid is not set, and the output is the default.
+        run.Diagnostics.ShouldBe(
+            ["SQLSRC014 (1,1)-(1,1): '" + value + "' is not a valid value of " + name, .. Default],
+            ignoreOrder: true
+        );
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources.Keys.ShouldContain("App.Sample.g.cs");
     }
 
     [Theory]
-    [InlineData("Output = GeneratorOutput.Sql")]
-    [InlineData("Output = GeneratorOutput.Models")]
-    [InlineData("Output = GeneratorOutput.CodeGen")]
-    [InlineData("InputModelSuffix = \"Args\", OutputModelSuffix = \"Row\", ModelNamespace = \"App.Models\"")]
-    [InlineData("InputModelType = GeneratorModelType.Class, OutputModelType = GeneratorModelType.SealedRecord")]
-    [InlineData("CollectionType = GeneratorCollectionType.IReadOnlyList")]
-    [InlineData("MethodLocation = MethodLocation.Internal")]
-    [InlineData("InputModelSuffix = \"\", ModelNamespace = \"  \"")]
-    public void Run_ValidAttributeProperty_ChangesNothing(string argument)
+    [InlineData("Output = GeneratorOutput.Sql", null)]
+    [InlineData("Output = GeneratorOutput.Models", "models")]
+    [InlineData("Output = GeneratorOutput.CodeGen", "codegen")]
+    [InlineData("InputModelSuffix = \"Args\", OutputModelSuffix = \"Row\", ModelNamespace = \"App.Models\"", "codegen")]
+    [InlineData(
+        "InputModelType = GeneratorModelType.Class, OutputModelType = GeneratorModelType.SealedRecord",
+        "codegen"
+    )]
+    [InlineData("CollectionType = GeneratorCollectionType.IReadOnlyList", "codegen")]
+    [InlineData("MethodLocation = MethodLocation.Internal", "codegen")]
+    [InlineData("InputModelSuffix = \"\", ModelNamespace = \"  \"", "codegen")]
+    public void Run_ValidAttributeProperty_ChangesNoGeneratedCode(string argument, string? output)
     {
         var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", Sql));
 
         var run = GeneratorHarness.Run(null, Source(argument), new SqlFile("/app/Repo/Q.sql", Sql));
 
-        run.Diagnostics.ShouldBeEmpty();
+        // At sql the query needs nothing that the dialect cannot give.
+        run.Diagnostics.ShouldBe(output is null ? [] : [NotDescribable(output, 1)]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
@@ -102,38 +141,34 @@ public sealed class SettingLevelTests
     {
         var run = GeneratorHarness.Run(null, Source(argument), new SqlFile("/app/Repo/Q.sql", Sql));
 
-        var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
+        // The type's files are still checked, under the default output.
+        run.Diagnostics.Count.ShouldBe(2);
+        run.Diagnostics.ShouldContain(Default[0]);
+        var diagnostic = run
+            .Diagnostics.Where(item => item.StartsWith("SQLSRC006", StringComparison.Ordinal))
+            .ShouldHaveSingleItem();
         diagnostic.ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(5,2)-");
         diagnostic.ShouldEndWith(": '" + value + "' is not a valid value of " + property);
         run.Sources.Keys.ShouldNotContain("App.Sample.g.cs");
     }
 
     // The markers that have no effect yet, in a preamble and in a query: the type's file is the one of the same file
-    // without them.
+    // without them.  The output's markers and the tokens' defaults change only the diagnostics.
     [Theory]
-    [InlineData(
-        "-- name: Q\nSELECT id FROM users WHERE id = @id;\n",
-        "-- database: main\n-- output: models\n-- input-model-suffix: Args\n-- output-model-suffix: Row\n"
-            + "-- model-namespace: App.Models\n-- input-model-type: sealed record\n-- output-model-type: class\n"
-            + "-- collection-type: ImmutableArray\n\n"
-            + "-- name: Q -> one\n-- param: @id int not null\n-- database: other\n-- output: codegen\n"
-            + "-- input-model: QueryArgs\n-- output-model: App.Models.QueryRow\n-- collection-type: List\n"
-            + "SELECT id FROM users WHERE id = @id;\n"
-    )]
-    [InlineData(
-        "-- name: Q\nSELECT id FROM {{table}} WHERE {{filter}};\n",
-        "-- output: models\n\n-- name: Q -> many\n-- param: @since timestamptz not null\n"
-            + "-- param: @page int\n-- token: {{filter:created_at > @since}}\n"
-            + "SELECT id FROM {{table:users}} WHERE {{filter}};\n"
-    )]
-    public void Run_MarkersWithoutAnEffect_GiveTheFileOfTheSameQueryWithoutThem(string plainSql, string markedSql)
+    [MemberData(nameof(MarkersWithoutAnEffect))]
+    public void Run_MarkersWithoutAnEffect_GiveTheFileOfTheSameQueryWithoutThem(
+        string plainSql,
+        string markedSql,
+        string[] plainDiagnostics,
+        string[] markedDiagnostics
+    )
     {
         var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", plainSql));
 
         var run = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", markedSql));
 
-        plain.Diagnostics.ShouldBeEmpty();
-        run.Diagnostics.ShouldBeEmpty();
+        plain.Diagnostics.ShouldBe(plainDiagnostics);
+        run.Diagnostics.ShouldBe(markedDiagnostics);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         run.Sources["App.Sample.g.cs"].ShouldBe(plain.Sources["App.Sample.g.cs"]);
@@ -150,9 +185,20 @@ public sealed class SettingLevelTests
         );
 
         // The property is not read, and the line is an ordinary comment.
-        run.Diagnostics.ShouldBeEmpty();
+        run.Diagnostics.ShouldBe(Default);
         run.Sources["App.Sample.g.cs"].ShouldContain("\"SELECT 1;\"");
     }
+
+    // SQLSRC209 for the query Q at this line, under the default dialect.
+    private static string NotDescribable(string output, int line) =>
+        $"SQLSRC209 /app/Repo/Q.sql({line},10)-({line},11): The output '{output}' needs each query described by its "
+        + "database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the "
+        + "output to 'sql'.";
+
+    // SQLSRC210 for this token of the query Q at the first line, under the default output.
+    private static string NoDefault(string token) =>
+        $"SQLSRC210 /app/Repo/Q.sql(1,10)-(1,11): The token '{token}' has no default, which a query whose output is "
+        + "'codegen' needs.  Give it a default, or set the output to 'sql'.";
 
     private static string Source(string? argument) =>
         "using SqlSource;\n\nnamespace App;\n\n[SqlSourceGenerate(SqlLocation = SqlLocation.Direct"

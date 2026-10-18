@@ -26,20 +26,20 @@ flowchart LR
     attribute -->|"read as syntax"| tool
     tool -->|"describes against"| database[("Database")]
     tool --> sidecar[".sql.json sidecar"]
-    sidecar -.->|"planned (phase 5)"| generator
+    sidecar -->|"checked"| generator
 ```
 
-In a build, the compiler gives the generator the project's `.sql` files as additional files, its settings as MSBuild properties and item metadata, and the types that carry `[SqlSourceGenerate]`, an attribute the generator itself adds to the compilation.  The generator parses each file that a type claims and writes the type's file: a constant for each query, or a method for a query that has tokens.
+In a build, the compiler gives the generator the project's `.sql` files and their sidecars as additional files, its settings as MSBuild properties and item metadata, and the types that carry `[SqlSourceGenerate]`, an attribute the generator itself adds to the compilation.  The generator parses each file that a type claims and writes the type's file: a constant for each query, or a method for a query that has tokens.  It also reads the sidecar of each claimed file, and reports a query that needs an entry and has no current one, as [sidecars](generator.md#sidecars) describes.
 
 Outside a build, `sqlsource describe` finds the run unit and evaluates its projects with `dotnet msbuild`, which runs `SqlSourceWriteManifest`.  It finds `[SqlSourceGenerate]` in a manifest's `Compile` files by syntax, with `AttributeReader`, and reads the manifest's `.sql` files that a type claims.  From those it plans the run with the generator's own code, asks each query's database through a describer, and writes a sidecar beside each `.sql` file.
 
-No step of the generator reads a sidecar yet.  Phase 5 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md) delivers that, which is why the edge is dashed.
+Nothing of a sidecar reaches the generated code: the generator checks the sidecars and reports what it finds.
 
 ## Shared code
 
 Code that both the generator and the tool use lives in the generator assembly.  The tool references `src/SqlSource/SqlSource.csproj` by a plain `ProjectReference`, and the generator's project lists `SqlSource.Tool` under `InternalsVisibleTo`, so the tool calls the generator's internal types directly and copies none of them.
 
-The tool plans a run with the generator's path resolver, settings readers, parser and hash, among them `PathResolver`, `SqlFileReader`, `QuerySettings` and `SqlQueryHash`, so that it claims the same files and computes the same hashes as a build.  [`GeneratorParityTests`](../../tests/SqlSource.Tool.Tests/Planning/GeneratorParityTests.cs) holds the two to the same claims.  The tool also reads, compares and writes sidecars with the generator assembly's `SidecarReader`, `SidecarComparer` and `SidecarWriter`, and reports its errors with the descriptors of `ToolDiagnostics`.
+The tool plans a run with the generator's path resolver, settings readers, parser and hash, among them `PathResolver`, `SqlFileReader`, `QuerySettings` and `SqlQueryHash`, so that it claims the same files and computes the same hashes as a build.  [`GeneratorParityTests`](../../tests/SqlSource.Tool.Tests/Planning/GeneratorParityTests.cs) holds the two to the same claims, and to the same `SQLSRC209` and `SQLSRC210`, which both report.  The tool also reads, compares and writes sidecars with the generator assembly's `SidecarReader`, `SidecarComparer` and `SidecarWriter`, the generator reads them with the same `SidecarReader`, and the tool reports its errors with the descriptors of `ToolDiagnostics`.
 
 ## Glossary
 
@@ -95,7 +95,7 @@ The `<file>.sql.json` file that `sqlsource describe` writes beside a `.sql` file
 
 ## Reading guide
 
-- [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a `.sql` file is parsed, what is written for a type, how diagnostics travel, and the sidecar model the assembly holds.
+- [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a `.sql` file is parsed, how each claimed file's sidecar is read and checked, what is written for a type, how diagnostics travel, and the sidecar model the assembly holds.
 - [The MSBuild files and the manifest](msbuild-and-manifest.md): what the props and targets hand the compiler, how they trim each value, and the manifest, whose format is the contract between the package and the tool, with its known limits.
 - [The tool](tool.md): how `sqlsource` reads a command line and ends a run, the steps of a `describe` run from the run unit to the sidecars, what each folder does and uses of the generator, and how a run reports and logs.
 - [The PostgreSQL describer](postgres-describer.md): the contract every describer implements, the exchange its calls go through and how a capture is recorded and replayed, then how the PostgreSQL describer describes one query, builds its parameters and columns, matches a table and chooses each error, and why no query can make it run a statement.

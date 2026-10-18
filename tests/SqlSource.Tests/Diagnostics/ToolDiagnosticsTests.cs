@@ -37,8 +37,12 @@ public sealed class ToolDiagnosticsTests
     }
 
     [Fact]
-    public void All_Ids_ComeAfterEveryIdOfTheGenerator() =>
-        string.CompareOrdinal(SqlDiagnostics.All[^1].Id, ToolDiagnostics.All[0].Id).ShouldBeLessThan(0);
+    public void All_Ids_AreUniqueAcrossBothClasses()
+    {
+        var ids = SqlDiagnostics.All.Concat(ToolDiagnostics.All).Select(descriptor => descriptor.Id).ToArray();
+
+        ids.ShouldBeUnique();
+    }
 
     [Fact]
     public void All_HelpLinks_PointAtTheDescriptorsSectionOfTheDiagnosticsDocument()
@@ -154,8 +158,8 @@ public sealed class ToolDiagnosticsTests
                 "ansi"
             )
             .ShouldBe(
-                "The output 'codegen' needs a dialect that can be described, and the dialect of this file is 'ansi'.  "
-                    + "Set the dialect to 'postgres' or 'mssql', or the output to 'sql'."
+                "The output 'codegen' needs each query described by its database, and the dialect 'ansi' has no "
+                    + "database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'."
             );
 
     [Fact]
@@ -167,8 +171,8 @@ public sealed class ToolDiagnosticsTests
                 "models"
             )
             .ShouldBe(
-                "The token 'where' has no default.  A query whose output is 'models' is described with a sample in "
-                    + "its place."
+                "The token 'where' has no default, which a query whose output is 'models' needs.  Give it a default, "
+                    + "or set the output to 'sql'."
             );
 
     [Fact]

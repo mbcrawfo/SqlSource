@@ -97,7 +97,8 @@ internal static class GeneratorHarness
                         && result.GeneratedTrees.Contains(diagnostic.Location.SourceTree!)
                     )
                     .Select(Format),
-            ]
+            ],
+            result
         );
     }
 
@@ -234,9 +235,11 @@ internal sealed record SqlFile(
 //   Diagnostics: what the generator reported.
 //   CompilationErrors: the compiler's errors for the source together with the generated code.
 //   GeneratedCodeWarnings: the compiler's warnings inside generated code, where a consumer cannot fix them.
+//   Result: the driver's own result, for a test that reads a diagnostic's severity or what a named step gave.
 internal sealed record GeneratorRun(
     IReadOnlyDictionary<string, string> Sources,
     IReadOnlyList<string> Diagnostics,
     IReadOnlyList<string> CompilationErrors,
-    IReadOnlyList<string> GeneratedCodeWarnings
+    IReadOnlyList<string> GeneratedCodeWarnings,
+    GeneratorDriverRunResult Result
 );
