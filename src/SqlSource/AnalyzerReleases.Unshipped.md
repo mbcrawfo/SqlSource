@@ -85,3 +85,6 @@ SQLSRC244 | SqlSource | Error | Entry is stale
 SQLSRC245 | SqlSource | Warning | Entry names no query
 SQLSRC247 | SqlSource | Error | Npgsql is older than 8.0
 SQLSRC248 | SqlSource | Info | Npgsql is newer than SqlSource knows
+SQLSRC250 | SqlSource | Error | Mapped type is not found
+SQLSRC251 | SqlSource | Error | Mapped type is not accessible
+SQLSRC252 | SqlSource | Error | Mapped type cannot be a property's type

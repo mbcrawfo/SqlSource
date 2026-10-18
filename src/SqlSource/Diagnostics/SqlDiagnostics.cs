@@ -511,6 +511,47 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc248"
     );
 
+    // {0} is the column or parameter, as "column 'id'", {1} the key, {2} the C# type and {3} the place that wrote the
+    // entry, as "the property SqlSourceTypeOverrides".
+    public static readonly DiagnosticDescriptor MappedTypeNotFound = new(
+        id: "SQLSRC250",
+        title: "Mapped type is not found",
+        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and no type of that name is found, or "
+            + "more than one reference has one that this project can see.  Correct the name, with its namespace and "
+            + "type arguments, or for a name that two references have, map to a type of this project.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc250",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor MappedTypeNotAccessible = new(
+        id: "SQLSRC251",
+        title: "Mapped type is not accessible",
+        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and this project cannot see that type.  "
+            + "Make it, and each type it is nested in, public, or internal when it is this project's own, or give this "
+            + "project its assembly's internals with InternalsVisibleTo.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc251",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor MappedTypeNotAPropertyType = new(
+        id: "SQLSRC252",
+        title: "Mapped type cannot be a property's type",
+        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and no property can have that type.  "
+            + "Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its "
+            + "property nullable.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc252",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -558,7 +599,10 @@ internal static class SqlDiagnostics
             EntryIsStale,
             OrphanEntry,
             NpgsqlTooOld,
-            NpgsqlNewerThanKnown
+            NpgsqlNewerThanKnown,
+            MappedTypeNotFound,
+            MappedTypeNotAccessible,
+            MappedTypeNotAPropertyType
         );
 
     /// <summary>

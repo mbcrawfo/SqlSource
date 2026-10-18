@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Sidecars;
+using SqlSource.Generation.Types;
 using SqlSource.Parsing;
 using SqlSource.Testing.Generator;
 using Xunit;
@@ -138,6 +139,7 @@ public sealed class CachingTests
         // was read again too, and gave an equal value, so nothing after it ran.
         AllReasons(result, TrackingNames.SupportedFramework).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.NpgsqlProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.MappedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         string[] steps =
         [
             TrackingNames.TargetTypes,
@@ -164,6 +166,7 @@ public sealed class CachingTests
             TrackingNames.SidecarCheckInput,
             TrackingNames.SidecarCheck,
             TrackingNames.UsesPostgresEntries,
+            TrackingNames.MappedTypeNames,
         ];
         foreach (var step in steps)
         {
@@ -1023,6 +1026,76 @@ public sealed class CachingTests
         Outputs(result, TrackingNames.SidecarCheck)
             .Select(output => (SidecarCheckResult)output.Value)
             .ShouldAllBe(check => check.Diagnostics.Count == 0 && check.UsableEntries.Count == 0);
+    }
+
+    // A project whose property maps a type: the resolution runs on the new compilation, gives an equal value, and
+    // nothing after it runs again.
+    [Fact]
+    public void Run_CSharpEdit_ResolvesTheMappedTypesAndNothingAfterThem()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = FirstRun(
+            compilation,
+            _users,
+            new TestOptionsProvider(
+                OutputKind.Sql,
+                null,
+                properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "uuid=System.Guid" }
+            )
+        );
+        var before = Outputs(driver.GetRunResult(), TrackingNames.MappedTypes).ShouldHaveSingleItem().Value;
+        ((EquatableArray<MappedType>)before).ShouldHaveSingleItem().Name.ShouldBe("global::System.Guid");
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        AllReasons(result, TrackingNames.MappedTypeNames).ShouldBe([IncrementalStepRunReason.Cached]);
+        var (types, reason) = Outputs(result, TrackingNames.MappedTypes).ShouldHaveSingleItem();
+        reason.ShouldBe(IncrementalStepRunReason.Unchanged);
+        types.ShouldBe(before);
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    [Fact]
+    public void Run_NoOverride_ResolvesNothing()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+
+        var result = FirstRun(OutputKind.Sql, compilation).GetRunResult();
+
+        (
+            (EquatableArray<string>)Outputs(result, TrackingNames.MappedTypeNames).ShouldHaveSingleItem().Value
+        ).ShouldBeEmpty();
+        (
+            (EquatableArray<MappedType>)Outputs(result, TrackingNames.MappedTypes).ShouldHaveSingleItem().Value
+        ).ShouldBeEmpty();
+    }
+
+    // The query's marker names a type.  An edit of its SQL parses the file again and leaves the names as they were.
+    // The driver hands the generator a new compilation on every run, a .sql edit's too, so the resolution runs again
+    // as the probe does, and gives an equal value: nothing after it runs.
+    [Fact]
+    public void Run_SqlEditThatLeavesTheMarkersAlone_ChangesNoMappedType()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var users = new InMemoryAdditionalText(
+            _users.Path,
+            "-- name: GetUser\n-- type-override: uuid = System.Guid\nSELECT 1;\n"
+        );
+        var driver = FirstRun(compilation, users, new TestOptionsProvider(OutputKind.Sql, null));
+
+        var edited = new InMemoryAdditionalText(
+            _users.Path,
+            "-- name: GetUser\n-- type-override: uuid = System.Guid\nSELECT 1, 2;\n"
+        );
+        var result = Run(driver.ReplaceAdditionalText(users, edited), compilation);
+
+        AllReasons(result, TrackingNames.ParsedFiles).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.MappedTypeNames).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.SupportedFramework).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.MappedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        ((EquatableArray<string>)Outputs(result, TrackingNames.MappedTypeNames).ShouldHaveSingleItem().Value).ShouldBe([
+            "global::System.Guid",
+        ]);
     }
 
     private GeneratorDriver FirstRun(OutputKind? output, Compilation compilation) =>

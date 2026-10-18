@@ -281,6 +281,29 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => SidecarChecker.Check(input))
             .WithTrackingName(TrackingNames.SidecarCheck);
 
+        // The C# types that the type override names at any level, as a sorted list of their names, which an edit that
+        // leaves the names alone gives again, equal.
+        var mappedTypeNames = projectSettings
+            .Combine(filesSettings)
+            .Combine(parsedFiles)
+            .Select(static (input, _) => MappedTypeNames.Collect(input.Left.Left, input.Left.Right, input.Right))
+            .WithTrackingName(TrackingNames.MappedTypeNames);
+
+        // Those types resolved against the compilation.  Like the probe, it runs on every run, since the driver gives
+        // a new compilation each time: a few lookups for each name, and none without an override.  Its value is equal
+        // until a type appears or goes, so nothing after it runs again.
+        var mappedTypes = context
+            .CompilationProvider.Combine(mappedTypeNames)
+            .Select(
+                static (input, cancellationToken) =>
+                    MappedTypeResolver.Resolve(input.Left, input.Right, cancellationToken)
+            )
+            .WithTrackingName(TrackingNames.MappedTypes);
+
+        // Nothing reports on the mapped types yet.  A step that no output reads never runs, so this one makes the
+        // resolution run, and its caching testable, until the types of the queries read it.
+        context.RegisterSourceOutput(mappedTypes, static (_, _) => { });
+
         // Whether a query of the project needs an entry of postgres, whose types the driver decides.  Without one, the
         // driver is not reported on.
         var usesPostgresEntries = fileNeeds

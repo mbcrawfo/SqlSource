@@ -58,4 +58,8 @@ internal static class TrackingNames
     public const string NpgsqlProbe = nameof(NpgsqlProbe);
 
     public const string UsesPostgresEntries = nameof(UsesPostgresEntries);
+
+    public const string MappedTypeNames = nameof(MappedTypeNames);
+
+    public const string MappedTypes = nameof(MappedTypes);
 }

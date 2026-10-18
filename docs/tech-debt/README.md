@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0056`
+Next id: `TD-0057`
 
 ## Active items
 
@@ -40,6 +40,7 @@ Next id: `TD-0056`
 | [TD-0050](TD-0050-a-catalog-types-name-depends-on-the-search-path.md) | Open | 2026-10-14 | Low | The name of a type of `pg_catalog` that has no modifier is `format_type(oid, -1)`, which qualifies it when a user type of the same name stands before `pg_catalog` on the session's `search_path`, so such a name depends on the session |
 | [TD-0051](TD-0051-columns-that-cannot-be-null-are-answered-nullable.md) | Open | 2026-10-15 | Medium | The PostgreSQL describer answers nullable or unknown for about a third of the realistic corpus's columns that cannot be `NULL`: expressions that parts A and B of the noise design do not answer, a column of no origin through a subquery the planner keeps apart, a `UNION` branch the planner keeps as a scan and recursive CTEs, `EXISTS` as a column, aggregates other than `count(*)`, `VALUES` and strict functions; `RealisticNullabilityNoiseTests` holds the count |
 | [TD-0052](TD-0052-explain-plans-every-partition.md) | Open | 2026-10-15 | Low | The PostgreSQL describer asks for a query's plan with partition pruning off, so that the members of a partitioned table's `Append` show for the `NULL`s of its parameters, and a query over a table of many partitions is planned, and logged, with every partition |
+| [TD-0056](TD-0056-mapped-generic-constraints-are-not-checked.md) | Open | 2026-10-18 | Low | The type arguments of a C# type that the type override names are not checked against the constraints of its type parameters, so a mapping such as `System.Collections.Generic.List<System.Nullable<string>>` is accepted, and its model will not compile |
 
 ## Columns
 
