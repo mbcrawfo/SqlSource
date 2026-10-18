@@ -22,7 +22,7 @@ namespace SqlSource.Tool.Projects;
 /// Two runs of <c>dotnet msbuild</c> for a project, and three for one with several target frameworks.  The first
 /// evaluates the project and runs no target; the last runs the target <c>SqlSourceWriteManifest</c> of the package,
 /// which writes a file the tool named.  So the tool reads nothing that MSBuild prints but the JSON of
-/// <c>-getProperty</c>, writes nothing into a project, and never restores or builds one.
+/// <c>-getProperty</c> and <c>-getItem</c>, writes nothing into a project, and never restores or builds one.
 /// </para>
 /// <para>
 /// Nothing is reported here.  An error travels in the <see cref="ProjectEvaluation" />, so that the caller reports

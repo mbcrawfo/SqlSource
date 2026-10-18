@@ -14,7 +14,7 @@ The known issues of [`docs/manual/parameters-and-tokens.md`](../manual/parameter
 
 - The stripped SQL is the one definition of a query's text, from which the tokens, the parameters and the hash come ([`SqlQueryHash`](../../src/SqlSource/Parsing/SqlQueryHash.cs)), so comments are gone before a token is found.
 - A marker's text is a separate piece of the file that is not stripped.
-- The parser cannot see the attribute, so it builds the kept form whenever any level it can see may want it; a parse that does not know a level of the settings cannot do better without making the settings an input of the parse, which the design rules out (see [`src/SqlSource/AGENTS.md`](../../src/SqlSource/AGENTS.md), "The settings have two stages").
+- The parser cannot see the attribute, so it builds the kept form whenever any level it can see may want it; a parse that does not know a level of the settings cannot do better without making the settings an input of the parse, which the design rules out (see [`docs/architecture/generator.md`](../architecture/generator.md#the-settings-have-two-stages), "The settings have two stages").
 
 ## Impact
 

@@ -14,8 +14,9 @@ using SqlSource.Settings;
 namespace SqlSource.Generation;
 
 /// <summary>
-/// Reads a type marked with the generated attribute into a <see cref="TargetType" />.  This is the only place the
-/// generator looks at symbols and syntax; everything after it works on data.
+/// Reads a type marked with the generated attribute into a <see cref="TargetType" />.  This and the step that checks
+/// the target framework are the only places the generator looks at symbols and syntax; everything after them works on
+/// data.
 /// </summary>
 internal static class TargetTypeReader
 {

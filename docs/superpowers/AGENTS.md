@@ -1,11 +1,6 @@
 # AGENTS.md - docs/superpowers
 
-Design and planning artifacts produced by the Superpowers brainstorming and writing-plans workflow.  Both folders use `YYYY-MM-DD-<topic>` filenames:
-
-| Folder | Contents |
-|----|----|
-| `specs/` | Validated designs (`*-design.md`) - the approved approach agreed on before implementation |
-| `plans/` | Implementation plans derived from a spec - the step-by-step breakdown of the work |
+Design and planning artifacts produced by the Superpowers brainstorming and writing-plans workflow, named `YYYY-MM-DD-<topic>`: `specs/` holds the validated designs (`*-design.md`) and `plans/` the implementation plans derived from them.
 
 ## Intent
 

@@ -1,0 +1,155 @@
+# PostgreSQL nullability
+
+How the PostgreSQL describer decides whether a column can be null: the catalog's answer, the gate that says when the catalog alone is not enough, and the [plan walk](README.md#plan-walk) that reads a query's generic plan to prove more.  Where these steps stand in a describe is [one describe, step by step](postgres-describer.md#one-describe-step-by-step).  Which columns a user sees as never null is the manual's [which columns can be null](../manual/postgresql.md#nullability), and the values of `nullable`, `nullableSource` and `plan` are the sidecar format's [a column](../superpowers/specs/2026-10-07-sidecar-format-design.md#14-a-column) and [a query entry](../superpowers/specs/2026-10-07-sidecar-format-design.md#12-a-query-entry).  The terms are the [glossary's](README.md#glossary).
+
+## Nullability
+
+A column's answer is built in three layers.  The catalog says what a column of a relation can hold.  The gate says whether the query holds a word that can make a `NOT NULL` column come back `NULL`.  The walk reads the plan of a gated query, and of one with a column of no [origin](README.md#origin), and answers what it can prove.  Whatever a layer cannot answer keeps the answer of the layer before it, and is never a wrong `false`.
+
+### The catalog
+
+[`ColumnNullability.Of`](../../src/SqlSource.Tool/Describing/Postgres/ColumnNullability.cs) gives the answer and its source from a column's origin and whether the query is [gated](README.md#gated-query), by the first arm that fits:
+
+| The column | `nullable` | `nullableSource` |
+|----|----|----|
+| No origin | `null` | `no-origin` |
+| Of a view or a materialized view | `null` | `view` |
+| Of a foreign table | `null` | `foreign-table` |
+| Of a table, in a gated query | `true` | `heuristic` |
+| Of a table that may return `NULL` where its column says it cannot | `true` | `catalog` |
+| Any other of a table | `false` when the catalog says `NOT NULL` and it is validated, `true` otherwise | `catalog` |
+
+PostgreSQL records no `NOT NULL` for a view's column, and does not enforce a foreign table's on its remote rows, so both are unknown and the source says which.  A `NOT NULL` that PostgreSQL 18 holds as not validated (`NOT VALID`) sets `attnotnull` while rows that were there before may hold `NULL`.  `tables` reads `pg_constraint.convalidated` for it into `PostgresAttributeRow.NotNullValidated`.
+
+A table may return `NULL` where its column says it cannot in three ways, and `tables` reads each into a member of `PostgresTableRow`:
+
+- **It has or had inheritance children**, `pg_class.relhassubclass` (`Relhassubclass`), for a table (`r`).  Before PostgreSQL 18 a child may drop a `NOT NULL` it inherited, and a query of the parent reads the child's rows.  The rule is the same on every version: it costs the parent's columns on 18, where a child cannot drop the constraint, and those of a table whose last child was dropped, whose flag PostgreSQL clears lazily.  A partition can never drop its parent's `NOT NULL`, so the rule leaves a partitioned table (`p`) out.
+- **It is partitioned and a foreign table is in its partition tree**, at any depth, by `pg_partition_tree` (`HasForeignPartition`).  A foreign partition inherits the parent's `NOT NULL`, which nothing enforces on its remote rows, and a query of the parent reads them.  It is false for any relation that is not partitioned.
+- **It has a `DO INSTEAD` rule on `INSERT`, `UPDATE` or `DELETE`**, by `pg_rewrite` (`HasInsteadRule`), for a table or a partitioned table.  The rule replaces the statement by its action, usually on another relation, whose rows the `RETURNING` list gives, while the row description keeps the table as each column's origin and the plan's `ModifyTable` is the action's.  The rule costs the columns wherever the table is a column's origin, a plain `SELECT` from it included, and also for a rule that returns no rows, `NOTHING`, a conditional one or a disabled one.
+
+The table match and the walk call `ColumnNullability.Of` for a query that is not gated wherever they need the catalog's answer, so the rule of a `NOT NULL` is written once.
+
+### The gate
+
+[`OuterJoinGate.IsGated`](../../src/SqlSource.Tool/Describing/Postgres/OuterJoinGate.cs) is true when the SQL holds one of `LEFT`, `RIGHT`, `FULL`, `OUTER`, `ROLLUP`, `CUBE`, `GROUPING`, `OLD`, `NEW` and `MERGE` as a whole word, in any case, in a `Text` lexeme.  A gated query makes every column of a table `true` with `heuristic`, and the walk then answers for each column whose relation instance the plan names.  A statement without rows is never gated, since it has nothing a join could null-extend.
+
+- The four words of an outer join are the joins that null-extend a side.
+- `ROLLUP`, `CUBE` and `GROUPING` are the grouping sets, which put `NULL` into a `NOT NULL` grouping column on a subtotal row with no join; `GROUPING` covers `GROUPING SETS` and the function.
+- `OLD` and `NEW` are the old and the new row of a `RETURNING` list of PostgreSQL 18, all `NULL` for the row an `INSERT` had no old one of and a `DELETE` no new one of.  `MERGE` has a `RETURNING` list that holds the source's columns as `NULL` for a row that `WHEN NOT MATCHED BY SOURCE` acted on.  Each keeps the table's origin in the row description.
+
+The gate reads the generator's lexemes, so a string, a comment and a quoted identifier do not count, and `left(name, 3)` does: the gate reads words and no structure, which costs a walk that finds nothing and never a wrong answer.  It is as right as the lexer's reading of the text.  A character above U+007F is part of a name, as the server reads it, so `SELECT o.total AS §$x$ FROM users u LEFT JOIN orders o ON o.user_id = u.id --$x$` opens no dollar quote and the gate sees its `LEFT`.  The exception is `OLD` and `NEW`, which PostgreSQL 18 resolves when quoted: a quoted identifier whose name, with `""` read as one quote, is `old` or `new` in any case counts, and so does any Unicode-escaped identifier `U&"..."`, whose escapes the tool does not decode.  `OuterJoinGate.NamesOldOrNew` reads the same two words for the walk at a root `ModifyTable`.
+
+### The plan
+
+`explain` ([`PostgresLive.ExplainAsync`](../../src/SqlSource.Tool/Describing/Postgres/PostgresLive.cs)) asks for the plan of the prepared statement.  It is asked after `check`, for a statement with rows that is gated or has a column of no origin (an expression, a column of a set operation, a system column), so a query that is neither has the capture it had.  It runs, on every version:
+
+1. `BEGIN`.
+2. `SET LOCAL plan_cache_mode = force_generic_plan`, so that the `NULL` of a parameter is not folded into the plan and `id = $1` stays a condition.
+3. `SET LOCAL enable_partition_pruning = off`.  The executor prunes partitions for the parameters when it starts, and a condition of the partition key on a parameter would prune every partition for its `NULL`, leaving an `Append` with no member, `Subplans Removed`, which the walk cannot tell from a set operation's.  [TD-0052](../tech-debt/TD-0052-explain-plans-every-partition.md) is what that costs.
+4. A `SET LOCAL` for each setting of the request.
+5. `EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlsource_<n>(NULL, ...)`, with a `NULL` for each type the server resolved for the statement, since `EXPLAIN EXECUTE` refuses any other number.
+6. `ROLLBACK`.
+
+`EXPLAIN` without `ANALYZE` plans the statement and does not execute it, and disposing a transaction that was not ended rolls it back, so a failure at any step leaves the session as it was found.  Planning evaluates an immutable function whose arguments are constants, inside that transaction, so a function wrongly marked immutable runs, and an effect outside the transaction, a sequence's for one, remains: [TD-0047](../tech-debt/TD-0047-explain-evaluates-immutable-functions.md), which the manual's [what describing does](../manual/postgresql.md#what-describing-does) tells a user.
+
+`EXPLAIN (GENERIC_PLAN)` of PostgreSQL 16 is not used.  Through Npgsql, with the parameters bound as nulls, 18.4 folded `u.id = $1` into a `Result` with `One-Time Filter: false`, which is no plan of the query; and 14 and 15 do not have it.
+
+An `explain` that fails is logged and never reported: `plan` is `unavailable` and the heuristic stands, since a plan the server will not give is no fault of the query.  The one exception is `26000`, a statement that is gone, which `PostgresSession.WalkAsync` reports as `SQLSRC236` at the step `explain`, since the describe is then no longer of this query.  A text that is no plan is `unavailable` too.
+
+After a plan is read, `partitions` asks for the ancestors of each relation that the members of an `Append` of the plan may scan as partitions (`PlanPartitions.MembersOf`).  `PostgresSession.WalkAsync` then builds one `PlanInstancesCache` for the walk, which `NullabilityWalk.MayAnswerFromBranches` and `NullabilityWalk.Run` share.  When a column has no origin and the walk may answer it from a set operation's branches, `relations` asks for the relations the plan scans anywhere (`PlanRelations.Of`) that `tables` did not answer, by schema and name, and its rows join the walk's tables.  An error of either is logged and never reported: without `partitions` every `Append` is read as a set operation, and without `relations` the walk goes on with the rows of `tables` alone.
+
+A query that is not gated is planned for its columns of no origin alone, and its columns with an origin keep the catalog's answer whatever the plan says (`WalkScope.Gated`).  A statement with rows records `plan` as `not-needed` when it is not gated and every column has an origin, `walked` when `NullabilityWalk` used its plan and `unavailable` when there was none to use; the `reason` of the `postgres.walk` event says why, one of `WalkReasons`.  What each value means in a sidecar is the format's [a query entry](../superpowers/specs/2026-10-07-sidecar-format-design.md#12-a-query-entry).
+
+### The settings of the planner
+
+[`PlannerSettings`](../../src/SqlSource.Tool/Describing/Postgres/PlannerSettings.cs) are for the tests, which force a join method with them.  `PostgresDescriber` takes them at construction and every `explain` of its sessions carries them; `ToolHost.Create` registers the describer with the constructor that takes none, so the planner chooses its own join methods.  The list is closed, `enable_hashjoin`, `enable_mergejoin`, `enable_nestloop`, `enable_memoize` and `enable_material`, each `on` or `off`, and anything else throws at construction and again where the text of the `SET LOCAL` is made, so the text holds nothing but what the class writes.  The settings are in the request, so a capture recorded with them is replayed with them.
+
+## The plan walk
+
+The walk is [`Describing/Postgres/Walk/`](../../src/SqlSource.Tool/Describing/Postgres/Walk): the reading of a plan, [`PlanNode`](../../src/SqlSource.Tool/Describing/Postgres/Walk/PlanNode.cs), and of its `Output`, and its tests are the mirrored folder.  It sees the rest of the describer as its parent namespace, and the session and the events take it by a `using`.  Every node type, relationship, join type and set-operation command it compares is a constant of [`PlanVocabulary.cs`](../../src/SqlSource.Tool/Describing/Postgres/Walk/PlanVocabulary.cs), and each set of node types is built from them for its purpose.  They differ on purpose: the set operations of `PlanInstances` hold `Recursive Union`, and `NullabilityWalk.ReachesSetOperation` does not.
+
+The root's `Output` is the result's target list in order: PostgreSQL prints the target list first and what a sort or a group added after it, so a column's entry is the one at its ordinal.  A plain reference in it prints as `alias.column`, which names the relation instance and so tells the two sides of a self-join apart.  The planner's join strength reduction comes for free: a `LEFT JOIN` that a `WHERE` makes inner is an `Inner` join in the plan, and one the planner swapped is a `Right` join with the sides swapped.
+
+### Relation instances
+
+[`PlanInstances`](../../src/SqlSource.Tool/Describing/Postgres/Walk/PlanInstances.cs) finds the relation instances of a plan, each by its alias, and whether a join on the path from the root null-extends it.  Only a child whose `Parent Relationship` is `Outer` or `Inner` is followed: it is a side of a join or the one input of another node.  An `InitPlan`, a `SubPlan`, a `Member` and a `Subquery` are other plans, since a CTE's plan hangs under whichever node first needs it, and their scans are no instances of this plan's joins.
+
+An instance is of one of three kinds (`InstanceKind`):
+
+- **A relation**: an `Alias` on a scan of one relation, one of the eight node types of `PlanInstances.RelationScans`, a `Foreign Scan` among them, or the target of a root `ModifyTable`.
+- **A partitioned table**: an `Append` or a `Merge Append` whose members scan the partitions of one table, under the table's alias and a number, `e_1` and `e_2` under `e`.  A `UNION ALL` plans as an `Append` too, and its root prints the first branch, so [`PlanPartitions`](../../src/SqlSource.Tool/Describing/Postgres/Walk/PlanPartitions.cs) asks two things more of the members: that `partitions` answers them as partitions of one table, by `pg_partition_ancestors`, and that they print the same `Output` but for the alias.  Such an `Append` is an instance of the table under the alias the nodes above print, and no set operation.
+- **A plan**: a `Subquery Scan` or a `CTE Scan`, an instance of the plan it scans, the `Subquery` child of the one and, for the other, the one `InitPlan` of the whole tree named `CTE` and the CTE's name.  A CTE's `InitPlan` hangs where its query level is, which may be above the scan, so the whole tree is searched, and a name found twice says nothing.
+
+An instance is null-extended when a join on the path from the root is `Left` or `Anti` with the instance under its `Inner` child, `Right` or `Right Anti` under its `Outer`, or `Full`.  An anti join is not only a `NOT EXISTS`: the planner makes one of `a LEFT JOIN b ... WHERE b.x IS NULL`, keeps `b`'s columns in its `Output` and returns them `NULL`, as `Anti` on 14 and `Right Anti` on 18.
+
+A plan the walk cannot use leaves every column to the heuristic, with its reason:
+
+| Reason | When |
+|----|----|
+| `unknown-join-type` | A join type outside the eight of `PlanInstances.ExtendsOf` |
+| `doubled-alias` | An alias found twice |
+| `grouping-sets` | A node with a `Grouping Sets` key.  `FORMAT JSON` names every aggregate `Aggregate`, with its strategy apart, so a mixed one is found by the key too |
+| `no-output` | A root without an `Output` entry for every column, a `UNION ALL`'s `Append` for one, unless a column has no origin and [set operations](#set-operations) take the plan |
+| `output-differs` | In a query that is not gated, a reference at the root that names another column than the described one's origin |
+
+The last check is `NullabilityWalk.OutputFits`.  For a column whose origin is a table, a reference the walk maps must name a column of the origin's name, or the plan may be another statement's, which a pooler can give for this statement's name ([TD-0049](../tech-debt/TD-0049-describe-behind-a-pooler-can-reach-another-backend.md)).  It compares only references to a relation and a partitioned table, since a scan of another plan prints the subquery's names for its columns, and a view's column prints as the column of the table under it.  A gated query's plan that fails the check is `walked` with the reason `output-differs` and is read for no expression, while its columns with an origin are still walked, since column aliases, `users u(a, b)`, print a column under another name.
+
+A plain `UNION` roots as an `Aggregate` over the `Append`, has an `Output`, and is walked: its columns have no origin, and the `Member` children of the `Append` are not followed here.  Set operations read them as plans of their own.
+
+### A root `ModifyTable`
+
+A `ModifyTable` at the root is its target, and the scan of the target under it is that same instance.  An `UPDATE` and a `DELETE` scan their target under the `ModifyTable` with the `ModifyTable`'s own alias, on 14 and 18; read as a second instance it would be a doubled alias, and every `RETURNING` of one would be unusable.  The target is never null-extended, whatever join it is under, since the row a `RETURNING` list gives is the one the statement acted on.  The source of a `MERGE` is extended as its join says, and a `MERGE` with `WHEN NOT MATCHED BY SOURCE` plans as a join that null-extends its source.
+
+PostgreSQL 18 prints the old and the new row as `old.id` and `new.id`, or under the names `WITH (OLD AS o, NEW AS n)` gives them.  The server refuses those names only when a table of the statement's top level has one, so an alias of an inner scope, the `SELECT` of an `INSERT ... SELECT` or a subquery in `FROM`, reaches the plan under the same name.  So when `OuterJoinGate.NamesOldOrNew` finds either word in the SQL, a qualified reference at a root `ModifyTable` maps only to the target's own alias, which the server never lets the old or the new row take, and any other keeps the heuristic.  The same holds at the root of a plan a scan scans, a data-modifying CTE's.
+
+### Output entries
+
+An entry of `Output` is a reference or it is nothing ([`OutputReference`](../../src/SqlSource.Tool/Describing/Postgres/Walk/OutputReference.cs)).  A reference is `alias.column`, each part a name PostgreSQL prints bare, lower-case letters, digits and underscores that start with no digit, or in double quotes with `""` for a quote; or it is one bare name.  Anything else is an expression: `"left"((u.name)::text, 1)` starts as a quoted name does and is none.
+
+A bare name is a column of the plan's one relation (`PlanInstances.BareAlias`), since PostgreSQL prints bare names only for a plan of one range table entry: the root when it scans a relation; the one relation scan the root reaches through nodes of one `Outer` child each, a `Limit` over a `Sort` over the scan; and the target of a root `ModifyTable` unless a join under it null-extends.  A `Result` that replaced a scan the planner proved empty prints bare names too, in a `RETURNING` list, and such a join can null-extend it.
+
+A mapped column that nothing extends takes `ColumnNullability.Of` for a query that is not gated, so a view's column stays `null` with `view` and a foreign table's with `foreign-table`.  One that a join extends is `true` with `outer-join`, a view's and a foreign table's too.
+
+A reference to a `Subquery Scan` or a `CTE Scan` is resolved in the scanned plan, walked as a plan of its own with its own instances, by the column's origin and never by its place or its name.  The scan prints the subquery's columns in the order the query above needs them, and a column renamed to another's name would be read as the other.  The candidates are the entries of the scanned plan's root that are references to the origin's table and column, a relation's by its schema and name and a partitioned table's by its ancestors, and every reference of a scan inside it in turn.  A column with an origin is among them, since it is a plain reference in the subquery, unless the planner made it a parameter or a placeholder, `(u.id)` for a `LATERAL` reference; so an entry that is no reference and names the column's name or holds a `$` parameter leaves the heuristic (`PlanExpression.MayNameColumn`).  When every candidate is preserved the column takes the catalog's answer, and when every one is extended it is `outer-join`.  A bare name, an alias that is no instance of that plan (a `LATERAL` reference), a set operation or a plan that cannot be used leaves the heuristic.  A scan that a join extends extends every column of it.  A subquery the planner flattens has no such scan and is walked exactly.
+
+A column of no origin through a scan is never resolved, so `ro.order_count` of a `count(*)` in a subquery stays unknown: [TD-0051](../tech-debt/TD-0051-columns-that-cannot-be-null-are-answered-nullable.md).
+
+### Expressions
+
+A column of no origin is answered from its entry of the root's `Output` as an expression, or not at all.  [`PlanExpression`](../../src/SqlSource.Tool/Describing/Postgres/Walk/PlanExpression.cs) reads an entry as a whole, never as a prefix, with a tokeniser of the plan's quoting.  `EXPLAIN` prints every operator, test and boolean combination in parentheses of its own, so `(count(*) + NULL::integer)` is no `count`.  The forms it knows, and what each gives, are in its remarks: `count(*)`, a window ranking, a constant, `NULL::type`, an `IS NULL` or `IS DISTINCT FROM` test, and `COALESCE`, `GREATEST`, `LEAST` or a `CASE` with an `ELSE` over such values or over references the walk proves.  [`PlanOutputTests`](../../tests/SqlSource.Tests.Postgres/Describer/PlanOutputTests.cs) pins each form as 14 and 18 print it.  `count` is read only as `count(*)` and never as `count(x)`: a function of another schema whose argument's type is exact beats the catalog's `count("any")` whatever the order of the path, and prints bare, while `count(*)` and the rankings have the catalog's own signature, which `pg_catalog` holds first.  An answer has `nullableSource` `expression`.
+
+A function name is the catalog's only when the session finds `pg_catalog`'s functions first, which [`PostgresSearchPath`](../../src/SqlSource.Tool/Describing/Postgres/PostgresSearchPath.cs) reads from the `search_path` of `open`: a plan prints a function bare whenever the path finds it, so with `shadow, pg_catalog` an aggregate `shadow.count(*)` prints as `count(*)`.  `COALESCE`, `GREATEST`, `LEAST`, `CASE` and the tests are syntax, and no path changes them.
+
+The walk asks only of a plan with no set operation, since an `Append` or a `SetOp` prints its first branch at the root (`PlanInstances.HasSetOperation`, which a partitioned table's `Append` does not set).  It reads every entry of a plan where no join null-extends.  In a plan where one does, an anti join included, it follows the entry down to the node that computes it:
+
+- A node prints a value a node under it computed in one pair of parentheses, `('x'::text)` at every node above the scan that prints `'x'::text`, so a child that prints the entry, or the entry without the parentheses that wrap it whole, is where it comes from.
+- A child that prints no `Output`, an `Append` or a `Bitmap Index Scan`, may compute anything, so it must be preserved, with no join under it that extends.
+- The entry is read only where the node that computes it is preserved.  There, a value in parentheses that it takes from a child, a pulled-up constant of the extended side inside a `CASE` the root computes, is read as unknown unless the child computes it where no join extends (the `groupPreserved` of `PlanExpression.NullableOf`).  So `COALESCE((sum(x)), '0'::numeric)` over the extended side is still `false`.
+
+A reference inside an expression is proved through an instance no join extends, to a relation `tables` answered, by `ColumnNullability.Of`.  A bare one is the plan's one relation's, never the one instance of a plan of several, whose bare names are a relation the planner proved empty.  Nothing new is asked of the server.
+
+### Set operations
+
+A set operation's column of no origin is answered from its inputs, in [`NullabilityWalk.SetOperations.cs`](../../src/SqlSource.Tool/Describing/Postgres/Walk/NullabilityWalk.SetOperations.cs).  The walk takes this path when a column has no origin, `WalkScope.ColumnTypes` holds the row description's type of each column, the root's plan has no reason against it, the root prints no `Output` or its plan holds a set operation and its `Output` has an entry for every column and passes `OutputFits`, and the root reaches an `Append`, a `Merge Append` or a `SetOp` through nodes of one `Outer` child, no join type, no grouping set and no `ModifyTable` (`NullabilityWalk.ReachesSetOperation`).  Each column of no origin is then `false` with `set-operation` when the inputs the operation returns rows of prove it, and is kept otherwise.  A column with an origin goes as it would, and `plan` is `walked`.  So a root `UNION ALL`'s `Append` is no longer `unavailable` for such a column, nor is a partitioned table's root `Append`, a union of its partitions, whose answer is `expression` since the plan holds no set operation.
+
+At a node, by the first rule that applies:
+
+- An `Append` or a `Merge Append`, of a `UNION`, a partitioned table or one nested in another, proves it when it has a member and every member does.
+- A `SetOp` `Intersect` or `Intersect All` proves it when an input does, since its rows are in both, and `Except` or `Except All` when its left input does.  The inputs on 14 are the two members of its one `Outer` `Append`, one with the flag `0` last (the left) and one with `1`; on 18 they are its `Outer` (the left) and `Inner` children.
+- A `SetOp` below another set operation, or under a node that prints a cast of its value, `((E)::T)`, is of the common type of its own inputs and not the row description's, so it proves it only when every input does.
+- Any other `SetOp` and a `Recursive Union` never prove it.
+- A `Sort`, an `Incremental Sort`, a `Limit`, a `Unique` and a `Materialize` never project, and pass the ordinal to their child.  Any other node of one `Outer` child, no join type, no grouping set and no `ModifyTable` passes it on only when its entry is the child's printed entry `E` at the same ordinal, as `E`, `(E)` or `((E)::T)`, and no other entry of the child is any of those texts.  An `Append` without `Output` prints its first member's.
+- A `Subquery Scan` aliased `*SELECT* <k>` is followed to its branch by position only when it is itself one of the two flagged members of a 14 `SetOp`'s `Append`.  The flag makes the planner's own leaf scan, built one entry for each column of the branch in order, and keeps it, so the member is that scan.  The alias alone proves nothing: under an `Append` the planner may have pulled a `UNION ALL` of a subquery in `FROM`, a CTE or an inlined SQL function up into its query, and a branch it keeps as such a scan prints the columns that query needs, in its order (`SELECT s.b, s.a FROM (... UNION ALL (SELECT ... LIMIT 5)) s`).  On 18 the planner drops its own leaf scan when it adds nothing, and a `SetOp`'s input may then be a user's subquery of that very name, through a view, an inlined SQL function or a `U&"..."` identifier the SQL does not show.  A scan under the flagged member is never followed either.
+- Any other node with the entry is walked as a plan of its own, with its own instances, and a plan that cannot be used or holds a set operation proves nothing.  A reference is proved by `ColumnNullability.Of` through an instance no join of that plan extends, and an expression by `PlanExpression.NullableOf`.
+
+The value's type must carry to the column's (`SetOperationTypes.Carries`), with the attribute's `TypeOid` for a reference and `PlanExpression.TypeOf` for an expression, which knows a literal's type only when `pg_catalog` is first on the path.  The planner casts a branch to the result's type and does not print the cast, and a user's cast or a domain's may return `NULL` for a value that is not, so a value counts only when its type is the column's or both are in one family of built-in types whose casts the server ships ([`SetOperationTypes`](../../src/SqlSource.Tool/Describing/Postgres/Walk/SetOperationTypes.cs)).  `tables` answers only the relations the columns name, so the session asks `relations` for the rest.
+
+The walk follows a column at most `16` plans deep, through scans of other plans and set operations' inputs, and an entry at most `256` nodes deep; past either it is unknown.
+
+### How the walk degrades
+
+[`NullabilityWalk`](../../src/SqlSource.Tool/Describing/Postgres/Walk/NullabilityWalk.cs) degrades a column alone, and the plan whole.  An entry that cannot be mapped leaves its own column to the heuristic and the plan `walked`; a plan that cannot be used leaves every column to it and is `unavailable`.  A column without an origin is answered as an expression, from a set operation's inputs, or kept, and is never mapped.  The walk never answers `false` for a column with an origin on its own: when in doubt it is the heuristic, and a `false` comes from `ColumnNullability.Of`.
+
+### The walk in the fixtures
+
+Every fixture case gives one answer on PostgreSQL 14 and on 18, which [the PostgreSQL tests](../../tests/SqlSource.Tests.Postgres/README.md) check on both images.  A shape the two plan differently, such as `ON ... AND o.id IS NULL`, which 17 and later prove false from the `NOT NULL`, is a test of [`WalkTests`](../../tests/SqlSource.Tests.Postgres/Describer/WalkTests.cs) with each version's answer.  How a case of the walk is named and added, and what [`WalkMatrixTests`](../../tests/SqlSource.Tool.Tests/Fixtures/WalkMatrixTests.cs) holds of it, is [the describer's fixtures](../../tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures).

@@ -28,13 +28,22 @@ Moving to a new minor is a change of its own: bump the tag, record the fixtures 
 
 ## The describer's fixtures
 
-The describer's fixtures are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/`: a folder for each case with its `query.sql`, the `capture.json` of describing it and the `expected.json` of its sidecar.  `tests/SqlSource.Tool.Tests` replays each from its capture with no database, and this project describes each against the container and compares the entry, so a describer that asks something else fails the first and one that answers something else fails the second.  After a change to what the describer asks or answers, or to `schema.sql`, record them again and read the diff before it is committed:
+The describer's fixtures are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/`: a folder for each case with its `query.sql`, the `capture.json` of describing it and the `expected.json` of its sidecar, whose `toolVersion` is `fixture` so that a new version of the tool touches no case.  A case may also hold an `issue.md`, which says where the case came from, and an `explain-settings.txt`, the settings of the planner it is described with.  `tests/SqlSource.Tool.Tests` replays each from its capture with no database, and this project describes each against the container and compares the entry, so a describer that asks something else fails the first and one that answers something else fails the second.  After a change to what the describer asks or answers, or to `schema.sql`, record them again and read the diff before it is committed:
 
 ```bash
 tools/record-fixtures.sh
 ```
 
 To add a case, add its folder with a `query.sql` and run the script.  A recorded file is never edited by hand.
+
+A case of the walk is named `walk-` and its shape, and `tests/SqlSource.Tool.Tests/Fixtures/WalkMatrixTests.cs` holds a row for each, written by hand, which fails for a `walk-` case it does not list.  To add a case that forces a join method:
+
+1. Name it for the method, with `-hash`, `-merge` or `-nestloop` at the end.
+2. Add an `explain-settings.txt` that turns the other two methods off, one `name=value` on a line, from the closed list of `PlannerSettings`: `enable_hashjoin=off` and `enable_nestloop=off` for a merge join.
+3. Add its row to `Rows` of `WalkMatrixTests`, and an `InlineData` with the join's node type to `Capture_CaseNamedForAJoinMethod_WasPlannedWithIt` beside it.
+4. Run the script.
+
+`FixtureCasesTests` describes such a case with its settings, and `DescribeCommandTests` leaves it out, since a run of the command cannot turn a join method off.
 
 ## The realistic corpus
 
