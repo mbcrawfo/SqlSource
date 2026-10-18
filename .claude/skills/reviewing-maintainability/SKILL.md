@@ -21,7 +21,8 @@ Dispatch these at once, each as a read-only subagent with the brief in [sweeps.m
 |----|----|
 | A cohesive group of four or more files in a large folder | Move now, if the cost below allows |
 | A folder whose traps no AGENTS.md covers | Add one, under 250 lines, traps only, with the maintenance footer |
-| A name in an AGENTS.md that does not exist, or a claim the code contradicts | Fix the line now |
+| A name in an AGENTS.md, an architecture page or a readme that does not exist, or a claim the code contradicts | Fix the line now |
+| A placeholder for a phase that has shipped | Write the section from the code in the review's pull request, or record a `TD-` item if that is more than a fix |
 | A comment that is wrong, stale, or restates its own code | Fix or delete now |
 | Duplicated logic, uneven conventions, over-long methods, dead members | One grouped `TD-` item per area (`src/`, tests), numbered, with the file links; do not refactor |
 | A test that depends on the process, the clock or the repository | Its own `TD-` item: it is fragility, not duplication |
@@ -41,7 +42,7 @@ A move changes a namespace: `dotnet_style_namespace_match_folder` is on, and the
 
 1. `git mv` each file and rewrite its `namespace` line.  For every type that moved, add `using <new namespace>;` to each file outside the folder that mentions the type by whole word; a word in a comment adds a `using` the compiler will reject, which the next step removes.
 2. Build the solution in a loop.  IDE0005 is an error, so each pass reports the unnecessary `using` lines; delete them by line number, highest first, and build again until clean.  The build stops at the first failing project, so expect several passes.
-3. Rewrite the old paths in every document that is kept current: the AGENTS.md files, `CONTRIBUTING.md`, `docs/tech-debt/*.md` and `docs/deferred/*.md`, and comments in `src`, `tests`, `tools` and `.github`.  Then check every relative link and every backtick path in those files resolves.  Leave `docs/superpowers/` alone: plans and specs are records of their date.
+3. Rewrite the old paths in every document that is kept current: the AGENTS.md files, `CONTRIBUTING.md`, `docs/architecture/`, the readmes (`tests/README.md`, `tests/SqlSource.Tests.Postgres/README.md`, `tools/README.md` and `.github/workflows/README.md`), `docs/tech-debt/*.md` and `docs/deferred/*.md`, and comments in `src`, `tests`, `tools` and `.github`.  Then check every relative link and every backtick path in those files resolves.  Leave `docs/superpowers/` alone: plans and specs are records of their date.
 4. Run `./format.sh` to sort the `using` lines, then the full test suite.
 
 In the shell, `zsh` does not split an unquoted variable into words; run a loop over a file list through `bash`.

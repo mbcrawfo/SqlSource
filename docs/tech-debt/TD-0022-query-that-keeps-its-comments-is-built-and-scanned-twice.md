@@ -15,7 +15,7 @@ The same file without `keep-comments` went from 9.3 to 11.3 bytes and from 61 to
 
 ## Why it exists
 
-`keep-comments` can come from a level the parser cannot see: a property, the metadata of the file's item, or the attribute of a type that claims the file, and two types that claim one file can ask for different things.  The parser therefore keeps both forms where both may be wanted, and the emitter picks one for each type and query.  The hash needs the form without comments in any case.  See "The settings have two stages" and "A block has two forms of its SQL" in [`src/SqlSource/AGENTS.md`](../../src/SqlSource/AGENTS.md).
+`keep-comments` can come from a level the parser cannot see: a property, the metadata of the file's item, or the attribute of a type that claims the file, and two types that claim one file can ask for different things.  The parser therefore keeps both forms where both may be wanted, and the emitter picks one for each type and query.  The hash needs the form without comments in any case.  See "[The settings have two stages](../architecture/generator.md#the-settings-have-two-stages)" and "[A block has two forms of its SQL](../architecture/generator.md#a-block-has-two-forms-of-its-sql)" in [`docs/architecture/generator.md`](../architecture/generator.md).
 
 ## Impact
 

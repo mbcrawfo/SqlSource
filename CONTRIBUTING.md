@@ -1,6 +1,6 @@
 # Contributing to SqlSource
 
-This repository holds SqlSource, a C# source generator that turns the `.sql` files of a project into typed code, and `sqlsource`, the command that describes those queries against a database.  This page is how to set up, build, test, check and pack them.  Each area has a readme with its procedures: [`tests/README.md`](tests/README.md), [`tools/README.md`](tools/README.md) and [`.github/workflows/README.md`](.github/workflows/README.md).  Versioning and releasing are covered in [docs/publishing.md](docs/publishing.md).
+This repository holds SqlSource, a C# source generator that turns the `.sql` files of a project into typed code, and `sqlsource`, the command that describes those queries against a database.  [`docs/architecture/README.md`](docs/architecture/README.md) explains how their code works.  This page is how to set up, build, test, check and pack them.  Each area has a readme with its procedures: [`tests/README.md`](tests/README.md), [`tools/README.md`](tools/README.md) and [`.github/workflows/README.md`](.github/workflows/README.md).  Versioning and releasing are covered in [docs/publishing.md](docs/publishing.md).
 
 ## Required tools
 
@@ -20,8 +20,8 @@ dotnet tool restore
 
 The two projects that ship are:
 
-- `src/SqlSource` is the source generator, and the package `SqlSource`.
-- `src/SqlSource.Tool` is the `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool`.
+- `src/SqlSource` is the source generator, and the package `SqlSource`.  [`docs/architecture/generator.md`](docs/architecture/generator.md) explains how it works.
+- `src/SqlSource.Tool` is the `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool`.  [`docs/architecture/tool.md`](docs/architecture/tool.md) explains how it works.
 
 The four test projects and the two libraries they share, which [`tests/README.md`](tests/README.md) describes:
 
