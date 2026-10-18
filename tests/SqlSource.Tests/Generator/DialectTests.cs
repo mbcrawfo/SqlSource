@@ -1,6 +1,7 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using Shouldly;
+using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -65,7 +66,7 @@ public sealed class DialectTests
     {
         var sql = (marker is null ? string.Empty : "-- dialect: " + marker + "\n") + Query;
 
-        var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
+        var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
@@ -77,6 +78,7 @@ public sealed class DialectTests
     public void Run_FilesWithDifferentMetadata_AreEachReadByTheirOwnDialect()
     {
         var run = Run(
+            OutputKind.Sql,
             "mysql",
             new SqlFile("/app/Repo/A.sql", Query),
             new SqlFile("/app/Repo/B.sql", Query, "mssql"),
@@ -112,7 +114,7 @@ public sealed class DialectTests
     {
         var sql = (marker is null ? string.Empty : "-- dialect: " + marker + "\n") + PathQuery;
 
-        var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
+        var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
@@ -128,7 +130,7 @@ public sealed class DialectTests
     {
         var sql = (marker is null ? string.Empty : "-- dialect: " + marker + "\n") + PathQuery;
 
-        var run = Run(property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
+        var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Q.sql", sql, metadata));
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC101 ");
     }
@@ -139,7 +141,7 @@ public sealed class DialectTests
     [InlineData("mysql,ansi")]
     public void Run_PropertyWithAnOptionThatIsNotValid_IsAnErrorThatQuotesTheWholeValue(string property)
     {
-        var run = Run(property, new SqlFile("/app/Repo/Q.sql", Query));
+        var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Q.sql", Query));
 
         run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): '" + property + Invalid]);
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + Ansi + "\";");
@@ -148,7 +150,11 @@ public sealed class DialectTests
     [Fact]
     public void Run_MarkerWithAnOptionThatIsNotValid_IsAnErrorAtItsValue()
     {
-        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- dialect: postgres,ansi-quotes\n" + Query));
+        var run = Run(
+            OutputKind.Sql,
+            null,
+            new SqlFile("/app/Repo/Q.sql", "-- dialect: postgres,ansi-quotes\n" + Query)
+        );
 
         run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC111 /app/Repo/Q.sql(1,13)-(1,33): ");
     }
@@ -160,7 +166,7 @@ public sealed class DialectTests
     [InlineData("postgres", "SQLSRC101 ")]
     public void Run_BytesLiteralWithAnEscapedQuote_IsReadOnlyByCockroachDb(string property, string? error)
     {
-        var run = Run(property, new SqlFile("/app/Repo/Q.sql", "SELECT b'\\'' AS x; -- c\n"));
+        var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Q.sql", "SELECT b'\\'' AS x; -- c\n"));
 
         if (error is null)
         {
@@ -179,7 +185,7 @@ public sealed class DialectTests
     [InlineData(" Postgres 16 ")]
     public void Run_PropertyThatIsNotADialect_IsAnErrorWithoutAPositionAndTheFilesAreReadAsAnsi(string property)
     {
-        var run = Run(property, new SqlFile("/app/Repo/Q.sql", Query));
+        var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Q.sql", Query));
 
         run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): '" + property + Invalid]);
 
@@ -192,6 +198,7 @@ public sealed class DialectTests
     public void Run_MetadataThatIsNotADialect_IsReportedOnceForEachValueAndTheFileIsReadAsAnsi()
     {
         var run = Run(
+            OutputKind.Sql,
             "mysql",
             new SqlFile("/app/Repo/A.sql", Query, "zeta"),
             new SqlFile("/app/Repo/B.sql", Query, "alpha"),
@@ -212,7 +219,7 @@ public sealed class DialectTests
     [Fact]
     public void Run_SameInvalidValueInThePropertyAndInMetadata_IsReportedOnce()
     {
-        var run = Run("nope", new SqlFile("/app/Repo/Q.sql", Query, "nope"));
+        var run = Run(OutputKind.Sql, "nope", new SqlFile("/app/Repo/Q.sql", Query, "nope"));
 
         run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): 'nope" + Invalid]);
     }
@@ -221,6 +228,7 @@ public sealed class DialectTests
     public void Run_InvalidMetadataOfAFileThatNoTypeClaims_IsNotReported()
     {
         var run = Run(
+            OutputKind.Sql,
             null,
             new SqlFile("/app/Repo/Q.sql", Query),
             new SqlFile("/app/Migrations/001_init.sql", "SELECT 'x;\n", "nope")
@@ -232,7 +240,7 @@ public sealed class DialectTests
     [Fact]
     public void Run_InvalidMetadataOfAFileWithAMarker_IsStillReportedAndTheMarkerIsUsed()
     {
-        var run = Run(null, new SqlFile("/app/Repo/Q.sql", "-- dialect: mysql\n" + Query, "nope"));
+        var run = Run(OutputKind.Sql, null, new SqlFile("/app/Repo/Q.sql", "-- dialect: mysql\n" + Query, "nope"));
 
         run.Diagnostics.ShouldBe(["SQLSRC011 (1,1)-(1,1): 'nope" + Invalid]);
         run.Sources["App.Sample.g.cs"].ShouldContain("public const string Q = \"" + MySql + "\";");
@@ -242,6 +250,7 @@ public sealed class DialectTests
     public void Run_InvalidPropertyInAProjectWithoutAnAttributedType_IsStillAnError()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, "public class Sample;")],
             [],
             dialect: "nope"
@@ -256,6 +265,7 @@ public sealed class DialectTests
     public void Run_BothPropertiesInvalid_ReportsEachUnderItsOwnId()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
             [new SqlFile("/app/Repo/Q.sql", Query)],
             generatorParameters: "mysql",
@@ -267,6 +277,6 @@ public sealed class DialectTests
         run.Diagnostics.ShouldContain("SQLSRC011 (1,1)-(1,1): 'false" + Invalid);
     }
 
-    private static GeneratorRun Run(string? property, params SqlFile[] files) =>
-        GeneratorHarness.Run([new SourceFile(GeneratorHarness.SourcePath, Source)], files, dialect: property);
+    private static GeneratorRun Run(OutputKind? output, string? property, params SqlFile[] files) =>
+        GeneratorHarness.Run(output, [new SourceFile(GeneratorHarness.SourcePath, Source)], files, dialect: property);
 }

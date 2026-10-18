@@ -22,7 +22,7 @@ public sealed class TypeEmitterTests
             Query("ListUsers", "SELECT id, name FROM users;")
         );
 
-        var output = Emit(TestModels.Type(), users);
+        var output = Emit(OutputKind.Sql, TestModels.Type(), users);
 
         output.HintName.ShouldBe("App.UserRepository.g.cs");
         output.Diagnostics.ShouldBeEmpty();
@@ -71,6 +71,7 @@ public sealed class TypeEmitterTests
     public void Emit_DirectPlacement_PutsTheConstantsOnTheType()
     {
         var output = Emit(
+            OutputKind.Sql,
             TestModels.Type(placement: MemberPlacement.Direct),
             File("Users.sql", Query("GetUser", "SELECT 1;"))
         );
@@ -114,7 +115,7 @@ public sealed class TypeEmitterTests
             ]
         );
 
-        var output = Emit(type, File("Users.sql", Query("GetUser", "SELECT 1;")));
+        var output = Emit(OutputKind.Sql, type, File("Users.sql", Query("GetUser", "SELECT 1;")));
 
         output.HintName.ShouldBe("IOuter-1.class-2.Inner.g.cs");
         output.Source.ShouldBe(
@@ -153,6 +154,7 @@ public sealed class TypeEmitterTests
     public void Emit_NamespaceWithAnEscapedKeyword_KeepsItInCodeAndDropsItFromTheHintName()
     {
         var output = Emit(
+            OutputKind.Sql,
             TestModels.Type(@namespace: "App.@event.Data"),
             File("Users.sql", Query("GetUser", "SELECT 1;"))
         );
@@ -166,7 +168,7 @@ public sealed class TypeEmitterTests
     {
         const string Sql = "SELECT \"a\", 'b\\c', '\t' WHERE x < 1 && y > 2;";
 
-        var output = Emit(TestModels.Type(), File("A&B.sql", Query("GetUser", Sql)));
+        var output = Emit(OutputKind.Sql, TestModels.Type(), File("A&B.sql", Query("GetUser", Sql)));
 
         var source = output.Source.ShouldNotBeNull();
         source.ShouldContain("/// The <c>GetUser</c> query from <c>A&amp;B.sql</c>.\n");
@@ -180,6 +182,7 @@ public sealed class TypeEmitterTests
     public void Emit_SummaryWithCharactersXmlReserves_EscapesThem()
     {
         var output = Emit(
+            OutputKind.Sql,
             TestModels.Type(),
             File("Users.sql", Query("GetUser", "SELECT 1;", "Users <b>with</b> a & b."))
         );
@@ -191,6 +194,7 @@ public sealed class TypeEmitterTests
     public void Emit_SeveralFiles_KeepsTheOrderOfTheFilesAndOfTheQueriesInEach()
     {
         var output = Emit(
+            OutputKind.Sql,
             TestModels.Type(placement: MemberPlacement.Direct),
             File("B.sql", Query("Zeta", "SELECT 1;"), Query("Alpha", "SELECT 2;")),
             File("A.sql", Query("Mid", "SELECT 3;"))
@@ -227,7 +231,7 @@ public sealed class TypeEmitterTests
                 TestModels.Array(SettingsLevel.None),
                 "App.UserRepository.g.cs"
             ),
-            SettingsLevel.None
+            new SettingsLevel { Output = OutputKind.Sql }
         );
 
         output.ShouldBe(new TypeOutput("App.UserRepository.g.cs", null, TestModels.Array(problem)));
@@ -237,6 +241,7 @@ public sealed class TypeEmitterTests
     public void Emit_QueryNameAlreadyUsedByAnEarlierFile_IsAnErrorAndTheLaterFileGivesNoMembers()
     {
         var output = Emit(
+            OutputKind.Sql,
             TestModels.Type(),
             File("A.sql", Query("GetUser", "SELECT 1;")),
             File("B.sql", Query("Other", "SELECT 2;"), Query("GetUser", "SELECT 3;", file: "B.sql")),
@@ -265,6 +270,7 @@ public sealed class TypeEmitterTests
     public void Emit_QueryNamedLikeTheTypeItsMemberGoesIn_IsAnErrorAndItsFileGivesNoMembers(bool direct, string name)
     {
         var output = Emit(
+            OutputKind.Sql,
             TestModels.Type(placement: Placement(direct)),
             File("A.sql", Query(name, "SELECT 1;"), Query("Other", "SELECT 2;")),
             File("B.sql", Query("Kept", "SELECT 3;"))
@@ -290,7 +296,11 @@ public sealed class TypeEmitterTests
     [InlineData(false, "sql")]
     public void Emit_QueryNamedLikeTheOtherPlacementsType_IsAllowed(bool direct, string name)
     {
-        var output = Emit(TestModels.Type(placement: Placement(direct)), File("A.sql", Query(name, "SELECT 1;")));
+        var output = Emit(
+            OutputKind.Sql,
+            TestModels.Type(placement: Placement(direct)),
+            File("A.sql", Query(name, "SELECT 1;"))
+        );
 
         output.Diagnostics.ShouldBeEmpty();
         output.Source.ShouldNotBeNull().ShouldContain("public const string " + name + " = \"SELECT 1;\";");
@@ -300,6 +310,7 @@ public sealed class TypeEmitterTests
     public void Emit_QueryWithAToken_IsAMethodInTheSamePlaceAndOrderAsTheConstants()
     {
         var output = Emit(
+            OutputKind.Sql,
             TestModels.Type(),
             File("Users.sql", Query("GetUser", "SELECT 1;"), TokenQuery("ListFrom"), Query("Count", "SELECT 3;"))
         );
@@ -375,6 +386,7 @@ public sealed class TypeEmitterTests
     public void Emit_QueryWithATokenInDirectPlacement_IsAMethodOnTheType()
     {
         var output = Emit(
+            OutputKind.Sql,
             TestModels.Type(placement: MemberPlacement.Direct),
             File("Users.sql", TokenQuery("ListFrom"))
         );
@@ -399,7 +411,12 @@ public sealed class TypeEmitterTests
         bool expected
     )
     {
-        var output = Emit(TestModels.Type(), project, File("Users.sql", TokenQuery("ListFrom", parameter)));
+        var output = Emit(
+            OutputKind.Sql,
+            TestModels.Type(),
+            project,
+            File("Users.sql", TokenQuery("ListFrom", parameter))
+        );
 
         var source = output.Source.ShouldNotBeNull();
         if (expected)
@@ -417,7 +434,8 @@ public sealed class TypeEmitterTests
     {
         var files = File("Users.sql", Query("GetUser", "SELECT 1;"));
 
-        Emit(TestModels.Type(), validateTokens: false, files).ShouldBe(Emit(TestModels.Type(), files));
+        Emit(OutputKind.Sql, TestModels.Type(), validateTokens: false, files)
+            .ShouldBe(Emit(OutputKind.Sql, TestModels.Type(), files));
     }
 
     [Fact]
@@ -453,7 +471,10 @@ public sealed class TypeEmitterTests
                 TestModels.Array(keep),
                 "App.UserRepository.g.cs"
             ),
-            keep
+            keep with
+            {
+                Output = OutputKind.Sql,
+            }
         );
 
         // The attribute's empty list beats the metadata and the property; a query's own marker beats the attribute.
@@ -465,6 +486,7 @@ public sealed class TypeEmitterTests
     public void Emit_MethodNamedLikeAConstantOfAnEarlierFile_IsTheSameErrorAsForTwoConstants()
     {
         var output = Emit(
+            OutputKind.Sql,
             TestModels.Type(),
             File("A.sql", Query("GetUser", "SELECT 1;")),
             File("B.sql", TokenQuery("GetUser", file: "B.sql"))
@@ -485,7 +507,7 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_MethodNamedLikeTheSqlClass_IsTheSameErrorAsForAConstant()
     {
-        var output = Emit(TestModels.Type(), File("Users.sql", TokenQuery("Sql")));
+        var output = Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", TokenQuery("Sql")));
 
         output.Diagnostics.ShouldHaveSingleItem().Descriptor.ShouldBe(SqlDiagnostics.QueryNamedLikeContainingType);
         output.Source.ShouldNotBeNull().ShouldNotContain("public static string Sql");
@@ -494,7 +516,7 @@ public sealed class TypeEmitterTests
     [Fact]
     public void Emit_TypeWhoseFilesGiveNoMembers_StillGetsItsEmptySqlClass()
     {
-        var output = Emit(TestModels.Type(), File("Users.sql"));
+        var output = Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql"));
 
         output.Source.ShouldBe(
             """
@@ -533,7 +555,7 @@ public sealed class TypeEmitterTests
             null
         );
 
-        Emit(TestModels.Type(), File("Users.sql", query))
+        Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
             .Source.ShouldNotBeNull()
             .ShouldContain("\"SELECT 1; -- kept\"");
     }
@@ -555,13 +577,16 @@ public sealed class TypeEmitterTests
             null
         );
 
-        Emit(TestModels.Type(), File("Users.sql", query)).Source.ShouldNotBeNull().ShouldContain("\"SELECT 1;\"");
+        Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
+            .Source.ShouldNotBeNull()
+            .ShouldContain("\"SELECT 1;\"");
     }
 
     [Fact]
     public void Emit_SameInput_GivesEqualOutput()
     {
-        static TypeOutput Create() => Emit(TestModels.Type(), File("Users.sql", Query("GetUser", "SELECT 1;")));
+        static TypeOutput Create() =>
+            Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", Query("GetUser", "SELECT 1;")));
 
         Create().ShouldBe(Create());
     }
@@ -569,11 +594,18 @@ public sealed class TypeEmitterTests
     // A theory cannot take the internal enum as a parameter.
     private static MemberPlacement Placement(bool direct) => direct ? MemberPlacement.Direct : MemberPlacement.Nested;
 
-    private static TypeOutput Emit(TargetType type, params ParsedSqlFile[] files) =>
-        Emit(type, validateTokens: true, files);
+    // Each test states its output, the project's SqlSourceOutput, which goes on the level of the project's properties.
+    private static TypeOutput Emit(OutputKind? output, TargetType type, params ParsedSqlFile[] files) =>
+        Emit(output, type, validateTokens: true, files);
 
-    private static TypeOutput Emit(TargetType type, bool validateTokens, params ParsedSqlFile[] files) =>
+    private static TypeOutput Emit(
+        OutputKind? output,
+        TargetType type,
+        bool validateTokens,
+        params ParsedSqlFile[] files
+    ) =>
         Emit(
+            output,
             type,
             validateTokens
                 ? SettingsLevel.None
@@ -584,6 +616,7 @@ public sealed class TypeEmitterTests
 
     // The levels of the files' metadata, one for each file, and the level of the project's properties.
     private static TypeOutput Emit(
+        OutputKind? output,
         TargetType type,
         SettingsLevel property,
         SettingsLevel[] fileSettings,
@@ -596,7 +629,10 @@ public sealed class TypeEmitterTests
                 TestModels.Array(fileSettings),
                 HintName.Create(type)
             ),
-            property
+            property with
+            {
+                Output = output,
+            }
         );
 
     private static ParsedSqlFile File(string fileName, params SqlQuery[] queries) =>

@@ -5,6 +5,7 @@ using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -17,7 +18,7 @@ public sealed class GeneratedSourceTests
     [Fact]
     public void Run_NoAttributedType_EmitsOnlyTheAttribute()
     {
-        var run = GeneratorHarness.Run("public class Sample;", Users);
+        var run = GeneratorHarness.Run(OutputKind.Sql, "public class Sample;", Users);
 
         run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
         run.Sources["SqlSourceGenerateAttribute.g.cs"].ShouldBe(AttributeSource.Text);
@@ -30,6 +31,7 @@ public sealed class GeneratedSourceTests
     public void Run_NestedLocation_PutsTheConstantsInAPrivateSqlClass()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -109,6 +111,7 @@ public sealed class GeneratedSourceTests
     public void Run_DirectLocation_PutsTheConstantsOnTheType()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -179,6 +182,7 @@ public sealed class GeneratedSourceTests
     public void Run_EachKindOfType_RepeatsItsKeywordNameAndTypeParameters(string declaration, string expected)
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             $$"""
             using SqlSource;
 
@@ -204,6 +208,7 @@ public sealed class GeneratedSourceTests
     public void Run_NestedType_RepeatsEachContainingType()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -268,6 +273,7 @@ public sealed class GeneratedSourceTests
     public void Run_TypeInTheGlobalNamespaceNamedWithAKeyword_HasNoNamespaceBlockAndKeepsTheEscape()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             [SqlSource.SqlSourceGenerate(SqlLocation = SqlSource.SqlLocation.Direct)]
             public partial struct @class
@@ -309,6 +315,7 @@ public sealed class GeneratedSourceTests
     public void Run_NamespaceWithAnEscapedKeyword_KeepsTheEscapeInCode()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -337,6 +344,7 @@ public sealed class GeneratedSourceTests
     public void Run_TypesThatDifferByNamespaceOrArity_GetTheirOwnFiles()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -371,6 +379,7 @@ public sealed class GeneratedSourceTests
     public void Run_SeveralFiles_OrdersMembersByFilePathIgnoringCaseThenByPositionInTheFile()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -413,6 +422,7 @@ public sealed class GeneratedSourceTests
     public void Run_Path_SelectsAFileOrTheFilesOfAFolder(string path, params string[] expectedMembers)
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             $$"""
             using SqlSource;
 
@@ -441,6 +451,7 @@ public sealed class GeneratedSourceTests
     public void Run_WindowsPaths_ResolveTheSameWay()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [
                 new SourceFile(
                     @"C:\app\Repo\Sample.cs",
@@ -461,6 +472,7 @@ public sealed class GeneratedSourceTests
     public void Run_FileSharedByTwoTypes_GivesBothItsConstants()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -492,6 +504,7 @@ public sealed class GeneratedSourceTests
     public void Run_QueryWithTokens_IsAMethodBesideTheConstantsOfItsFile()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -589,6 +602,7 @@ public sealed class GeneratedSourceTests
     public void Run_QueryWithTokensOnAGenericStructInNestedLocation_IsAMethodOfTheSqlClass()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -620,6 +634,7 @@ public sealed class GeneratedSourceTests
     public void Run_QueryThatIsOnlyATokenOrHasEightOfThem_Compiles()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -674,6 +689,7 @@ public sealed class GeneratedSourceTests
     public void Run_TokenWithAnAwkwardName_Compiles(string name)
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -718,10 +734,12 @@ public sealed class GeneratedSourceTests
             """;
 
         var plain = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Q.sql", "SELECT * FROM {{table}} {{filter}};\n")
         );
         var withDefaults = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile(
                 "/app/Repo/Q.sql",
@@ -741,6 +759,7 @@ public sealed class GeneratedSourceTests
         const string Sql = "SELECT \"a\", 'b\\c', '\t', '<&>', '\u2028\u0085' FROM {{table}} WHERE x < 1;";
 
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -769,6 +788,7 @@ public sealed class GeneratedSourceTests
         const string Sql = "SELECT \"a\", 'b\\c', '\t', '<&>', '\u2028\u0085' WHERE x < 1;";
 
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -796,6 +816,7 @@ public sealed class GeneratedSourceTests
         // A consumer that treats CS1591, a public member without documentation, as an error must not be broken by
         // generated code.  Here the consumer's own members are documented, so any CS1591 comes from the generator.
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -824,6 +845,7 @@ public sealed class GeneratedSourceTests
         // A form feed and a Ctrl-Z, which old tools leave at the end of a file, are legal in SQL text and in a C#
         // string, and are not legal anywhere in an XML document.
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -851,6 +873,7 @@ public sealed class GeneratedSourceTests
         // framework and so defaults to an older language.  Such a project must get SQLSRC003 if it uses the
         // attribute, not a compiler error in a file it did not write.
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, "public class Sample { }")],
             [],
             languageVersion: languageVersion
@@ -867,12 +890,14 @@ public sealed class GeneratedSourceTests
         // Both assemblies hold the generated attribute and enum.  This one sees both copies, and the compiler warns
         // (CS0436) wherever the name is used: inside the generated attribute itself, unless that file says otherwise.
         var other = GeneratorHarness.CreateReference(
+            OutputKind.Sql,
             "Other",
             "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n"
                 + "public class InOther { }\n"
         );
 
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, "public class Sample : InOther { }")],
             [],
             references: [other]
@@ -897,6 +922,7 @@ public sealed class GeneratedSourceTests
         // "GetType" is a likely name for a query on a table of types.  The constant hides the inherited method, which
         // is what was asked for, and the compiler's request to add "new" is one nobody can act on.
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             $$"""
             using SqlSource;
 
@@ -921,6 +947,7 @@ public sealed class GeneratedSourceTests
         // asks for "override" or "new" (CS0114).  Nobody can add either to generated code.  A constant never gets this
         // warning; a method can.
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -946,6 +973,7 @@ public sealed class GeneratedSourceTests
     public void Run_NestedLocationAndAnInheritedMemberNamedSql_GetsNoWarningInGeneratedCode()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -976,6 +1004,7 @@ public sealed class GeneratedSourceTests
         // The compiler compares the names of generated files ignoring case, and refuses the second of two that are
         // equal that way with an exception that costs every type its generated code.
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
 
@@ -1014,6 +1043,7 @@ public sealed class GeneratedSourceTests
     public void Run_TypeWhoseFileWouldBeNamedLikeTheAttributes_GetsAnotherName()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             [SqlSource.SqlSourceGenerate]
             public partial class SqlSourceGenerateAttribute
@@ -1035,6 +1065,7 @@ public sealed class GeneratedSourceTests
     {
         // "\u0053ample" is the identifier Sample.  The escape is legal in code and not in the name of a file.
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             namespace App;
 
@@ -1056,6 +1087,7 @@ public sealed class GeneratedSourceTests
     public void Run_NonAsciiNames_AreKept()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [
                 new SourceFile(
                     "/app/Dépôt/Sample.cs",
@@ -1076,6 +1108,7 @@ public sealed class GeneratedSourceTests
     public void Run_AttributeOnTwoPartialDeclarations_IsLeftToTheCompilerAndTheTypeGetsOneFile()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [
                 new SourceFile("/app/Repo/Sample.cs", "[SqlSource.SqlSourceGenerate]\npublic partial class Sample;\n"),
                 new SourceFile("/app/Other/Sample.cs", "[SqlSource.SqlSourceGenerate]\npublic partial class Sample;\n"),

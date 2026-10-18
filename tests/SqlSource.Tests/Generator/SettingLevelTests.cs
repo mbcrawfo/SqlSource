@@ -9,6 +9,8 @@ namespace SqlSource.Tests.Generator;
 
 // The settings that have no effect yet are accepted at every level they have, and a value none of them takes is
 // reported where it was written.
+//
+// Every run leaves the output unset, since the output's levels are among what these tests compare.
 public sealed class SettingLevelTests
 {
     private const string Sql = "-- name: Q\nSELECT 1;\n";
@@ -25,9 +27,10 @@ public sealed class SettingLevelTests
     [InlineData("SqlSourceCollectionType", "IReadOnlyList")]
     public void Run_ValidSettingAsPropertyAndAsMetadata_ChangesNothing(string name, string value)
     {
-        var plain = GeneratorHarness.Run(Source(null), new SqlFile("/app/Repo/Q.sql", Sql));
+        var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", Sql));
 
         var run = GeneratorHarness.Run(
+            null,
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [new SqlFile("/app/Repo/Q.sql", Sql, Metadata: new Dictionary<string, string> { [name] = value })],
             properties: new Dictionary<string, string?> { [name] = value }
@@ -49,6 +52,7 @@ public sealed class SettingLevelTests
     public void Run_InvalidSettingAsPropertyAndAsMetadata_IsReportedOnceWithoutAPosition(string name, string value)
     {
         var run = GeneratorHarness.Run(
+            null,
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [new SqlFile("/app/Repo/Q.sql", Sql, Metadata: new Dictionary<string, string> { [name] = value })],
             properties: new Dictionary<string, string?> { [name] = value }
@@ -70,9 +74,9 @@ public sealed class SettingLevelTests
     [InlineData("InputModelSuffix = \"\", ModelNamespace = \"  \"")]
     public void Run_ValidAttributeProperty_ChangesNothing(string argument)
     {
-        var plain = GeneratorHarness.Run(Source(null), new SqlFile("/app/Repo/Q.sql", Sql));
+        var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", Sql));
 
-        var run = GeneratorHarness.Run(Source(argument), new SqlFile("/app/Repo/Q.sql", Sql));
+        var run = GeneratorHarness.Run(null, Source(argument), new SqlFile("/app/Repo/Q.sql", Sql));
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
@@ -96,7 +100,7 @@ public sealed class SettingLevelTests
         string property
     )
     {
-        var run = GeneratorHarness.Run(Source(argument), new SqlFile("/app/Repo/Q.sql", Sql));
+        var run = GeneratorHarness.Run(null, Source(argument), new SqlFile("/app/Repo/Q.sql", Sql));
 
         var diagnostic = run.Diagnostics.ShouldHaveSingleItem();
         diagnostic.ShouldStartWith("SQLSRC006 /app/Repo/Sample.cs(5,2)-");
@@ -124,9 +128,9 @@ public sealed class SettingLevelTests
     )]
     public void Run_MarkersWithoutAnEffect_GiveTheFileOfTheSameQueryWithoutThem(string plainSql, string markedSql)
     {
-        var plain = GeneratorHarness.Run(Source(null), new SqlFile("/app/Repo/Q.sql", plainSql));
+        var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", plainSql));
 
-        var run = GeneratorHarness.Run(Source(null), new SqlFile("/app/Repo/Q.sql", markedSql));
+        var run = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", markedSql));
 
         plain.Diagnostics.ShouldBeEmpty();
         run.Diagnostics.ShouldBeEmpty();
@@ -139,6 +143,7 @@ public sealed class SettingLevelTests
     public void Run_MethodLocationAsAPropertyOrAMarker_IsNotASetting()
     {
         var run = GeneratorHarness.Run(
+            null,
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [new SqlFile("/app/Repo/Q.sql", "-- name: Q\n-- method-location: public\nSELECT 1; -- c\n")],
             properties: new Dictionary<string, string?> { ["SqlSourceMethodLocation"] = "nope" }

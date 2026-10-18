@@ -182,13 +182,18 @@ public sealed class GeneratorParityTests : IDisposable
         expected.Length.ShouldBe(types);
     }
 
-    // What the generator's own step gives for each attributed type.
+    // What the generator's own step gives for each attributed type.  The output is left unset, as the tool's side
+    // sets no property.
     private static Claimed[] FromGenerator(SourceFile[] sources, string[] sqlFiles, string[] constants)
     {
         var options = GeneratorHarness.ParseOptions.WithPreprocessorSymbols(constants);
         var compilation = GeneratorHarness.CreateCompilation(sources, parseOptions: options);
         var driver = GeneratorHarness
-            .CreateDriver(sqlFiles.Select(static path => new SqlFile(path, "SELECT 1;").ToAdditionalText()), options)
+            .CreateDriver(
+                sqlFiles.Select(static path => new SqlFile(path, "SELECT 1;").ToAdditionalText()),
+                new TestOptionsProvider(null, null),
+                options
+            )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
 
         var steps = driver.GetRunResult().Results.Single().TrackedSteps;

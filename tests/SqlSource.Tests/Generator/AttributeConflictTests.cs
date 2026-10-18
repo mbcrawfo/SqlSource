@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Testing.Generator;
 using Xunit;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -31,8 +32,14 @@ public sealed class AttributeConflictTests
     [InlineData("internal class Sample { object o = SqlSource.GeneratorOutput.Sql; }", "(1,36)-(1,61)")]
     public async Task Build_UseOfAGeneratedType_IsAConflictOnlyWithoutThePackageAnalyzers(string source, string span)
     {
-        var compilerAlone = await GeneratorHarness.BuildAsync(source, [Users], [Other()], packageAnalyzers: false);
-        var build = await GeneratorHarness.BuildAsync(source, [Users], [Other()]);
+        var compilerAlone = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            source,
+            [Users],
+            [Other(OutputKind.Sql)],
+            packageAnalyzers: false
+        );
+        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, source, [Users], [Other(OutputKind.Sql)]);
 
         Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}{span}"]);
         build.ShouldBeEmpty();
@@ -47,8 +54,14 @@ public sealed class AttributeConflictTests
             internal partial class Sample { }
             """;
 
-        var compilerAlone = await GeneratorHarness.BuildAsync(Source, [Users], [Other()], packageAnalyzers: false);
-        var build = await GeneratorHarness.BuildAsync(Source, [Users], [Other()]);
+        var compilerAlone = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            Source,
+            [Users],
+            [Other(OutputKind.Sql)],
+            packageAnalyzers: false
+        );
+        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, Source, [Users], [Other(OutputKind.Sql)]);
 
         Places(compilerAlone)
             .ShouldBe([
@@ -67,8 +80,14 @@ public sealed class AttributeConflictTests
             internal partial class Sample { }
             """;
 
-        var compilerAlone = await GeneratorHarness.BuildAsync(Source, [Users], [Other()], packageAnalyzers: false);
-        var build = await GeneratorHarness.BuildAsync(Source, [Users], [Other()]);
+        var compilerAlone = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            Source,
+            [Users],
+            [Other(OutputKind.Sql)],
+            packageAnalyzers: false
+        );
+        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, Source, [Users], [Other(OutputKind.Sql)]);
 
         Places(compilerAlone)
             .ShouldBe([
@@ -90,8 +109,14 @@ public sealed class AttributeConflictTests
             internal partial class Sample { }
             """;
 
-        var compilerAlone = await GeneratorHarness.BuildAsync(Source, [Users], [Other()], packageAnalyzers: false);
-        var build = await GeneratorHarness.BuildAsync(Source, [Users], [Other()]);
+        var compilerAlone = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            Source,
+            [Users],
+            [Other(OutputKind.Sql)],
+            packageAnalyzers: false
+        );
+        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, Source, [Users], [Other(OutputKind.Sql)]);
 
         Places(compilerAlone)
             .ShouldBe([
@@ -110,13 +135,20 @@ public sealed class AttributeConflictTests
         const string Source = "using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }";
 
         var compilerAlone = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
             Source,
             [Users],
-            [Other()],
+            [Other(OutputKind.Sql)],
             warningsAsErrors: true,
             packageAnalyzers: false
         );
-        var build = await GeneratorHarness.BuildAsync(Source, [Users], [Other()], warningsAsErrors: true);
+        var build = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            Source,
+            [Users],
+            [Other(OutputKind.Sql)],
+            warningsAsErrors: true
+        );
 
         Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)"]);
         build.ShouldBeEmpty();
@@ -130,8 +162,14 @@ public sealed class AttributeConflictTests
     {
         var source = $"using SqlSource;\n{attribute}\ninternal partial class Sample {{ }}";
 
-        var compilerAlone = await GeneratorHarness.BuildAsync(source, [Users], [Other()], packageAnalyzers: false);
-        var build = await GeneratorHarness.BuildAsync(source, [Users], [Other()]);
+        var compilerAlone = await GeneratorHarness.BuildAsync(
+            OutputKind.Sql,
+            source,
+            [Users],
+            [Other(OutputKind.Sql)],
+            packageAnalyzers: false
+        );
+        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, source, [Users], [Other(OutputKind.Sql)]);
 
         Places(compilerAlone).ShouldBe([$"CS0436 {GeneratorHarness.SourcePath}(2,2)-(2,19)", error], true);
         Places(build).ShouldBe([error]);
@@ -148,17 +186,17 @@ public sealed class AttributeConflictTests
     public async Task Build_UseOfATypeThatBothProjectsDeclare_IsStillAConflict(string @namespace, string name)
     {
         var declaration = $"namespace {@namespace} {{ internal class {name} {{ }} }}\n";
-        var other = GeneratorHarness.CreateReference("Other", InternalsVisible + declaration);
+        var other = GeneratorHarness.CreateReference(OutputKind.Sql, "Other", InternalsVisible + declaration);
         var source = declaration + $"internal class Sample {{ object o = typeof({@namespace}.{name}); }}";
 
-        var build = await GeneratorHarness.BuildAsync(source, [], [other]);
+        var build = await GeneratorHarness.BuildAsync(OutputKind.Sql, source, [], [other]);
 
         Places(build).ShouldHaveSingleItem().ShouldStartWith("CS0436 ");
     }
 
     // The other project, compiled with the generator: it holds the attribute and the enum too.
-    private static MetadataReference Other() =>
-        GeneratorHarness.CreateReference("Other", InternalsVisible + "public class InOther { }\n");
+    private static MetadataReference Other(OutputKind? output) =>
+        GeneratorHarness.CreateReference(output, "Other", InternalsVisible + "public class InOther { }\n");
 
     // Each diagnostic without its message, which for CS0436 names files and assemblies.
     private static IEnumerable<string> Places(IEnumerable<string> diagnostics) =>
