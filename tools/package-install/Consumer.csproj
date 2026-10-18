@@ -21,6 +21,11 @@
         <SqlSourceDialect>
             postgres
         </SqlSourceDialect>
+        <!--
+            Every query of this project is generated as SQL alone, the constants and the token methods.  A query
+            with models would need a sidecar beside its file.
+        -->
+        <SqlSourceOutput>Sql</SqlSourceOutput>
     </PropertyGroup>
     <ItemGroup>
         <!-- The item exists here only because NuGet imported the package's build/SqlSource.props before this. -->
