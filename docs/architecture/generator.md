@@ -286,9 +286,11 @@ A problem travels between steps as a [`DiagnosticInfo`](../../src/SqlSource/Diag
 - **A problem of a query that only the type can see**, such as two files of a type with one query name, is found by `TypeEmitter` and reported with the type's output.
 - **A parse error** is a `SqlParseError` with a `SqlParseErrorKind`.  `SqlFileReader` maps the kind to a descriptor with `SqlDiagnostics.ForParseError`, and the error is reported once for each file, not once for each type that claims it.
 - **`SQLSRC013`** travels as a `PathCollision`, located at the start of the later file.
-- **A problem of a file's sidecar**, and `SQLSRC209` and `SQLSRC210`, is found by `SidecarChecker` and reported from `SidecarCheck`, once for each file, not once for each type that claims it.  `SQLSRC240` and `SQLSRC245` are warnings a project may configure, and every other diagnostic is an error that cannot be configured.
+- **A problem of a file's sidecar**, and `SQLSRC209` and `SQLSRC210`, is found by `SidecarChecker` and reported from `SidecarCheck`, once for each file, not once for each type that claims it.  `SQLSRC240` and `SQLSRC245` are warnings a project may configure, `SQLSRC248` is information a project may configure, and every other diagnostic is an error that cannot be configured.
 
 The compiler does not say where an MSBuild property or the metadata of an item was set, so `SQLSRC011` and `SQLSRC014` cannot be located.  An invalid dialect travels as `DialectSetting.InvalidValue` for the property and `ParsedSqlFile.InvalidDialect` for a file, and an invalid setting as an `InvalidSetting` of `ProjectSettings` or `FileSettings`.  The output step gathers the values into a set and reports them with `Location.None`, in ordinal order, so the errors of a build do not depend on the order of its files.  The metadata of a file that no type claims is not reported.
+
+`SQLSRC247` and `SQLSRC248` are about the project's reference to Npgsql, so they have no position either.  The output step over `NpgsqlProbe` and `UsesPostgresEntries` reports each once for the project, with `Location.None`, and only when some file with needs is read as `postgres`.
 
 ### The suppressor
 

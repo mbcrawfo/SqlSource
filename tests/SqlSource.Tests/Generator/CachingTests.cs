@@ -137,6 +137,7 @@ public sealed class CachingTests
         // The run saw the new compilation: the framework check ran again and gave the same answer.  The declaration
         // was read again too, and gave an equal value, so nothing after it ran.
         AllReasons(result, TrackingNames.SupportedFramework).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.NpgsqlProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
         string[] steps =
         [
             TrackingNames.TargetTypes,
@@ -162,12 +163,36 @@ public sealed class CachingTests
             TrackingNames.FileNeeds,
             TrackingNames.SidecarCheckInput,
             TrackingNames.SidecarCheck,
+            TrackingNames.UsesPostgresEntries,
         ];
         foreach (var step in steps)
         {
             AllReasons(result, step).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached, step);
         }
 
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    // A project that references Npgsql and needs entries of postgres: the probe runs on the new compilation, gives an
+    // equal value, and nothing after it runs again.
+    [Fact]
+    public void Run_CSharpEdit_RunsTheProbeAndNothingAfterIt()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var driver = FirstRunWithSidecars(compilation);
+        var before = Outputs(driver.GetRunResult(), TrackingNames.NpgsqlProbe).ShouldHaveSingleItem().Value;
+        (
+            (bool)Outputs(driver.GetRunResult(), TrackingNames.UsesPostgresEntries).ShouldHaveSingleItem().Value
+        ).ShouldBeTrue();
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        var (probe, reason) = Outputs(result, TrackingNames.NpgsqlProbe).ShouldHaveSingleItem();
+        reason.ShouldBeOneOf(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged);
+        probe.ShouldBe(before);
+        AllReasons(result, TrackingNames.UsesPostgresEntries)
+            .ShouldHaveSingleItem()
+            .ShouldBeOneOf(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Unchanged);
         OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
     }
 

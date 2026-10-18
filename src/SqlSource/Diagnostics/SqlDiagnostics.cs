@@ -485,6 +485,32 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc245"
     );
 
+    public static readonly DiagnosticDescriptor NpgsqlTooOld = new(
+        id: "SQLSRC247",
+        title: "Npgsql is older than 8.0",
+        messageFormat: "This project references Npgsql {0}, and SqlSource needs Npgsql 8.0 or later.  Update the "
+            + "package.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc247",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // Information a project may configure, not a warning: the models of a newer Npgsql use the types of Npgsql 10,
+    // which are right unless the newer driver changed one, and a warning would break the build of every project that
+    // treats warnings as errors on the day it updates the driver.
+    public static readonly DiagnosticDescriptor NpgsqlNewerThanKnown = new(
+        id: "SQLSRC248",
+        title: "Npgsql is newer than SqlSource knows",
+        messageFormat: "This project references Npgsql {0}, which is newer than this version of SqlSource knows.  Its "
+            + "models use the types of Npgsql 10.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc248"
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -530,7 +556,9 @@ internal static class SqlDiagnostics
             EntryEngineDiffers,
             EngineHasNoTypeMap,
             EntryIsStale,
-            OrphanEntry
+            OrphanEntry,
+            NpgsqlTooOld,
+            NpgsqlNewerThanKnown
         );
 
     /// <summary>

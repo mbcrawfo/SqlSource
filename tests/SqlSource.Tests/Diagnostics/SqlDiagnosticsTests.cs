@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -12,20 +13,25 @@ namespace SqlSource.Tests.Diagnostics;
 
 public sealed class SqlDiagnosticsTests
 {
-    // The warnings a project may configure, each with a comment on its descriptor that says why.  Every other
-    // diagnostic is an error that a project cannot turn off.
-    private static readonly string[] Configurable = ["SQLSRC240", "SQLSRC245"];
+    // The warnings and the information a project may configure, each with its severity and a comment on its descriptor
+    // that says why.  Every other diagnostic is an error that a project cannot turn off.
+    private static readonly Dictionary<string, DiagnosticSeverity> Configurable = new(StringComparer.Ordinal)
+    {
+        ["SQLSRC240"] = DiagnosticSeverity.Warning,
+        ["SQLSRC245"] = DiagnosticSeverity.Warning,
+        ["SQLSRC248"] = DiagnosticSeverity.Info,
+    };
 
     [Fact]
-    public void All_EveryDescriptor_IsAnErrorThatCannotBeConfiguredButTheListedWarnings()
+    public void All_EveryDescriptor_IsAnErrorThatCannotBeConfiguredButTheListedOnes()
     {
         foreach (var descriptor in SqlDiagnostics.All)
         {
             descriptor.IsEnabledByDefault.ShouldBeTrue(descriptor.Id);
             descriptor.Category.ShouldBe("SqlSource", descriptor.Id);
-            if (Configurable.Contains(descriptor.Id))
+            if (Configurable.TryGetValue(descriptor.Id, out var severity))
             {
-                descriptor.DefaultSeverity.ShouldBe(DiagnosticSeverity.Warning, descriptor.Id);
+                descriptor.DefaultSeverity.ShouldBe(severity, descriptor.Id);
                 descriptor.CustomTags.ShouldNotContain(WellKnownDiagnosticTags.NotConfigurable, descriptor.Id);
             }
             else
@@ -35,7 +41,7 @@ public sealed class SqlDiagnosticsTests
             }
         }
 
-        foreach (var id in Configurable)
+        foreach (var id in Configurable.Keys)
         {
             SqlDiagnostics.All.ShouldContain(descriptor => descriptor.Id == id, id);
         }
@@ -150,6 +156,21 @@ public sealed class SqlDiagnosticsTests
             .ShouldBe(
                 "The entry 'GetUser' names no query of the file that needs one.  Run 'sqlsource describe', which "
                     + "removes it."
+            );
+
+    [Fact]
+    public void NpgsqlTooOld_Message_HoldsTheVersionAndTheFloor() =>
+        Format(SqlDiagnostics.NpgsqlTooOld, "7.0.4")
+            .ShouldBe(
+                "This project references Npgsql 7.0.4, and SqlSource needs Npgsql 8.0 or later.  Update the package."
+            );
+
+    [Fact]
+    public void NpgsqlNewerThanKnown_Message_HoldsTheVersion() =>
+        Format(SqlDiagnostics.NpgsqlNewerThanKnown, "11.0.0")
+            .ShouldBe(
+                "This project references Npgsql 11.0.0, which is newer than this version of SqlSource knows.  Its "
+                    + "models use the types of Npgsql 10."
             );
 
     [Fact]

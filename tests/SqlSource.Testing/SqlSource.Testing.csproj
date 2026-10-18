@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         The helpers that the test projects share and that need nothing of the tool: the harness of the generator's
-        driver tests, the builder of a sidecar's records, and RepositoryRoot, which finds the repository's folder.  A
-        library of the tests, never a test project of its own.
+        driver tests, the builder of a sidecar's records, the references to the drivers of Npgsql, and RepositoryRoot,
+        which finds the repository's folder.  A library of the tests, never a test project of its own.
     -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -18,6 +18,15 @@
         <PackageReference Include="Shouldly" />
         <!-- TestContext, without what makes a project a test executable. -->
         <PackageReference Include="xunit.v3.extensibility.core" />
+    </ItemGroup>
+    <ItemGroup>
+        <!--
+            The drivers whose metadata the probe of Npgsql is tested against.  They are downloaded and never
+            referenced: the tests read each one's metadata from the NuGet folder, which the assembly records, and
+            never load it.
+        -->
+        <PackageDownload Include="Npgsql" Version="[8.0.3];[9.0.3];[10.0.3]" />
+        <AssemblyMetadata Include="NuGetPackageRoot" Value="$(NuGetPackageRoot)" />
     </ItemGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="SqlSource.Tests" />

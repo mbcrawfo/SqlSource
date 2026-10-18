@@ -11,6 +11,8 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Sidecars;
+using SqlSource.Generation.Types;
+using SqlSource.Parsing;
 using SqlSource.Settings;
 
 namespace SqlSource;
@@ -69,6 +71,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                     compilation.GetTypeByMetadataName(FloorType)?.GetMembers(FloorMember).IsEmpty == false
             )
             .WithTrackingName(TrackingNames.SupportedFramework);
+
+        // The Npgsql the project references, which chooses the column of the base map.  Like the framework check, it
+        // runs on every compilation and gives an equal value until a reference changes.
+        var npgsqlProbe = context
+            .CompilationProvider.Select(static (compilation, _) => NpgsqlProbe.Read(compilation))
+            .WithTrackingName(TrackingNames.NpgsqlProbe);
 
         // The project's language version, which is the same value until the project's parse options change.
         var unsupportedLanguageVersion = context
@@ -273,6 +281,41 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => SidecarChecker.Check(input))
             .WithTrackingName(TrackingNames.SidecarCheck);
 
+        // Whether a query of the project needs an entry of postgres, whose types the driver decides.  Without one, the
+        // driver is not reported on.
+        var usesPostgresEntries = fileNeeds
+            .Combine(parsedFiles)
+            .Select(static (input, _) => UsesPostgresEntries(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.UsesPostgresEntries);
+
+        // Not located, and once for the project, however many of its queries need the driver.
+        context.RegisterSourceOutput(
+            npgsqlProbe.Combine(usesPostgresEntries),
+            static (output, input) =>
+            {
+                if (!input.Right)
+                {
+                    return;
+                }
+
+                var probe = input.Left;
+
+                if (probe.IsBelowTheFloor)
+                {
+                    output.ReportDiagnostic(
+                        Diagnostic.Create(SqlDiagnostics.NpgsqlTooOld, Location.None, probe.VersionText)
+                    );
+                }
+
+                if (probe.IsNewerThanKnown)
+                {
+                    output.ReportDiagnostic(
+                        Diagnostic.Create(SqlDiagnostics.NpgsqlNewerThanKnown, Location.None, probe.VersionText)
+                    );
+                }
+            }
+        );
+
         context.RegisterSourceOutput(
             sidecarChecks,
             static (output, check) =>
@@ -366,6 +409,21 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         }
 
         return values;
+    }
+
+    // A search for each file with needs, so that the cost does not grow with the files that have none.
+    private static bool UsesPostgresEntries(EquatableArray<FileNeeds> fileNeeds, EquatableArray<ParsedSqlFile> files)
+    {
+        foreach (var needs in fileNeeds)
+        {
+            var index = SqlPath.IndexOf(files, needs.NormalizedPath, static file => file.NormalizedPath);
+            if (index >= 0 && files[index].Dialect == SqlDialect.PostgreSql)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static TypeQueries SelectFiles(

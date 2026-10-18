@@ -54,4 +54,8 @@ internal static class TrackingNames
     public const string SidecarCheckInput = nameof(SidecarCheckInput);
 
     public const string SidecarCheck = nameof(SidecarCheck);
+
+    public const string NpgsqlProbe = nameof(NpgsqlProbe);
+
+    public const string UsesPostgresEntries = nameof(UsesPostgresEntries);
 }

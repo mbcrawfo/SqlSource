@@ -83,3 +83,5 @@ SQLSRC242 | SqlSource | Error | Entry is of another database
 SQLSRC243 | SqlSource | Error | No type map for the dialect
 SQLSRC244 | SqlSource | Error | Entry is stale
 SQLSRC245 | SqlSource | Warning | Entry names no query
+SQLSRC247 | SqlSource | Error | Npgsql is older than 8.0
+SQLSRC248 | SqlSource | Info | Npgsql is newer than SqlSource knows
