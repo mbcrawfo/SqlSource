@@ -194,7 +194,15 @@ Both projects can use SqlSource.  Each has its own copy of the attribute, and Sq
 
 ## Custom type mapping
 
-> **Coming in a later release.**  You will be able to choose the C# type that a database type becomes in generated models and query methods.  See [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
+Each column and parameter of a described PostgreSQL query gets the C# type that Npgsql reads its database type as: see [the PostgreSQL types](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md#type-map).  The type override gives a database type the C# type of your choice instead, for the project in its file, for some files as item metadata, or in a `.sql` file with `-- type-override:`, and each place changes only the types it names:
+
+```xml
+<PropertyGroup>
+    <SqlSourceTypeOverrides>timestamptz=System.DateTimeOffset public.user_status=MyApp.UserStatus</SqlSourceTypeOverrides>
+</PropertyGroup>
+```
+
+The setting is accepted and checked today: an entry that is not written correctly, or whose key has no schema and is not a type SqlSource knows, is a build error, and so is a C# type that the project cannot find or use, at each query that uses it.  It takes effect when generated models arrive.  See [type overrides](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides) and [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
 
 ## Where to next
 

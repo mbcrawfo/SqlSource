@@ -14,6 +14,7 @@ namespace SqlSource.Settings;
 /// </remarks>
 internal static class TypeOverrideMap
 {
+    // Keys compare ignoring case on every engine, so two types whose names differ only by case are one key (TD-0057).
     private static readonly StringComparer Keys = StringComparer.OrdinalIgnoreCase;
 
     /// <summary>

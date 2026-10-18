@@ -10,7 +10,7 @@ Next id: `D-0005`
 |----|----|----|----|----|
 | [D-0001](D-0001-dialects-not-delivered.md) | Open | 2026-10-06 | [SQL dialects design](../superpowers/specs/2026-10-06-sql-dialects-design.md) | Dialects for Redshift, Snowflake, BigQuery, ClickHouse, Spark and Trino, and names of their own for DuckDB, Firebird and Db2 |
 | [D-0002](D-0002-describing-call-and-data-definition.md) | Open | 2026-10-14 | [Query generation epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) | Describing `CALL` and data definition statements |
-| [D-0003](D-0003-custom-type-conversion.md) | Open | 2026-10-15 | [Query generation epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) | A conversion a project declares for a database type, for parameters, models and generated query code, so that a type the driver cannot write can be used |
+| [D-0003](D-0003-custom-type-conversion.md) | Open | 2026-10-15 | [Query generation epic design](../superpowers/specs/2026-10-07-query-generation-epic-design.md) | A conversion a project declares for a database type, for parameters and generated query code, so that a type the driver cannot write can be used; the type override gives a model's C# type and no conversion |
 | [D-0004](D-0004-input-models-bound-by-the-names-of-the-sql.md) | Open | 2026-10-18 | [Phase 5.3 models design](../superpowers/specs/2026-10-18-query-generation-phase-5-3-models-design.md) | A way to pass an input model to Dapper when its query writes snake_case parameters |
 
 ## Columns

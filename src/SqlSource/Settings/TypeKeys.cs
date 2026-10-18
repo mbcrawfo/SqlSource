@@ -6,7 +6,8 @@ namespace SqlSource.Settings;
 /// <summary>
 /// The keys a type override may name: the names of the PostgreSQL types that the base map knows, their one-word
 /// aliases, and a schema-qualified name of any type.  The settings check a key here, and the map reads the names of
-/// the extensions' types here, so that the two never disagree.
+/// the extensions' types here.  The map keeps its own rows, and
+/// <c>PostgresTypeMapTests.Keys_OfTheMap_AreTheKnownNamesOfTheSettings</c> holds them equal to the names here.
 /// </summary>
 internal static class TypeKeys
 {
@@ -187,6 +188,7 @@ internal static class TypeKeys
         return false;
     }
 
+    // No quotes: a type whose schema or name needs them for more than its case has no key (TD-0058).
     private static bool IsPart(ReadOnlySpan<char> part)
     {
         foreach (var character in part)

@@ -37,6 +37,7 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- input-model-type:`, `-- output-model-type:` | The shape of a model (no effect yet) | yes | yes | [Shape of a model](settings.md#setting-model-type) |
 | `-- input-model:`, `-- output-model:` | The name of one query's model (no effect yet) | no | yes | [Name of one query's model](settings.md#setting-model-name) |
 | `-- collection-type:` | The type that holds many rows (no effect yet) | yes | yes | [Collection type](settings.md#setting-collection-type) |
+| `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line (no effect yet) | yes | yes | [Type overrides](settings.md#setting-type-overrides) |
 
 > **Coming in a later release.**  The markers above that have no effect yet will shape generated models and query methods; today they are read and checked, and change no generated code.  See [what works today](README.md#what-works-today).
 

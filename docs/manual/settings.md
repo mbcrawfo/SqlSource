@@ -56,6 +56,7 @@ These are read and checked today, and change no generated code until models and 
 | [One query's model name](#setting-model-name) | A type's name, or its full name | `-- input-model:`, `-- output-model:` inside a query | [Accepted; no effect yet](README.md#what-works-today) |
 | [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`: see [its section](#setting-collection-type).  Default `Array` | `SqlSourceCollectionType` property and metadata; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | [Accepted; no effect yet](README.md#what-works-today) |
 | [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | [Accepted; no effect yet](README.md#what-works-today) |
+| [Type overrides](#setting-type-overrides) | Entries `key=type`, each a database type and the C# type it gets, or `key=default`.  Default: none | `SqlSourceTypeOverrides` property and metadata; `-- type-override:` in the file header and inside a query | [Accepted and checked; takes effect with models in a later release](README.md#what-works-today) |
 
 A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`.  On the attribute you write the member of the enum that the package adds to your project, as in `Output = GeneratorOutput.Sql`.
 
@@ -85,11 +86,12 @@ The rules:
 - **A setting has only the places its row of [the tables](#all-settings) lists.**  A property or item metadata that SqlSource does not list is not read.  A marker where its row says it cannot stand is [SQLSRC116](diagnostics.md#sqlsrc116), except a `-- dialect:` inside a query or after SQL, which is [SQLSRC115](diagnostics.md#sqlsrc115): see [markers in the wrong place](sql-files.md#markers-in-the-wrong-place).
 - **The attribute belongs to one type.**  Two types that claim one file each use their own attribute, and each gets its own result.
 
-Three exceptions, stated plainly:
+Four exceptions, stated plainly:
 
 - **A list of generator parameters replaces the one below it whole.**  It never adds to it.  See [generator parameters](#setting-generator-parameters).
 - **A dialect value replaces the one below it whole**, options included.  The dialect has no attribute and no in-query level: a file has one dialect, which is the marker in its file header, else its item metadata, else the property, else `ansi`.  See [dialect](#setting-dialect).
 - **`SqlLocation`, `MethodLocation` and `Path` exist only on the attribute.**  They have nothing to choose between.
+- **A type override replaces only the types it names.**  Each place adds its entries to those of the places below it, an entry for a type replaces the entry below it for that type, and `default` takes the type out.  The type override has no attribute level.  See [type overrides](#setting-type-overrides).
 
 <a id="a-value-that-is-wrong"></a>
 
@@ -316,6 +318,72 @@ The type a generated method will return many rows in.  The values are `IEnumerab
 
 > **Coming in a later release.**  The collection type will say what a generated method returns many rows in.  Today the setting is read and checked, and changes no generated code.  See [what works today](README.md#what-works-today).
 
+<a id="setting-type-overrides"></a>
+
+## Type overrides
+
+```xml
+<PropertyGroup>
+    <SqlSourceTypeOverrides>
+        timestamptz=System.DateTimeOffset
+        public.user_status=MyApp.UserStatus
+        int4[]=System.Collections.Generic.List&lt;int?&gt;
+    </SqlSourceTypeOverrides>
+</PropertyGroup>
+<ItemGroup>
+    <AdditionalFiles Update="Legacy/**/*.sql" SqlSourceTypeOverrides="date=System.DateTime" />
+</ItemGroup>
+```
+
+```sql postgres
+-- type-override: numeric = double
+
+-- name: ListEvents
+-- type-override: timestamptz = default
+SELECT id, happened_at, amount FROM events;
+```
+
+A type override gives a database type the C# type of your choice, in place of the one that [the type map](postgresql.md#type-map) gives it: a `timestamp with time zone` as a `System.DateTimeOffset`, a `numeric` as a `double`, an enum of your schema as a C# enum.  Each entry is `key=type`: the key names the database type, and the type is the C# type that every column and parameter of that database type gets.  `key=default` gives the type back to the type map.
+
+In the example, every query of the project gets `timestamptz` as a `System.DateTimeOffset`, `public.user_status` as `MyApp.UserStatus`, and `int4[]` as a list.  The files under `Legacy/` get `date` as a `System.DateTime` too.  Every query of the `.sql` file gets `numeric` as a `double`, and `ListEvents` gets `timestamptz` from the type map, a `System.DateTime`, while it keeps the project's other entries.
+
+> **Coming in a later release.**  Generated models will give each property the C# type of its column or parameter, the type override's included.  Today the type override is read and checked, and the build reports the errors below, but it changes no generated code.  See [what works today](README.md#what-works-today).
+
+**Four places, merged by type.**  The type override is the `SqlSourceTypeOverrides` property, the `SqlSourceTypeOverrides` metadata of a file's item, and the `-- type-override:` marker in the file header and inside a query.  It has no attribute property.  For each query the entries add up from the property, then the metadata, then the file header, then the query, and an entry for a type replaces the entry of a place below for that type alone.  So a query that needs one type otherwise names that type, and keeps the rest of the project's entries.  This is the exception to the rule that the most specific place wins whole: see [which place wins](#precedence).  `default` takes the type out of the entries of every place below, and a key with no entry anywhere has the type map's C# type.  Nothing removes every entry at once.
+
+**The key** is a database type:
+
+- **A type of PostgreSQL's catalog is its one-word name**, as [the type table](postgresql.md#type-table) gives it: `timestamptz`, `int4`, `float8`, `bpchar`.  The one-word spellings `integer`, `int`, `smallint`, `bigint`, `real`, `float`, `boolean`, `decimal` and `character` are read as the names they stand for: `float` is `float8`, and `character` is `bpchar`.  A spelling of several words, `timestamp with time zone` or `double precision`, is not a key: write the one-word name, which every built-in type has.  `char` is the one-byte type `"char"`; a `char(n)` column is a `bpchar`.
+- **Any other type is written with its schema**, `public.user_status`, as the tool records it in the sidecar.  A key with a schema is not checked against the types SqlSource knows, so a type it does not know can be named.  `pg_catalog.int4` is `int4`.
+- **The types of extensions** that the type table names, `citext`, `hstore`, `ltree`, `lquery`, `ltxtquery` and `cube`, are matched by their name alone in any schema.  `public.citext` matches the `citext` of `public` alone, and wins over `citext` there.
+- **An array** is its element's key and `[]`, `int4[]`, or its catalog name, `_int4`.  An array's own entry wins over its element's.  Without one, an array gets its element's C# type with `[]`, so `int4=long` makes an `int4[]` column a `long[]`.
+- **A domain** has a key of its own, `public.email`, which wins over its base type's.  Without one, a domain gets its base type's C# type, so an entry for `text` maps every domain over `text` too.
+- **A range and a multirange** have only their own key.  An entry for `int4` does not change an `int4range`.
+- A key is compared ignoring case, and its length, precision and scale are not part of it: `numeric` matches `numeric(18,2)`.
+- A key holds letters, digits, `_` and `$`, with a `.` between the schema and the name, `[]` after an array's, and no quotes.  A schema or a type whose name needs quotes for anything but its case, such as `"my schema".status`, cannot be named: see [known issues](#known-issues).
+
+**The type** is a C# type that a property can have:
+
+- **A keyword**, `int`, `string`, `double` and the others of the built-in types, or **a full name from its namespace**, `System.DateTimeOffset` or `MyApp.Ids.UserKey`, which may start with `global::`.  A name without its namespace, `DateTimeOffset`, is not valid, since SqlSource cannot see the `using` lines of your files.  A nested type is written with a `.`, as in C#: `MyApp.Outer.Inner`.
+- **A generic type** names its type arguments, each of which may end in `?`: `System.Collections.Generic.List<int?>`.  White space inside `<>` and `[]` is allowed.  In a project file, `<` and `>` are written `&lt;` and `&gt;`, as XML requires.
+- **An array** is the element and its ranks: `long[]`, `int?[]`, `int[,]`.
+- **No `?` at the end of the whole type.**  Whether a property can be null is its column's, decided by [which columns can be null](postgresql.md#nullability), so `int4=int?` is not valid.  A tuple, `dynamic`, `void`, a pointer, and anything after the type are not valid either.
+- **The type must exist and be usable.**  A type that the project and its references do not have, or that two references have, is [SQLSRC250](diagnostics.md#sqlsrc250); one the project cannot see is [SQLSRC251](diagnostics.md#sqlsrc251); and one that no property can have, such as a `static` class or `System.Nullable<int>`, is [SQLSRC252](diagnostics.md#sqlsrc252).  Each is reported at the name of a query whose output is `models` or `codegen` and whose entry in its sidecar is current, once for the query: when the first of its columns and parameters that has no C# type, parameters before columns, is one whose type, or whose array's element or domain's base, has the entry's key.  An entry that no query uses is never an error, so a project can set its entries before it has the queries.
+
+**In a property or metadata**, the value is a list of entries separated by spaces or line breaks, so a property can hold one entry on each line, as in the example.  No space stands around the `=`: `numeric = double` is three entries, none of them valid.  An entry may break across lines inside `<>`.  Of two entries for one type in one value, the last wins, so a project can add to the value that a `Directory.Build.props` gives it:
+
+```xml
+<PropertyGroup>
+    <SqlSourceTypeOverrides>$(SqlSourceTypeOverrides) timestamptz=System.DateTime</SqlSourceTypeOverrides>
+</PropertyGroup>
+```
+
+An entry that is not valid is [SQLSRC014](diagnostics.md#sqlsrc014), and the other entries of the value still apply.
+
+**In a marker**, a `-- type-override:` line holds one entry, with or without spaces around its `=`.  The lines of one place add up, one for each type.  Two lines that give one type two C# types in the file header, or inside one query, are [SQLSRC112](diagnostics.md#sqlsrc112); the types are compared by how they are named, so `int` and `System.Int32` are two, while `System.Int32` and `global::System.Int32` are one.  An entry that is not valid is [SQLSRC111](diagnostics.md#sqlsrc111).
+
+The `sqlsource` tool does not read the property or the metadata, which change nothing that is described.  A `-- type-override:` marker that is not valid is an error for the tool as for the build, and the tool describes no query of its file until it is fixed.
+
 <a id="setting-sql-location"></a>
 
 ## Where the SQL goes
@@ -461,6 +529,8 @@ The package removes the white space around the value of each property and each i
 
 A line break inside one word puts a space there.  `App.` and `Models` on two lines are `App. Models`, which is not a namespace and is reported as [SQLSRC014](diagnostics.md#sqlsrc014).
 
+In a [type override](#setting-type-overrides), white space separates the entries, so an entry has no space around its `=`.
+
 **Do not use `;` or `#` in a value.**  The compiler hands a generator only the part of a value before the first `;` or `#`, and nothing reports the rest.  `keep-comments;no-token-validation` is read as `keep-comments`.  Separate words with spaces or line breaks.
 
 <a id="known-issues"></a>
@@ -478,3 +548,7 @@ A line break inside one word puts a space there.  `App.` and `Models` on two lin
   ```
 
   Change the name, the path and the metadata to your own.  `BeforeTargets="SqlSourceTrimMetadataOfFiles"` is the line that matters.
+
+- **A type override cannot tell apart two types whose names differ only by case.**  PostgreSQL keeps two types of one schema apart when their names differ only by case, such as a `public."Status"` created with quotes and a `public.status` created without.  A type override compares its keys ignoring case, so `public.Status=MyApp.Status` maps both, and two entries for them are two entries for one type.  Rename one of the types, or map both to one C# type.
+
+- **A type whose schema or name needs quotes cannot be given a type override.**  A key holds letters, digits, `_` and `$`, and no quotes, so a type of a schema such as `"my schema"`, or a type named such as `"order-status"`, has no key.  For such a type that has no C# type, the build's error suggests an entry that cannot be written.  Rename the schema or the type.  Until then, a domain still gets its base type's C# type, so map its base type; and for a composite type, select its fields as columns of their own.
