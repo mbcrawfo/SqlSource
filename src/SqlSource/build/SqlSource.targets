@@ -33,6 +33,7 @@
             <SqlSourceInputModelType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceInputModelType), '\s+', ' ').Trim())</SqlSourceInputModelType>
             <SqlSourceOutputModelType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelType), '\s+', ' ').Trim())</SqlSourceOutputModelType>
             <SqlSourceCollectionType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceCollectionType), '\s+', ' ').Trim())</SqlSourceCollectionType>
+            <SqlSourceTypeOverrides>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceTypeOverrides), '\s+', ' ').Trim())</SqlSourceTypeOverrides>
             <SqlSourceDatabase>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDatabase), '\s+', ' ').Trim())</SqlSourceDatabase>
         </PropertyGroup>
     </Target>
@@ -56,7 +57,7 @@
     <Target
         Name="SqlSourceTrimMetadataOfFiles"
         BeforeTargets="GenerateMSBuildEditorConfigFileCore"
-        Outputs="%(AdditionalFiles.SqlSourceDialect)|%(AdditionalFiles.SqlSourceGeneratorParameters)|%(AdditionalFiles.SqlSourceOutput)|%(AdditionalFiles.SqlSourceInputModelSuffix)|%(AdditionalFiles.SqlSourceOutputModelSuffix)|%(AdditionalFiles.SqlSourceModelNamespace)|%(AdditionalFiles.SqlSourceInputModelType)|%(AdditionalFiles.SqlSourceOutputModelType)|%(AdditionalFiles.SqlSourceCollectionType)|%(AdditionalFiles.SqlSourceDatabase)"
+        Outputs="%(AdditionalFiles.SqlSourceDialect)|%(AdditionalFiles.SqlSourceGeneratorParameters)|%(AdditionalFiles.SqlSourceOutput)|%(AdditionalFiles.SqlSourceInputModelSuffix)|%(AdditionalFiles.SqlSourceOutputModelSuffix)|%(AdditionalFiles.SqlSourceModelNamespace)|%(AdditionalFiles.SqlSourceInputModelType)|%(AdditionalFiles.SqlSourceOutputModelType)|%(AdditionalFiles.SqlSourceCollectionType)|%(AdditionalFiles.SqlSourceTypeOverrides)|%(AdditionalFiles.SqlSourceDatabase)"
     >
         <PropertyGroup>
             <SqlSourceDialectAsWritten>%(AdditionalFiles.SqlSourceDialect)</SqlSourceDialectAsWritten>
@@ -68,9 +69,10 @@
             <SqlSourceInputModelTypeAsWritten>%(AdditionalFiles.SqlSourceInputModelType)</SqlSourceInputModelTypeAsWritten>
             <SqlSourceOutputModelTypeAsWritten>%(AdditionalFiles.SqlSourceOutputModelType)</SqlSourceOutputModelTypeAsWritten>
             <SqlSourceCollectionTypeAsWritten>%(AdditionalFiles.SqlSourceCollectionType)</SqlSourceCollectionTypeAsWritten>
+            <SqlSourceTypeOverridesAsWritten>%(AdditionalFiles.SqlSourceTypeOverrides)</SqlSourceTypeOverridesAsWritten>
             <SqlSourceDatabaseAsWritten>%(AdditionalFiles.SqlSourceDatabase)</SqlSourceDatabaseAsWritten>
         </PropertyGroup>
-        <ItemGroup Condition="'$(SqlSourceDialectAsWritten)$(SqlSourceGeneratorParametersAsWritten)$(SqlSourceOutputAsWritten)$(SqlSourceInputModelSuffixAsWritten)$(SqlSourceOutputModelSuffixAsWritten)$(SqlSourceModelNamespaceAsWritten)$(SqlSourceInputModelTypeAsWritten)$(SqlSourceOutputModelTypeAsWritten)$(SqlSourceCollectionTypeAsWritten)$(SqlSourceDatabaseAsWritten)' != ''">
+        <ItemGroup Condition="'$(SqlSourceDialectAsWritten)$(SqlSourceGeneratorParametersAsWritten)$(SqlSourceOutputAsWritten)$(SqlSourceInputModelSuffixAsWritten)$(SqlSourceOutputModelSuffixAsWritten)$(SqlSourceModelNamespaceAsWritten)$(SqlSourceInputModelTypeAsWritten)$(SqlSourceOutputModelTypeAsWritten)$(SqlSourceCollectionTypeAsWritten)$(SqlSourceTypeOverridesAsWritten)$(SqlSourceDatabaseAsWritten)' != ''">
             <AdditionalFiles>
                 <SqlSourceDialect Condition="'$(SqlSourceDialectAsWritten)' != ''"
                     >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDialectAsWritten), '\s+', ' ').Trim())</SqlSourceDialect>
@@ -90,6 +92,8 @@
                     >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceOutputModelTypeAsWritten), '\s+', ' ').Trim())</SqlSourceOutputModelType>
                 <SqlSourceCollectionType Condition="'$(SqlSourceCollectionTypeAsWritten)' != ''"
                     >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceCollectionTypeAsWritten), '\s+', ' ').Trim())</SqlSourceCollectionType>
+                <SqlSourceTypeOverrides Condition="'$(SqlSourceTypeOverridesAsWritten)' != ''"
+                    >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceTypeOverridesAsWritten), '\s+', ' ').Trim())</SqlSourceTypeOverrides>
                 <SqlSourceDatabase Condition="'$(SqlSourceDatabaseAsWritten)' != ''"
                     >$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDatabaseAsWritten), '\s+', ' ').Trim())</SqlSourceDatabase>
             </AdditionalFiles>
@@ -112,7 +116,7 @@
         <ItemGroup>
             <SqlSourceSettingsFile
                 Include="@(AdditionalFiles)"
-                Condition="'%(AdditionalFiles.SqlSourceDialect)%(AdditionalFiles.SqlSourceGeneratorParameters)%(AdditionalFiles.SqlSourceOutput)%(AdditionalFiles.SqlSourceInputModelSuffix)%(AdditionalFiles.SqlSourceOutputModelSuffix)%(AdditionalFiles.SqlSourceModelNamespace)%(AdditionalFiles.SqlSourceInputModelType)%(AdditionalFiles.SqlSourceOutputModelType)%(AdditionalFiles.SqlSourceCollectionType)' != ''"
+                Condition="'%(AdditionalFiles.SqlSourceDialect)%(AdditionalFiles.SqlSourceGeneratorParameters)%(AdditionalFiles.SqlSourceOutput)%(AdditionalFiles.SqlSourceInputModelSuffix)%(AdditionalFiles.SqlSourceOutputModelSuffix)%(AdditionalFiles.SqlSourceModelNamespace)%(AdditionalFiles.SqlSourceInputModelType)%(AdditionalFiles.SqlSourceOutputModelType)%(AdditionalFiles.SqlSourceCollectionType)%(AdditionalFiles.SqlSourceTypeOverrides)' != ''"
             />
         </ItemGroup>
     </Target>
@@ -213,8 +217,9 @@
             <SqlSourceManifestLine Include="Property.SqlSourceInputModelType=$([MSBuild]::Escape($(SqlSourceInputModelType)))" />
             <SqlSourceManifestLine Include="Property.SqlSourceOutputModelType=$([MSBuild]::Escape($(SqlSourceOutputModelType)))" />
             <SqlSourceManifestLine Include="Property.SqlSourceCollectionType=$([MSBuild]::Escape($(SqlSourceCollectionType)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceTypeOverrides=$([MSBuild]::Escape($(SqlSourceTypeOverrides)))" />
             <SqlSourceManifestSqlFile Include="@(AdditionalFiles)" Condition="'%(Extension)' == '.sql'" />
-            <SqlSourceManifestLine Include="@(SqlSourceManifestSqlFile->'File=%(FullPath)%0aFile.SqlSourceDialect=%(SqlSourceDialect)%0aFile.SqlSourceDatabase=%(SqlSourceDatabase)%0aFile.SqlSourceOutput=%(SqlSourceOutput)%0aFile.SqlSourceGeneratorParameters=%(SqlSourceGeneratorParameters)%0aFile.SqlSourceInputModelSuffix=%(SqlSourceInputModelSuffix)%0aFile.SqlSourceOutputModelSuffix=%(SqlSourceOutputModelSuffix)%0aFile.SqlSourceModelNamespace=%(SqlSourceModelNamespace)%0aFile.SqlSourceInputModelType=%(SqlSourceInputModelType)%0aFile.SqlSourceOutputModelType=%(SqlSourceOutputModelType)%0aFile.SqlSourceCollectionType=%(SqlSourceCollectionType)')" />
+            <SqlSourceManifestLine Include="@(SqlSourceManifestSqlFile->'File=%(FullPath)%0aFile.SqlSourceDialect=%(SqlSourceDialect)%0aFile.SqlSourceDatabase=%(SqlSourceDatabase)%0aFile.SqlSourceOutput=%(SqlSourceOutput)%0aFile.SqlSourceGeneratorParameters=%(SqlSourceGeneratorParameters)%0aFile.SqlSourceInputModelSuffix=%(SqlSourceInputModelSuffix)%0aFile.SqlSourceOutputModelSuffix=%(SqlSourceOutputModelSuffix)%0aFile.SqlSourceModelNamespace=%(SqlSourceModelNamespace)%0aFile.SqlSourceInputModelType=%(SqlSourceInputModelType)%0aFile.SqlSourceOutputModelType=%(SqlSourceOutputModelType)%0aFile.SqlSourceCollectionType=%(SqlSourceCollectionType)%0aFile.SqlSourceTypeOverrides=%(SqlSourceTypeOverrides)')" />
             <SqlSourceManifestLine Include="@(Compile->'Compile=%(FullPath)')" />
         </ItemGroup>
         <WriteLinesToFile

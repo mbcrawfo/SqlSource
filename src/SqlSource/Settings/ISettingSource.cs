@@ -12,6 +12,9 @@ namespace SqlSource.Settings;
 /// </remarks>
 internal interface ISettingSource
 {
+    /// <summary>The place the source is, which the entries of a type override it gives carry.</summary>
+    SettingPlace Place { get; }
+
     /// <summary>The text as written, or null when the source does not have the setting or does not set it.</summary>
     string? Text(SettingId setting);
 

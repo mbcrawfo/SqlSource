@@ -1381,6 +1381,7 @@ public sealed class SqlFileParserTests
     [Theory]
     [InlineData("output", "models", "sql")]
     [InlineData("database", "billing", "Billing")]
+    [InlineData("type-override", "int4=System.Int32", "int4 = int")]
     public void Parse_TwoValuesOfOneMarkerInOneScope_ConflictAtTheSecond(string word, string first, string second)
     {
         var text = "-- name: Q\n-- " + word + ": " + first + "\n-- " + word + ": " + second + "\nSELECT 1\n";
@@ -1397,6 +1398,8 @@ public sealed class SqlFileParserTests
     [InlineData("output", "model")]
     [InlineData("database", "see the wiki")]
     [InlineData("database", "a/b")]
+    [InlineData("type-override", "int4 = int?")]
+    [InlineData("type-override", "timestampz = System.DateTimeOffset")]
     public void Parse_MarkerWithAValueItDoesNotTake_IsInvalidAtTheValue(string word, string value)
     {
         var text = "-- name: Q\n-- " + word + ": " + value + "\nSELECT 1\n";
@@ -1410,6 +1413,7 @@ public sealed class SqlFileParserTests
     [Theory]
     [InlineData("output")]
     [InlineData("database")]
+    [InlineData("type-override")]
     public void Parse_MarkerWithoutAValue_IsInvalidAtTheMarker(string word)
     {
         var text = "-- name: Q\n-- " + word + ":\nSELECT 1\n";
@@ -1423,6 +1427,51 @@ public sealed class SqlFileParserTests
                 ),
             ]);
     }
+
+    [Fact]
+    public void Parse_SameTypeOverrideTwiceInOneScope_IsNoConflict() =>
+        Blocks("-- name: Q\n-- type-override: int4 = long\n-- type-override: int4=long\nSELECT 1\n")
+            .ShouldHaveSingleItem()
+            .Markers.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Query)]);
+
+    // A query's entry replaces the header's for its key alone, and a default stays in the markers' level, so that it
+    // also hides the key of a level below the markers.
+    [Fact]
+    public void Parse_TypeOverridesOfAQuery_ReplaceOnlyTheKeysTheyName()
+    {
+        const string Text =
+            "-- type-override: int4 = long\n-- type-override: timestamptz = System.DateTimeOffset\n"
+            + "-- type-override: text = string\n\n"
+            + "-- name: A\n-- type-override: timestamptz = System.DateTime\n-- type-override: text = default\n"
+            + "SELECT 1\n"
+            + "-- name: B\nSELECT 2\n";
+
+        var blocks = Blocks(Text);
+
+        blocks[0]
+            .Markers.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([
+                new TypeOverride("int4", "long", SettingPlace.FileHeader),
+                new TypeOverride("text", null, SettingPlace.Query),
+                new TypeOverride("timestamptz", "global::System.DateTime", SettingPlace.Query),
+            ]);
+        blocks[1]
+            .Markers.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([
+                new TypeOverride("int4", "long", SettingPlace.FileHeader),
+                new TypeOverride("text", "string", SettingPlace.FileHeader),
+                new TypeOverride("timestamptz", "global::System.DateTimeOffset", SettingPlace.FileHeader),
+            ]);
+    }
+
+    // A file with no name marker is one query, and its entries are the query's.
+    [Fact]
+    public void Parse_TypeOverrideOfAFileWithNoName_IsAtTheQuery() =>
+        Blocks("-- type-override: int4 = long\nSELECT 1\n")
+            .ShouldHaveSingleItem()
+            .Markers.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Query)]);
 
     [Fact]
     public void Parse_PreambleSettings_AreOneLevelSharedByTheQueriesThatHaveNoMarkersOfTheirOwn()

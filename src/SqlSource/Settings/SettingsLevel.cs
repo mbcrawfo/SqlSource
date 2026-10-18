@@ -45,12 +45,18 @@ internal sealed record SettingsLevel
     /// <summary>The type a method returns many rows in.</summary>
     public CollectionKind? CollectionType { get; init; }
 
+    /// <summary>
+    /// The entries of the type override, sorted by key as <see cref="TypeOverrideMap" /> keeps them, entries of
+    /// <c>default</c> included.  Merged per key, not taken whole.
+    /// </summary>
+    public EquatableArray<TypeOverride>? TypeOverrides { get; init; }
+
     /// <summary>Whether the level gives a list that has <c>keep-comments</c>.</summary>
     public bool KeepsComments => Parameters is { } list && (list & GeneratorParameters.KeepComments) != 0;
 
     /// <summary>
     /// This level over <paramref name="other" />: each member from this level when it has one, and from
-    /// <paramref name="other" /> when it has not.
+    /// <paramref name="other" /> when it has not.  The type override is merged per key, this level's entry winning.
     /// </summary>
     public SettingsLevel Over(SettingsLevel other)
     {
@@ -75,6 +81,7 @@ internal sealed record SettingsLevel
             InputModelType = InputModelType ?? other.InputModelType,
             OutputModelType = OutputModelType ?? other.OutputModelType,
             CollectionType = CollectionType ?? other.CollectionType,
+            TypeOverrides = TypeOverrideMap.Over(TypeOverrides, other.TypeOverrides),
         };
     }
 }

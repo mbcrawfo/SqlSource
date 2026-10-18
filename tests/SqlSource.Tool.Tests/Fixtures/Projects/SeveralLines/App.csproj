@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         Each value of the package that a project or a file can have, with one word on each line, as
-        tests/SqlSource.Tests writes its own.  The manifest must hold each on one line.  Queries/Users.sql has no
-        value of its own.
+        tests/SqlSource.Tests writes its own, and a type override whose generic is split over two lines.  The
+        manifest must hold each on one line.  Queries/Users.sql has no value of its own.
     -->
     <Import Project="../build/SqlSource.props" />
     <PropertyGroup>
@@ -14,6 +14,11 @@
         <SqlSourceDialect>
             postgres
         </SqlSourceDialect>
+        <SqlSourceTypeOverrides>
+            timestamptz=System.DateTimeOffset
+            hstore=System.Collections.Generic.Dictionary&lt;string,
+                string?&gt;
+        </SqlSourceTypeOverrides>
     </PropertyGroup>
     <ItemGroup>
         <AdditionalFiles Update="Queries/Dialects/ByMetadata.sql">
@@ -32,6 +37,10 @@
                 no-token-validation
                 keep-comments
             </SqlSourceGeneratorParameters>
+            <SqlSourceTypeOverrides>
+                int4[]=System.Collections.Generic.List&lt;int?&gt;
+                date=default
+            </SqlSourceTypeOverrides>
         </AdditionalFiles>
     </ItemGroup>
     <Import Project="../build/SqlSource.targets" />

@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Shouldly;
 using SqlSource.Settings;
 using Xunit;
@@ -129,4 +130,52 @@ public sealed class QuerySettingsTests
         settings.OutputModelType.ShouldBe(ModelKind.Class);
         settings.CollectionType.ShouldBe(CollectionKind.IReadOnlyList);
     }
+
+    // The type override is the exception: each level replaces only the keys it names.
+    [Fact]
+    public void ResolveTypeOverrides_Levels_MergePerKeyAcrossTheLevels()
+    {
+        var property = Overrides(
+            new TypeOverride("int4", "long", SettingPlace.Property),
+            new TypeOverride("text", "string", SettingPlace.Property),
+            new TypeOverride("timestamptz", "global::System.DateTimeOffset", SettingPlace.Property)
+        );
+        var metadata = Overrides(
+            new TypeOverride("int4", "int", SettingPlace.Metadata),
+            new TypeOverride("text", null, SettingPlace.Metadata)
+        );
+        var markers = Overrides(new TypeOverride("timestamptz", "global::System.DateTime", SettingPlace.Query));
+
+        QuerySettings
+            .ResolveTypeOverrides(markers, metadata, property)
+            .ShouldBe([
+                new TypeOverride("int4", "int", SettingPlace.Metadata),
+                new TypeOverride("timestamptz", "global::System.DateTime", SettingPlace.Query),
+            ]);
+    }
+
+    [Fact]
+    public void ResolveTypeOverrides_NoLevelSetsOne_IsEmpty() =>
+        QuerySettings.ResolveTypeOverrides(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None).ShouldBeEmpty();
+
+    [Fact]
+    public void Over_TypeOverrides_MergePerKey()
+    {
+        var query = Overrides(new TypeOverride("int4", null, SettingPlace.Query));
+        var preamble = Overrides(
+            new TypeOverride("int4", "long", SettingPlace.FileHeader),
+            new TypeOverride("int8", "decimal", SettingPlace.FileHeader)
+        );
+
+        query
+            .Over(preamble)
+            .TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([
+                new TypeOverride("int4", null, SettingPlace.Query),
+                new TypeOverride("int8", "decimal", SettingPlace.FileHeader),
+            ]);
+    }
+
+    private static SettingsLevel Overrides(params TypeOverride[] entries) =>
+        new() { TypeOverrides = new EquatableArray<TypeOverride>(ImmutableArray.Create(entries)) };
 }

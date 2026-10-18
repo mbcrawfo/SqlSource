@@ -39,6 +39,8 @@ public sealed class SqlMarkerReaderTests
     [InlineData("-- input-model: A", "InputModel:A")]
     [InlineData("-- output-model: A.B", "OutputModel:A.B")]
     [InlineData("-- collection-type: list", "CollectionType:list")]
+    [InlineData("-- type-override: numeric = System.Double", "TypeOverride:numeric = System.Double")]
+    [InlineData("--TYPE-OVERRIDE:int4=long ", "TypeOverride:int4=long")]
     [InlineData("-- token: {{a:b}}", "Token:{{a:b}}")]
     [InlineData("-- TOKEN: x", "Token:x")]
     [InlineData("--token:", "Token:")]
@@ -148,6 +150,7 @@ public sealed class SqlMarkerReaderTests
         SqlMarkerReader.WordOf(SqlMarkerKind.Param).ShouldBe("param");
         SqlMarkerReader.WordOf(SqlMarkerKind.Output).ShouldBe("output");
         SqlMarkerReader.WordOf(SqlMarkerKind.Database).ShouldBe("database");
+        SqlMarkerReader.WordOf(SqlMarkerKind.TypeOverride).ShouldBe("type-override");
     }
 
     [Theory]

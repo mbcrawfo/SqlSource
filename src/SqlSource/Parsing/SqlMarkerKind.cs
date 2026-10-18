@@ -57,4 +57,9 @@ internal enum SqlMarkerKind
 
     /// <summary><c>-- collection-type:</c> gives the type that holds many rows, for a query or for its file.</summary>
     CollectionType,
+
+    /// <summary>
+    /// <c>-- type-override:</c> maps one database type to a C# type, for a query or for every query of its file.
+    /// </summary>
+    TypeOverride,
 }

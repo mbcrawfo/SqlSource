@@ -92,6 +92,64 @@ public sealed class MSBuildSettingsTests
     }
 
     [Fact]
+    public void ReadProject_TypeOverrides_AreReadAtTheProjectsPlaceWithTheirInvalidEntries()
+    {
+        var settings = ProjectSettings.Read(
+            Provider("SqlSourceTypeOverrides", "timestamptz=System.DateTimeOffset timestampz=int").GlobalOptions
+        );
+
+        settings
+            .Level.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("timestamptz", "global::System.DateTimeOffset", SettingPlace.Property)]);
+        settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceTypeOverrides", "timestampz=int")]);
+    }
+
+    [Fact]
+    public void ReadFile_TypeOverrides_AreReadAtTheMetadatasPlace()
+    {
+        var settings = ReadFileMetadata(
+            new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = "date=System.DateOnly int4=Guid" }
+        );
+
+        settings
+            .ShouldNotBeNull()
+            .Level.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("date", "global::System.DateOnly", SettingPlace.Metadata)]);
+        settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceTypeOverrides", "int4=Guid")]);
+    }
+
+    // The tool does not read the type override, which changes nothing that is described: the keys of a manifest
+    // have none for it.
+    [Fact]
+    public void ReadProject_TypeOverridesUnderTheKeysOfAManifest_AreNotRead()
+    {
+        var settings = ProjectSettings.Read(
+            Provider("SqlSourceTypeOverrides", "int4=long timestampz=int").GlobalOptions,
+            MSBuildSettings.ManifestProperty
+        );
+
+        settings.Level.ShouldBeSameAs(SettingsLevel.None);
+        settings.Invalid.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadFile_TypeOverridesUnderTheKeysOfAManifest_AreNotRead() =>
+        FileSettings
+            .Read(
+                Path,
+                new TestOptionsProvider(
+                    null,
+                    null,
+                    fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
+                    {
+                        [Path] = new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = "timestampz=int" },
+                    }
+                ).GetOptions(new InMemoryAdditionalText(Path, "")),
+                MSBuildSettings.ManifestMetadata
+            )
+            .ShouldBeNull();
+
+    [Fact]
     public void ReadProject_NothingSet_IsTheSharedEmptyLevel()
     {
         var settings = ProjectSettings.Read(new TestOptionsProvider(null, null).GlobalOptions);

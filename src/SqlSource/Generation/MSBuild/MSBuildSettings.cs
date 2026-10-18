@@ -47,6 +47,12 @@ internal static class MSBuildSettings
 
     public const string CollectionTypeName = "SqlSourceCollectionType";
 
+    /// <summary>
+    /// The setting that the generator reads and the tool does not, since it changes nothing that is described: the
+    /// keys of a manifest, <see cref="ManifestProperty" /> and <see cref="ManifestMetadata" />, have none for it.
+    /// </summary>
+    public const string TypeOverridesName = "SqlSourceTypeOverrides";
+
     // The names, in the order of SettingId.  Above Property and Metadata, which read it when they are made.
     private static readonly string[] Names =
     [
@@ -59,22 +65,28 @@ internal static class MSBuildSettings
         InputModelTypeName,
         OutputModelTypeName,
         CollectionTypeName,
+        TypeOverridesName,
     ];
 
     /// <summary>
     /// The keys of the project's properties that the compiler is shown.  The database is not among them, so the
     /// generator does not read it, and does not judge it for a project that shows it to the compiler itself.
     /// </summary>
-    public static SettingKeys Property { get; } = new(PropertyPrefix, hasDatabase: false);
+    public static SettingKeys Property { get; } = new(PropertyPrefix, SettingPlace.Property, isManifest: false);
 
     /// <summary>The keys of the metadata of a file's item that the compiler is shown, without the database.</summary>
-    public static SettingKeys Metadata { get; } = new(MetadataPrefix, hasDatabase: false);
+    public static SettingKeys Metadata { get; } = new(MetadataPrefix, SettingPlace.Metadata, isManifest: false);
 
-    /// <summary>The keys of the properties in a project manifest, which the tool reads: with the database.</summary>
-    public static SettingKeys ManifestProperty { get; } = new(PropertyPrefix, hasDatabase: true);
+    /// <summary>
+    /// The keys of the properties in a project manifest, which the tool reads: with the database, and without the
+    /// type override.
+    /// </summary>
+    public static SettingKeys ManifestProperty { get; } = new(PropertyPrefix, SettingPlace.Property, isManifest: true);
 
-    /// <summary>The keys of a file's metadata in a project manifest: with the database.</summary>
-    public static SettingKeys ManifestMetadata { get; } = new(MetadataPrefix, hasDatabase: true);
+    /// <summary>
+    /// The keys of a file's metadata in a project manifest: with the database, and without the type override.
+    /// </summary>
+    public static SettingKeys ManifestMetadata { get; } = new(MetadataPrefix, SettingPlace.Metadata, isManifest: true);
 
     /// <summary>The name MSBuild knows a setting by, without a prefix.</summary>
     public static string NameOf(SettingId setting) => Names[(int)setting];
@@ -96,6 +108,8 @@ internal static class MSBuildSettings
         : ISettingSource
     {
         public List<InvalidSetting>? InvalidSettings { get; private set; } = invalid;
+
+        public readonly SettingPlace Place => keys.Place;
 
         public readonly string? Text(SettingId setting) =>
             keys[setting] is { } key && options.TryGetValue(key, out var value) ? value : null;
@@ -121,13 +135,21 @@ internal static class MSBuildSettings
             (InvalidSettings ??= []).Add(new InvalidSetting(NameOf(setting), value));
     }
 
-    /// <summary>The keys of the settings under one prefix, built once.</summary>
-    internal sealed class SettingKeys(string prefix, bool hasDatabase)
+    /// <summary>
+    /// The keys of the settings under one prefix, built once.  The keys of a manifest are the tool's, and have the
+    /// database and not the type override; the compiler's have the type override and not the database.
+    /// </summary>
+    internal sealed class SettingKeys(string prefix, SettingPlace place, bool isManifest)
     {
         private readonly string[] _keys = Array.ConvertAll(Names, name => prefix + name);
 
-        /// <summary>The key of a setting, or null for the database where these keys have none.</summary>
+        /// <summary>The place the settings under these keys are written in.</summary>
+        public SettingPlace Place => place;
+
+        /// <summary>The key of a setting, or null for one these keys have none for.</summary>
         public string? this[SettingId setting] =>
-            setting == SettingId.Database && !hasDatabase ? null : _keys[(int)setting];
+            (setting == SettingId.Database && !isManifest) || (setting == SettingId.TypeOverrides && isManifest)
+                ? null
+                : _keys[(int)setting];
     }
 }

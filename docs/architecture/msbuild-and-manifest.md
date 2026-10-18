@@ -10,7 +10,7 @@ The props do three things.
 
 - They set `SqlSourceImported` to `true`, with no condition.  The tool asks a project for this property, and for nothing else, to tell whether it uses SqlSource.  It is in the props because they reach a project whether the package came from NuGet or its files are imported by path.  A project that was never restored has no props of a package, and so no marker.
 - They add every `.sql` file under the project's folder as an `AdditionalFiles` item, the only way a source generator sees a file, unless the project sets `SqlSourceIncludeFiles` to `false`.  The item comes before the project's content, so a project can remove files from it.  The same condition and the same excludes give the compiler every `.sql.json` file too, a `.sql` file's sidecar, which the generator reads; a project that sets `SqlSourceIncludeFiles` to `false` lists its sidecars itself.  Items are evaluated after every property, so `DefaultItemExcludes` already holds the output and intermediate folders, whatever the project sets them to.
-- They list the nine settings that the generator reads as `CompilerVisibleProperty` items, and the same nine as `CompilerVisibleItemMetadata` of `SqlSourceSettingsFile`.  A generator sees only the properties and metadata that are listed.  None of these is under the condition of `SqlSourceIncludeFiles`, since a project that lists its own `.sql` files still needs them.  `SqlSourceDatabase` is not listed: the tool reads it and the generator does not, as [the tool runs the same code](generator.md#the-tool-runs-the-same-code) explains.
+- They list the ten settings that the generator reads as `CompilerVisibleProperty` items, and the same ten as `CompilerVisibleItemMetadata` of `SqlSourceSettingsFile`.  A generator sees only the properties and metadata that are listed.  None of these is under the condition of `SqlSourceIncludeFiles`, since a project that lists its own `.sql` files still needs them.  `SqlSourceDatabase` is not listed: the tool reads it and the generator does not, as [the tool runs the same code](generator.md#the-tool-runs-the-same-code) explains.  `SqlSourceTypeOverrides` is the other way round: listed, and not read by the tool.
 
 The targets hold four targets of a build, which all hook `GenerateMSBuildEditorConfigFileCore`, the target of the SDK that writes the file the compiler reads the properties and metadata from.  They also hold `SqlSourceWriteManifest`, which no build runs, the `PropertyGroup` that lists what it depends on, and an `ItemGroup` that nests each sidecar under its `.sql` file.  An arrow means "runs before":
 
@@ -34,7 +34,7 @@ The `ItemGroup` sets `DependentUpon="%(Filename)"` on every `**/*.sql.json` item
 
 ### `SqlSourceSettingsFile`
 
-The SDK writes a section into the file the compiler reads for every item of a type that `CompilerVisibleItemMetadata` names, whether the item has the metadata or not.  Listed for `AdditionalFiles`, that would be a section for every `.sql` file of the project, a cost that [TD-0016](../tech-debt/TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) measures.  So the metadata is listed for `SqlSourceSettingsFile`, and `SqlSourceCollectSettingsFiles` fills that item type with the `AdditionalFiles` items that have any of the nine.  A project has few of them.
+The SDK writes a section into the file the compiler reads for every item of a type that `CompilerVisibleItemMetadata` names, whether the item has the metadata or not.  Listed for `AdditionalFiles`, that would be a section for every `.sql` file of the project, a cost that [TD-0016](../tech-debt/TD-0016-dialect-of-a-file-added-by-a-late-target-is-lost.md) measures.  So the metadata is listed for `SqlSourceSettingsFile`, and `SqlSourceCollectSettingsFiles` fills that item type with the `AdditionalFiles` items that have any of the ten.  A project has few of them.
 
 The collecting depends on `SqlSourceTrimMetadataOfFiles`, so that it copies trimmed values and leaves out a file whose values were only white space.  It has to say so, because MSBuild promises no order for two targets that hook the same one.  `SqlSourceDatabase` is trimmed and not collected, since the compiler is not shown it.
 
@@ -50,8 +50,8 @@ The compiler reads each property that the props list, and each metadata, from a 
 
 So each value is trimmed with one expression, `Regex.Replace(value, '\s+', ' ').Trim()`, which gives what the manual's [values written in MSBuild](../manual/settings.md#values-written-in-msbuild) describes, and both forms mean what they say.  That is safe only because no value of the package gives white space a meaning beyond separating its words.  A trim is written on one line however long it is, since white space around the expression would be part of the value, so the check of the line length is off for both trim targets.
 
-- `SqlSourceTrimProperties` trims the ten properties of the package: the nine the generator reads, and `SqlSourceDatabase`.
-- `SqlSourceTrimMetadataOfFiles` trims the same ten as metadata of the `AdditionalFiles` items.  Its `Outputs` makes MSBuild run it once for each combination of values the metadata have, with only that combination's items in reach.  Each value goes through a property, `SqlSourceDialectAsWritten` and the like, because MSBuild puts metadata into an expression as text, and a quote in a value would end the argument of the property function early.  The files without any of the metadata are one batch with nothing to trim, so nothing is written back to them.  That condition is on the item group, because the condition of a target cannot read metadata, and each metadata has a condition of its own, so that one an item does not have is not written as an empty value.
+- `SqlSourceTrimProperties` trims the eleven properties of the package: the ten the generator reads, and `SqlSourceDatabase`.
+- `SqlSourceTrimMetadataOfFiles` trims the same eleven as metadata of the `AdditionalFiles` items.  Its `Outputs` makes MSBuild run it once for each combination of values the metadata have, with only that combination's items in reach.  Each value goes through a property, `SqlSourceDialectAsWritten` and the like, because MSBuild puts metadata into an expression as text, and a quote in a value would end the argument of the property function early.  The files without any of the metadata are one batch with nothing to trim, so nothing is written back to them.  That condition is on the item group, because the condition of a target cannot read metadata, and each metadata has a condition of its own, so that one an item does not have is not written as an empty value.
 
 The trims run before `GenerateMSBuildEditorConfigFileCore`, and not where the file is imported, because `Directory.Build.targets` is imported later and a target can add an item while the build runs.  Every build that writes the file runs them, a design-time build too.
 
@@ -77,8 +77,8 @@ The file is lines of `key=value`, and the key ends at the first `=`.  The target
 1. `SqlSourceManifest=1`, the version of the format.
 2. `Project=`, the full path of the project file.
 3. `TargetFramework=`, `LangVersion=` and `DefineConstants=`, three properties of the SDK.
-4. `Property.<Name>=` for each of the ten properties of the package, empty when it is not set.
-5. For each `AdditionalFiles` item whose extension is `.sql`, compared ignoring case, in the order of the items: `File=` and its full path, then `File.<Name>=` for each of the ten metadata.
+4. `Property.<Name>=` for each of the eleven properties of the package, empty when it is not set.
+5. For each `AdditionalFiles` item whose extension is `.sql`, compared ignoring case, in the order of the items: `File=` and its full path, then `File.<Name>=` for each of the eleven metadata.
 6. `Compile=` and the full path of each `Compile` item.
 
 Three things keep each value on its own line:
