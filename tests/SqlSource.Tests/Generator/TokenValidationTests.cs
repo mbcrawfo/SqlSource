@@ -1,6 +1,7 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using Shouldly;
+using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -55,7 +56,7 @@ public sealed class TokenValidationTests
             + (queryGeneratorParameter is null ? string.Empty : "-- generator: " + queryGeneratorParameter + "\n")
             + "SELECT * FROM {{table}};\n";
 
-        var run = Run(property, new SqlFile("/app/Repo/Users.sql", sql));
+        var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Users.sql", sql));
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
@@ -75,6 +76,7 @@ public sealed class TokenValidationTests
     public void Run_PropertyOff_ChangesOnlyTheQueriesWithoutAGeneratorParameter()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [
                 new SourceFile(
                     GeneratorHarness.SourcePath,
@@ -107,6 +109,7 @@ public sealed class TokenValidationTests
     public void Run_InvalidPropertyInAProjectWithoutAnAttributedType_IsStillAnError()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, "public class Sample;")],
             [],
             generatorParameters: "nope"
@@ -116,8 +119,9 @@ public sealed class TokenValidationTests
         run.Sources.Keys.ShouldBe(["SqlSourceGenerateAttribute.g.cs"]);
     }
 
-    private static GeneratorRun Run(string? property, SqlFile file) =>
+    private static GeneratorRun Run(OutputKind? output, string? property, SqlFile file) =>
         GeneratorHarness.Run(
+            output,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
             [file],
             generatorParameters: property

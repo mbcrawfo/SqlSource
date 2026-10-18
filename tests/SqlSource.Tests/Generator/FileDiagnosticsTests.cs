@@ -1,6 +1,7 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
 using Shouldly;
+using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -37,6 +38,7 @@ public sealed class FileDiagnosticsTests
     public void Run_FileWithParserErrors_ReportsEachAtItsLineAndColumnInTheSqlFile()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile(
                 "/app/Repo/Users.sql",
@@ -66,6 +68,7 @@ public sealed class FileDiagnosticsTests
     public void Run_DialectMarkerInsideAQuery_IsAnErrorAtTheMarker()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n-- dialect: mysql\nSELECT 1;\n")
         );
@@ -81,6 +84,7 @@ public sealed class FileDiagnosticsTests
     public void Run_DialectMarkerThatIsNotValidOrConflicts_IsAnErrorAtItsValue()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile(
                 "/app/Repo/Users.sql",
@@ -99,7 +103,11 @@ public sealed class FileDiagnosticsTests
     [Fact]
     public void Run_FileWithAnError_GivesNoMembersAndTheTypeKeepsItsEmptySqlClass()
     {
-        var run = GeneratorHarness.Run(Source, new SqlFile("/app/Repo/Users.sql", "SELECT 'unfinished;\n"));
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            Source,
+            new SqlFile("/app/Repo/Users.sql", "SELECT 'unfinished;\n")
+        );
 
         run.Diagnostics.ShouldBe([
             "SQLSRC101 /app/Repo/Users.sql(1,8)-(1,9): A quoted string or identifier is not closed",
@@ -112,6 +120,7 @@ public sealed class FileDiagnosticsTests
     public void Run_OneFileWithAnErrorAmongSeveral_KeepsTheMembersOfTheOthers()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Broken.sql", "/* open\nSELECT 1;\n"),
             new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n")
@@ -124,7 +133,11 @@ public sealed class FileDiagnosticsTests
     [Fact]
     public void Run_FileWhoseNameIsNotAnIdentifier_IsAnErrorAtTheStartOfTheFile()
     {
-        var run = GeneratorHarness.Run(Source, new SqlFile("/app/Repo/001_init.sql", "CREATE TABLE t (id int);\n"));
+        var run = GeneratorHarness.Run(
+            OutputKind.Sql,
+            Source,
+            new SqlFile("/app/Repo/001_init.sql", "CREATE TABLE t (id int);\n")
+        );
 
         run.Diagnostics.ShouldBe([
             "SQLSRC105 /app/Repo/001_init.sql(1,1)-(1,1): The file has no '-- name:' marker, and its name "
@@ -138,7 +151,7 @@ public sealed class FileDiagnosticsTests
     [InlineData("-- nothing here\n")]
     public void Run_UnreadableOrEmptyFile_IsAnErrorAndNotAnException(string? text)
     {
-        var run = GeneratorHarness.Run(Source, new SqlFile("/app/Repo/Users.sql", text));
+        var run = GeneratorHarness.Run(OutputKind.Sql, Source, new SqlFile("/app/Repo/Users.sql", text));
 
         run.Diagnostics.ShouldBe(["SQLSRC113 /app/Repo/Users.sql(1,1)-(1,1): The query has no SQL"]);
         run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
@@ -148,6 +161,7 @@ public sealed class FileDiagnosticsTests
     public void Run_FileSharedByTwoTypes_ReportsItsErrorsOnce()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -169,6 +183,7 @@ public sealed class FileDiagnosticsTests
         var users = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
 
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             broken,
             users,
@@ -190,6 +205,7 @@ public sealed class FileDiagnosticsTests
     public void Run_TwoFilesOfATypeWhosePathsDifferOnlyByCase_IsAnErrorAtTheSecond(string second)
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile(second, "-- name: GetOrder\nSELECT 2;\n")
@@ -205,6 +221,7 @@ public sealed class FileDiagnosticsTests
     public void Run_FileListedTwiceAndAnotherThatDiffersByCase_IsOneErrorForEachSpelling()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile("/app/Repo/users.sql", "-- name: GetOrder\nSELECT 2;\n"),
@@ -221,6 +238,7 @@ public sealed class FileDiagnosticsTests
     public void Run_FilesThatNoTypeClaimsWhosePathsDifferOnlyByCase_AreIgnored()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile("/app/Migrations/001_init.sql", "SELECT 1;\n"),
@@ -236,6 +254,7 @@ public sealed class FileDiagnosticsTests
     public void Run_FileWhosePathLeavesItsRoot_IsIgnoredWithItsErrors()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile("../Users.sql", "-- name: 1x\nSELECT 2;\n")
@@ -250,6 +269,7 @@ public sealed class FileDiagnosticsTests
     public void Run_FileThatNoTypeClaims_IsIgnoredWithItsErrors()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile("/app/Migrations/001_init.sql", "SELECT 'unfinished;\n"),
@@ -264,6 +284,7 @@ public sealed class FileDiagnosticsTests
     public void Run_QueryNameUsedInTwoFilesOfOneType_IsAnErrorAtTheSecondAndThatFileGivesNoMembers()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/A.sql", "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile("/app/Repo/B.sql", "-- name: Other\nSELECT 2;\n\n-- name: GetUser\nSELECT 3;\n")
@@ -283,6 +304,7 @@ public sealed class FileDiagnosticsTests
     public void Run_QueryNameUsedInTwoFilesOfDifferentTypes_IsAllowed()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -302,7 +324,7 @@ public sealed class FileDiagnosticsTests
     [Fact]
     public void Run_NestedLocationAndAQueryNamedSql_IsAnErrorAtTheQuery()
     {
-        var run = GeneratorHarness.Run(Source, new SqlFile("/app/Repo/Sql.sql", "SELECT 1;\n"));
+        var run = GeneratorHarness.Run(OutputKind.Sql, Source, new SqlFile("/app/Repo/Sql.sql", "SELECT 1;\n"));
 
         run.Diagnostics.ShouldBe([
             "SQLSRC009 /app/Repo/Sql.sql(1,1)-(1,1): A query of 'Sample' cannot be named 'Sql', because its member "
@@ -316,6 +338,7 @@ public sealed class FileDiagnosticsTests
     public void Run_DirectLocationAndATypeNamedWithAKeyword_LeavesAQueryOfThatNameToTheParser()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -335,6 +358,7 @@ public sealed class FileDiagnosticsTests
     public void Run_DirectLocationAndAQueryNamedLikeTheType_IsAnErrorAndItsFileGivesNoMembers()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;

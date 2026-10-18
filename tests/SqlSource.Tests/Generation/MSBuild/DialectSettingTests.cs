@@ -58,13 +58,13 @@ public sealed class DialectSettingTests
     public void ReadProperty_ProjectWithAndWithoutTheProperty_ReadsItFromTheGlobalOptions()
     {
         DialectSetting
-            .ReadProperty(new TestOptionsProvider(null).GlobalOptions)
+            .ReadProperty(new TestOptionsProvider(null, null).GlobalOptions)
             .ShouldBe(new DialectSetting(null, null));
         DialectSetting
-            .ReadProperty(new TestOptionsProvider(null, "oracle").GlobalOptions)
+            .ReadProperty(new TestOptionsProvider(null, null, "oracle").GlobalOptions)
             .ShouldBe(new DialectSetting(SqlDialect.Oracle, null));
         DialectSetting
-            .ReadProperty(new TestOptionsProvider(null, "orcl").GlobalOptions)
+            .ReadProperty(new TestOptionsProvider(null, null, "orcl").GlobalOptions)
             .ShouldBe(new DialectSetting(SqlDialect.Ansi, "orcl"));
     }
 
@@ -73,7 +73,12 @@ public sealed class DialectSettingTests
     {
         var file = new InMemoryAdditionalText(Path, "SELECT 1;");
         var other = new InMemoryAdditionalText("/app/Repo/Orders.sql", "SELECT 2;");
-        var options = new TestOptionsProvider(null, "oracle", new Dictionary<string, string> { [Path] = "sqlite" });
+        var options = new TestOptionsProvider(
+            null,
+            null,
+            "oracle",
+            new Dictionary<string, string> { [Path] = "sqlite" }
+        );
 
         DialectSetting.ReadMetadata(options.GetOptions(file)).ShouldBe(new DialectSetting(SqlDialect.Sqlite, null));
         DialectSetting.ReadMetadata(options.GetOptions(other)).ShouldBe(new DialectSetting(null, null));
@@ -84,7 +89,12 @@ public sealed class DialectSettingTests
     public void Read_PropertyAndMetadata_AreNotMistakenForEachOther()
     {
         var file = new InMemoryAdditionalText(Path, "SELECT 1;");
-        var options = new TestOptionsProvider(null, "oracle", new Dictionary<string, string> { [Path] = "sqlite" });
+        var options = new TestOptionsProvider(
+            null,
+            null,
+            "oracle",
+            new Dictionary<string, string> { [Path] = "sqlite" }
+        );
 
         DialectSetting.ReadMetadata(options.GlobalOptions).Dialect.ShouldBeNull();
         DialectSetting.ReadProperty(options.GetOptions(file)).Dialect.ShouldBeNull();

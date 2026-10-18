@@ -78,6 +78,7 @@ public sealed class MSBuildSettingsTests
             Path,
             new TestOptionsProvider(
                 null,
+                null,
                 fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
                 {
                     [Path] = new Dictionary<string, string> { ["SqlSourceDatabase"] = "files" },
@@ -93,7 +94,7 @@ public sealed class MSBuildSettingsTests
     [Fact]
     public void ReadProject_NothingSet_IsTheSharedEmptyLevel()
     {
-        var settings = ProjectSettings.Read(new TestOptionsProvider(null).GlobalOptions);
+        var settings = ProjectSettings.Read(new TestOptionsProvider(null, null).GlobalOptions);
 
         settings.Level.ShouldBeSameAs(SettingsLevel.None);
         settings.Invalid.ShouldBeEmpty();
@@ -102,7 +103,7 @@ public sealed class MSBuildSettingsTests
     [Fact]
     public void ReadProject_GeneratorParameters_AreReadWithTheirInvalidWords()
     {
-        var settings = ProjectSettings.Read(new TestOptionsProvider(" keep-comments nope ").GlobalOptions);
+        var settings = ProjectSettings.Read(new TestOptionsProvider(null, " keep-comments nope ").GlobalOptions);
 
         settings.Level.Parameters.ShouldBe(GeneratorParameters.KeepComments);
         settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceGeneratorParameters", "nope")]);
@@ -113,6 +114,7 @@ public sealed class MSBuildSettingsTests
     {
         var settings = ProjectSettings.Read(
             new TestOptionsProvider(
+                null,
                 null,
                 properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = " Models " }
             ).GlobalOptions
@@ -127,6 +129,7 @@ public sealed class MSBuildSettingsTests
     {
         var settings = ProjectSettings.Read(
             new TestOptionsProvider(
+                null,
                 null,
                 properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = "nope" }
             ).GlobalOptions
@@ -194,7 +197,9 @@ public sealed class MSBuildSettingsTests
             ["SqlSourceCollectionType"] = "immutable-array",
         };
 
-        var level = ProjectSettings.Read(new TestOptionsProvider(null, properties: properties).GlobalOptions).Level;
+        var level = ProjectSettings
+            .Read(new TestOptionsProvider(null, null, properties: properties).GlobalOptions)
+            .Level;
 
         level.ShouldBe(
             new SettingsLevel
@@ -212,13 +217,14 @@ public sealed class MSBuildSettingsTests
     [Fact]
     public void ReadFile_NothingSet_IsNull() =>
         FileSettings
-            .Read(Path, new TestOptionsProvider(null).GetOptions(new InMemoryAdditionalText(Path, "")))
+            .Read(Path, new TestOptionsProvider(null, null).GetOptions(new InMemoryAdditionalText(Path, "")))
             .ShouldBeNull();
 
     [Fact]
     public void ReadFile_Metadata_IsReadForThatFile()
     {
         var options = new TestOptionsProvider(
+            null,
             null,
             fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
@@ -247,7 +253,7 @@ public sealed class MSBuildSettingsTests
         };
 
     private static TestOptionsProvider Provider(string name, string value) =>
-        new(null, properties: new Dictionary<string, string?> { [name] = value });
+        new(null, null, properties: new Dictionary<string, string?> { [name] = value });
 
     private static QuerySettings Resolve(SettingsLevel level) =>
         QuerySettings.Resolve(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None, level);
@@ -259,6 +265,7 @@ public sealed class MSBuildSettingsTests
             "app/Repo/Users.sql",
             new TestOptionsProvider(
                 null,
+                null,
                 fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>> { [Path] = metadata }
             ).GetOptions(new InMemoryAdditionalText(Path, ""))
         );
@@ -266,6 +273,6 @@ public sealed class MSBuildSettingsTests
     [Fact]
     public void ProjectSettings_ReadTwice_AreEqual() =>
         ProjectSettings
-            .Read(new TestOptionsProvider("keep-comments nope").GlobalOptions)
-            .ShouldBe(ProjectSettings.Read(new TestOptionsProvider("keep-comments nope").GlobalOptions));
+            .Read(new TestOptionsProvider(null, "keep-comments nope").GlobalOptions)
+            .ShouldBe(ProjectSettings.Read(new TestOptionsProvider(null, "keep-comments nope").GlobalOptions));
 }

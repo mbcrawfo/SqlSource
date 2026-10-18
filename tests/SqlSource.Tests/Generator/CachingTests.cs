@@ -9,6 +9,7 @@ using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Testing.Generator;
 using Xunit;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
@@ -54,7 +55,7 @@ public sealed class CachingTests
     public void Run_SqlFileEdited_ParsesOnlyThatFileAndEmitsOnlyTheTypeThatUsesIt()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         var edited = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1, 2;\n");
         var result = Run(driver.ReplaceAdditionalText(_users, edited), compilation);
@@ -100,7 +101,7 @@ public sealed class CachingTests
     public void Run_SqlFileEditedWithoutChangingItsQueries_EmitsNothingAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         var edited = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1; -- a new comment\n");
         var result = Run(driver.ReplaceAdditionalText(_users, edited), compilation);
@@ -115,7 +116,7 @@ public sealed class CachingTests
     public void Run_MethodBodyEdited_TakesEveryStepFromThePreviousRun()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         var tree = compilation.SyntaxTrees.Single(tree => tree.FilePath == UsersSourcePath);
         var edited = compilation.ReplaceSyntaxTree(
@@ -163,7 +164,7 @@ public sealed class CachingTests
     public void Run_SqlFileAddedThatNoTypeClaims_ReadsNoFileAndEmitsNothingAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         var result = Run(
             driver.AddAdditionalTexts([new InMemoryAdditionalText("/app/Migrations/001_init.sql", "SELECT 'x;\n")]),
@@ -197,7 +198,7 @@ public sealed class CachingTests
     public void Run_SqlFileAddedWhosePathDiffersOnlyByCase_ReportsItAndEmitsNothingAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         var result = Run(
             driver.AddAdditionalTexts([new InMemoryAdditionalText("/app/Users/users.sql", "SELECT 3;\n")]),
@@ -216,7 +217,7 @@ public sealed class CachingTests
     public void Run_SqlFileAddedToATypesFolder_EmitsOnlyThatTypeAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         var result = Run(
             driver.AddAdditionalTexts([new InMemoryAdditionalText("/app/Orders/Count.sql", "SELECT 3;\n")]),
@@ -244,10 +245,10 @@ public sealed class CachingTests
             _users.Path,
             "-- name: GetUser\nSELECT 1;\n-- name: ListFrom\nSELECT * FROM {{table}};\n"
         );
-        var driver = FirstRun(compilation, users);
+        var driver = FirstRun(compilation, users, new TestOptionsProvider(OutputKind.Sql, null));
 
         var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider("no-token-validation")),
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, "no-token-validation")),
             compilation
         );
 
@@ -288,10 +289,13 @@ public sealed class CachingTests
     public void Run_OptionsReplacedWithoutChangingTheProperty_EmitsNothingAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         // What the IDE does when any other property or an .editorconfig changes: new options, the same value.
-        var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null)), compilation);
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, null)),
+            compilation
+        );
 
         AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.ProjectDialect).ShouldBe([IncrementalStepRunReason.Unchanged]);
@@ -308,10 +312,12 @@ public sealed class CachingTests
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var users = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1; # c\n");
         var orderDialect = new Dictionary<string, string> { [_orders.Path] = "mssql" };
-        var driver = FirstRun(compilation, users, new TestOptionsProvider(null, null, orderDialect));
+        var driver = FirstRun(compilation, users, new TestOptionsProvider(OutputKind.Sql, null, null, orderDialect));
 
         var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null, "mysql", orderDialect)),
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(OutputKind.Sql, null, "mysql", orderDialect)
+            ),
             compilation
         );
 
@@ -360,12 +366,22 @@ public sealed class CachingTests
         var driver = FirstRun(
             compilation,
             users,
-            new TestOptionsProvider(null, null, new Dictionary<string, string> { [_users.Path] = "mssql" })
+            new TestOptionsProvider(
+                OutputKind.Sql,
+                null,
+                null,
+                new Dictionary<string, string> { [_users.Path] = "mssql" }
+            )
         );
 
         var result = Run(
             driver.WithUpdatedAnalyzerConfigOptions(
-                new TestOptionsProvider(null, null, new Dictionary<string, string> { [_users.Path] = "mysql" })
+                new TestOptionsProvider(
+                    OutputKind.Sql,
+                    null,
+                    null,
+                    new Dictionary<string, string> { [_users.Path] = "mysql" }
+                )
             ),
             compilation
         );
@@ -405,10 +421,10 @@ public sealed class CachingTests
     public void Run_DialectChangedToOneThatReadsTheFilesTheSameWay_EmitsNothingAgain()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null, "postgres")),
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, null, "postgres")),
             compilation
         );
 
@@ -437,10 +453,10 @@ public sealed class CachingTests
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var users = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1; -- c\n");
-        var driver = FirstRun(compilation, users);
+        var driver = FirstRun(compilation, users, new TestOptionsProvider(OutputKind.Sql, null));
 
         var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider("keep-comments")),
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, "keep-comments")),
             compilation
         );
 
@@ -474,9 +490,12 @@ public sealed class CachingTests
     public void Run_PropertyGainsAParameterThatIsNotKeepComments_ParsesNoFile()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
-        var result = Run(driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider("sort-input")), compilation);
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(OutputKind.Sql, "sort-input")),
+            compilation
+        );
 
         AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
 
@@ -501,14 +520,16 @@ public sealed class CachingTests
     public void Run_MetadataOfOneFileGainsAParameter_ParsesNoFileAndEmitsOnlyItsType()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
         var metadata = new Dictionary<string, IReadOnlyDictionary<string, string>>
         {
             [_users.Path] = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "sort-input" },
         };
 
         var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null, fileMetadata: metadata)),
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(OutputKind.Sql, null, fileMetadata: metadata)
+            ),
             compilation
         );
 
@@ -545,7 +566,7 @@ public sealed class CachingTests
     public void Run_AttributeGainsKeepComments_ParsesOnlyTheFilesOfThatType()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         var result = Run(driver, WithParametersOnUserQueries(compilation, "keep-comments"));
 
@@ -571,7 +592,7 @@ public sealed class CachingTests
     public void Run_AttributeGainsAParameterThatIsNotKeepComments_ParsesNoFileAndEmitsOnlyItsType()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
-        var driver = FirstRun(compilation);
+        var driver = FirstRun(OutputKind.Sql, compilation);
 
         var result = Run(driver, WithParametersOnUserQueries(compilation, "sort-input"));
 
@@ -606,14 +627,16 @@ public sealed class CachingTests
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var users = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\nSELECT 1; -- c\n");
-        var driver = FirstRun(compilation, users);
+        var driver = FirstRun(compilation, users, new TestOptionsProvider(OutputKind.Sql, null));
         var metadata = new Dictionary<string, IReadOnlyDictionary<string, string>>
         {
             [_users.Path] = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments" },
         };
 
         var result = Run(
-            driver.WithUpdatedAnalyzerConfigOptions(new TestOptionsProvider(null, fileMetadata: metadata)),
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(OutputKind.Sql, null, fileMetadata: metadata)
+            ),
             compilation
         );
 
@@ -651,13 +674,10 @@ public sealed class CachingTests
             .ShouldContain("SELECT 1; -- c");
     }
 
-    private GeneratorDriver FirstRun(Compilation compilation) => FirstRun(compilation, _users);
+    private GeneratorDriver FirstRun(OutputKind? output, Compilation compilation) =>
+        FirstRun(compilation, _users, new TestOptionsProvider(output, null));
 
-    private GeneratorDriver FirstRun(
-        Compilation compilation,
-        InMemoryAdditionalText users,
-        TestOptionsProvider? options = null
-    )
+    private GeneratorDriver FirstRun(Compilation compilation, InMemoryAdditionalText users, TestOptionsProvider options)
     {
         var driver = GeneratorHarness
             .CreateDriver([users, _orders], options: options)

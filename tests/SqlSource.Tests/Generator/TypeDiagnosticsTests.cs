@@ -4,6 +4,7 @@ using System;
 using System.Linq;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
+using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -20,6 +21,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_TypeThatIsNotPartial_IsAnErrorAtItsName()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -41,6 +43,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_ContainingTypesThatAreNotPartial_AreEachAnError()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -72,6 +75,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_FileLocalType_IsAnErrorAtItsName()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -93,6 +97,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_TypeNestedInAFileLocalType_IsAnErrorAtTheFileLocalType()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -116,6 +121,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_ProjectThatTargetsAFrameworkOlderThanNet8_IsAnErrorAtEachAttribute()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [
                 new SourceFile(
                     GeneratorHarness.SourcePath,
@@ -156,6 +162,7 @@ public sealed class TypeDiagnosticsTests
     )
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [
                 new SourceFile(
                     GeneratorHarness.SourcePath,
@@ -194,6 +201,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_ProjectOnAnOlderFrameworkAndLanguageVersion_ReportsTheFrameworkOnly()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [
                 new SourceFile(
                     GeneratorHarness.SourcePath,
@@ -225,6 +233,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_PathThatMatchesNothing_IsAnErrorAtTheAttribute(string path)
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             $$"""
             using SqlSource;
             namespace App;
@@ -249,6 +258,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_NoPathAndNoSqlFileInTheFolder_IsAnErrorAtTheAttribute()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -273,6 +283,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_SqlLocationThatIsNotDefined_IsAnErrorAtTheAttribute(string location, string value)
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             $$"""
             using SqlSource;
             namespace App;
@@ -298,6 +309,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_NestedLocationAndAMemberNamedSql_IsAnErrorAtTheAttribute(string member)
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             $$"""
             using SqlSource;
             namespace App;
@@ -329,6 +341,7 @@ public sealed class TypeDiagnosticsTests
     {
         // A nested class cannot have the name of the type that contains it, or of one of its type parameters.
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             $$"""
             using SqlSource;
             namespace App;
@@ -350,6 +363,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_DirectLocationAndATypeNamedSql_IsAllowed()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -368,6 +382,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_DirectLocationAndAMemberNamedSql_IsAllowed()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -391,6 +406,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_AttributeWithSeveralValuesThatAreNotValid_ReportsThemInTheOrderTheyAreRead()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -431,6 +447,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_TypeWithSeveralProblems_ReportsThemAll()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -456,6 +473,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_TypeWithAProblem_StillReportsTheErrorsOfItsSqlFiles()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;
@@ -476,6 +494,7 @@ public sealed class TypeDiagnosticsTests
     public void Run_AttributeOnAnInterfaceOrAnEnum_IsLeftToTheCompiler()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             """
             using SqlSource;
             namespace App;

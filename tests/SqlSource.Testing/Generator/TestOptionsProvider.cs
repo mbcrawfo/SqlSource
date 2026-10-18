@@ -1,7 +1,9 @@
+using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Testing.Generator;
 
@@ -9,9 +11,13 @@ namespace SqlSource.Testing.Generator;
 // .sql file by the file's path.  A null value is a project that does not set the property, and a path that is not
 // listed is a file without metadata.  A property or a metadata is named as MSBuild names it: SqlSourceOutput.
 //
+// The output is the project's SqlSourceOutput, and every test that builds a provider states it: a null output is a
+// project that does not set it, for a test of the default.  An entry of the same name in the properties wins.
+//
 // The keys are spelled out here, not taken from the generator, so that a change to the generator's spelling fails a
 // test.
 internal sealed class TestOptionsProvider(
+    OutputKind? output,
     string? generatorParameters,
     string? dialect = null,
     IReadOnlyDictionary<string, string>? fileDialects = null,
@@ -26,7 +32,7 @@ internal sealed class TestOptionsProvider(
     private static readonly Options None = new([]);
 
     public override AnalyzerConfigOptions GlobalOptions { get; } =
-        CreateGlobal(generatorParameters, dialect, properties);
+        CreateGlobal(output, generatorParameters, dialect, properties);
 
     public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => None;
 
@@ -50,6 +56,7 @@ internal sealed class TestOptionsProvider(
     }
 
     private static Options CreateGlobal(
+        OutputKind? output,
         string? generatorParameters,
         string? dialect,
         IReadOnlyDictionary<string, string?>? properties
@@ -59,6 +66,7 @@ internal sealed class TestOptionsProvider(
         {
             [PropertyPrefix + "SqlSourceGeneratorParameters"] = generatorParameters,
             [PropertyPrefix + "SqlSourceDialect"] = dialect,
+            [PropertyPrefix + "SqlSourceOutput"] = Spell(output),
         };
         foreach (var pair in properties ?? new Dictionary<string, string?>())
         {
@@ -67,6 +75,17 @@ internal sealed class TestOptionsProvider(
 
         return new Options(values);
     }
+
+    // Spelled out, as the keys are, so that a change to the generator's spelling fails a test.
+    private static string? Spell(OutputKind? output) =>
+        output switch
+        {
+            OutputKind.Sql => "Sql",
+            OutputKind.Models => "Models",
+            OutputKind.CodeGen => "CodeGen",
+            null => null,
+            _ => throw new ArgumentOutOfRangeException(nameof(output), output, null),
+        };
 
     private sealed class Options(Dictionary<string, string?> values) : AnalyzerConfigOptions
     {

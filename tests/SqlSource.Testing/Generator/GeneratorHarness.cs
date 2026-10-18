@@ -12,6 +12,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Shouldly;
 using Xunit;
+using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Testing.Generator;
 
@@ -43,10 +44,12 @@ internal static class GeneratorHarness
         new LoadedAssembly()
     ).GetAnalyzers(LanguageNames.CSharp);
 
-    public static GeneratorRun Run(string source, params SqlFile[] sqlFiles) =>
-        Run([new SourceFile(SourcePath, source)], sqlFiles);
+    // Every run states its output, the project's SqlSourceOutput: null leaves it unset, for a test of the default.
+    public static GeneratorRun Run(OutputKind? output, string source, params SqlFile[] sqlFiles) =>
+        Run(output, [new SourceFile(SourcePath, source)], sqlFiles);
 
     public static GeneratorRun Run(
+        OutputKind? output,
         SourceFile[] sources,
         SqlFile[] sqlFiles,
         bool supportedFramework = true,
@@ -60,13 +63,14 @@ internal static class GeneratorHarness
         var parseOptions = ParseOptions.WithLanguageVersion(languageVersion);
         var compilation = CreateCompilation(sources, supportedFramework, parseOptions, references);
         var options = new TestOptionsProvider(
+            output,
             generatorParameters,
             dialect,
             sqlFiles.Where(file => file.Dialect is not null).ToDictionary(file => file.Path, file => file.Dialect!),
             properties,
             sqlFiles.Where(file => file.Metadata is not null).ToDictionary(file => file.Path, file => file.Metadata!)
         );
-        var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), parseOptions, options)
+        var driver = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), options, parseOptions)
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,
@@ -116,30 +120,30 @@ internal static class GeneratorHarness
                 )
             ),
             (supportedFramework ? RuntimeReferences : []).Concat(references ?? []),
-            new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary)
+            new CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary)
         );
 
-    // Step tracking is on, so that a test can read why each step of the pipeline ran.  Without options the project
-    // sets none of the package's properties and no file has metadata.
+    // Step tracking is on, so that a test can read why each step of the pipeline ran.  The options are what MSBuild
+    // tells the generator, the output among them.
     public static GeneratorDriver CreateDriver(
         IEnumerable<AdditionalText> sqlFiles,
-        CSharpParseOptions? parseOptions = null,
-        TestOptionsProvider? options = null
+        TestOptionsProvider options,
+        CSharpParseOptions? parseOptions = null
     ) =>
         CSharpGeneratorDriver.Create(
             [new SqlSourceGenerator().AsSourceGenerator()],
             sqlFiles,
             parseOptions ?? ParseOptions,
-            options ?? new TestOptionsProvider(null),
+            options,
             new GeneratorDriverOptions(IncrementalGeneratorOutputKind.None, trackIncrementalGeneratorSteps: true)
         );
 
     // Another assembly that the generator ran on too, compiled and ready to reference.  With InternalsVisibleTo for
     // "TestAssembly" in its source, it is what a test project sees of the project it tests.
-    public static MetadataReference CreateReference(string assemblyName, string source)
+    public static MetadataReference CreateReference(OutputKind? output, string assemblyName, string source)
     {
         var compilation = CreateCompilation([new SourceFile("/other/Other.cs", source)], assemblyName: assemblyName);
-        _ = CreateDriver([])
+        _ = CreateDriver([], new TestOptionsProvider(output, null))
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,
@@ -156,6 +160,7 @@ internal static class GeneratorHarness
     // reports them: after the analyzers that the package brings have run.  Without them it is what the compiler
     // reports on its own.
     public static async Task<IReadOnlyList<string>> BuildAsync(
+        OutputKind? output,
         string source,
         SqlFile[] sqlFiles,
         MetadataReference[] references,
@@ -171,7 +176,7 @@ internal static class GeneratorHarness
             );
         }
 
-        _ = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()))
+        _ = CreateDriver(sqlFiles.Select(file => file.ToAdditionalText()), new TestOptionsProvider(output, null))
             .RunGeneratorsAndUpdateCompilation(
                 compilation,
                 out var updated,

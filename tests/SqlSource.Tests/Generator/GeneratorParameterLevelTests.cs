@@ -2,6 +2,7 @@
 
 using System.Collections.Generic;
 using Shouldly;
+using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using Xunit;
 
@@ -58,6 +59,7 @@ public sealed class GeneratorParameterLevelTests
         );
 
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
             [file],
             generatorParameters: property
@@ -103,6 +105,7 @@ public sealed class GeneratorParameterLevelTests
             """;
 
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Q.sql", "-- name: Q\nSELECT 1 /* {{note}} */ FROM t;\n")
         );
@@ -116,7 +119,7 @@ public sealed class GeneratorParameterLevelTests
     [Fact]
     public void Run_PropertyWithAWordThatIsNoParameter_IsAnErrorWithoutAPositionAndTheOthersApply()
     {
-        var run = Run("keep-comments nope token-validation", null);
+        var run = Run(OutputKind.Sql, "keep-comments nope token-validation", null);
 
         run.Diagnostics.ShouldBe([
             "SQLSRC014 (1,1)-(1,1): 'nope' is not a valid value of SqlSourceGeneratorParameters",
@@ -131,6 +134,7 @@ public sealed class GeneratorParameterLevelTests
     public void Run_MetadataWithAWordThatIsNoParameter_IsAnErrorWithoutAPositionAndTheOthersApply()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [
                 new SqlFile(
@@ -154,6 +158,7 @@ public sealed class GeneratorParameterLevelTests
         var metadata = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "nope" };
 
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [
                 new SqlFile("/app/Repo/A.sql", "SELECT 1;\n", Metadata: metadata),
@@ -172,6 +177,7 @@ public sealed class GeneratorParameterLevelTests
     public void Run_InvalidMetadataOfAFileThatNoTypeClaims_IsNotReported()
     {
         var run = GeneratorHarness.Run(
+            OutputKind.Sql,
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [
                 new SqlFile("/app/Repo/A.sql", "SELECT 1;\n"),
@@ -189,7 +195,7 @@ public sealed class GeneratorParameterLevelTests
     [Fact]
     public void Run_DefaultBesideAnotherWordInTheProperty_IsReportedWholeAndGivesNoList()
     {
-        var run = Run("default keep-comments", null);
+        var run = Run(OutputKind.Sql, "default keep-comments", null);
 
         run.Diagnostics.ShouldBe([
             "SQLSRC014 (1,1)-(1,1): 'default keep-comments' is not a valid value of SqlSourceGeneratorParameters",
@@ -200,7 +206,7 @@ public sealed class GeneratorParameterLevelTests
     [Fact]
     public void Run_AttributeWithAWordThatIsNoParameter_IsAnErrorAtTheAttribute()
     {
-        var run = Run(null, "keep-comments nope");
+        var run = Run(OutputKind.Sql, null, "keep-comments nope");
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldBe("SQLSRC006 /app/Repo/Sample.cs(5,2)-(5,88): 'nope' is not a valid value of Parameters");
@@ -211,7 +217,7 @@ public sealed class GeneratorParameterLevelTests
     [InlineData("   ")]
     public void Run_AttributeParametersWithoutText_IsNotSet(string value)
     {
-        var run = Run("keep-comments", value);
+        var run = Run(OutputKind.Sql, "keep-comments", value);
 
         run.Diagnostics.ShouldBeEmpty();
         run.Sources["App.Sample.g.cs"].ShouldContain("-- kept");
@@ -222,8 +228,9 @@ public sealed class GeneratorParameterLevelTests
         + (attribute is null ? string.Empty : ", Parameters = \"" + attribute + "\"")
         + ")]\npublic partial class Sample;\n";
 
-    private static GeneratorRun Run(string? property, string? attribute) =>
+    private static GeneratorRun Run(OutputKind? output, string? property, string? attribute) =>
         GeneratorHarness.Run(
+            output,
             [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
             [new SqlFile("/app/Repo/Users.sql", "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n")],
             generatorParameters: property
