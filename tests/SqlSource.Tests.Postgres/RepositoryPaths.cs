@@ -23,4 +23,14 @@ internal static class RepositoryPaths
     public static string RealisticSeed { get; } = Path.Combine(Realistic, "seed.sql");
 
     public static string RealisticCases { get; } = Path.Combine(Realistic, "Cases");
+
+    // The databases "app" and "billing" of the end-to-end tests, from EndToEndFiles, which the Npgsql 8 project shares.
+    public static string EndToEnd => EndToEndFiles.Folder;
+
+    public static string EndToEndProject { get; } =
+        Path.Combine(Root, "tests", "SqlSource.Tests.Postgres", "SqlSource.Tests.Postgres.csproj");
+
+    public static string EndToEndSchema(string database) => EndToEndFiles.Schema(database);
+
+    public static string EndToEndSeed(string database) => EndToEndFiles.Seed(database);
 }

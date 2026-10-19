@@ -1,6 +1,6 @@
 # Tests
 
-SqlSource has four test projects and two libraries that they share.  `dotnet test --solution SqlSource.slnx` runs every test project, and [`CONTRIBUTING.md`](../CONTRIBUTING.md) has the commands to build and test.  `tests/SqlSource.Tests.Postgres` needs Docker running.
+SqlSource has five test projects and two libraries that they share.  `dotnet test --solution SqlSource.slnx` runs every test project, and [`CONTRIBUTING.md`](../CONTRIBUTING.md) has the commands to build and test.  `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8` need Docker running.
 
 ## The projects
 
@@ -11,17 +11,18 @@ The test projects:
 | `tests/SqlSource.Tests` | A current version | No | Every test of the generator |
 | `tests/SqlSource.Tests.RoslynFloor` | 4.8.0, the oldest supported | No | The generator driver tests: the files of `tests/SqlSource.Tests/Generator/`, compiled a second time |
 | `tests/SqlSource.Tool.Tests` | A current version | No | The tests of the tool, which run the whole command in process with their own output, working directory and environment |
-| `tests/SqlSource.Tests.Postgres` | A current version | Yes | The PostgreSQL describer and the `describe` command against a real server, which Testcontainers starts |
+| `tests/SqlSource.Tests.Postgres` | A current version | Yes | The PostgreSQL describer and the `describe` command against a real server, which Testcontainers starts, and the end-to-end project: the generator over its own queries, `--check`, and every query read into its models, through Dapper but for one read by ordinal |
+| `tests/SqlSource.Tests.Postgres.Npgsql8` | 4.8.0, from `tests/SqlSource.Testing` | Yes | The read of `all_types` through Dapper on Npgsql 8.0.9, the oldest supported driver |
 
-`TerminationTests` of `tests/SqlSource.Tool.Tests` alone starts the tool that was built in a process of its own: to send it a signal, where the system has signals, and to close its console on Windows, which only `nightly.yml` runs.  `tests/SqlSource.Tests.Postgres` is the one project that `nightly.yml` leaves out, since the runners cannot start its container.  Its procedures are in [`SqlSource.Tests.Postgres/README.md`](SqlSource.Tests.Postgres/README.md): Docker and the image, the describer's fixtures and the realistic corpus.
+`TerminationTests` of `tests/SqlSource.Tool.Tests` alone starts the tool that was built in a process of its own: to send it a signal, where the system has signals, and to close its console on Windows, which only `nightly.yml` runs.  `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8` are the projects that `nightly.yml` leaves out, since the runners cannot start their containers.  The procedures of the first are in [`SqlSource.Tests.Postgres/README.md`](SqlSource.Tests.Postgres/README.md): Docker and the image, the describer's fixtures, the realistic corpus and the end-to-end project.
 
-A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both of those projects; [`SqlSource.Tests/Generator/AGENTS.md`](SqlSource.Tests/Generator/AGENTS.md) says what that asks of it, and why that folder is the only code a test project compiles of another.
+A test in `tests/SqlSource.Tests/Generator/` must compile and pass in both `tests/SqlSource.Tests` and `tests/SqlSource.Tests.RoslynFloor`; [`SqlSource.Tests/Generator/AGENTS.md`](SqlSource.Tests/Generator/AGENTS.md) says what that asks of it, and why that folder is the only code a test project compiles of another.
 
 The libraries are never run as tests, hold no tests and are never packed:
 
 | Project | Roslyn | Holds |
 |----|----|----|
-| `tests/SqlSource.Testing` | 4.8.0, since RoslynFloor references it | The harness of the generator's driver tests (`Generator/`, with `Sidecars`, which hands the generator a sidecar, `StepOutputs`, which reads what a step gave, and `NpgsqlReferences`, the drivers the probe of Npgsql is tested against), `TestSidecars` (`Snapshot/`) and `RepositoryRoot`.  It downloads Npgsql 8.0.3, 9.0.3 and 10.0.3 with `PackageDownload`, and `NpgsqlReferences` reads their metadata from the NuGet folder, `NuGetPackageRoot`, without loading them, so a restore needs to reach the package source or find them in the NuGet cache |
+| `tests/SqlSource.Testing` | 4.8.0, since RoslynFloor references it | The harness of the generator's driver tests (`Generator/`, with `Sidecars`, which hands the generator a sidecar, `StepOutputs`, which reads what a step gave, and `NpgsqlReferences`, the drivers the probe of Npgsql is tested against), `TestSidecars` (`Snapshot/`), `RepositoryRoot`, `EndToEndFiles`, the schema and seed of each end-to-end database, and `AllTypesRows` (`EndToEnd/`), the expectations of the rows of `all_types` for both PostgreSQL projects, which compares the values of `NpgsqlTypes` without a reference to Npgsql, since the two run different versions of it.  It downloads Npgsql 8.0.3, 9.0.3 and 10.0.3 with `PackageDownload`, and `NpgsqlReferences` reads their metadata from the NuGet folder, `NuGetPackageRoot`, without loading them, so a restore needs to reach the package source or find them in the NuGet cache |
 | `tests/SqlSource.Tool.Testing` | A current version, the tool's | The helpers that the tool's tests and the PostgreSQL tests share |
 
 `tests/SqlSource.Tool.Testing` holds:
@@ -55,6 +56,7 @@ graph TD
     Floor["tests/SqlSource.Tests.RoslynFloor"]
     ToolTests["tests/SqlSource.Tool.Tests"]
     Postgres["tests/SqlSource.Tests.Postgres"]
+    Npgsql8["tests/SqlSource.Tests.Postgres.Npgsql8"]
     Testing["tests/SqlSource.Testing"]
     ToolTesting["tests/SqlSource.Tool.Testing"]
 
@@ -69,6 +71,8 @@ graph TD
     Postgres --> Generator
     Postgres --> Testing
     Postgres --> ToolTesting
+    Npgsql8 --> Generator
+    Npgsql8 --> Testing
     Testing --> Generator
     ToolTesting --> Generator
     ToolTesting --> Tool
@@ -79,9 +83,14 @@ What each test project takes from the libraries:
 
 - `tests/SqlSource.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, and `tests/SqlSource.Tests.RoslynFloor` references it for the same.
 - `tests/SqlSource.Tool.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, which `GeneratorParityTests` runs with the tool over the same sources, and `tests/SqlSource.Tool.Testing` for the helpers it shares with `tests/SqlSource.Tests.Postgres`.
-- `tests/SqlSource.Tests.Postgres` references `tests/SqlSource.Testing` for `RepositoryRoot`, and `tests/SqlSource.Tool.Testing` for the fixture harness, the command harness of the tool's tests, `CliRun` and what it needs, `Programs` and `FixtureProjects`.
+- `tests/SqlSource.Tests.Postgres` references `tests/SqlSource.Testing` for `RepositoryRoot`, `EndToEndFiles` and `AllTypesRows`, and `tests/SqlSource.Tool.Testing` for the fixture harness, the command harness of the tool's tests, `CliRun` and what it needs, `Programs` and `FixtureProjects`.
+- `tests/SqlSource.Tests.Postgres.Npgsql8` references `tests/SqlSource.Testing` for `RepositoryRoot`, `EndToEndFiles` and `AllTypesRows`, and nothing that brings Npgsql 10.
 
-`tests/SqlSource.Tests` also uses the generator the way a consumer does.  The types in `EndToEnd/` are compiled with the generator loaded, and the project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  It gets them by path and the generator through a project reference.  [`tools/check-package-install.sh`](../tools/README.md#check-package-installsh) is what installs the packed package.
+`tests/SqlSource.Tests`, `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8` also use the generator the way a consumer does.  Their attributed types, in the `EndToEnd/` of the first two and at the root of the third, are compiled with the generator loaded, and each project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  Each gets them by path and the generator through a project reference.  [`tools/check-package-install.sh`](../tools/README.md#check-package-installsh) is what installs the packed package.
+
+## The Npgsql 8 project
+
+`tests/SqlSource.Tests.Postgres.Npgsql8` runs the read of `all_types` on Npgsql 8, the oldest driver that is supported, since the type map gives other C# types under it.  It is a project of its own because `tests/SqlSource.Tests.Postgres` cannot run on Npgsql 8: that project references the tool, which brings Npgsql 10, and a reference to 8 under it is a package downgrade.  So this one references the generator and `tests/SqlSource.Testing` alone, and pins Npgsql to 8.0.9 with `VersionOverride`.  It links `AllTypes.sql` and its sidecar from `tests/SqlSource.Tests.Postgres/EndToEnd/Queries/`, so the generator builds the models that it gives under Npgsql 8, and reads both rows of `all_types` into them through Dapper, with the expectations of `AllTypesRows`.  Its container, `AppContainer`, applies the schema and the seed of `app` on the default image, which it reads from the line of `PostgresContainer.cs` that declares `DefaultImage`, and ignores `SQLSOURCE_TESTS_POSTGRES_IMAGE`.  It has no `--check`: the end-to-end project checks the sidecar it reads.
 
 ## Fixture projects
 
@@ -89,6 +98,6 @@ What each test project takes from the libraries:
 
 MSBuild reads the environment for its properties, and the workflow has a variable named `CONFIGURATION`, so in CI a fixture is evaluated as `Release`.  A test of a fixture expects no `Debug`, in a constant or in a path.
 
-A fixture project is no part of the solution, so nothing builds or restores it, and a test leaves nothing in the repository.  A file under that folder is copied to the test project's output as it is.  `FixtureProjects` of `tests/SqlSource.Tool.Testing` copies a fixture out of the repository for a test; [the PostgreSQL tests' readme](SqlSource.Tests.Postgres/README.md#running) says how that project gets `Single`.
+A fixture project is no part of the solution, so nothing builds or restores it, and a test leaves nothing in the repository.  A file under that folder is copied to the test project's output as it is.  `FixtureProjects` of `tests/SqlSource.Tool.Testing` copies a fixture out of the repository for a test; [the PostgreSQL tests' readme](SqlSource.Tests.Postgres/README.md#running) says how that project gets `Single`, and `ErrorPaths`, a fixture of its own in `tests/SqlSource.Tests.Postgres/EndToEnd/ErrorPaths/`, which it copies to the same place in its output.
 
 To add a fixture project, add a folder to `tests/SqlSource.Tool.Tests/Fixtures/Projects/` with an `App.csproj` that imports `../build/SqlSource.props` and `../build/SqlSource.targets`.

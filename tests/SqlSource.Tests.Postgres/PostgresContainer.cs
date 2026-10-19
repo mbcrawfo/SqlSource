@@ -15,9 +15,10 @@ namespace SqlSource.Tests.Postgres;
 // the process is killed.
 public sealed class PostgresContainer : IAsyncLifetime
 {
-    // The one place that names the image.  tools/record-fixtures.sh and tools/record-realistic.sh read it from this
-    // line, by its shape.  It names a major and a minor, as every image of the tests does: the recorded fixtures
-    // carry the version they were recorded against, and a moving tag would run another.
+    // The one place that names the image.  tools/record-fixtures.sh, tools/record-realistic.sh,
+    // tools/describe-end-to-end.sh and AppContainer of tests/SqlSource.Tests.Postgres.Npgsql8 read it from this line,
+    // by its shape.  It names a major and a minor, as every image of the tests does: the recorded fixtures carry the
+    // version they were recorded against, and a moving tag would run another.
     // See tests/SqlSource.Tests.Postgres/README.md.
     public const string DefaultImage = "postgres:18.6";
 
@@ -29,6 +30,13 @@ public sealed class PostgresContainer : IAsyncLifetime
     // The second database, for the corpus of realistic queries: its own schema and seed, so that the fixture schema
     // and the rows that tests count in it stay as they are.
     public const string RealisticDatabase = "realistic";
+
+    // The databases of the end-to-end tests, in the folders of tests/SqlSource.Tests.Postgres/EndToEnd/ that bear their
+    // names: "app" holds the tables that the queries read and every type of the type map, "billing" a second database
+    // for a query that names its own.
+    public const string AppDatabase = "app";
+
+    public const string BillingDatabase = "billing";
 
     // Why a test of old and new in RETURNING skips before PostgreSQL 18.
     public const string NoOldAndNewInReturning = "PostgreSQL before 18 has no old and new in RETURNING.";
@@ -48,12 +56,19 @@ public sealed class PostgresContainer : IAsyncLifetime
     // The tag of an image, which for a pinned image is the server's version: "postgres:18.6" is "18.6".
     public static string TagOf(string image) => image[(image.LastIndexOf(':') + 1)..];
 
+    // The databases that the end-to-end tests are described and run against, each built from its folder of
+    // tests/SqlSource.Tests.Postgres/EndToEnd/.
+    public static IReadOnlyList<string> EndToEndDatabases { get; } = [AppDatabase, BillingDatabase];
+
     // Of the database "fixtures".
     public string ConnectionString => _container.GetConnectionString();
 
     // Of the database "realistic".
-    public string RealisticConnectionString =>
-        new NpgsqlConnectionStringBuilder(ConnectionString) { Database = RealisticDatabase }.ConnectionString;
+    public string RealisticConnectionString => ConnectionStringOf(RealisticDatabase);
+
+    // Of the named database of the container.
+    public string ConnectionStringOf(string database) =>
+        new NpgsqlConnectionStringBuilder(ConnectionString) { Database = database }.ConnectionString;
 
     // Runs one statement of the test's own on the database "fixtures".
     public async Task ExecuteAsync(string sql)
@@ -114,6 +129,29 @@ public sealed class PostgresContainer : IAsyncLifetime
             {
                 await using var script = realistic.CreateCommand(await File.ReadAllTextAsync(path, token));
                 _ = await script.ExecuteNonQueryAsync(token);
+            }
+
+            // The databases of the end-to-end tests: each is created, then built from its schema and its seed, in the
+            // order that tools/describe-end-to-end.sh applies them.
+            foreach (var database in EndToEndDatabases)
+            {
+                await using (var create = source.CreateCommand($"CREATE DATABASE {database}"))
+                {
+                    _ = await create.ExecuteNonQueryAsync(token);
+                }
+
+                await using var endToEnd = NpgsqlDataSource.Create(ConnectionStringOf(database));
+                foreach (
+                    var path in new[]
+                    {
+                        RepositoryPaths.EndToEndSchema(database),
+                        RepositoryPaths.EndToEndSeed(database),
+                    }
+                )
+                {
+                    await using var script = endToEnd.CreateCommand(await File.ReadAllTextAsync(path, token));
+                    _ = await script.ExecuteNonQueryAsync(token);
+                }
             }
 
             await using var opened = await source.OpenConnectionAsync(token);

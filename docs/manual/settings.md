@@ -291,7 +291,7 @@ The shape of the [model](generator.md#models) generated for a query's parameters
 - It stands in the file header and inside a query, as two markers.  It can also be item metadata, an MSBuild property, or a property of the attribute: `InputModelType = GeneratorModelType.Class`.
 - Two queries that share a model must give it one shape, or the later is [SQLSRC257](diagnostics.md#sqlsrc257).
 
-What each shape looks like is on [the generator page](generator.md#model-shape).  To read rows into sorted models through Dapper, make them classes: see [the recipe](recipes.md#models-through-dapper).
+What each shape looks like is on [the generator page](generator.md#model-shape).  To read rows through Dapper into sorted models, or into a model with an array column, make them classes: see [the recipe](recipes.md#models-through-dapper).
 
 <a id="setting-model-name"></a>
 

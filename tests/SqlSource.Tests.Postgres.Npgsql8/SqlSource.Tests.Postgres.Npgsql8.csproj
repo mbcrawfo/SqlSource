@@ -1,0 +1,50 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The end-to-end read of all_types on Npgsql 8.0.9, the oldest driver that is supported.  A project of its own,
+        since the end-to-end project gets Npgsql 10 through the tool it references.  The generator comes from a project
+        reference, which does not bring the package's MSBuild files, so the real ones are imported here and at the end
+        of this file.
+    -->
+    <Import Project="../../src/SqlSource/build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <OutputType>Exe</OutputType>
+        <IsPackable>false</IsPackable>
+        <!-- SQLSRC240 stays a warning: raising VersionPrefix warns until tools/describe-end-to-end.sh runs. -->
+        <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
+        <!-- The dialect of every query of the project. -->
+        <SqlSourceDialect>postgres</SqlSourceDialect>
+        <!-- What a query generates: its SQL and its models, which need an entry in the sidecar beside its file. -->
+        <SqlSourceOutput>Models</SqlSourceOutput>
+    </PropertyGroup>
+    <ItemGroup>
+        <!-- The query and the sidecar of the end-to-end project, kept at their own paths for the generator. -->
+        <AdditionalFiles
+            Include="../SqlSource.Tests.Postgres/EndToEnd/Queries/AllTypes.sql"
+            Link="Queries/%(Filename)%(Extension)"
+        />
+        <AdditionalFiles
+            Include="../SqlSource.Tests.Postgres/EndToEnd/Queries/AllTypes.sql.json"
+            Link="Queries/%(Filename)%(Extension)"
+        />
+    </ItemGroup>
+    <ItemGroup>
+        <PackageReference Include="Dapper" />
+        <PackageReference Include="GitHubActionsTestLogger" />
+        <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+        <!-- The latest 8.0 release, the floor's driver: the end-to-end project gets 10 from the tool it references. -->
+        <PackageReference Include="Npgsql" VersionOverride="8.0.9" />
+        <PackageReference Include="Shouldly" />
+        <PackageReference Include="Testcontainers.PostgreSql" />
+        <PackageReference Include="xunit.v3" />
+    </ItemGroup>
+    <ItemGroup>
+        <ProjectReference
+            Include="../../src/SqlSource/SqlSource.csproj"
+            OutputItemType="Analyzer"
+            ReferenceOutputAssembly="false"
+        />
+        <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
+    </ItemGroup>
+    <Import Project="../../src/SqlSource/build/SqlSource.targets" />
+</Project>
