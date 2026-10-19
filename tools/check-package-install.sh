@@ -2,6 +2,7 @@
 # Installs the SqlSource package into a project the way a consumer does, runs the project and checks what it prints.
 # Then asks the project what the sqlsource tool asks one: whether it uses SqlSource, and for its project manifest.
 # Then removes a .sql file the project uses and checks that the next build, an incremental one, fails for it.
+# Last, publishes a web project that references the package, and checks that no .sql file and no sidecar is copied.
 # The project is tools/package-install.  It is copied out of the repository first, so that nothing of the repository's
 # own build applies to it, and it restores from the folder that holds the package and from nowhere else.
 # Usage: check-package-install.sh [directory]   The directory holds one SqlSource.<version>.nupkg, and may hold the
@@ -177,6 +178,43 @@ if ! grep -q "error CS0117: .*$REMOVED_MEMBER" "$work/rebuild.log"; then
     exit 1
 fi
 
+# A sidecar is an input of the generator alone.  The Web SDK lists a .json file as Content, which it copies to the
+# output and publish folders, and the nesting group of build/SqlSource.targets says Never for it.  The project claims
+# no file, so the generator reads neither, and nothing else would copy a .sql file.
+web="$work/web"
+mkdir -p "$web/Queries"
+cp global.json nuget.config "$web/"
+cat >"$web/Web.csproj" <<EOF
+<Project Sdk="Microsoft.NET.Sdk.Web">
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <SqlSourceDialect>postgres</SqlSourceDialect>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="$PACKAGE_ID" Version="$version" PrivateAssets="all" />
+    </ItemGroup>
+</Project>
+EOF
+echo 'System.Console.WriteLine();' >"$web/Program.cs"
+echo 'SELECT 1 AS one;' >"$web/Queries/Users.sql"
+echo '{}' >"$web/Queries/Users.sql.json"
+
+dotnet publish "$web/Web.csproj" --output "$work/published" --nologo --verbosity quiet >"$work/publish.log" 2>&1 || {
+    cat "$work/publish.log" >&2
+    echo "check-package-install: a web project that references $package does not publish" >&2
+    exit 1
+}
+
+for folder in "$web/bin" "$work/published"; do
+    copied="$(find "$folder" -name '*.sql' -o -name '*.sql.json')"
+    if [[ -n "$copied" ]]; then
+        echo "$copied" >&2
+        echo "check-package-install: a web project that references $package copies its queries to $folder" >&2
+        exit 1
+    fi
+done
+
 echo "check-package-install: $package installs into a project, which builds and prints $FIXTURE/$EXPECTED,"
 echo "check-package-install: which has SqlSourceImported and writes its project manifest,"
-echo "check-package-install: and whose next build compiles again after a .sql file is removed"
+echo "check-package-install: and whose next build compiles again after a .sql file is removed,"
+echo "check-package-install: and into a web project, whose build and publish copy no .sql file and no sidecar"

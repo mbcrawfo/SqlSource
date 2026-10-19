@@ -147,17 +147,23 @@ public sealed partial class BuildFileTests
 
         // The item types an IDE may nest on: the SDK lists a sidecar under None, and the Web SDK under Content.  Update
         // changes the items that are already there and adds none, so a project without a sidecar is not given one.
+        // Content is never copied: the Web SDK copies it to the output and publish folders.  None is copied only when a
+        // project asks, as this one does for the examples of the sidecar format, and is left as the project has it.
         var nesting = outside[1];
         nesting.Attributes().ShouldBeEmpty();
         var items = nesting.Elements().ToList();
         items.Select(item => item.Name.LocalName).ShouldBe(["AdditionalFiles", "None", "Content"]);
+        var nested = new Dictionary<string, string> { ["Update"] = "**/*.sql.json", ["DependentUpon"] = "%(Filename)" };
+        var neverCopied = new Dictionary<string, string>(nested)
+        {
+            ["CopyToOutputDirectory"] = "Never",
+            ["CopyToPublishDirectory"] = "Never",
+        };
         foreach (var item in items)
         {
             item.Attributes()
                 .ToDictionary(attribute => attribute.Name.LocalName, attribute => attribute.Value)
-                .ShouldBe(
-                    new Dictionary<string, string> { ["Update"] = "**/*.sql.json", ["DependentUpon"] = "%(Filename)" }
-                );
+                .ShouldBe(item.Name.LocalName == "Content" ? neverCopied : nested);
             item.HasElements.ShouldBeFalse();
         }
     }
