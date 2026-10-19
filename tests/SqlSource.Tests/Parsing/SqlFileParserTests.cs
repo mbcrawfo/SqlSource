@@ -1504,8 +1504,30 @@ public sealed class SqlFileParserTests
                 CollectionType = CollectionKind.IReadOnlyList,
             }
         );
-        block.InputModelName.ShouldBe("FindArgs");
-        block.OutputModelName.ShouldBe("App.Shared.UserRow");
+        block.InputModel!.Name.ShouldBe("FindArgs");
+        block.OutputModel!.Name.ShouldBe("App.Shared.UserRow");
+    }
+
+    [Fact]
+    public void Parse_ModelMarkers_KeepTheirSpans()
+    {
+        const string Text = "-- name: Q\n-- input-model: FindArgs\n-- output-model: App.Shared.UserRow\nSELECT @a\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        block.InputModel.ShouldBe(new SqlModelName("FindArgs", SpanOf(Text, "-- input-model: FindArgs")));
+        block.OutputModel.ShouldBe(
+            new SqlModelName("App.Shared.UserRow", SpanOf(Text, "-- output-model: App.Shared.UserRow"))
+        );
+    }
+
+    [Fact]
+    public void Parse_QueryWithoutModelMarkers_HasNoModels()
+    {
+        var block = Blocks("-- name: Q\nSELECT @a\n").ShouldHaveSingleItem();
+
+        block.InputModel.ShouldBeNull();
+        block.OutputModel.ShouldBeNull();
     }
 
     [Theory]
@@ -1584,7 +1606,7 @@ public sealed class SqlFileParserTests
     public void Parse_InputModelOnAQueryWithADeclaredOnlyParameter_IsFine() =>
         Blocks("-- name: Q\n-- param: @page int\n-- input-model: FindArgs\nSELECT 1 {{f}}\n")
             .ShouldHaveSingleItem()
-            .InputModelName.ShouldBe("FindArgs");
+            .InputModel!.Name.ShouldBe("FindArgs");
 
     private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialectChoice dialect = default)
     {

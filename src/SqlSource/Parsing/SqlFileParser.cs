@@ -248,8 +248,8 @@ internal static class SqlFileParser
                     query.Tokens,
                     query.Parameters,
                     markers,
-                    scope?.InputModel?.Name,
-                    scope?.OutputModel
+                    ModelNameOf(scope?.InputModel),
+                    ModelNameOf(scope?.OutputModel)
                 )
             );
         }
@@ -431,6 +431,10 @@ internal static class SqlFileParser
 
             return -1;
         }
+
+        // The record is made only for a query that has the marker: the parser's allocation budget holds.
+        private static SqlModelName? ModelNameOf((string Name, SqlMarker Marker)? model) =>
+            model is { } found ? new SqlModelName(found.Name, found.Marker.Span) : null;
 
         private void AddError(SqlParseErrorKind kind, TextSpan span, params string[] arguments) =>
             _errors.Add(SqlParseError.Create(kind, span, arguments));

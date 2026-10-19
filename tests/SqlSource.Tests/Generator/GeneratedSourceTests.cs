@@ -1121,4 +1121,18 @@ public sealed class GeneratedSourceTests
         run.Sources["Sample.g.cs"].ShouldContain("public const string GetUser");
         run.CompilationErrors.ShouldHaveSingleItem().ShouldStartWith("CS0579 /app/Other/Sample.cs(1,2)");
     }
+
+    // CS8981 is reported from warning level 7 on, so it shows that the harness compiles at the highest level.
+    [Fact]
+    public void Run_GeneratedCode_IsCompiledAtTheHighestWarningLevel()
+    {
+        var compilation = GeneratorHarness.CreateCompilation([
+            new SourceFile("/app/Repo/Lowercase.cs", "internal class lowercase { }\n"),
+        ]);
+
+        compilation
+            .GetDiagnostics(TestContext.Current.CancellationToken)
+            .Select(diagnostic => diagnostic.Id)
+            .ShouldContain("CS8981");
+    }
 }

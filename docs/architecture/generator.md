@@ -266,6 +266,8 @@ A block is read by `SqlFileParser.Parser.ReadBlock` in three steps, in this orde
 
 Since errors are sorted by position with a stable sort, the order of the steps decides which of two errors at one place comes first.  A block without SQL builds no query, so no error that comes from the parameters is reported for it.
 
+The names that a query's `-- input-model:` and `-- output-model:` markers give stay with where each marker is: the block holds them as [`SqlModelName`](../../src/SqlSource/Parsing/SqlModelName.cs), the marker's name and its span, and [`SqlFileReader`](../../src/SqlSource/Generation/SqlFileReader.cs) turns each into a [`ModelMarker`](../../src/SqlSource/Generation/ModelMarker.cs) with a `LocationInfo`.  A query without the marker holds null, so the parser allocates a record only for a query that has one.
+
 ### The dialect marker
 
 [`SqlDialectMarker.Apply`](../../src/SqlSource/Parsing/SqlDialectMarker.cs) puts a file's dialect marker into effect before the rest of the text is lexed.  It reads the comments at the top of the file one at a time, with `SqlLexer.TryReadLeadingComment`, under the rules the lexer starts with.  At the first valid marker it switches the lexer's rules, which apply from the line after.  It stops at the first `-- name:` marker or the first thing that is not a comment, and returns where the header ends.

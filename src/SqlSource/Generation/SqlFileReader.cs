@@ -71,8 +71,8 @@ internal static class SqlFileReader
                     block.Tokens,
                     block.Parameters,
                     block.Markers,
-                    block.InputModelName,
-                    block.OutputModelName
+                    ModelMarkerOf(file.Path, text, block.InputModel),
+                    ModelMarkerOf(file.Path, text, block.OutputModel)
                 )
             );
         }
@@ -86,4 +86,7 @@ internal static class SqlFileReader
             invalidDialect
         );
     }
+
+    private static ModelMarker? ModelMarkerOf(string path, SourceText text, SqlModelName? model) =>
+        model is null ? null : new ModelMarker(model.Name, LocationInfo.From(path, text, model.Span));
 }

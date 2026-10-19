@@ -70,11 +70,15 @@ internal sealed class SqlMarkerScope(
         private set;
     }
 
-    /// <summary>The name a <c>-- input-model:</c> marker gives, with the first such marker, or null.</summary>
+    /// <summary>
+    /// The name an <c>-- input-model:</c> marker gives, with the first such marker, the marker in effect, or null.
+    /// </summary>
     public (string Name, SqlMarker Marker)? InputModel { get; private set; }
 
-    /// <summary>The name an <c>-- output-model:</c> marker gives, or null.</summary>
-    public string? OutputModel => _outputModel;
+    /// <summary>
+    /// The name an <c>-- output-model:</c> marker gives, with the first such marker, the marker in effect, or null.
+    /// </summary>
+    public (string Name, SqlMarker Marker)? OutputModel { get; private set; }
 
     /// <summary>The defaults the scope's <c>-- token:</c> markers give, in marker order, each name once.</summary>
     public IReadOnlyList<SqlTokenDefault> TokenDefaults => _tokenDefaults ?? (IReadOnlyList<SqlTokenDefault>)[];
@@ -176,6 +180,10 @@ internal sealed class SqlMarkerScope(
         else if (marker.Kind == SqlMarkerKind.OutputModel)
         {
             SetText(ref _outputModel, marker, SettingValue.IsQualifiedName(Value(marker)));
+            if (_outputModel is { } outputModel && OutputModel is null)
+            {
+                OutputModel = (outputModel, marker);
+            }
         }
     }
 
