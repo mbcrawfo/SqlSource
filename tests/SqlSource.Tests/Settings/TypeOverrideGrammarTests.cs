@@ -225,15 +225,19 @@ public sealed class TypeOverrideGrammarTests
         invalid.ShouldBe(["numeric", "=", "System.Double"]);
     }
 
-    [Fact]
-    public void ReadList_AngleBracketThatDoesNotClose_IsOneEntryThatIsNotValid()
+    // A bracket that does not close takes the rest of the value into its entry, so the entries after it are lost
+    // with it, and those before it apply.
+    [Theory]
+    [InlineData("int4=System.Collections.Generic.List<int int8=long text=string")]
+    [InlineData("int4=int[ int8=long text=string")]
+    public void ReadList_BracketThatDoesNotClose_SwallowsTheRestOfTheValue(string rest)
     {
         var invalid = new List<string>();
 
         TypeOverrideGrammar
-            .ReadList("int4=System.Collections.Generic.List<int int8=long", SettingPlace.Property, invalid)
-            .ShouldBeEmpty();
-        invalid.ShouldBe(["int4=System.Collections.Generic.List<int int8=long"]);
+            .ReadList("bool=bool " + rest, SettingPlace.Property, invalid)
+            .ShouldBe([new TypeOverride("bool", "bool", SettingPlace.Property)]);
+        invalid.ShouldBe([rest]);
     }
 
     [Fact]

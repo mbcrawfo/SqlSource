@@ -339,7 +339,7 @@ Correct the value, or remove it to keep the default.  While it is wrong the sett
 
 `SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceInputModelType` and `SqlSourceOutputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `SqlSourceCollectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `SqlSourceInputModelSuffix` and `SqlSourceOutputModelSuffix` take characters that can be part of an identifier, and `SqlSourceModelNamespace` takes a namespace such as `App.Models`.  `SqlSourceDatabase` takes one word of letters, digits, `-`, `_` and `.`.  The generator does not read it, so a build does not report it; the `sqlsource` tool does.  Where a type's methods go is set by the attribute alone, so there is no property for it.
 
-`SqlSourceTypeOverrides` takes entries `key=type`, separated by spaces or line breaks, and each entry that is not valid is reported on its own, while the others still apply:
+`SqlSourceTypeOverrides` takes entries `key=type`, separated by spaces or line breaks, and each entry that is not valid is reported on its own, while the others still apply.  A space or a line break inside `<>` or `[]` is part of the entry, so a `<` or a `[` that is never closed makes the rest of the value one entry, which is reported whole, and the entries after it do not apply:
 
 ```xml
 <PropertyGroup>
@@ -1577,12 +1577,12 @@ What to do depends on the type:
 
 - **`regclass`, `regproc`, `regprocedure`, `regoper`, `regoperator`, `regrole`, `regnamespace`, `regcollation` and `regdictionary`.**  Cast the column to `oid` in the query, `SELECT 'users'::regclass::oid AS relation`, which Npgsql reads as a `uint`.  Cast an array of one to `oid[]`, as the message says.
 - **A composite type, which includes a table's row type, and a base type of an extension that SqlSource does not know.**  Map it with the [type override](settings.md#setting-type-overrides) to the C# type that your application reads it as, `public.address=MyApp.Address` for a type that the data source maps, or select its fields as columns of their own.
-- **A range of a subtype that SqlSource does not know, and a multirange of one.**  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.
-- **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`, or cast the column to `text` in the query.
-- **`pg_snapshot`, `txid_snapshot` and `pg_node_tree`.**  Cast the column to `text` in the query.
+- **A range of a subtype that SqlSource does not know, and a multirange of one.**  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.  A project that does not reference Npgsql cannot name `NpgsqlTypes.NpgsqlRange<T>`, so the message tells it to reference Npgsql first.
+- **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`, or cast the column to `text` in the query, as the message says.
+- **`pg_snapshot`, `txid_snapshot`, `pg_node_tree`, and any other base type of `pg_catalog` that SqlSource does not know, such as `aclitem`.**  No version of Npgsql reads them, so a type override would build and fail when the query runs.  Cast the column to `text` in the query, and an array of one to `text[]`, as the message says.
 - **A parameter with no type, `record`, `unknown`, `void`, or a kind of type that this version of SqlSource does not know.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand or written by a newer tool.  Run `dotnet sqlsource describe`.
 
-The help of the message names the key of the type to map: its name for a type of `pg_catalog` and for a type of an extension that SqlSource knows, and its schema and name otherwise.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  The query's constant or method is still generated.
+When the message says to map the type, it names the key of the type with its schema: `public.address`, or `pg_catalog.pg_class` for the row type of a catalog table, since a key without a schema must be a type that SqlSource knows.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  The query's constant or method is still generated.
 
 See: [Types](postgresql.md#type-map)
 
@@ -1643,7 +1643,7 @@ See: [Which version of Npgsql](postgresql.md#which-npgsql)
 The type override maps a database type to a C# type that the project cannot find: no type of that name and number of type arguments is in the project or its references, or more than one reference has one that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry: the property `SqlSourceTypeOverrides`, the metadata of the file, a `-- type-override:` marker in the file header or one of the query.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC250: The type override maps 'uuid' to 'global::MyApp.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and no type of that name is found, or more than one reference has one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
+/work/App/Queries/Users.sql(1,10): error SQLSRC250: The type override maps 'uuid' to 'MyApp.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and no type of that name is found, or more than one reference has one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
 ```
 
 Write the type's full name, from its namespace, with its type arguments: `MyApp.Ids.UserKey`, or `System.Collections.Generic.List<int>`.  A nested type is written with a `.` before its name, as in C#: `MyApp.Outer.Inner`.  When two references have a type of the name that the project can see, map the database type to a type of the project's own, which is always chosen first.  The query's constant or method is still generated.
@@ -1657,7 +1657,7 @@ See: [Type overrides](settings.md#setting-type-overrides)
 The type override maps a database type to a C# type that the project cannot use: the type, or one of its type arguments, is `internal` in another assembly, or is a `private` or `protected` type nested in another, in the project itself or another assembly.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC251: The type override maps 'uuid' to 'global::Shared.UserKey' for column 'id', in a -- type-override: marker of the query, and this project cannot see that type.  Make it, and each type it is nested in, public, or internal when it is this project's own, or give this project its assembly's internals with InternalsVisibleTo.
+/work/App/Queries/Users.sql(1,10): error SQLSRC251: The type override maps 'uuid' to 'Shared.UserKey' for column 'id', in a -- type-override: marker of the query, and this project cannot see that type.  Make it, and each type it is nested in, public, or internal when it is this project's own, or give this project its assembly's internals with InternalsVisibleTo.
 ```
 
 Make the type, and each type it is nested in, `public`.  A type of the project itself can be `internal` instead.  For a type of another assembly, you can also add `[assembly: InternalsVisibleTo("YourProject")]` to the assembly that declares it, which lets the project see its `internal` types.  The query's constant or method is still generated.
@@ -1671,7 +1671,7 @@ See: [Type overrides](settings.md#setting-type-overrides)
 The type override maps a database type to a C# type that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC252: The type override maps 'int4' to 'global::System.Nullable<int>' for column 'id', in the metadata SqlSourceTypeOverrides of the file, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
+/work/App/Queries/Users.sql(1,10): error SQLSRC252: The type override maps 'int4' to 'System.Nullable<int>' for column 'id', in the metadata SqlSourceTypeOverrides of the file, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
 ```
 
 Map the database type to another C# type.  For `System.Nullable<T>`, map it to `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  The query's constant or method is still generated.

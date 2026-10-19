@@ -78,7 +78,13 @@ public sealed class PostgresTypeMapTests
             false,
             "public.geometry"
         ),
-        ["base type of pg_catalog the map lacks"] = new(Catalog("aclitem"), "!Unreadable", false, "aclitem"),
+        ["base type of pg_catalog the map lacks"] = new(Catalog("aclitem"), "!CastToText", false, "aclitem"),
+        ["composite of pg_catalog"] = new(
+            Catalog("pg_class", SidecarValues.Kind.Composite),
+            "!Unreadable",
+            false,
+            "pg_class"
+        ),
         ["composite named as an extension's type"] = new(
             User("cube", SidecarValues.Kind.Composite),
             "!Unreadable",
@@ -201,7 +207,7 @@ public sealed class PostgresTypeMapTests
             { "ltree", "string", "string", "string", false },
             { "lquery", "string", "string", "string", false },
             { "ltxtquery", "string", "string", "string", false },
-            { "cube", "!Unreadable", "global::NpgsqlTypes.NpgsqlCube", "!NeedsDriver", true },
+            { "cube", "!NeedsNpgsql10", "global::NpgsqlTypes.NpgsqlCube", "!NeedsDriver", true },
             { "int4range", $"{Range}<int>", $"{Range}<int>", "!NeedsDriver", true },
             { "int8range", $"{Range}<long>", $"{Range}<long>", "!NeedsDriver", true },
             { "numrange", $"{Range}<decimal>", $"{Range}<decimal>", "!NeedsDriver", true },
@@ -223,9 +229,9 @@ public sealed class PostgresTypeMapTests
             { "regnamespace", "!CastToOid", "!CastToOid", "!CastToOid", false },
             { "regcollation", "!CastToOid", "!CastToOid", "!CastToOid", false },
             { "regdictionary", "!CastToOid", "!CastToOid", "!CastToOid", false },
-            { "pg_snapshot", "!Unreadable", "!Unreadable", "!Unreadable", false },
-            { "txid_snapshot", "!Unreadable", "!Unreadable", "!Unreadable", false },
-            { "pg_node_tree", "!Unreadable", "!Unreadable", "!Unreadable", false },
+            { "pg_snapshot", "!CastToText", "!CastToText", "!CastToText", false },
+            { "txid_snapshot", "!CastToText", "!CastToText", "!CastToText", false },
+            { "pg_node_tree", "!CastToText", "!CastToText", "!CastToText", false },
             { "record", "!NotWrittenByTheTool", "!NotWrittenByTheTool", "!NotWrittenByTheTool", false },
             { "unknown", "!NotWrittenByTheTool", "!NotWrittenByTheTool", "!NotWrittenByTheTool", false },
             { "void", "!NotWrittenByTheTool", "!NotWrittenByTheTool", "!NotWrittenByTheTool", false },
@@ -355,6 +361,20 @@ public sealed class PostgresTypeMapTests
         PostgresTypeMap
             .Map(ArrayOf(DomainOf("relation", Catalog("regclass"))), DriverColumn.Npgsql10)
             .Detail.ShouldBe("oid[]");
+    }
+
+    // No Npgsql reads these, or Npgsql 8 and 9 cube, and a cast to text reads each, an array by a cast to text[].
+    [Theory]
+    [InlineData("pg_snapshot", "pg_catalog")]
+    [InlineData("pg_node_tree", "pg_catalog")]
+    [InlineData("aclitem", "pg_catalog")]
+    [InlineData("cube", "public")]
+    public void Map_TypeReadByACastToText_NamesTheCastOfItsRank(string internalName, string schema)
+    {
+        var type = TestSidecars.Postgres(name: internalName, schema: schema, internalName: internalName);
+
+        PostgresTypeMap.Map(type, DriverColumn.Npgsql8).Detail.ShouldBe("text");
+        PostgresTypeMap.Map(ArrayOf(type), DriverColumn.Npgsql8).Detail.ShouldBe("text[]");
     }
 
     [Fact]

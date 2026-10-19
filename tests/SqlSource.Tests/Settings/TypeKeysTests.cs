@@ -29,9 +29,22 @@ public sealed class TypeKeysTests
     [InlineData("regclass", "regclass")]
     [InlineData("citext", "citext")]
     [InlineData("int4[]", "int4[]")]
-    [InlineData("_int4", "_int4")]
-    [InlineData("_TEXT", "_text")]
     public void TryNormalize_KnownName_IsValid(string key, string expected) => ShouldNormalize(key, expected);
+
+    // The catalog names an array of a type with _ before the type's name, and that name is the array's key, so the
+    // two spellings are one key: for a name the map knows without a schema, and for any name of pg_catalog, where
+    // no other type starts with _.  An array of such a name is kept as written.
+    [Theory]
+    [InlineData("_int4", "int4[]")]
+    [InlineData("_TEXT", "text[]")]
+    [InlineData("pg_catalog._int4", "int4[]")]
+    [InlineData("PG_CATALOG._Citext", "citext[]")]
+    [InlineData("pg_catalog._pg_class", "pg_class[]")]
+    [InlineData("pg_catalog._newtype", "newtype[]")]
+    [InlineData("_int4[]", "_int4[]")]
+    [InlineData("pg_catalog._int4[]", "_int4[]")]
+    public void TryNormalize_CatalogNameOfAnArray_IsItsElementsKeyWithBrackets(string key, string expected) =>
+        ShouldNormalize(key, expected);
 
     // What is left once the system schema is taken off is not checked, so a type the map does not know can be named.
     [Theory]
@@ -42,6 +55,7 @@ public sealed class TypeKeysTests
     [InlineData("public.user_status[]", "public.user_status[]")]
     [InlineData("Billing.Invoice$State", "Billing.Invoice$State")]
     [InlineData("public.citext", "public.citext")]
+    [InlineData("public._status", "public._status")]
     public void TryNormalize_QualifiedKey_IsKeptUnchecked(string key, string expected) =>
         ShouldNormalize(key, expected);
 

@@ -21,6 +21,7 @@ internal static class PostgresTypeMap
     private const string DateTime = "global::System.DateTime";
     private const string DateOnly = "global::System.DateOnly";
     private const string StringKeyword = "string";
+    private const string TextType = "text";
     private const string NpgsqlTypesNamespace = "global::NpgsqlTypes.";
 
     private static readonly string[] BitKeys = ["bit", "varbit"];
@@ -81,6 +82,12 @@ internal static class PostgresTypeMap
                 TypeMappingKind.UserDefinedRange,
                 key
             ),
+            // No Npgsql reads a base type of pg_catalog that the map lacks, and its bare name is not a key.
+            PostgresTypeKind.Base when IsSystemType(type) => TypeMapping.Failed(
+                TypeMappingKind.CastToText,
+                key,
+                TextType
+            ),
             PostgresTypeKind.Base or PostgresTypeKind.Composite or _ => TypeMapping.Failed(
                 TypeMappingKind.Unreadable,
                 key
@@ -95,6 +102,9 @@ internal static class PostgresTypeMap
     public static string KeyOf(PostgresType type) =>
         IsSystemType(type) ? type.InternalName : type.Schema + "." + type.InternalName;
 
+    /// <summary>A C# type as a user writes it in the type override, without <c>global::</c>.</summary>
+    public static string AsWritten(string text) => text.Replace("global::", string.Empty);
+
     // bit and varbit are decided by their length, not by a row.
     private static bool IsBit(string internalName) =>
         internalName.Equals("bit", StringComparison.OrdinalIgnoreCase)
@@ -102,7 +112,7 @@ internal static class PostgresTypeMap
 
     private static bool IsSystemType(PostgresType type) => type.Schema.Equals(SystemSchema, StringComparison.Ordinal);
 
-    // An array of a type that a cast to oid reads is read by a cast to an array of oid, of the same rank.
+    // An array of a type that a cast reads is read by a cast to an array, of the same rank.
     private static TypeMapping ArrayOf(TypeMapping element)
     {
         if (element.Kind == TypeMappingKind.Mapped)
@@ -110,7 +120,12 @@ internal static class PostgresTypeMap
             return element with { Text = element.Text + "[]", IsValueType = false };
         }
 
-        return element.Kind == TypeMappingKind.CastToOid ? element with { Detail = element.Detail + "[]" } : element;
+        return element.Kind is TypeMappingKind.CastToOid or TypeMappingKind.CastToText or TypeMappingKind.NeedsNpgsql10
+            ? element with
+            {
+                Detail = element.Detail + "[]",
+            }
+            : element;
     }
 
     private static Dictionary<string, Row> BuildRows()
@@ -175,7 +190,7 @@ internal static class PostgresTypeMap
         Add(Row.Multirange(DateTime), "tsmultirange", "tstzmultirange");
         Add(Row.Multirange(DateTime, DateOnly), "datemultirange");
         Add(
-            Row.Refused(TypeMappingKind.CastToOid),
+            Row.Refused(TypeMappingKind.CastToOid, "oid"),
             "regclass",
             "regproc",
             "regprocedure",
@@ -186,7 +201,7 @@ internal static class PostgresTypeMap
             "regcollation",
             "regdictionary"
         );
-        Add(Row.Refused(TypeMappingKind.Unreadable), "pg_snapshot", "txid_snapshot", "pg_node_tree");
+        Add(Row.Refused(TypeMappingKind.CastToText, TextType), "pg_snapshot", "txid_snapshot", "pg_node_tree");
         Add(Row.Refused(TypeMappingKind.NotWrittenByTheTool), "record", "unknown", "void");
         return rows;
     }
@@ -196,20 +211,22 @@ internal static class PostgresTypeMap
     /// <param name="Npgsql10">The C# type on Npgsql 10 where it differs, or null.</param>
     /// <param name="IsValueType">Whether the C# type is a value type.</param>
     /// <param name="IsOfNpgsql">Whether the C# type is of the <c>NpgsqlTypes</c> namespace.</param>
-    /// <param name="Refusal">Why no driver can read the type, or null.</param>
+    /// <param name="Refusal">The failure of a type no driver can read, without its key, or null.</param>
     private sealed record Row(
         string? Npgsql8,
         string? Npgsql10,
         bool IsValueType,
         bool IsOfNpgsql,
-        TypeMappingKind? Refusal
+        TypeMapping? Refusal
     )
     {
         public static Row Same(string text, bool isValueType) => new(text, null, isValueType, false, null);
 
         public static Row OfNpgsql(string text, bool isValueType) => new(text, null, isValueType, true, null);
 
-        public static Row Refused(TypeMappingKind kind) => new(null, null, false, false, kind);
+        // A refusal that a cast mends names the type to cast to.
+        public static Row Refused(TypeMappingKind kind, string? cast = null) =>
+            new(null, null, false, false, TypeMapping.Failed(kind, string.Empty, cast));
 
         // A range names its subtype's type; a multirange is an array of its range's.
         public static Row Range(string subtype, string? subtypeOn10 = null) =>
@@ -225,7 +242,7 @@ internal static class PostgresTypeMap
         {
             if (Refusal is { } refusal)
             {
-                return TypeMapping.Failed(refusal, key, refusal == TypeMappingKind.CastToOid ? "oid" : null);
+                return refusal with { Key = key };
             }
 
             if (column == DriverColumn.None && Npgsql8 is not null && Npgsql10 is not null)
@@ -238,9 +255,10 @@ internal static class PostgresTypeMap
                 return TypeMapping.Failed(TypeMappingKind.NeedsDriver, key);
             }
 
+            // A row that only Npgsql 10 reads has no C# type on 8 and 9.
             var text = column == DriverColumn.Npgsql10 ? Npgsql10 ?? Npgsql8 : Npgsql8;
             return text is null
-                ? TypeMapping.Failed(TypeMappingKind.Unreadable, key)
+                ? TypeMapping.Failed(TypeMappingKind.NeedsNpgsql10, key, TextType)
                 : TypeMapping.Mapped(key, text, IsValueType);
         }
 
@@ -263,8 +281,5 @@ internal static class PostgresTypeMap
 
         private static bool IsOfNpgsqlTypes(string text) =>
             text.StartsWith(NpgsqlTypesNamespace, StringComparison.Ordinal);
-
-        // A C# type as a user writes it in the type override, without global::.
-        private static string AsWritten(string text) => text.Replace("global::", string.Empty);
     }
 }

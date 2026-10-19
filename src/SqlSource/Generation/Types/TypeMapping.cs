@@ -13,8 +13,9 @@ namespace SqlSource.Generation.Types;
 /// <param name="IsPublic">Whether the C# type is accessible from any assembly.</param>
 /// <param name="IsObsolete">Whether the C# type is marked <c>[Obsolete]</c>.</param>
 /// <param name="Detail">
-/// What a failure's message adds, or null: for <see cref="TypeMappingKind.CastToOid" />, the type to cast to, an
-/// array of <c>oid</c> for an array; for <see cref="TypeMappingKind.DiffersByDriver" />, the entry of the type
+/// What a failure's message adds, or null: for <see cref="TypeMappingKind.CastToOid" />,
+/// <see cref="TypeMappingKind.CastToText" /> and <see cref="TypeMappingKind.NeedsNpgsql10" />, the type to cast to,
+/// an array of it for an array; for <see cref="TypeMappingKind.DiffersByDriver" />, the entry of the type
 /// override for each driver whose C# type is not of <c>NpgsqlTypes</c>, or null when neither is; and for a failure
 /// of a type the override names, the place that wrote the entry.
 /// </param>

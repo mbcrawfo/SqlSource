@@ -99,6 +99,20 @@ public sealed class SqlMarkerScopeTests
             .ShouldBe([new TypeOverride("int4", "global::System.Int32", SettingPlace.FileHeader)]);
     }
 
+    // _int4 is the catalog's name of int4[], and the two are one key.
+    [Fact]
+    public void Read_ArrayKeySpelledTwoWaysWithTwoValuesInOneScope_ConflictAtTheSecond()
+    {
+        var (scope, errors) = Scope(
+            SqlScopeKind.Query,
+            "-- type-override: _int4 = long",
+            "-- type-override: int4[] = int"
+        );
+
+        errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
+        scope.Level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4[]", "long", SettingPlace.Query)]);
+    }
+
     [Theory]
     [InlineData("-- type-override: int4 = int?")]
     [InlineData("-- type-override: timestampz = System.DateTimeOffset")]

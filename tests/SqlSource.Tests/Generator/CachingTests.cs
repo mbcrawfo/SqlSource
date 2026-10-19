@@ -1220,6 +1220,99 @@ public sealed class CachingTests
             .Text.ShouldBe("long");
     }
 
+    // The probe and the resolution of the property's one type run on the new compilation and give equal values, so
+    // a project with a type override types no file again either.
+    [Fact]
+    public void Run_MethodBodyEditedWithATypeOverride_TypesNoQuery()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var driver = FirstRunWithTypes(compilation, OptionsWithTypeOverrides("int4=long"));
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        AllReasons(result, TrackingNames.MappedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.FileTypesInput)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        TypesOf(result, "app/Users/Users.sql")
+            .Queries.ShouldHaveSingleItem()
+            .Columns.ShouldNotBeNull()
+            .ShouldHaveSingleItem()
+            .Text.ShouldBe("long");
+    }
+
+    // The property maps int4 to a type the project does not have, so Users, whose column is of int4, is SQLSRC250.
+    // A new file declares the type: its resolution changes, and Users is typed again without the error.  Every file
+    // with a usable entry carries the resolved types, so Orders, whose column is of text, is typed again too, and
+    // gives an equal value, which nothing after it reads again.
+    [Fact]
+    public void Run_CSharpEditAddsTheMappedType_TypesTheFileThatUsesItAnew()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [_users, _orders, TypedSidecar(_users, "GetUser", "int4"), TypedSidecar(_orders, "GetOrder", "text")],
+                OptionsWithTypeOverrides("int4=MyApp.Missing")
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["SQLSRC250"]);
+
+        var result = Run(
+            driver,
+            compilation.AddSyntaxTrees(
+                CSharpSyntaxTree.ParseText(
+                    "namespace MyApp;\n\npublic sealed class Missing;\n",
+                    GeneratorHarness.ParseOptions,
+                    "/app/MyApp/Missing.cs",
+                    cancellationToken: TestContext.Current.CancellationToken
+                )
+            )
+        );
+
+        AllReasons(result, TrackingNames.MappedTypes).ShouldBe([IncrementalStepRunReason.Modified]);
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+        TypesOf(result, "app/Users/Users.sql")
+            .Queries.ShouldHaveSingleItem()
+            .Columns.ShouldNotBeNull()
+            .ShouldHaveSingleItem()
+            .Text.ShouldBe("global::MyApp.Missing");
+    }
+
+    // Without Npgsql, date has no C# type, SQLSRC249.  The reference changes the probe, and every file is typed
+    // again, with the type of Npgsql 10.
+    [Fact]
+    public void Run_NpgsqlReferenceAdded_TypesEveryFileAgain()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [_users, _orders, TypedSidecar(_users, "GetUser", "date"), TypedSidecar(_orders, "GetOrder", "date")],
+                OptionsWithTypeOverrides(null)
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["SQLSRC249", "SQLSRC249"]);
+
+        var result = Run(driver, compilation.AddReferences(NpgsqlReferences.Npgsql10));
+
+        AllReasons(result, TrackingNames.NpgsqlProbe).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.FileTypes).ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        result.Diagnostics.ShouldBeEmpty();
+        TypesOf(result, "app/Orders/Orders.sql")
+            .Queries.ShouldHaveSingleItem()
+            .Columns.ShouldNotBeNull()
+            .ShouldHaveSingleItem()
+            .Text.ShouldBe("global::System.DateOnly");
+    }
+
     private GeneratorDriver FirstRun(OutputKind? output, Compilation compilation) =>
         FirstRun(compilation, _users, new TestOptionsProvider(output, null));
 

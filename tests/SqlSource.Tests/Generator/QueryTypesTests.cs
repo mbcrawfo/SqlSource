@@ -87,7 +87,7 @@ public sealed class QueryTypesTests
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'box' has the type 'cube', which SqlSource cannot give a C# type.  "
-                + "Map it with the type override, as cube=<a C# type>.",
+                + "Update Npgsql to 10, or cast it to text in the query.",
         ]);
         run.SeverityOf("SQLSRC246").ShouldBe(DiagnosticSeverity.Error);
         StepOutputs.Single<FileTypes>(run, TrackingNames.FileTypes).Queries.ShouldBeEmpty();
@@ -141,6 +141,62 @@ public sealed class QueryTypesTests
         ]);
     }
 
+    // No Npgsql reads these, and the type override cannot help: an entry would compile and fail as the query runs.
+    // A base type of pg_catalog that SqlSource does not know is one of them, and its bare name is no key.
+    [Theory]
+    [InlineData("pg_snapshot", "pg_snapshot", "text")]
+    [InlineData("txid_snapshot", "txid_snapshot", "text")]
+    [InlineData("pg_node_tree", "pg_node_tree", "text")]
+    [InlineData("aclitem", "aclitem", "text")]
+    [InlineData("aclitem[]", "_aclitem", "text[]")]
+    public void Run_TypeNoNpgsqlReads_IsSqlsrc246WithTheCastToText(string name, string internalName, string cast)
+    {
+        var type = name.EndsWith("[]", StringComparison.Ordinal)
+            ? TestSidecars.Postgres(
+                name: name,
+                kind: SidecarValues.Kind.Array,
+                internalName: internalName,
+                element: Catalog("aclitem")
+            )
+            : Catalog(internalName);
+
+        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("value", type)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'value' has the type '{name}', which SqlSource cannot give a C# "
+                + $"type.  Cast it to {cast} in the query.",
+        ]);
+    }
+
+    // pg_class is no key, so the entry names its schema, and pg_catalog.pg_class is read as pg_class.
+    [Fact]
+    public void Run_CompositeOfTheCatalog_IsSqlsrc246WithTheQualifiedKey()
+    {
+        var pgClass = TestSidecars.Postgres(
+            name: "pg_class",
+            kind: SidecarValues.Kind.Composite,
+            internalName: "pg_class"
+        );
+        var mapped = new SqlFile(
+            UsersPath,
+            "-- type-override: pg_catalog.pg_class=MyApp.Tag\n-- name: GetUser\nSELECT 1;\n"
+        );
+
+        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("relation", pgClass)]));
+        var mappedRun = Run(
+            [NpgsqlReferences.Npgsql10],
+            mapped,
+            Entry(mapped, "GetUser", [], [Column("relation", pgClass)])
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'relation' has the type 'pg_class', which SqlSource cannot give a "
+                + "C# type.  Map it with the type override, as pg_catalog.pg_class=<a C# type>.",
+        ]);
+        mappedRun.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(mappedRun).ShouldBe([new PropertyType("global::MyApp.Tag", false, true, false, "pg_class")]);
+    }
+
     // The tool never writes record, unknown or void, or a kind this version does not know, so describing again
     // mends the sidecar.
     [Theory]
@@ -159,8 +215,11 @@ public sealed class QueryTypesTests
         ]);
     }
 
-    [Fact]
-    public void Run_UserDefinedRange_IsSqlsrc246WithTheRangeAndTheOptIn()
+    // NpgsqlRange<T> is a type of Npgsql, so a project without it is told to reference it first.
+    [Theory]
+    [InlineData("10", "Map it")]
+    [InlineData("none", "Reference Npgsql, then map it")]
+    public void Run_UserDefinedRange_IsSqlsrc246WithTheRangeAndTheOptIn(string driver, string start)
     {
         var floatRange = TestSidecars.Postgres(
             name: "floatrange",
@@ -170,11 +229,11 @@ public sealed class QueryTypesTests
             subtype: Catalog("float8")
         );
 
-        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("span", floatRange)]));
+        var run = Run(Driver(driver), Users, Entry(Users, "GetUser", [], [Column("span", floatRange)]));
 
         run.Diagnostics.ShouldBe([
             $"SQLSRC246 {GetUserName}: The column 'span' has the type 'floatrange', which SqlSource cannot give a C# "
-                + "type.  Map it with the type override, as public.floatrange=NpgsqlTypes.NpgsqlRange<T> with the "
+                + $"type.  {start} with the type override, as public.floatrange=NpgsqlTypes.NpgsqlRange<T> with the "
                 + "data source's EnableUnmappedTypes().",
         ]);
     }

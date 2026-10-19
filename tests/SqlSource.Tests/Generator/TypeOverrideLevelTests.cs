@@ -167,14 +167,14 @@ public sealed class TypeOverrideLevelTests
         ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, false, "int4")]);
     }
 
-    // An array's own key is written as its element's with [], or as its name in the catalog, and for an array of an
-    // extension's type in any schema, bare or qualified.  Without either, the element's entry gives the array its
-    // element type.
+    // An array's own key is written as its element's with [], or as its name in the catalog, which is read as the
+    // same key, and for an array of an extension's type in any schema, bare or qualified.  Without either, the
+    // element's entry gives the array its element type.
     [Theory]
     [InlineData("int4", "int4=long int4[]=System.Collections.Generic.List<int>", "int4[]")]
-    [InlineData("int4", "int4=long _int4=System.Collections.Generic.List<int>", "_int4")]
+    [InlineData("int4", "int4=long _int4=System.Collections.Generic.List<int>", "int4[]")]
     [InlineData("citext", "citext=System.Uri citext[]=System.Collections.Generic.List<int>", "citext[]")]
-    [InlineData("citext", "citext=System.Uri _citext=System.Collections.Generic.List<int>", "_citext")]
+    [InlineData("citext", "citext=System.Uri _citext=System.Collections.Generic.List<int>", "citext[]")]
     [InlineData("citext", "citext=System.Uri public._citext=System.Collections.Generic.List<int>", "public._citext")]
     public void Run_ArraysOwnKey_WinsOverItsElements(string element, string overrides, string key)
     {
@@ -197,6 +197,30 @@ public sealed class TypeOverrideLevelTests
         ColumnsOf(own, "GetUser")
             .ShouldBe([new PropertyType("global::System.Collections.Generic.List<int>", false, true, false, key)]);
         ColumnsOf(ofTheElement, "GetUser").ShouldBe([new PropertyType(elementType, false, true, false, element)]);
+    }
+
+    // _int4 and int4[] are one key, so the query's entry replaces the property's whichever spelling each has, and
+    // the query's default gives the array back to the base map.
+    [Theory]
+    [InlineData(
+        "-- type-override: int4[] = System.Collections.Generic.List<long>\n",
+        "global::System.Collections.Generic.List<long>"
+    )]
+    [InlineData("-- type-override: int4[] = default\n", "int[]")]
+    public void Run_ArrayKeySpelledTwoWaysAtTwoLevels_IsOneKey(string marker, string expected)
+    {
+        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n" + marker + "SELECT 1;\n");
+        var array = TestSidecars.Postgres(
+            name: "int4[]",
+            kind: SidecarValues.Kind.Array,
+            internalName: "_int4",
+            element: Int4
+        );
+
+        var run = Run("_int4=System.Collections.Generic.List<int>", (file, [Entry(file, "GetUser", array)]));
+
+        run.Diagnostics.ShouldBeEmpty();
+        TextsOf(run)["GetUser"].ShouldBe(expected);
     }
 
     // A domain's key wins over its base's, and the base's entry reaches every domain over it.
@@ -294,7 +318,7 @@ public sealed class TypeOverrideLevelTests
         string[] reported = ["GetFirst", "GetSecond"];
         run.Diagnostics.ShouldBe(
             reported.Select(name =>
-                $"SQLSRC250 {NameOf(text, name)}: The type override maps 'int4' to 'global::MyApp.Missing' for column "
+                $"SQLSRC250 {NameOf(text, name)}: The type override maps 'int4' to 'MyApp.Missing' for column "
                 + $"'c0', in {place}, and no type of that name is found, or more than one reference has one that this "
                 + "project can see.  Correct the name, with its namespace and type arguments, or for a name that two "
                 + "references have, map to a type of this project."
@@ -323,7 +347,7 @@ public sealed class TypeOverrideLevelTests
         var run = Run("int4=" + type, (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBe([
-            $"{id} /app/Repo/Users.sql(1,10)-(1,17): The type override maps 'int4' to 'global::{type}' for column "
+            $"{id} /app/Repo/Users.sql(1,10)-(1,17): The type override maps 'int4' to '{type}' for column "
                 + $"'c0', in the property SqlSourceTypeOverrides, {reason}",
         ]);
     }
@@ -347,7 +371,7 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldStartWith(
-                "SQLSRC250 /app/Repo/Users.sql(1,10)-(1,17): The type override maps 'int4' to 'global::MyApp.Missing' "
+                "SQLSRC250 /app/Repo/Users.sql(1,10)-(1,17): The type override maps 'int4' to 'MyApp.Missing' "
                     + "for parameter 'id', in the property SqlSourceTypeOverrides,"
             );
     }

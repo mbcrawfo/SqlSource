@@ -170,13 +170,13 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 | `int2vector`, `oidvector` | `short[]`, `uint[]` | Same | Same |
 | `hstore` | `System.Collections.Generic.Dictionary<string, string?>` | Same | Same |
 | `ltree`, `lquery`, `ltxtquery` | `string` | Same | Same |
-| `cube` | None: [SQLSRC246](diagnostics.md#sqlsrc246) | `NpgsqlTypes.NpgsqlCube` | SQLSRC249 |
+| `cube` | None: [SQLSRC246](diagnostics.md#sqlsrc246).  Update Npgsql to 10, or cast the column to `text` in the query | `NpgsqlTypes.NpgsqlCube` | SQLSRC249 |
 | `int4range`, `int8range`, `numrange` | `NpgsqlTypes.NpgsqlRange<int>`, `NpgsqlTypes.NpgsqlRange<long>`, `NpgsqlTypes.NpgsqlRange<decimal>` | Same | SQLSRC249 |
 | `tsrange`, `tstzrange` | `NpgsqlTypes.NpgsqlRange<System.DateTime>` | Same | SQLSRC249 |
 | `daterange` | `NpgsqlTypes.NpgsqlRange<System.DateTime>` | `NpgsqlTypes.NpgsqlRange<System.DateOnly>` | SQLSRC249 |
 | `int4multirange`, `int8multirange`, `nummultirange`, `tsmultirange`, `tstzmultirange`, `datemultirange` | An array of the range's type: `NpgsqlTypes.NpgsqlRange<int>[]` and so on | As the range: `NpgsqlTypes.NpgsqlRange<System.DateOnly>[]` for `datemultirange` | SQLSRC249 |
 | `regclass`, `regproc`, `regprocedure`, `regoper`, `regoperator`, `regrole`, `regnamespace`, `regcollation`, `regdictionary` | None: SQLSRC246.  Cast the column to `oid` in the query | Same | Same |
-| `pg_snapshot`, `txid_snapshot`, `pg_node_tree` | None: SQLSRC246 | Same | Same |
+| `pg_snapshot`, `txid_snapshot`, `pg_node_tree` | None: SQLSRC246.  Cast the column to `text` in the query | Same | Same |
 
 `citext`, `hstore`, `ltree`, `lquery`, `ltxtquery` and `cube` are the types of extensions, and are known by their name in whatever schema the extension was created.  A type that the table does not name gets its C# type by its kind:
 
@@ -185,9 +185,10 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 | An array | Its element's C# type with `[]`: `int[]` for `int4[]`, `string[]` for `text[]`, `string[]` for an array of an enum |
 | A domain | Its base type's C# type: a domain over `text` is a `string` |
 | An enum | `string`.  Npgsql reads an enum as its label.  To read it as a C# enum, map it with the type override, `public.user_status=MyApp.UserStatus`, and call `MapEnum<MyApp.UserStatus>()` on the application's data source builder |
-| A range or a multirange that the table does not name, a range of your own over `int4` included | None: SQLSRC246.  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it |
+| A range or a multirange that the table does not name, a range of your own over `int4` included | None: SQLSRC246.  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.  A project without Npgsql references it first, since that type is Npgsql's |
 | A composite type, which includes a table's row type | None: SQLSRC246.  Map it with the type override to the type the application's data source maps it to, or select its fields as columns of their own |
-| A base type that the table does not name, such as one of an extension SqlSource does not know | None: SQLSRC246.  Map it with the type override to the type the application reads it as |
+| A base type of `pg_catalog` that the table does not name, such as `aclitem` | None: SQLSRC246.  No version of Npgsql reads it: cast the column to `text` in the query |
+| Any other base type that the table does not name, such as one of an extension SqlSource does not know | None: SQLSRC246.  Map it with the type override to the type the application reads it as |
 
 <a id="type-notes"></a>
 

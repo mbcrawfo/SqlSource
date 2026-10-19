@@ -138,9 +138,14 @@ internal static class TypeKeys
     /// <summary>
     /// Reads a key, <c>[part "."] part ["[]"]</c>, where a part is letters, digits, <c>_</c> and <c>$</c>.  An
     /// unqualified part must be a name the base map knows, an alias of one, or <c>_</c> and a name it knows, and is
-    /// given as the name in lower case: <c>integer[]</c> gives <c>int4[]</c>.  <c>pg_catalog.</c> is taken off
-    /// and what is left is not checked, so <c>pg_catalog.newtype</c> gives <c>newtype</c>.  Any other qualified key
-    /// is given as written, unchecked.  Returns false for anything else, with an empty <paramref name="normalized" />.
+    /// given as the name in lower case: <c>integer[]</c> gives <c>int4[]</c>.  <c>_</c> and a name it knows is the
+    /// catalog's name of an array, and is given as the array's key, so <c>_int4</c> gives <c>int4[]</c>, and
+    /// <c>_int4[]</c> stays as written.  <c>pg_catalog.</c> is taken off and what is left is not checked, but that
+    /// every name of <c>pg_catalog</c> that starts with <c>_</c> is an array's, so <c>pg_catalog.newtype</c> gives
+    /// <c>newtype</c>, <c>pg_catalog._int4</c> gives <c>int4[]</c> and <c>pg_catalog._pg_class</c> gives
+    /// <c>pg_class[]</c>.  Any other qualified key is given as written, unchecked: <c>public._tag</c> is not
+    /// <c>public.tag[]</c>, since a type of another schema may be named with a <c>_</c> (TD-0059).  Returns false for
+    /// anything else, with an empty <paramref name="normalized" />.
     /// </summary>
     public static bool TryNormalize(ReadOnlySpan<char> key, out string normalized)
     {
@@ -151,41 +156,56 @@ internal static class TypeKeys
         if (period >= 0)
         {
             var schema = name.Slice(0, period);
-            if (!IsPart(schema) || !IsPart(name.Slice(period + 1)))
+            var part = name.Slice(period + 1);
+            if (!IsPart(schema) || !IsPart(part))
             {
                 return false;
             }
 
-            normalized = schema.Equals(SystemSchema.AsSpan(), StringComparison.OrdinalIgnoreCase)
-                ? key.Slice(period + 1).ToString()
-                : key.ToString();
+            if (!schema.Equals(SystemSchema.AsSpan(), StringComparison.OrdinalIgnoreCase))
+            {
+                normalized = key.ToString();
+            }
+            else if (!isArray && part.Length > 1 && part[0] == '_')
+            {
+                // Every type of pg_catalog whose name starts with _ is an array, of the type named by the rest.
+                var ofElement = part.Slice(1).ToString();
+                normalized = (Names.TryGetValue(ofElement, out var knownElement) ? knownElement : ofElement) + "[]";
+            }
+            else
+            {
+                normalized = key.Slice(period + 1).ToString();
+            }
+
             return true;
         }
 
-        if (!IsPart(name) || !TryReadName(name.ToString(), out var known))
+        if (!IsPart(name))
         {
             return false;
         }
 
-        normalized = isArray ? known + "[]" : known;
-        return true;
+        var text = name.ToString();
+        if (Names.TryGetValue(text, out var known) || Aliases.TryGetValue(text, out known))
+        {
+            normalized = isArray ? known + "[]" : known;
+            return true;
+        }
+
+        if (TryReadArrayName(name, out var element))
+        {
+            normalized = isArray ? "_" + element + "[]" : element + "[]";
+            return true;
+        }
+
+        return false;
     }
 
-    private static bool TryReadName(string part, out string name)
+    // The catalog's name of an array of a type the map knows, _int4, gives that type's name.
+    private static bool TryReadArrayName(ReadOnlySpan<char> part, out string element)
     {
-        if (Names.TryGetValue(part, out name) || Aliases.TryGetValue(part, out name))
-        {
-            return true;
-        }
-
-        if (part.Length > 1 && part[0] == '_' && Names.TryGetValue(part.Substring(1), out var element))
-        {
-            name = "_" + element;
-            return true;
-        }
-
-        name = string.Empty;
-        return false;
+        element = string.Empty;
+        return part.Length > 1 && part[0] == '_' && Names.TryGetValue(part.Slice(1).ToString(), out element);
     }
 
     // No quotes: a type whose schema or name needs them for more than its case has no key (TD-0058).

@@ -137,21 +137,34 @@ internal static class QueryTyper
             return new PropertyType(text, mapping.IsValueType, mapping.IsPublic, mapping.IsObsolete, mapping.Key);
         }
 
-        typing.Diagnostics.Add(Diagnose(mapping, Subject(owner, name), postgres.Name, typing.Location));
+        typing.Diagnostics.Add(Diagnose(mapping, Subject(owner, name), postgres.Name, typing.Location, typing.Column));
         return null;
     }
 
-    private static DiagnosticInfo Diagnose(TypeMapping failure, string subject, string typeName, LocationInfo at)
+    private static DiagnosticInfo Diagnose(
+        TypeMapping failure,
+        string subject,
+        string typeName,
+        LocationInfo at,
+        DriverColumn column
+    )
     {
         var key = failure.Key;
         return failure.Kind switch
         {
-            TypeMappingKind.CastToOid => DiagnosticInfo.Create(
+            TypeMappingKind.CastToOid or TypeMappingKind.CastToText => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,
                 subject,
                 typeName,
-                "Cast it to " + (failure.Detail ?? "oid") + " in the query"
+                "Cast it to " + failure.Detail + " in the query"
+            ),
+            TypeMappingKind.NeedsNpgsql10 => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeHasNoCSharpType,
+                at,
+                subject,
+                typeName,
+                "Update Npgsql to 10, or cast it to " + failure.Detail + " in the query"
             ),
             TypeMappingKind.NotWrittenByTheTool => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
@@ -160,12 +173,14 @@ internal static class QueryTyper
                 typeName,
                 Describe
             ),
+            // NpgsqlRange<T> is a type of the driver, which a project without it cannot name.
             TypeMappingKind.UserDefinedRange => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,
                 subject,
                 typeName,
-                "Map it with the type override, as "
+                (column == DriverColumn.None ? "Reference Npgsql, then map" : "Map")
+                    + " it with the type override, as "
                     + key
                     + "=NpgsqlTypes.NpgsqlRange<T> with the data source's EnableUnmappedTypes()"
             ),
@@ -209,19 +224,33 @@ internal static class QueryTyper
                 at,
                 subject,
                 typeName,
-                "Map it with the type override, as " + key + "=<a C# type>"
+                "Map it with the type override, as " + AsAKey(key) + "=<a C# type>"
             ),
         };
     }
 
-    // A failure of a mapped type keeps the type the override names in its text, and the place that wrote the entry
-    // in its detail.
+    // The key as an entry names it: the key of a type of pg_catalog is its bare name, which a key may be only for a
+    // name the map knows, so a catalog table's row type, pg_class, is written pg_catalog.pg_class.  The key of any
+    // other type has its schema already.
+    private static string AsAKey(string key) =>
+        key.IndexOf('.') >= 0 || TypeKeys.TryNormalize(key.AsSpan(), out _) ? key : "pg_catalog." + key;
+
+    // A failure of a mapped type keeps the type the override names in its text, which the message gives as a user
+    // writes it, and the place that wrote the entry in its detail.
     private static DiagnosticInfo MappedTypeFailure(
         DiagnosticDescriptor descriptor,
         TypeMapping failure,
         string subject,
         LocationInfo at
-    ) => DiagnosticInfo.Create(descriptor, at, subject, failure.Key, failure.Text ?? "", failure.Detail ?? "");
+    ) =>
+        DiagnosticInfo.Create(
+            descriptor,
+            at,
+            subject,
+            failure.Key,
+            PostgresTypeMap.AsWritten(failure.Text ?? ""),
+            failure.Detail ?? ""
+        );
 
     // "column 'id'", as a message names a parameter or column.
     private static string Subject(string owner, string name) => owner + " '" + name + "'";
@@ -271,10 +300,15 @@ internal static class QueryTyper
 
     /// <summary>
     /// The type override's answer for a type, at one level of the map's walk: the entry of the type's key, then, for
-    /// a type of an extension outside <c>pg_catalog</c> or an array of one, of its bare name, then, for an array, of
-    /// its element's key with <c>[]</c>, looked up the same way.  An entry's type is the one the compilation
-    /// resolved, or the failure of its status.
+    /// a type of an extension outside <c>pg_catalog</c>, of its bare name, then, for an array, of its element's key
+    /// with <c>[]</c>, looked up the same way.  An entry's type is the one the compilation resolved, or the failure
+    /// of its status.
     /// </summary>
+    /// <remarks>
+    /// An array of <c>pg_catalog</c> is found by its element's key alone: its own, <c>_int4</c> or
+    /// <c>pg_catalog._pg_class</c>, is read as <c>int4[]</c> or <c>pg_class[]</c>, so no map holds it.  An array of
+    /// another schema keeps its own key, <c>public._tag</c>, which is another key than <c>public.tag[]</c>.
+    /// </remarks>
     private sealed class OverrideLookup(EquatableArray<TypeOverride> map, EquatableArray<MappedType> mappedTypes)
     {
         public TypeMapping? Find(PostgresType type)
@@ -289,26 +323,18 @@ internal static class QueryTyper
             return entry is null ? null : MappingOf(entry);
         }
 
-        // The entry of the type's key with the suffix, or for a type of an extension or an array of one, of its bare
-        // name with it: _citext as well as public._citext.  A key longer than the name is qualified.
+        // The entry of the type's key with the suffix, or for a type of an extension, of its bare name with it:
+        // citext[] as well as public.citext[].  A key longer than the name is qualified.
         private TypeOverride? EntryOf(PostgresType type, string suffix)
         {
             var key = PostgresTypeMap.KeyOf(type);
             return TypeOverrideMap.Find(map, key + suffix)
                 ?? (
-                    key.Length > type.InternalName.Length && IsOfAnExtension(type)
+                    key.Length > type.InternalName.Length && IsExtension(type)
                         ? TypeOverrideMap.Find(map, type.InternalName + suffix)
                         : null
                 );
         }
-
-        private static bool IsOfAnExtension(PostgresType type) =>
-            IsExtension(type)
-            || (
-                type.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal)
-                && type.Element is { } element
-                && IsExtension(element)
-            );
 
         private static bool IsExtension(PostgresType type) =>
             type.Kind.Equals(SidecarValues.Kind.Base, StringComparison.Ordinal)

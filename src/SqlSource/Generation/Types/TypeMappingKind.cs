@@ -6,11 +6,26 @@ internal enum TypeMappingKind
     /// <summary>The type has a C# type.</summary>
     Mapped,
 
-    /// <summary>Npgsql cannot read the type as an object.</summary>
+    /// <summary>
+    /// Npgsql cannot read the type as an object, and only the type override can give it a C# type: a composite, or a
+    /// base type outside <c>pg_catalog</c> that the map does not know.
+    /// </summary>
     Unreadable,
 
     /// <summary>Npgsql cannot read the type as an object, and a cast to <c>oid</c> reads it.</summary>
     CastToOid,
+
+    /// <summary>
+    /// No Npgsql can read the type as an object, and a cast to <c>text</c> reads it: <c>pg_snapshot</c>,
+    /// <c>txid_snapshot</c>, <c>pg_node_tree</c>, and a base type of <c>pg_catalog</c> that the map does not know.
+    /// </summary>
+    CastToText,
+
+    /// <summary>
+    /// Npgsql 8 and 9 cannot read the type as an object, and Npgsql 10 can: <c>cube</c>.  A cast to <c>text</c> reads
+    /// it on any.
+    /// </summary>
+    NeedsNpgsql10,
 
     /// <summary>
     /// A type that the tool never writes in a sidecar: <c>record</c>, <c>unknown</c>, <c>void</c>, a kind this version

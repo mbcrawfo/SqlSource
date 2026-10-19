@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0059`
+Next id: `TD-0060`
 
 ## Active items
 
@@ -43,6 +43,7 @@ Next id: `TD-0059`
 | [TD-0056](TD-0056-mapped-generic-constraints-are-not-checked.md) | Open | 2026-10-18 | Low | The type arguments of a C# type that the type override names are not checked against the constraints of its type parameters, so a mapping such as `System.Collections.Generic.List<System.Nullable<string>>` is accepted, and its model will not compile |
 | [TD-0057](TD-0057-type-override-keys-that-differ-by-case.md) | Open | 2026-10-18 | Low | The keys of the type override compare ignoring case, so it cannot tell apart two types of one schema whose names differ only by case, `public."Status"` and `public.status`, and one entry maps both |
 | [TD-0058](TD-0058-type-override-keys-cannot-be-quoted.md) | Open | 2026-10-18 | Low | A key of the type override holds no quotes, so a type whose schema or name needs quotes for more than its case cannot be mapped, and the help of its `SQLSRC246` suggests an entry that is not valid |
+| [TD-0059](TD-0059-array-of-another-schema-has-two-keys.md) | Open | 2026-10-18 | Low | An array of a type outside `pg_catalog` has two keys of the type override, `public._user_status` and `public.user_status[]`: the first wins over the second at any level, and two entries for them in one scope are not `SQLSRC112` |
 
 ## Columns
 
