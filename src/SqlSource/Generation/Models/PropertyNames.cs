@@ -1,4 +1,6 @@
+using System;
 using System.Buffers;
+using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Models;
 
@@ -56,6 +58,48 @@ internal static class PropertyNames
         {
             ArrayPool<char>.Shared.Return(buffer);
         }
+    }
+
+    /// <summary>
+    /// The name a table gives its model, before the suffix: the PascalCase of the table's name, with the PascalCase of
+    /// its schema before it unless the schema is <c>public</c>, compared ordinally.  <c>users</c> is <c>Users</c> and
+    /// <c>billing.invoices</c> is <c>BillingInvoices</c>.  Null when the schema or the table is unknown, when the
+    /// PascalCase of a part is no identifier, as for the quoted <c>"order-lines"</c>, or when a part ends in <c>!</c>
+    /// or <c>?</c>, which <see cref="PascalCase" /> would drop as a column's nullability: the table then gives no name.
+    /// </summary>
+    public static string? FromTable(SidecarTable table)
+    {
+        if (table.Schema is not { } schema || table.Table is not { } name)
+        {
+            return null;
+        }
+
+        var tableName = NameOfPart(name);
+        if (tableName is null)
+        {
+            return null;
+        }
+
+        if (string.Equals(schema, "public", StringComparison.Ordinal))
+        {
+            return tableName;
+        }
+
+        var schemaName = NameOfPart(schema);
+        return schemaName is null ? null : schemaName + tableName;
+    }
+
+    // The PascalCase of a part of a table's name, or null when it ends in a mark that PascalCase would drop or is no
+    // identifier.
+    private static string? NameOfPart(string part)
+    {
+        if (part.Length > 0 && part[part.Length - 1] is '!' or '?')
+        {
+            return null;
+        }
+
+        var name = PascalCase(part);
+        return IsIdentifier(name) ? name : null;
     }
 
     /// <summary>Whether <paramref name="name" /> can be a property's name: a C# identifier.</summary>

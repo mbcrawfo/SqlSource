@@ -1,5 +1,6 @@
 using Shouldly;
 using SqlSource.Generation.Models;
+using SqlSource.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Models;
@@ -58,4 +59,37 @@ public sealed class PropertyNamesTests
     [InlineData("Id")]
     [InlineData("equals")]
     public void IsReserved_Name_IsFalse(string name) => PropertyNames.IsReserved(name).ShouldBeFalse();
+
+    [Theory]
+    [InlineData("public", "users", "Users")]
+    [InlineData("public", "order_lines", "OrderLines")]
+    [InlineData("billing", "invoices", "BillingInvoices")]
+    [InlineData("Billing_Admin", "audit_log", "BillingAdminAuditLog")]
+    [InlineData("Public", "users", "PublicUsers")]
+    [InlineData("PUBLIC", "users", "PUBLICUsers")]
+    public void FromTable_Table_IsTheSchemaUnlessItIsPublicThenTheTable(string schema, string table, string expected) =>
+        PropertyNames.FromTable(new SidecarTable(schema, table)).ShouldBe(expected);
+
+    [Theory]
+    [InlineData(null, "users")]
+    [InlineData("public", null)]
+    [InlineData(null, null)]
+    [InlineData("public", "order-lines")]
+    [InlineData("public", "")]
+    [InlineData("public", "___")]
+    [InlineData("public", "2fa")]
+    [InlineData("my-schema", "orders")]
+    [InlineData("", "orders")]
+    [InlineData("2nd", "orders")]
+    [InlineData("public", "users?")]
+    [InlineData("public", "users!")]
+    [InlineData("billing?", "invoices")]
+    [InlineData("billing!", "invoices")]
+    public void FromTable_PartThatGivesNoIdentifier_IsNull(string? schema, string? table) =>
+        PropertyNames.FromTable(new SidecarTable(schema, table)).ShouldBeNull();
+
+    // The public schema gives no name, so it is not checked: a table whose name is an identifier needs no schema.
+    [Fact]
+    public void FromTable_PublicSchema_NeedsNothingOfTheSchema() =>
+        PropertyNames.FromTable(new SidecarTable("public", "t")).ShouldBe("T");
 }

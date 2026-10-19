@@ -6,6 +6,7 @@ using System.Text;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Paths;
 using SqlSource.Settings;
+using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Models;
 
@@ -103,6 +104,7 @@ internal static class TypeModels
         string name;
         string @namespace;
         string namespaceText;
+        SidecarTable? table = null;
         var period = marker?.Name.LastIndexOf('.') ?? -1;
         if (marker is not null && period >= 0)
         {
@@ -113,7 +115,24 @@ internal static class TypeModels
         }
         else
         {
-            name = marker?.Name ?? (query.Name + (isInput ? settings.InputModelSuffix : settings.OutputModelSuffix));
+            // A row of the table a query matches is named after the table, unless the query names its model or
+            // no-table-models is in effect.  A table that gives no name leaves the query's.
+            string? tableName = null;
+            if (
+                !isInput
+                && marker is null
+                && (settings.Parameters & GeneratorParameters.NoTableModels) == 0
+                && query.Table is { } matched
+                && PropertyNames.FromTable(matched) is { } fromTable
+            )
+            {
+                tableName = fromTable;
+                table = matched;
+            }
+
+            name =
+                marker?.Name
+                ?? ((tableName ?? query.Name) + (isInput ? settings.InputModelSuffix : settings.OutputModelSuffix));
 
             // The setting's names are not keywords, so its value is its text.  The type's namespace keeps the @ of a
             // keyword in code.
@@ -138,7 +157,7 @@ internal static class TypeModels
             isInput ? settings.InputModelType : settings.OutputModelType,
             isSorted,
             target.IsPublic,
-            null,
+            table,
             isSorted ? Sort(properties) : properties,
             new ModelSource(
                 file.NormalizedPath,
