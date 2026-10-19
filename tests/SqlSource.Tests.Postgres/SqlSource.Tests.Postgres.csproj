@@ -24,6 +24,15 @@
         <SqlSourceTypeOverrides>timestamptz=System.DateTimeOffset</SqlSourceTypeOverrides>
     </PropertyGroup>
     <ItemGroup>
+        <!-- The queries of billing: sealed class output models, the suffix Row, and timestamptz as a DateTime. -->
+        <AdditionalFiles
+            Update="EndToEnd/Queries/Billing/**/*.sql"
+            SqlSourceOutputModelType="sealed class"
+            SqlSourceOutputModelSuffix="Row"
+            SqlSourceTypeOverrides="timestamptz=System.DateTime"
+        />
+    </ItemGroup>
+    <ItemGroup>
         <PackageReference Include="Dapper" />
         <PackageReference Include="GitHubActionsTestLogger" />
         <!-- The version the tool itself references: central pinning would otherwise hold it at the generator's. -->
