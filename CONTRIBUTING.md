@@ -28,7 +28,7 @@ The five test projects and the two libraries they share, which [`tests/README.md
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
 - `tests/SqlSource.Tool.Tests` runs the tests of the tool.
-- `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server, and is the end-to-end project, which builds models from its own queries and reads rows into them through Dapper.  It needs Docker.
+- `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server and is the end-to-end project, which builds models from its own queries and reads rows into them through Dapper, and needs Docker.
 - `tests/SqlSource.Tests.Postgres.Npgsql8` reads every mapped type through Dapper on Npgsql 8, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 

@@ -247,7 +247,7 @@ The input model is the parameter object, and the output model is the type of a r
   WHERE o.id = @orderId;
   ```
 
-  A record with a range, a multirange, an `hstore`, a C# enum or a struct of your own is filled as any other.
+  A record with a range, a multirange, an `hstore`, a C# enum, or a struct of your own with its type handler, is filled as any other.
 - **A type override to a type that Npgsql does not give needs a Dapper type handler.**  Dapper fills a property with the type Npgsql gives for its column, or through a handler.  `timestamptz=System.DateTimeOffset` makes a property a `DateTimeOffset` where Npgsql gives a `DateTime`.  A domain mapped to a struct of your own is the same: Npgsql gives the domain's base type, a `string` for a domain over `text`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
 
   ```csharp

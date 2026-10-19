@@ -188,19 +188,29 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
     }
 
     // Npgsql gives the type of an array column as System.Array, and Dapper looks for a constructor of that exact type,
-    // so it cannot construct a positional record with an array.  This is why AllTypesDto is a class.
+    // so it cannot construct a positional record with an array, whether it can be null or not.  This is why AllTypesDto
+    // is a class.
     // TD-0062: the generator's fix for a record with an array read through Dapper.
-    [Fact]
-    public async Task QueryAsync_RecordWithAnArray_DapperCannotConstructIt()
+    [Theory]
+    [InlineData(nameof(Int4Array), "int4_array_value")]
+    [InlineData(nameof(NotNullInt4Array), "int4_array_value")]
+    [InlineData(nameof(TextArray), "text_array_value")]
+    public async Task QueryAsync_RecordWithAnArray_DapperCannotConstructIt(string record, string column)
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+        var sql = $"SELECT {column} FROM all_types WHERE id = {AllTypesRows.FullRowId}";
 
         var error = await Should.ThrowAsync<InvalidOperationException>(() =>
-            connection.QueryAsync<Int4Array>("SELECT int4_array_value FROM all_types")
+            record switch
+            {
+                nameof(Int4Array) => connection.QueryAsync<Int4Array>(sql),
+                nameof(NotNullInt4Array) => connection.QueryAsync<NotNullInt4Array>(sql),
+                _ => connection.QueryAsync<TextArray>(sql),
+            }
         );
 
-        error.Message.ShouldContain("(System.Array int4_array_value)");
+        error.Message.ShouldContain($"(System.Array {column})");
     }
 
     // The input model with the values of the full row, property by property by name, and the id of the new row.  A
@@ -245,6 +255,20 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
         Justification = "Dapper would make it, and the test proves that it cannot."
     )]
     private sealed record Int4Array(int[]? Int4ArrayValue);
+
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "Dapper would make it, and the test proves that it cannot."
+    )]
+    private sealed record NotNullInt4Array(int[] Int4ArrayValue);
+
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "Dapper would make it, and the test proves that it cannot."
+    )]
+    private sealed record TextArray(string[]? TextArrayValue);
 
     // The parameters of one column, as the input model has them, and the id of the row.
     [SuppressMessage(
