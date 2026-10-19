@@ -63,7 +63,7 @@ A case has models when neither the describer nor the generator refuses it.  Each
 
 `RealisticClaimsTests`, `RealisticModelNullabilityTests` and the two tests of the helpers need no server.
 
-A change to what the describer asks or answers, or to the schema, the seed or a case, writes the cases' sidecars again with `tools/describe-end-to-end.sh`, as in [writing the sidecars](#writing-the-sidecars), and its diff is read before it is committed.  The sidecars are written on the default image and compared on PostgreSQL 14 and 18.  Of a refused case, only its id is compared: the arguments, the help and the server's lines of its failure are compared nowhere.
+A change to what the describer asks or answers, or to the schema, the seed or a case, writes the cases' sidecars again with `tools/describe-end-to-end.sh`, as in [writing the sidecars](#writing-the-sidecars), and its diff is read before it is committed.  The sidecars are written on the default image and compared on PostgreSQL 14 and 18, each on the majors that run its case and that its `checkedFrom` does not leave out.  Of a refused case, only its id is compared: the arguments, the help and the server's lines of its failure are compared nowhere.
 
 A `case.json` can also say:
 
