@@ -28,12 +28,14 @@ public sealed class SettingLevelTests
                 "-- name: Q\nSELECT id FROM users WHERE id = @id;\n",
                 "-- database: main\n-- output: models\n-- input-model-suffix: Args\n-- output-model-suffix: Row\n"
                     + "-- model-namespace: App.Models\n-- input-model-type: sealed record\n"
-                    + "-- output-model-type: class\n-- collection-type: ImmutableArray\n\n"
+                    + "-- output-model-type: class\n-- collection-type: ImmutableArray\n"
+                    + "-- type-override: numeric = System.Double\n\n"
                     + "-- name: Q -> one\n-- param: @id int not null\n-- database: other\n-- output: codegen\n"
                     + "-- input-model: QueryArgs\n-- output-model: App.Models.QueryRow\n-- collection-type: List\n"
+                    + "-- type-override: numeric = default\n-- type-override: int4 = long\n"
                     + "SELECT id FROM users WHERE id = @id;\n",
                 Default,
-                [NotDescribable("codegen", 10)]
+                [NotDescribable("codegen", 11)]
             },
             {
                 "-- name: Q\nSELECT id FROM {{table}} WHERE {{filter}};\n",
@@ -55,6 +57,7 @@ public sealed class SettingLevelTests
     [InlineData("SqlSourceInputModelType", "sealed record", "codegen")]
     [InlineData("SqlSourceOutputModelType", "Class", "codegen")]
     [InlineData("SqlSourceCollectionType", "IReadOnlyList", "codegen")]
+    [InlineData("SqlSourceTypeOverrides", "timestamptz=System.DateTimeOffset  int4[]=int?[]", "codegen")]
     public void Run_ValidSettingAsPropertyAndAsMetadata_ChangesNoGeneratedCode(string name, string value, string output)
     {
         var plain = GeneratorHarness.Run(null, Source(null), new SqlFile("/app/Repo/Q.sql", Sql));
@@ -80,6 +83,8 @@ public sealed class SettingLevelTests
     [InlineData("SqlSourceInputModelType", "struct")]
     [InlineData("SqlSourceOutputModelType", "sealed")]
     [InlineData("SqlSourceCollectionType", "HashSet")]
+    [InlineData("SqlSourceTypeOverrides", "timestampz=System.DateTimeOffset")]
+    [InlineData("SqlSourceTypeOverrides", "int4=int?")]
     public void Run_InvalidSettingAsPropertyAndAsMetadata_IsReportedOnceWithoutAPosition(string name, string value)
     {
         var run = GeneratorHarness.Run(
@@ -96,6 +101,37 @@ public sealed class SettingLevelTests
         );
         run.CompilationErrors.ShouldBeEmpty();
         run.Sources.Keys.ShouldContain("App.Sample.g.cs");
+    }
+
+    // An entry of the type override that is not valid is reported alone.  That the other entries apply is
+    // SettingsLevelReaderTests.Read_TypeOverrideThatIsNotValid_IsRecordedAndTheOthersApply.
+    [Fact]
+    public void Run_TypeOverridesWithAnEntryThatIsNotValid_ReportThatEntryOnce()
+    {
+        const string Value = "int4=long\n  timestampz=System.DateTimeOffset date=System.DateOnly";
+
+        var run = GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [
+                new SqlFile(
+                    "/app/Repo/Q.sql",
+                    Sql,
+                    Metadata: new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = Value }
+                ),
+            ],
+            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = Value }
+        );
+
+        run.Diagnostics.ShouldBe(
+            [
+                "SQLSRC014 (1,1)-(1,1): 'timestampz=System.DateTimeOffset' is not a valid value of "
+                    + "SqlSourceTypeOverrides",
+                .. Default,
+            ],
+            ignoreOrder: true
+        );
+        run.CompilationErrors.ShouldBeEmpty();
     }
 
     [Theory]

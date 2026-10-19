@@ -44,6 +44,7 @@ public sealed partial class BuildFileTests
         "SqlSourceInputModelType",
         "SqlSourceOutputModelType",
         "SqlSourceCollectionType",
+        "SqlSourceTypeOverrides",
     ];
 
     // What the targets trim and the generator does not read.

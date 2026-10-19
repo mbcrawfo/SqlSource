@@ -162,6 +162,8 @@ internal static class TargetTypeReader
         ImmutableArray<DiagnosticInfo>.Builder diagnostics
     ) : ISettingSource
     {
+        public SettingPlace Place => SettingPlace.Attribute;
+
         // A string that is empty or white space is not set, as Path is: the reader of the level says so.
         public string? Text(SettingId setting) =>
             PropertyOf(setting) is { } property && GetNamedArgument(attribute, property) is { Value: string written }
@@ -217,6 +219,8 @@ internal static class TargetTypeReader
                 SettingId.InputModelType => AttributeSource.InputModelTypeProperty,
                 SettingId.OutputModelType => AttributeSource.OutputModelTypeProperty,
                 SettingId.CollectionType => AttributeSource.CollectionTypeProperty,
+                // The type override has no attribute level.
+                SettingId.TypeOverrides => null,
                 _ => null,
             };
     }

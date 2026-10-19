@@ -11,6 +11,8 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Sidecars;
+using SqlSource.Generation.Types;
+using SqlSource.Parsing;
 using SqlSource.Settings;
 
 namespace SqlSource;
@@ -69,6 +71,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                     compilation.GetTypeByMetadataName(FloorType)?.GetMembers(FloorMember).IsEmpty == false
             )
             .WithTrackingName(TrackingNames.SupportedFramework);
+
+        // The Npgsql the project references, which chooses the column of the base map.  Like the framework check, it
+        // runs on every compilation and gives an equal value until a reference changes.
+        var npgsqlProbe = context
+            .CompilationProvider.Select(static (compilation, _) => NpgsqlProbe.Read(compilation))
+            .WithTrackingName(TrackingNames.NpgsqlProbe);
 
         // The project's language version, which is the same value until the project's parse options change.
         var unsupportedLanguageVersion = context
@@ -273,11 +281,100 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => SidecarChecker.Check(input))
             .WithTrackingName(TrackingNames.SidecarCheck);
 
+        // The C# types that the type override names at any level, as a sorted list of their names, which an edit that
+        // leaves the names alone gives again, equal.
+        var mappedTypeNames = projectSettings
+            .Combine(filesSettings)
+            .Combine(parsedFiles)
+            .Select(static (input, _) => MappedTypeNames.Collect(input.Left.Left, input.Left.Right, input.Right))
+            .WithTrackingName(TrackingNames.MappedTypeNames);
+
+        // Those types resolved against the compilation.  Like the probe, it runs on every run, since the driver gives
+        // a new compilation each time: a few lookups for each name, and none without an override.  Its value is equal
+        // until a type appears or goes, so nothing after it runs again.
+        var mappedTypes = context
+            .CompilationProvider.Combine(mappedTypeNames)
+            .Select(
+                static (input, cancellationToken) =>
+                    MappedTypeResolver.Resolve(input.Left, input.Right, cancellationToken)
+            )
+            .WithTrackingName(TrackingNames.MappedTypes);
+
+        // The property's type override alone, so that a change to another property types no file again.
+        var projectTypeOverrides = projectLevel.Select(static (level, _) => FileTypesInput.TypeOverridesOf(level));
+
+        // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
+        // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.
+        var fileTypes = sidecarChecks
+            .Combine(parsedFiles.Combine(filesSettings))
+            .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(mappedTypes)))
+            .Select(
+                static (input, _) =>
+                    FileTypesInput.Gather(
+                        input.Left.Left,
+                        input.Left.Right.Left,
+                        input.Left.Right.Right,
+                        input.Right.Left,
+                        input.Right.Right.Left,
+                        input.Right.Right.Right
+                    )
+            )
+            .WithTrackingName(TrackingNames.FileTypesInput)
+            .Select(static (input, _) => QueryTyper.Type(input))
+            .WithTrackingName(TrackingNames.FileTypes);
+
+        // Whether a query of the project needs an entry of postgres, whose types the driver decides.  Without one, the
+        // driver is not reported on.
+        var usesPostgresEntries = fileNeeds
+            .Combine(parsedFiles)
+            .Select(static (input, _) => UsesPostgresEntries(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.UsesPostgresEntries);
+
+        // Not located, and once for the project, however many of its queries need the driver.
+        context.RegisterSourceOutput(
+            npgsqlProbe.Combine(usesPostgresEntries),
+            static (output, input) =>
+            {
+                if (!input.Right)
+                {
+                    return;
+                }
+
+                var probe = input.Left;
+
+                if (probe.IsBelowTheFloor)
+                {
+                    output.ReportDiagnostic(
+                        Diagnostic.Create(SqlDiagnostics.NpgsqlTooOld, Location.None, probe.VersionText)
+                    );
+                }
+
+                if (probe.IsNewerThanKnown)
+                {
+                    output.ReportDiagnostic(
+                        Diagnostic.Create(SqlDiagnostics.NpgsqlNewerThanKnown, Location.None, probe.VersionText)
+                    );
+                }
+            }
+        );
+
         context.RegisterSourceOutput(
             sidecarChecks,
             static (output, check) =>
             {
                 foreach (var diagnostic in check.Diagnostics)
+                {
+                    output.ReportDiagnostic(diagnostic.ToDiagnostic());
+                }
+            }
+        );
+
+        // Beside the checks' output, so that a change to the types alone reports the checks of no file again.
+        context.RegisterSourceOutput(
+            fileTypes,
+            static (output, types) =>
+            {
+                foreach (var diagnostic in types.Diagnostics)
                 {
                     output.ReportDiagnostic(diagnostic.ToDiagnostic());
                 }
@@ -366,6 +463,21 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         }
 
         return values;
+    }
+
+    // A search for each file with needs, so that the cost does not grow with the files that have none.
+    private static bool UsesPostgresEntries(EquatableArray<FileNeeds> fileNeeds, EquatableArray<ParsedSqlFile> files)
+    {
+        foreach (var needs in fileNeeds)
+        {
+            var index = SqlPath.IndexOf(files, needs.NormalizedPath, static file => file.NormalizedPath);
+            if (index >= 0 && files[index].Dialect == SqlDialect.PostgreSql)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private static TypeQueries SelectFiles(

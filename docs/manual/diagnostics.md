@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure: [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245).  The generator reports its errors and warnings in the build.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 119, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: the query's constant or method is still generated.  An error in a sidecar is reported at its line and column in the sidecar.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and one message of information about the version of Npgsql, [SQLSRC248](#sqlsrc248).  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) says.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 119, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: the query's constant or method is still generated.  An error in a sidecar is reported at its line and column in the sidecar.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
 
 **Project and attribute**
 
@@ -105,11 +105,34 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC244](#sqlsrc244) | Entry is stale |
 | [SQLSRC245](#sqlsrc245) | Entry names no query |
 
+**The C# types of a PostgreSQL query**
+
+| Id | Title |
+|----|----|
+| [SQLSRC246](#sqlsrc246) | Type has no C# type |
+| [SQLSRC247](#sqlsrc247) | Npgsql is older than 8.0 |
+| [SQLSRC248](#sqlsrc248) | Npgsql is newer than SqlSource knows |
+| [SQLSRC249](#sqlsrc249) | Type needs Npgsql |
+
+**The type override**
+
+| Id | Title |
+|----|----|
+| [SQLSRC250](#sqlsrc250) | Mapped type is not found |
+| [SQLSRC251](#sqlsrc251) | Mapped type is not accessible |
+| [SQLSRC252](#sqlsrc252) | Mapped type cannot be a property's type |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` to `SQLSRC236` are the errors of describing a query against PostgreSQL, which this version of the tool does for the `postgres` dialect.  It reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
 
 The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` dialect every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209), [SQLSRC210](#sqlsrc210) or [SQLSRC243](#sqlsrc243) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 119, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
+
+The ids `SQLSRC246` and `SQLSRC249` are reported by the build, about the C# types of a query whose output is `models` or `codegen` under the `postgres` dialect and whose entry in its sidecar is current.  Each column and parameter of the entry gets the C# type that Npgsql reads it as, which can depend on the version of Npgsql that the project references, or the type the type override maps its database type to.  Each is reported at the query's name, once for a query: for its first column or parameter that has no C# type, parameters before columns.
+
+The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version of the `Npgsql` package that the project references, directly or through another package.  The C# types of a PostgreSQL query depend on it.  Each is reported once for the project, with no file and line, and only when a query needs an entry in its sidecar under the `postgres` dialect.
+
+The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -316,6 +339,20 @@ Correct the value, or remove it to keep the default.  While it is wrong the sett
 
 `SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceInputModelType` and `SqlSourceOutputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `SqlSourceCollectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `SqlSourceInputModelSuffix` and `SqlSourceOutputModelSuffix` take characters that can be part of an identifier, and `SqlSourceModelNamespace` takes a namespace such as `App.Models`.  `SqlSourceDatabase` takes one word of letters, digits, `-`, `_` and `.`.  The generator does not read it, so a build does not report it; the `sqlsource` tool does.  Where a type's methods go is set by the attribute alone, so there is no property for it.
 
+`SqlSourceTypeOverrides` takes entries `key=type`, separated by spaces or line breaks, and each entry that is not valid is reported on its own, while the others still apply.  A space or a line break inside `<>` or `[]` is part of the entry, so a `<` or a `[` that is never closed makes the rest of the value one entry, which is reported whole, and the entries after it do not apply:
+
+```xml
+<PropertyGroup>
+    <SqlSourceTypeOverrides>timestamp with time zone=DateTimeOffset user_status=MyApp.UserStatus int4=int?</SqlSourceTypeOverrides>
+</PropertyGroup>
+```
+
+- **No space around `=`.**  A space separates entries, so `numeric = double` is three entries, and `timestamp with time zone=...` is four.
+- **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog` is written with its schema, `public.user_status`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.
+- **The C# type is a keyword or a full name from its namespace**, `System.DateTimeOffset` and not `DateTimeOffset`, with no `?` at the end: `int4=int` and not `int4=int?`.  Write a generic's `<` and `>` as `&lt;` and `&gt;` in the project file.
+
+The rules are in [type overrides](settings.md#setting-type-overrides).
+
 The compiler hands a generator only the part of a value before the first `;` or `#`.
 
 See: [A value that is wrong](settings.md#a-value-that-is-wrong)
@@ -472,7 +509,7 @@ See: [Generator parameters](settings.md#setting-generator-parameters)
 
 **Marker value is not valid**
 
-A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:` or `-- collection-type:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
+A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:` or `-- type-override:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
 
 - No generator parameter takes a value: `keep-comments=1` is this error.
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
@@ -488,6 +525,7 @@ A generator parameter has a value it does not take; what follows a name in a `--
 - `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.  `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`.
 - `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`.
 - `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  Neither is a reserved keyword, and no generic type is named.
+- `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog` is written with its schema, `public.user_status`.  The type is a keyword or a full name from its namespace, `System.DateTimeOffset`, with no `?` at the end.  See [type overrides](settings.md#setting-type-overrides).
 
 A `-- token-ignore:` marker holds one name, a C# identifier, and nothing else.
 
@@ -511,6 +549,7 @@ Two settings contradict each other.  The error is at the second.
 - Two `-- param:` markers for one parameter that give different types or different nullability.  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
 - Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different), in the file header or inside one query.
 - Two markers of any other setting of the models and the collection type that give different values in the file header or inside one query: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
+- Two `-- type-override:` markers that give one database type different C# types, in the file header or inside one query.  The key is compared as [type overrides](settings.md#setting-type-overrides) compares it, so `integer` and `int4` are one type, and the C# types by how they are named, so `int` and `System.Int32` are two.
 
 ```sql error
 -- name: ListUsers
@@ -519,7 +558,7 @@ Two settings contradict each other.  The error is at the second.
 SELECT id, name FROM users;
 ```
 
-Remove one of the two.  A query's `-- generator:` list replaces the file header's list, and that is not a conflict.  The same dialect given twice with the same options is not a conflict either.
+Remove one of the two.  A query's `-- generator:` list replaces the file header's list, and a query's `-- type-override:` for a type replaces the file header's for that type: neither is a conflict.  The same dialect given twice with the same options is not a conflict either.
 
 See: [A value that is wrong](settings.md#a-value-that-is-wrong)
 
@@ -1523,3 +1562,118 @@ A `.sql` file that two projects include is the exception.  A run of `describe` o
 This is a warning, since an entry that nothing uses changes no generated code.  A project can list it in `NoWarn` to hide it, or in `WarningsNotAsErrors` to keep it a warning in a project that sets `TreatWarningsAsErrors`.
 
 See: [Sidecar files](tool.md#sidecar-files)
+
+## SQLSRC246
+
+**Type has no C# type**
+
+A column or a parameter of the query has a database type that Npgsql cannot read as a C# value, so SqlSource can give it no C# type.  The message names the column or parameter, its type, and what to do.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC246: The column 'relation' has the type 'regclass', which SqlSource cannot give a C# type.  Cast it to oid in the query.
+```
+
+What to do depends on the type:
+
+- **`regclass`, `regproc`, `regprocedure`, `regoper`, `regoperator`, `regrole`, `regnamespace`, `regcollation` and `regdictionary`.**  Cast the column to `oid` in the query, `SELECT 'users'::regclass::oid AS relation`, which Npgsql reads as a `uint`.  Cast an array of one to `oid[]`, as the message says.
+- **A composite type, which includes a table's row type, and a base type of an extension that SqlSource does not know.**  Map it with the [type override](settings.md#setting-type-overrides) to the C# type that your application reads it as, `public.address=MyApp.Address` for a type that the data source maps, or select its fields as columns of their own.
+- **A range of a subtype that SqlSource does not know, and a multirange of one.**  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.  A project that does not reference Npgsql cannot name `NpgsqlTypes.NpgsqlRange<T>`, so the message tells it to reference Npgsql first.
+- **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`, or cast the column to `text` in the query, as the message says.
+- **`pg_snapshot`, `txid_snapshot`, `pg_node_tree`, and any other base type of `pg_catalog` that SqlSource does not know, such as `aclitem`.**  No version of Npgsql reads them, so a type override would build and fail when the query runs.  Cast the column to `text` in the query, and an array of one to `text[]`, as the message says.
+- **A parameter with no type, `record`, `unknown`, `void`, or a kind of type that this version of SqlSource does not know.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand or written by a newer tool.  Run `dotnet sqlsource describe`.
+
+When the message says to map the type, it names the key of the type with its schema: `public.address`, or `pg_catalog.pg_class` for the row type of a catalog table, since a key without a schema must be a type that SqlSource knows.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  The query's constant or method is still generated.
+
+See: [Types](postgresql.md#type-map)
+
+## SQLSRC247
+
+**Npgsql is older than 8.0**
+
+The project references a version of Npgsql older than 8.0, and SqlSource gives the queries of the `postgres` dialect the C# types of Npgsql 8.0 and later.  The message names the version the project references.
+
+```console
+CSC : error SQLSRC247: This project references Npgsql 7.0.4, and SqlSource needs Npgsql 8.0 or later.  Update the package.
+```
+
+Update the `Npgsql` package to 8.0 or later.  When another package brings the older version, reference `Npgsql` from the project itself, at the version you want.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `postgres` dialect.
+
+See: [Which version of Npgsql](postgresql.md#which-npgsql)
+
+## SQLSRC248
+
+**Npgsql is newer than SqlSource knows**
+
+The project references Npgsql 11 or later, and this version of SqlSource knows the C# types of Npgsql up to version 10.  It gives the queries of the `postgres` dialect the types that Npgsql 10 reads, which are right unless the newer driver reads one of them as another type.  The message names the version the project references.
+
+```console
+info SQLSRC248: This project references Npgsql 11.0.0, which is newer than this version of SqlSource knows.  Its models use the types of Npgsql 10.
+```
+
+Update the `SqlSource` package when a version that knows the driver is released.  This is information, not a warning, so that a project that sets `TreatWarningsAsErrors` still builds on the day it updates Npgsql.  A project can list it in `NoWarn` to hide it:
+
+```xml
+<PropertyGroup>
+    <NoWarn>$(NoWarn);SQLSRC248</NoWarn>
+</PropertyGroup>
+```
+
+It has no file and line, and is reported once for the project, only while a query's output is `models` or `codegen` under the `postgres` dialect.  As information, it is not in the output of `dotnet build`.  An IDE that lists information shows it with the errors and warnings.  A build log has it at the detailed verbosity, `dotnet build -v:detailed -tl:off`, as the sample shows it, since the terminal logger leaves information out at any verbosity.  A binary log, `dotnet build -bl`, has it too.
+
+See: [Which version of Npgsql](postgresql.md#which-npgsql)
+
+## SQLSRC249
+
+**Type needs Npgsql**
+
+The project does not reference Npgsql, and a column or a parameter of the query has a type whose C# type depends on it.  It is either a type that Npgsql reads as a type of its own `NpgsqlTypes` namespace, such as `point`, `tsvector` or `int4range`, or a type that Npgsql 8 and 9 read as one C# type and Npgsql 10 as another: `date`, `time`, `cidr`, `daterange` and `datemultirange`, and an array or a domain of one of them.  Without a reference, SqlSource cannot tell which Npgsql the application runs on.  The message names the column or parameter and its type.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC249: The column 'born' has the type 'date', whose C# type depends on Npgsql, and this project does not reference it.  Reference Npgsql, or map it with the type override for the Npgsql the application runs on: date=System.DateTime on Npgsql 8 and 9, date=System.DateOnly on Npgsql 10.
+```
+
+Reference the `Npgsql` package from the project, at the version the application runs on: every type then gets the C# type of that version.  A project that keeps its queries apart from the driver can map each type that differs with the [type override](settings.md#setting-type-overrides) instead, for the version the application runs on, as the message says: `<SqlSourceTypeOverrides>date=System.DateOnly time=System.TimeOnly</SqlSourceTypeOverrides>` for Npgsql 10.  An entry for `date` maps an array or a domain of `date` too.  The message offers only C# types that a project without Npgsql can name: for `cidr`, `System.Net.IPNetwork` on Npgsql 10, since Npgsql 8 and 9 read it as a type of `NpgsqlTypes`.  `daterange` and `datemultirange` are read as a type of `NpgsqlTypes` on every version, so for them, as for every other type of the `NpgsqlTypes` namespace, the message says to reference Npgsql, which they need.  Every other type has the same C# type on every version of Npgsql, and needs neither.  The query's constant or method is still generated.
+
+See: [Which version of Npgsql](postgresql.md#which-npgsql)
+
+## SQLSRC250
+
+**Mapped type is not found**
+
+The type override maps a database type to a C# type that the project cannot find: no type of that name and number of type arguments is in the project or its references, or more than one reference has one that the project can see and the project has none.  A type of a reference that the project cannot see does not count, so a name that one reference has as `public` and another as `internal` is the public one.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry: the property `SqlSourceTypeOverrides`, the metadata of the file, a `-- type-override:` marker in the file header or one of the query.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC250: The type override maps 'uuid' to 'MyApp.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and no type of that name is found, or more than one reference has one that this project can see.  Correct the name, with its namespace and type arguments, or for a name that two references have, map to a type of this project.
+```
+
+Write the type's full name, from its namespace, with its type arguments: `MyApp.Ids.UserKey`, or `System.Collections.Generic.List<int>`.  A nested type is written with a `.` before its name, as in C#: `MyApp.Outer.Inner`.  When two references have a type of the name that the project can see, map the database type to a type of the project's own, which is always chosen first.  The query's constant or method is still generated.
+
+See: [Type overrides](settings.md#setting-type-overrides)
+
+## SQLSRC251
+
+**Mapped type is not accessible**
+
+The type override maps a database type to a C# type that the project cannot use: the type, or one of its type arguments, is `internal` in another assembly, or is a `private` or `protected` type nested in another, in the project itself or another assembly.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC251: The type override maps 'uuid' to 'Shared.UserKey' for column 'id', in a -- type-override: marker of the query, and this project cannot see that type.  Make it, and each type it is nested in, public, or internal when it is this project's own, or give this project its assembly's internals with InternalsVisibleTo.
+```
+
+Make the type, and each type it is nested in, `public`.  A type of the project itself can be `internal` instead.  For a type of another assembly, you can also add `[assembly: InternalsVisibleTo("YourProject")]` to the assembly that declares it, which lets the project see its `internal` types.  The query's constant or method is still generated.
+
+See: [Type overrides](settings.md#setting-type-overrides)
+
+## SQLSRC252
+
+**Mapped type cannot be a property's type**
+
+The type override maps a database type to a C# type that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC252: The type override maps 'int4' to 'System.Nullable<int>' for column 'id', in the metadata SqlSourceTypeOverrides of the file, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
+```
+
+Map the database type to another C# type.  For `System.Nullable<T>`, map it to `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  The query's constant or method is still generated.
+
+See: [Type overrides](settings.md#setting-type-overrides)

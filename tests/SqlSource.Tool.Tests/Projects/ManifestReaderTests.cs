@@ -25,6 +25,7 @@ public sealed class ManifestReaderTests
         Property.SqlSourceInputModelType=
         Property.SqlSourceOutputModelType=
         Property.SqlSourceCollectionType=
+        Property.SqlSourceTypeOverrides=
         File=/work/src/App/Queries/Users.sql
         File.SqlSourceDialect=
         File.SqlSourceDatabase=billing
@@ -36,6 +37,7 @@ public sealed class ManifestReaderTests
         File.SqlSourceInputModelType=
         File.SqlSourceOutputModelType=
         File.SqlSourceCollectionType=
+        File.SqlSourceTypeOverrides=
         File=/work/src/App/Queries/Orders.sql
         File.SqlSourceDialect=mysql, no-backslash-escapes
         File.SqlSourceDatabase=

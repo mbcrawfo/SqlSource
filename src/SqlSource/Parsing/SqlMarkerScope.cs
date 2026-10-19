@@ -54,6 +54,9 @@ internal sealed class SqlMarkerScope(
 
     private string? _outputModel;
 
+    // Sorted by key as TypeOverrideMap keeps a map, each key once.
+    private List<TypeOverride>? _typeOverrides;
+
     /// <summary>The scope's generator parameters.</summary>
     public SqlGeneratorParameterScope Generator { get; } = new();
 
@@ -126,6 +129,10 @@ internal sealed class SqlMarkerScope(
         {
             SetText(ref _database, marker, SettingValue.IsDatabaseName(Value(marker)));
         }
+        else if (marker.Kind == SqlMarkerKind.TypeOverride)
+        {
+            ReadTypeOverride(marker);
+        }
         else
         {
             ReadModelSetting(marker);
@@ -193,7 +200,8 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.OutputModelType
                 or SqlMarkerKind.CollectionType
                 or SqlMarkerKind.InputModel
-                or SqlMarkerKind.OutputModel;
+                or SqlMarkerKind.OutputModel
+                or SqlMarkerKind.TypeOverride;
 
     private static bool IsAllowedInPreamble(SqlMarkerKind kind) =>
         kind
@@ -205,7 +213,8 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.ModelNamespace
                 or SqlMarkerKind.InputModelType
                 or SqlMarkerKind.OutputModelType
-                or SqlMarkerKind.CollectionType;
+                or SqlMarkerKind.CollectionType
+                or SqlMarkerKind.TypeOverride;
 
     private SettingsLevel BuildLevel() =>
         Generator.Parameters is null
@@ -217,6 +226,7 @@ internal sealed class SqlMarkerScope(
         && _inputModelType is null
         && _outputModelType is null
         && _collectionType is null
+        && _typeOverrides is null
             ? SettingsLevel.None
             : new SettingsLevel
             {
@@ -229,7 +239,11 @@ internal sealed class SqlMarkerScope(
                 InputModelType = _inputModelType,
                 OutputModelType = _outputModelType,
                 CollectionType = _collectionType,
+                TypeOverrides = BuildTypeOverrides(),
             };
+
+    private EquatableArray<TypeOverride>? BuildTypeOverrides() =>
+        _typeOverrides is null ? null : new EquatableArray<TypeOverride>(_typeOverrides.ToImmutableArray());
 
     private ReadOnlySpan<char> Value(SqlMarker marker) => text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length);
 
@@ -268,6 +282,30 @@ internal sealed class SqlMarkerScope(
         else
         {
             field = value;
+        }
+    }
+
+    // One entry, with white space allowed around its "=".  The entries of a scope add up, one for each key; the same
+    // type twice is fine, and another type for a key is a conflict, the first standing.  The types are compared as
+    // their text, so int and System.Int32 are two.  A file's header is the place of its preamble's entries.
+    private void ReadTypeOverride(SqlMarker marker)
+    {
+        var place = scopeKind == SqlScopeKind.Preamble ? SettingPlace.FileHeader : SettingPlace.Query;
+        if (!TypeOverrideGrammar.TryReadEntry(Value(marker), spacesAroundEquals: true, place, out var entry))
+        {
+            AddInvalid(marker);
+            return;
+        }
+
+        _typeOverrides ??= [];
+        var at = TypeOverrideMap.IndexOf(_typeOverrides, entry!.Key);
+        if (at < 0)
+        {
+            _typeOverrides.Insert(~at, entry);
+        }
+        else if (!string.Equals(_typeOverrides[at].Type, entry.Type, StringComparison.Ordinal))
+        {
+            AddConflict(marker);
         }
     }
 

@@ -485,6 +485,102 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc245"
     );
 
+    // {0} is the column or parameter, as "column 'id'", {1} its type as the database spells it, and {2} the help,
+    // without its period: the cast for a type Npgsql reads once it is cast, and otherwise the type override's entry
+    // for its key.
+    public static readonly DiagnosticDescriptor TypeHasNoCSharpType = new(
+        id: "SQLSRC246",
+        title: "Type has no C# type",
+        messageFormat: "The {0} has the type '{1}', which SqlSource cannot give a C# type.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc246",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor NpgsqlTooOld = new(
+        id: "SQLSRC247",
+        title: "Npgsql is older than 8.0",
+        messageFormat: "This project references Npgsql {0}, and SqlSource needs Npgsql 8.0 or later.  Update the "
+            + "package.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc247",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // Information a project may configure, not a warning: the models of a newer Npgsql use the types of Npgsql 10,
+    // which are right unless the newer driver changed one, and a warning would break the build of every project that
+    // treats warnings as errors on the day it updates the driver.
+    public static readonly DiagnosticDescriptor NpgsqlNewerThanKnown = new(
+        id: "SQLSRC248",
+        title: "Npgsql is newer than SqlSource knows",
+        messageFormat: "This project references Npgsql {0}, which is newer than this version of SqlSource knows.  Its "
+            + "models use the types of Npgsql 10.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc248"
+    );
+
+    // {0} is the column or parameter, as "column 'id'", {1} its type as the database spells it, and {2} the help,
+    // without its period: to reference Npgsql, and for a type whose C# type differs between the drivers, the type
+    // override's entry for each.
+    public static readonly DiagnosticDescriptor TypeNeedsNpgsql = new(
+        id: "SQLSRC249",
+        title: "Type needs Npgsql",
+        messageFormat: "The {0} has the type '{1}', whose C# type depends on Npgsql, and this project does not "
+            + "reference it.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc249",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the column or parameter, as "column 'id'", {1} the key, {2} the C# type and {3} the place that wrote the
+    // entry, as "the property SqlSourceTypeOverrides".
+    public static readonly DiagnosticDescriptor MappedTypeNotFound = new(
+        id: "SQLSRC250",
+        title: "Mapped type is not found",
+        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and no type of that name is found, or "
+            + "more than one reference has one that this project can see.  Correct the name, with its namespace and "
+            + "type arguments, or for a name that two references have, map to a type of this project.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc250",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor MappedTypeNotAccessible = new(
+        id: "SQLSRC251",
+        title: "Mapped type is not accessible",
+        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and this project cannot see that type.  "
+            + "Make it, and each type it is nested in, public, or internal when it is this project's own, or give this "
+            + "project its assembly's internals with InternalsVisibleTo.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc251",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor MappedTypeNotAPropertyType = new(
+        id: "SQLSRC252",
+        title: "Mapped type cannot be a property's type",
+        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and no property can have that type.  "
+            + "Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its "
+            + "property nullable.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc252",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -530,7 +626,14 @@ internal static class SqlDiagnostics
             EntryEngineDiffers,
             EngineHasNoTypeMap,
             EntryIsStale,
-            OrphanEntry
+            OrphanEntry,
+            TypeHasNoCSharpType,
+            NpgsqlTooOld,
+            NpgsqlNewerThanKnown,
+            TypeNeedsNpgsql,
+            MappedTypeNotFound,
+            MappedTypeNotAccessible,
+            MappedTypeNotAPropertyType
         );
 
     /// <summary>

@@ -242,4 +242,13 @@ internal sealed record GeneratorRun(
     IReadOnlyList<string> CompilationErrors,
     IReadOnlyList<string> GeneratedCodeWarnings,
     GeneratorDriverRunResult Result
-);
+)
+{
+    // The one severity of every diagnostic of the id that the generator reported.
+    public DiagnosticSeverity SeverityOf(string id) =>
+        Result
+            .Diagnostics.Where(diagnostic => diagnostic.Id == id)
+            .Select(diagnostic => diagnostic.Severity)
+            .Distinct()
+            .Single();
+}

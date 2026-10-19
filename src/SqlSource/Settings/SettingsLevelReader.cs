@@ -5,8 +5,9 @@ namespace SqlSource.Settings;
 
 /// <summary>
 /// Reads a <see cref="SettingsLevel" /> from a source that is not a marker.  This is the one place that says which
-/// members such a level has, what makes a text and a list of generator parameters valid, and that a text which is
-/// empty or white space is not set.  A choice is decoded by its source, which alone knows how one is written.
+/// members such a level has, what makes a text, a list of generator parameters and a type override valid, and that a
+/// text which is empty or white space is not set.  A choice is decoded by its source, which alone knows how one is
+/// written.
 /// </summary>
 internal static class SettingsLevelReader
 {
@@ -32,6 +33,7 @@ internal static class SettingsLevelReader
             InputModelType = source.Choice<ModelKind>(SettingId.InputModelType),
             OutputModelType = source.Choice<ModelKind>(SettingId.OutputModelType),
             CollectionType = source.Choice<CollectionKind>(SettingId.CollectionType),
+            TypeOverrides = ReadTypeOverrides(ref source),
         };
 
         // A source that sets nothing shares the empty level.
@@ -55,6 +57,26 @@ internal static class SettingsLevelReader
         }
 
         return parameters;
+    }
+
+    // An entry that is not valid is recorded as written, and the other entries apply.  A list with no valid entry
+    // is not set.
+    private static EquatableArray<TypeOverride>? ReadTypeOverrides<TSource>(ref TSource source)
+        where TSource : struct, ISettingSource
+    {
+        if (source.Text(SettingId.TypeOverrides) is not { } list || string.IsNullOrWhiteSpace(list))
+        {
+            return null;
+        }
+
+        var entries = new List<string>();
+        var overrides = TypeOverrideGrammar.ReadList(list, source.Place, entries);
+        foreach (var entry in entries)
+        {
+            source.Invalid(SettingId.TypeOverrides, entry);
+        }
+
+        return overrides.Count == 0 ? null : overrides;
     }
 
     private static string? ReadText<TSource>(ref TSource source, SettingId setting, Validator isValid)

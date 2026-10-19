@@ -15,4 +15,5 @@ internal enum SettingId
     InputModelType,
     OutputModelType,
     CollectionType,
+    TypeOverrides,
 }

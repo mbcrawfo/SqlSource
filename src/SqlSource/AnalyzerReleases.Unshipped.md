@@ -83,3 +83,10 @@ SQLSRC242 | SqlSource | Error | Entry is of another database
 SQLSRC243 | SqlSource | Error | No type map for the dialect
 SQLSRC244 | SqlSource | Error | Entry is stale
 SQLSRC245 | SqlSource | Warning | Entry names no query
+SQLSRC246 | SqlSource | Error | Type has no C# type
+SQLSRC247 | SqlSource | Error | Npgsql is older than 8.0
+SQLSRC248 | SqlSource | Info | Npgsql is newer than SqlSource knows
+SQLSRC249 | SqlSource | Error | Type needs Npgsql
+SQLSRC250 | SqlSource | Error | Mapped type is not found
+SQLSRC251 | SqlSource | Error | Mapped type is not accessible
+SQLSRC252 | SqlSource | Error | Mapped type cannot be a property's type

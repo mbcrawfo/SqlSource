@@ -274,6 +274,11 @@ public sealed class FixtureProjectTests : IDisposable
         var manifest = evaluation.Manifest.ShouldNotBeNull();
         manifest.Properties["SqlSourceDialect"].ShouldBe("postgres");
         manifest.Properties["SqlSourceGeneratorParameters"].ShouldBe("sort-input no-token-validation");
+        manifest
+            .Properties["SqlSourceTypeOverrides"]
+            .ShouldBe(
+                "timestamptz=System.DateTimeOffset hstore=System.Collections.Generic.Dictionary<string, string?>"
+            );
 
         string Query(params string[] parts) => Path.Combine([folder, "Queries", .. parts]);
         var files = manifest.Files.ToDictionary(file => file.Path, file => file.Metadata);
@@ -284,6 +289,9 @@ public sealed class FixtureProjectTests : IDisposable
         files[Query("Parameters", "Kept.sql")]
             ["SqlSourceGeneratorParameters"]
             .ShouldBe("no-token-validation keep-comments");
+        files[Query("Parameters", "Kept.sql")]
+            ["SqlSourceTypeOverrides"]
+            .ShouldBe("int4[]=System.Collections.Generic.List<int?> date=default");
         manifest.CompileFiles.ShouldBe([Path.Combine(folder, "UserQueries.cs")]);
     }
 }

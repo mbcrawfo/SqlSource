@@ -143,7 +143,13 @@ public sealed class RunPlannerErrorTests : IDisposable
         var project = Project();
         project.Properties["SqlSourceGeneratorParameters"] = "keep-coments";
         project.Properties["SqlSourceInputModelSuffix"] = "a b";
-        _ = project.AddSql("Q/One.sql", "SELECT 1;", ("SqlSourceCollectionType", "bag"));
+        project.Properties["SqlSourceTypeOverrides"] = "timestampz=int";
+        _ = project.AddSql(
+            "Q/One.sql",
+            "SELECT 1;",
+            ("SqlSourceCollectionType", "bag"),
+            ("SqlSourceTypeOverrides", "int4=Guid")
+        );
 
         Plans.Result(project).Errors.ShouldBeEmpty();
     }

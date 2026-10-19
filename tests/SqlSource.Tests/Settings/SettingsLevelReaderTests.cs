@@ -63,6 +63,7 @@ public sealed class SettingsLevelReaderTests
     [InlineData("OutputModelSuffix")]
     [InlineData("ModelNamespace")]
     [InlineData("Parameters")]
+    [InlineData("TypeOverrides")]
     public void Read_TextThatIsWhiteSpace_IsNotSetAndNotRecorded(string setting)
     {
         var source = new FakeSource(new Dictionary<SettingId, string> { [Enum.Parse<SettingId>(setting)] = " \t " });
@@ -82,6 +83,48 @@ public sealed class SettingsLevelReaderTests
             .Read(ref source)
             .Parameters.ShouldBe(GeneratorParameters.KeepComments | GeneratorParameters.SortInput);
         source.Invalids.ShouldBe([(SettingId.Parameters, "nope"), (SettingId.Parameters, "other")]);
+    }
+
+    [Fact]
+    public void Read_TypeOverrides_AreReadSortedAtThePlaceOfTheSource()
+    {
+        var source = new FakeSource(
+            new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = " timestamptz=default\n int4=long " },
+            SettingPlace.Metadata
+        );
+
+        SettingsLevelReader
+            .Read(ref source)
+            .TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([
+                new TypeOverride("int4", "long", SettingPlace.Metadata),
+                new TypeOverride("timestamptz", null, SettingPlace.Metadata),
+            ]);
+        source.Invalids.ShouldBeEmpty();
+    }
+
+    // Each entry that is not valid is recorded as written, and the others apply.
+    [Fact]
+    public void Read_TypeOverrideThatIsNotValid_IsRecordedAndTheOthersApply()
+    {
+        var source = new FakeSource(
+            new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = "int4=long timestampz=int int8=Guid" }
+        );
+
+        SettingsLevelReader
+            .Read(ref source)
+            .TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Property)]);
+        source.Invalids.ShouldBe([(SettingId.TypeOverrides, "timestampz=int"), (SettingId.TypeOverrides, "int8=Guid")]);
+    }
+
+    [Fact]
+    public void Read_TypeOverridesThatAreNoneValid_AreNotSet()
+    {
+        var source = new FakeSource(new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = "timestampz=int" });
+
+        SettingsLevelReader.Read(ref source).ShouldBeSameAs(SettingsLevel.None);
+        source.Invalids.ShouldBe([(SettingId.TypeOverrides, "timestampz=int")]);
     }
 
     [Fact]
@@ -123,8 +166,11 @@ public sealed class SettingsLevelReaderTests
     private static string? TextOf(SettingsLevel level, SettingId setting) => Texts[setting](level);
 
     // A source over a dictionary.  A choice is written as the member's name.
-    private struct FakeSource(Dictionary<SettingId, string> texts) : ISettingSource
+    private struct FakeSource(Dictionary<SettingId, string> texts, SettingPlace place = SettingPlace.Property)
+        : ISettingSource
     {
+        public readonly SettingPlace Place => place;
+
         public List<(SettingId Setting, string Value)> Invalids { get; } = [];
 
         public List<SettingId> Asked { get; } = [];

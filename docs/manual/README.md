@@ -27,6 +27,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Know what the tool needs of my PostgreSQL database | [PostgreSQL](postgresql.md#connecting) |
 | Know why a column is recorded as possibly null | [Which columns can be null](postgresql.md#nullability) |
 | Know which queries the tool cannot describe | [What can be described](postgresql.md#what-can-be-described) |
+| Know which C# type a PostgreSQL type gets, or choose another | [Types](postgresql.md#type-map), [type overrides](settings.md#setting-type-overrides) |
 | Look up a build error or a tool error | [Diagnostics](diagnostics.md) |
 | Find a problem that is not an error | The known issues of [`.sql` files](sql-files.md#known-issues), [settings](settings.md#known-issues), [parameters and tokens](parameters-and-tokens.md#known-issues), [dialects](dialects.md#known-issues), [the generator](generator.md#known-issues), [the tool](tool.md#known-issues) and [PostgreSQL](postgresql.md#known-issues) |
 
@@ -48,11 +49,12 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
 | An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
 | Describing PostgreSQL queries | Available | [PostgreSQL](postgresql.md) |
+| The C# type of each column and parameter of a described PostgreSQL query, and an error in the build for one that has none | Available; no effect yet on generated code | [Types](postgresql.md#type-map) |
 | Describing SQL Server queries | Coming ([SQLSRC216](diagnostics.md#sqlsrc216) until then) | [SQL Server](sqlserver.md) |
 | Models for the parameters and rows of a query | Coming | [Models](generator.md#models) |
 | Generated query methods | Coming | [Query methods](generator.md#query-methods) |
 | Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |
-| Custom type mapping | Coming | Not documented until it is delivered; for a PostgreSQL type that cannot be sent today, see [SQLSRC232](diagnostics.md#sqlsrc232) |
+| Custom type mapping: the type override, `SqlSourceTypeOverrides` and `-- type-override:` | Accepted and checked; takes effect with models in a later release | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
 | Build integration: the tool running in your build | Coming | Not documented until it is delivered; today you run the tool yourself: [install the tool](tool.md#install-the-tool) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |
 

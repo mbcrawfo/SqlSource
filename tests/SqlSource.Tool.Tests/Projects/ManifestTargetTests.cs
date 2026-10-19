@@ -23,13 +23,14 @@ public sealed class ManifestTargetTests : IDisposable
         "SqlSourceInputModelType",
         "SqlSourceOutputModelType",
         "SqlSourceCollectionType",
+        "SqlSourceTypeOverrides",
     ];
 
     private readonly FixtureProjects _fixtures = new();
 
     public void Dispose() => _fixtures.Dispose();
 
-    // The lines of one file: its File line and the ten under it, with the values that are not empty.
+    // The lines of one file: its File line and the eleven under it, with the values that are not empty.
     private static string[] FileLines(string path, params (string Name, string Value)[] metadata) =>
         [
             "File=" + path,

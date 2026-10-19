@@ -1,0 +1,80 @@
+using SqlSource.Generation.MSBuild;
+using SqlSource.Generation.Paths;
+using SqlSource.Generation.Sidecars;
+using SqlSource.Settings;
+
+namespace SqlSource.Generation.Types;
+
+/// <summary>
+/// One claimed file with everything its types read.  It compares equal until one of them changes, so an edit to
+/// another file, to another sidecar or to a setting other than the type override types this one again only when its
+/// own value changed.
+/// </summary>
+/// <param name="Check">What the checks of the file's sidecar gave, its usable entries among them.</param>
+/// <param name="File">
+/// The parsed file, or null when no entry of it is usable.  Such a file carries nothing else but the probe, since it
+/// has nothing to type.
+/// </param>
+/// <param name="Metadata">
+/// The type override of the metadata of the file's item, as a level that says nothing else.
+/// </param>
+/// <param name="Property">The type override of the project's property, as a level that says nothing else.</param>
+/// <param name="Probe">The Npgsql the project references, which chooses the column of the base map.</param>
+/// <param name="MappedTypes">The C# types that the type override names at any level, resolved.</param>
+internal sealed record FileTypesInput(
+    SidecarCheckResult Check,
+    ParsedSqlFile? File,
+    SettingsLevel Metadata,
+    SettingsLevel Property,
+    NpgsqlProbe Probe,
+    EquatableArray<MappedType> MappedTypes
+)
+{
+    /// <summary>
+    /// Finds the parsed file and the metadata of <paramref name="check" />'s file.  Both lists are sorted by
+    /// <see cref="SqlPath.Comparer" />.  <paramref name="property" /> is the property's type override alone, as
+    /// <see cref="TypeOverridesOf" /> gives it.
+    /// </summary>
+    public static FileTypesInput Gather(
+        SidecarCheckResult check,
+        EquatableArray<ParsedSqlFile> files,
+        EquatableArray<FileSettings> filesSettings,
+        SettingsLevel property,
+        NpgsqlProbe probe,
+        EquatableArray<MappedType> mappedTypes
+    )
+    {
+        var fileIndex =
+            check.UsableEntries.Count == 0
+                ? -1
+                : SqlPath.IndexOf(files, check.NormalizedPath, static file => file.NormalizedPath);
+        if (fileIndex < 0)
+        {
+            return new FileTypesInput(
+                check,
+                null,
+                SettingsLevel.None,
+                SettingsLevel.None,
+                probe,
+                EquatableArray<MappedType>.Empty
+            );
+        }
+
+        var settingsIndex = SqlPath.IndexOf(filesSettings, check.NormalizedPath, static file => file.NormalizedPath);
+        return new FileTypesInput(
+            check,
+            files[fileIndex],
+            settingsIndex < 0 ? SettingsLevel.None : TypeOverridesOf(filesSettings[settingsIndex].Level),
+            property,
+            probe,
+            mappedTypes
+        );
+    }
+
+    /// <summary>
+    /// The type override of <paramref name="level" /> as a level that says nothing else, so that a change to another
+    /// setting gives an equal level.  <see cref="SettingsLevel.None" /> when it has none.
+    /// </summary>
+    public static SettingsLevel TypeOverridesOf(SettingsLevel level) =>
+        level.TypeOverrides is null ? SettingsLevel.None : new SettingsLevel { TypeOverrides = level.TypeOverrides };
+}
