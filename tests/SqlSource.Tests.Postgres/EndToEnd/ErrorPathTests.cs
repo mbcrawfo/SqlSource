@@ -32,18 +32,26 @@ public sealed class ErrorPathTests(PostgresContainer postgres) : IDisposable
                 : ["describe", project, "--connection", ConnectionArgument]
         );
 
-    private Task CreateTableAsync() =>
-        postgres.ExecuteAsync($"CREATE TABLE {Table} (id integer PRIMARY KEY, name text NOT NULL)");
-
-    private Task DropTableAsync() => postgres.ExecuteAsync($"DROP TABLE IF EXISTS {Table}");
+    // Runs a test's body with the table of the query made, and drops it again however the body ends.
+    private async Task WithWidgetsTableAsync(Func<Task> body)
+    {
+        await postgres.ExecuteAsync($"CREATE TABLE {Table} (id integer PRIMARY KEY, name text NOT NULL)");
+        try
+        {
+            await body();
+        }
+        finally
+        {
+            await postgres.ExecuteAsync($"DROP TABLE IF EXISTS {Table}");
+        }
+    }
 
     [Fact]
     public async Task Check_QueryEditedAfterDescribe_IsOutOfDate()
     {
         var project = _projects.Copy("ErrorPaths");
         var queries = Path.Combine(Path.GetDirectoryName(project)!, "Widgets.sql");
-        await CreateTableAsync();
-        try
+        await WithWidgetsTableAsync(async () =>
         {
             var described = await DescribeAsync(project);
             described.ExitCode.ShouldBe(0, described.Error);
@@ -59,19 +67,14 @@ public sealed class ErrorPathTests(PostgresContainer postgres) : IDisposable
 
             result.ExitCode.ShouldBe(2, result.Out);
             result.Error.ShouldContain("SQLSRC219");
-        }
-        finally
-        {
-            await DropTableAsync();
-        }
+        });
     }
 
     [Fact]
     public async Task Check_ColumnAddedAfterDescribe_IsOutOfDate()
     {
         var project = _projects.Copy("ErrorPaths");
-        await CreateTableAsync();
-        try
+        await WithWidgetsTableAsync(async () =>
         {
             var described = await DescribeAsync(project);
             described.ExitCode.ShouldBe(0, described.Error);
@@ -82,11 +85,7 @@ public sealed class ErrorPathTests(PostgresContainer postgres) : IDisposable
 
             result.ExitCode.ShouldBe(2, result.Out);
             result.Error.ShouldContain("SQLSRC219");
-        }
-        finally
-        {
-            await DropTableAsync();
-        }
+        });
     }
 
     [Fact]
@@ -100,18 +99,13 @@ public sealed class ErrorPathTests(PostgresContainer postgres) : IDisposable
             "-- name: GetMissing\nSELECT id FROM error_path_no_such_table;\n",
             TestContext.Current.CancellationToken
         );
-        await CreateTableAsync();
-        try
+        await WithWidgetsTableAsync(async () =>
         {
             var result = await DescribeAsync(project);
 
             result.ExitCode.ShouldBe(1, result.Out);
             result.Error.ShouldContain("SQLSRC225");
             File.Exists(refused + ".json").ShouldBeFalse();
-        }
-        finally
-        {
-            await DropTableAsync();
-        }
+        });
     }
 }
