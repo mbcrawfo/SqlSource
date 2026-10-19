@@ -80,8 +80,8 @@ internal static class RealisticParameters
         if (values.Count != parameters.Count)
         {
             throw new InvalidOperationException(
-                $"The input model {input.Name} is built from {values.Count} values, and the query has "
-                    + $"{parameters.Count} parameters."
+                $"The input model {input.Name} takes one value for each parameter, but the count of values is "
+                    + $"{values.Count} and the count of parameters is {parameters.Count}."
             );
         }
 

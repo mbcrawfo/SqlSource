@@ -83,8 +83,8 @@ public sealed class RealisticParametersTests
             RealisticParameters.ModelOf(typeof(R), Parameters, new object?[count])
         );
 
-        thrown.Message.ShouldContain($"{count} values");
-        thrown.Message.ShouldContain("2 parameters");
+        thrown.Message.ShouldContain($"count of values is {count}");
+        thrown.Message.ShouldContain("count of parameters is 2");
     }
 
     [Fact]
