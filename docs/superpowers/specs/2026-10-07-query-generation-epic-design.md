@@ -817,6 +817,7 @@ The describer against a SQL Server container, recorded as fixtures for `SqlSourc
 3. `JsonDocument` and `JsonElement`: built into Npgsql, by parsing on SQL Server.  `SqlJson` on SqlClient 6.0 and later, gated on its flag.
 4. Detection from the compilation keyed on the plugin assembly, a property per library, and the three map-row shapes under Types in C#.
 5. The user documentation of the library maps, in the pages that the phase map of `docs/manual/AGENTS.md` names, among them the README's "NodaTime and other libraries" section, with the `Use...()` call each plugin needs; the Types section of each database page in `docs/manual/`; and a row in `docs/manual/settings.md` for each library's property.
+6. An example of each map in each example project, by the rules of `examples/AGENTS.md`.
 
 ### Decided
 
