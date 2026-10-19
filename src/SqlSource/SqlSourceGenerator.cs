@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Models;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Sidecars;
@@ -304,8 +305,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var projectTypeOverrides = projectLevel.Select(static (level, _) => FileTypesInput.TypeOverridesOf(level));
 
         // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
-        // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.
-        var fileTypes = sidecarChecks
+        // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.  Each
+        // file keeps its input beside its types, so that the models read its entries without typing it again.
+        var typedFiles = sidecarChecks
             .Combine(parsedFiles.Combine(filesSettings))
             .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(mappedTypes)))
             .Select(
@@ -320,8 +322,16 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                     )
             )
             .WithTrackingName(TrackingNames.FileTypesInput)
-            .Select(static (input, _) => QueryTyper.Type(input))
-            .WithTrackingName(TrackingNames.FileTypes);
+            .Select(static (input, _) => new TypedFile(input, QueryTyper.Type(input)))
+            .WithTrackingName(TrackingNames.TypedFile);
+
+        var fileTypes = typedFiles.Select(static (file, _) => file.Types).WithTrackingName(TrackingNames.FileTypes);
+
+        // The properties of each file's models and the errors of their names, once for each file, whatever the number
+        // of types that claim it, since no setting of a type changes them.
+        var fileModels = typedFiles
+            .Select(static (file, _) => ModelReader.Read(file))
+            .WithTrackingName(TrackingNames.FileModels);
 
         // Whether a query of the project needs an entry of postgres, whose types the driver decides.  Without one, the
         // driver is not reported on.
@@ -375,6 +385,18 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             static (output, types) =>
             {
                 foreach (var diagnostic in types.Diagnostics)
+                {
+                    output.ReportDiagnostic(diagnostic.ToDiagnostic());
+                }
+            }
+        );
+
+        // Beside the types' output, so that a change to the models alone reports the types of no file again.
+        context.RegisterSourceOutput(
+            fileModels,
+            static (output, models) =>
+            {
+                foreach (var diagnostic in models.Diagnostics)
                 {
                     output.ReportDiagnostic(diagnostic.ToDiagnostic());
                 }

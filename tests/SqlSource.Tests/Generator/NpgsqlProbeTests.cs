@@ -282,7 +282,9 @@ public sealed class NpgsqlProbeTests
         StepOutputs
             .Single<FileTypes>(run, TrackingNames.FileTypes)
             .Queries.ShouldHaveSingleItem()
-            .Columns.ShouldBe([new PropertyType(expected, isValueType, true, false, key)]);
+            .Columns.ShouldBe([
+                new PropertyType(expected, isValueType, true, false, key, "the property SqlSourceTypeOverrides"),
+            ]);
     }
 
     [Fact]
@@ -312,7 +314,7 @@ public sealed class NpgsqlProbeTests
         StepOutputs
             .Single<FileTypes>(run, TrackingNames.FileTypes)
             .Queries.ShouldHaveSingleItem()
-            .Columns.ShouldBe([new PropertyType(expected, isValueType, true, false, internalName)]);
+            .Columns.ShouldBe([new PropertyType(expected, isValueType, true, false, internalName, null)]);
     }
 
     // The project at the output, under postgres unless the dialect is given, with these references.

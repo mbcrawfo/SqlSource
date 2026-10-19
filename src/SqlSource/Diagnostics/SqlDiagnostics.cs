@@ -581,6 +581,69 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the column's position, 1-based, and {1} the query's name.
+    public static readonly DiagnosticDescriptor ColumnHasNoName = new(
+        id: "SQLSRC253",
+        title: "Column has no name",
+        messageFormat: "The column at position {0} of the query '{1}' has no name.  Give it an alias.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc253",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the column or parameter, as "column 'id'", {1} the property name it gives, and {2} the help, without its
+    // period: an alias for a column, a new name for a parameter.
+    public static readonly DiagnosticDescriptor PropertyNameNotIdentifier = new(
+        id: "SQLSRC254",
+        title: "Name is not an identifier after PascalCase",
+        messageFormat: "The {0} gives the property name '{1}', which is not a C# identifier.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc254",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} and {1} are the two columns or parameters, as "column 'id' at position 1", {2} the property name of the
+    // first, and {3} the help, without its period.
+    public static readonly DiagnosticDescriptor PropertyNameRepeated = new(
+        id: "SQLSRC255",
+        title: "Two names give one property name",
+        messageFormat: "The {0} and the {1} give one property name, '{2}', ignoring case.  {3}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc255",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the column or parameter, as "column 'id'", {1} the property name it gives, {2} what takes it, as "a
+    // record or object already has", and {3} the help, without its period.
+    public static readonly DiagnosticDescriptor PropertyNameTaken = new(
+        id: "SQLSRC256",
+        title: "Property name is taken",
+        messageFormat: "The {0} gives the property name '{1}', which {2}.  {3}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc256",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor OutputModelWithoutRows = new(
+        id: "SQLSRC259",
+        title: "Output model on a query without rows",
+        messageFormat: "The query '{0}' names an output model, and its statement returns no rows.  Remove the "
+            + "-- output-model: marker.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc259",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -633,7 +696,12 @@ internal static class SqlDiagnostics
             TypeNeedsNpgsql,
             MappedTypeNotFound,
             MappedTypeNotAccessible,
-            MappedTypeNotAPropertyType
+            MappedTypeNotAPropertyType,
+            ColumnHasNoName,
+            PropertyNameNotIdentifier,
+            PropertyNameRepeated,
+            PropertyNameTaken,
+            OutputModelWithoutRows
         );
 
     /// <summary>

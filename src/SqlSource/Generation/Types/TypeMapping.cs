@@ -16,8 +16,8 @@ namespace SqlSource.Generation.Types;
 /// What a failure's message adds, or null: for <see cref="TypeMappingKind.CastToOid" />,
 /// <see cref="TypeMappingKind.CastToText" /> and <see cref="TypeMappingKind.NeedsNpgsql10" />, the type to cast to,
 /// an array of it for an array; for <see cref="TypeMappingKind.DiffersByDriver" />, the entry of the type
-/// override for each driver whose C# type is not of <c>NpgsqlTypes</c>, or null when neither is; and for a failure
-/// of a type the override names, the place that wrote the entry.
+/// override for each driver whose C# type is not of <c>NpgsqlTypes</c>, or null when neither is; and for a type the
+/// override names, found or not, the place that wrote the entry.
 /// </param>
 internal sealed record TypeMapping(
     TypeMappingKind Kind,

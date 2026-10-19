@@ -90,3 +90,8 @@ SQLSRC249 | SqlSource | Error | Type needs Npgsql
 SQLSRC250 | SqlSource | Error | Mapped type is not found
 SQLSRC251 | SqlSource | Error | Mapped type is not accessible
 SQLSRC252 | SqlSource | Error | Mapped type cannot be a property's type
+SQLSRC253 | SqlSource | Error | Column has no name
+SQLSRC254 | SqlSource | Error | Name is not an identifier after PascalCase
+SQLSRC255 | SqlSource | Error | Two names give one property name
+SQLSRC256 | SqlSource | Error | Property name is taken
+SQLSRC259 | SqlSource | Error | Output model on a query without rows

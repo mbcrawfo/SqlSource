@@ -134,7 +134,14 @@ internal static class QueryTyper
         var mapping = PostgresTypeMap.Map(postgres, typing.Column, typing.Lookup);
         if (mapping is { Kind: TypeMappingKind.Mapped, Text: { } text })
         {
-            return new PropertyType(text, mapping.IsValueType, mapping.IsPublic, mapping.IsObsolete, mapping.Key);
+            return new PropertyType(
+                text,
+                mapping.IsValueType,
+                mapping.IsPublic,
+                mapping.IsObsolete,
+                mapping.Key,
+                mapping.Detail
+            );
         }
 
         typing.Diagnostics.Add(Diagnose(mapping, Subject(owner, name), postgres.Name, typing.Location, typing.Column));
@@ -355,9 +362,10 @@ internal static class QueryTyper
                 MappedTypeStatus.NotAPropertyType => TypeMappingKind.MappedTypeNotAPropertyType,
                 MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous or _ => TypeMappingKind.MappedTypeNotFound,
             };
+            var place = PlaceOf(entry.Place);
             return kind == TypeMappingKind.Mapped
-                ? new TypeMapping(kind, entry.Key, name, mapped!.IsValueType, mapped.IsPublic, mapped.IsObsolete, null)
-                : new TypeMapping(kind, entry.Key, name, false, false, false, PlaceOf(entry.Place));
+                ? new TypeMapping(kind, entry.Key, name, mapped!.IsValueType, mapped.IsPublic, mapped.IsObsolete, place)
+                : new TypeMapping(kind, entry.Key, name, false, false, false, place);
         }
 
         // The place that wrote an entry, as SQLSRC250 to SQLSRC252 name it.  The attribute has no level for the type

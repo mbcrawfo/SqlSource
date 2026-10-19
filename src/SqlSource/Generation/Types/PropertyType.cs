@@ -9,4 +9,15 @@ namespace SqlSource.Generation.Types;
 /// The key that answered: of the type override's entry, or of the row of the base map, which may be the key of an
 /// array's element or of a domain's base.
 /// </param>
-internal sealed record PropertyType(string Text, bool IsValueType, bool IsPublic, bool IsObsolete, string Key);
+/// <param name="Place">
+/// The place that wrote the type override's entry, as <c>SQLSRC250</c> to <c>SQLSRC252</c> word it, for a type the
+/// override names, or null for a type of the base map.
+/// </param>
+internal sealed record PropertyType(
+    string Text,
+    bool IsValueType,
+    bool IsPublic,
+    bool IsObsolete,
+    string Key,
+    string? Place
+);

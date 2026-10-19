@@ -43,7 +43,7 @@ public sealed class QueryTypesTests
 
     private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
-    private static readonly PropertyType Int = new("int", true, true, false, "int4");
+    private static readonly PropertyType Int = new("int", true, true, false, "int4", null);
 
     [Theory]
     [InlineData("none")]
@@ -73,7 +73,7 @@ public sealed class QueryTypesTests
         var run = Run(Driver(driver), Users, Entry(Users, "GetUser", [], [Column("born", Catalog("date"))]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run).ShouldBe([new PropertyType(expected, true, true, false, "date")]);
+        ColumnsOf(run).ShouldBe([new PropertyType(expected, true, true, false, "date", null)]);
     }
 
     [Fact]
@@ -103,7 +103,7 @@ public sealed class QueryTypesTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run).ShouldBe([new PropertyType("global::NpgsqlTypes.NpgsqlCube", true, true, false, "cube")]);
+        ColumnsOf(run).ShouldBe([new PropertyType("global::NpgsqlTypes.NpgsqlCube", true, true, false, "cube", null)]);
     }
 
     [Fact]
@@ -194,7 +194,17 @@ public sealed class QueryTypesTests
                 + "C# type.  Map it with the type override, as pg_catalog.pg_class=<a C# type>.",
         ]);
         mappedRun.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(mappedRun).ShouldBe([new PropertyType("global::MyApp.Tag", false, true, false, "pg_class")]);
+        ColumnsOf(mappedRun)
+            .ShouldBe([
+                new PropertyType(
+                    "global::MyApp.Tag",
+                    false,
+                    true,
+                    false,
+                    "pg_class",
+                    "a -- type-override: marker in the file header"
+                ),
+            ]);
     }
 
     // The tool never writes record, unknown or void, or a kind this version does not know, so describing again
@@ -356,7 +366,7 @@ public sealed class QueryTypesTests
                 new QueryTypes(
                     "GetUser",
                     Of<PropertyType>(),
-                    Of(Int, new PropertyType("string", false, true, false, "text"))
+                    Of(Int, new PropertyType("string", false, true, false, "text", null))
                 ),
                 new QueryTypes("DeleteUser", Of(Int), null),
             ]);
@@ -365,12 +375,18 @@ public sealed class QueryTypesTests
     // A domain over an array over a domain over text: the array's element is the inner domain, and its type is
     // text's, or the override's of the inner domain, which reaches it through the array and the outer domain.
     [Theory]
-    [InlineData("", "string[]", "text")]
-    [InlineData("-- type-override: public.tag=MyApp.Tag\n", "global::MyApp.Tag[]", "public.tag")]
+    [InlineData("", "string[]", "text", null)]
+    [InlineData(
+        "-- type-override: public.tag=MyApp.Tag\n",
+        "global::MyApp.Tag[]",
+        "public.tag",
+        "a -- type-override: marker in the file header"
+    )]
     public void Run_DomainOverAnArrayOverADomain_IsAnArrayOfTheInnerDomainsType(
         string marker,
         string expected,
-        string key
+        string key,
+        string? place
     )
     {
         var tag = TestSidecars.Postgres(
@@ -398,7 +414,7 @@ public sealed class QueryTypesTests
         var run = Run([NpgsqlReferences.Npgsql10], file, Entry(file, "GetUser", [], [Column("tags", tags)]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run).ShouldBe([new PropertyType(expected, false, true, false, key)]);
+        ColumnsOf(run).ShouldBe([new PropertyType(expected, false, true, false, key, place)]);
     }
 
     private static MetadataReference[] Driver(string driver) =>
