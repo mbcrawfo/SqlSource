@@ -63,11 +63,27 @@ internal static class TargetTypeReader
             placement,
             source.Choice<MethodPlacement>(AttributeSource.MethodLocationProperty) ?? MethodPlacement.ExtensionClass,
             SettingsLevelReader.Read(ref source),
+            IsPublic(symbol),
             ReadPath(attribute),
             reference.SyntaxTree.FilePath,
             attributeLocation,
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
         );
+    }
+
+    // A model is public or internal, so the declared accessibility of the type and of each type it is nested in is
+    // all that decides it: anything but public makes the type, and so its models, internal at most.
+    private static bool IsPublic(INamedTypeSymbol symbol)
+    {
+        for (var type = symbol; type is not null; type = type.ContainingType)
+        {
+            if (type.DeclaredAccessibility != Accessibility.Public)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     // A nested class cannot share its name with a member of the type, with the type itself or with one of the

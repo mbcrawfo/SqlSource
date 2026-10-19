@@ -14,6 +14,8 @@ internal static class HintName
 {
     private const string Extension = ".g.cs";
 
+    private const string ModelExtension = "-Model" + Extension;
+
     /// <summary>
     /// The namespace and each type name joined with dots.  A generic type's name is followed by its arity, so that
     /// <c>Repository</c> and <c>Repository&lt;T&gt;</c> get different names.  Every character is one a hint name may
@@ -22,7 +24,7 @@ internal static class HintName
     /// </summary>
     public static string Create(TargetType type)
     {
-        var name = new StringBuilder(type.Namespace.Replace("@", string.Empty));
+        var name = new StringBuilder(type.NamespaceValue);
         foreach (var declaration in type.Types)
         {
             if (name.Length > 0)
@@ -39,6 +41,14 @@ internal static class HintName
 
         return name.Append(Extension).ToString();
     }
+
+    /// <summary>
+    /// The name of a model's file: its full name, the namespace's value and the name joined with a dot, then
+    /// <c>-Model.g.cs</c>.  No type's file can have the name, since a <c>-</c> in a type's is followed only by its
+    /// arity's digits.
+    /// </summary>
+    /// <param name="fullName">The model's full name, from identifier values.</param>
+    public static string ForModel(string fullName) => fullName + ModelExtension;
 
     /// <summary>
     /// The names that are equal, ignoring case, to another name or to the name of the generated attribute's file.

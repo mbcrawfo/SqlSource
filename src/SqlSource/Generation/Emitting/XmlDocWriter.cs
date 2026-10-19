@@ -52,6 +52,15 @@ internal static class XmlDocWriter
             .Append("}}</c>.</param>\n");
 
     /// <summary>
+    /// Appends XML as documentation comment lines, one for each of its lines, so that a line terminator in the text,
+    /// which a quoted name of the database can hold, starts a new comment line instead of ending the comment.
+    /// </summary>
+    /// <param name="builder">The source being built.</param>
+    /// <param name="indent">The whitespace that starts each line.</param>
+    /// <param name="xml">The XML: already escaped, and free to hold tags.</param>
+    public static void AppendXml(StringBuilder builder, string indent, string xml) => AppendLines(builder, indent, xml);
+
+    /// <summary>
     /// Appends the <c>returns</c> of the method of a query that has tokens.
     /// </summary>
     /// <param name="builder">The source being built.</param>

@@ -333,6 +333,31 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (file, _) => ModelReader.Read(file))
             .WithTrackingName(TrackingNames.FileModels);
 
+        // Every file's models, sorted by path, so that a type finds the models of each of its files with a search.
+        var allFileModels = fileModels
+            .Collect()
+            .Select(static (files, _) => ToSorted(files, static file => file.NormalizedPath))
+            .WithTrackingName(TrackingNames.AllFileModels);
+
+        // What each type asks for of its queries' models, which only its own settings decide.  A change to a type or
+        // to a file's models that leaves the type's requests alone gives an equal value, and nothing after it runs.
+        var typeModels = typeQueries
+            .Combine(allFileModels)
+            .Combine(projectLevel)
+            .Select(static (input, _) => TypeModels.Of(input.Left.Left, input.Left.Right, input.Right))
+            .WithTrackingName(TrackingNames.TypeModels);
+
+        // Every type's requests together, by full name, since two types or two queries can ask for one model.
+        var modelGroups = typeModels
+            .SelectMany(static (requests, _) => requests)
+            .Collect()
+            .Select(static (requests, _) => ModelCollector.Group(requests))
+            .WithTrackingName(TrackingNames.ModelGroups);
+
+        var models = modelGroups
+            .Select(static (groups, _) => ModelCollector.Resolve(groups))
+            .WithTrackingName(TrackingNames.Models);
+
         // Whether a query of the project needs an entry of postgres, whose types the driver decides.  Without one, the
         // driver is not reported on.
         var usesPostgresEntries = fileNeeds
@@ -401,6 +426,30 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                     output.ReportDiagnostic(diagnostic.ToDiagnostic());
                 }
             }
+        );
+
+        // Apart from the models' sources, so that a change to one model reports nothing again.
+        context.RegisterSourceOutput(
+            models.Select(static (set, _) => set.Diagnostics),
+            static (output, diagnostics) =>
+            {
+                foreach (var diagnostic in diagnostics)
+                {
+                    output.ReportDiagnostic(diagnostic.ToDiagnostic());
+                }
+            }
+        );
+
+        // One node for each model, compared by position, so that an edit writes again only the models whose record
+        // changed, and those after a model that was added or removed.
+        var modelOutputs = models
+            .SelectMany(static (set, _) => set.Models)
+            .Select(static (model, _) => (model.HintName, Source: ModelEmitter.Emit(model)))
+            .WithTrackingName(TrackingNames.ModelOutput);
+
+        context.RegisterSourceOutput(
+            modelOutputs,
+            static (output, model) => output.AddSource(model.HintName, SourceText.From(model.Source, Encoding.UTF8))
         );
 
         context.RegisterSourceOutput(

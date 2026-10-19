@@ -55,17 +55,23 @@ internal static class TypeEmitter
         );
     }
 
-    // A file contributes all of its queries or none: one that has a query with a name that cannot be used here is
-    // left out, with a diagnostic for each such query.  Each query goes with what the metadata of its file's item says.
-    private static List<(SqlQuery Query, string FileName, SettingsLevel Metadata)> SelectMembers(
+    /// <summary>
+    /// Which of the type's files it can use.  A file contributes all of its queries or none: one that has a query
+    /// with a name that cannot be used here (<c>SQLSRC008</c>, <c>SQLSRC009</c>) is left out, with a diagnostic for
+    /// each such query when <paramref name="diagnostics" /> is given.
+    /// </summary>
+    /// <param name="type">The type.</param>
+    /// <param name="files">The type's files, in member order.</param>
+    /// <param name="diagnostics">Where the diagnostics go, or null when the caller does not report them.</param>
+    /// <returns>One element for each of <paramref name="files" />: whether the type can use it.</returns>
+    public static bool[] FindUsableFiles(
         TargetType type,
         EquatableArray<ParsedSqlFile> files,
-        EquatableArray<SettingsLevel> fileSettings,
-        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+        ImmutableArray<DiagnosticInfo>.Builder? diagnostics
     )
     {
         var containingTypeName = type.Placement == MemberPlacement.Nested ? NestedClassName : type.Name;
-        var members = new List<(SqlQuery Query, string FileName, SettingsLevel Metadata)>();
+        var usable = new bool[files.Count];
         var fileOfName = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var index = 0; index < files.Count; index++)
         {
@@ -75,7 +81,7 @@ internal static class TypeEmitter
             {
                 if (string.Equals(query.Name, containingTypeName, StringComparison.Ordinal))
                 {
-                    diagnostics.Add(
+                    diagnostics?.Add(
                         DiagnosticInfo.Create(
                             SqlDiagnostics.QueryNamedLikeContainingType,
                             query.NameLocation,
@@ -87,7 +93,7 @@ internal static class TypeEmitter
                 }
                 else if (fileOfName.TryGetValue(query.Name, out var firstFile))
                 {
-                    diagnostics.Add(
+                    diagnostics?.Add(
                         DiagnosticInfo.Create(
                             SqlDiagnostics.DuplicateQueryName,
                             query.NameLocation,
@@ -105,9 +111,36 @@ internal static class TypeEmitter
                 continue;
             }
 
+            usable[index] = true;
             foreach (var query in file.Queries)
             {
                 fileOfName.Add(query.Name, file.FileName);
+            }
+        }
+
+        return usable;
+    }
+
+    // The queries of the files the type can use, each with what the metadata of its file's item says.
+    private static List<(SqlQuery Query, string FileName, SettingsLevel Metadata)> SelectMembers(
+        TargetType type,
+        EquatableArray<ParsedSqlFile> files,
+        EquatableArray<SettingsLevel> fileSettings,
+        ImmutableArray<DiagnosticInfo>.Builder diagnostics
+    )
+    {
+        var usable = FindUsableFiles(type, files, diagnostics);
+        var members = new List<(SqlQuery Query, string FileName, SettingsLevel Metadata)>();
+        for (var index = 0; index < files.Count; index++)
+        {
+            if (!usable[index])
+            {
+                continue;
+            }
+
+            var file = files[index];
+            foreach (var query in file.Queries)
+            {
                 members.Add((query, file.FileName, fileSettings[index]));
             }
         }
