@@ -1,8 +1,11 @@
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot.Reading;
+using SqlSource.Tests.Postgres.Realistic;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;
@@ -16,8 +19,15 @@ public sealed class CheckTests(PostgresContainer postgres)
     // The number of entries of the sidecars under EndToEnd/ and Realistic/Cases/, by the database each was described
     // against.
     private static int CommittedEntries(string database) =>
-        new[] { RepositoryPaths.EndToEnd, RepositoryPaths.RealisticCases }
-            .SelectMany(static folder => Directory.EnumerateFiles(folder, "*.sql.json", SearchOption.AllDirectories))
+        Entries(
+            new[] { RepositoryPaths.EndToEnd, RepositoryPaths.RealisticCases }.SelectMany(static folder =>
+                Directory.EnumerateFiles(folder, "*.sql.json", SearchOption.AllDirectories)
+            ),
+            database
+        );
+
+    private static int Entries(IEnumerable<string> sidecars, string database) =>
+        sidecars
             .SelectMany(static path => SidecarReader.Read(File.ReadAllText(path)).Sidecar.ShouldNotBeNull(path).Queries)
             .Count(entry => entry.Database == database);
 
@@ -30,25 +40,58 @@ public sealed class CheckTests(PostgresContainer postgres)
         app.ShouldBeGreaterThan(0);
         billing.ShouldBeGreaterThan(0);
         realistic.ShouldBeGreaterThan(0);
-
-        var result = await EndToEndTool.RunAsync(
-            RepositoryPaths.Root,
-            "describe",
-            "--check",
-            RepositoryPaths.EndToEndProject,
-            "--connection",
-            PostgresContainer.AppDatabase + "=" + postgres.ConnectionStringOf(PostgresContainer.AppDatabase),
-            "--connection",
-            PostgresContainer.BillingDatabase + "=" + postgres.ConnectionStringOf(PostgresContainer.BillingDatabase),
-            "--connection",
-            PostgresContainer.RealisticDatabase + "=" + postgres.RealisticConnectionString
-        );
-
-        result.ExitCode.ShouldBe(0, result.Error);
-        result.Out.ShouldBe(
+        var others =
             $"app (postgres): {app} same, 0 differ, 0 failed\n"
-                + $"billing (postgres): {billing} same, 0 differ, 0 failed\n"
-                + $"realistic (postgres): {realistic} same, 0 differ, 0 failed\n"
+            + $"billing (postgres): {billing} same, 0 differ, 0 failed\n";
+
+        var withModels = RealisticCases.All.Where(static found => found.HasModels).ToList();
+        var checkedHere = withModels.Where(found => found.IsCheckedOn(postgres.Major)).ToList();
+        if (checkedHere.Count == withModels.Count)
+        {
+            var result = await CheckAsync([
+                .. Connection(PostgresContainer.AppDatabase),
+                .. Connection(PostgresContainer.BillingDatabase),
+                .. Connection(PostgresContainer.RealisticDatabase),
+            ]);
+
+            result.ExitCode.ShouldBe(0, result.Error);
+            result.Out.ShouldBe(others + $"realistic (postgres): {realistic} same, 0 differ, 0 failed\n");
+            return;
+        }
+
+        // A server that leaves cases out, by their minimumMajor or their checkedFrom, gets two runs, since a filtered
+        // check compares only what it names: the realistic cases that it checks, each named by its query.sql, and
+        // the other databases whole, named by --database alone, so that none of their queries goes unchecked.
+        checkedHere.ShouldNotBeEmpty();
+        var checkedEntries = Entries(
+            checkedHere.Select(static found => found.SidecarPath),
+            PostgresContainer.RealisticDatabase
         );
+        var realisticResult = await CheckAsync([
+            "--database",
+            PostgresContainer.RealisticDatabase,
+            .. Connection(PostgresContainer.RealisticDatabase),
+            .. checkedHere.Select(static found => Path.Combine(found.Folder, RealisticCase.QueryFile)),
+        ]);
+        var othersResult = await CheckAsync([
+            "--database",
+            PostgresContainer.AppDatabase,
+            "--database",
+            PostgresContainer.BillingDatabase,
+            .. Connection(PostgresContainer.AppDatabase),
+            .. Connection(PostgresContainer.BillingDatabase),
+        ]);
+
+        checkedEntries.ShouldBeLessThan(realistic);
+        realisticResult.ExitCode.ShouldBe(0, realisticResult.Error);
+        realisticResult.Out.ShouldBe($"realistic (postgres): {checkedEntries} same, 0 differ, 0 failed\n");
+        othersResult.ExitCode.ShouldBe(0, othersResult.Error);
+        othersResult.Out.ShouldBe(others);
     }
+
+    private static Task<CliResult> CheckAsync(IEnumerable<string> args) =>
+        EndToEndTool.RunAsync(RepositoryPaths.Root, ["describe", "--check", RepositoryPaths.EndToEndProject, .. args]);
+
+    private string[] Connection(string database) =>
+        ["--connection", database + "=" + postgres.ConnectionStringOf(database)];
 }

@@ -76,7 +76,8 @@ internal static class RealisticCases
             read.Refusal,
             ColumnsOf(read, named),
             SamplesOf(read, named),
-            ModelsOf(read, named)
+            ModelsOf(read, named),
+            CheckedFromOf(read, named)
         );
     }
 
@@ -189,6 +190,49 @@ internal static class RealisticCases
         return new ModelRefusal(models.Refusal, models.Why);
     }
 
+    // The major from which a case's sidecar is checked, for a case that an earlier major describes otherwise: one of
+    // the recorded majors, above the case's minimum, which already keeps the earlier ones from running it, and said
+    // why.
+    private static CheckedFrom? CheckedFromOf(CaseJson read, string named)
+    {
+        if (read.CheckedFrom is not { } from)
+        {
+            return null;
+        }
+
+        if (read.Refusal is not null || read.Models is not null)
+        {
+            throw Fault(named, "puts a checkedFrom on a case with no models, which has no sidecar to check");
+        }
+
+        const string Says = "says from which major its sidecar is checked, but";
+        if (from.Major is not { } major)
+        {
+            throw Fault(named, $"{Says} checkedFrom names no major");
+        }
+
+        if (!PostgresContainer.RecordedMajors.Contains(major))
+        {
+            throw Fault(
+                named,
+                $"{Says} checkedFrom names {major}, which is not a recorded major: "
+                    + string.Join(" or ", PostgresContainer.RecordedMajors)
+            );
+        }
+
+        if (read.MinimumMajor is { } minimum && major <= minimum)
+        {
+            throw Fault(named, $"{Says} checkedFrom is not above its minimumMajor, {minimum}");
+        }
+
+        if (string.IsNullOrWhiteSpace(from.Why))
+        {
+            throw Fault(named, $"{Says} checkedFrom gives no why");
+        }
+
+        return new CheckedFrom(major, from.Why);
+    }
+
     private static InvalidOperationException Fault(string named, string fault) =>
         new($"The {RealisticCase.CaseFile} of the case {named} {fault}.");
 
@@ -203,7 +247,8 @@ internal static class RealisticCases
         string? Refusal,
         List<ColumnJson>? Columns,
         List<Dictionary<string, string>>? Samples,
-        ModelsJson? Models
+        ModelsJson? Models,
+        CheckedFromJson? CheckedFrom
     );
 
     [SuppressMessage(
@@ -219,4 +264,11 @@ internal static class RealisticCases
         Justification = "JsonSerializer makes it."
     )]
     private sealed record ModelsJson(string? Refusal, string? Why);
+
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JsonSerializer makes it."
+    )]
+    private sealed record CheckedFromJson(int? Major, string? Why);
 }

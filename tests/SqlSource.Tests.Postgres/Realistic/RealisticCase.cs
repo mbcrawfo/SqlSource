@@ -17,9 +17,14 @@ internal sealed record TruthColumn(string Name, bool Nullable, string? Why, stri
 // case keeps the SQL that it refuses.
 internal sealed record ModelRefusal(string Id, string Why);
 
+// The first major whose description a case's sidecar holds, for a case that an earlier major describes otherwise,
+// and why.
+internal sealed record CheckedFrom(int Major, string Why);
+
 // One realistic case: a folder with a query, its truth and its sample values, the description recorded of it on each
 // major version of the server, and the sidecar of its models.  A case refused by the describer has the failure's id
-// and no columns; one whose models the generator refuses says so by Models.  A sample set holds a SQL literal for each
+// and no columns; one whose models the generator refuses says so by Models, and one whose sidecar an earlier major
+// describes otherwise says from which major it is checked by CheckedFrom.  A sample set holds a SQL literal for each
 // parameter, by its name without @, compared ignoring case.
 internal sealed record RealisticCase(
     string Name,
@@ -28,7 +33,8 @@ internal sealed record RealisticCase(
     string? Refusal,
     IReadOnlyList<TruthColumn> Columns,
     IReadOnlyList<IReadOnlyDictionary<string, string>> Samples,
-    ModelRefusal? Models = null
+    ModelRefusal? Models = null,
+    CheckedFrom? CheckedFrom = null
 )
 {
     // A complete SqlSource file with exactly one query, read as FixtureReplay reads a fixture's.
@@ -58,6 +64,11 @@ internal sealed record RealisticCase(
 
     // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
     public bool RunsOn(int major) => MinimumMajor is not { } minimum || minimum <= major;
+
+    // Whether "describe --check" on the server of that major compares the case's sidecar: the case has one, the
+    // server runs it, and the server describes it as the sidecar holds.
+    public bool IsCheckedOn(int major) =>
+        HasModels && RunsOn(major) && (CheckedFrom is not { } from || from.Major <= major);
 
     // The description as RealisticDescribe renders it, recorded on the server of that major version.
     public string ExpectedPath(int major) =>

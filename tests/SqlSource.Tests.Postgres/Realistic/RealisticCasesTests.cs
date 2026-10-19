@@ -205,6 +205,31 @@ public sealed class RealisticCasesTests
         "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"\" } }",
         "models gives no why"
     )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"why\": \"w\" } }",
+        "checkedFrom names no major"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"major\": 15, \"why\": \"w\" } }",
+        "checkedFrom names 15, which is not a recorded major"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"minimumMajor\": 18, \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
+        "checkedFrom is not above its minimumMajor"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \" \" } }",
+        "checkedFrom gives no why"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"refusal\": \"SQLSRC229\", \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
+        "checkedFrom on a case with no models"
+    )]
+    [InlineData(
+        "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"w\" },"
+            + " \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
+        "checkedFrom on a case with no models"
+    )]
     public void Read_CaseJsonThatIsWrong_ThrowsNamingTheCaseAndTheFault(string json, string fault)
     {
         using var temp = new TempFolder();
@@ -231,6 +256,54 @@ public sealed class RealisticCasesTests
 
         found.Models.ShouldBe(new ModelRefusal("SQLSRC255", "two ids"));
         found.HasModels.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Read_CaseWithCheckedFrom_ReadsIt()
+    {
+        using var temp = new TempFolder();
+        _ = temp.WriteFile("later/query.sql", Query);
+        _ = temp.WriteFile(
+            "later/case.json", /*lang=json,strict*/
+            "{ \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"a later plan\" } }"
+        );
+
+        RealisticCases.Read(temp.PathOf("later")).CheckedFrom.ShouldBe(new CheckedFrom(18, "a later plan"));
+    }
+
+    // A case whose sidecar an earlier major cannot describe as recorded is left out of --check there, as is one that
+    // the server does not run.
+    [Theory]
+    [InlineData(null, null, 14, true)]
+    [InlineData(17, null, 14, false)]
+    [InlineData(17, null, 18, true)]
+    [InlineData(null, 18, 14, false)]
+    [InlineData(null, 18, 18, true)]
+    public void IsCheckedOn_CaseAndServer_IsWhetherCheckComparesIt(
+        int? minimum,
+        int? checkedFrom,
+        int major,
+        bool expected
+    ) =>
+        (
+            Case() with
+            {
+                MinimumMajor = minimum,
+                CheckedFrom = checkedFrom is { } from ? new CheckedFrom(from, "w") : null,
+            }
+        )
+            .IsCheckedOn(major)
+            .ShouldBe(expected);
+
+    // A refused case has no sidecar, so --check has nothing of it to compare on any major.
+    [Theory]
+    [InlineData("SQLSRC229", null)]
+    [InlineData(null, "SQLSRC255")]
+    public void IsCheckedOn_RefusedOrModelRefusedCase_IsNever(string? refusal, string? models)
+    {
+        var found = Case() with { Refusal = refusal, Models = models is null ? null : new ModelRefusal(models, "w") };
+
+        PostgresContainer.RecordedMajors.ShouldAllBe(major => !found.IsCheckedOn(major));
     }
 
     [Fact]
