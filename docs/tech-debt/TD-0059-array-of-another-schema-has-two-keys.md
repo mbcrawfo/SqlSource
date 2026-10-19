@@ -13,7 +13,7 @@ A type of another schema may itself be named with a leading `_`, `CREATE TYPE pu
 
 ## Impact
 
-Low.  A user who writes `public._user_status` gets the mapping, and a user who mixes the spellings across levels gets the `_` entry wherever it is, with no error that says so.  From sub-phase 5.3, a model then has the C# type of the entry the user meant to replace.
+Low.  A user who writes `public._user_status` gets the mapping, and a user who mixes the spellings across levels gets the `_` entry wherever it is, with no error that says so.  A model then has the C# type of the entry the user meant to replace.
 
 ## Proposed fix
 
@@ -21,4 +21,4 @@ In `OverrideLookup.Find`, skip the own key of an array of any schema, so that an
 
 ## Trigger
 
-A user's report of an array entry that does not take effect, or the models of sub-phase 5.3, whose properties make the wrong type visible.
+A user's report of an array entry that does not take effect.  The models of sub-phase 5.3, whose properties make the wrong type visible, have shipped with phase 5.
