@@ -62,4 +62,7 @@ internal enum SqlMarkerKind
     /// <c>-- type-override:</c> maps one database type to a C# type, for a query or for every query of its file.
     /// </summary>
     TypeOverride,
+
+    /// <summary><c>-- column:</c> sets the nullability of one column of its query's result.</summary>
+    Column,
 }

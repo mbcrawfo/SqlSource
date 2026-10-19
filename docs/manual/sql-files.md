@@ -38,6 +38,7 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | `-- input-model:`, `-- output-model:` | The name of one query's model | no | yes | [Name of one query's model](settings.md#setting-model-name) |
 | `-- collection-type:` | The type that holds many rows (no effect yet) | yes | yes | [Collection type](settings.md#setting-collection-type) |
 | `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line | yes | yes | [Type overrides](settings.md#setting-type-overrides) |
+| `-- column:` | Says whether one column of the query's result can be null, for its property in the output model, and leaves the column's name alone | no | yes | [Setting a column's nullability with a marker](generator.md#column-marker) |
 
 > **Coming in a later release.**  `-- collection-type:`, which has no effect yet, will say what a generated query method returns many rows in; today it is read and checked, and changes no generated code.  See [what works today](README.md#what-works-today).
 

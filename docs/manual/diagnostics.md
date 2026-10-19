@@ -133,6 +133,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC257](#sqlsrc257) | Two models of one name differ |
 | [SQLSRC258](#sqlsrc258) | Model name cannot be used |
 | [SQLSRC259](#sqlsrc259) | Output model on a query without rows |
+| [SQLSRC260](#sqlsrc260) | Column marker names no usable column |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
@@ -146,7 +147,7 @@ The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version
 
 The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
-The ids from `SQLSRC253` to `SQLSRC259` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, and `SQLSRC259` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
+The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259` and `SQLSRC260`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, `SQLSRC259` and `SQLSRC260` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259` and `SQLSRC260`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -523,7 +524,7 @@ See: [Generator parameters](settings.md#setting-generator-parameters)
 
 **Marker value is not valid**
 
-A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:` or `-- type-override:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
+A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:` or `-- type-override:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
 
 - No generator parameter takes a value: `keep-comments=1` is this error.
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
@@ -547,6 +548,8 @@ A `-- token:` marker holds exactly one token with a default, `{{name:default}}`,
 
 A `-- param:` marker starts with the parameter as the SQL writes it, `@name`, alone or followed by a space.
 
+A `-- column:` marker holds a column's name, then `null` or `not null`, as in `-- column: total not null`.  A name with white space, or one that is the word `null` or `not`, is written in double quotes, with a quote inside it doubled: `-- column: "total due" not null`.
+
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
 See: [Marker index](sql-files.md#marker-index)
@@ -560,6 +563,7 @@ Two settings contradict each other.  The error is at the second.
 - `default` beside another generator parameter in the file header, or inside one query: `default` is the empty list, and a list that holds something is not empty.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 - Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
+- Two `-- column:` markers for one column, its name compared ignoring case, of which one says `null` and the other `not null`.
 - Two `-- param:` markers for one parameter that give different types or different nullability.  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
 - Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different), in the file header or inside one query.
 - Two markers of any other setting of the models and the collection type that give different values in the file header or inside one query: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
@@ -665,6 +669,8 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 | `-- input-model-type:`, `-- output-model-type:` | yes | yes |
 | `-- input-model:`, `-- output-model:` | no | yes |
 | `-- collection-type:` | yes | yes |
+| `-- type-override:` | yes | yes |
+| `-- column:` | no | yes |
 
 The table is this error's, with two exceptions.  A `-- summary:` in the file header is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
 
@@ -1895,3 +1901,34 @@ DELETE FROM users WHERE id = @id;
 Remove the marker.  To read the rows the statement changes instead, add a `RETURNING` clause and run `dotnet sqlsource describe`.  The query's constant or method is still generated.
 
 See: [Which queries get models](generator.md#which-models)
+
+## SQLSRC260
+
+**Column marker names no usable column**
+
+A `-- column:` marker, which sets the nullability of one column of its query's result, cannot be used.  Either it names no column of the result, its name compared ignoring case, or the query returns no rows; or it names a column whose alias already ends in `!` or `?`, which says the column's nullability too.  The error is at the marker, and the message says which it is.
+
+```console
+/work/App/Queries/Payments.sql(2,1): error SQLSRC260: The -- column: marker for 'totl' names no column of the query's result.  Name a column as the query returns it.
+/work/App/Queries/Payments.sql(3,1): error SQLSRC260: The -- column: marker for 'note' names a column whose alias already ends in ! or ?.  Remove the mark from the alias, or the marker.
+```
+
+```sql error
+-- name: GetTotals
+-- column: totl not null
+-- column: note null
+SELECT sum(amount) AS total, max(note) AS "note?" FROM payments;
+```
+
+Name the column as the query returns it: its alias, or its own name when it has none.  For a column whose alias ends in a mark, keep one of the two: remove the marker, or remove the mark from the alias, which changes the query, and run `dotnet sqlsource describe`.  Where the rows are read by the names of their columns, as Dapper reads them, keep the marker:
+
+```sql postgres
+-- name: GetTotals
+-- column: total not null
+-- column: note null
+SELECT sum(amount) AS total, max(note) AS note FROM payments;
+```
+
+The query's constant or method is still generated.
+
+See: [Setting a column's nullability with a marker](generator.md#column-marker)

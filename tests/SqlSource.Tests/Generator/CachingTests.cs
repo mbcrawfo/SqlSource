@@ -1361,6 +1361,44 @@ public sealed class CachingTests
             .ShouldContain("GetOrderDto(string Value)");
     }
 
+    // A -- column: marker is a comment, so the query's hash, and so its sidecar, stays current: only Users is parsed
+    // again, and only its model is emitted again, with the column nullable.
+    [Fact]
+    public void Run_ColumnMarkerAdded_ParsesOnlyThatFileAndEmitsOnlyItsModelAgain()
+    {
+        var compilation = ModelsCompilation();
+        var driver = FirstRunOfModels(compilation, _users, _orders);
+
+        var edited = new InMemoryAdditionalText(_users.Path, "-- name: GetUser\n-- column: value null\nSELECT 1;\n");
+        var result = Run(driver.ReplaceAdditionalText(_users, edited), compilation);
+
+        result.Diagnostics.ShouldBeEmpty();
+        ParseInputs(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_users.Path] = IncrementalStepRunReason.Modified,
+                    [_orders.Path] = IncrementalStepRunReason.Cached,
+                    [_payments.Path] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        ModelReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Orders.GetOrderDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Users.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                },
+                ignoreOrder: true
+            );
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("GetUserDto-Model.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("GetUserDto(int? Value)");
+    }
+
     // The model App.Shared.Row is the marker's in Orders and Users alike.  Orders comes first, so its request is the
     // model.  Whichever file is edited, the two now differ, which is SQLSRC257 at Users, and the model is the request
     // of Orders alone, so its summary no longer names Users.  The edit of Orders changes the model's property too;

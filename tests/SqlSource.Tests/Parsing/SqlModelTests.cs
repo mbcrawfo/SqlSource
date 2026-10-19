@@ -39,7 +39,8 @@ public sealed class SqlModelTests
             string? tokenDefault = null,
             ResultShape? shape = null,
             string? keptSql = null,
-            SettingsLevel? markers = null
+            SettingsLevel? markers = null,
+            bool? columnIsNullable = null
         )
         {
             EquatableArray<SqlSegment>? kept = keptSql is null
@@ -59,7 +60,12 @@ public sealed class SqlModelTests
                 new EquatableArray<SqlQueryParameter>([new SqlQueryParameter(parameter, null, null, false)]),
                 markers ?? SettingsLevel.None,
                 null,
-                null
+                null,
+                columnIsNullable is { } isNullable
+                    ? new EquatableArray<SqlColumnMarker>([
+                        new SqlColumnMarker("total", isNullable, new TextSpan(20, 21)),
+                    ])
+                    : EquatableArray<SqlColumnMarker>.Empty
             );
         }
 
@@ -78,5 +84,8 @@ public sealed class SqlModelTests
             .ShouldNotBe(
                 Create("SELECT 1 FROM ", markers: new SettingsLevel { Parameters = GeneratorParameters.SortInput })
             );
+        Create("SELECT 1 FROM ", columnIsNullable: true).ShouldBe(Create("SELECT 1 FROM ", columnIsNullable: true));
+        Create("SELECT 1 FROM ").ShouldNotBe(Create("SELECT 1 FROM ", columnIsNullable: true));
+        Create("SELECT 1 FROM ", columnIsNullable: true).ShouldNotBe(Create("SELECT 1 FROM ", columnIsNullable: false));
     }
 }

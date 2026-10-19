@@ -672,6 +672,19 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the column's name as the marker gives it, {1} what is wrong with it, as "names no column of the query's
+    // result", and {2} the help, without its period.
+    public static readonly DiagnosticDescriptor ColumnMarkerUnusable = new(
+        id: "SQLSRC260",
+        title: "Column marker names no usable column",
+        messageFormat: "The -- column: marker for '{0}' {1}.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc260",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -731,7 +744,8 @@ internal static class SqlDiagnostics
             PropertyNameTaken,
             ModelsDiffer,
             ModelNameUnusable,
-            OutputModelWithoutRows
+            OutputModelWithoutRows,
+            ColumnMarkerUnusable
         );
 
     /// <summary>

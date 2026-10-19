@@ -39,7 +39,8 @@ public sealed class SqlFileReaderTests
                 EquatableArray<SqlQueryParameter>.Empty,
                 SettingsLevel.None,
                 null,
-                null
+                null,
+                EquatableArray<ColumnMarker>.Empty
             ),
             new SqlQuery(
                 "ListUsers",
@@ -52,7 +53,8 @@ public sealed class SqlFileReaderTests
                 EquatableArray<SqlQueryParameter>.Empty,
                 SettingsLevel.None,
                 null,
-                null
+                null,
+                EquatableArray<ColumnMarker>.Empty
             ),
         ]);
     }
@@ -75,7 +77,8 @@ public sealed class SqlFileReaderTests
                 EquatableArray<SqlQueryParameter>.Empty,
                 SettingsLevel.None,
                 null,
-                null
+                null,
+                EquatableArray<ColumnMarker>.Empty
             ),
         ]);
     }
@@ -85,6 +88,16 @@ public sealed class SqlFileReaderTests
         Read("-- name: Q\n-- token: {{b:y}}\nSELECT {{a:x}}, {{b}};\n")
             .Queries.ShouldHaveSingleItem()
             .Tokens.ShouldBe([new SqlToken("a", "x"), new SqlToken("b", "y")]);
+
+    // "-- column: b null" is the 17 characters from 33, on the third line.
+    [Fact]
+    public void Read_QueryWithColumnMarkers_CopiesThemWithTheirLocations() =>
+        Read("-- name: Q\n-- column: a not null\n-- column: b null\nSELECT 1 AS a, 2 AS b;\n")
+            .Queries.ShouldHaveSingleItem()
+            .ColumnMarkers.ShouldBe([
+                new ColumnMarker("a", false, Location(new TextSpan(11, 21), 1, 0, 1, 21)),
+                new ColumnMarker("b", true, Location(new TextSpan(33, 17), 2, 0, 2, 17)),
+            ]);
 
     [Fact]
     public void Read_QueryWithAShape_CopiesIt() =>

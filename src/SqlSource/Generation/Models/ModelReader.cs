@@ -20,9 +20,10 @@ namespace SqlSource.Generation.Models;
 /// error, at the query's name: a column with no name (<c>SQLSRC253</c>), a name that is no identifier
 /// (<c>SQLSRC254</c>), a name equal ignoring case to an earlier one of the model (<c>SQLSRC255</c>), and a name that
 /// a record or <see cref="object" /> takes (<c>SQLSRC256</c>).  An <c>-- output-model:</c> marker on a query without
-/// rows is <c>SQLSRC259</c>, at the marker, also for a query whose types have an error, whose names are not read.
-/// Every error of a query is reported, and a query with any has no models.  None depends on a setting of a type, so
-/// each is found once for the file, whatever the number of types that claim it.
+/// rows is <c>SQLSRC259</c>, and a <c>-- column:</c> marker that names no column of the query's result, or a column
+/// whose name ends in <c>!</c> or <c>?</c>, is <c>SQLSRC260</c>, each at its marker, also for a query whose types have
+/// an error, whose names are not read.  Every error of a query is reported, and a query with any has no models.  None
+/// depends on a setting of a type, so each is found once for the file, whatever the number of types that claim it.
 /// </remarks>
 internal static class ModelReader
 {
@@ -44,9 +45,17 @@ internal static class ModelReader
 
     private const string TakenByARecord = "a record or object already has";
 
+    private const string NamesNoColumn = "names no column of the query's result";
+
+    private const string NameAColumn = "Name a column as the query returns it";
+
+    private const string NamesAMarkedColumn = "names a column whose alias already ends in ! or ?";
+
+    private const string RemoveTheMark = "Remove the mark from the alias, or the marker";
+
     /// <summary>
     /// The models of the file's queries whose types have no error, the errors of their names, and the
-    /// <c>SQLSRC259</c> of each query with a usable entry, whatever its types.
+    /// <c>SQLSRC259</c> and <c>SQLSRC260</c> of each query with a usable entry, whatever its types.
     /// </summary>
     public static FileModels Read(TypedFile file)
     {
@@ -86,6 +95,7 @@ internal static class ModelReader
             {
                 // A query with a type error has no types, and its names are not read.
                 AddOutputModelWithoutRows(entry, query, reading);
+                AddUnusableColumnMarkers(entry, query, reading);
                 continue;
             }
 
@@ -132,6 +142,8 @@ internal static class ModelReader
             AddOutputModelWithoutRows(entry, query, reading);
         }
 
+        AddUnusableColumnMarkers(entry, query, reading);
+
         return reading.Diagnostics.Count != errors
             ? null
             : new QueryModels(
@@ -156,6 +168,49 @@ internal static class ModelReader
                 DiagnosticInfo.Create(SqlDiagnostics.OutputModelWithoutRows, marker.Location, query.Name)
             );
         }
+    }
+
+    // SQLSRC260, at the marker, for each -- column: marker that names no column of the entry's, or one whose name ends
+    // in a mark, which sets its nullability already.
+    private static void AddUnusableColumnMarkers(SidecarEntry entry, SqlQuery query, Reading reading)
+    {
+        foreach (var marker in query.ColumnMarkers)
+        {
+            var column = entry.Columns is { } columns ? FindColumn(columns, marker.Name) : null;
+            if (column is null || HasMark(column.Name))
+            {
+                reading.Diagnostics.Add(
+                    DiagnosticInfo.Create(
+                        SqlDiagnostics.ColumnMarkerUnusable,
+                        marker.Location,
+                        marker.Name,
+                        column is null ? NamesNoColumn : NamesAMarkedColumn,
+                        column is null ? NameAColumn : RemoveTheMark
+                    )
+                );
+            }
+        }
+    }
+
+    // The first column the marker's name names, ignoring case, with its mark or without it, or null.
+    private static SidecarColumn? FindColumn(EquatableArray<SidecarColumn> columns, string name)
+    {
+        foreach (var column in columns)
+        {
+            var length = column.Name.Length - (HasMark(column.Name) ? 1 : 0);
+            if (
+                string.Equals(column.Name, name, StringComparison.OrdinalIgnoreCase)
+                || (
+                    name.Length == length
+                    && string.Compare(column.Name, 0, name, 0, length, StringComparison.OrdinalIgnoreCase) == 0
+                )
+            )
+            {
+                return column;
+            }
+        }
+
+        return null;
     }
 
     private static EquatableArray<ModelProperty> ReadParameters(
@@ -225,7 +280,7 @@ internal static class ModelReader
                 new ModelProperty(
                     name,
                     types[index],
-                    IsNullable(column),
+                    IsNullable(column, query.ColumnMarkers),
                     ColumnDocumentation(column, reading.Text),
                     Subject(ColumnOwner, column.Name)
                 )
@@ -288,13 +343,32 @@ internal static class ModelReader
         return true;
     }
 
-    // A trailing ? makes a column nullable and a trailing ! not; otherwise only a column known not to be null is not.
-    private static bool IsNullable(SidecarColumn column)
+    // A trailing ? makes a column nullable and a trailing ! not, and a -- column: marker that names the column sets it;
+    // otherwise only a column known not to be null is not.  A column with a mark and a marker is SQLSRC260 and has no
+    // model.
+    private static bool IsNullable(SidecarColumn column, EquatableArray<ColumnMarker> markers)
     {
         var name = column.Name;
         var last = name.Length > 0 ? name[name.Length - 1] : '\0';
-        return last == '?' || (last != '!' && column.Nullable != false);
+        if (last is '?' or '!')
+        {
+            return last == '?';
+        }
+
+        foreach (var marker in markers)
+        {
+            if (!string.Equals(marker.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return marker.IsNullable;
+        }
+
+        return column.Nullable != false;
     }
+
+    private static bool HasMark(string name) => name.Length > 0 && name[name.Length - 1] is '!' or '?';
 
     // "The column <c>id</c>, <c>integer</c>, from <c>public.users.id</c>.  An identity column."
     private static string ColumnDocumentation(SidecarColumn column, StringBuilder text)

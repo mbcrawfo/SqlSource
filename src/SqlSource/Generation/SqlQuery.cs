@@ -40,6 +40,10 @@ namespace SqlSource.Generation;
 /// The name an <c>-- output-model:</c> marker gives the type of the query's rows, with the marker in effect and where
 /// it is, or null.
 /// </param>
+/// <param name="ColumnMarkers">
+/// What the query's <c>-- column:</c> markers say of the nullability of its columns, in marker order, each column
+/// once.  Empty when it has none.
+/// </param>
 internal sealed record SqlQuery(
     string Name,
     LocationInfo NameLocation,
@@ -51,5 +55,6 @@ internal sealed record SqlQuery(
     EquatableArray<SqlQueryParameter> Parameters,
     SettingsLevel Markers,
     ModelMarker? InputModel,
-    ModelMarker? OutputModel
+    ModelMarker? OutputModel,
+    EquatableArray<ColumnMarker> ColumnMarkers
 );

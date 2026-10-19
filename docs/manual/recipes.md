@@ -212,7 +212,7 @@ public partial class OrderRepository(DbConnection connection)
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 ```
 
-The input model is the parameter object, and the output model is the type of a row.  Three things make Dapper read them:
+The input model is the parameter object, and the output model is the type of a row.  Four things make Dapper read them:
 
 - **Columns in snake_case need `DefaultTypeMap.MatchNamesWithUnderscores`**, as above: Dapper matches `customer_name` to `CustomerName` only with it.
 - **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.
@@ -225,9 +225,19 @@ The input model is the parameter object, and the output model is the type of a r
   </PropertyGroup>
   ```
 
-A column whose alias ends in `!` or `?`, which sets its property's nullability, keeps the mark in its name, and Dapper does not match it to the property: give such a column an alias without the mark when you read it through Dapper, or read the row yourself.
+- **Set a column's nullability with a `-- column:` marker, not with `!` or `?` at the end of its alias.**  A mark stays in the name of the column, `total!`, and Dapper does not match it to the property `Total`.  The marker leaves the name alone:
 
-Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [shape of a model](settings.md#setting-model-type), and [known issues](generator.md#known-issues) for parameters in snake_case and for a column whose name ends in `!` or `?`.
+  ```sql postgres
+  -- name: GetOrderTotal
+  -- column: total not null
+  SELECT o.id, sum(l.amount) AS total
+  FROM orders o
+  JOIN order_lines l ON l.order_id = o.id
+  WHERE o.id = @orderId
+  GROUP BY o.id;
+  ```
+
+Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker), [shape of a model](settings.md#setting-model-type), and [known issues](generator.md#known-issues) for parameters in snake_case.
 
 <a id="table-name-at-run-time"></a>
 

@@ -72,7 +72,8 @@ internal static class SqlFileReader
                     block.Parameters,
                     block.Markers,
                     ModelMarkerOf(file.Path, text, block.InputModel),
-                    ModelMarkerOf(file.Path, text, block.OutputModel)
+                    ModelMarkerOf(file.Path, text, block.OutputModel),
+                    ColumnMarkersOf(file.Path, text, block.ColumnMarkers)
                 )
             );
         }
@@ -85,6 +86,26 @@ internal static class SqlFileReader
             result.Dialect,
             invalidDialect
         );
+    }
+
+    private static EquatableArray<ColumnMarker> ColumnMarkersOf(
+        string path,
+        SourceText text,
+        EquatableArray<SqlColumnMarker> markers
+    )
+    {
+        if (markers.Count == 0)
+        {
+            return EquatableArray<ColumnMarker>.Empty;
+        }
+
+        var columns = ImmutableArray.CreateBuilder<ColumnMarker>(markers.Count);
+        foreach (var marker in markers)
+        {
+            columns.Add(new ColumnMarker(marker.Name, marker.IsNullable, LocationInfo.From(path, text, marker.Span)));
+        }
+
+        return new EquatableArray<ColumnMarker>(columns.MoveToImmutable());
     }
 
     private static ModelMarker? ModelMarkerOf(string path, SourceText text, SqlModelName? model) =>

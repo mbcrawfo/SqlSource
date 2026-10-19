@@ -249,7 +249,8 @@ internal static class SqlFileParser
                     query.Parameters,
                     markers,
                     ModelNameOf(scope?.InputModel),
-                    ModelNameOf(scope?.OutputModel)
+                    ModelNameOf(scope?.OutputModel),
+                    ColumnMarkersOf(scope)
                 )
             );
         }
@@ -435,6 +436,23 @@ internal static class SqlFileParser
         // The record is made only for a query that has the marker: the parser's allocation budget holds.
         private static SqlModelName? ModelNameOf((string Name, SqlMarker Marker)? model) =>
             model is { } found ? new SqlModelName(found.Name, found.Marker.Span) : null;
+
+        // The array is made only for a query that has the marker: the parser's allocation budget holds.
+        private static EquatableArray<SqlColumnMarker> ColumnMarkersOf(SqlMarkerScope? scope)
+        {
+            if (scope is null || scope.Columns.Count == 0)
+            {
+                return EquatableArray<SqlColumnMarker>.Empty;
+            }
+
+            var markers = ImmutableArray.CreateBuilder<SqlColumnMarker>(scope.Columns.Count);
+            foreach (var column in scope.Columns)
+            {
+                markers.Add(new SqlColumnMarker(column.Name, column.IsNullable, column.Marker.Span));
+            }
+
+            return new EquatableArray<SqlColumnMarker>(markers.MoveToImmutable());
+        }
 
         private void AddError(SqlParseErrorKind kind, TextSpan span, params string[] arguments) =>
             _errors.Add(SqlParseError.Create(kind, span, arguments));

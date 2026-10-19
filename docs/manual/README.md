@@ -56,6 +56,7 @@ SqlSource is in early development.  This table is the one list of what works in 
 | The C# type of each column and parameter of a described PostgreSQL query, and an error in the build for one that has none | Available | [Types](postgresql.md#type-map) |
 | Describing SQL Server queries | Coming ([SQLSRC216](diagnostics.md#sqlsrc216) until then) | [SQL Server](sqlserver.md) |
 | Models for the parameters and rows of a query: their names, namespace, shape, properties and nullability, table models and shared models | Available | [Models](generator.md#models), [PostgreSQL](postgresql.md#models) |
+| A column's nullability set by `!` or `?` at the end of its alias, or by a `-- column:` marker, which leaves the column's name alone for Dapper | Available | [Which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker) |
 | Generated query methods | Coming | [Query methods](generator.md#query-methods) |
 | Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |
 | Custom type mapping: the type override, `SqlSourceTypeOverrides` and `-- type-override:` | Available | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
