@@ -164,6 +164,24 @@ public sealed class ModelShapeTests
             ("Name", typeof(string), false)
         );
         ShouldBeModel(
+            typeof(Reporting.GetAccountNameArgs),
+            $"{ReportingNamespace}.GetAccountNameArgs",
+            Shape.Record,
+            ("AccountId", typeof(int), false)
+        );
+        ShouldBeModel(
+            typeof(Reporting.FindAccountNameArgs),
+            $"{ReportingNamespace}.FindAccountNameArgs",
+            Shape.Record,
+            ("Email", typeof(string), false)
+        );
+        ShouldBeModel(
+            typeof(Reporting.ListClosedBeforeArgs),
+            $"{ReportingNamespace}.ListClosedBeforeArgs",
+            Shape.Record,
+            ("ClosedBefore", typeof(DateTimeOffset?), true)
+        );
+        ShouldBeModel(
             typeof(Reporting.ListClosedBeforeDto),
             $"{ReportingNamespace}.ListClosedBeforeDto",
             Shape.SealedRecord,
@@ -171,6 +189,8 @@ public sealed class ModelShapeTests
             ("Name", typeof(string), false),
             ("ClosedAt", typeof(DateTimeOffset?), true)
         );
+        ModelNamed($"{ReportingNamespace}.ListAccountsDto").ShouldBeNull();
+        ModelNamed($"{ReportingNamespace}.ListAccountsInTableOrderDto").ShouldBeNull();
         Reporting.AccountReports.GetAccount.ShouldBe("SELECT name, id, email\nFROM accounts\nWHERE id = @accountId;");
     }
 
@@ -309,6 +329,15 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
+    public void InvoiceQueries_DirectLocation_HasTheConstantsOnTheType()
+    {
+        InvoiceQueries.ListInvoices.ShouldBe("SELECT *\nFROM billing.invoices\nORDER BY id;");
+        InvoiceQueries.GetInvoice.ShouldBe(
+            "SELECT id, number, amount, paid_at\nFROM billing.invoices\nWHERE id = @invoiceId;"
+        );
+    }
+
+    [Fact]
     public void Models_OutputTypeByMetadata_IsASealedClass()
     {
         ShouldBeModel(
@@ -351,9 +380,21 @@ public sealed class ModelShapeTests
     [Fact]
     public void Models_InsertReturningEveryColumn_SharesTheTableModel()
     {
-        ShapeOf(typeof(InsertAllTypesArgs)).ShouldBe(Shape.Record);
-        PropertiesOf(typeof(InsertAllTypesArgs))[0].ShouldBe(("Id", typeof(int), false));
         ModelNamed($"{Namespace}.InsertAllTypesDto").ShouldBeNull();
+        ShapeOf(typeof(InsertAllTypesArgs)).ShouldBe(Shape.Record);
+
+        // A parameter for each column, in its order, with the column's type, and none can be null, since no -- param:
+        // marker says null.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
+        var columns = PropertiesOf(typeof(AllTypesDto));
+        var expected = columns.Select(column =>
+            (
+                column.Name,
+                column.Name == "Bit1Value" ? typeof(BitArray) : Nullable.GetUnderlyingType(column.Type) ?? column.Type,
+                false
+            )
+        );
+        PropertiesOf(typeof(InsertAllTypesArgs)).ShouldBe(expected);
+        PropertiesOf(typeof(InsertAllTypesArgs)).Length.ShouldBe(76);
     }
 
     [Fact]
