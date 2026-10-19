@@ -242,6 +242,23 @@ public sealed class RealisticCasesTests
             + " \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
         "checkedFrom on a case with no models"
     )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"dapper\": { \"why\": \"\" } }",
+        "dapper gives no why"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"dapper\": { \"why\": \"w\", \"reason\": \"x\" } }",
+        "reason"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"refusal\": \"SQLSRC229\", \"dapper\": { \"why\": \"w\" } }",
+        "dapper on a case with no models"
+    )]
+    [InlineData(
+        "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"w\" },"
+            + " \"dapper\": { \"why\": \"w\" } }",
+        "dapper on a case with no models"
+    )]
     public void Read_CaseJsonThatIsWrong_ThrowsNamingTheCaseAndTheFault(string json, string fault)
     {
         using var temp = new TempFolder();
@@ -281,6 +298,44 @@ public sealed class RealisticCasesTests
         );
 
         RealisticCases.Read(temp.PathOf("later")).CheckedFrom.ShouldBe(new CheckedFrom(18, "a later plan"));
+    }
+
+    [Fact]
+    public void Read_CaseWithDapper_ReadsIt()
+    {
+        using var temp = new TempFolder();
+        _ = temp.WriteFile("unbound/query.sql", Query);
+        _ = temp.WriteFile(
+            "unbound/case.json", /*lang=json,strict*/
+            "{ \"columns\": [], \"dapper\": { \"why\": \"a string sent as text\" } }"
+        );
+
+        RealisticCases.Read(temp.PathOf("unbound")).Dapper.ShouldBe("a string sent as text");
+    }
+
+    // A case with a parameter that Dapper cannot send is left out of the run through Dapper, as is one that the
+    // server does not run.
+    [Theory]
+    [InlineData(null, null, 14, true)]
+    [InlineData(null, "w", 14, false)]
+    [InlineData(17, null, 14, false)]
+    [InlineData(17, null, 18, true)]
+    public void IsReadThroughDapperOn_CaseAndServer_IsWhetherTheRunReadsIt(
+        int? minimum,
+        string? dapper,
+        int major,
+        bool expected
+    ) => (Case() with { MinimumMajor = minimum, Dapper = dapper }).IsReadThroughDapperOn(major).ShouldBe(expected);
+
+    // A refused case has no models to read rows into.
+    [Theory]
+    [InlineData("SQLSRC229", null)]
+    [InlineData(null, "SQLSRC255")]
+    public void IsReadThroughDapperOn_RefusedOrModelRefusedCase_IsNever(string? refusal, string? models)
+    {
+        var found = Case() with { Refusal = refusal, Models = models is null ? null : new ModelRefusal(models, "w") };
+
+        PostgresContainer.RecordedMajors.ShouldAllBe(major => !found.IsReadThroughDapperOn(major));
     }
 
     // A case whose sidecar an earlier major cannot describe as recorded is left out of --check there, as is one that

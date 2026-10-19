@@ -24,8 +24,9 @@ internal sealed record CheckedFrom(int Major, string Why);
 // One realistic case: a folder with a query, its truth and its sample values, the description recorded of it on each
 // major version of the server, and the sidecar of its models.  A case refused by the describer has the failure's id
 // and no columns; one whose models the generator refuses says so by Models, and one whose sidecar an earlier major
-// describes otherwise says from which major it is checked by CheckedFrom.  A sample set holds a SQL literal for each
-// parameter, by its name without @, compared ignoring case.
+// describes otherwise says from which major it is checked by CheckedFrom.  One with a parameter that Dapper cannot
+// send says why by Dapper, which leaves it out of the run through Dapper alone.  A sample set holds a SQL literal for
+// each parameter, by its name without @, compared ignoring case.
 internal sealed record RealisticCase(
     string Name,
     string Folder,
@@ -34,7 +35,8 @@ internal sealed record RealisticCase(
     IReadOnlyList<TruthColumn> Columns,
     IReadOnlyList<IReadOnlyDictionary<string, string>> Samples,
     ModelRefusal? Models = null,
-    CheckedFrom? CheckedFrom = null
+    CheckedFrom? CheckedFrom = null,
+    string? Dapper = null
 )
 {
     // A complete SqlSource file with exactly one query, read as FixtureReplay reads a fixture's.
@@ -69,6 +71,10 @@ internal sealed record RealisticCase(
     // server runs it, and the server describes it as the sidecar holds.
     public bool IsCheckedOn(int major) =>
         HasModels && RunsOn(major) && (CheckedFrom is not { } from || from.Major <= major);
+
+    // Whether the run through Dapper reads the case's rows on the server of that major: the case has models, the
+    // server runs it, and Dapper can send its parameters.
+    public bool IsReadThroughDapperOn(int major) => HasModels && Dapper is null && RunsOn(major);
 
     // The description as RealisticDescribe renders it, recorded on the server of that major version.
     public string ExpectedPath(int major) =>

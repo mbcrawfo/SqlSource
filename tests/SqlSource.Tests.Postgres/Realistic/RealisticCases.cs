@@ -80,7 +80,8 @@ internal static class RealisticCases
             ColumnsOf(read, named),
             SamplesOf(read, named),
             ModelsOf(read, named),
-            CheckedFromOf(read, named)
+            CheckedFromOf(read, named),
+            DapperOf(read, named)
         );
     }
 
@@ -242,6 +243,24 @@ internal static class RealisticCases
         return new CheckedFrom(major, from.Why);
     }
 
+    // Why Dapper cannot send a parameter of a case with models, which the run through Dapper leaves out for it.
+    private static string? DapperOf(CaseJson read, string named)
+    {
+        if (read.Dapper is not { } dapper)
+        {
+            return null;
+        }
+
+        if (read.Refusal is not null || read.Models is not null)
+        {
+            throw Fault(named, "puts a dapper on a case with no models, which has no models to read rows into");
+        }
+
+        return string.IsNullOrWhiteSpace(dapper.Why)
+            ? throw Fault(named, "says Dapper cannot send a parameter, but dapper gives no why")
+            : dapper.Why;
+    }
+
     private static InvalidOperationException Fault(string named, string fault) =>
         new($"The {RealisticCase.CaseFile} of the case {named} {fault}.");
 
@@ -257,7 +276,8 @@ internal static class RealisticCases
         List<ColumnJson>? Columns,
         List<Dictionary<string, string>>? Samples,
         ModelsJson? Models,
-        CheckedFromJson? CheckedFrom
+        CheckedFromJson? CheckedFrom,
+        DapperJson? Dapper
     );
 
     [SuppressMessage(
@@ -280,4 +300,11 @@ internal static class RealisticCases
         Justification = "JsonSerializer makes it."
     )]
     private sealed record CheckedFromJson(int? Major, string? Why);
+
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JsonSerializer makes it."
+    )]
+    private sealed record DapperJson(string? Why);
 }

@@ -21,7 +21,7 @@ public sealed class RealisticModelNullabilityTests
             Assert.Skip(
                 found.Refusal is not null
                     ? $"{found} is refused as {found.Refusal}, so it has no models."
-                    : $"{found} has no models: the generator gives {found.Models?.Id}."
+                    : $"{found} has no models: the generator gives {found.Models!.Id}."
             );
         }
 
