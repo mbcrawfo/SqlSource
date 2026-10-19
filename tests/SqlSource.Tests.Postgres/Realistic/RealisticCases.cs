@@ -39,6 +39,9 @@ internal static class RealisticCases
     public static IReadOnlyList<RealisticCase> AllIn(string root) =>
         [.. NamesIn(root).Select(name => Read(Path.Combine(root, name)))];
 
+    // The case of that folder of Cases, read from the repository.
+    public static RealisticCase ReadNamed(string name) => Read(Path.Combine(RepositoryPaths.RealisticCases, name));
+
     public static RealisticCase Read(string folder)
     {
         var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(folder));

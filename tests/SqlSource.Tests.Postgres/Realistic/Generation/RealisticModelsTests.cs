@@ -1,8 +1,8 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
-using System.IO;
 using System.Linq;
 using Shouldly;
+using SqlSource.Snapshot;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
@@ -51,8 +51,7 @@ public sealed class RealisticModelsTests
     public void InputModelOf_EntryWithoutParameters_IsNull() =>
         RealisticModels.InputModelOf(EntryOf("cte-chain")).ShouldBeNull();
 
-    private static Snapshot.SidecarEntry EntryOf(string name) =>
-        RealisticModels.EntryOf(RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, name)));
+    private static SidecarEntry EntryOf(string name) => RealisticModels.EntryOf(RealisticCases.ReadNamed(name));
 
     // A class with each kind of property a model of the generator has, which the tests read by reflection alone.
     [SuppressMessage(

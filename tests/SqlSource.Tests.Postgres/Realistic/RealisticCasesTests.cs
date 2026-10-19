@@ -54,7 +54,7 @@ public sealed class RealisticCasesTests
     [MemberData(nameof(Cases))]
     public void Folder_Case_HoldsItsFilesAlone(string name)
     {
-        var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, name));
+        var found = RealisticCases.ReadNamed(name);
 
         Directory
             .GetFiles(found.Folder)

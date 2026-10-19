@@ -43,7 +43,8 @@ internal static class RealisticModels
     }
 
     // The output model of the entry: the table's model when the result is a table's columns and the table gives a
-    // name, the query's otherwise, as the generator names them.
+    // name, the query's otherwise, as the generator names them.  The corpus has no output-model marker and leaves
+    // no-table-models unset, so the table's or the query's name is the model's.
     public static Type OutputModelOf(SidecarEntry entry) =>
         ModelNamed(
             (entry.MatchesTable is { } table ? PropertyNames.FromTable(table) : null) ?? entry.Name,

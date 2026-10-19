@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Linq;
 using Shouldly;
 using Xunit;
@@ -83,7 +82,7 @@ public sealed class RealisticClaimsTests
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
     public void All_Claims_AreTheCasesWithModelsEachOnce(string name)
     {
-        var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, name));
+        var found = RealisticCases.ReadNamed(name);
 
         var claims = RealisticClaims.All.Count(claim => claim.Case == name);
 
