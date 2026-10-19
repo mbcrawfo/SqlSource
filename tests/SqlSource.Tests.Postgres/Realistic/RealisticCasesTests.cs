@@ -9,8 +9,8 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Realistic;
 
 // The reading of the cases' folders: every folder of Cases is a case, a case.json that is wrong fails naming the
-// case and the fault, a folder holds its query, its truth and the expectation of each major it is recorded on, and a
-// case runs on the majors from its minimum on.
+// case and the fault, a folder holds its query, its truth, the expectation of each major it is recorded on and its
+// sidecar when it has models, and a case runs on the majors from its minimum on.
 public sealed class RealisticCasesTests
 {
     private const string KnownCase = "aggregate-cte-left-joined";
@@ -52,9 +52,9 @@ public sealed class RealisticCasesTests
     // Each case is checked apart, so that a broken one fails its own row.
     [Theory]
     [MemberData(nameof(Cases))]
-    public void Folder_Case_HoldsItsQueryItsTruthAndTheExpectationsOfItsRecordedMajorsAlone(string name)
+    public void Folder_Case_HoldsItsFilesAlone(string name)
     {
-        var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, name));
+        var found = RealisticCases.ReadNamed(name);
 
         Directory
             .GetFiles(found.Folder)
@@ -73,12 +73,24 @@ public sealed class RealisticCasesTests
         (Case() with { MinimumMajor = minimum }).RunsOn(major).ShouldBe(runs);
 
     [Theory]
-    [InlineData(null, new[] { "query.sql", "case.json", "expected-pg14.txt", "expected-pg18.txt" })]
-    [InlineData(17, new[] { "query.sql", "case.json", "expected-pg18.txt" })]
-    public void Files_MinimumMajor_AreTheQueryTheTruthAndAnExpectationOfEachRecordedMajorItRunsOn(
+    [InlineData(null, new[] { "query.sql", "case.json", "query.sql.json", "expected-pg14.txt", "expected-pg18.txt" })]
+    [InlineData(17, new[] { "query.sql", "case.json", "query.sql.json", "expected-pg18.txt" })]
+    public void Files_Case_AreTheQueryTheTruthTheSidecarAndAnExpectationOfEachRecordedMajorItRunsOn(
         int? minimum,
         string[] files
     ) => (Case() with { MinimumMajor = minimum }).Files.ShouldBe(files);
+
+    // A case the describer refuses has no entry to write, and one the generator refuses is claimed by no class.
+    [Theory]
+    [InlineData("SQLSRC229", null)]
+    [InlineData(null, "SQLSRC255")]
+    public void Files_RefusedOrModelRefusedCase_HasNoSidecar(string? refusal, string? models)
+    {
+        var found = Case() with { Refusal = refusal, Models = models is null ? null : new ModelRefusal(models, "w") };
+
+        found.HasModels.ShouldBeFalse();
+        found.Files.ShouldNotContain(RealisticCase.SidecarFile);
+    }
 
     [Fact]
     public void Read_FolderWithoutCaseJson_ThrowsNamingTheCase()
@@ -181,6 +193,76 @@ public sealed class RealisticCasesTests
         "{ \"columns\": [ { \"name\": \"id\", \"nullable\": false, \"exempt\": \"no row\" } ] }",
         "not nullable and has an exempt"
     )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"refusal\": \"SQLSRC229\", \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"w\" } }",
+        "both a refusal and a refusal of its models"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"models\": { \"refusal\": \" \", \"why\": \"w\" } }",
+        "models gives no refusal"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"\" } }",
+        "models gives no why"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"why\": \"w\" } }",
+        "checkedFrom names no major"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"major\": 15, \"why\": \"w\" } }",
+        "checkedFrom names 15, which is not a recorded major"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"minimumMajor\": 18, \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
+        "checkedFrom is not above 18, the first recorded major the case runs on"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"minimumMajor\": 17, \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
+        "checkedFrom is not above 18, the first recorded major the case runs on"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"major\": 14, \"why\": \"w\" } }",
+        "checkedFrom is not above 14, the first recorded major the case runs on"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"w\", \"reason\": \"x\" } }",
+        "reason"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"w\", \"reason\": \"x\" } }",
+        "reason"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \" \" } }",
+        "checkedFrom gives no why"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"refusal\": \"SQLSRC229\", \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
+        "checkedFrom on a case with no models"
+    )]
+    [InlineData(
+        "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"w\" },"
+            + " \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
+        "checkedFrom on a case with no models"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"dapper\": { \"why\": \"\" } }",
+        "dapper gives no why"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"dapper\": { \"why\": \"w\", \"reason\": \"x\" } }",
+        "reason"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"refusal\": \"SQLSRC229\", \"dapper\": { \"why\": \"w\" } }",
+        "dapper on a case with no models"
+    )]
+    [InlineData(
+        "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"w\" },"
+            + " \"dapper\": { \"why\": \"w\" } }",
+        "dapper on a case with no models"
+    )]
     public void Read_CaseJsonThatIsWrong_ThrowsNamingTheCaseAndTheFault(string json, string fault)
     {
         using var temp = new TempFolder();
@@ -191,6 +273,108 @@ public sealed class RealisticCasesTests
 
         thrown.Message.ShouldContain("realistic/wrong");
         thrown.Message.ShouldContain(fault);
+    }
+
+    [Fact]
+    public void Read_CaseWithModelRefusal_ReadsIt()
+    {
+        using var temp = new TempFolder();
+        _ = temp.WriteFile("refused/query.sql", Query);
+        _ = temp.WriteFile(
+            "refused/case.json", /*lang=json,strict*/
+            "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"two ids\" } }"
+        );
+
+        var found = RealisticCases.Read(temp.PathOf("refused"));
+
+        found.Models.ShouldBe(new ModelRefusal("SQLSRC255", "two ids"));
+        found.HasModels.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Read_CaseWithCheckedFrom_ReadsIt()
+    {
+        using var temp = new TempFolder();
+        _ = temp.WriteFile("later/query.sql", Query);
+        _ = temp.WriteFile(
+            "later/case.json", /*lang=json,strict*/
+            "{ \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"a later plan\" } }"
+        );
+
+        RealisticCases.Read(temp.PathOf("later")).CheckedFrom.ShouldBe(new CheckedFrom(18, "a later plan"));
+    }
+
+    [Fact]
+    public void Read_CaseWithDapper_ReadsIt()
+    {
+        using var temp = new TempFolder();
+        _ = temp.WriteFile("unbound/query.sql", Query);
+        _ = temp.WriteFile(
+            "unbound/case.json", /*lang=json,strict*/
+            "{ \"columns\": [], \"dapper\": { \"why\": \"a string sent as text\" } }"
+        );
+
+        RealisticCases.Read(temp.PathOf("unbound")).Dapper.ShouldBe("a string sent as text");
+    }
+
+    // A case with a parameter that Dapper cannot send is left out of the run through Dapper, as is one that the
+    // server does not run.
+    [Theory]
+    [InlineData(null, null, 14, true)]
+    [InlineData(null, "w", 14, false)]
+    [InlineData(17, null, 14, false)]
+    [InlineData(17, null, 18, true)]
+    public void IsReadThroughDapperOn_CaseAndServer_IsWhetherTheRunReadsIt(
+        int? minimum,
+        string? dapper,
+        int major,
+        bool expected
+    ) => (Case() with { MinimumMajor = minimum, Dapper = dapper }).IsReadThroughDapperOn(major).ShouldBe(expected);
+
+    // A refused case has no models to read rows into.
+    [Theory]
+    [InlineData("SQLSRC229", null)]
+    [InlineData(null, "SQLSRC255")]
+    public void IsReadThroughDapperOn_RefusedOrModelRefusedCase_IsNever(string? refusal, string? models)
+    {
+        var found = Case() with { Refusal = refusal, Models = models is null ? null : new ModelRefusal(models, "w") };
+
+        PostgresContainer.RecordedMajors.ShouldAllBe(major => !found.IsReadThroughDapperOn(major));
+    }
+
+    // A case whose sidecar an earlier major cannot describe as recorded is left out of --check there, as is one that
+    // the server does not run.
+    [Theory]
+    [InlineData(null, null, 14, true)]
+    [InlineData(17, null, 14, false)]
+    [InlineData(17, null, 18, true)]
+    [InlineData(null, 18, 14, false)]
+    [InlineData(null, 18, 18, true)]
+    public void IsCheckedOn_CaseAndServer_IsWhetherCheckComparesIt(
+        int? minimum,
+        int? checkedFrom,
+        int major,
+        bool expected
+    ) =>
+        (
+            Case() with
+            {
+                MinimumMajor = minimum,
+                CheckedFrom = checkedFrom is { } from ? new CheckedFrom(from, "w") : null,
+            }
+        )
+            .IsCheckedOn(major)
+            .ShouldBe(expected);
+
+    // A refused case has no sidecar, so --check has nothing of it to compare on any major.
+    [Theory]
+    [InlineData("SQLSRC229", null)]
+    [InlineData(null, "SQLSRC255")]
+    public void IsCheckedOn_RefusedOrModelRefusedCase_IsNever(string? refusal, string? models)
+    {
+        var found = Case() with { Refusal = refusal, Models = models is null ? null : new ModelRefusal(models, "w") };
+
+        PostgresContainer.RecordedMajors.ShouldAllBe(major => !found.IsCheckedOn(major));
     }
 
     [Fact]

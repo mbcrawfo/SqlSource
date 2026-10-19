@@ -38,7 +38,7 @@ Packages go to nuget.org through [trusted publishing](https://learn.microsoft.co
    ```
 
 6. `publish.yml` builds the tag, fails unless the build gave exactly `SqlSource.0.2.0.nupkg` and `SqlSource.Tool.0.2.0.nupkg`, which it does when the tag is `v<VersionPrefix>`, pushes both to nuget.org and creates the GitHub release with both attached.  If the push of the second fails, run the workflow again: `--skip-duplicate` passes over the first.
-7. Raise `VersionPrefix` in the next pull request.  Until then, betas built from `main` sort below the release just published.  In that pull request, run `tools/describe-end-to-end.sh` and commit the sidecars it rewrites: every sidecar of the end-to-end tests and of the examples holds the tool's version, and the build warns with `SQLSRC240` until they are written again.  [`tools/README.md`](../tools/README.md#recording-scripts) has the script.
+7. Raise `VersionPrefix` in the next pull request.  Until then, betas built from `main` sort below the release just published.  In that pull request, run `tools/describe-end-to-end.sh` and commit the sidecars it rewrites: every sidecar of the end-to-end queries, the realistic cases and the examples holds the tool's version, and the build warns with `SQLSRC240` until they are written again.  [`tools/README.md`](../tools/README.md#recording-scripts) has the script.
 
 ### Beta
 

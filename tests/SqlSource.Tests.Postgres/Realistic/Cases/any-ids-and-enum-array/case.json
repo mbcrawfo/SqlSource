@@ -8,5 +8,8 @@
   ],
   "samples": [
     { "ids": "'{1,2,3,5}'", "statuses": "'{active,suspended}'" }
-  ]
+  ],
+  "dapper": {
+    "why": "@statuses is a string[], sent as text[]: the server has no operator account_status = text; phase 8 binds it"
+  }
 }

@@ -39,6 +39,9 @@ internal static class RealisticCases
     public static IReadOnlyList<RealisticCase> AllIn(string root) =>
         [.. NamesIn(root).Select(name => Read(Path.Combine(root, name)))];
 
+    // The case of that folder of Cases, read from the repository.
+    public static RealisticCase ReadNamed(string name) => Read(Path.Combine(RepositoryPaths.RealisticCases, name));
+
     public static RealisticCase Read(string folder)
     {
         var name = Path.GetFileName(Path.TrimEndingDirectorySeparator(folder));
@@ -75,7 +78,10 @@ internal static class RealisticCases
             read.MinimumMajor,
             read.Refusal,
             ColumnsOf(read, named),
-            SamplesOf(read, named)
+            SamplesOf(read, named),
+            ModelsOf(read, named),
+            CheckedFromOf(read, named),
+            DapperOf(read, named)
         );
     }
 
@@ -162,6 +168,102 @@ internal static class RealisticCases
         return samples;
     }
 
+    // A refusal of the models is the generator's, of a query the describer accepts, so it is said with its reason.
+    private static ModelRefusal? ModelsOf(CaseJson read, string named)
+    {
+        if (read.Models is not { } models)
+        {
+            return null;
+        }
+
+        if (read.Refusal is not null)
+        {
+            throw Fault(named, "has both a refusal and a refusal of its models: a refused query has no models");
+        }
+
+        if (string.IsNullOrWhiteSpace(models.Refusal))
+        {
+            throw Fault(named, "says its models are refused, but models gives no refusal");
+        }
+
+        if (string.IsNullOrWhiteSpace(models.Why))
+        {
+            throw Fault(named, "says its models are refused, but models gives no why");
+        }
+
+        return new ModelRefusal(models.Refusal, models.Why);
+    }
+
+    // The major from which a case's sidecar is checked, for a case that an earlier major describes otherwise: one of
+    // the recorded majors, above the first recorded one the case runs on, since a checkedFrom at or below it leaves
+    // nothing out, and said why.
+    private static CheckedFrom? CheckedFromOf(CaseJson read, string named)
+    {
+        if (read.CheckedFrom is not { } from)
+        {
+            return null;
+        }
+
+        if (read.Refusal is not null || read.Models is not null)
+        {
+            throw Fault(named, "puts a checkedFrom on a case with no models, which has no sidecar to check");
+        }
+
+        const string Says = "says from which major its sidecar is checked, but";
+        if (from.Major is not { } major)
+        {
+            throw Fault(named, $"{Says} checkedFrom names no major");
+        }
+
+        if (!PostgresContainer.RecordedMajors.Contains(major))
+        {
+            throw Fault(
+                named,
+                $"{Says} checkedFrom names {major}, which is not a recorded major: "
+                    + string.Join(" or ", PostgresContainer.RecordedMajors)
+            );
+        }
+
+        var first = FirstRecordedMajorOf(read.MinimumMajor);
+        if (major <= first)
+        {
+            throw Fault(named, $"{Says} checkedFrom is not above {first}, the first recorded major the case runs on");
+        }
+
+        if (string.IsNullOrWhiteSpace(from.Why))
+        {
+            throw Fault(named, $"{Says} checkedFrom gives no why");
+        }
+
+        return new CheckedFrom(major, from.Why);
+    }
+
+    // The lowest recorded major at or above the minimum, or the lowest of all when the case has no minimum or none
+    // is at or above it.
+    private static int FirstRecordedMajorOf(int? minimumMajor) =>
+        PostgresContainer
+            .RecordedMajors.Where(major => minimumMajor is not { } minimum || major >= minimum)
+            .DefaultIfEmpty(PostgresContainer.RecordedMajors.Min())
+            .Min();
+
+    // Why Dapper cannot send a parameter of a case with models, which the run through Dapper leaves out for it.
+    private static string? DapperOf(CaseJson read, string named)
+    {
+        if (read.Dapper is not { } dapper)
+        {
+            return null;
+        }
+
+        if (read.Refusal is not null || read.Models is not null)
+        {
+            throw Fault(named, "puts a dapper on a case with no models, which has no models to read rows into");
+        }
+
+        return string.IsNullOrWhiteSpace(dapper.Why)
+            ? throw Fault(named, "says Dapper cannot send a parameter, but dapper gives no why")
+            : dapper.Why;
+    }
+
     private static InvalidOperationException Fault(string named, string fault) =>
         new($"The {RealisticCase.CaseFile} of the case {named} {fault}.");
 
@@ -175,7 +277,10 @@ internal static class RealisticCases
         int? MinimumMajor,
         string? Refusal,
         List<ColumnJson>? Columns,
-        List<Dictionary<string, string>>? Samples
+        List<Dictionary<string, string>>? Samples,
+        ModelsJson? Models,
+        CheckedFromJson? CheckedFrom,
+        DapperJson? Dapper
     );
 
     [SuppressMessage(
@@ -184,4 +289,25 @@ internal static class RealisticCases
         Justification = "JsonSerializer makes it."
     )]
     private sealed record ColumnJson(string? Name, bool? Nullable, string? Why, string? Exempt);
+
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JsonSerializer makes it."
+    )]
+    private sealed record ModelsJson(string? Refusal, string? Why);
+
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JsonSerializer makes it."
+    )]
+    private sealed record CheckedFromJson(int? Major, string? Why);
+
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JsonSerializer makes it."
+    )]
+    private sealed record DapperJson(string? Why);
 }
