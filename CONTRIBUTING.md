@@ -32,7 +32,7 @@ The five test projects and the two libraries they share, which [`tests/README.md
 - `tests/SqlSource.Tests.Postgres.Npgsql8` reads every mapped type through Dapper on Npgsql 8, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 
-`examples/PostgresExamples` is a small project that shows a user SqlSource with PostgreSQL and Dapper, which builds with the solution and holds no tests.
+`examples/PostgresExamples` shows a user SqlSource with PostgreSQL and Dapper; it builds with the solution and holds no tests.
 
 ## Build, test and run
 

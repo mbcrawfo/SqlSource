@@ -1,6 +1,6 @@
 # Starts the PostgreSQL of the example, with schema.sql run on its first start.  The user, password and database are
 # for this example alone.  The image is the tests' default image, which rule 5 of the repository's AGENTS.md keeps in
-# step.  To use another host port, change the first number of "ports", and the port of the connection string with it.
+# step.  To use another host port, change 55432 under "ports", and the port of the connection string with it.
 services:
   postgres:
     image: postgres:18.6
