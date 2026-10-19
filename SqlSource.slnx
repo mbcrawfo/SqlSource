@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/examples/">
+    <Project Path="examples/PostgresExamples/PostgresExamples.csproj" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/SqlSource.Tool/SqlSource.Tool.csproj" />
     <Project Path="src/SqlSource/SqlSource.csproj" />

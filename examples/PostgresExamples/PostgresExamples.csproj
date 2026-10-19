@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        Only in this repository: the example builds with the generator of the same commit, so the generator comes
+        from a project reference, which does not bring the package's MSBuild files, and they are imported by path, here
+        and at the end of this file.  A project of your own has one line in their place, which the command to add the
+        package in README.md writes for you:
+
+            <PackageReference Include="SqlSource" Version="..." />
+
+        The repository's Directory.Build.props and Directory.Packages.props also apply here.  The first sets the
+        language version, implicit usings off, the repository's analyzers and TreatWarningsAsErrors, which your project
+        does not need, and the second gives Dapper and Npgsql their versions, which your project writes on each
+        PackageReference.
+    -->
+    <Import Project="../../src/SqlSource/build/SqlSource.props" />
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <IsPackable>false</IsPackable>
+        <!-- The models' nullable properties are annotated, as in a new project of the .NET SDK. -->
+        <Nullable>enable</Nullable>
+        <!-- Only in this repository: raising VersionPrefix warns until tools/describe-end-to-end.sh runs. -->
+        <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
+        <!-- The dialect of every query of the project. -->
+        <SqlSourceDialect>postgres</SqlSourceDialect>
+        <!-- Every timestamptz is a DateTimeOffset, which Dapper reads through UtcDateTimeOffsetHandler. -->
+        <SqlSourceTypeOverrides>timestamptz=System.DateTimeOffset</SqlSourceTypeOverrides>
+    </PropertyGroup>
+    <ItemGroup>
+        <PackageReference Include="Dapper" />
+        <PackageReference Include="Npgsql" />
+    </ItemGroup>
+    <ItemGroup>
+        <!-- Only in this repository: the generator, as the package adds it. -->
+        <ProjectReference
+            Include="../../src/SqlSource/SqlSource.csproj"
+            OutputItemType="Analyzer"
+            ReferenceOutputAssembly="false"
+        />
+    </ItemGroup>
+    <Import Project="../../src/SqlSource/build/SqlSource.targets" />
+</Project>

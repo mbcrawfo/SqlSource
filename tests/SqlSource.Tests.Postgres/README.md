@@ -16,7 +16,7 @@ The project copies two fixture projects to its output, with the package's MSBuil
 
 ## The image
 
-The image is `postgres:18.6`, named in one place, `PostgresContainer.DefaultImage`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported, which CI runs as `postgres:14.24`:
+The image is `postgres:18.6`, named for the tests and the scripts in one place, `PostgresContainer.DefaultImage`, and repeated in `examples/PostgresExamples/docker-compose.yml`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported, which CI runs as `postgres:14.24`:
 
 ```bash
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres
@@ -24,7 +24,7 @@ SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSou
 
 Every database image the tests run is pinned to a major and a minor, such as `postgres:18.6`, and never to a bare major such as `postgres:18`.  The recorded fixtures carry the version of the server they were recorded against, and a bare major moves to each new minor without a word, so the tests would run a server the recordings never saw.  This holds for the default image, for the image CI runs on the oldest supported version, and for the image of any engine added later.  `PostgresContainerTests` fails on an image whose tag is not a major and a minor, or whose server reports another version, and `FixtureVersionTests` fails on a fixture case recorded against any version but the default image's.
 
-Moving to a new minor is a change of its own: bump the tag, record the fixtures and the realistic corpus again on the new image, as in the next two sections, write the end-to-end sidecars again, as in [the end-to-end project](#the-end-to-end-project), since each entry holds the server's version, and read the diff, all in the same pull request.
+Moving to a new minor is a change of its own: bump the tag, here and in `examples/PostgresExamples/docker-compose.yml`, record the fixtures and the realistic corpus again on the new image, as in the next two sections, write the sidecars of the end-to-end project and of the examples again, as in [writing the sidecars](#writing-the-sidecars), since each entry holds the server's version, and read the diff, all in the same pull request.
 
 ## The describer's fixtures
 
@@ -108,10 +108,10 @@ Every query writes its parameters in camelCase, `@accountId`, so that its input 
 
 ### Writing the sidecars
 
-Every sidecar under `EndToEnd/Queries/` is written by one script, never by hand:
+Every sidecar under `EndToEnd/Queries/`, and every sidecar of `examples/PostgresExamples`, is written by one script, never by hand:
 
 ```bash
 tools/describe-end-to-end.sh
 ```
 
-It starts a container of the default image and applies the schemas and seeds of `app` and `billing`, then deletes the sidecars and runs `describe --force` on the project.  The project does not build while a sidecar is missing or stale, so the script runs the tool from its source, not a test.  Run it after a change to a query, a schema or a seed of `EndToEnd/`, after a move to a new minor of the default image, and in the pull request that raises `VersionPrefix` ([`docs/publishing.md`](../../docs/publishing.md)), and read the diff before it is committed.
+It starts a container of the default image and applies the schemas and seeds of `app` and `billing`, then deletes the sidecars and runs `describe --force` on the project.  It then does the same for the examples, on a database `examples` made from their `schema.sql`.  The project does not build while a sidecar is missing or stale, so the script runs the tool from its source, not a test.  Run it after a change to a query, a schema or a seed of `EndToEnd/` or of the examples, after a move to a new minor of the default image, and in the pull request that raises `VersionPrefix` ([`docs/publishing.md`](../../docs/publishing.md)), and read the diff before it is committed.

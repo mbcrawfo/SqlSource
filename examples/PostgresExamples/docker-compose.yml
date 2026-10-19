@@ -1,0 +1,19 @@
+# Starts the PostgreSQL of the example, with schema.sql run on its first start.  The user, password and database are
+# for this example alone.  The image is the tests' default image, which rule 5 of the repository's AGENTS.md keeps in
+# step.  To use another host port, change 55432 under "ports", and the port of the connection string with it.
+services:
+  postgres:
+    image: postgres:18.6
+    environment:
+      POSTGRES_DB: examples
+      POSTGRES_USER: examples
+      POSTGRES_PASSWORD: examples
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - ./schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD", "pg_isready", "-h", "127.0.0.1", "-U", "examples", "-d", "examples"]
+      interval: 1s
+      timeout: 5s
+      retries: 60
