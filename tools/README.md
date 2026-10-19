@@ -39,7 +39,9 @@ Its `Directory.Build.targets` sets one of the two properties and has a target th
 
 The script then asks the project what the `sqlsource` tool asks one.  `SqlSourceImported` must be `true`, which shows that NuGet imported the package's props.  The target `SqlSourceWriteManifest`, run by name, must write a manifest that starts with its version, lists a `.sql` file, holds a dialect and a property that the project writes over several lines, trimmed, and does not list `Queries/AddedByATarget.sql`, the file that `Directory.Build.targets` adds from a hook of the build.  A target that is run by name does not run that hook, which is [TD-0025](../docs/tech-debt/TD-0025-manifest-misses-a-file-that-a-build-hook-adds.md); the build of the consumer compiled the file, and `expected-output.txt` has its query.
 
-It then deletes a `.sql` file the project uses and builds again, and fails unless that build reports the missing member: an incremental build must notice that a file is gone.  Without an argument the script packs first, as the other does.
+It then deletes a `.sql` file the project uses and builds again, and fails unless that build reports the missing member: an incremental build must notice that a file is gone.
+
+Last, it writes a web project, of `Microsoft.NET.Sdk.Web`, that references the package and has a `.sql` file and its sidecar, publishes it, and fails when either file is in its `bin` folder or in what `dotnet publish` wrote.  The Web SDK copies a `.json` file to both unless the package says otherwise, and the consumer, of the plain SDK, copies neither.  The project claims no file, so the sidecar can be empty.  Without an argument the script packs first, as the other does.
 
 ### `check-tool-install.sh`
 

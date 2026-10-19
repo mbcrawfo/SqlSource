@@ -162,17 +162,27 @@
             >$(SqlSourceManifestDependsOn);AddImplicitDefineConstants</SqlSourceManifestDependsOn>
     </PropertyGroup>
     <!--
-        Nests a sidecar under its .sql file in the solution explorer of an IDE: Users.sql.json under Users.sql.  The
-        IDEs nest from the evaluated items, so this is outside every target.  It is in this file, and not in the
-        props, so that it reaches a sidecar that a project lists itself when SqlSourceIncludeFiles is off.  It is on
-        None and Content too, since an IDE may nest on any of them: the SDK lists every file of the project under
-        None, and the Web SDK lists a .json file under Content instead.  Update changes the items that are already
-        listed and adds none.
+        Nests a sidecar under its .sql file in the solution explorer of an IDE, Users.sql.json under Users.sql, and
+        keeps it out of the output and publish folders.  The IDEs nest from the evaluated items, so this is outside
+        every target.  It is in this file, and not in the props, so that it reaches a sidecar that a project lists
+        itself when SqlSourceIncludeFiles is off.  It is on None and Content too, since an IDE may nest on any of
+        them: the SDK lists every file of the project under None, and the Web SDK lists a .json file under Content
+        instead.  Update changes the items that are already listed and adds none.
+
+        A sidecar is an input of the generator alone, so neither the build nor a publish copies it.  The Web SDK has
+        its Content copied to the output and publish folders, a .json file among it, and Never overrides that: the
+        targets are imported after the project's content.  None is copied only when a project asks, and is left as
+        the project has it.
     -->
     <ItemGroup>
         <AdditionalFiles Update="**/*.sql.json" DependentUpon="%(Filename)" />
         <None Update="**/*.sql.json" DependentUpon="%(Filename)" />
-        <Content Update="**/*.sql.json" DependentUpon="%(Filename)" />
+        <Content
+            Update="**/*.sql.json"
+            DependentUpon="%(Filename)"
+            CopyToOutputDirectory="Never"
+            CopyToPublishDirectory="Never"
+        />
     </ItemGroup>
     <!--
         Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
