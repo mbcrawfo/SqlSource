@@ -5,6 +5,7 @@
     </PropertyGroup>
     <ItemGroup>
         <PackageVersion Include="Bogus" Version="35.6.5" />
+        <!-- examples/PostgresExamples/README.md lists this version. -->
         <PackageVersion Include="Dapper" Version="2.1.89" />
         <PackageVersion Include="GitHubActionsTestLogger" Version="3.0.5" />
         <!--
@@ -31,6 +32,7 @@
         <!--
             The driver of the PostgreSQL describer.  The tool's driver is its own: the floor of the Npgsql that a
             consumer's project may use is decided with the generated code, not here.
+            examples/PostgresExamples/README.md lists this version.
         -->
         <PackageVersion Include="Npgsql" Version="10.0.3" />
         <PackageVersion Include="NSubstitute" Version="6.2.0" />

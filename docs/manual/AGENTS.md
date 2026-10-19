@@ -87,8 +87,9 @@ Every phase of query generation (`docs/superpowers/specs/2026-10-07-query-genera
 4. **Adds or removes its known issues** as its `docs/tech-debt` and `docs/deferred` items open and close.
 5. **Adds its diagnostics** to `diagnostics.md`, with their See: lines, and its recipes to `recipes.md`, where a task is new.
 6. **Updates the README** where it changes the common path: the status line in the introduction, getting started, a scenario, a FAQ answer, the supported environments.
+7. **Updates the examples** in `examples/`, by the `examples/` item of rule 4 in the root `AGENTS.md`.
 
-Which pages each phase touches, besides those six steps:
+Which pages each phase touches, besides those seven steps:
 
 | Phase | Pages |
 |----|----|
