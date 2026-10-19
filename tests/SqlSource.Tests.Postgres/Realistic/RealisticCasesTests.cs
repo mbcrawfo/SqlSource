@@ -9,8 +9,8 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Realistic;
 
 // The reading of the cases' folders: every folder of Cases is a case, a case.json that is wrong fails naming the
-// case and the fault, a folder holds its query, its truth and the expectation of each major it is recorded on, and a
-// case runs on the majors from its minimum on.
+// case and the fault, a folder holds its query, its truth, the expectation of each major it is recorded on and its
+// sidecar when it has models, and a case runs on the majors from its minimum on.
 public sealed class RealisticCasesTests
 {
     private const string KnownCase = "aggregate-cte-left-joined";
@@ -52,7 +52,7 @@ public sealed class RealisticCasesTests
     // Each case is checked apart, so that a broken one fails its own row.
     [Theory]
     [MemberData(nameof(Cases))]
-    public void Folder_Case_HoldsItsQueryItsTruthAndTheExpectationsOfItsRecordedMajorsAlone(string name)
+    public void Folder_Case_HoldsItsFilesAlone(string name)
     {
         var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, name));
 
@@ -73,12 +73,24 @@ public sealed class RealisticCasesTests
         (Case() with { MinimumMajor = minimum }).RunsOn(major).ShouldBe(runs);
 
     [Theory]
-    [InlineData(null, new[] { "query.sql", "case.json", "expected-pg14.txt", "expected-pg18.txt" })]
-    [InlineData(17, new[] { "query.sql", "case.json", "expected-pg18.txt" })]
-    public void Files_MinimumMajor_AreTheQueryTheTruthAndAnExpectationOfEachRecordedMajorItRunsOn(
+    [InlineData(null, new[] { "query.sql", "case.json", "query.sql.json", "expected-pg14.txt", "expected-pg18.txt" })]
+    [InlineData(17, new[] { "query.sql", "case.json", "query.sql.json", "expected-pg18.txt" })]
+    public void Files_Case_AreTheQueryTheTruthTheSidecarAndAnExpectationOfEachRecordedMajorItRunsOn(
         int? minimum,
         string[] files
     ) => (Case() with { MinimumMajor = minimum }).Files.ShouldBe(files);
+
+    // A case the describer refuses has no entry to write, and one the generator refuses is claimed by no class.
+    [Theory]
+    [InlineData("SQLSRC229", null)]
+    [InlineData(null, "SQLSRC255")]
+    public void Files_RefusedOrModelRefusedCase_HasNoSidecar(string? refusal, string? models)
+    {
+        var found = Case() with { Refusal = refusal, Models = models is null ? null : new ModelRefusal(models, "w") };
+
+        found.HasModels.ShouldBeFalse();
+        found.Files.ShouldNotContain(RealisticCase.SidecarFile);
+    }
 
     [Fact]
     public void Read_FolderWithoutCaseJson_ThrowsNamingTheCase()
@@ -181,6 +193,18 @@ public sealed class RealisticCasesTests
         "{ \"columns\": [ { \"name\": \"id\", \"nullable\": false, \"exempt\": \"no row\" } ] }",
         "not nullable and has an exempt"
     )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"refusal\": \"SQLSRC229\", \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"w\" } }",
+        "both a refusal and a refusal of its models"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"models\": { \"refusal\": \" \", \"why\": \"w\" } }",
+        "models gives no refusal"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"\" } }",
+        "models gives no why"
+    )]
     public void Read_CaseJsonThatIsWrong_ThrowsNamingTheCaseAndTheFault(string json, string fault)
     {
         using var temp = new TempFolder();
@@ -191,6 +215,22 @@ public sealed class RealisticCasesTests
 
         thrown.Message.ShouldContain("realistic/wrong");
         thrown.Message.ShouldContain(fault);
+    }
+
+    [Fact]
+    public void Read_CaseWithModelRefusal_ReadsIt()
+    {
+        using var temp = new TempFolder();
+        _ = temp.WriteFile("refused/query.sql", Query);
+        _ = temp.WriteFile(
+            "refused/case.json", /*lang=json,strict*/
+            "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"two ids\" } }"
+        );
+
+        var found = RealisticCases.Read(temp.PathOf("refused"));
+
+        found.Models.ShouldBe(new ModelRefusal("SQLSRC255", "two ids"));
+        found.HasModels.ShouldBeFalse();
     }
 
     [Fact]

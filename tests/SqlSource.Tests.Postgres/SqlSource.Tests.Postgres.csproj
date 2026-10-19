@@ -31,6 +31,12 @@
             SqlSourceOutputModelSuffix="Row"
             SqlSourceTypeOverrides="timestamptz=System.DateTime"
         />
+        <!-- The realistic corpus: the database realistic, and the type map's own C# type for timestamptz. -->
+        <AdditionalFiles
+            Update="Realistic/Cases/**/*.sql"
+            SqlSourceDatabase="realistic"
+            SqlSourceTypeOverrides="timestamptz=default"
+        />
     </ItemGroup>
     <ItemGroup>
         <!-- The scratch project of the error-path tests is a project of its own, never built or described here. -->

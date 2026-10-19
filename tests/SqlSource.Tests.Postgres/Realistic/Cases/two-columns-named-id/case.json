@@ -15,5 +15,9 @@
   ],
   "samples": [
     { "status": "'active'" }
-  ]
+  ],
+  "models": {
+    "refusal": "SQLSRC255",
+    "why": "a.id and o.id give one property name, Id, which the generator refuses; the case keeps both columns named id"
+  }
 }

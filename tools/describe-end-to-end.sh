@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# Writes every sidecar of the end-to-end queries, the .sql.json files under
-# tests/SqlSource.Tests.Postgres/EndToEnd/Queries, from nothing: it deletes them, then runs `sqlsource describe --force`
-# on the project against the databases "app" and "billing" of a PostgreSQL in a container.  It is no check: a person
-# runs it after a change to a query, to a schema or to a seed of tests/SqlSource.Tests.Postgres/EndToEnd, and in the
-# pull request that raises VersionPrefix, since every sidecar holds the tool's version, and reads the diff of what it
-# wrote before committing it.
+# Writes every sidecar of the end-to-end queries and the realistic cases, the .sql.json files under
+# tests/SqlSource.Tests.Postgres/EndToEnd/Queries and tests/SqlSource.Tests.Postgres/Realistic/Cases, from nothing: it
+# deletes them, then runs `sqlsource describe --force` on the project against the databases "realistic", "app" and
+# "billing" of a PostgreSQL in a container.  It is no check: a person runs it after a change to a query, to a schema or
+# to a seed of tests/SqlSource.Tests.Postgres/EndToEnd or Realistic, and in the pull request that raises VersionPrefix,
+# since every sidecar holds the tool's version, and reads the diff of what it wrote before committing it.
 # It starts its own container and runs the tool as a project, where the other recording scripts run a test: the test
 # project does not build until its sidecars are current.  The image is the default image of the tests, which the
 # sidecars are recorded on, so SQLSOURCE_TESTS_POSTGRES_IMAGE is ignored.  It needs Docker.
@@ -13,7 +13,8 @@ set -euo pipefail
 
 PROJECT='tests/SqlSource.Tests.Postgres'
 END_TO_END="$PROJECT/EndToEnd"
-DATABASES=(app billing)
+REALISTIC="$PROJECT/Realistic"
+DATABASES=(realistic app billing)
 PASSWORD='postgres'
 
 if [[ $# -ne 0 ]]; then
@@ -52,16 +53,20 @@ connections=()
 for database in "${DATABASES[@]}"; do
     printf 'Creating the database %s ... ' "$database"
     docker exec "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $database" >/dev/null
+    folder="$END_TO_END/$database"
+    if [[ $database == realistic ]]; then
+        folder="$REALISTIC"
+    fi
     for file in schema.sql seed.sql; do
         docker exec -i "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$database" \
-            <"$END_TO_END/$database/$file" >/dev/null
+            <"$folder/$file" >/dev/null
     done
     echo 'done'
     connection="Host=127.0.0.1;Port=$port;Username=postgres;Password=$PASSWORD;Database=$database"
     connections+=(--connection "$database=$connection")
 done
 
-find "$END_TO_END/Queries" -name '*.sql.json' -type f -delete
+find "$END_TO_END/Queries" "$REALISTIC/Cases" -name '*.sql.json' -type f -delete
 
 dotnet run --project src/SqlSource.Tool -- \
     describe --force "$PROJECT/SqlSource.Tests.Postgres.csproj" "${connections[@]}"

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
@@ -12,16 +13,22 @@ namespace SqlSource.Tests.Postgres.Realistic;
 // show it.
 internal sealed record TruthColumn(string Name, bool Nullable, string? Why, string? Exempt);
 
-// One realistic case: a folder with a query, its truth and its sample values, and the description recorded of it on
-// each major version of the server.  A case refused by the describer has the failure's id and no columns.  A sample
-// set holds a SQL literal for each parameter, by its name without @, compared ignoring case.
+// Why the generator refuses the models of a case that the describer accepts: the id of the diagnostic, and why the
+// case keeps the SQL that it refuses.
+internal sealed record ModelRefusal(string Id, string Why);
+
+// One realistic case: a folder with a query, its truth and its sample values, the description recorded of it on each
+// major version of the server, and the sidecar of its models.  A case refused by the describer has the failure's id
+// and no columns; one whose models the generator refuses says so by Models.  A sample set holds a SQL literal for each
+// parameter, by its name without @, compared ignoring case.
 internal sealed record RealisticCase(
     string Name,
     string Folder,
     int? MinimumMajor,
     string? Refusal,
     IReadOnlyList<TruthColumn> Columns,
-    IReadOnlyList<IReadOnlyDictionary<string, string>> Samples
+    IReadOnlyList<IReadOnlyDictionary<string, string>> Samples,
+    ModelRefusal? Models = null
 )
 {
     // A complete SqlSource file with exactly one query, read as FixtureReplay reads a fixture's.
@@ -30,11 +37,22 @@ internal sealed record RealisticCase(
     // The truth and the sample values, written by hand.  Recording never writes it.
     public const string CaseFile = "case.json";
 
-    // The files of the case's folder: its query, its truth, and the description of each recorded major it runs on.
+    // The entry of the query's models, written by tools/describe-end-to-end.sh beside the query it describes.
+    public const string SidecarFile = "query.sql.json";
+
+    public string SidecarPath => Path.Combine(Folder, SidecarFile);
+
+    // Whether the case is a Models query of the project, claimed by its class in Realistic/Generation: neither the
+    // describer nor the generator refuses it.
+    public bool HasModels => Refusal is null && Models is null;
+
+    // The files of the case's folder: its query, its truth, its sidecar when it has models, and the description of
+    // each recorded major it runs on.
     public IReadOnlyList<string> Files =>
         [
             QueryFile,
             CaseFile,
+            .. HasModels ? [SidecarFile] : Array.Empty<string>(),
             .. PostgresContainer.RecordedMajors.Where(RunsOn).Select(major => Path.GetFileName(ExpectedPath(major))),
         ];
 

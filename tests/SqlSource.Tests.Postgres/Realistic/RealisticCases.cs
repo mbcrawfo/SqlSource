@@ -75,7 +75,8 @@ internal static class RealisticCases
             read.MinimumMajor,
             read.Refusal,
             ColumnsOf(read, named),
-            SamplesOf(read, named)
+            SamplesOf(read, named),
+            ModelsOf(read, named)
         );
     }
 
@@ -162,6 +163,32 @@ internal static class RealisticCases
         return samples;
     }
 
+    // A refusal of the models is the generator's, of a query the describer accepts, so it is said with its reason.
+    private static ModelRefusal? ModelsOf(CaseJson read, string named)
+    {
+        if (read.Models is not { } models)
+        {
+            return null;
+        }
+
+        if (read.Refusal is not null)
+        {
+            throw Fault(named, "has both a refusal and a refusal of its models: a refused query has no models");
+        }
+
+        if (string.IsNullOrWhiteSpace(models.Refusal))
+        {
+            throw Fault(named, "says its models are refused, but models gives no refusal");
+        }
+
+        if (string.IsNullOrWhiteSpace(models.Why))
+        {
+            throw Fault(named, "says its models are refused, but models gives no why");
+        }
+
+        return new ModelRefusal(models.Refusal, models.Why);
+    }
+
     private static InvalidOperationException Fault(string named, string fault) =>
         new($"The {RealisticCase.CaseFile} of the case {named} {fault}.");
 
@@ -175,7 +202,8 @@ internal static class RealisticCases
         int? MinimumMajor,
         string? Refusal,
         List<ColumnJson>? Columns,
-        List<Dictionary<string, string>>? Samples
+        List<Dictionary<string, string>>? Samples,
+        ModelsJson? Models
     );
 
     [SuppressMessage(
@@ -184,4 +212,11 @@ internal static class RealisticCases
         Justification = "JsonSerializer makes it."
     )]
     private sealed record ColumnJson(string? Name, bool? Nullable, string? Why, string? Exempt);
+
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "JsonSerializer makes it."
+    )]
+    private sealed record ModelsJson(string? Refusal, string? Why);
 }
