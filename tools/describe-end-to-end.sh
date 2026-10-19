@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Writes every sidecar of the end-to-end queries, the .sql.json files under
 # tests/SqlSource.Tests.Postgres/EndToEnd/Queries, from nothing: it deletes them, then runs `sqlsource describe --force`
-# on the project against the databases "app" and "billing" of a PostgreSQL in a container.  It is no check: a person
-# runs it after a change to a query, to a schema or to a seed of tests/SqlSource.Tests.Postgres/EndToEnd, and in the
-# pull request that raises VersionPrefix, since every sidecar holds the tool's version, and reads the diff of what it
-# wrote before committing it.
+# on the project against the databases "app" and "billing" of a PostgreSQL in a container.  It then does the same for
+# the examples, every .sql.json file under examples/PostgresExamples, against the database "examples".  It is no
+# check: a person runs it after a change to a query, to a schema or to a seed of tests/SqlSource.Tests.Postgres/EndToEnd
+# or of examples/PostgresExamples, and in the pull request that raises VersionPrefix, since every sidecar holds the
+# tool's version, and reads the diff of what it wrote before committing it.
 # It starts its own container and runs the tool as a project, where the other recording scripts run a test: the test
 # project does not build until its sidecars are current.  The image is the default image of the tests, which the
 # sidecars are recorded on, so SQLSOURCE_TESTS_POSTGRES_IMAGE is ignored.  It needs Docker.
@@ -14,6 +15,7 @@ set -euo pipefail
 PROJECT='tests/SqlSource.Tests.Postgres'
 END_TO_END="$PROJECT/EndToEnd"
 DATABASES=(app billing)
+EXAMPLES='examples/PostgresExamples'
 PASSWORD='postgres'
 
 if [[ $# -ne 0 ]]; then
@@ -65,3 +67,16 @@ find "$END_TO_END/Queries" -name '*.sql.json' -type f -delete
 
 dotnet run --project src/SqlSource.Tool -- \
     describe --force "$PROJECT/SqlSource.Tests.Postgres.csproj" "${connections[@]}"
+
+# The examples: their schema on a database of their own, and their project described with that connection, under the
+# logical database that its queries belong to, named after their dialect.
+printf 'Creating the database examples ... '
+docker exec "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -c 'CREATE DATABASE examples' >/dev/null
+docker exec -i "$container" psql -v ON_ERROR_STOP=1 -q -U postgres -d examples <"$EXAMPLES/schema.sql" >/dev/null
+echo 'done'
+
+find "$EXAMPLES" -name '*.sql.json' -type f -delete
+
+dotnet run --project src/SqlSource.Tool -- \
+    describe --force "$EXAMPLES/PostgresExamples.csproj" \
+    --connection "postgres=Host=127.0.0.1;Port=$port;Username=postgres;Password=$PASSWORD;Database=examples"
