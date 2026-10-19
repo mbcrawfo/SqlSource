@@ -32,6 +32,8 @@ The five test projects and the two libraries they share, which [`tests/README.md
 - `tests/SqlSource.Tests.Postgres.Npgsql8` reads every mapped type through Dapper on Npgsql 8, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 
+`examples/PostgresExamples` is a small project that shows a user SqlSource with PostgreSQL and Dapper, which builds with the solution and holds no tests.
+
 ## Build, test and run
 
 ```bash
@@ -45,7 +47,7 @@ This runs every test project, the two PostgreSQL projects on the default Postgre
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres
 ```
 
-The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) with `tools/record-fixtures.sh`, [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus) and recording it with `tools/record-realistic.sh`, and [writing the end-to-end sidecars again](tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`.  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
+The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) with `tools/record-fixtures.sh`, [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus) and recording it with `tools/record-realistic.sh`, and [writing the sidecars of the end-to-end project and the examples again](tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`.  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
 
 To run the tool from its source:
 

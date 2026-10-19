@@ -108,10 +108,10 @@ Every query writes its parameters in camelCase, `@accountId`, so that its input 
 
 ### Writing the sidecars
 
-Every sidecar under `EndToEnd/Queries/` is written by one script, never by hand:
+Every sidecar under `EndToEnd/Queries/`, and every sidecar of `examples/PostgresExamples`, is written by one script, never by hand:
 
 ```bash
 tools/describe-end-to-end.sh
 ```
 
-It starts a container of the default image and applies the schemas and seeds of `app` and `billing`, then deletes the sidecars and runs `describe --force` on the project.  The project does not build while a sidecar is missing or stale, so the script runs the tool from its source, not a test.  Run it after a change to a query, a schema or a seed of `EndToEnd/`, after a move to a new minor of the default image, and in the pull request that raises `VersionPrefix` ([`docs/publishing.md`](../../docs/publishing.md)), and read the diff before it is committed.
+It starts a container of the default image and applies the schemas and seeds of `app` and `billing`, then deletes the sidecars and runs `describe --force` on the project.  It then does the same for the examples, on a database `examples` made from their `schema.sql`.  The project does not build while a sidecar is missing or stale, so the script runs the tool from its source, not a test.  Run it after a change to a query, a schema or a seed of `EndToEnd/` or of the examples, after a move to a new minor of the default image, and in the pull request that raises `VersionPrefix` ([`docs/publishing.md`](../../docs/publishing.md)), and read the diff before it is committed.
