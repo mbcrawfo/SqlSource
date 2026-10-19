@@ -383,18 +383,23 @@ public sealed class ModelShapeTests
         ModelNamed($"{Namespace}.InsertAllTypesDto").ShouldBeNull();
         ShapeOf(typeof(InsertAllTypesArgs)).ShouldBe(Shape.Record);
 
-        // A parameter for each column, in its order, with the column's type, and none can be null, since no -- param:
-        // marker says null.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
+        // A parameter for each column that the query writes, in its order, with the column's type, and none can be
+        // null, since no -- param: marker says null.  It writes every column but those whose parameter Dapper cannot
+        // send.  A parameter of bit(1) has no length, so it is a BitArray where the column is a bool.
         var columns = PropertiesOf(typeof(AllTypesDto));
-        var expected = columns.Select(column =>
-            (
-                column.Name,
-                column.Name == "Bit1Value" ? typeof(BitArray) : Nullable.GetUnderlyingType(column.Type) ?? column.Type,
-                false
-            )
-        );
+        var expected = columns
+            .Where(static column => !AllTypesQueryTests.WriteSideLeftOut.ContainsKey(column.Name))
+            .Select(column =>
+                (
+                    column.Name,
+                    column.Name == "Bit1Value"
+                        ? typeof(BitArray)
+                        : Nullable.GetUnderlyingType(column.Type) ?? column.Type,
+                    false
+                )
+            );
         PropertiesOf(typeof(InsertAllTypesArgs)).ShouldBe(expected);
-        PropertiesOf(typeof(InsertAllTypesArgs)).Length.ShouldBe(76);
+        PropertiesOf(typeof(InsertAllTypesArgs)).Length.ShouldBe(39);
     }
 
     [Fact]

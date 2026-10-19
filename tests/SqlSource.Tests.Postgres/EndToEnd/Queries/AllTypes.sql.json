@@ -1583,7 +1583,7 @@
       ]
     },
     "InsertAllTypes": {
-      "hash": "dccc8035a008b13bd11c818a7eef8b6b65bbfe66ffcb4f4294dd9a2426b8bd15",
+      "hash": "271889c8f7b7d9b8f5ecb3d43e21866ad4b4753b030982ce056c29f55b1879ab",
       "engine": "postgres",
       "database": "app",
       "serverVersion": "18.6",
@@ -1830,21 +1830,8 @@
           "typeSource": "inferred"
         },
         {
-          "name": "timetzValue",
-          "ordinal": 18,
-          "type": {
-            "name": "time with time zone",
-            "bindName": "time with time zone",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "timetz"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
           "name": "timestampValue",
-          "ordinal": 19,
+          "ordinal": 18,
           "type": {
             "name": "timestamp without time zone",
             "bindName": "timestamp without time zone",
@@ -1857,7 +1844,7 @@
         },
         {
           "name": "timestamptzValue",
-          "ordinal": 20,
+          "ordinal": 19,
           "type": {
             "name": "timestamp with time zone",
             "bindName": "timestamp with time zone",
@@ -1870,7 +1857,7 @@
         },
         {
           "name": "intervalValue",
-          "ordinal": 21,
+          "ordinal": 20,
           "type": {
             "name": "interval",
             "bindName": "interval",
@@ -1883,7 +1870,7 @@
         },
         {
           "name": "uuidValue",
-          "ordinal": 22,
+          "ordinal": 21,
           "type": {
             "name": "uuid",
             "bindName": "uuid",
@@ -1895,112 +1882,8 @@
           "typeSource": "inferred"
         },
         {
-          "name": "jsonValue",
-          "ordinal": 23,
-          "type": {
-            "name": "json",
-            "bindName": "json",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "json"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "jsonbValue",
-          "ordinal": 24,
-          "type": {
-            "name": "jsonb",
-            "bindName": "jsonb",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "jsonb"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "jsonpathValue",
-          "ordinal": 25,
-          "type": {
-            "name": "jsonpath",
-            "bindName": "jsonpath",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "jsonpath"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "xmlValue",
-          "ordinal": 26,
-          "type": {
-            "name": "xml",
-            "bindName": "xml",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "xml"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "inetValue",
-          "ordinal": 27,
-          "type": {
-            "name": "inet",
-            "bindName": "inet",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "inet"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "cidrValue",
-          "ordinal": 28,
-          "type": {
-            "name": "cidr",
-            "bindName": "cidr",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "cidr"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "macaddrValue",
-          "ordinal": 29,
-          "type": {
-            "name": "macaddr",
-            "bindName": "macaddr",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "macaddr"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "macaddr8Value",
-          "ordinal": 30,
-          "type": {
-            "name": "macaddr8",
-            "bindName": "macaddr8",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "macaddr8"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
           "name": "bit1Value",
-          "ordinal": 31,
+          "ordinal": 22,
           "type": {
             "name": "\"bit\"",
             "bindName": "bit",
@@ -2013,7 +1896,7 @@
         },
         {
           "name": "bit8Value",
-          "ordinal": 32,
+          "ordinal": 23,
           "type": {
             "name": "\"bit\"",
             "bindName": "bit",
@@ -2026,7 +1909,7 @@
         },
         {
           "name": "varbitValue",
-          "ordinal": 33,
+          "ordinal": 24,
           "type": {
             "name": "bit varying",
             "bindName": "bit varying",
@@ -2038,60 +1921,8 @@
           "typeSource": "inferred"
         },
         {
-          "name": "pointValue",
-          "ordinal": 34,
-          "type": {
-            "name": "point",
-            "bindName": "point",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "point"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "lineValue",
-          "ordinal": 35,
-          "type": {
-            "name": "line",
-            "bindName": "line",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "line"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "lsegValue",
-          "ordinal": 36,
-          "type": {
-            "name": "lseg",
-            "bindName": "lseg",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "lseg"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "boxValue",
-          "ordinal": 37,
-          "type": {
-            "name": "box",
-            "bindName": "box",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "box"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
           "name": "pathValue",
-          "ordinal": 38,
+          "ordinal": 25,
           "type": {
             "name": "path",
             "bindName": "path",
@@ -2104,7 +1935,7 @@
         },
         {
           "name": "polygonValue",
-          "ordinal": 39,
+          "ordinal": 26,
           "type": {
             "name": "polygon",
             "bindName": "polygon",
@@ -2116,21 +1947,8 @@
           "typeSource": "inferred"
         },
         {
-          "name": "circleValue",
-          "ordinal": 40,
-          "type": {
-            "name": "circle",
-            "bindName": "circle",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "circle"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
           "name": "tsvectorValue",
-          "ordinal": 41,
+          "ordinal": 27,
           "type": {
             "name": "tsvector",
             "bindName": "tsvector",
@@ -2142,164 +1960,8 @@
           "typeSource": "inferred"
         },
         {
-          "name": "tsqueryValue",
-          "ordinal": 42,
-          "type": {
-            "name": "tsquery",
-            "bindName": "tsquery",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "tsquery"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "oidValue",
-          "ordinal": 43,
-          "type": {
-            "name": "oid",
-            "bindName": "oid",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "oid"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "xidValue",
-          "ordinal": 44,
-          "type": {
-            "name": "xid",
-            "bindName": "xid",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "xid"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "cidValue",
-          "ordinal": 45,
-          "type": {
-            "name": "cid",
-            "bindName": "cid",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "cid"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "regtypeValue",
-          "ordinal": 46,
-          "type": {
-            "name": "regtype",
-            "bindName": "regtype",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "regtype"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "regconfigValue",
-          "ordinal": 47,
-          "type": {
-            "name": "regconfig",
-            "bindName": "regconfig",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "regconfig"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "xid8Value",
-          "ordinal": 48,
-          "type": {
-            "name": "xid8",
-            "bindName": "xid8",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "xid8"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "tidValue",
-          "ordinal": 49,
-          "type": {
-            "name": "tid",
-            "bindName": "tid",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "tid"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "pgLsnValue",
-          "ordinal": 50,
-          "type": {
-            "name": "pg_lsn",
-            "bindName": "pg_lsn",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "pg_lsn"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "int2vectorValue",
-          "ordinal": 51,
-          "type": {
-            "name": "int2vector",
-            "bindName": "int2vector",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "int2vector"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "oidvectorValue",
-          "ordinal": 52,
-          "type": {
-            "name": "oidvector",
-            "bindName": "oidvector",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "oidvector"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "refcursorValue",
-          "ordinal": 53,
-          "type": {
-            "name": "refcursor",
-            "bindName": "refcursor",
-            "kind": "base",
-            "schema": "pg_catalog",
-            "internalName": "refcursor"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
           "name": "hstoreValue",
-          "ordinal": 54,
+          "ordinal": 28,
           "type": {
             "name": "public.hstore",
             "bindName": "public.hstore",
@@ -2311,161 +1973,8 @@
           "typeSource": "inferred"
         },
         {
-          "name": "ltreeValue",
-          "ordinal": 55,
-          "type": {
-            "name": "public.ltree",
-            "bindName": "public.ltree",
-            "kind": "base",
-            "schema": "public",
-            "internalName": "ltree"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "lqueryValue",
-          "ordinal": 56,
-          "type": {
-            "name": "public.lquery",
-            "bindName": "public.lquery",
-            "kind": "base",
-            "schema": "public",
-            "internalName": "lquery"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "ltxtqueryValue",
-          "ordinal": 57,
-          "type": {
-            "name": "public.ltxtquery",
-            "bindName": "public.ltxtquery",
-            "kind": "base",
-            "schema": "public",
-            "internalName": "ltxtquery"
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "int4rangeValue",
-          "ordinal": 58,
-          "type": {
-            "name": "int4range",
-            "bindName": "int4range",
-            "kind": "range",
-            "schema": "pg_catalog",
-            "internalName": "int4range",
-            "subtype": {
-              "name": "integer",
-              "kind": "base",
-              "schema": "pg_catalog",
-              "internalName": "int4"
-            }
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "int8rangeValue",
-          "ordinal": 59,
-          "type": {
-            "name": "int8range",
-            "bindName": "int8range",
-            "kind": "range",
-            "schema": "pg_catalog",
-            "internalName": "int8range",
-            "subtype": {
-              "name": "bigint",
-              "kind": "base",
-              "schema": "pg_catalog",
-              "internalName": "int8"
-            }
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "numrangeValue",
-          "ordinal": 60,
-          "type": {
-            "name": "numrange",
-            "bindName": "numrange",
-            "kind": "range",
-            "schema": "pg_catalog",
-            "internalName": "numrange",
-            "subtype": {
-              "name": "numeric",
-              "kind": "base",
-              "schema": "pg_catalog",
-              "internalName": "numeric"
-            }
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "tsrangeValue",
-          "ordinal": 61,
-          "type": {
-            "name": "tsrange",
-            "bindName": "tsrange",
-            "kind": "range",
-            "schema": "pg_catalog",
-            "internalName": "tsrange",
-            "subtype": {
-              "name": "timestamp without time zone",
-              "kind": "base",
-              "schema": "pg_catalog",
-              "internalName": "timestamp"
-            }
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "tstzrangeValue",
-          "ordinal": 62,
-          "type": {
-            "name": "tstzrange",
-            "bindName": "tstzrange",
-            "kind": "range",
-            "schema": "pg_catalog",
-            "internalName": "tstzrange",
-            "subtype": {
-              "name": "timestamp with time zone",
-              "kind": "base",
-              "schema": "pg_catalog",
-              "internalName": "timestamptz"
-            }
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "daterangeValue",
-          "ordinal": 63,
-          "type": {
-            "name": "daterange",
-            "bindName": "daterange",
-            "kind": "range",
-            "schema": "pg_catalog",
-            "internalName": "daterange",
-            "subtype": {
-              "name": "date",
-              "kind": "base",
-              "schema": "pg_catalog",
-              "internalName": "date"
-            }
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
           "name": "int4multirangeValue",
-          "ordinal": 64,
+          "ordinal": 29,
           "type": {
             "name": "int4multirange",
             "bindName": "int4multirange",
@@ -2484,7 +1993,7 @@
         },
         {
           "name": "int8multirangeValue",
-          "ordinal": 65,
+          "ordinal": 30,
           "type": {
             "name": "int8multirange",
             "bindName": "int8multirange",
@@ -2503,7 +2012,7 @@
         },
         {
           "name": "nummultirangeValue",
-          "ordinal": 66,
+          "ordinal": 31,
           "type": {
             "name": "nummultirange",
             "bindName": "nummultirange",
@@ -2522,7 +2031,7 @@
         },
         {
           "name": "tsmultirangeValue",
-          "ordinal": 67,
+          "ordinal": 32,
           "type": {
             "name": "tsmultirange",
             "bindName": "tsmultirange",
@@ -2541,7 +2050,7 @@
         },
         {
           "name": "tstzmultirangeValue",
-          "ordinal": 68,
+          "ordinal": 33,
           "type": {
             "name": "tstzmultirange",
             "bindName": "tstzmultirange",
@@ -2560,7 +2069,7 @@
         },
         {
           "name": "datemultirangeValue",
-          "ordinal": 69,
+          "ordinal": 34,
           "type": {
             "name": "datemultirange",
             "bindName": "datemultirange",
@@ -2579,7 +2088,7 @@
         },
         {
           "name": "int4ArrayValue",
-          "ordinal": 70,
+          "ordinal": 35,
           "type": {
             "name": "integer[]",
             "bindName": "integer[]",
@@ -2598,7 +2107,7 @@
         },
         {
           "name": "textArrayValue",
-          "ordinal": 71,
+          "ordinal": 36,
           "type": {
             "name": "text[]",
             "bindName": "text[]",
@@ -2617,7 +2126,7 @@
         },
         {
           "name": "dateArrayValue",
-          "ordinal": 72,
+          "ordinal": 37,
           "type": {
             "name": "date[]",
             "bindName": "date[]",
@@ -2635,32 +2144,8 @@
           "typeSource": "inferred"
         },
         {
-          "name": "statusArrayValue",
-          "ordinal": 73,
-          "type": {
-            "name": "public.account_status[]",
-            "bindName": "public.account_status[]",
-            "kind": "array",
-            "schema": "public",
-            "internalName": "_account_status",
-            "element": {
-              "name": "public.account_status",
-              "kind": "enum",
-              "schema": "public",
-              "internalName": "account_status",
-              "labels": [
-                "active",
-                "suspended",
-                "closed"
-              ]
-            }
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
           "name": "emailValue",
-          "ordinal": 74,
+          "ordinal": 38,
           "type": {
             "name": "public.email",
             "bindName": "public.email",
@@ -2673,24 +2158,6 @@
               "schema": "pg_catalog",
               "internalName": "text"
             }
-          },
-          "nullable": null,
-          "typeSource": "inferred"
-        },
-        {
-          "name": "statusValue",
-          "ordinal": 75,
-          "type": {
-            "name": "public.account_status",
-            "bindName": "public.account_status",
-            "kind": "enum",
-            "schema": "public",
-            "internalName": "account_status",
-            "labels": [
-              "active",
-              "suspended",
-              "closed"
-            ]
           },
           "nullable": null,
           "typeSource": "inferred"
