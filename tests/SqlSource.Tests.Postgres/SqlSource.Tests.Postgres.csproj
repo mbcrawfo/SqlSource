@@ -1,10 +1,33 @@
 <Project Sdk="Microsoft.NET.Sdk">
+    <!--
+        The generator comes from a project reference, which does not bring the package's MSBuild files.  Importing the
+        real ones, here and at the end of this file, means the end-to-end tests exercise what ships.
+    -->
+    <Import Project="../../src/SqlSource/build/SqlSource.props" />
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
+        <!--
+            SQLSRC240, a sidecar written by another version of the tool, stays a warning.  A pull request that raises
+            VersionPrefix warns until it runs tools/describe-end-to-end.sh.
+        -->
+        <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
+        <!-- The dialect of every query of the project. -->
+        <SqlSourceDialect>postgres</SqlSourceDialect>
+        <!-- The logical database that a query is described against, unless its file names another. -->
+        <SqlSourceDatabase>app</SqlSourceDatabase>
+        <!-- What a query generates: its SQL and its models, which need an entry in the sidecar beside its file. -->
+        <SqlSourceOutput>Models</SqlSourceOutput>
+        <!-- The suffix of the model of a query's parameters. -->
+        <SqlSourceInputModelSuffix>Args</SqlSourceInputModelSuffix>
+        <!-- The kind of type that a query's input model is. -->
+        <SqlSourceInputModelType>record</SqlSourceInputModelType>
+        <!-- The C# type that timestamptz is read as, in place of the default of the type map. -->
+        <SqlSourceTypeOverrides>timestamptz=System.DateTimeOffset</SqlSourceTypeOverrides>
     </PropertyGroup>
     <ItemGroup>
+        <PackageReference Include="Dapper" />
         <PackageReference Include="GitHubActionsTestLogger" />
         <!-- The version the tool itself references: central pinning would otherwise hold it at the generator's. -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
@@ -37,8 +60,13 @@
         <None Include="../../global.json" Link="Fixtures/global.json" CopyToOutputDirectory="PreserveNewest" />
     </ItemGroup>
     <ItemGroup>
-        <ProjectReference Include="../../src/SqlSource/SqlSource.csproj" />
+        <ProjectReference
+            Include="../../src/SqlSource/SqlSource.csproj"
+            OutputItemType="Analyzer"
+            ReferenceOutputAssembly="true"
+        />
         <ProjectReference Include="../SqlSource.Testing/SqlSource.Testing.csproj" />
         <ProjectReference Include="../SqlSource.Tool.Testing/SqlSource.Tool.Testing.csproj" />
     </ItemGroup>
+    <Import Project="../../src/SqlSource/build/SqlSource.targets" />
 </Project>
