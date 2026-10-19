@@ -47,7 +47,7 @@ This runs every test project, the two PostgreSQL projects on the default Postgre
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres
 ```
 
-The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) with `tools/record-fixtures.sh`, [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus), writing its sidecar with `tools/describe-end-to-end.sh` and recording it with `tools/record-realistic.sh`, and [writing the sidecars of the end-to-end project, the realistic cases and the examples again](tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`.  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
+The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) with `tools/record-fixtures.sh`, [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus), writing its sidecar with `tools/describe-end-to-end.sh`, and [writing the sidecars of the end-to-end project, the realistic cases and the examples again](tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`.  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
 
 To run the tool from its source:
 

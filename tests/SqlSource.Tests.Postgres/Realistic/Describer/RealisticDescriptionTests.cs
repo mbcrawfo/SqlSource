@@ -9,18 +9,11 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Realistic.Describer;
 
 // What the describer gives for each realistic case against a real server, whole: the refusal its case says or none,
-// and the description recorded of it, its kind, plan, table match, parameters and columns.  Whether its nullability
-// is safe is RealisticNullabilitySafetyTests'.  With SQLSOURCE_RECORD_REALISTIC set the theory of the recorded
-// description writes the case's expected-pg{major}.txt and compares nothing: tools/record-realistic.sh runs it so.
+// and for a case with models the entry its committed sidecar holds, every field of it.  Whether its nullability is
+// safe is RealisticNullabilitySafetyTests'.
 [Collection(UsesPostgres.Name)]
 public sealed class RealisticDescriptionTests(PostgresContainer postgres)
 {
-    public const string RecordVariable = "SQLSOURCE_RECORD_REALISTIC";
-
-    private const string KnownCase = "aggregate-cte-left-joined";
-
-    private const string RecordScript = "tools/record-realistic.sh";
-
     // The script that writes the sidecars of the realistic cases.
     private const string SidecarScript = "tools/describe-end-to-end.sh";
 
@@ -28,17 +21,6 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
     private static readonly ServerInfo AnyServer = new(AnyVersion, null, null, new EquatableArray<ServerSetting>([]));
 
     private const string AnyVersion = "*";
-
-    [Fact]
-    public async Task DescribeAsync_KnownCase_IsDescribedAndRendered()
-    {
-        var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, KnownCase));
-
-        var described = await RealisticDescribe.DescribeAsync(found, postgres.RealisticConnectionString);
-
-        described.Failure.ShouldBeNull();
-        RealisticDescribe.Render(described).ShouldStartWith("kind: rows\n");
-    }
 
     [Theory]
     [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
@@ -56,37 +38,6 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
         }
 
         _ = RealisticDescribe.ColumnsOf(found, described);
-    }
-
-    [Theory]
-    [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
-    public async Task DescribeAsync_Case_IsItsRecordedDescription(string name)
-    {
-        var found = RealisticDescribe.Start(name, postgres.Major);
-        var path = found.ExpectedPath(postgres.Major);
-        var expectation = RealisticDescribe.ExpectationOn(Recording.IsAsked(RecordVariable), postgres.Major);
-        // A recording on a major that is not recorded fails before the skip, which would hide it.
-        if (expectation == Expectation.Refuse)
-        {
-            Assert.Fail(RealisticDescribe.RefuseMessage);
-        }
-
-        postgres.SkipUnlessRecordedMajor("The expectations");
-
-        var rendered = RealisticDescribe.Render(
-            await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString)
-        );
-        if (expectation == Expectation.Record)
-        {
-            await File.WriteAllTextAsync(path, rendered, TestContext.Current.CancellationToken);
-            return;
-        }
-
-        File.Exists(path).ShouldBeTrue($"{found} has no expectation at {path}: run {RecordScript}");
-        rendered.ShouldBe(
-            await File.ReadAllTextAsync(path, TestContext.Current.CancellationToken),
-            $"{found} is described otherwise than {path} says; {RecordScript} records it"
-        );
     }
 
     // The entry of each case with models is the one its sidecar holds, whole: what --check compares, and the

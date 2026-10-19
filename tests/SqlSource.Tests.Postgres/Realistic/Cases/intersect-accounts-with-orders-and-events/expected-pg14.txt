@@ -1,7 +1,0 @@
-kind: rows
-plan: walked
-table-match: no-origin
-parameter @since: timestamp with time zone (inferred)
-column 0 id: integer | nullable false | set-operation | -
-column 1 name: character varying(100) | nullable false | set-operation | -
-column 2 email: text | nullable null | no-origin | -

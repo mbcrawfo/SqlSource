@@ -9,8 +9,8 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Realistic;
 
 // The reading of the cases' folders: every folder of Cases is a case, a case.json that is wrong fails naming the
-// case and the fault, a folder holds its query, its truth, the expectation of each major it is recorded on and its
-// sidecar when it has models, and a case runs on the majors from its minimum on.
+// case and the fault, a folder holds its query, its truth and its sidecar when it has models, and a case runs on the
+// majors from its minimum on.
 public sealed class RealisticCasesTests
 {
     private const string KnownCase = "aggregate-cte-left-joined";
@@ -72,13 +72,9 @@ public sealed class RealisticCasesTests
     public void RunsOn_MinimumMajorAndServer_IsWhetherTheCaseRuns(int? minimum, int major, bool runs) =>
         (Case() with { MinimumMajor = minimum }).RunsOn(major).ShouldBe(runs);
 
-    [Theory]
-    [InlineData(null, new[] { "query.sql", "case.json", "query.sql.json", "expected-pg14.txt", "expected-pg18.txt" })]
-    [InlineData(17, new[] { "query.sql", "case.json", "query.sql.json", "expected-pg18.txt" })]
-    public void Files_Case_AreTheQueryTheTruthTheSidecarAndAnExpectationOfEachRecordedMajorItRunsOn(
-        int? minimum,
-        string[] files
-    ) => (Case() with { MinimumMajor = minimum }).Files.ShouldBe(files);
+    [Fact]
+    public void Files_Case_AreTheQueryTheTruthAndTheSidecar() =>
+        Case().Files.ShouldBe(["query.sql", "case.json", "query.sql.json"]);
 
     // A case the describer refuses has no entry to write, and one the generator refuses is claimed by no class.
     [Theory]

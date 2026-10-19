@@ -46,12 +46,6 @@ end_of_line = lf
 max_line_length = off
 end_of_line = lf
 
-# The expectations of the realistic cases, as tools/record-realistic.sh writes them: a line is as long as what the
-# describer said, such as the help of a refusal.
-[tests/SqlSource.Tests.Postgres/Realistic/Cases/*/expected-pg*.txt]
-max_line_length = off
-end_of_line = lf
-
 # Files formatted by CSharpier
 [*.{cs,csproj,props,targets,slnx}]
 end_of_line = lf

@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
-using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Testing.Fixtures;
 
@@ -21,12 +19,12 @@ internal sealed record ModelRefusal(string Id, string Why);
 // and why.
 internal sealed record CheckedFrom(int Major, string Why);
 
-// One realistic case: a folder with a query, its truth and its sample values, the description recorded of it on each
-// major version of the server, and the sidecar of its models.  A case refused by the describer has the failure's id
-// and no columns; one whose models the generator refuses says so by Models, and one whose sidecar an earlier major
-// describes otherwise says from which major it is checked by CheckedFrom.  One with a parameter that Dapper cannot
-// send says why by Dapper, which leaves it out of the run through Dapper alone.  A sample set holds a SQL literal for
-// each parameter, by its name without @, compared ignoring case.
+// One realistic case: a folder with a query, its truth and its sample values, and the sidecar of its models.  A case
+// refused by the describer has the failure's id and no columns; one whose models the generator refuses says so by
+// Models, and one whose sidecar an earlier major describes otherwise says from which major it is checked by
+// CheckedFrom.  One with a parameter that Dapper cannot send says why by Dapper, which leaves it out of the run
+// through Dapper alone.  A sample set holds a SQL literal for each parameter, by its name without @, compared
+// ignoring case.
 internal sealed record RealisticCase(
     string Name,
     string Folder,
@@ -54,15 +52,8 @@ internal sealed record RealisticCase(
     // describer nor the generator refuses it.
     public bool HasModels => Refusal is null && Models is null;
 
-    // The files of the case's folder: its query, its truth, its sidecar when it has models, and the description of
-    // each recorded major it runs on.
-    public IReadOnlyList<string> Files =>
-        [
-            QueryFile,
-            CaseFile,
-            .. HasModels ? [SidecarFile] : Array.Empty<string>(),
-            .. PostgresContainer.RecordedMajors.Where(RunsOn).Select(major => Path.GetFileName(ExpectedPath(major))),
-        ];
+    // The files of the case's folder: its query, its truth, and its sidecar when it has models.
+    public IReadOnlyList<string> Files => [QueryFile, CaseFile, .. HasModels ? [SidecarFile] : Array.Empty<string>()];
 
     // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
     public bool RunsOn(int major) => MinimumMajor is not { } minimum || minimum <= major;
@@ -75,10 +66,6 @@ internal sealed record RealisticCase(
     // Whether the run through Dapper reads the case's rows on the server of that major: the case has models, the
     // server runs it, and Dapper can send its parameters.
     public bool IsReadThroughDapperOn(int major) => HasModels && Dapper is null && RunsOn(major);
-
-    // The description as RealisticDescribe renders it, recorded on the server of that major version.
-    public string ExpectedPath(int major) =>
-        Path.Combine(Folder, string.Create(CultureInfo.InvariantCulture, $"expected-pg{major}.txt"));
 
     // The case as FixtureReplay plans one.
     public FixtureCase AsFixture => new(SidecarValues.Engine.Postgres, Name, Folder);

@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Globalization;
 using System.IO;
-using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using SqlSource.Snapshot;
@@ -16,45 +15,16 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Describer;
 
-// What the theory of a case's recorded description does with a run: record or compare on a recorded major, skip or
-// refuse on another.
-// Public, since a public theory takes it as an argument.
-public enum Expectation
-{
-    Compare,
-    Record,
-    Skip,
-    Refuse,
-}
-
-// Describes a realistic case as a run does, in a session of its own on the database "realistic", and renders what
-// it gave as the text an expected-pg{major}.txt holds.  The rules every check of the describer over a case shares
-// are here too: that the server runs the case, and that a description has the columns of the truth.
+// Describes a realistic case as a run does, in a session of its own on the database "realistic", and builds the
+// entry a run writes from what it gave.  The rules every check of the describer over a case shares are here too:
+// that the server runs the case, and that a description has the columns of the truth.
 internal static class RealisticDescribe
 {
-    public static string RefuseMessage { get; } =
-        string.Create(
-            CultureInfo.InvariantCulture,
-            $"Record on PostgreSQL {string.Join(" or ", PostgresContainer.RecordedMajors)}."
-        );
-
-    // What is not there, in a rendered line.
-    private const string None = "-";
-
     // The description of each case by its name, once in a run: every check describes against the one container of
     // the run, and a case's folder does not change during it.  A describe that throws is not kept.
     private static readonly ConcurrentDictionary<string, Outcome<QueryDescription, DescribeFailure>> Described = new(
         StringComparer.Ordinal
     );
-
-    public static Expectation ExpectationOn(bool recording, int major) =>
-        (recording, PostgresContainer.RecordedMajors.Contains(major)) switch
-        {
-            (true, true) => Expectation.Record,
-            (true, false) => Expectation.Refuse,
-            (false, true) => Expectation.Compare,
-            (false, false) => Expectation.Skip,
-        };
 
     // The case of that folder of Cases, read from the repository, once the server of that major runs it.
     public static RealisticCase Start(string name, int major)
@@ -169,44 +139,7 @@ internal static class RealisticDescribe
         }
     }
 
-    // One line for each fact, each ending in a line feed.  The kind, the plan and the table match are spelled as the
-    // sidecar spells them.
-    public static string Render(Outcome<QueryDescription, DescribeFailure> described)
-    {
-        if (!described.Succeeded)
-        {
-            return RenderFailure(described.Failure);
-        }
-
-        var text = new StringBuilder();
-        var description = described.Value;
-        var kind =
-            description.ResultKind == SidecarResultKind.Rows
-                ? SidecarValues.ResultKind.Rows
-                : SidecarValues.ResultKind.None;
-        Line(text, $"kind: {kind}");
-        Line(text, $"plan: {description.Plan ?? None}");
-        Line(text, $"table-match: {description.TableMatch ?? None}");
-        foreach (var parameter in description.Parameters)
-        {
-            Line(text, $"parameter @{parameter.Name}: {parameter.Type?.Name ?? None} ({parameter.TypeSource ?? None})");
-        }
-
-        foreach (var column in description.Columns ?? [])
-        {
-            var nullable = NullableOf(column.Nullable);
-            var source = column.NullableSource ?? None;
-            var origin = OriginOf(column.Origin);
-            Line(
-                text,
-                $"column {column.Ordinal} {column.Name}: {column.Type.Name} | nullable {nullable} | {source} | {origin}"
-            );
-        }
-
-        return text.ToString();
-    }
-
-    // The id, each argument, the help and each line of the server, as a failure's expectation holds them.
+    // The id, each argument, the help and each line of the server of a failure, a line for each, for a message.
     public static string RenderFailure(DescribeFailure failure)
     {
         var text = new StringBuilder();
@@ -231,15 +164,4 @@ internal static class RealisticDescribe
 
     private static void Line(StringBuilder text, FormattableString line) =>
         text.Append(line.ToString(CultureInfo.InvariantCulture)).Append('\n');
-
-    private static string NullableOf(bool? nullable) =>
-        nullable switch
-        {
-            true => "true",
-            false => "false",
-            null => "null",
-        };
-
-    private static string OriginOf(SidecarOrigin? origin) =>
-        origin is null ? None : $"{origin.Schema ?? None}.{origin.Table ?? None}.{origin.Column ?? None}";
 }

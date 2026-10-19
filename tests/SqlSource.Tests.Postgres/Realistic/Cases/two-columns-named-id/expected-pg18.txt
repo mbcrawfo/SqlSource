@@ -1,8 +1,0 @@
-kind: rows
-plan: walked
-table-match: several-tables
-parameter @status: public.account_status (inferred)
-column 0 id: integer | nullable false | catalog | public.accounts.id
-column 1 id: bigint | nullable true | outer-join | public.orders.id
-column 2 name: character varying(100) | nullable false | catalog | public.accounts.name
-column 3 placed_at: timestamp with time zone | nullable true | outer-join | public.orders.placed_at

@@ -1,9 +1,0 @@
-kind: rows
-plan: not-needed
-table-match: matched
-parameter @limit: bigint (inferred)
-column 0 id: integer | nullable false | catalog | billing.invoices.id
-column 1 order_id: bigint | nullable false | catalog | billing.invoices.order_id
-column 2 amount: public.positive_amount | nullable true | catalog | billing.invoices.amount
-column 3 issued_on: date | nullable false | catalog | billing.invoices.issued_on
-column 4 paid_on: date | nullable true | catalog | billing.invoices.paid_on

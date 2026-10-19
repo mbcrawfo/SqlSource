@@ -1,7 +1,0 @@
-kind: rows
-plan: walked
-table-match: no-origin
-parameter @pattern: text (inferred)
-column 0 id: bigint | nullable null | no-origin | -
-column 1 label: character varying | nullable null | no-origin | -
-column 2 kind: text | nullable false | set-operation | -

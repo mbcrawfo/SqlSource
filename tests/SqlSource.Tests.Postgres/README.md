@@ -24,7 +24,7 @@ SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSou
 
 Every database image the tests run is pinned to a major and a minor, such as `postgres:18.6`, and never to a bare major such as `postgres:18`.  The recorded fixtures carry the version of the server they were recorded against, and a bare major moves to each new minor without a word, so the tests would run a server the recordings never saw.  This holds for the default image, for the image CI runs on the oldest supported version, and for the image of any engine added later.  `PostgresContainerTests` fails on an image whose tag is not a major and a minor, or whose server reports another version, and `FixtureVersionTests` fails on a fixture case recorded against any version but the default image's.
 
-Moving to a new minor is a change of its own: bump the tag, here and in `examples/PostgresExamples/docker-compose.yml`, record the fixtures and the realistic corpus again on the new image, as in the next two sections, write the sidecars of the end-to-end project, of the realistic cases and of the examples again, as in [writing the sidecars](#writing-the-sidecars), since each entry holds the server's version, and read the diff, all in the same pull request.
+Moving to a new minor is a change of its own: bump the tag, here and in `examples/PostgresExamples/docker-compose.yml`, record the fixtures again on the new image, as in the next section, write the sidecars of the end-to-end project, of the realistic cases and of the examples again, as in [writing the sidecars](#writing-the-sidecars), since each entry holds the server's version, and read the diff, all in the same pull request.  Nothing is recorded on `postgres:14.24`: moving it bumps its tag here, in `CONTRIBUTING.md` and in `.github/workflows/build.yml`, and runs the tests on it.
 
 ## The describer's fixtures
 
@@ -47,9 +47,9 @@ A case of the walk is named `walk-` and its shape, and `tests/SqlSource.Tool.Tes
 
 ## The realistic corpus
 
-`tests/SqlSource.Tests.Postgres/Realistic/` holds the corpus and what reads it: the cases in `Realistic/Cases/`, each a folder with `query.sql`, `case.json` (the truth), the recorded expectations, `expected-pg14.txt` and `expected-pg18.txt`, of each major the case runs on, and, when the case has models, its sidecar `query.sql.json`.  The `realistic` database is built from `tests/SqlSource.Tests.Postgres/Realistic/schema.sql` and `tests/SqlSource.Tests.Postgres/Realistic/seed.sql`.  The root of `Realistic/` holds what every layer shares: `RealisticCase`, `RealisticCases`, `RealisticSamples` and `RealisticDatabase`.  `Realistic/Describer/` holds the describer's checks over it, the description whole in `RealisticDescriptionTests` and its nullability in the classes named `RealisticNullability*`:
+`tests/SqlSource.Tests.Postgres/Realistic/` holds the corpus and what reads it: the cases in `Realistic/Cases/`, each a folder with `query.sql`, `case.json` (the truth) and, when the case has models, its sidecar `query.sql.json`.  The `realistic` database is built from `tests/SqlSource.Tests.Postgres/Realistic/schema.sql` and `tests/SqlSource.Tests.Postgres/Realistic/seed.sql`.  The root of `Realistic/` holds what every layer shares: `RealisticCase`, `RealisticCases`, `RealisticSamples` and `RealisticDatabase`.  `Realistic/Describer/` holds the describer's checks over it, the description whole in `RealisticDescriptionTests` and its nullability in the classes named `RealisticNullability*`:
 
-- `RealisticDescriptionTests` compares each description with the `expected-pg14.txt` and `expected-pg18.txt` recorded of it;
+- `RealisticDescriptionTests` checks that a case is refused only as its `refusal` says, by that id, and that a case with models is described as its committed sidecar's entry holds, every field of it: what `--check` compares, and the provenance and the origins, which `--check` ignores;
 - `RealisticNullabilitySafetyTests` checks its nullability against the truth and against the oracle that executes the query over the seed;
 - `RealisticNullabilityNoiseTests` holds the count of columns that are not null and that the describer answers as nullable or unknown to a budget for each recorded major, 14 and 18, in its `Budgets`.
 
@@ -63,27 +63,20 @@ A case has models when neither the describer nor the generator refuses it.  Each
 
 `RealisticClaimsTests`, `RealisticModelNullabilityTests` and the two tests of the helpers need no server.
 
-The corpus is recorded by its own script, `tools/record-realistic.sh`, which writes the `expected-pg{major}.txt` of each case under `tests/SqlSource.Tests.Postgres/Realistic/Cases/` for the major version of the server it ran against, and never a `case.json`.  The expectations are those of PostgreSQL 18 and 14, so recording is two runs, the second on the older image; run it after a change to what the describer asks or answers, or to the schema, the seed or a case, and read the diff before it is committed:
-
-```bash
-tools/record-realistic.sh
-SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 tools/record-realistic.sh
-```
-
-The same changes need the cases' sidecars written again by `tools/describe-end-to-end.sh`, as in [writing the sidecars](#writing-the-sidecars), before the recording when a case's `query.sql` changed, since the project, and so the recording, does not build while a sidecar is stale.
+A change to what the describer asks or answers, or to the schema, the seed or a case, writes the cases' sidecars again with `tools/describe-end-to-end.sh`, as in [writing the sidecars](#writing-the-sidecars), and its diff is read before it is committed.  The sidecars are written on the default image and compared on PostgreSQL 14 and 18.  Of a refused case, only its id is compared: the arguments, the help and the server's lines of its failure are compared nowhere.
 
 A `case.json` can also say:
 
-- `minimumMajor`, when the case needs a later server than 14.  The case then has no expectation for an earlier major, and `--check` and the run through Dapper leave it out there.
+- `minimumMajor`, when the case needs a later server than 14.  The checks, `--check` and the run through Dapper leave it out on an earlier major.
 - `samples`, a SQL literal for each parameter.  A check that executes the query runs it over the seed with them.
 - `refusal`, the id of the failure, when the describer refuses the case.  The case then has no columns, no class and no sidecar.
 - `models`, a `refusal` and a `why`, when the generator refuses the models of a case that the describer accepts, as it refuses `two-columns-named-id` with `SQLSRC255`, since its two columns `id` give one property name.  The case keeps its SQL and has no class and no sidecar, and the describer's checks still read it.  `RealisticModelRefusalTests` checks that the generator still refuses it so.
-- `checkedFrom`, a `major` and a `why`, when an earlier major describes the case otherwise than its sidecar, which is written on the default image.  `--check` on an earlier server then leaves the case out.  The `major` is a recorded one above the first recorded major the case runs on, since one at or below it leaves nothing out.  No case has one today.
+- `checkedFrom`, a `major` and a `why`, when an earlier major describes the case otherwise than its sidecar, which is written on the default image.  `--check` and the comparison with the sidecar on an earlier server then leave the case out, so that no committed record says how the earlier major describes it.  The `major` is a recorded one above the first recorded major the case runs on, since one at or below it leaves nothing out.  No case has one today.
 - `dapper`, a `why`, when Dapper cannot send a parameter of the case: a `string` that it sends as `text` where the query compares it with an enum or a `jsonb`, for which the server has no operator.  The member leaves the case out of the run through Dapper alone: phase 8's generated methods, which bind each parameter by its type, run every case, those with `dapper` too.  Four cases have one today.
 
 A column that can be `NULL` says why, and an `exempt` says why the seed cannot show it, so it needs a reason and belongs only on a column that can be `NULL`.  `RealisticCases` refuses a `case.json` that breaks either.  Every folder of `Cases/` is a case.
 
-To add a case, add its folder with a `query.sql` and a `case.json`, which holds the truth, written from the SQL and `schema.sql` and never from what the describer answers.  Add its class to `Realistic/Generation/RealisticQueries.cs`, unless the describer refuses it, which its `refusal` says, or the generator does, which its `models` says.  Then run `tools/describe-end-to-end.sh`, which writes its sidecar, and both runs of `tools/record-realistic.sh`, in that order, since the project does not build while a claimed query has no sidecar.  When a column of the truth can be `NULL` and no row of `seed.sql` makes it so, add such a row to `seed.sql`, which never removes one; `exempt` is for a `NULL` no seed can show.  The noise budget is lowered in the change that lowers the noise, the test says to, and raised only in a change that adds cases.
+To add a case, add its folder with a `query.sql` and a `case.json`, which holds the truth, written from the SQL and `schema.sql` and never from what the describer answers.  Add its class to `Realistic/Generation/RealisticQueries.cs`, unless the describer refuses it, which its `refusal` says, or the generator does, which its `models` says.  Then run `tools/describe-end-to-end.sh`, which writes its sidecar: the project does not build while a claimed query has none.  When a column of the truth can be `NULL` and no row of `seed.sql` makes it so, add such a row to `seed.sql`, which never removes one; `exempt` is for a `NULL` no seed can show.  The noise budget is lowered in the change that lowers the noise, the test says to, and raised only in a change that adds cases.
 
 ## The end-to-end project
 

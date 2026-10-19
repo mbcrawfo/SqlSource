@@ -1,7 +1,0 @@
-kind: rows
-plan: walked
-table-match: no-origin
-column 0 id: integer | nullable false | set-operation | -
-column 1 name: text | nullable false | set-operation | -
-column 2 slug: text | nullable null | no-origin | -
-column 3 sort_group: integer | nullable false | set-operation | -

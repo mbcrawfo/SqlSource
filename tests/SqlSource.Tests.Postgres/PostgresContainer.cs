@@ -16,8 +16,8 @@ namespace SqlSource.Tests.Postgres;
 public sealed class PostgresContainer : IAsyncLifetime
 {
     // The one place that the tests and the scripts read the image from: tools/record-fixtures.sh,
-    // tools/record-realistic.sh, tools/describe-end-to-end.sh and AppContainer of
-    // tests/SqlSource.Tests.Postgres.Npgsql8 read it from this line, by its shape.
+    // tools/describe-end-to-end.sh and AppContainer of tests/SqlSource.Tests.Postgres.Npgsql8 read it from this line,
+    // by its shape.
     // examples/PostgresExamples/docker-compose.yml repeats the tag, which rule 5 of AGENTS.md keeps in step.  It names
     // a major and a minor, as every image of the tests does: the recorded fixtures carry the version they were recorded
     // against, and a moving tag would run another.
@@ -48,8 +48,8 @@ public sealed class PostgresContainer : IAsyncLifetime
     // The server's major version, read once when the container has started.
     public int Major { get; private set; }
 
-    // The majors that CI runs and that are recorded on: a realistic case's description, the noise budget and the
-    // forms of a plan that the tests pin.
+    // The majors that CI runs and that the tests pin answers for: a realistic case's committed entry, the noise
+    // budget and the forms of a plan.
     public static IReadOnlyList<int> RecordedMajors { get; } = [14, 18];
 
     public static string Image =>
@@ -93,7 +93,7 @@ public sealed class PostgresContainer : IAsyncLifetime
 
     public static void SkipBelow(int server, int major, string reason) => Assert.SkipWhen(server < major, reason);
 
-    // Skips the test on a server whose major is not recorded, where what it pins has no expectation.
+    // Skips the test on a server whose major is not recorded, where what it pins is not known.
     public void SkipUnlessRecordedMajor(string what) => SkipUnlessRecordedMajor(Major, what);
 
     public static void SkipUnlessRecordedMajor(int server, string what) =>
