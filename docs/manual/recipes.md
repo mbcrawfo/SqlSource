@@ -178,7 +178,7 @@ public partial class UserRepository(DbConnection connection)
 }
 ```
 
-With `GetUser` as `SELECT id, name FROM users WHERE id = @id;`, and `GetUserDto` as its generated [model](generator.md#models).  SqlSource never opens a connection or binds a value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
+Here `GetUser` is `SELECT id, name FROM users WHERE id = @id;`, and `GetUserDto` is its generated [model](generator.md#models).  SqlSource never opens a connection or binds a value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
 
 Rules: [constants](generator.md#constants), [query parameters](parameters-and-tokens.md#query-parameters).
 
