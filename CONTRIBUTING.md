@@ -70,7 +70,7 @@ dotnet pack SqlSource.slnx --output artifacts/packages
 This builds in `Release` and writes two packages with one version, `artifacts/packages/SqlSource.<version>-dev.nupkg` and `artifacts/packages/SqlSource.Tool.<version>-dev.nupkg`.  Three scripts then check them, each with the folder as its argument, and [`tools/README.md`](tools/README.md#package-checks) says what each proves:
 
 - `tools/check-package.sh` checks what the two packages hold.
-- [`tools/check-package-install.sh`](tools/README.md#check-package-installsh) installs the generator's package into a consumer project, builds it and runs it.
+- [`tools/check-package-install.sh`](tools/README.md#check-package-installsh) installs the generator's package into a consumer project, builds it and runs it, and publishes a web project that references it.
 - `tools/check-tool-install.sh` installs the tool the way a user does and runs it.
 
 ## Checks

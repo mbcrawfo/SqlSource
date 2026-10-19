@@ -97,7 +97,7 @@ Queries/
     Users.sql.json      written by sqlsource describe
 ```
 
-**Commit the sidecars with the project.**  The build reads them in place of a database, so that every developer and every build server builds without a connection.  A copy of the project without them reports [SQLSRC241](diagnostics.md#sqlsrc241) for each query that must be described.  Only the person who changes a query, or the schema, needs a database to describe it again.
+**Commit the sidecars with the project.**  The build reads them in place of a database, so that every developer and every build server builds without a connection.  A copy of the project without them reports [SQLSRC241](diagnostics.md#sqlsrc241) for each query that must be described.  Only the person who changes a query, or the schema, needs a database to describe it again.  By default the build reads a sidecar and copies it nowhere: like your `.sql` files, it is not in the build output or in what `dotnet publish` writes, in a web project too.  A project that copies its sidecars itself, with `CopyToOutputDirectory` or `CopyToPublishDirectory` on their items, still gets the copy; in a web project that setting goes in `Directory.Build.targets`.
 
 Rider shows each sidecar under its `.sql` file, with nothing to set.  To show each sidecar under its `.sql` file in Visual Studio Code, which nests files by a setting of its own, add this to your settings:
 
