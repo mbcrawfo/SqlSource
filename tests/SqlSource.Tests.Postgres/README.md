@@ -49,7 +49,7 @@ A case of the walk is named `walk-` and its shape, and `tests/SqlSource.Tool.Tes
 
 `tests/SqlSource.Tests.Postgres/Realistic/` holds the corpus and what reads it: the cases in `Realistic/Cases/`, each a folder with `query.sql`, `case.json` (the truth) and, when the case has models, its sidecar `query.sql.json`.  The `realistic` database is built from `tests/SqlSource.Tests.Postgres/Realistic/schema.sql` and `tests/SqlSource.Tests.Postgres/Realistic/seed.sql`.  The root of `Realistic/` holds what every layer shares: `RealisticCase`, `RealisticCases`, `RealisticSamples` and `RealisticDatabase`.  `Realistic/Describer/` holds the describer's checks over it, the description whole in `RealisticDescriptionTests` and its nullability in the classes named `RealisticNullability*`:
 
-- `RealisticDescriptionTests` checks that a case is refused only as its `refusal` says, by that id, and that a case with models is described as its committed sidecar's entry holds, every field of it but the server's version: what `--check` compares, and the provenance and the origins, which `--check` ignores;
+- `RealisticDescriptionTests` checks that a case is refused only as its `refusal` says, by that id, and that a case with models is described as its committed sidecar's entry holds, every field of it but the server's version.  That whole-entry comparison includes the provenance and the origins, which `--check` ignores;
 - `RealisticNullabilitySafetyTests` checks its nullability against the truth and against the oracle that executes the query over the seed;
 - `RealisticNullabilityNoiseTests` holds the count of columns that are not null and that the describer answers as nullable or unknown to a budget for each recorded major, 14 and 18, in its `Budgets`.
 
