@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
+using SqlSource.Generation.Models;
 using SqlSource.Generation.Sidecars;
 using SqlSource.Generation.Types;
 using SqlSource.Parsing;
@@ -61,10 +62,19 @@ public sealed class CachingTests
 
     private readonly InMemoryAdditionalText _ordersSidecar;
 
+    // A third file for OrderQueries, which the tests of the models use, with its sidecar of one column, of int4.
+    private readonly InMemoryAdditionalText _payments = new(
+        "/app/Orders/Payments.sql",
+        "-- name: GetPayment\nSELECT 3;\n"
+    );
+
+    private readonly InMemoryAdditionalText _paymentsSidecar;
+
     public CachingTests()
     {
         _usersSidecar = CurrentSidecar(_users, "GetUser");
         _ordersSidecar = CurrentSidecar(_orders, "GetOrder");
+        _paymentsSidecar = TypedSidecar(_payments, "GetPayment", "int4");
     }
 
     [Fact]
@@ -1312,6 +1322,295 @@ public sealed class CachingTests
             .ShouldHaveSingleItem()
             .Text.ShouldBe("global::System.DateOnly");
     }
+
+    // The three files of the models tests: Orders and Payments are claimed by OrderQueries and Users by UserQueries,
+    // so the models are App.Orders.GetOrderDto, App.Orders.GetPaymentDto and App.Users.GetUserDto, in that order.
+    // Each file has its own model, with one column, of int4.
+    [Fact]
+    public void Run_SqlFileEditedChangingOneModel_EmitsOnlyThatModelAgain()
+    {
+        var compilation = ModelsCompilation();
+        var ordersSidecar = TypedSidecar(_orders, "GetOrder", "int4");
+        var driver = FirstRunOfModels(compilation, _users, _orders, ordersSidecar);
+
+        // The column of Orders is now text.
+        var result = Run(
+            driver.ReplaceAdditionalText(ordersSidecar, TypedSidecar(_orders, "GetOrder", "text")),
+            compilation
+        );
+
+        ModelReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Orders.GetOrderDto-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Users.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Modified]);
+
+        // The names are the same as before.  The lookup in the project still ran, since the driver gives every run a
+        // new compilation, and it gave the same answer.
+        AllReasons(result, TrackingNames.ModelNames).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.TakenModelNames).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("GetOrderDto-Model.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("GetOrderDto(string Value)");
+    }
+
+    // The model App.Shared.Row is the marker's in Orders and Users alike.  Orders comes first, so its request is the
+    // model.  Whichever file is edited, the two now differ, which is SQLSRC257 at Users, and the model is the request
+    // of Orders alone, so its summary no longer names Users.  The edit of Orders changes the model's property too;
+    // the edit of Users changes the model's summary alone.  The model of Payments is no part of it.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_SharedModelEdited_EmitsOnlyThatModelAgain(bool editsTheFileThatGivesIt)
+    {
+        var compilation = ModelsCompilation();
+        var users = new InMemoryAdditionalText(
+            _users.Path,
+            "-- name: GetUser\n-- output-model: App.Shared.Row\nSELECT 1;\n"
+        );
+        var orders = new InMemoryAdditionalText(
+            _orders.Path,
+            "-- name: GetOrder\n-- output-model: App.Shared.Row\nSELECT 2;\n"
+        );
+        var usersSidecar = TypedSidecar(users, "GetUser", "int4");
+        var ordersSidecar = TypedSidecar(orders, "GetOrder", "int4");
+        var driver = FirstRunOfModels(compilation, users, orders, usersSidecar, ordersSidecar);
+        var before = driver.GetRunResult().GeneratedTrees.Single(IsShared).ToString();
+        before.ShouldContain("queries <c>GetOrder</c> from <c>Orders.sql</c> and <c>GetUser</c> from <c>Users.sql</c>");
+        before.ShouldContain("Row(int Value)");
+
+        var result = Run(
+            editsTheFileThatGivesIt
+                ? driver.ReplaceAdditionalText(ordersSidecar, TypedSidecar(orders, "GetOrder", "text"))
+                : driver.ReplaceAdditionalText(usersSidecar, TypedSidecar(users, "GetUser", "text")),
+            compilation
+        );
+
+        ModelReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Shared.Row-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                },
+                ignoreOrder: true
+            );
+        var diagnostic = result.Diagnostics.ShouldHaveSingleItem();
+        diagnostic.Id.ShouldBe("SQLSRC257");
+        diagnostic.Location.GetLineSpan().Path.ShouldBe(_users.Path);
+        var after = result.GeneratedTrees.Single(IsShared).ToString();
+        after.ShouldContain("A row of the query <c>GetOrder</c> from <c>Orders.sql</c>.");
+        after.ShouldNotContain("GetUser");
+        after.ShouldContain(editsTheFileThatGivesIt ? "Row(string Value)" : "Row(int Value)");
+        static bool IsShared(SyntaxTree tree) => tree.FilePath.EndsWith("Row-Model.g.cs", StringComparison.Ordinal);
+    }
+
+    // The accepted cost of SelectMany: its nodes are matched by their place in the list, which is sorted by the
+    // models' full names, not by name.  A model added sorted first takes the place of the one that was first, and
+    // every model after it moves down a place, so each is emitted again.  This pins the cost so that it is not made
+    // worse unseen.
+    [Fact]
+    public void Run_ModelAdded_EmitsTheModelsAfterItAgain()
+    {
+        var compilation = ModelsCompilation();
+        var driver = FirstRunOfModels(compilation, _users, _orders);
+        var archive = new InMemoryAdditionalText("/app/Orders/Archive.sql", "-- name: GetArchive\nSELECT 4;\n");
+
+        var result = Run(
+            driver.AddAdditionalTexts([archive, TypedSidecar(archive, "GetArchive", "int4")]),
+            compilation
+        );
+
+        ModelReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Orders.GetArchiveDto-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.GetOrderDto-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Users.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.New,
+                },
+                ignoreOrder: true
+            );
+    }
+
+    // The same cost for a model that goes: the models before it are left alone, and each one after it takes the place
+    // of the one before it.
+    [Fact]
+    public void Run_ModelRemoved_EmitsTheModelsAfterItAgain()
+    {
+        var compilation = ModelsCompilation();
+        var driver = FirstRunOfModels(compilation, _users, _orders);
+
+        var result = Run(driver.RemoveAdditionalTexts([_payments, _paymentsSidecar]), compilation);
+
+        ModelReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Orders.GetOrderDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Users.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                },
+                ignoreOrder: true
+            );
+        ModelsRemoved(result).ShouldBe(["App.Users.GetUserDto-Model.g.cs"]);
+    }
+
+    // The edit gives the pipeline a new compilation: the names the project has are looked up again and found the
+    // same, so the models are not worked out again, and none is emitted.
+    [Fact]
+    public void Run_CSharpEdit_EmitsNoModelAgain()
+    {
+        var compilation = ModelsCompilation();
+        var driver = FirstRunOfModels(compilation, _users, _orders);
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        AllReasons(result, TrackingNames.TakenModelNames).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        ModelReasons(result).Count.ShouldBe(3);
+        OutputReasons(result).Distinct().ShouldBe([IncrementalStepRunReason.Cached]);
+    }
+
+    // The collection type is read by the methods of a type and by no model, so the requests of each type come out
+    // equal and nothing after them runs.
+    [Fact]
+    public void Run_CollectionTypePropertyChanged_EmitsNoModelAgain()
+    {
+        var compilation = ModelsCompilation();
+        var driver = FirstRunOfModels(compilation, _users, _orders);
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(
+                    OutputKind.Models,
+                    null,
+                    "postgres",
+                    properties: new Dictionary<string, string?> { ["SqlSourceCollectionType"] = "List" }
+                )
+            ),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
+        AllReasons(result, TrackingNames.TypeModels)
+            .ShouldBe([IncrementalStepRunReason.Unchanged, IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.ModelGroups).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        ModelReasons(result).Count.ShouldBe(3);
+    }
+
+    // An attribute argument that no model reads: the type is read again, and its requests come out equal.
+    [Fact]
+    public void Run_AttributeEditedWithoutChangingAModel_EmitsNoModelAgain()
+    {
+        var compilation = ModelsCompilation();
+        var driver = FirstRunOfModels(compilation, _users, _orders);
+
+        var result = Run(
+            driver,
+            WithArgumentsOnUserQueries(compilation, "CollectionType = GeneratorCollectionType.List")
+        );
+
+        Reasons<TypeQueries>(result, TrackingNames.TypeQueries, type => type.HintName)["App.Users.UserQueries.g.cs"]
+            .ShouldBe(IncrementalStepRunReason.Modified);
+        Reasons<EquatableArray<ModelRequest>>(
+                result,
+                TrackingNames.TypeModels,
+                requests => requests[0].Source.ClaimingType
+            )
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Users.UserQueries"] = IncrementalStepRunReason.Unchanged,
+                    ["App.Orders.OrderQueries"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.ModelGroups).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.Models).ShouldBe([IncrementalStepRunReason.Cached]);
+        ModelReasons(result).Count.ShouldBe(3);
+        AllReasons(result, TrackingNames.ModelOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    // A project at Sql has no model, so there is no name to look up in the compilation.
+    [Fact]
+    public void Run_ProjectWithoutModels_LooksUpNoName()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+
+        var result = FirstRun(OutputKind.Sql, compilation).GetRunResult();
+
+        (
+            (EquatableArray<string>)Outputs(result, TrackingNames.ModelNames).ShouldHaveSingleItem().Value
+        ).ShouldBeEmpty();
+        (
+            (EquatableArray<TakenName>)Outputs(result, TrackingNames.TakenModelNames).ShouldHaveSingleItem().Value
+        ).ShouldBeEmpty();
+    }
+
+    private static CSharpCompilation ModelsCompilation() =>
+        GeneratorHarness.CreateCompilation(Sources, references: [NpgsqlReferences.Npgsql10]);
+
+    // Both types at Models under postgres, with Users, Orders and Payments, each with a current sidecar whose entry has
+    // one column, of int4.  A sidecar given is used in place of the one of its file.
+    private GeneratorDriver FirstRunOfModels(
+        Compilation compilation,
+        InMemoryAdditionalText users,
+        InMemoryAdditionalText orders,
+        params InMemoryAdditionalText[] given
+    )
+    {
+        var sidecars = new List<InMemoryAdditionalText>
+        {
+            TypedSidecar(users, "GetUser", "int4"),
+            TypedSidecar(orders, "GetOrder", "int4"),
+            _paymentsSidecar,
+        };
+        foreach (var sidecar in given)
+        {
+            _ = sidecars.RemoveAll(other => other.Path == sidecar.Path);
+            sidecars.Add(sidecar);
+        }
+
+        var driver = GeneratorHarness
+            .CreateDriver([users, orders, _payments, .. sidecars], OptionsWithTypeOverrides(null))
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return driver;
+    }
+
+    // The models the run has, by the name of their file, and why each ran.  A model that went is no part of them: see
+    // ModelsRemoved.
+    private static Dictionary<string, IncrementalStepRunReason> ModelReasons(GeneratorDriverRunResult result) =>
+        Outputs(result, TrackingNames.ModelOutput)
+            .Where(output => output.Reason != IncrementalStepRunReason.Removed)
+            .ToDictionary(output => HintNameOf(output.Value), output => output.Reason);
+
+    // A model output is its hint name and its source.
+    private static string HintNameOf(object modelOutput)
+    {
+        var (hintName, _) = ((string HintName, string Source))modelOutput;
+        return hintName;
+    }
+
+    // The files of the models that went.  Nodes are matched by their place, so what goes is the last place the list
+    // had, and not the model that was removed.
+    private static string[] ModelsRemoved(GeneratorDriverRunResult result) =>
+        [
+            .. Outputs(result, TrackingNames.ModelOutput)
+                .Where(output => output.Reason == IncrementalStepRunReason.Removed)
+                .Select(output => HintNameOf(output.Value)),
+        ];
 
     private GeneratorDriver FirstRun(OutputKind? output, Compilation compilation) =>
         FirstRun(compilation, _users, new TestOptionsProvider(output, null));
