@@ -130,7 +130,7 @@ Run `describe` again when you change a query, `describe --force` after a change 
 
 ## Only want to generate models?
 
-Set the output to `models`.  A query whose output is `models` gets its constant and its models, as in step 4, once the tool has described it, as in step 5, and never a method that runs it:
+Set the output to `models`.  A query whose output is `models` gets its constant, or its method when it has a token, and its models, as in step 4, once the tool has described it, as in step 5, and never a method that runs it:
 
 ```xml
 <PropertyGroup>

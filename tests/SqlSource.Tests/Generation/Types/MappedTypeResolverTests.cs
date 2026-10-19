@@ -52,6 +52,13 @@ public sealed class MappedTypeResolverTests
             [System.Obsolete("Numbered.", DiagnosticId = "1234")]
             public sealed class Numbered;
 
+            // A pragma takes a keyword as an id, so these are disabled like any other.
+            [System.Obsolete("Keyword.", DiagnosticId = "class")]
+            public sealed class KeywordId;
+
+            [System.Diagnostics.CodeAnalysis.Experimental("if")]
+            public sealed class KeywordTrial;
+
             [System.Diagnostics.CodeAnalysis.Experimental("TRIAL001")]
             public sealed class Trial;
 
@@ -245,6 +252,8 @@ public sealed class MappedTypeResolverTests
     [InlineData("global::MyApp.Gone", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
     [InlineData("global::MyApp.OddId", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
     [InlineData("global::MyApp.Numbered", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
+    [InlineData("global::MyApp.KeywordId", nameof(MappedTypeStatus.Found), false, true, "class")]
+    [InlineData("global::MyApp.KeywordTrial", nameof(MappedTypeStatus.Found), false, true, "if")]
     [InlineData("global::MyApp.Box<global::MyApp.Gone>", nameof(MappedTypeStatus.NotAPropertyType), false, false, "")]
     public void Resolve_Name_GivesItsStatusAndWhatTheTypeIs(
         string name,
