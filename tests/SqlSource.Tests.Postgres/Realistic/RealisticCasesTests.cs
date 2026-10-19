@@ -338,8 +338,8 @@ public sealed class RealisticCasesTests
         PostgresContainer.RecordedMajors.ShouldAllBe(major => !found.IsReadThroughDapperOn(major));
     }
 
-    // A case whose sidecar an earlier major cannot describe as recorded is left out of --check there, as is one that
-    // the server does not run.
+    // A case whose sidecar an earlier major cannot describe as recorded is left out of --check there, and out of the
+    // comparison with its committed entry, as is one that the server does not run.
     [Theory]
     [InlineData(null, null, 14, true)]
     [InlineData(17, null, 14, false)]

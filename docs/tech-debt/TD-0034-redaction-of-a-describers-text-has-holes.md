@@ -25,4 +25,4 @@ Have the PostgreSQL describer hand the tool the parts of the connection that are
 
 ## Trigger
 
-A user's report of a part of a connection in what the tool printed or logged.  Phase 5, whose release is the first a user can use, has closed, so the tool now describes `postgres` for users.  For a capture, phase 10's `sqlsource diagnose`, which writes one for a user.
+A user's report of a part of a connection in what the tool printed or logged.  Phase 5 has landed, and its release is the first a user can use.  For a capture, phase 10's `sqlsource diagnose`, which writes one for a user.

@@ -21,4 +21,4 @@ In `OverrideLookup.Find`, skip the own key of an array of any schema, so that an
 
 ## Trigger
 
-A user's report of an array entry that does not take effect.  The models of sub-phase 5.3, whose properties make the wrong type visible, have shipped with phase 5.
+A user's report of an array entry that does not take effect.  The models of sub-phase 5.3, whose properties make the wrong type visible, have landed with phase 5, whose release is the first a user can use.

@@ -18,4 +18,4 @@ In `MappedTypeResolver.ResolveType`, for a part with arguments, construct the fo
 
 ## Trigger
 
-A user's report of a compiler error in a generated model for such a mapping.  Sub-phase 5.3, which emits a model property of the mapped type and so makes the error visible, has shipped with phase 5.
+A user's report of a compiler error in a generated model for such a mapping.  Sub-phase 5.3, which emits a model property of the mapped type and so makes the error visible, has landed with phase 5, whose release is the first a user can use.

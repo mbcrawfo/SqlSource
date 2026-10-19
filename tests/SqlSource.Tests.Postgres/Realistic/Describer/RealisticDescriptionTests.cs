@@ -17,7 +17,7 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
     // The script that writes the sidecars of the realistic cases.
     private const string SidecarScript = "tools/describe-end-to-end.sh";
 
-    // What a run knows of the server, but its version, which an entry compared here does not hold.
+    // A server for EntryBuilder, which reads only its version: the placeholder that both entries are compared with.
     private static readonly ServerInfo AnyServer = new(AnyVersion, null, null, new EquatableArray<ServerSetting>([]));
 
     private const string AnyVersion = "*";

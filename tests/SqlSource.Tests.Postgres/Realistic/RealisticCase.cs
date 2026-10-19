@@ -40,7 +40,7 @@ internal sealed record RealisticCase(
     // A complete SqlSource file with exactly one query, read as FixtureReplay reads a fixture's.
     public const string QueryFile = FixtureCase.QueryFile;
 
-    // The truth and the sample values, written by hand.  Recording never writes it.
+    // The truth and the sample values, written by hand.  No script writes it.
     public const string CaseFile = "case.json";
 
     // The entry of the query's models, written by tools/describe-end-to-end.sh beside the query it describes.
@@ -58,8 +58,8 @@ internal sealed record RealisticCase(
     // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
     public bool RunsOn(int major) => MinimumMajor is not { } minimum || minimum <= major;
 
-    // Whether "describe --check" on the server of that major compares the case's sidecar: the case has one, the
-    // server runs it, and the server describes it as the sidecar holds.
+    // Whether "describe --check" on the server of that major compares the case's sidecar, and RealisticDescriptionTests
+    // its committed entry: the case has one, the server runs it, and the server describes it as the sidecar holds.
     public bool IsCheckedOn(int major) =>
         HasModels && RunsOn(major) && (CheckedFrom is not { } from || from.Major <= major);
 

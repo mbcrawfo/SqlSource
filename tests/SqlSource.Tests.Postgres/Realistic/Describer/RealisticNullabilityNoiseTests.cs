@@ -44,8 +44,9 @@ public sealed class RealisticNullabilityNoiseTests(PostgresContainer postgres)
         {
             Assert.Fail(
                 $"The noise is {count}, over the budget of {held}: a change made the describer answer nullable or "
-                    + "unknown where it answered not null, and the cases that changed fail the comparison with "
-                    + $"their committed sidecars; or, in a change that adds cases, raise the budget of {major} in "
+                    + "unknown where it answered not null, and the cases that changed fail RealisticDescriptionTests "
+                    + "or are in the diff of their sidecars, query.sql.json; or, in a change that adds cases, raise "
+                    + $"the budget of {major} in "
                     + $"Budgets to {count} and say why in the commit."
             );
         }
