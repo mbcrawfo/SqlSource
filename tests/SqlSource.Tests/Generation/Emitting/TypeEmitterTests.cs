@@ -455,7 +455,8 @@ public sealed class TypeEmitterTests
                 EquatableArray<SqlQueryParameter>.Empty,
                 markers,
                 null,
-                null
+                null,
+                EquatableArray<ColumnMarker>.Empty
             );
 
         var output = TypeEmitter.Emit(
@@ -552,7 +553,8 @@ public sealed class TypeEmitterTests
             EquatableArray<SqlQueryParameter>.Empty,
             new SettingsLevel { Parameters = GeneratorParameters.KeepComments },
             null,
-            null
+            null,
+            EquatableArray<ColumnMarker>.Empty
         );
 
         Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
@@ -574,7 +576,8 @@ public sealed class TypeEmitterTests
             EquatableArray<SqlQueryParameter>.Empty,
             new SettingsLevel { Parameters = GeneratorParameters.KeepComments },
             null,
-            null
+            null,
+            EquatableArray<ColumnMarker>.Empty
         );
 
         Emit(OutputKind.Sql, TestModels.Type(), File("Users.sql", query))
@@ -656,7 +659,8 @@ public sealed class TypeEmitterTests
             EquatableArray<SqlQueryParameter>.Empty,
             SettingsLevel.None,
             null,
-            null
+            null,
+            EquatableArray<ColumnMarker>.Empty
         );
 
     // "SELECT * FROM {{table}};", which is a method with one parameter.
@@ -681,7 +685,8 @@ public sealed class TypeEmitterTests
                 null => SettingsLevel.None,
             },
             null,
-            null
+            null,
+            EquatableArray<ColumnMarker>.Empty
         );
 
     private static LocationInfo NameLocation(string file) =>

@@ -65,5 +65,23 @@ internal static class TrackingNames
 
     public const string FileTypesInput = nameof(FileTypesInput);
 
+    public const string TypedFile = nameof(TypedFile);
+
     public const string FileTypes = nameof(FileTypes);
+
+    public const string FileModels = nameof(FileModels);
+
+    public const string AllFileModels = nameof(AllFileModels);
+
+    public const string TypeModels = nameof(TypeModels);
+
+    public const string ModelGroups = nameof(ModelGroups);
+
+    public const string ModelNames = nameof(ModelNames);
+
+    public const string TakenModelNames = nameof(TakenModelNames);
+
+    public const string Models = nameof(Models);
+
+    public const string ModelOutput = nameof(ModelOutput);
 }

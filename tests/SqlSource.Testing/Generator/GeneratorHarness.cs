@@ -122,7 +122,8 @@ internal static class GeneratorHarness
                 )
             ),
             (supportedFramework ? RuntimeReferences : []).Concat(references ?? []),
-            new CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary)
+            // Every warning wave is reported: CS8981, a lower-case type name, is only from warning level 7.
+            new CSharpCompilationOptions(Microsoft.CodeAnalysis.OutputKind.DynamicallyLinkedLibrary, warningLevel: 9999)
         );
 
     // Step tracking is on, so that a test can read why each step of the pipeline ran.  The options are what MSBuild

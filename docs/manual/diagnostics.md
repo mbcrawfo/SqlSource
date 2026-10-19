@@ -122,6 +122,19 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC251](#sqlsrc251) | Mapped type is not accessible |
 | [SQLSRC252](#sqlsrc252) | Mapped type cannot be a property's type |
 
+**The models of a query**
+
+| Id | Title |
+|----|----|
+| [SQLSRC253](#sqlsrc253) | Column has no name |
+| [SQLSRC254](#sqlsrc254) | Name is not an identifier after PascalCase |
+| [SQLSRC255](#sqlsrc255) | Two names give one property name |
+| [SQLSRC256](#sqlsrc256) | Property name is taken |
+| [SQLSRC257](#sqlsrc257) | Two models of one name differ |
+| [SQLSRC258](#sqlsrc258) | Model name cannot be used |
+| [SQLSRC259](#sqlsrc259) | Output model on a query without rows |
+| [SQLSRC260](#sqlsrc260) | Column marker names no usable column |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` to `SQLSRC236` are the errors of describing a query against PostgreSQL, which this version of the tool does for the `postgres` dialect.  It reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
@@ -133,6 +146,8 @@ The ids `SQLSRC246` and `SQLSRC249` are reported by the build, about the C# type
 The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version of the `Npgsql` package that the project references, directly or through another package.  The C# types of a PostgreSQL query depend on it.  Each is reported once for the project, with no file and line, and only when a query needs an entry in its sidecar under the `postgres` dialect.
 
 The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
+
+The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259` and `SQLSRC260`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, `SQLSRC259` and `SQLSRC260` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259` and `SQLSRC260`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -509,7 +524,7 @@ See: [Generator parameters](settings.md#setting-generator-parameters)
 
 **Marker value is not valid**
 
-A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:` or `-- type-override:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:` or `-- param:` marker does not hold what it needs.
+A generator parameter has a value it does not take; what follows a name in a `-- name:` marker is not a shape; a `-- dialect:` marker does not name a dialect; a marker that holds a setting, such as `-- output:`, `-- database:`, `-- input-model-type:`, `-- collection-type:` or `-- type-override:`, has a value that setting does not take; or a `-- token:`, `-- token-ignore:`, `-- param:` or `-- column:` marker does not hold what it needs.
 
 - No generator parameter takes a value: `keep-comments=1` is this error.
 - What follows the name in a `-- name:` marker must be `->` and one of `many`, `one`, `one-optional`, `none` and `rowcount`, as in `-- name: GetUser -> one`.
@@ -533,6 +548,8 @@ A `-- token:` marker holds exactly one token with a default, `{{name:default}}`,
 
 A `-- param:` marker starts with the parameter as the SQL writes it, `@name`, alone or followed by a space.
 
+A `-- column:` marker holds a column's name, then `null` or `not null`, as in `-- column: total not null`.  A name with white space, or one that is the word `null` or `not`, is written in double quotes, with a quote inside it doubled: `-- column: "total due" not null`.
+
 Add the missing value, correct the one that is wrong, or remove the one that does not belong.
 
 See: [Marker index](sql-files.md#marker-index)
@@ -546,6 +563,7 @@ Two settings contradict each other.  The error is at the second.
 - `default` beside another generator parameter in the file header, or inside one query: `default` is the empty list, and a list that holds something is not empty.
 - Two `-- dialect:` markers name different dialects, or one dialect with different options.  A file has one dialect.
 - Two defaults for one token of a query that differ: two `{{name:default}}` in its SQL, two `-- token:` markers, or one of each.
+- Two `-- column:` markers for one column, its name compared ignoring case, of which one says `null` and the other `not null`.
 - Two `-- param:` markers for one parameter that give different types or different nullability.  `not null` counts as different from saying nothing: `-- param: @a int` and `-- param: @a int not null` conflict.  Write both the same.
 - Two `-- output:` markers that give different values, or two `-- database:` markers that name different databases (`billing` and `Billing` are different), in the file header or inside one query.
 - Two markers of any other setting of the models and the collection type that give different values in the file header or inside one query: two `-- input-model:` markers that name different types, two `-- model-namespace:` markers, and so on.
@@ -651,6 +669,8 @@ Move the marker to where the message says.  A file with no `-- name:` line is on
 | `-- input-model-type:`, `-- output-model-type:` | yes | yes |
 | `-- input-model:`, `-- output-model:` | no | yes |
 | `-- collection-type:` | yes | yes |
+| `-- type-override:` | yes | yes |
+| `-- column:` | no | yes |
 
 The table is this error's, with two exceptions.  A `-- summary:` in the file header is [SQLSRC107](#sqlsrc107), and a `-- dialect:` inside a query or after SQL is [SQLSRC115](#sqlsrc115).
 
@@ -1662,18 +1682,253 @@ The type override maps a database type to a C# type that the project cannot use:
 
 Make the type, and each type it is nested in, `public`.  A type of the project itself can be `internal` instead.  For a type of another assembly, you can also add `[assembly: InternalsVisibleTo("YourProject")]` to the assembly that declares it, which lets the project see its `internal` types.  The query's constant or method is still generated.
 
+The same error is reported when the type is not `public` and the model that would have the column or parameter as a property is: a model is `public` when a `public` type claims its query, as [accessibility](generator.md#model-accessibility) says, and a `public` type cannot have a property of a type that is not.  Each such property is an error of its own, and the message then also names the model.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC251: The type override maps 'uuid' to 'App.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and that type is not public, and the model 'App.Queries.GetUserDto' is.  Make the type public, or make each type that claims the query's file internal.
+```
+
+Make the type `public`, or make each type that claims the query's file `internal`, which makes its models `internal`.  The model is not generated until then, and the query's constant or method still is.
+
 See: [Type overrides](settings.md#setting-type-overrides)
 
 ## SQLSRC252
 
 **Mapped type cannot be a property's type**
 
-The type override maps a database type to a C# type that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
+The type override maps a database type to a C# type that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  So is a type when it, a type it is nested in or one of its type arguments is marked `[Obsolete]` as an error, as `[Obsolete("Use UserKey.", true)]`, since no code can use it without an error; and so is one marked `[Obsolete]` or `[Experimental]` under a diagnostic id that is not an identifier, such as `MY-001` or `1234`, since a model could not turn off the warning, or the error of `[Experimental]`, that its use gives.  `[Experimental]` on the assembly or module that declares the type counts as on the type.  A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted, and its model compiles without a warning.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC252: The type override maps 'int4' to 'System.Nullable<int>' for column 'id', in the metadata SqlSourceTypeOverrides of the file, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
 ```
 
-Map the database type to another C# type.  For `System.Nullable<T>`, map it to `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  The query's constant or method is still generated.
+Map the database type to another C# type.  For `System.Nullable<T>`, map it to `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  For a type marked `[Obsolete]` as an error, map it to the type that replaces it.  The query's constant or method is still generated.
 
 See: [Type overrides](settings.md#setting-type-overrides)
+
+## SQLSRC253
+
+**Column has no name**
+
+A column of the query has no name, so its property in the output model would have none.  PostgreSQL names a column `?column?` when the query gives it no alias and it is no column of a table or call of a function: an expression such as `price * quantity`, or a literal.  The message gives the column's position, from 1, and the query.
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC253: The column at position 2 of the query 'GetLines' has no name.  Give it an alias.
+```
+
+```sql error
+-- name: GetLines
+SELECT id, price * quantity FROM order_lines;
+```
+
+Give the column an alias, which names its property, then run `dotnet sqlsource describe`:
+
+```sql postgres
+-- name: GetLines
+SELECT id, price * quantity AS total FROM order_lines;
+```
+
+The query's constant or method is still generated.
+
+See: [Property names](generator.md#property-names)
+
+## SQLSRC254
+
+**Name is not an identifier after PascalCase**
+
+The PascalCase of a column's or a parameter's name, which names its property, is not a C# identifier: it is empty, as for a name of underscores alone, it starts with a digit, as `_1st` gives `1st`, or it holds a character that an identifier cannot, as `unit-price` does.  The message names the column or parameter and the property name it gives.
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC254: The column 'unit-price' gives the property name 'Unit-price', which is not a C# identifier.  Give it an alias.
+```
+
+```sql error
+-- name: GetLines
+SELECT id, "unit-price" FROM order_lines;
+```
+
+Give the column an alias that is a name a C# property can have, or rename the parameter, then run `dotnet sqlsource describe`:
+
+```sql postgres
+-- name: GetLines
+SELECT id, "unit-price" AS unit_price FROM order_lines;
+```
+
+The query's constant or method is still generated.
+
+See: [Property names](generator.md#property-names)
+
+## SQLSRC255
+
+**Two names give one property name**
+
+Two columns, or two parameters, of the query give their model one property name, ignoring case: the same column selected from two tables, as `SELECT u.id, o.id`, or two spellings of a name, as `user_id` beside `userId`.  Names are compared ignoring case, since Dapper matches a column to a property ignoring case, and would fill both properties from one column.  The message names both, with their positions from 1, and the property name.
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC255: The column 'id' at position 1 and the column 'id' at position 2 give one property name, 'Id', ignoring case.  Give one of them an alias.
+```
+
+```sql error
+-- name: GetUserOrders
+SELECT u.id, o.id FROM users u JOIN orders o ON o.user_id = u.id;
+```
+
+Give one of the columns an alias, or rename one of the parameters, then run `dotnet sqlsource describe`:
+
+```sql postgres
+-- name: GetUserOrders
+SELECT u.id AS user_id, o.id AS order_id FROM users u JOIN orders o ON o.user_id = u.id;
+```
+
+The query's constant or method is still generated.
+
+See: [Property names](generator.md#property-names)
+
+## SQLSRC256
+
+**Property name is taken**
+
+A column or a parameter gives a property name that a record or `object` already has a member of: `EqualityContract`, `Equals`, `GetHashCode`, `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`, `PrintMembers`, `Deconstruct` or `Clone`.  A column named `equals` or `to_string` is one.  So is a property name that is the name of its model, which C# does not allow a member to have: a column `total` of a query whose `-- output-model:` marker names its model `Total`.  The message names the column or parameter and the property name.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC256: The column 'to_string' gives the property name 'ToString', which a record or object already has.  Give it an alias.
+/work/App/Queries/Orders.sql(1,10): error SQLSRC256: The column 'total' gives the property name 'Total', which is the name of its model.  Give it an alias.
+```
+
+```sql error
+-- name: GetUsers
+SELECT id, to_string FROM users;
+```
+
+Give the column an alias, or rename the parameter, then run `dotnet sqlsource describe`:
+
+```sql postgres
+-- name: GetUsers
+SELECT id, to_string AS display_name FROM users;
+```
+
+For a property named as its model, you can instead give the model [another name](settings.md#setting-model-name).  The query's constant or method is still generated.
+
+See: [Property names](generator.md#property-names)
+
+## SQLSRC257
+
+**Two models of one name differ**
+
+Two queries give their models one full name, by an `-- input-model:` or `-- output-model:` marker, or by the suffixes and the namespace, and the two models are not the same.  Two queries share a model when the two agree on the properties' names, C# types and nullability, in the same order, on the model type, `record`, `sealed record`, `class` or `sealed class`, and on whether the properties are sorted: one model is generated, and its documentation names each query.  An input model and an output model of one name are never the same.  Two types that claim one file and give its query's model one name are two queries here too, so their settings must agree.  The queries are taken in the order of their files' paths, then of their order in a file, then of the types' names, and the error is at the later of the two, at its marker when it has one and at its name otherwise.  The message names the model, the earlier query, with the type when the two are one query, and the first difference.
+
+```console
+/work/App/Queries/Users.sql(6,1): error SQLSRC257: The output model 'App.Queries.UserRow' of the query 'GetUsers' is not the same as the output model of that name of the query 'GetUser' in Users.sql: it has 2 properties here and 3 there.  Give one of the two queries another model name, or make the two the same.
+```
+
+```sql error
+-- name: GetUser
+-- output-model: UserRow
+SELECT id, name, email FROM users WHERE id = @id;
+
+-- name: GetUsers
+-- output-model: UserRow
+SELECT id, name FROM users;
+```
+
+Give one of the two queries [another model name](settings.md#setting-model-name), or make the two models the same, then run `dotnet sqlsource describe` if you changed a query:
+
+```sql postgres
+-- name: GetUser
+-- output-model: UserRow
+SELECT id, name, email FROM users WHERE id = @id;
+
+-- name: GetUsers
+-- output-model: UserSummary
+SELECT id, name FROM users;
+```
+
+The earlier query's model is still generated, and the later query has no model of that kind until the two agree.  The query's constant or method is still generated.
+
+See: [Shared models](generator.md#shared-models)
+
+## SQLSRC258
+
+**Model name cannot be used**
+
+A model's full name is one that a generated type cannot have, because the code would not compile or would be warned on:
+
+- a type of the project has the full name, the type that carries `[SqlSourceGenerate]` among them;
+- it is a namespace of the project, or a part of the model's namespace is a type of the project, as a [model namespace](settings.md#setting-model-namespace) of `App.Queries` beside a class `App.Queries`;
+- it is the namespace of another model, or a part of its namespace is another model, as `App.Data` beside `App.Data.Row`, which reports both;
+- its name is lower-case ASCII letters alone, as `usersdto`, which the compiler warns on, since such a name could become a keyword.
+
+The model is not generated, and each query that would have it is told.  The message names the model, the query and the reason.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC258: The model 'App.Queries.usersdto' of the query 'GetUsers' cannot be generated: the compiler warns on a type name of lower-case ASCII letters alone.  Give the query another model name, or set another model namespace.
+```
+
+```sql error
+-- name: GetUsers
+-- output-model: usersdto
+SELECT id, name FROM users;
+```
+
+Give the query [another model name](settings.md#setting-model-name), or set another [model namespace](settings.md#setting-model-namespace):
+
+```sql postgres
+-- name: GetUsers
+-- output-model: UserDto
+SELECT id, name FROM users;
+```
+
+The query's constant or method is still generated.
+
+See: [Names that cannot be used](generator.md#unusable-model-names)
+
+## SQLSRC259
+
+**Output model on a query without rows**
+
+The query has an `-- output-model:` marker, which names the type of its rows, and its statement returns none, as an `INSERT`, `UPDATE` or `DELETE` without `RETURNING` does.  The error is at the marker.
+
+```console
+/work/App/Queries/Users.sql(2,1): error SQLSRC259: The query 'DeleteUser' names an output model, and its statement returns no rows.  Remove the -- output-model: marker.
+```
+
+```sql error
+-- name: DeleteUser
+-- output-model: DeletedUser
+DELETE FROM users WHERE id = @id;
+```
+
+Remove the marker.  To read the rows the statement changes instead, add a `RETURNING` clause and run `dotnet sqlsource describe`.  The query's constant or method is still generated.
+
+See: [Which queries get models](generator.md#which-models)
+
+## SQLSRC260
+
+**Column marker names no usable column**
+
+A `-- column:` marker, which sets the nullability of one column of its query's result, cannot be used.  Either it names no column of the result, its name compared ignoring case, or the query returns no rows; or it names a column whose alias already ends in `!` or `?`, which says the column's nullability too.  The error is at the marker, and the message says which it is.
+
+```console
+/work/App/Queries/Payments.sql(2,1): error SQLSRC260: The -- column: marker for 'totl' names no column of the query's result.  Name a column as the query returns it.
+/work/App/Queries/Payments.sql(3,1): error SQLSRC260: The -- column: marker for 'note' names a column whose alias already ends in ! or ?.  Remove the mark from the alias, or the marker.
+```
+
+```sql error
+-- name: GetTotals
+-- column: totl not null
+-- column: note null
+SELECT sum(amount) AS total, max(note) AS "note?" FROM payments;
+```
+
+Name the column as the query returns it: its alias, or its own name when it has none.  For a column whose alias ends in a mark, keep one of the two: remove the marker, or remove the mark from the alias, which changes the query, and run `dotnet sqlsource describe`.  Where the rows are read by the names of their columns, as Dapper reads them, keep the marker:
+
+```sql postgres
+-- name: GetTotals
+-- column: total not null
+-- column: note null
+SELECT sum(amount) AS total, max(note) AS note FROM payments;
+```
+
+The query's constant or method is still generated.
+
+See: [Setting a column's nullability with a marker](generator.md#column-marker)

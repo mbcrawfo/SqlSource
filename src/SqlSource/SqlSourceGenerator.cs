@@ -8,6 +8,7 @@ using Microsoft.CodeAnalysis.Text;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Emitting;
+using SqlSource.Generation.Models;
 using SqlSource.Generation.MSBuild;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Sidecars;
@@ -304,8 +305,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var projectTypeOverrides = projectLevel.Select(static (level, _) => FileTypesInput.TypeOverridesOf(level));
 
         // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
-        // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.
-        var fileTypes = sidecarChecks
+        // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.  Each
+        // file keeps its input beside its types, so that the models read its entries without typing it again.
+        var typedFiles = sidecarChecks
             .Combine(parsedFiles.Combine(filesSettings))
             .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(mappedTypes)))
             .Select(
@@ -320,8 +322,61 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                     )
             )
             .WithTrackingName(TrackingNames.FileTypesInput)
-            .Select(static (input, _) => QueryTyper.Type(input))
-            .WithTrackingName(TrackingNames.FileTypes);
+            .Select(static (input, _) => new TypedFile(input, QueryTyper.Type(input)))
+            .WithTrackingName(TrackingNames.TypedFile);
+
+        var fileTypes = typedFiles.Select(static (file, _) => file.Types).WithTrackingName(TrackingNames.FileTypes);
+
+        // The properties of each file's models and the errors of their names, once for each file, whatever the number
+        // of types that claim it, since no setting of a type changes them.
+        var fileModels = typedFiles
+            .Select(static (file, _) => ModelReader.Read(file))
+            .WithTrackingName(TrackingNames.FileModels);
+
+        // Every file's models, sorted by path, so that a type finds the models of each of its files with a search.
+        var allFileModels = fileModels
+            .Collect()
+            .Select(static (files, _) => ToSorted(files, static file => file.NormalizedPath))
+            .WithTrackingName(TrackingNames.AllFileModels);
+
+        // What each type asks for of its queries' models, which only its own settings decide.  A change to a type or
+        // to a file's models that leaves the type's requests alone gives an equal value, and nothing after it runs.
+        var typeModels = typeQueries
+            .Combine(allFileModels)
+            .Combine(projectLevel)
+            .Select(static (input, _) => TypeModels.Of(input.Left.Left, input.Left.Right, input.Right))
+            .WithTrackingName(TrackingNames.TypeModels);
+
+        // Every type's requests together, by full name, since two types or two queries can ask for one model.
+        var modelGroups = typeModels
+            .SelectMany(static (requests, _) => requests)
+            .Collect()
+            .Select(static (requests, _) => ModelCollector.Group(requests))
+            .WithTrackingName(TrackingNames.ModelGroups);
+
+        // The models' full names alone, which an edit that leaves every name alone gives again, equal.
+        var modelNames = modelGroups
+            .Select(static (groups, _) => ModelCollector.FullNamesOf(groups))
+            .WithTrackingName(TrackingNames.ModelNames);
+
+        // Those names that the project has already, as a type or a namespace.  Like the lookup of the mapped types, it
+        // runs on every run, since the driver gives a new compilation each time: a few lookups for each name, and none
+        // for a project without a model.  Its value is equal until a type or a namespace of a name appears or goes.
+        var takenModelNames = context
+            .CompilationProvider.Combine(modelNames)
+            .Select(
+                static (input, cancellationToken) =>
+                    ModelNameChecker.FindTaken(input.Left, input.Right, cancellationToken)
+            )
+            .WithTrackingName(TrackingNames.TakenModelNames);
+
+        // A step of its own, since it sees every request at once: it is where the requests of one full name are
+        // checked against each other, and each model's name against the other models' and the project's, which
+        // decides which models are generated and what is reported.
+        var models = modelGroups
+            .Combine(takenModelNames)
+            .Select(static (input, _) => ModelCollector.Resolve(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.Models);
 
         // Whether a query of the project needs an entry of postgres, whose types the driver decides.  Without one, the
         // driver is not reported on.
@@ -379,6 +434,42 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                     output.ReportDiagnostic(diagnostic.ToDiagnostic());
                 }
             }
+        );
+
+        // Beside the types' output, so that a change to the models alone reports the types of no file again.
+        context.RegisterSourceOutput(
+            fileModels,
+            static (output, models) =>
+            {
+                foreach (var diagnostic in models.Diagnostics)
+                {
+                    output.ReportDiagnostic(diagnostic.ToDiagnostic());
+                }
+            }
+        );
+
+        // Apart from the models' sources, so that a change to one model reports nothing again.
+        context.RegisterSourceOutput(
+            models.Select(static (set, _) => set.Diagnostics),
+            static (output, diagnostics) =>
+            {
+                foreach (var diagnostic in diagnostics)
+                {
+                    output.ReportDiagnostic(diagnostic.ToDiagnostic());
+                }
+            }
+        );
+
+        // One node for each model, compared by position, so that an edit writes again only the models whose record
+        // changed, and those after a model that was added or removed.
+        var modelOutputs = models
+            .SelectMany(static (set, _) => set.Models)
+            .Select(static (model, _) => (model.HintName, Source: ModelEmitter.Emit(model)))
+            .WithTrackingName(TrackingNames.ModelOutput);
+
+        context.RegisterSourceOutput(
+            modelOutputs,
+            static (output, model) => output.AddSource(model.HintName, SourceText.From(model.Source, Encoding.UTF8))
         );
 
         context.RegisterSourceOutput(

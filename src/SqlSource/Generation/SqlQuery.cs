@@ -32,11 +32,17 @@ namespace SqlSource.Generation;
 /// marker declares, in marker order.  Empty when it has none.
 /// </param>
 /// <param name="Markers">What the query's markers say about the settings, over those of its file's preamble.</param>
-/// <param name="InputModelName">
-/// The full name or the name a <c>-- input-model:</c> marker gives the type of the query's parameters, or null.
+/// <param name="InputModel">
+/// The name a <c>-- input-model:</c> marker gives the type of the query's parameters, with the marker in effect and
+/// where it is, or null.
 /// </param>
-/// <param name="OutputModelName">
-/// The full name or the name an <c>-- output-model:</c> marker gives the type of the query's rows, or null.
+/// <param name="OutputModel">
+/// The name an <c>-- output-model:</c> marker gives the type of the query's rows, with the marker in effect and where
+/// it is, or null.
+/// </param>
+/// <param name="ColumnMarkers">
+/// What the query's <c>-- column:</c> markers say of the nullability of its columns, in marker order, each column
+/// once.  Empty when it has none.
 /// </param>
 internal sealed record SqlQuery(
     string Name,
@@ -48,6 +54,7 @@ internal sealed record SqlQuery(
     EquatableArray<SqlToken> Tokens,
     EquatableArray<SqlQueryParameter> Parameters,
     SettingsLevel Markers,
-    string? InputModelName,
-    string? OutputModelName
+    ModelMarker? InputModel,
+    ModelMarker? OutputModel,
+    EquatableArray<ColumnMarker> ColumnMarkers
 );

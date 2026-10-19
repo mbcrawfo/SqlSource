@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/mbcrawfo/SqlSource/actions/workflows/ci.yml?query=branch%3Amain) [![NuGet](https://img.shields.io/nuget/vpre/SqlSource.svg)](https://www.nuget.org/packages/SqlSource/)
 
-SqlSource keeps the SQL of a C# project in `.sql` files, out of your code files, and generates the C# that uses it.  SQL in a file of its own is cleaner than SQL in a C# string: your editor highlights it, SQL linters and formatters work on it, and it is easy to find when you search for a table or a column.  A query that is renamed or removed is a compile error where it is used, and your editor shows a query's SQL wherever it is used.  With PostgreSQL, the `sqlsource` tool also checks every query against your database's schema.
+SqlSource keeps the SQL of a C# project in `.sql` files, out of your code files, and generates the C# that uses it: a constant that holds each query, and for a query that your database has described, a type for its parameters and a type for its rows.  SQL in a file of its own is cleaner than SQL in a C# string: your editor highlights it, SQL linters and formatters work on it, and it is easy to find when you search for a table or a column.  A query that is renamed or removed is a compile error where it is used, and so is a column that your code reads and the query no longer returns, and your editor shows a query's SQL wherever it is used.  With PostgreSQL, the `sqlsource` tool checks every query against your database's schema, and records what the database says of its parameters and columns, from which the types are generated.
 
-**Status:** SqlSource is in early development.  Today it generates a constant for each query, or a method for a query with a `{{token}}` chosen at run time, and its tool can ask a PostgreSQL database about each query's parameters and columns, which SqlSource calls describing the query.  Coming in a later release: a generated model for each query's parameters and rows, which will turn a column that does not match your code into a build error, and a generated method that runs each query.  [What works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today) has the full list.
+**Status:** SqlSource is in early development.  Today it generates a constant for each query, or a method for a query with a `{{token}}` chosen at run time, and its tool can ask a PostgreSQL database about each query's parameters and columns, which SqlSource calls describing the query.  From that description it generates a model for each query's parameters and rows, which turns a column that does not match your code into a build error.  Coming in a later release: a generated method that runs each query.  [What works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today) has the full list.
 
 **Databases:** keeping SQL in `.sql` files and generating constants works with any database: SQL Server and Azure SQL, PostgreSQL, MySQL, MariaDB, SQLite, Oracle, CockroachDB and others.  Describing queries works with PostgreSQL 14 or later today; SQL Server is coming, and other databases are not described: see [database support](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#database-support).  So with PostgreSQL, follow the five steps below: by default every query must be described, which step 5 does, and the build reports an error for each query until it is.  With any other database, follow steps 1 to 4 and set the output to `sql`, which gives you a constant for each query and needs no description, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  There are two other ways to use SqlSource: [only generating models](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#only-want-to-generate-models), and [only keeping your SQL out of code files](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files).
 
@@ -84,36 +84,36 @@ Databases disagree about where a comment or a string ends, and SqlSource takes t
 
 ### 4. Use the queries
 
-The constants are plain strings, so any library can run them: Dapper here (`dotnet add package Dapper`), or your own ADO.NET code.  Replace the contents of `Queries/UserRepository.cs` with this, and write the row type yourself until models arrive:
+The constants are plain strings, so any library can run them: Dapper here (`dotnet add package Dapper`), or your own ADO.NET code.  Once the queries are described, in step 5, the build also generates their models: a record for the parameters of each query, `GetUserParams` and `FindUsersParams`, and a record for its rows, `GetUserDto` and `FindUsersDto`, with a property for each parameter and each column.  This assumes that the table `users` has more columns than these three, as a table of users usually does.  Replace the contents of `Queries/UserRepository.cs` with this:
 
 ```csharp
 using System.Data.Common;
 using Dapper;
 using SqlSource;
 
-public sealed record User(int Id, string Name, string Email);
-
 [SqlSourceGenerate]
 public partial class UserRepository(DbConnection connection)
 {
-    public Task<User> Get(int id) =>
-        connection.QuerySingleAsync<User>(Sql.GetUser, new { id });
+    public Task<GetUserDto> Get(int id) =>
+        connection.QuerySingleAsync<GetUserDto>(Sql.GetUser, new GetUserParams(id));
 
-    public Task<IEnumerable<User>> Find(string? name) =>
-        connection.QueryAsync<User>(Sql.FindUsers, new { name });
+    public Task<IEnumerable<FindUsersDto>> Find(string? name) =>
+        connection.QueryAsync<FindUsersDto>(Sql.FindUsers, new FindUsersParams(name));
 }
 ```
 
-> **Coming in a later release.**  SqlSource will generate the `User` type from the query's columns and a method that runs each query, so that `Get` and `Find` are written for you.  See [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
+A property can be null where its column can, and `FindUsersParams.Name` can be null because its `-- param:` says `null`.  A query that selects every column of a table, in the table's order, gets a row model named after the table instead: if `users` had exactly the columns `id`, `name` and `email`, in that order, both queries would share one model, `UsersDto`, and the code would use it in place of `GetUserDto` and `FindUsersDto`.  For columns written in snake_case, such as `created_at`, set Dapper's `DefaultTypeMap.MatchNamesWithUnderscores` to `true` once when your application starts.
 
-More: [constants](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md#constants), [the Dapper and ADO.NET recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#dapper-and-adonet).
+> **Coming in a later release.**  SqlSource will generate a method that runs each query, so that `Get` and `Find` are written for you.  See [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
+
+More: [constants](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md#constants), [models](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md#models), [the Dapper and ADO.NET recipe](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#dapper-and-adonet), [running the models through Dapper](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/recipes.md#models-through-dapper).
 
 ### 5. Describe your queries
 
 This step works with PostgreSQL only: for another database, or for queries that want only their SQL, skip it and set the output to `sql`, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  The tool asks your database what the parameters and columns of each query are, without running the query, and writes the answers into a sidecar file beside the `.sql` file: `Users.sql.json`.
 
 - **Today** that checks every query against your schema: a table or a column that does not exist, or a parameter whose type cannot be worked out, is an error now and not when the query runs.
-- **The build reads the sidecars**, and reports an error for a query that has no entry in its sidecar, or whose entry is older than the query: run `describe` again after you change a query.  The generated models and query methods of a later release will be built from them, so that the build never needs a database.
+- **The build reads the sidecars**, and reports an error for a query that has no entry in its sidecar, or whose entry is older than the query: run `describe` again after you change a query.  The models are built from them, so that the build never needs a database.
 
 Run the tool from the folder of your project or solution, or name it, as in `dotnet sqlsource describe src/App/App.csproj`:
 
@@ -130,7 +130,7 @@ Run `describe` again when you change a query, `describe --force` after a change 
 
 ## Only want to generate models?
 
-Set the output to `models`.  Today a query whose output is `models` gets its constant, as in step 4, and the tool describes it, as in step 5:
+Set the output to `models`.  A query whose output is `models` gets its constant, or its method when it has a token, and its models, as in step 4, once the tool has described it, as in step 5, and never a method that runs it:
 
 ```xml
 <PropertyGroup>
@@ -138,9 +138,7 @@ Set the output to `models`.  Today a query whose output is `models` gets its con
 </PropertyGroup>
 ```
 
-> **Coming in a later release.**  A query whose output is `models` will get a type for its parameters and a type for its rows, and no method that runs it.  See [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
-
-More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-output), which can also be set for one folder, one file or one query.
+More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-output), which can also be set for one folder, one file or one query, and [models](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/generator.md#models), for their names, shape and properties.
 
 ## Just want to keep your SQL out of code files?
 
@@ -153,7 +151,7 @@ Follow steps 1 to 4, set the output to `sql`, and skip the tool.  For a SQL Serv
 </PropertyGroup>
 ```
 
-- **`sql` asks for each query's SQL and nothing else**: its constant, or, for a query with a `{{token}}`, a method that fills it in.  It needs no database, no tool and no sidecar.  Today it tells the tool to leave these queries out, so a run on the project reports nothing for them, and the build to need no sidecar for them; when generated models arrive, it also keeps these queries to their SQL alone.  Without it the default output, `codegen`, asks for every query to be described, and the build reports an error for each file or query that is not.
+- **`sql` asks for each query's SQL and nothing else**: its constant, or, for a query with a `{{token}}`, a method that fills it in.  It needs no database, no tool and no sidecar.  It tells the tool to leave these queries out, so a run on the project reports nothing for them, and the build to need no sidecar for them and to generate no models.  Without it the default output, `codegen`, asks for every query to be described, and the build reports an error for each file or query that is not.
 - **Any dialect works**: `mssql` for SQL Server, `mysql`, `sqlite`, the default `ansi` and the others.  Set the one named for your database, so that SqlSource reads your comments and strings as your database does.
 
 More: [output](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-output), [database support](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/dialects.md#database-support).
@@ -166,7 +164,7 @@ The generator parameter `async-method-suffix` is accepted today: `<SqlSourceGene
 
 ### How do I change the namespace of the models?
 
-The setting is accepted today: `<SqlSourceModelNamespace>App.Models</SqlSourceModelNamespace>` in the project file, `ModelNamespace` on the attribute, or `-- model-namespace:` in a `.sql` file.  It takes effect when generated models arrive.  See [namespace of the models](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-model-namespace) and [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
+By default the models are in the namespace of the type that claims the query.  Set `<SqlSourceModelNamespace>App.Models</SqlSourceModelNamespace>` in the project file, `ModelNamespace` on the attribute, or `-- model-namespace:` in a `.sql` file.  Two types in two namespaces that read one table each get a model of it, one in each namespace, and the setting gives them one.  A name with a period in an `-- output-model:` line, `App.Rows.UserRow`, is a full name and ignores the setting.  See [namespace of the models](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-model-namespace).
 
 ### My project uses several databases
 
@@ -202,7 +200,7 @@ Each column and parameter of a PostgreSQL query whose output is `models` or `cod
 </PropertyGroup>
 ```
 
-The setting is accepted and checked today: an entry that is not written correctly, or whose key has no schema and is not a type SqlSource knows, is a build error, and so is a C# type that the project cannot find or use, at each query that uses it.  It takes effect when generated models arrive.  See [type overrides](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides) and [what works today](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/README.md#what-works-today).
+Each property of a model has the type its database type maps to.  An entry that is not written correctly, or whose key has no schema and is not a type SqlSource knows, is a build error, and so is a C# type that the project cannot find or use, at each query that uses it.  See [type overrides](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/settings.md#setting-type-overrides).
 
 ## Where to next
 

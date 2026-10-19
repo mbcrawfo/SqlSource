@@ -555,12 +555,12 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} to {3} as SQLSRC250's, {4} the case, a type this project cannot see or a type that is not public in a model
+    // that is, and {5} its help, without its period.
     public static readonly DiagnosticDescriptor MappedTypeNotAccessible = new(
         id: "SQLSRC251",
         title: "Mapped type is not accessible",
-        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and this project cannot see that type.  "
-            + "Make it, and each type it is nested in, public, or internal when it is this project's own, or give this "
-            + "project its assembly's internals with InternalsVisibleTo.",
+        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and {4}.  {5}.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -578,6 +578,110 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc252",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the column's position, 1-based, and {1} the query's name.
+    public static readonly DiagnosticDescriptor ColumnHasNoName = new(
+        id: "SQLSRC253",
+        title: "Column has no name",
+        messageFormat: "The column at position {0} of the query '{1}' has no name.  Give it an alias.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc253",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the column or parameter, as "column 'id'", {1} the property name it gives, and {2} the help, without its
+    // period: an alias for a column, a new name for a parameter.
+    public static readonly DiagnosticDescriptor PropertyNameNotIdentifier = new(
+        id: "SQLSRC254",
+        title: "Name is not an identifier after PascalCase",
+        messageFormat: "The {0} gives the property name '{1}', which is not a C# identifier.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc254",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} and {1} are the two columns or parameters, as "column 'id' at position 1", {2} the property name of the
+    // first, and {3} the help, without its period.
+    public static readonly DiagnosticDescriptor PropertyNameRepeated = new(
+        id: "SQLSRC255",
+        title: "Two names give one property name",
+        messageFormat: "The {0} and the {1} give one property name, '{2}', ignoring case.  {3}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc255",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the column or parameter, as "column 'id'", {1} the property name it gives, {2} what takes it, as "a
+    // record or object already has", and {3} the help, without its period.
+    public static readonly DiagnosticDescriptor PropertyNameTaken = new(
+        id: "SQLSRC256",
+        title: "Property name is taken",
+        messageFormat: "The {0} gives the property name '{1}', which {2}.  {3}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc256",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} and {3} are the roles of the later and the earlier model, "input" or "output", {1} the full name, {2} the
+    // later query's name, {4} the earlier query, as "'GetUser' in Users.sql", with ", for the type App.Repo" when the
+    // two are one query, and {5} the first difference.
+    public static readonly DiagnosticDescriptor ModelsDiffer = new(
+        id: "SQLSRC257",
+        title: "Two models of one name differ",
+        messageFormat: "The {0} model '{1}' of the query '{2}' is not the same as the {3} model of that name of the "
+            + "query {4}: {5}.  Give one of the two queries another model name, or make the two the same.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc257",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the model's full name, {1} the query's name and {2} why the name cannot be used.
+    public static readonly DiagnosticDescriptor ModelNameUnusable = new(
+        id: "SQLSRC258",
+        title: "Model name cannot be used",
+        messageFormat: "The model '{0}' of the query '{1}' cannot be generated: {2}.  Give the query another model "
+            + "name, or set another model namespace.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc258",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor OutputModelWithoutRows = new(
+        id: "SQLSRC259",
+        title: "Output model on a query without rows",
+        messageFormat: "The query '{0}' names an output model, and its statement returns no rows.  Remove the "
+            + "-- output-model: marker.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc259",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the column's name as the marker gives it, {1} what is wrong with it, as "names no column of the query's
+    // result", and {2} the help, without its period.
+    public static readonly DiagnosticDescriptor ColumnMarkerUnusable = new(
+        id: "SQLSRC260",
+        title: "Column marker names no usable column",
+        messageFormat: "The -- column: marker for '{0}' {1}.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc260",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -633,7 +737,15 @@ internal static class SqlDiagnostics
             TypeNeedsNpgsql,
             MappedTypeNotFound,
             MappedTypeNotAccessible,
-            MappedTypeNotAPropertyType
+            MappedTypeNotAPropertyType,
+            ColumnHasNoName,
+            PropertyNameNotIdentifier,
+            PropertyNameRepeated,
+            PropertyNameTaken,
+            ModelsDiffer,
+            ModelNameUnusable,
+            OutputModelWithoutRows,
+            ColumnMarkerUnusable
         );
 
     /// <summary>

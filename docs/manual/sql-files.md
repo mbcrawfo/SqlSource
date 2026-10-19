@@ -24,22 +24,23 @@ A marker stands in one of two places.  A marker that describes one query stands 
 | Marker | Purpose | File header | Inside a query | Documented in |
 |----|----|----|----|----|
 | `-- name:` | Starts a query and names it, with an optional result shape | no | starts one | [Queries and names](#queries-and-names) |
-| `-- summary:` | Documents the query's generated member | no | yes | [Summaries](#summaries) |
+| `-- summary:` | Documents the query's generated member and its models | no | yes | [Summaries](#summaries) |
 | `-- dialect:` | The dialect the file is read by, and its options.  The names and the reading rules are on [the dialects page](dialects.md) | yes | no | [Dialect](settings.md#setting-dialect) |
 | `-- generator:` | Generator parameters | yes | yes | [Generator parameters](settings.md#setting-generator-parameters) |
 | `-- param:` | Gives a query parameter its type and whether it can be null | no | yes | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
 | `-- token:` | Gives a token a default | no | yes | [Defaults](parameters-and-tokens.md#token-marker) |
 | `-- token-ignore:` | Keeps text that looks like a token as it is written | no | yes | [Text that looks like a token](parameters-and-tokens.md#token-ignore) |
 | `-- database:` | The logical database a query belongs to | yes | yes | [Database](settings.md#setting-database) |
-| `-- output:` | What is generated for a query.  Today it decides which queries must be described (`models` or `codegen`), by the tool and in the build's check of the sidecars; its effect on generated code comes later | yes | yes | [Output](settings.md#setting-output) |
-| `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model (no effect yet) | yes | no | [Suffix of a model's name](settings.md#setting-model-suffix) |
-| `-- model-namespace:` | The namespace of the models (no effect yet) | yes | no | [Namespace of the models](settings.md#setting-model-namespace) |
-| `-- input-model-type:`, `-- output-model-type:` | The shape of a model (no effect yet) | yes | yes | [Shape of a model](settings.md#setting-model-type) |
-| `-- input-model:`, `-- output-model:` | The name of one query's model (no effect yet) | no | yes | [Name of one query's model](settings.md#setting-model-name) |
+| `-- output:` | What is generated for a query: its SQL alone, or its models as well (`models` or `codegen`).  It also decides which queries must be described, by the tool and in the build's check of the sidecars | yes | yes | [Output](settings.md#setting-output) |
+| `-- input-model-suffix:`, `-- output-model-suffix:` | What ends the name of a model | yes | no | [Suffix of a model's name](settings.md#setting-model-suffix) |
+| `-- model-namespace:` | The namespace of the models | yes | no | [Namespace of the models](settings.md#setting-model-namespace) |
+| `-- input-model-type:`, `-- output-model-type:` | The shape of a model | yes | yes | [Shape of a model](settings.md#setting-model-type) |
+| `-- input-model:`, `-- output-model:` | The name of one query's model | no | yes | [Name of one query's model](settings.md#setting-model-name) |
 | `-- collection-type:` | The type that holds many rows (no effect yet) | yes | yes | [Collection type](settings.md#setting-collection-type) |
-| `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line (no effect yet) | yes | yes | [Type overrides](settings.md#setting-type-overrides) |
+| `-- type-override:` | Gives a database type the C# type of your choice, one entry for each line | yes | yes | [Type overrides](settings.md#setting-type-overrides) |
+| `-- column:` | Says whether one column of the query's result can be null, for its property in the output model, and leaves the column's name alone | no | yes | [Setting a column's nullability with a marker](generator.md#column-marker) |
 
-> **Coming in a later release.**  The markers above that have no effect yet will shape generated models and query methods; today they are read and checked, and change no generated code.  See [what works today](README.md#what-works-today).
+> **Coming in a later release.**  `-- collection-type:`, which has no effect yet, will say what a generated query method returns many rows in; today it is read and checked, and changes no generated code.  See [what works today](README.md#what-works-today).
 
 A marker that is a setting links to its section of [the settings page](settings.md), which also says where else the setting can be given, which place wins, and whether the setting has an effect today.  A marker where its column says "no" is an error: see [markers in the wrong place](#markers-in-the-wrong-place).
 
@@ -99,7 +100,7 @@ The case of a shape is ignored.  A word after `->` that is not one of the five, 
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-A `-- summary:` line inside a query becomes the documentation of its member, which IntelliSense shows beside the query's SQL.  Several are joined with a space.  A summary with no text is skipped, and the text is written as it is, so `<` and `&` appear as typed.
+A `-- summary:` line inside a query becomes the documentation of its member, which IntelliSense shows beside the query's SQL, and of its [models](generator.md#model-documentation).  Several are joined with a space.  A summary with no text is skipped, and the text is written as it is, so `<` and `&` appear as typed.
 
 A query without a summary is documented with its name and its file: "The `GetUser` query from `Users.sql`."
 

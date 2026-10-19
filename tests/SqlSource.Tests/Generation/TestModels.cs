@@ -26,7 +26,8 @@ internal static class TestModels
         string @namespace = "App",
         TypeDeclaration[]? types = null,
         DiagnosticInfo[]? diagnostics = null,
-        SettingsLevel? settings = null
+        SettingsLevel? settings = null,
+        bool isPublic = true
     ) =>
         new(
             @namespace,
@@ -34,6 +35,7 @@ internal static class TestModels
             placement,
             MethodPlacement.ExtensionClass,
             settings ?? SettingsLevel.None,
+            isPublic,
             path,
             filePath,
             AttributeLocation,

@@ -1,10 +1,12 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using SqlSource.Settings;
 
 namespace SqlSource.Generation.Types;
@@ -26,12 +28,32 @@ namespace SqlSource.Generation.Types;
 /// No generic type is constructed, and its constraints are not checked (TD-0056): a name is accessible when each of
 /// its types is, and each type's own flags say the rest.
 /// </para>
+/// <para>
+/// A use of a type marked <c>[Obsolete]</c> or <c>[Experimental]</c>, or nested in one, or of an assembly or module
+/// marked <c>[Experimental]</c>, is a warning, or an error that a <c>#pragma warning disable</c> of its id turns off,
+/// and the ids of each type of a name are the name's.  A type cannot be a property's type when a use of it is an
+/// error that no pragma turns off, as for <c>[Obsolete]</c> as an error (CS0619), or when it is marked under an id
+/// that a pragma cannot name, whose warning, or error, a model could not turn off.
+/// </para>
 /// </remarks>
 internal static class MappedTypeResolver
 {
     private const string ObsoleteAttributeName = "ObsoleteAttribute";
 
+    private const string ExperimentalAttributeName = "ExperimentalAttribute";
+
+    private const string ExperimentalAttributeFullName = "System.Diagnostics.CodeAnalysis.ExperimentalAttribute";
+
+    private const string DiagnosticIdArgument = "DiagnosticId";
+
     private const string SystemNamespace = "System";
+
+    // The ids of a use of a type marked [Obsolete] without a message and with one, and of [Experimental] with no id.
+    private const string ObsoleteId = "CS0612";
+
+    private const string ObsoleteWithMessageId = "CS0618";
+
+    private const string ExperimentalId = "CS9204";
 
     /// <summary>
     /// One record for each of <paramref name="names" />, in the same order, and <see cref="EquatableArray{T}.Empty" />
@@ -50,13 +72,23 @@ internal static class MappedTypeResolver
 
         var types = ImmutableArray.CreateBuilder<MappedType>(names.Count);
         var builder = new StringBuilder();
+        var warningIds = new List<string>();
         foreach (var name in names)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            warningIds.Clear();
             var found = ClrTypeName.TryParse(name.AsSpan(), out var parsed)
-                ? ResolveType(compilation, parsed!, Use.Whole, builder)
+                ? ResolveType(compilation, parsed!, Use.Whole, builder, warningIds)
                 : Resolution.Failed(MappedTypeStatus.NotFound);
-            types.Add(new MappedType(name, found.Status, found.IsValueType, found.IsPublic, found.IsObsolete));
+            types.Add(
+                new MappedType(
+                    name,
+                    found.Status,
+                    found.IsValueType,
+                    found.IsPublic,
+                    found.Status == MappedTypeStatus.Found ? Distinct(warningIds) : EquatableArray<string>.Empty
+                )
+            );
         }
 
         return new EquatableArray<MappedType>(types.MoveToImmutable());
@@ -91,7 +123,15 @@ internal static class MappedTypeResolver
         return null;
     }
 
-    private static Resolution ResolveType(Compilation compilation, ClrTypeName name, Use use, StringBuilder builder)
+    // The resolution of the name, after the ids of the warnings a use of each of its types gives are added to
+    // warningIds.
+    private static Resolution ResolveType(
+        Compilation compilation,
+        ClrTypeName name,
+        Use use,
+        StringBuilder builder,
+        List<string> warningIds
+    )
     {
         // A keyword names a built-in type, which is public and never obsolete.
         if (name.Keyword is { } keyword)
@@ -99,8 +139,7 @@ internal static class MappedTypeResolver
             return new Resolution(
                 MappedTypeStatus.Found,
                 name.Ranks.Count == 0 && keyword is not ("string" or "object"),
-                true,
-                false
+                true
             );
         }
 
@@ -110,7 +149,6 @@ internal static class MappedTypeResolver
         }
 
         var isPublic = true;
-        var isObsolete = false;
         foreach (var part in name.Parts)
         {
             foreach (var argument in part.Arguments)
@@ -119,11 +157,11 @@ internal static class MappedTypeResolver
                     compilation,
                     argument.Type,
                     argument.Nullable ? Use.NullableArgument : Use.Argument,
-                    builder
+                    builder,
+                    warningIds
                 );
                 status = First(status, resolved.Status);
                 isPublic &= resolved.IsPublic;
-                isObsolete |= resolved.IsObsolete;
             }
         }
 
@@ -132,19 +170,23 @@ internal static class MappedTypeResolver
             status = First(status, MappedTypeStatus.NotAccessible);
         }
 
-        if (!CanBeAPropertyType(type, name, use))
+        var canBeUsed = CanBeAPropertyType(type, name, use);
+        for (var current = type; current is not null; current = current.ContainingType)
+        {
+            isPublic &= current.DeclaredAccessibility == Accessibility.Public;
+            canBeUsed &= AddWarningIds(current, warningIds);
+        }
+
+        // [Experimental] on a module or an assembly marks each of its types.
+        canBeUsed &= AddWarningIds(type.ContainingModule, warningIds);
+        canBeUsed &= AddWarningIds(type.ContainingAssembly, warningIds);
+        if (!canBeUsed)
         {
             status = First(status, MappedTypeStatus.NotAPropertyType);
         }
 
-        for (var current = type; current is not null; current = current.ContainingType)
-        {
-            isPublic &= current.DeclaredAccessibility == Accessibility.Public;
-            isObsolete |= IsMarkedObsolete(current);
-        }
-
         return status == MappedTypeStatus.Found
-            ? new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic, isObsolete)
+            ? new Resolution(status, name.Ranks.Count == 0 && type.IsValueType, isPublic)
             : Resolution.Failed(status);
     }
 
@@ -268,15 +310,117 @@ internal static class MappedTypeResolver
         return builder.ToString();
     }
 
-    private static bool IsMarkedObsolete(INamedTypeSymbol type) =>
-        type.GetAttributes()
-            .Any(static attribute =>
-                attribute.AttributeClass
-                    is {
-                        Name: ObsoleteAttributeName,
-                        ContainingNamespace: { Name: SystemNamespace, ContainingNamespace.IsGlobalNamespace: true },
-                    }
-            );
+    // Adds the ids of the warnings that a use of the symbol gives for its own [Obsolete] or [Experimental], and says
+    // whether a pragma can turn each off.  An [Obsolete] with no DiagnosticId is CS0612 or CS0618 by its message, both
+    // added, and an [Experimental] with no id CS9204.  An argument of another shape gives no id and no error.  A
+    // symbol that is null, as a type of no module, adds none.
+    private static bool AddWarningIds(ISymbol? symbol, List<string> warningIds)
+    {
+        if (symbol is null)
+        {
+            return true;
+        }
+
+        var canBeUsed = true;
+        foreach (var attribute in symbol.GetAttributes())
+        {
+            if (attribute.AttributeClass is not { } attributeClass)
+            {
+                continue;
+            }
+
+            if (
+                attributeClass is
+                {
+                    Name: ObsoleteAttributeName,
+                    ContainingNamespace: { Name: SystemNamespace, ContainingNamespace.IsGlobalNamespace: true },
+                }
+            )
+            {
+                var arguments = attribute.ConstructorArguments;
+                if (arguments.Length > 1 && ValueOf(arguments[1]) is true)
+                {
+                    canBeUsed = false;
+                    continue;
+                }
+
+                if (DiagnosticIdOf(attribute) is { Length: > 0 } id)
+                {
+                    canBeUsed &= TryAdd(id, warningIds);
+                }
+                else
+                {
+                    warningIds.Add(ObsoleteId);
+                    warningIds.Add(ObsoleteWithMessageId);
+                }
+            }
+            else if (
+                attributeClass.Name.Equals(ExperimentalAttributeName, StringComparison.Ordinal)
+                && attributeClass.ToDisplayString().Equals(ExperimentalAttributeFullName, StringComparison.Ordinal)
+            )
+            {
+                var arguments = attribute.ConstructorArguments;
+                if (arguments.Length > 0 && ValueOf(arguments[0]) is string { Length: > 0 } id)
+                {
+                    canBeUsed &= TryAdd(id, warningIds);
+                }
+                else
+                {
+                    warningIds.Add(ExperimentalId);
+                }
+            }
+        }
+
+        return canBeUsed;
+    }
+
+    // The named argument's value, or null when it is not given: the default pair's constant is not primitive.
+    private static string? DiagnosticIdOf(AttributeData attribute) =>
+        ValueOf(
+            attribute
+                .NamedArguments.FirstOrDefault(static argument =>
+                    argument.Key.Equals(DiagnosticIdArgument, StringComparison.Ordinal)
+                )
+                .Value
+        ) as string;
+
+    // The value of a primitive constant, or null for any other.  Value throws for an array, which an attribute of the
+    // name declared in the project or a reference can take.
+    private static object? ValueOf(TypedConstant constant) =>
+        constant.Kind == TypedConstantKind.Primitive && !constant.IsNull ? constant.Value : null;
+
+    // A pragma names an id as an identifier; one that is not, as A-B, is read otherwise, and 1234 as CS1234.
+    private static bool TryAdd(string id, List<string> warningIds)
+    {
+        if (!SyntaxFacts.IsValidIdentifier(id))
+        {
+            return false;
+        }
+
+        warningIds.Add(id);
+        return true;
+    }
+
+    // The ids in ordinal order, each once.
+    private static EquatableArray<string> Distinct(List<string> ids)
+    {
+        if (ids.Count == 0)
+        {
+            return EquatableArray<string>.Empty;
+        }
+
+        ids.Sort(StringComparer.Ordinal);
+        var distinct = ImmutableArray.CreateBuilder<string>(ids.Count);
+        foreach (var id in ids)
+        {
+            if (distinct.Count == 0 || !distinct[distinct.Count - 1].Equals(id, StringComparison.Ordinal))
+            {
+                distinct.Add(id);
+            }
+        }
+
+        return new EquatableArray<string>(distinct.ToImmutable());
+    }
 
     // Of two statuses, the failure first in the order of the enum; Found only when both are.
     private static MappedTypeStatus First(MappedTypeStatus current, MappedTypeStatus next)
@@ -297,8 +441,8 @@ internal static class MappedTypeResolver
         NullableArgument,
     }
 
-    private readonly record struct Resolution(MappedTypeStatus Status, bool IsValueType, bool IsPublic, bool IsObsolete)
+    private readonly record struct Resolution(MappedTypeStatus Status, bool IsValueType, bool IsPublic)
     {
-        public static Resolution Failed(MappedTypeStatus status) => new(status, false, false, false);
+        public static Resolution Failed(MappedTypeStatus status) => new(status, false, false);
     }
 }

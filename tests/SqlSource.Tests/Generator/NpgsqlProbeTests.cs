@@ -45,6 +45,9 @@ public sealed class NpgsqlProbeTests
         }
         """;
 
+    // The warning ids of a C# type whose use gives none.
+    private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
+
     private static readonly SqlFile Users = new("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
 
     // Each type whose C# type differs between Npgsql 8 and 9 and Npgsql 10, or comes from one that does, by name.
@@ -282,7 +285,9 @@ public sealed class NpgsqlProbeTests
         StepOutputs
             .Single<FileTypes>(run, TrackingNames.FileTypes)
             .Queries.ShouldHaveSingleItem()
-            .Columns.ShouldBe([new PropertyType(expected, isValueType, true, false, key)]);
+            .Columns.ShouldBe([
+                new PropertyType(expected, isValueType, true, NoWarnings, key, "the property SqlSourceTypeOverrides"),
+            ]);
     }
 
     [Fact]
@@ -312,7 +317,7 @@ public sealed class NpgsqlProbeTests
         StepOutputs
             .Single<FileTypes>(run, TrackingNames.FileTypes)
             .Queries.ShouldHaveSingleItem()
-            .Columns.ShouldBe([new PropertyType(expected, isValueType, true, false, internalName)]);
+            .Columns.ShouldBe([new PropertyType(expected, isValueType, true, NoWarnings, internalName, null)]);
     }
 
     // The project at the output, under postgres unless the dialect is given, with these references.

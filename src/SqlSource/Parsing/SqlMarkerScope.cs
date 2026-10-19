@@ -34,6 +34,8 @@ internal sealed class SqlMarkerScope(
 
     private List<SqlParameterDeclaration>? _declarations;
 
+    private List<SqlColumnDeclaration>? _columns;
+
     private OutputKind? _output;
 
     private string? _database;
@@ -70,11 +72,15 @@ internal sealed class SqlMarkerScope(
         private set;
     }
 
-    /// <summary>The name a <c>-- input-model:</c> marker gives, with the first such marker, or null.</summary>
+    /// <summary>
+    /// The name an <c>-- input-model:</c> marker gives, with the first marker that set it, or null.
+    /// </summary>
     public (string Name, SqlMarker Marker)? InputModel { get; private set; }
 
-    /// <summary>The name an <c>-- output-model:</c> marker gives, or null.</summary>
-    public string? OutputModel => _outputModel;
+    /// <summary>
+    /// The name an <c>-- output-model:</c> marker gives, with the first marker that set it, or null.
+    /// </summary>
+    public (string Name, SqlMarker Marker)? OutputModel { get; private set; }
 
     /// <summary>The defaults the scope's <c>-- token:</c> markers give, in marker order, each name once.</summary>
     public IReadOnlyList<SqlTokenDefault> TokenDefaults => _tokenDefaults ?? (IReadOnlyList<SqlTokenDefault>)[];
@@ -85,6 +91,9 @@ internal sealed class SqlMarkerScope(
     /// <summary>What the scope's <c>-- param:</c> markers declare, in marker order, each parameter once.</summary>
     public IReadOnlyList<SqlParameterDeclaration> Declarations =>
         _declarations ?? (IReadOnlyList<SqlParameterDeclaration>)[];
+
+    /// <summary>What the scope's <c>-- column:</c> markers say, in marker order, each column once.</summary>
+    public IReadOnlyList<SqlColumnDeclaration> Columns => _columns ?? (IReadOnlyList<SqlColumnDeclaration>)[];
 
     /// <summary>
     /// Reads one marker.  The scope takes it or reports it by what it is the scope of.
@@ -120,6 +129,10 @@ internal sealed class SqlMarkerScope(
         else if (marker.Kind == SqlMarkerKind.Param)
         {
             ReadParam(marker);
+        }
+        else if (marker.Kind == SqlMarkerKind.Column)
+        {
+            ReadColumn(marker);
         }
         else if (marker.Kind == SqlMarkerKind.Output)
         {
@@ -176,6 +189,10 @@ internal sealed class SqlMarkerScope(
         else if (marker.Kind == SqlMarkerKind.OutputModel)
         {
             SetText(ref _outputModel, marker, SettingValue.IsQualifiedName(Value(marker)));
+            if (_outputModel is { } outputModel && OutputModel is null)
+            {
+                OutputModel = (outputModel, marker);
+            }
         }
     }
 
@@ -194,6 +211,7 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.Token
                 or SqlMarkerKind.TokenIgnore
                 or SqlMarkerKind.Param
+                or SqlMarkerKind.Column
                 or SqlMarkerKind.Database
                 or SqlMarkerKind.Output
                 or SqlMarkerKind.InputModelType
@@ -421,6 +439,94 @@ internal sealed class SqlMarkerScope(
         }
 
         _declarations.Add(declaration);
+    }
+
+    // "name null" or "name not null".  The name is one word, or a double-quoted name, in which "" is one quote, for a
+    // name with white space or one that is a word of nullability.  The same column twice, ignoring case, with the same
+    // nullability is fine; with another it is a conflict, the first standing.
+    private void ReadColumn(SqlMarker marker)
+    {
+        var rest = text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length);
+        if (!TryTakeLastWord(ref rest, "null"))
+        {
+            AddInvalid(marker);
+            return;
+        }
+
+        var nullable = !TryTakeLastWord(ref rest, "not");
+        if (ReadColumnName(rest) is not { } name)
+        {
+            AddInvalid(marker);
+            return;
+        }
+
+        _columns ??= [];
+        foreach (var existing in _columns)
+        {
+            if (!string.Equals(existing.Name, name, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (existing.IsNullable != nullable)
+            {
+                AddConflict(marker);
+            }
+
+            return;
+        }
+
+        _columns.Add(new SqlColumnDeclaration(name, nullable, marker));
+    }
+
+    // The name a -- column: marker writes, without its quotes, or null when it is empty, has white space or a quote
+    // outside quotes, or has a quote inside them that is not doubled.
+    private static string? ReadColumnName(ReadOnlySpan<char> written)
+    {
+        if (written.Length == 0)
+        {
+            return null;
+        }
+
+        if (written[0] != '"')
+        {
+            foreach (var character in written)
+            {
+                if (character == '"' || char.IsWhiteSpace(character))
+                {
+                    return null;
+                }
+            }
+
+            return written.ToString();
+        }
+
+        if (written.Length < 3 || written[written.Length - 1] != '"')
+        {
+            return null;
+        }
+
+        var inner = written.Slice(1, written.Length - 2);
+        var quotes = 0;
+        var index = 0;
+        while (index < inner.Length)
+        {
+            if (inner[index] != '"')
+            {
+                index++;
+            }
+            else if (index + 1 < inner.Length && inner[index + 1] == '"')
+            {
+                quotes++;
+                index += 2;
+            }
+            else
+            {
+                return null;
+            }
+        }
+
+        return quotes == 0 ? inner.ToString() : inner.ToString().Replace("\"\"", "\"");
     }
 
     // Takes word off the end of rest when it stands there as a word: alone, or after white space.

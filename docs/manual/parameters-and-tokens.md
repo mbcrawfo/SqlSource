@@ -26,9 +26,9 @@ A value cannot stand for a table name, a list of columns or a whole clause, and 
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-SqlSource finds the parameters of a query: `@` and a name of letters, digits and `_`, outside strings, quoted identifiers, comments and hints.  The list holds each parameter once, in the order it first appears.  The tool uses the list to ask a database what each parameter is, and a later release will use it to type the generated methods.
+SqlSource finds the parameters of a query: `@` and a name of letters, digits and `_`, outside strings, quoted identifiers, comments and hints.  The list holds each parameter once, in the order it first appears.  The tool uses the list to ask a database what each parameter is, the query's input [model](generator.md#models) has a property for each parameter in its order, and a later release will use it to type the generated methods.
 
-> **Coming in a later release.**  The parameters of a query will become the typed arguments of its generated method.  Today they are found and listed, and change no generated code.  See [what works today](README.md#what-works-today).
+> **Coming in a later release.**  The parameters of a query will become the typed arguments of its generated method.  Today they are found and listed, and give the input model its properties.  See [what works today](README.md#what-works-today).
 
 - **A parameter stays in the SQL exactly as written.**  The constant for `GetUser` holds `@id`.
 - **Names are compared ignoring case.**  `@Id` and `@id` are one parameter.
@@ -53,7 +53,7 @@ A `-- param:` marker inside a query declares one parameter.  The form is `@name`
 
 - **The type is written in the database's own words**, such as `decimal(18,2)` or `double precision`.  SqlSource does not check it.  When the tool describes the query, it asks the database to resolve the type and checks it against every use of the parameter: a type the database does not have is [SQLSRC228](diagnostics.md#sqlsrc228).
 - **Without a type, the database decides.**  The tool takes the type that the database infers from how the parameter is used.  When a use says nothing, as in `SELECT @p IS NULL`, the tool cannot, and the fix is a type here ([SQLSRC226](diagnostics.md#sqlsrc226), [SQLSRC227](diagnostics.md#sqlsrc227)).
-- **`null` says the value can be null.**  No database reports whether a parameter can be null, so this is the only way to say it.  A parameter that does not say `null` is read as not nullable, and `not null` is accepted because it is what a column definition says; it has the same meaning as saying nothing.  Today the declaration is recorded by the tool in the sidecar and changes no generated code: models will use it in a later release.
+- **`null` says the value can be null.**  No database reports whether a parameter can be null, so this is the only way to say it.  A parameter that does not say `null` is read as not nullable, and `not null` is accepted because it is what a column definition says; it has the same meaning as saying nothing.  The tool records the declaration in the sidecar, and `null` makes the parameter's property in the query's input model nullable: see [which properties can be null](generator.md#model-nullability).
 - **A parameter that only a token brings needs a type.**  When a parameter stands only in the default of a token (see [defaults](#token-defaults)), nothing but the marker can say what it is.  The marker without a type is [SQLSRC117](diagnostics.md#sqlsrc117), and no marker at all is [SQLSRC118](diagnostics.md#sqlsrc118).  In the example under [defaults](#token-defaults), `-- param: @page int` is what makes the query valid.
 - **The marker names the parameter as the SQL writes it**, `@name`, alone or followed by a space.  Anything else is [SQLSRC111](diagnostics.md#sqlsrc111).
 - **A parameter may be declared twice** if the two markers say the same.  Two that differ in type or in nullability are [SQLSRC112](diagnostics.md#sqlsrc112), and `not null` counts as a difference: `@a int` and `@a int not null` conflict, though they mean the same.

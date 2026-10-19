@@ -29,6 +29,13 @@ internal static class QueryTyper
     // without its period.
     private const string Describe = "Run 'sqlsource describe'";
 
+    // The first case of SQLSRC251, and its help.  The model's step reports the second.
+    private const string NotVisible = "this project cannot see that type";
+
+    private const string MakeItVisible =
+        "Make it, and each type it is nested in, public, or internal when it is this project's own, or give this "
+        + "project its assembly's internals with InternalsVisibleTo";
+
     /// <summary>The types of the file's queries whose entries are usable, and the errors of the others.</summary>
     public static FileTypes Type(FileTypesInput input)
     {
@@ -134,7 +141,14 @@ internal static class QueryTyper
         var mapping = PostgresTypeMap.Map(postgres, typing.Column, typing.Lookup);
         if (mapping is { Kind: TypeMappingKind.Mapped, Text: { } text })
         {
-            return new PropertyType(text, mapping.IsValueType, mapping.IsPublic, mapping.IsObsolete, mapping.Key);
+            return new PropertyType(
+                text,
+                mapping.IsValueType,
+                mapping.IsPublic,
+                mapping.WarningIds,
+                mapping.Key,
+                mapping.Detail
+            );
         }
 
         typing.Diagnostics.Add(Diagnose(mapping, Subject(owner, name), postgres.Name, typing.Location, typing.Column));
@@ -211,7 +225,9 @@ internal static class QueryTyper
                 SqlDiagnostics.MappedTypeNotAccessible,
                 failure,
                 subject,
-                at
+                at,
+                NotVisible,
+                MakeItVisible
             ),
             TypeMappingKind.MappedTypeNotAPropertyType => MappedTypeFailure(
                 SqlDiagnostics.MappedTypeNotAPropertyType,
@@ -236,20 +252,18 @@ internal static class QueryTyper
         key.IndexOf('.') >= 0 || TypeKeys.TryNormalize(key.AsSpan(), out _) ? key : "pg_catalog." + key;
 
     // A failure of a mapped type keeps the type the override names in its text, which the message gives as a user
-    // writes it, and the place that wrote the entry in its detail.
+    // writes it, and the place that wrote the entry in its detail.  SQLSRC251 adds its case and help after them.
     private static DiagnosticInfo MappedTypeFailure(
         DiagnosticDescriptor descriptor,
         TypeMapping failure,
         string subject,
-        LocationInfo at
+        LocationInfo at,
+        params string[] more
     ) =>
         DiagnosticInfo.Create(
             descriptor,
             at,
-            subject,
-            failure.Key,
-            PostgresTypeMap.AsWritten(failure.Text ?? ""),
-            failure.Detail ?? ""
+            [subject, failure.Key, PostgresTypeMap.AsWritten(failure.Text ?? ""), failure.Detail ?? "", .. more]
         );
 
     // "column 'id'", as a message names a parameter or column.
@@ -355,9 +369,10 @@ internal static class QueryTyper
                 MappedTypeStatus.NotAPropertyType => TypeMappingKind.MappedTypeNotAPropertyType,
                 MappedTypeStatus.NotFound or MappedTypeStatus.Ambiguous or _ => TypeMappingKind.MappedTypeNotFound,
             };
+            var place = PlaceOf(entry.Place);
             return kind == TypeMappingKind.Mapped
-                ? new TypeMapping(kind, entry.Key, name, mapped!.IsValueType, mapped.IsPublic, mapped.IsObsolete, null)
-                : new TypeMapping(kind, entry.Key, name, false, false, false, PlaceOf(entry.Place));
+                ? new TypeMapping(kind, entry.Key, name, mapped!.IsValueType, mapped.IsPublic, mapped.WarningIds, place)
+                : new TypeMapping(kind, entry.Key, name, false, false, EquatableArray<string>.Empty, place);
         }
 
         // The place that wrote an entry, as SQLSRC250 to SQLSRC252 name it.  The attribute has no level for the type

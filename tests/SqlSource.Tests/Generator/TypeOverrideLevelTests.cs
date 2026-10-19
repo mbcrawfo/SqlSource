@@ -45,6 +45,11 @@ public sealed class TypeOverrideLevelTests
 
     private const string DateTimeOffset = "global::System.DateTimeOffset";
 
+    private const string ThePropertyPlace = "the property SqlSourceTypeOverrides";
+
+    // The warning ids of a C# type whose use gives none.
+    private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
+
     private static readonly PostgresType Timestamptz = Catalog("timestamptz");
 
     private static readonly PostgresType Int4 = Catalog("int4");
@@ -128,7 +133,7 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
-            .ShouldBe([new PropertyType("global::System.DateTime", true, true, false, "timestamptz")]);
+            .ShouldBe([new PropertyType("global::System.DateTime", true, true, NoWarnings, "timestamptz", null)]);
     }
 
     [Fact]
@@ -144,8 +149,8 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("short", true, true, false, "int4"),
-                new PropertyType(DateTimeOffset, true, true, false, "timestamptz"),
+                new PropertyType("short", true, true, NoWarnings, "int4", "a -- type-override: marker of the query"),
+                new PropertyType(DateTimeOffset, true, true, NoWarnings, "timestamptz", ThePropertyPlace),
             ]);
     }
 
@@ -162,9 +167,10 @@ public sealed class TypeOverrideLevelTests
         );
 
         var run = Run(level == "property" ? Value : null, (file, [Entry(file, "GetUser", Int4)]));
+        var place = level == "property" ? ThePropertyPlace : "the metadata SqlSourceTypeOverrides of the file";
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, false, "int4")]);
+        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, NoWarnings, "int4", place)]);
     }
 
     // An array's own key is written as its element's with [], or as its name in the catalog, which is read as the
@@ -195,8 +201,18 @@ public sealed class TypeOverrideLevelTests
 
         own.Diagnostics.ShouldBeEmpty();
         ColumnsOf(own, "GetUser")
-            .ShouldBe([new PropertyType("global::System.Collections.Generic.List<int>", false, true, false, key)]);
-        ColumnsOf(ofTheElement, "GetUser").ShouldBe([new PropertyType(elementType, false, true, false, element)]);
+            .ShouldBe([
+                new PropertyType(
+                    "global::System.Collections.Generic.List<int>",
+                    false,
+                    true,
+                    NoWarnings,
+                    key,
+                    ThePropertyPlace
+                ),
+            ]);
+        ColumnsOf(ofTheElement, "GetUser")
+            .ShouldBe([new PropertyType(elementType, false, true, NoWarnings, element, ThePropertyPlace)]);
     }
 
     // _int4 and int4[] are one key, so the query's entry replaces the property's whichever spelling each has, and
@@ -242,10 +258,11 @@ public sealed class TypeOverrideLevelTests
         own.Diagnostics.ShouldBeEmpty();
         ColumnsOf(own, "GetUser")
             .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, false, "public.user_id"),
-                new PropertyType("long", true, true, false, "int4"),
+                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.user_id", ThePropertyPlace),
+                new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace),
             ]);
-        ColumnsOf(ofTheBase, "GetUser").ShouldBe([new PropertyType("long", true, true, false, "int4")]);
+        ColumnsOf(ofTheBase, "GetUser")
+            .ShouldBe([new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace)]);
     }
 
     [Fact]
@@ -263,7 +280,9 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
-            .ShouldBe([new PropertyType("global::NpgsqlTypes.NpgsqlRange<int>", true, true, false, "int4range")]);
+            .ShouldBe([
+                new PropertyType("global::NpgsqlTypes.NpgsqlRange<int>", true, true, NoWarnings, "int4range", null),
+            ]);
     }
 
     // The bare key of an extension's type matches it in any schema, and the qualified one in its schema alone.
@@ -279,8 +298,8 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, false, "public.citext"),
-                new PropertyType("global::System.Uri", false, true, false, "citext"),
+                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.citext", ThePropertyPlace),
+                new PropertyType("global::System.Uri", false, true, NoWarnings, "citext", ThePropertyPlace),
             ]);
     }
 
@@ -386,36 +405,57 @@ public sealed class TypeOverrideLevelTests
         var run = Run("uuid=MyApp.Missing int4=System.Math", (file, [Entry(file, "GetUser", Catalog("text"))]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("string", false, true, false, "text")]);
+        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("string", false, true, NoWarnings, "text", null)]);
     }
 
     [Fact]
-    public void Run_MappedTypeMarkedObsolete_IsObsolete()
+    public void Run_MappedTypeMarkedObsolete_GivesTheObsoleteWarnings()
     {
         var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
 
         var run = Run("int4=MyApp.OldThing", (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("global::MyApp.OldThing", false, true, true, "int4")]);
+        var column = ColumnsOf(run, "GetUser").ShouldHaveSingleItem();
+        column.WarningIds.ShouldBe(["CS0612", "CS0618"]);
+        (column with { WarningIds = NoWarnings }).ShouldBe(
+            new PropertyType("global::MyApp.OldThing", false, true, NoWarnings, "int4", ThePropertyPlace)
+        );
     }
 
+    // Claimed by an internal type, so that its model is internal and compiles.  In a public model the type is
+    // SQLSRC251, which SharedModelTests holds.
     [Fact]
     public void Run_MappedTypeOfTheProjectThatIsInternal_IsNotPublic()
     {
         var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var source = Source.Replace(
+            "public partial class Sample",
+            "internal partial class Sample",
+            StringComparison.Ordinal
+        );
 
-        var run = Run("int4=MyApp.Inner", (file, [Entry(file, "GetUser", Int4)]));
+        var run = Run(source, "int4=MyApp.Inner", (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("global::MyApp.Inner", true, false, false, "int4")]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ColumnsOf(run, "GetUser")
+            .ShouldBe([new PropertyType("global::MyApp.Inner", true, false, NoWarnings, "int4", ThePropertyPlace)]);
     }
 
     // The files with their sidecars, under the property's type override, or none.
     private static GeneratorRun Run(string? property, params (SqlFile File, SidecarEntry[] Entries)[] files) =>
+        Run(Source, property, files);
+
+    private static GeneratorRun Run(
+        string source,
+        string? property,
+        params (SqlFile File, SidecarEntry[] Entries)[] files
+    ) =>
         GeneratorHarness.Run(
             OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
             [.. files.SelectMany(file => new[] { file.File, Sidecars.Of(file.File, file.Entries) })],
             references: [NpgsqlReferences.Npgsql10],
             dialect: "postgres",

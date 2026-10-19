@@ -1,6 +1,6 @@
 # Concepts
 
-SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: a string constant, or a method where the query has tokens.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  A query whose [output](#output) is `models` or `codegen`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
+SqlSource reads the queries you keep in `.sql` files.  The **generator**, in the `SqlSource` package, runs inside the compiler whenever you build the project, and turns each query into C# code: a string constant, or a method where the query has tokens, and for a described query its models, a type for its parameters and a type for its rows.  The **tool**, in the `SqlSource.Tool` package, connects to your database, asks it what each query's parameters and columns are, and writes the answer into a **sidecar** file beside the `.sql` file.  You commit the sidecar with the project, and the generator reads it during the build, so that the build needs no database.  A query whose [output](#output) is `models` or `codegen`, the default, must be described: the build reports an error for one that has no current entry in its sidecar.  A query whose output is `sql` needs neither the tool nor a sidecar.
 
 ```mermaid
 flowchart LR
@@ -8,13 +8,13 @@ flowchart LR
     subgraph build["Your build"]
         generator["Generator"]
     end
-    generator --> code["Constants and methods"]
+    generator --> code["Constants, methods and models"]
     sql --> tool["Tool + your database"]
     tool --> sidecar["Sidecar"]
-    sidecar -->|checked| generator
+    sidecar -->|checked and read| generator
 ```
 
-> **Coming in a later release.**  The generator will build models and query methods from the sidecars.  See [what works today](README.md#what-works-today).
+> **Coming in a later release.**  The generator will build query methods from the sidecars.  See [what works today](README.md#what-works-today).
 
 The rest of this page defines the words the manual uses.  Each is used in this one sense everywhere.
 
@@ -48,7 +48,7 @@ The part of a `.sql` file before its first `-- name:` line.  It holds comments, 
 
 The tool's record of what the database said about each query's parameters and columns.  It is the file `Users.sql.json` beside `Users.sql`.  It is committed with the project, so that a build never needs a database, and it is never edited by hand: the tool writes it.  The build checks it, and reports a query that must be described and has no current entry in it.  See [sidecar files](tool.md#sidecar-files).
 
-> **Coming in a later release.**  The generator will give your queries typed models from their sidecars.  See [what works today](README.md#what-works-today).
+The generator builds the [models](generator.md#models) of a query from its entry in the sidecar.
 
 ### What a query gets
 
@@ -56,7 +56,7 @@ The tool's record of what the database said about each query's parameters and co
 
 #### Output
 
-The setting that says how much SqlSource produces for a query: its SQL alone, models as well, or models and a query method, which come in a later release.  Today it also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](settings.md#setting-output).
+The setting that says how much SqlSource produces for a query: its SQL alone, [models](generator.md#models) as well, or models and a query method, which comes in a later release.  It also decides which queries must be described: the ones the tool describes, and the ones the build checks against their sidecar.  See [the output setting](settings.md#setting-output).
 
 <a id="token-method"></a>
 

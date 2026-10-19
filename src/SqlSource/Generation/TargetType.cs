@@ -12,6 +12,9 @@ namespace SqlSource.Generation;
 /// <param name="Placement">Where the members go.</param>
 /// <param name="MethodPlacement">Where the type's methods go.  It has no effect yet.</param>
 /// <param name="Settings">What the attribute says about the settings.</param>
+/// <param name="IsPublic">
+/// Whether the type and every type it is nested in are declared <c>public</c>, which makes its models public.
+/// </param>
 /// <param name="Path">The attribute's <c>Path</c>, or null when it is not set or is empty.</param>
 /// <param name="FilePath">The path of the source file that carries the attribute.</param>
 /// <param name="AttributeLocation">Where the attribute is.</param>
@@ -22,6 +25,7 @@ internal sealed record TargetType(
     MemberPlacement Placement,
     MethodPlacement MethodPlacement,
     SettingsLevel Settings,
+    bool IsPublic,
     string? Path,
     string FilePath,
     LocationInfo AttributeLocation,
@@ -32,4 +36,9 @@ internal sealed record TargetType(
     /// The name of the type itself, as a value: without the <c>@</c> of an escaped keyword.
     /// </summary>
     public string Name => Types[Types.Count - 1].ValueName;
+
+    /// <summary>
+    /// The namespace as a value: without the <c>@</c> of an escaped keyword.  Empty for the global namespace.
+    /// </summary>
+    public string NamespaceValue => Namespace.Replace("@", string.Empty);
 }

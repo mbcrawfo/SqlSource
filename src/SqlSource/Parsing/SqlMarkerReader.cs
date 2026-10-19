@@ -27,6 +27,7 @@ internal static class SqlMarkerReader
         ("output-model:", SqlMarkerKind.OutputModel),
         ("collection-type:", SqlMarkerKind.CollectionType),
         ("type-override:", SqlMarkerKind.TypeOverride),
+        ("column:", SqlMarkerKind.Column),
     ];
 
     /// <summary>

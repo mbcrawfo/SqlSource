@@ -1504,8 +1504,30 @@ public sealed class SqlFileParserTests
                 CollectionType = CollectionKind.IReadOnlyList,
             }
         );
-        block.InputModelName.ShouldBe("FindArgs");
-        block.OutputModelName.ShouldBe("App.Shared.UserRow");
+        block.InputModel!.Name.ShouldBe("FindArgs");
+        block.OutputModel!.Name.ShouldBe("App.Shared.UserRow");
+    }
+
+    [Fact]
+    public void Parse_ModelMarkers_KeepTheirSpans()
+    {
+        const string Text = "-- name: Q\n-- input-model: FindArgs\n-- output-model: App.Shared.UserRow\nSELECT @a\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        block.InputModel.ShouldBe(new SqlModelName("FindArgs", SpanOf(Text, "-- input-model: FindArgs")));
+        block.OutputModel.ShouldBe(
+            new SqlModelName("App.Shared.UserRow", SpanOf(Text, "-- output-model: App.Shared.UserRow"))
+        );
+    }
+
+    [Fact]
+    public void Parse_QueryWithoutModelMarkers_HasNoModels()
+    {
+        var block = Blocks("-- name: Q\nSELECT @a\n").ShouldHaveSingleItem();
+
+        block.InputModel.ShouldBeNull();
+        block.OutputModel.ShouldBeNull();
     }
 
     [Theory]
@@ -1565,6 +1587,19 @@ public sealed class SqlFileParserTests
             ]);
     }
 
+    // The same name twice is no conflict, and the model's marker is the first, where SQLSRC257 and SQLSRC259 point.
+    [Fact]
+    public void Parse_OneNameForOneModelTwice_KeepsTheFirstMarker()
+    {
+        const string Text = "-- name: Q\n-- output-model: A\n-- output-model: A\nSELECT 1\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        block.OutputModel.ShouldBe(
+            new SqlModelName("A", new TextSpan(Text.IndexOf("-- output-model: A", StringComparison.Ordinal), 18))
+        );
+    }
+
     [Fact]
     public void Parse_InputModelOnAQueryWithoutParameters_IsAnError()
     {
@@ -1584,7 +1619,128 @@ public sealed class SqlFileParserTests
     public void Parse_InputModelOnAQueryWithADeclaredOnlyParameter_IsFine() =>
         Blocks("-- name: Q\n-- param: @page int\n-- input-model: FindArgs\nSELECT 1 {{f}}\n")
             .ShouldHaveSingleItem()
-            .InputModelName.ShouldBe("FindArgs");
+            .InputModel!.Name.ShouldBe("FindArgs");
+
+    [Theory]
+    [InlineData("total null", "total:null")]
+    [InlineData("total not null", "total:not null")]
+    // As people type it.
+    [InlineData("total NOT NULL", "total:not null")]
+    [InlineData("Total\tnot \t Null", "Total:not null")]
+    // A quoted name, for white space, a name that is a word of nullability, or a quote.
+    [InlineData("\"total amount\" not null", "total amount:not null")]
+    [InlineData("\"null\" null", "null:null")]
+    [InlineData("\"not\" not null", "not:not null")]
+    [InlineData("\"say \"\"hi\"\"\" null", "say \"hi\":null")]
+    // A name that only ends in the letters of a word.
+    [InlineData("knot null", "knot:null")]
+    [InlineData("isnull not null", "isnull:not null")]
+    [InlineData("is_null null", "is_null:null")]
+    public void Parse_ColumnMarker_GivesItsColumnANullability(string value, string expected) =>
+        Columns(Blocks("-- name: Q\n-- column: " + value + "\nSELECT 1\n").ShouldHaveSingleItem()).ShouldBe([expected]);
+
+    [Fact]
+    public void Parse_ColumnMarker_KeepsTheSpanOfTheWholeMarker()
+    {
+        const string Text = "-- name: Q\n-- column: total not null\nSELECT 1\n";
+
+        Blocks(Text)
+            .ShouldHaveSingleItem()
+            .ColumnMarkers.ShouldBe([new SqlColumnMarker("total", false, SpanOf(Text, "-- column: total not null"))]);
+    }
+
+    // A comment: the SQL, from which the query's hash is computed, is that of the query without the marker.
+    [Fact]
+    public void Parse_ColumnMarker_LeavesTheSqlAlone() =>
+        Blocks("-- name: Q\n-- column: total null\nSELECT 1\n")
+            .ShouldHaveSingleItem()
+            .Segments.ShouldBe(Blocks("-- name: Q\nSELECT 1\n").ShouldHaveSingleItem().Segments);
+
+    [Fact]
+    public void Parse_ColumnMarkers_AreInMarkerOrderEachColumnOnce() =>
+        Columns(
+                Blocks("-- name: Q\n-- column: b null\n-- column: a not null\n-- column: B NULL\nSELECT 1\n")
+                    .ShouldHaveSingleItem()
+            )
+            .ShouldBe(["b:null", "a:not null"]);
+
+    [Theory]
+    [InlineData("total not null")]
+    [InlineData("TOTAL not null")]
+    public void Parse_OneColumnWithTwoNullabilities_ConflictsAtTheSecond(string second)
+    {
+        var text = "-- name: Q\n-- column: total null\n-- column: " + second + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.ConflictingSettings,
+                    new TextSpan(text.IndexOf("-- column: " + second, StringComparison.Ordinal) + 11, second.Length),
+                    "column: " + second
+                ),
+            ]);
+    }
+
+    [Theory]
+    [InlineData("total")]
+    [InlineData("total nullable")]
+    [InlineData("total not")]
+    [InlineData("null")]
+    [InlineData("not null")]
+    [InlineData("\"\" null")]
+    [InlineData("\"total null")]
+    [InlineData("\"to\"tal\" null")]
+    [InlineData("\"total\"x null")]
+    [InlineData("total\"\" null")]
+    [InlineData("total amount null")]
+    public void Parse_ColumnMarkerWithoutANameAndANullability_IsInvalid(string value)
+    {
+        var text = "-- name: Q\n-- column: " + value + "\nSELECT 1\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "column: " + value),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_ColumnMarkerWithoutAValue_IsInvalid()
+    {
+        const string Text = "-- name: Q\n-- column:\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(Text, "-- column:"), "column:"),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_ColumnMarkerInTheFileHeader_IsNotAllowedThere()
+    {
+        const string Text = "-- column: total null\n-- name: Q\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.MarkerNotAllowedHere,
+                    SpanOf(Text, "-- column: total null"),
+                    "column",
+                    "inside a query"
+                ),
+            ]);
+    }
+
+    // A file without a name marker is one query, and its markers are the query's.
+    [Fact]
+    public void Parse_ColumnMarkerInAFileWithoutANameMarker_IsTheQuerys() =>
+        Columns(Blocks("-- column: total null\nSELECT 1\n").ShouldHaveSingleItem()).ShouldBe(["total:null"]);
+
+    [Fact]
+    public void Parse_QueryWithoutAColumnMarker_HasNoColumnMarkers() =>
+        Blocks("-- name: Q\n-- param: @a int\nSELECT @a\n").ShouldHaveSingleItem().ColumnMarkers.ShouldBeEmpty();
+
+    private static string[] Columns(SqlBlock block) =>
+        [.. block.ColumnMarkers.Select(static column => column.Name + ":" + (column.IsNullable ? "null" : "not null"))];
 
     private static SqlBlock[] Blocks(string text, string fileName = "Query.sql", SqlDialectChoice dialect = default)
     {
