@@ -194,7 +194,7 @@ public sealed class CachingTests
         var result = Run(driver, WithMethodBodyEdited(compilation));
 
         var (probe, reason) = Outputs(result, TrackingNames.NpgsqlProbe).ShouldHaveSingleItem();
-        reason.ShouldBeOneOf(IncrementalStepRunReason.Modified, IncrementalStepRunReason.Unchanged);
+        reason.ShouldBe(IncrementalStepRunReason.Unchanged);
         probe.ShouldBe(before);
         AllReasons(result, TrackingNames.UsesPostgresEntries)
             .ShouldHaveSingleItem()

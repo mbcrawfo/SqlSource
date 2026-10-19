@@ -194,7 +194,7 @@ Both projects can use SqlSource.  Each has its own copy of the attribute, and Sq
 
 ## Custom type mapping
 
-Each column and parameter of a described PostgreSQL query gets the C# type that Npgsql reads its database type as: see [the PostgreSQL types](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md#type-map).  The type override gives a database type the C# type of your choice instead, for the project in its file, for some files as item metadata, or in a `.sql` file with `-- type-override:`, and each place changes only the types it names:
+Each column and parameter of a PostgreSQL query whose output is `models` or `codegen`, and whose entry in its sidecar is current, gets the C# type that Npgsql reads its database type as: see [the PostgreSQL types](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/postgresql.md#type-map).  The type override gives a database type the C# type of your choice instead, for the project in its file, for some files as item metadata, or in a `.sql` file with `-- type-override:`, and each place changes only the types it names:
 
 ```xml
 <PropertyGroup>
