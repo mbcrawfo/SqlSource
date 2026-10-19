@@ -13,7 +13,7 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 public sealed class NoteQueryTests(PostgresContainer postgres)
 {
     [Fact]
-    public async Task Query_ListAccountNotes_AccountWithNoNote_HasNulls()
+    public async Task QueryAsync_ListAccountNotes_AccountWithNoNote_HasNulls()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -29,7 +29,7 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_CountAccountNotes_ReadsTheCounts()
+    public async Task QueryAsync_CountAccountNotes_ReadsTheCounts()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -44,7 +44,7 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_ListNoteKinds_ReadsTheEnumAndTheDomain()
+    public async Task QueryAsync_ListNoteKinds_ReadsTheEnumAndTheDomain()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -61,7 +61,7 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
     // A mark stays in the column's name, which Dapper matches to no property: the marks are for a reader that reads by
     // ordinal, as this one does.
     [Fact]
-    public async Task ExecuteReader_ListMarkedNames_ReadsByOrdinalIntoTheRecord()
+    public async Task ExecuteReaderAsync_ListMarkedNames_ReadsByOrdinalIntoTheRecord()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);

@@ -14,8 +14,9 @@ namespace SqlSource.Testing.EndToEnd;
 // Dapper has them: row 1 with a value in every column, row 2 with NULL in every column but id.  A row is read by
 // reflection, so that every project that reads the table shares the expectations, whatever driver it runs.  Each
 // expectation is the value of a property, by its name, for the property's type: a date is a DateOnly on Npgsql 10 and a
-// DateTime on Npgsql 8.  This library cannot reference Npgsql, so a value of NpgsqlTypes is compared by its text under
-// the invariant culture, and so is a cidr, which is an NpgsqlCidr on Npgsql 8.
+// DateTime on Npgsql 8.  This library cannot reference Npgsql, so a range is compared by its properties through
+// reflection, and any other value of NpgsqlTypes by its text under the invariant culture, as is a cidr, which is an
+// NpgsqlCidr on Npgsql 8.
 internal static class AllTypesRows
 {
     public const int FullRowId = 1;
@@ -103,33 +104,26 @@ internal static class AllTypesRows
         ["LtreeValue"] = static _ => "Top.Science.Astronomy",
         ["LqueryValue"] = static _ => "Top.*{,2}.Astronomy",
         ["LtxtqueryValue"] = static _ => "Science & Astronomy",
-        ["Int4rangeValue"] = static _ => "[1,10)",
-        ["Int8rangeValue"] = static _ => "[1,100)",
-        ["NumrangeValue"] = static _ => "(1.5,10.25]",
-        ["TsrangeValue"] = static _ => "[01/01/2024 00:00:00,02/01/2024 00:00:00)",
-        ["TstzrangeValue"] = static _ => "[01/01/2024 00:00:00,02/01/2024 00:00:00)",
-        ["DaterangeValue"] = static type =>
-            ByDriver(
-                SubtypeOf(type),
-                (typeof(DateOnly), "[01/01/2024,02/01/2024)"),
-                (typeof(DateTime), "[01/01/2024 00:00:00,02/01/2024 00:00:00)")
-            ),
-        ["Int4multirangeValue"] = static _ => new[] { "[1,5)", "[10,20)" },
-        ["Int8multirangeValue"] = static _ => new[] { "[1,5)", "[10,20)" },
-        ["NummultirangeValue"] = static _ => new[] { "(1.5,2.5]", "[4,5)" },
+        ["Int4rangeValue"] = static _ => new Bounds(1, 10),
+        ["Int8rangeValue"] = static _ => new Bounds(1L, 100L),
+        ["NumrangeValue"] = static _ => new Bounds(1.5m, 10.25m, LowerIsInclusive: false, UpperIsInclusive: true),
+        ["TsrangeValue"] = static _ => new Bounds(Timestamp(1, 1, 500), Timestamp(2, 1)),
+        ["TstzrangeValue"] = static _ => new Bounds(Timestamptz(1, 1), Timestamptz(2, 1)),
+        ["DaterangeValue"] = static type => new Bounds(Date(type, 1, 1), Date(type, 2, 1)),
+        ["Int4multirangeValue"] = static _ => new[] { new Bounds(1, 5), new Bounds(10, 20) },
+        ["Int8multirangeValue"] = static _ => new[] { new Bounds(1L, 5L), new Bounds(10L, 20L) },
+        ["NummultirangeValue"] = static _ =>
+            new[] { new Bounds(1.5m, 2.5m, LowerIsInclusive: false, UpperIsInclusive: true), new Bounds(4m, 5m) },
         ["TsmultirangeValue"] = static _ =>
-            new[] { "[01/01/2024 00:00:00,01/02/2024 00:00:00)", "[02/01/2024 00:00:00,02/02/2024 00:00:00)" },
+            new[] { new Bounds(Timestamp(1, 1), Timestamp(1, 2)), new Bounds(Timestamp(2, 1), Timestamp(2, 2)) },
         ["TstzmultirangeValue"] = static _ =>
-            new[] { "[01/01/2024 00:00:00,01/02/2024 00:00:00)", "[02/01/2024 00:00:00,02/02/2024 00:00:00)" },
+            new[]
+            {
+                new Bounds(Timestamptz(1, 1), Timestamptz(1, 2)),
+                new Bounds(Timestamptz(2, 1), Timestamptz(2, 2)),
+            },
         ["DatemultirangeValue"] = static type =>
-            ByDriver(
-                SubtypeOf(type),
-                (typeof(DateOnly), new[] { "[01/01/2024,01/05/2024)", "[02/01/2024,02/05/2024)" }),
-                (
-                    typeof(DateTime),
-                    new[] { "[01/01/2024 00:00:00,01/05/2024 00:00:00)", "[02/01/2024 00:00:00,02/05/2024 00:00:00)" }
-                )
-            ),
+            new[] { new Bounds(Date(type, 1, 1), Date(type, 1, 5)), new Bounds(Date(type, 2, 1), Date(type, 2, 5)) },
         ["Int4ArrayValue"] = static _ => new[] { 1, 2, 3 },
         ["TextArrayValue"] = static _ => new[] { "a", "b c", "Zoë" },
         ["DateArrayValue"] = static type =>
@@ -200,6 +194,12 @@ internal static class AllTypesRows
         }
 
         actual = actual.ShouldNotBeNull(path);
+        if (IsRange(actual.GetType()))
+        {
+            ShouldBeRange(actual, expected.ShouldBeOfType<Bounds>(path), path);
+            return;
+        }
+
         if (IsComparedByText(actual.GetType()))
         {
             TextOf(actual).ShouldBe(expected.ShouldBeOfType<string>(path), path);
@@ -253,12 +253,31 @@ internal static class AllTypesRows
         }
     }
 
+    // A range is compared by its properties, each as a value of its own, so that a DateTime bound is compared with its
+    // fraction and its Kind, which its text leaves out.
+    private static void ShouldBeRange(object actual, Bounds expected, string path)
+    {
+        object? Property(string name) =>
+            actual.GetType().GetProperty(name).ShouldNotBeNull($"{path}.{name}").GetValue(actual);
+
+        ShouldBeValue(Property("LowerBound"), expected.Lower, $"{path}.LowerBound");
+        ShouldBeValue(Property("UpperBound"), expected.Upper, $"{path}.UpperBound");
+        ShouldBeValue(Property("LowerBoundIsInclusive"), expected.LowerIsInclusive, $"{path}.LowerBoundIsInclusive");
+        ShouldBeValue(Property("UpperBoundIsInclusive"), expected.UpperIsInclusive, $"{path}.UpperBoundIsInclusive");
+        ShouldBeValue(Property("LowerBoundInfinite"), false, $"{path}.LowerBoundInfinite");
+        ShouldBeValue(Property("UpperBoundInfinite"), false, $"{path}.UpperBoundInfinite");
+        ShouldBeValue(Property("IsEmpty"), false, $"{path}.IsEmpty");
+    }
+
+    private static bool IsRange(Type type) =>
+        type.IsGenericType && type.GetGenericTypeDefinition().FullName == $"{NpgsqlTypes}.NpgsqlRange`1";
+
     // An array of them is compared element by element: its type has the namespace of its elements.
     private static bool IsComparedByText(Type type) =>
         !type.IsArray && (type.Namespace == NpgsqlTypes || type == typeof(IPNetwork));
 
-    // The text of a value of NpgsqlTypes, which formats its parts, such as the bounds of a range, in the current
-    // culture: the culture is the invariant one for the call, and is given back after it.
+    // The text of a value of NpgsqlTypes, which may format its parts in the current culture: the culture is the
+    // invariant one for the call, and is given back after it.
     private static string TextOf(object value)
     {
         var culture = CultureInfo.CurrentCulture;
@@ -284,6 +303,28 @@ internal static class AllTypesRows
     private static Type SubtypeOf(Type type) =>
         ScalarOf(type.IsArray ? type.GetElementType()! : type).GetGenericArguments().ShouldHaveSingleItem();
 
+    private static DateTime Timestamp(int month, int day, int millisecond = 0) =>
+        new(2024, month, day, 0, 0, 0, millisecond, DateTimeKind.Unspecified);
+
+    private static DateTime Timestamptz(int month, int day) => new(2024, month, day, 0, 0, 0, DateTimeKind.Utc);
+
+    // A bound of a daterange or a datemultirange, by the type of the bounds: a DateOnly on Npgsql 10, a DateTime on 8.
+    private static object Date(Type type, int month, int day) =>
+        ByDriver(
+            SubtypeOf(type),
+            (typeof(DateOnly), new DateOnly(2024, month, day)),
+            (typeof(DateTime), Timestamp(month, day))
+        );
+
     // A bit string as Npgsql reads it, its first bit first.
     private static BitArray Bits(string bits) => new(bits.Select(static bit => bit == '1').ToArray());
+
+    // The expectation of a range: its bounds, and whether each is inclusive.  No range of the seed is empty or has an
+    // infinite bound.
+    private sealed record Bounds(
+        object Lower,
+        object Upper,
+        bool LowerIsInclusive = true,
+        bool UpperIsInclusive = false
+    );
 }

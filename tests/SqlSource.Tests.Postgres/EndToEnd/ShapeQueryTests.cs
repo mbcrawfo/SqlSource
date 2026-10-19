@@ -14,7 +14,7 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 public sealed class ShapeQueryTests(PostgresContainer postgres)
 {
     [Fact]
-    public async Task Query_SearchAccounts_ReadsTheAccountsOfEitherParameter()
+    public async Task QueryAsync_SearchAccounts_ReadsTheAccountsOfEitherParameter()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -28,7 +28,7 @@ public sealed class ShapeQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_ListAccountColumns_ReadsTheSortedClass()
+    public async Task QueryAsync_ListAccountColumns_ReadsTheSortedClass()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -61,7 +61,7 @@ public sealed class ShapeQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_GetHeadline_ReadsTheNamedModel()
+    public async Task QuerySingleAsync_GetHeadline_ReadsTheNamedModel()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -75,7 +75,7 @@ public sealed class ShapeQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_LookUpAccount_TakesTheInputModelOfAnotherNamespace()
+    public async Task QuerySingleAsync_LookUpAccount_TakesTheInputModelOfAnotherNamespace()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);

@@ -14,7 +14,7 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 public sealed class InvoiceQueryTests(PostgresContainer postgres)
 {
     [Fact]
-    public async Task Query_ListInvoices_ReadsTheTableModel()
+    public async Task QueryAsync_ListInvoices_ReadsTheTableModel()
     {
         await using var source = EndToEndSources.Billing(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -57,7 +57,7 @@ public sealed class InvoiceQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_GetInvoice_ReadsTheUnpaidInvoice()
+    public async Task QuerySingleAsync_GetInvoice_ReadsTheUnpaidInvoice()
     {
         await using var source = EndToEndSources.Billing(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);

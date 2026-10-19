@@ -27,7 +27,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     ];
 
     [Fact]
-    public async Task Query_GetAccount_ReadsTheAccount()
+    public async Task QuerySingleAsync_GetAccount_ReadsTheAccount()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -41,7 +41,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_ListAccounts_ReadsEveryAccountIntoTheTableModel()
+    public async Task QueryAsync_ListAccounts_ReadsEveryAccountIntoTheTableModel()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -52,7 +52,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_ListAccountsInTableOrder_ReadsTheSameRows()
+    public async Task QueryAsync_ListAccountsInTableOrder_ReadsTheSameRows()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -63,7 +63,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_ListAccountsUntabled_ReadsEveryAccount()
+    public async Task QueryAsync_ListAccountsUntabled_ReadsEveryAccount()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -86,7 +86,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_SharedModel_ReadsBothQueries()
+    public async Task QuerySingleAsync_SharedModel_ReadsBothQueries()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -105,7 +105,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_ListClosedBefore_NullParameter_ReadsEveryAccount()
+    public async Task QueryAsync_ListClosedBefore_NullParameter_ReadsEveryAccount()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -123,7 +123,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_ListClosedBefore_Date_ReadsTheClosedAccount()
+    public async Task QueryAsync_ListClosedBefore_Date_ReadsTheClosedAccount()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -137,7 +137,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_SecondNamespace_ReadsTheSameAccount()
+    public async Task QuerySingleAsync_SecondNamespace_ReadsTheSameAccount()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);

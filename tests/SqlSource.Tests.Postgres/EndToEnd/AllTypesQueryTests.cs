@@ -1,11 +1,14 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Data;
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Threading.Tasks;
 using Dapper;
+using Npgsql;
 using Shouldly;
 using SqlSource.Testing.EndToEnd;
 using Xunit;
@@ -26,7 +29,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
             ["TimetzValue"] =
-                "Dapper sends a DateTimeOffset by its own DbType, not the handler, as timestamptz, at offset 0 alone.",
+                "Dapper and Npgsql send a DateTimeOffset as timestamptz, which takes offset 0 alone, never as timetz.",
             ["JsonValue"] = "Dapper sends a string as text, which the server refuses for a column of json.",
             ["JsonbValue"] = "Dapper sends a string as text, which the server refuses for a column of jsonb.",
             ["JsonpathValue"] = "Dapper sends a string as text, which the server refuses for a column of jsonpath.",
@@ -68,8 +71,10 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
             ["StatusValue"] = "Dapper sends a string as text, which the server refuses for a column of account_status.",
         };
 
+    public static TheoryData<string> LeftOutColumns => [.. WriteSideLeftOut.Keys];
+
     [Fact]
-    public async Task Query_ListAllTypes_ReadsBothRows()
+    public async Task QueryAsync_ListAllTypes_ReadsBothRows()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -82,7 +87,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task Query_InsertAllTypes_ReturnsTheValuesWritten()
+    public async Task QuerySingleAsync_InsertAllTypes_ReturnsTheValuesWritten()
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = EndToEndSources.App(postgres);
@@ -104,7 +109,57 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
         }
         finally
         {
-            await transaction.RollbackAsync(token);
+            // A parameter that Npgsql fails to write breaks the connection and disposes the transaction, whose
+            // rollback, and even its Connection, would then throw over that error.
+            if (connection.State == ConnectionState.Open)
+            {
+                await transaction.RollbackAsync(token);
+            }
+        }
+    }
+
+    // Each column that InsertAllTypes leaves out still fails alone, with its value of row 1 as the parameter, typed as
+    // the input model would type it: a type that comes to bind fails here, and goes back into the query.
+    [Theory]
+    [MemberData(nameof(LeftOutColumns))]
+    public async Task ExecuteAsync_LeftOutColumnAlone_FailsToBind(string property)
+    {
+        var token = TestContext.Current.CancellationToken;
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(token);
+        var full = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).Single(static row =>
+            row.Id == AllTypesRows.FullRowId
+        );
+        var column = typeof(AllTypesDto).GetProperty(property).ShouldNotBeNull(property);
+        var type = Nullable.GetUnderlyingType(column.PropertyType) ?? column.PropertyType;
+        var arguments = Activator.CreateInstance(
+            typeof(ColumnArgs<>).MakeGenericType(type),
+            InsertedId,
+            column.GetValue(full).ShouldNotBeNull(property)
+        );
+        var sql = $"INSERT INTO all_types (id, {ColumnOf(property)}) VALUES (@id, @value)";
+
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        try
+        {
+            var error = await Should.ThrowAsync<Exception>(() => connection.ExecuteAsync(sql, arguments, transaction));
+
+            // The server's refusal is a mismatch of types, and not an error of the statement.
+            if (error is PostgresException refusal)
+            {
+                refusal.SqlState.ShouldBe(PostgresErrorCodes.DatatypeMismatch, refusal.MessageText);
+            }
+            else
+            {
+                _ = error.ShouldBeAssignableTo<SystemException>(error.ToString());
+            }
+        }
+        finally
+        {
+            if (connection.State == ConnectionState.Open)
+            {
+                await transaction.RollbackAsync(token);
+            }
         }
     }
 
@@ -124,7 +179,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
     // Npgsql gives the type of an array column as System.Array, and Dapper looks for a constructor of that exact type,
     // so it cannot construct a positional record with an array.  This is why AllTypesDto is a class.
     [Fact]
-    public async Task Query_RecordWithAnArray_DapperCannotConstructIt()
+    public async Task QueryAsync_RecordWithAnArray_DapperCannotConstructIt()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -158,6 +213,17 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
         return (InsertAllTypesArgs)constructor.Invoke(arguments);
     }
 
+    // The column of a property of AllTypesDto: Int4ArrayValue is int4_array_value.
+    private static string ColumnOf(string property) =>
+        string.Concat(
+            property.Select(
+                static (letter, i) =>
+                    i > 0 && char.IsUpper(letter)
+                        ? "_" + char.ToLowerInvariant(letter)
+                        : char.ToLowerInvariant(letter).ToString(CultureInfo.InvariantCulture)
+            )
+        );
+
     private static string[] NamesOf(Type model) =>
         [.. model.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(static property => property.Name)];
 
@@ -167,4 +233,12 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
         Justification = "Dapper would make it, and the test proves that it cannot."
     )]
     private sealed record Int4Array(int[]? Int4ArrayValue);
+
+    // The parameters of one column, as the input model has them, and the id of the row.
+    [SuppressMessage(
+        "Performance",
+        "CA1812:Avoid uninstantiated internal classes",
+        Justification = "The theory makes it by reflection."
+    )]
+    private sealed record ColumnArgs<T>(int Id, T Value);
 }
