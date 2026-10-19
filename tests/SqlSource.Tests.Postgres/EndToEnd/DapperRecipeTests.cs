@@ -205,6 +205,22 @@ public sealed class DapperRecipeTests(PostgresContainer postgres)
         type.ShouldBe("timestamp with time zone");
     }
 
+    // Npgsql gives a timestamptz of infinity as DateTime.MaxValue and one of -infinity as DateTime.MinValue, of no
+    // kind.  The handler reads both at offset 0, where a local offset would put one of them out of range.
+    [Theory]
+    [InlineData("infinity")]
+    [InlineData("-infinity")]
+    public async Task QuerySingleAsync_TimestamptzInfinity_ReadsAtOffsetZero(string value)
+    {
+        await using var source = EndToEndSources.App(postgres);
+        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
+
+        var row = await connection.QuerySingleAsync<Instant>("SELECT @value::timestamptz AS at", new { value });
+
+        row.At.Offset.ShouldBe(TimeSpan.Zero);
+        row.At.UtcDateTime.ShouldBe(value == "infinity" ? DateTime.MaxValue : DateTime.MinValue);
+    }
+
     [Fact]
     public async Task QueryAsync_RecordWithRangesAndHstore_IsFilled()
     {
@@ -236,6 +252,9 @@ public sealed class DapperRecipeTests(PostgresContainer postgres)
             );
         rows[1].ShouldBe(new RangesAndHstore(null, null, null));
     }
+
+    [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Dapper makes it.")]
+    private sealed record Instant(DateTimeOffset At);
 
     [SuppressMessage("Performance", "CA1812:Avoid uninstantiated internal classes", Justification = "Dapper makes it.")]
     private sealed record RangesAndHstore(

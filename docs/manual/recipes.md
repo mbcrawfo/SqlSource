@@ -257,7 +257,9 @@ The input model is the parameter object, and the output model is the type of a r
   public sealed class UtcDateTimeOffsetHandler : SqlMapper.TypeHandler<DateTimeOffset>
   {
       public override DateTimeOffset Parse(object value) =>
-          value is DateTime dateTime ? new DateTimeOffset(dateTime) : (DateTimeOffset)value;
+          value is DateTime dateTime
+              ? new DateTimeOffset(DateTime.SpecifyKind(dateTime, DateTimeKind.Utc))
+              : (DateTimeOffset)value;
 
       public override void SetValue(IDbDataParameter parameter, DateTimeOffset value) => parameter.Value = value;
   }
