@@ -61,12 +61,15 @@ public sealed class CheckTests(PostgresContainer postgres)
 
         // A server that leaves cases out, by their minimumMajor or their checkedFrom, gets two runs, since a filtered
         // check compares only what it names: the realistic cases that it checks, each named by its query.sql, and
-        // the other databases whole, named by --database alone, so that none of their queries goes unchecked.
+        // the other databases whole, named by --database alone, so that none of their queries goes unchecked.  Only
+        // such a server runs this path, PostgreSQL 14 today, which CI runs: a local run on the default image does not
+        // exercise it.
         checkedHere.ShouldNotBeEmpty();
         var checkedEntries = Entries(
             checkedHere.Select(static found => found.SidecarPath),
             PostgresContainer.RealisticDatabase
         );
+        checkedEntries.ShouldBeLessThan(realistic);
         var realisticResult = await CheckAsync([
             "--database",
             PostgresContainer.RealisticDatabase,
@@ -82,7 +85,6 @@ public sealed class CheckTests(PostgresContainer postgres)
             .. Connection(PostgresContainer.BillingDatabase),
         ]);
 
-        checkedEntries.ShouldBeLessThan(realistic);
         realisticResult.ExitCode.ShouldBe(0, realisticResult.Error);
         realisticResult.Out.ShouldBe($"realistic (postgres): {checkedEntries} same, 0 differ, 0 failed\n");
         othersResult.ExitCode.ShouldBe(0, othersResult.Error);

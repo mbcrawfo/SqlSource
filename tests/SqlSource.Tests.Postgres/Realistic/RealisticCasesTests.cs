@@ -218,6 +218,18 @@ public sealed class RealisticCasesTests
         "checkedFrom is not above its minimumMajor"
     )]
     [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"major\": 14, \"why\": \"w\" } }",
+        "checkedFrom is not above 14, the first recorded major the case runs on"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"w\", \"reason\": \"x\" } }",
+        "reason"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"columns\": [], \"models\": { \"refusal\": \"SQLSRC255\", \"why\": \"w\", \"reason\": \"x\" } }",
+        "reason"
+    )]
+    [InlineData( /*lang=json,strict*/
         "{ \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \" \" } }",
         "checkedFrom gives no why"
     )]

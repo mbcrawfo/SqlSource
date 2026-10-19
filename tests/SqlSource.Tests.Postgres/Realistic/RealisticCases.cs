@@ -191,8 +191,8 @@ internal static class RealisticCases
     }
 
     // The major from which a case's sidecar is checked, for a case that an earlier major describes otherwise: one of
-    // the recorded majors, above the case's minimum, which already keeps the earlier ones from running it, and said
-    // why.
+    // the recorded majors, above the first recorded one the case runs on, its minimumMajor or else the lowest, since
+    // a checkedFrom at or below it leaves nothing out, and said why.
     private static CheckedFrom? CheckedFromOf(CaseJson read, string named)
     {
         if (read.CheckedFrom is not { } from)
@@ -220,9 +220,15 @@ internal static class RealisticCases
             );
         }
 
-        if (read.MinimumMajor is { } minimum && major <= minimum)
+        var lowest = PostgresContainer.RecordedMajors.Min();
+        if (read.MinimumMajor is { } minimum && minimum >= lowest && major <= minimum)
         {
             throw Fault(named, $"{Says} checkedFrom is not above its minimumMajor, {minimum}");
+        }
+
+        if (major <= lowest)
+        {
+            throw Fault(named, $"{Says} checkedFrom is not above {lowest}, the first recorded major the case runs on");
         }
 
         if (string.IsNullOrWhiteSpace(from.Why))
