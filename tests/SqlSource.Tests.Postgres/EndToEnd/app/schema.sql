@@ -2,8 +2,8 @@
 -- PostgresContainer and tools/describe-end-to-end.sh apply it, then seed.sql.  A change to it is followed by a run of
 -- tools/describe-end-to-end.sh, which writes the sidecars again.
 
--- The extensions whose types all_types reads.  cube is left out: Npgsql 8 cannot read it, and the generator tests of
--- phase 5.2 prove its row.
+-- The extensions whose types all_types reads.  cube is left out: Npgsql 8 cannot read it, and its row of the type map
+-- is proved by PostgresTypeMapTests in tests/SqlSource.Tests.
 CREATE EXTENSION citext;
 CREATE EXTENSION hstore;
 CREATE EXTENSION ltree;

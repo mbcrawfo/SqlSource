@@ -28,7 +28,8 @@ internal static class RepositoryPaths
     // seed.sql, which tools/describe-end-to-end.sh applies in the same order.
     public static string EndToEnd { get; } = Path.Combine(Root, "tests", "SqlSource.Tests.Postgres", "EndToEnd");
 
-    public static string EndToEndProject { get; } = Path.Combine(EndToEnd, "..", "SqlSource.Tests.Postgres.csproj");
+    public static string EndToEndProject { get; } =
+        Path.Combine(Root, "tests", "SqlSource.Tests.Postgres", "SqlSource.Tests.Postgres.csproj");
 
     public static string EndToEndSchema(string database) => Path.Combine(EndToEnd, database, "schema.sql");
 

@@ -8,10 +8,7 @@
         <TargetFramework>net10.0</TargetFramework>
         <OutputType>Exe</OutputType>
         <IsPackable>false</IsPackable>
-        <!--
-            SQLSRC240, a sidecar written by another version of the tool, stays a warning.  A pull request that raises
-            VersionPrefix warns until it runs tools/describe-end-to-end.sh.
-        -->
+        <!-- SQLSRC240 stays a warning: raising VersionPrefix warns until tools/describe-end-to-end.sh runs. -->
         <WarningsNotAsErrors>$(WarningsNotAsErrors);SQLSRC240</WarningsNotAsErrors>
         <!-- The dialect of every query of the project. -->
         <SqlSourceDialect>postgres</SqlSourceDialect>

@@ -65,6 +65,19 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
         reader.GetInt64(1).ShouldBe(columns - 1);
     }
 
+    // The oid of the text search configuration "simple" is fixed in the catalog, where that of "english" is made by
+    // initdb and differs between majors.
+    [Fact]
+    public async Task InitializeAsync_AllTypesRegconfig_IsTheFixedOidOfSimple()
+    {
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionStringOf(PostgresContainer.AppDatabase));
+        await using var command = source.CreateCommand("SELECT regconfig_value::oid FROM all_types WHERE id = 1");
+
+        var oid = await command.ExecuteScalarAsync(TestContext.Current.CancellationToken);
+
+        oid.ShouldBe(3748u);
+    }
+
     // Every image the tests run, the default or the one the variable names, is pinned to a major and a minor.  A
     // bare major moves to each new minor unseen; see tests/SqlSource.Tests.Postgres/README.md.
     [Fact]
