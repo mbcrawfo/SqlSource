@@ -37,30 +37,30 @@ Each name links to its section, which gives its values and its rules.  **Written
 
 | Setting | Values | Written as | Status |
 |----|----|----|----|
-| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `SqlSourceOutput` property and metadata; `Output` on the attribute; `-- output:` in the file header and inside a query | Works today: it decides which queries the tool describes and the build checks against their sidecar; [no effect yet](README.md#what-works-today) on generated code |
+| [Output](#setting-output) | `sql`, `models`, `codegen`.  Default `codegen` | `SqlSourceOutput` property and metadata; `Output` on the attribute; `-- output:` in the file header and inside a query | Works today: it decides which queries the tool describes and the build checks against their sidecar, and `models` and `codegen` generate models; [no effect yet](README.md#what-works-today) for the method that `codegen` adds |
 | [Database](#setting-database) | A name of letters, digits, `-`, `_` and `.`.  Default: the name of the file's dialect | `SqlSourceDatabase` property and metadata; `-- database:` in the file header and inside a query | Works today, for the tool alone |
 | [Dialect](#setting-dialect) | A dialect's name, with options for `mysql` and `mariadb`: see [the dialects page](dialects.md#choosing-a-dialect).  Default `ansi` | `SqlSourceDialect` property and metadata; `-- dialect:` in the file header | Works today |
-| [Generator parameters](#setting-generator-parameters) | Words separated by spaces: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `default`.  Default: none | `SqlSourceGeneratorParameters` property and metadata; `Parameters` on the attribute; `-- generator:` in the file header and inside a query | Works today for `keep-comments` and `no-token-validation`; [accepted; no effect yet](README.md#what-works-today) for the other four |
+| [Generator parameters](#setting-generator-parameters) | Words separated by spaces: `keep-comments`, `no-token-validation`, `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix`, `default`.  Default: none | `SqlSourceGeneratorParameters` property and metadata; `Parameters` on the attribute; `-- generator:` in the file header and inside a query | Works today for `keep-comments`, `no-token-validation`, `sort-input`, `sort-output` and `no-table-models`; [accepted; no effect yet](README.md#what-works-today) for `async-method-suffix` |
+| [Input and output model suffix](#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix` property and metadata; `InputModelSuffix`, `OutputModelSuffix` on the attribute; `-- input-model-suffix:`, `-- output-model-suffix:` in the file header | Works today |
+| [Model namespace](#setting-model-namespace) | A namespace.  Default: the namespace of the type | `SqlSourceModelNamespace` property and metadata; `ModelNamespace` on the attribute; `-- model-namespace:` in the file header | Works today |
+| [Input and output model type](#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `SqlSourceInputModelType`, `SqlSourceOutputModelType` property and metadata; `InputModelType`, `OutputModelType` on the attribute; `-- input-model-type:`, `-- output-model-type:` in the file header and inside a query | Works today |
+| [One query's model name](#setting-model-name) | A type's name, or its full name | `-- input-model:`, `-- output-model:` inside a query | Works today |
+| [Type overrides](#setting-type-overrides) | Entries `key=type`, each a database type and the C# type it gets, or `key=default`.  Default: none | `SqlSourceTypeOverrides` property and metadata; `-- type-override:` in the file header and inside a query | Works today |
 | [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
 | [`Path`](#setting-path) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | `Path` on the attribute | Works today |
 
-### Settings for models and methods
+### Settings for query methods
 
-These are read and checked today, and change no generated code until models and query methods arrive.
+These are read and checked today, and change no generated code until query methods arrive.
 
 | Setting | Values | Written as | Status |
 |----|----|----|----|
-| [Input and output model suffix](#setting-model-suffix) | Characters of a C# identifier.  Defaults `Params` and `Dto` | `SqlSourceInputModelSuffix`, `SqlSourceOutputModelSuffix` property and metadata; `InputModelSuffix`, `OutputModelSuffix` on the attribute; `-- input-model-suffix:`, `-- output-model-suffix:` in the file header | [Accepted; no effect yet](README.md#what-works-today) |
-| [Model namespace](#setting-model-namespace) | A namespace.  Default: the namespace of the type | `SqlSourceModelNamespace` property and metadata; `ModelNamespace` on the attribute; `-- model-namespace:` in the file header | [Accepted; no effect yet](README.md#what-works-today) |
-| [Input and output model type](#setting-model-type) | `record`, `sealed record`, `class`, `sealed class`.  Default `sealed record` | `SqlSourceInputModelType`, `SqlSourceOutputModelType` property and metadata; `InputModelType`, `OutputModelType` on the attribute; `-- input-model-type:`, `-- output-model-type:` in the file header and inside a query | [Accepted; no effect yet](README.md#what-works-today) |
-| [One query's model name](#setting-model-name) | A type's name, or its full name | `-- input-model:`, `-- output-model:` inside a query | [Accepted; no effect yet](README.md#what-works-today) |
 | [Collection type](#setting-collection-type) | A collection interface or type, such as `IReadOnlyList` or `List`: see [its section](#setting-collection-type).  Default `Array` | `SqlSourceCollectionType` property and metadata; `CollectionType` on the attribute; `-- collection-type:` in the file header and inside a query | [Accepted; no effect yet](README.md#what-works-today) |
 | [`MethodLocation`](#setting-method-location) | `ExtensionClass`, `Public`, `Internal`, `Private`.  Default `ExtensionClass` | `MethodLocation` on the attribute | [Accepted; no effect yet](README.md#what-works-today) |
-| [Type overrides](#setting-type-overrides) | Entries `key=type`, each a database type and the C# type it gets, or `key=default`.  Default: none | `SqlSourceTypeOverrides` property and metadata; `-- type-override:` in the file header and inside a query | [Accepted and checked; takes effect with models in a later release](README.md#what-works-today) |
 
 A value from a list is matched ignoring case, hyphens and spaces, so `CodeGen`, `codegen` and `code-gen` are one value, and so are `SealedRecord` and `sealed record`.  On the attribute you write the member of the enum that the package adds to your project, as in `Output = GeneratorOutput.Sql`.
 
-"Accepted; no effect yet" means SqlSource checks the setting and reports an error for a value that is not valid, but the setting changes no generated code yet.  Models and query methods come in a later release.
+"Accepted; no effect yet" means SqlSource checks the setting and reports an error for a value that is not valid, but the setting changes no generated code yet.  Query methods come in a later release.
 
 <a id="precedence"></a>
 
@@ -123,16 +123,18 @@ TRUNCATE TABLE audit_log;
 | Value | A query gets |
 |----|----|
 | `sql` | Its SQL: a constant, or a method where the query has tokens |
-| `models` | Its SQL, and types for its parameters and for its result |
-| `codegen` | Its SQL, the types, and a method that runs the query |
+| `models` | Its SQL, and its [models](generator.md#models): types for its parameters and for a row of its result |
+| `codegen` | Its SQL, its models, and a method that runs the query, which comes in a later release |
 
 On the attribute: `[SqlSourceGenerate(Output = GeneratorOutput.Sql)]`.  As a marker it stands in the file header, for every query of the file, and inside a query.
 
-**Today, `Output` decides which queries must be described.**  `sqlsource describe` asks a database about the queries whose output is `models` or `codegen`, and the build checks that each of them has a current entry in its file's [sidecar](concepts.md#sidecar): a query that has none is [SQLSRC241](diagnostics.md#sqlsrc241), and one that changed since it was described is [SQLSRC244](diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry, no connection, and belongs to no [logical database](#setting-database).  On the attribute, write the value out literally, as in `Output = GeneratorOutput.Models`, so that the tool can read it; a constant or an expression there is [SQLSRC208](diagnostics.md#sqlsrc208).  Details are under [the generator's known issues](generator.md#known-issues).  A file claimed by two types, or listed by two projects, is described when either needs it, and the build of a project checks the entries that any of its types needs, once for the file.
+**`Output` decides which queries must be described.**  `sqlsource describe` asks a database about the queries whose output is `models` or `codegen`, and the build checks that each of them has a current entry in its file's [sidecar](concepts.md#sidecar): a query that has none is [SQLSRC241](diagnostics.md#sqlsrc241), and one that changed since it was described is [SQLSRC244](diagnostics.md#sqlsrc244).  A query whose output is `sql` needs no description, no entry, no connection, and belongs to no [logical database](#setting-database).  On the attribute, write the value out literally, as in `Output = GeneratorOutput.Models`, so that the tool can read it; a constant or an expression there is [SQLSRC208](diagnostics.md#sqlsrc208).  Details are under [the generator's known issues](generator.md#known-issues).  A file claimed by two types, or listed by two projects, is described when either needs it, and the build of a project checks the entries that any of its types needs, once for the file.
 
 The tool can describe only some dialects: see [the database support table](dialects.md#database-support).  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets [SQLSRC209](diagnostics.md#sqlsrc209) for every file, in its build and from the tool.  A file of `mssql` whose queries must be described is [SQLSRC243](diagnostics.md#sqlsrc243) in the build, until SQL Server queries can be described.  Set the dialect and describe the queries, or set the output to `sql` for queries that want only their SQL.
 
-> **Coming in a later release.**  `models` and `codegen` will generate types for a query's parameters and result, and a method that runs it.  Today every query gets its constant or token method whatever its output.  See [what works today](README.md#what-works-today).
+Every query gets its constant or token method whatever its output.  A query whose output is `models` or `codegen`, and whose entry in its sidecar is current, also gets its [models](generator.md#models); one whose output is `sql` gets none.
+
+> **Coming in a later release.**  `codegen` will also generate a method that runs the query; until then it gives what `models` gives.  See [what works today](README.md#what-works-today).
 
 <a id="setting-database"></a>
 
@@ -208,12 +210,14 @@ A [generator parameter](concepts.md#generator-parameter) is a word that changes 
 |----|----|----|
 | `keep-comments` | Comments and blank lines stay in the generated SQL: see [what reaches the generated SQL](sql-files.md#generated-sql) | Works today |
 | `no-token-validation` | The method of a query with tokens does not check its arguments: see [validation](parameters-and-tokens.md#token-validation) | Works today |
-| `sort-input`, `sort-output`, `no-table-models`, `async-method-suffix` | None yet | [Accepted; no effect yet](README.md#what-works-today) |
+| `sort-input`, `sort-output` | The properties of the query's input model, or of its output model, are sorted by name: see [the order of the properties](generator.md#property-order) | Works today |
+| `no-table-models` | A query that reads a whole table gets a row model named after the query, not after the table: see [table models](generator.md#table-models) | Works today |
+| `async-method-suffix` | None yet | [Accepted; no effect yet](README.md#what-works-today) |
 | `default` | The empty list: every default.  `default` must be the only word in its list, though it may be repeated | Works today |
 
 Words are matched ignoring case.
 
-> **Coming in a later release.**  `sort-input`, `sort-output`, `no-table-models` and `async-method-suffix` will shape the models and methods that a later release generates.  See [what works today](README.md#what-works-today).
+> **Coming in a later release.**  `async-method-suffix` will end the names of the generated query methods with `Async`.  See [what works today](README.md#what-works-today).
 
 **A list replaces; it never adds.**  In the example, `Total` has the list `no-token-validation` and nothing else: it does not keep its comments, though the file header says `keep-comments`.  A query that wants both writes both, `-- generator: keep-comments no-token-validation`.  `-- generator: default` gives a query every default, whatever its file says.
 
@@ -241,12 +245,13 @@ In a property, in metadata and on the attribute the list is words separated by s
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-The suffix ends the name of the type generated for a query's parameters (input) and for a row of its result (output).  The defaults are `Params` and `Dto`.
+The suffix ends the name of the [model](generator.md#models) generated for a query's parameters (input) and for a row of its result (output).  The defaults are `Params` and `Dto`, so `GetUser` gets `GetUserParams` and `GetUserDto`; above, it gets `GetUserArgs` and `GetUserRow`.
 
 - The value is one or more characters that a C# identifier can contain, such as letters, digits and `_`.  A space or a period is not one.
 - It stands in the file header only, not inside a query.  It can also be item metadata, an MSBuild property, or a property of the attribute.
+- It ends a [table model's](generator.md#table-models) name too, `UsersRow`, and not a name that `-- input-model:` or `-- output-model:` gives.  Two equal suffixes give a query's two models one name, which is [SQLSRC257](diagnostics.md#sqlsrc257).
 
-> **Coming in a later release.**  The suffix will end the names of the types generated for a query's parameters and result rows.  Today the settings are read and checked, and change no generated code.  See [what works today](README.md#what-works-today).
+The rules of the names are on [the generator page](generator.md#model-names).
 
 <a id="setting-model-namespace"></a>
 
@@ -259,12 +264,15 @@ The suffix ends the name of the type generated for a query's parameters (input) 
 SELECT id, name FROM users;
 ```
 
-The namespace the generated models go in.  The default is the namespace of the type that claims the file.
+The namespace the generated [models](generator.md#models) go in.  The default is the namespace of the type that claims the file.  Above, the models of `ListUsers` are in `App.Models`.
 
 - The value is C# identifiers joined by periods, none of them a reserved keyword.
 - It stands in the file header only.  It can also be item metadata, an MSBuild property (`SqlSourceModelNamespace`), or `ModelNamespace` on the attribute.
+- A name with a period that `-- input-model:` or `-- output-model:` gives is a full name, and ignores this setting.
+- Two types in two namespaces that claim one file, or read one table, get a model each, one in each namespace, unless this setting gives them one.
+- A namespace that is, or starts with, the full name of a type of your project gives models whose names cannot be used: [SQLSRC258](diagnostics.md#sqlsrc258).
 
-> **Coming in a later release.**  The namespace will say where the generated models go.  Today the setting is read and checked, and changes no generated code.  See [what works today](README.md#what-works-today).
+The rules are on [the generator page](generator.md#model-namespace).
 
 <a id="setting-model-type"></a>
 
@@ -278,11 +286,12 @@ The namespace the generated models go in.  The default is the namespace of the t
 SELECT id, name FROM users WHERE id > @min;
 ```
 
-The shape of the type generated for a query's parameters (input) and for a row of its result (output): `record`, `sealed record`, `class` or `sealed class`.  The default is `sealed record` for both.
+The shape of the [model](generator.md#models) generated for a query's parameters (input) and for a row of its result (output): `record`, `sealed record`, `class` or `sealed class`.  The default is `sealed record` for both.  A record is positional; a class has a property with `get` and `set` for each column or parameter.  Above, every output model of the file is a `sealed class`, and the input model of `ListUsers` a `record`.
 
 - It stands in the file header and inside a query, as two markers.  It can also be item metadata, an MSBuild property, or a property of the attribute: `InputModelType = GeneratorModelType.Class`.
+- Two queries that share a model must give it one shape, or the later is [SQLSRC257](diagnostics.md#sqlsrc257).
 
-> **Coming in a later release.**  The shape will say whether a generated model is a record or a class, and whether it is sealed.  Today the settings are read and checked, and change no generated code.  See [what works today](README.md#what-works-today).
+What each shape looks like is on [the generator page](generator.md#model-shape).  To read rows into sorted models through Dapper, make them classes: see [the recipe](recipes.md#models-through-dapper).
 
 <a id="setting-model-name"></a>
 
@@ -295,12 +304,12 @@ The shape of the type generated for a query's parameters (input) and for a row o
 SELECT id, name FROM users WHERE id = @id;
 ```
 
-`-- input-model:` and `-- output-model:` name the type of one query's parameters and of its result rows.  The value is a type's name, or its full name: identifiers joined by periods, none of them a reserved keyword.
+`-- input-model:` and `-- output-model:` name the [model](generator.md#models) of one query's parameters and of its result rows, whole, with no suffix.  The value is a type's name, or its full name: identifiers joined by periods, none of them a reserved keyword.  Above, `GetUser` gets `UserArgs`, in the namespace its models would have without the marker, and `UserRow` in the namespace `App.Models`, whatever the [model namespace](#setting-model-namespace) says.
 
 - It stands inside a query only.  It has no property, no item metadata and no attribute property, since a name is for one query.
-- `-- input-model:` on a query with no parameters is [SQLSRC119](diagnostics.md#sqlsrc119).
-
-> **Coming in a later release.**  The markers will name the types of one query's parameters and result rows.  Today they are read and checked, and change no generated code.  See [what works today](README.md#what-works-today).
+- `-- input-model:` on a query with no parameters is [SQLSRC119](diagnostics.md#sqlsrc119), and `-- output-model:` on a query whose statement returns no rows is [SQLSRC259](diagnostics.md#sqlsrc259).
+- `-- output-model:` wins over the name of a [table model](generator.md#table-models).
+- Two queries that give one name share one model when their models are the same, and are [SQLSRC257](diagnostics.md#sqlsrc257) otherwise: see [shared models](generator.md#shared-models).  A name that cannot be used, such as that of a type of your project, is [SQLSRC258](diagnostics.md#sqlsrc258).
 
 <a id="setting-collection-type"></a>
 
@@ -347,7 +356,7 @@ A type override gives a database type the C# type of your choice, in place of th
 
 In the example, every query of the project gets `timestamptz` as a `System.DateTimeOffset`, `public.user_status` as `MyApp.UserStatus`, and `int4[]` as a list.  The files under `Legacy/` get `date` as a `System.DateTime` too.  Every query of the `.sql` file gets `numeric` as a `double`, and `ListEvents` gets `timestamptz` from the type map, a `System.DateTime`, while it keeps the project's other entries.
 
-> **Coming in a later release.**  Generated models will give each property the C# type of its column or parameter, the type override's included.  Today the type override is read and checked, and the build reports the errors below, but it changes no generated code.  See [what works today](README.md#what-works-today).
+Each property of a generated [model](generator.md#models) has the C# type of its column or parameter, the type override's included.
 
 **Four places, merged by type.**  The type override is the `SqlSourceTypeOverrides` property, the `SqlSourceTypeOverrides` metadata of a file's item, and the `-- type-override:` marker in the file header and inside a query.  It has no attribute property.  For each query the entries add up from the property, then the metadata, then the file header, then the query, and an entry for a type replaces the entry of a place below for that type alone.  So a query that needs one type otherwise names that type, and keeps the rest of the project's entries.  This is the exception to the rule that the most specific place wins whole: see [which place wins](#precedence).  `default` takes the type out of the entries of every place below, and a key with no entry anywhere has the type map's C# type.  Nothing removes every entry at once.
 

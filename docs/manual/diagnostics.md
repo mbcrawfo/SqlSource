@@ -146,7 +146,7 @@ The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version
 
 The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
-The ids from `SQLSRC253` to `SQLSRC256`, and `SQLSRC259`, are about the models of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  Each error is reported at the query's name, except `SQLSRC259`, which is at its marker, and a query gets every error it has, and no models until they are fixed.
+The ids from `SQLSRC253` to `SQLSRC259` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC256` and `SQLSRC259` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for a type that is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -1684,7 +1684,7 @@ The same error is reported when the type is not `public` and the model that woul
 
 Make the type `public`, or make each type that claims the query's file `internal`, which makes its models `internal`.  The model is not generated until then, and the query's constant or method still is.
 
-See: [Type overrides](settings.md#setting-type-overrides)
+See: [Type overrides](settings.md#setting-type-overrides), and for a model, [accessibility](generator.md#model-accessibility)
 
 ## SQLSRC252
 
@@ -1724,6 +1724,8 @@ SELECT id, price * quantity AS total FROM order_lines;
 
 The query's constant or method is still generated.
 
+See: [Property names](generator.md#property-names)
+
 ## SQLSRC254
 
 **Name is not an identifier after PascalCase**
@@ -1735,6 +1737,8 @@ The PascalCase of a column's or a parameter's name, which names its property, is
 ```
 
 Give the column an alias that is a name a C# property can have, such as `AS unit_price`, or rename the parameter, then run `dotnet sqlsource describe`.  The query's constant or method is still generated.
+
+See: [Property names](generator.md#property-names)
 
 ## SQLSRC255
 
@@ -1760,6 +1764,8 @@ SELECT u.id AS user_id, o.id AS order_id FROM users u JOIN orders o ON o.user_id
 
 The query's constant or method is still generated.
 
+See: [Property names](generator.md#property-names)
+
 ## SQLSRC256
 
 **Property name is taken**
@@ -1772,6 +1778,8 @@ A column or a parameter gives a property name that a record or `object` already 
 ```
 
 Give the column an alias, or rename the parameter, then run `dotnet sqlsource describe`.  For a property named as its model, you can instead give the model [another name](settings.md#setting-model-name).  The query's constant or method is still generated.
+
+See: [Property names](generator.md#property-names)
 
 ## SQLSRC257
 
@@ -1807,6 +1815,8 @@ SELECT id, name FROM users;
 
 The earlier query's model is still generated, and the later query has no model of that kind until the two agree.  The query's constant or method is still generated.
 
+See: [Shared models](generator.md#shared-models)
+
 ## SQLSRC258
 
 **Model name cannot be used**
@@ -1840,6 +1850,8 @@ SELECT id, name FROM users;
 
 The query's constant or method is still generated.
 
+See: [Names that cannot be used](generator.md#unusable-model-names)
+
 ## SQLSRC259
 
 **Output model on a query without rows**
@@ -1857,3 +1869,5 @@ DELETE FROM users WHERE id = @id;
 ```
 
 Remove the marker.  To read the rows the statement changes instead, add a `RETURNING` clause and run `dotnet sqlsource describe`.  The query's constant or method is still generated.
+
+See: [Which queries get models](generator.md#which-models)

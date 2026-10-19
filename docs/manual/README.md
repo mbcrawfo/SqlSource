@@ -17,7 +17,9 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Choose the dialect a file is read by | [Choosing a dialect](dialects.md#choosing-a-dialect) |
 | Use a database other than PostgreSQL | [Database support](dialects.md#database-support) |
 | See what the generator writes, and where it goes | [The generator](generator.md#locations) |
+| Know which models a query gets, what they are named, and what their properties are | [Models](generator.md#models) |
 | Use the queries with Dapper or ADO.NET | [The recipe](recipes.md#dapper-and-adonet) |
+| Read rows into the models with Dapper | [The recipe](recipes.md#models-through-dapper) |
 | Let a test project see the internals of another project | [Projects that share internals](generator.md#projects-that-share-internals) |
 | Install the tool and describe my queries | [Install the tool](tool.md#install-the-tool) |
 | Give the tool a connection, or work with several databases | [Connections](tool.md#connections), or the [recipe](recipes.md#use-several-databases) |
@@ -43,18 +45,20 @@ SqlSource is in early development.  This table is the one list of what works in 
 | Methods for queries with tokens | Available | [Token methods](generator.md#token-methods) |
 | Reading `.sql` files by the rules of your database's dialect | Available | [Dialects](dialects.md) |
 | Settings, and an error for a value that is wrong | Available | [Settings](settings.md#all-settings) |
-| The `Output` setting | Works today: it decides which queries the tool describes and the build checks against their sidecar; no effect yet on generated code | [Output](settings.md#setting-output) |
-| The settings for models and methods: model suffixes, namespace, shape and name, collection type, `MethodLocation`, and the generator parameters `sort-input`, `sort-output`, `no-table-models` and `async-method-suffix` | Accepted; no effect yet | [All settings](settings.md#all-settings) |
-| Result shapes (`-- name: GetUser -> one`), and `null` or `not null` in a `-- param:` marker | Accepted; no effect yet: both are checked, and the tool records a parameter's `null` in the sidecar | [Result shapes](sql-files.md#result-shapes), [giving a parameter a type](parameters-and-tokens.md#param-marker) |
+| The `Output` setting | Works today: it decides which queries the tool describes and the build checks against their sidecar, and `models` and `codegen` generate models; no effect yet for the method that `codegen` adds | [Output](settings.md#setting-output) |
+| The settings for models: model suffixes, namespace, shape and name, and the generator parameters `sort-input`, `sort-output` and `no-table-models` | Available | [All settings](settings.md#all-settings) |
+| The settings for query methods: collection type, `MethodLocation`, and the generator parameter `async-method-suffix` | Accepted; no effect yet | [All settings](settings.md#all-settings) |
+| `null` or `not null` in a `-- param:` marker | Available: `null` makes the parameter's property in the input model nullable | [Giving a parameter a type](parameters-and-tokens.md#param-marker) |
+| Result shapes (`-- name: GetUser -> one`) | Accepted; no effect yet | [Result shapes](sql-files.md#result-shapes) |
 | Describing queries with the `sqlsource` tool, sidecar files, and `--check` | Available | [The tool](tool.md) |
 | An error in the build for a query whose sidecar entry is missing or out of date | Available | [Sidecar files](tool.md#sidecar-files), [SQLSRC241](diagnostics.md#sqlsrc241), [SQLSRC244](diagnostics.md#sqlsrc244) |
 | Describing PostgreSQL queries | Available | [PostgreSQL](postgresql.md) |
-| The C# type of each column and parameter of a described PostgreSQL query, and an error in the build for one that has none | Available; no effect yet on generated code | [Types](postgresql.md#type-map) |
+| The C# type of each column and parameter of a described PostgreSQL query, and an error in the build for one that has none | Available | [Types](postgresql.md#type-map) |
 | Describing SQL Server queries | Coming ([SQLSRC216](diagnostics.md#sqlsrc216) until then) | [SQL Server](sqlserver.md) |
-| Models for the parameters and rows of a query | Coming | [Models](generator.md#models) |
+| Models for the parameters and rows of a query: their names, namespace, shape, properties and nullability, table models and shared models | Available | [Models](generator.md#models), [PostgreSQL](postgresql.md#models) |
 | Generated query methods | Coming | [Query methods](generator.md#query-methods) |
 | Library maps for the types of libraries such as NodaTime | Coming | Not documented until it is delivered |
-| Custom type mapping: the type override, `SqlSourceTypeOverrides` and `-- type-override:` | Accepted and checked; takes effect with models in a later release | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
+| Custom type mapping: the type override, `SqlSourceTypeOverrides` and `-- type-override:` | Available | [Type overrides](settings.md#setting-type-overrides); for a PostgreSQL type that cannot be sent as a parameter, see [SQLSRC232](diagnostics.md#sqlsrc232) |
 | Build integration: the tool running in your build | Coming | Not documented until it is delivered; today you run the tool yourself: [install the tool](tool.md#install-the-tool) |
 | Bug-report bundles | Coming | Not documented until it is delivered; today attach a [log](tool.md#logs) |
 

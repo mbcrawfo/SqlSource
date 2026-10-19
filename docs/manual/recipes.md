@@ -8,6 +8,7 @@ Short answers to "how do I...", each a sample you can copy and a link to the pag
 - [Check the sidecars in CI](#check-sidecars-in-ci)
 - [Describe again after a schema change](#after-a-migration)
 - [Use the queries with Dapper or your own ADO.NET code](#dapper-and-adonet)
+- [Run the models through Dapper](#models-through-dapper)
 - [Choose a table name at run time](#table-name-at-run-time)
 - [Let a test project see the internals of the main project](#test-project-sees-internals)
 
@@ -148,14 +149,12 @@ using System.Data.Common;
 using Dapper;
 using SqlSource;
 
-public sealed record User(int Id, string Name);
-
 [SqlSourceGenerate]
 public partial class UserRepository(DbConnection connection)
 {
     // Dapper
-    public Task<User> Get(int id) =>
-        connection.QuerySingleAsync<User>(Sql.GetUser, new { id });
+    public Task<GetUserDto> Get(int id) =>
+        connection.QuerySingleAsync<GetUserDto>(Sql.GetUser, new { id });
 
     // ADO.NET
     public async Task<string?> GetName(int id)
@@ -179,9 +178,56 @@ public partial class UserRepository(DbConnection connection)
 }
 ```
 
-With `GetUser` as `SELECT id, name FROM users WHERE id = @id;`.  SqlSource never opens a connection or binds a value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
+With `GetUser` as `SELECT id, name FROM users WHERE id = @id;`, and `GetUserDto` its generated [model](generator.md#models).  SqlSource never opens a connection or binds a value: Dapper opens a closed connection for you, ADO.NET needs it open, and you give the database the value of each `@name` yourself.
 
 Rules: [constants](generator.md#constants), [query parameters](parameters-and-tokens.md#query-parameters).
+
+<a id="models-through-dapper"></a>
+
+## Run the models through Dapper
+
+```sql postgres
+-- name: GetOrder
+SELECT o.id, o.placed_at, c.name AS customer_name
+FROM orders o
+JOIN customers c ON c.id = o.customer_id
+WHERE o.id = @orderId;
+```
+
+```csharp
+using System.Data.Common;
+using Dapper;
+using SqlSource;
+
+[SqlSourceGenerate]
+public partial class OrderRepository(DbConnection connection)
+{
+    public Task<GetOrderDto?> Get(long orderId) =>
+        connection.QuerySingleOrDefaultAsync<GetOrderDto>(Sql.GetOrder, new GetOrderParams(orderId));
+}
+```
+
+```csharp
+// Once, when the application starts, before the first query
+DefaultTypeMap.MatchNamesWithUnderscores = true;
+```
+
+The input model is the parameter object, and the output model is the type of a row.  Three things make Dapper read them:
+
+- **Columns in snake_case need `DefaultTypeMap.MatchNamesWithUnderscores`**, as above: Dapper matches `customer_name` to `CustomerName` only with it.
+- **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.
+- **Sorted models are classes.**  Dapper matches a record's constructor to the columns by position, so a record whose properties are sorted no longer matches.  A class is matched by name:
+
+  ```xml
+  <PropertyGroup>
+      <SqlSourceGeneratorParameters>sort-output</SqlSourceGeneratorParameters>
+      <SqlSourceOutputModelType>class</SqlSourceOutputModelType>
+  </PropertyGroup>
+  ```
+
+A column whose alias ends in `!` or `?`, which sets its property's nullability, keeps the mark in its name, and Dapper does not match it to the property: give such a column an alias without the mark when you read it through Dapper, or read the row yourself.
+
+Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [shape of a model](settings.md#setting-model-type), and [known issues](generator.md#known-issues) for parameters in snake_case and for a column whose name ends in `!` or `?`.
 
 <a id="table-name-at-run-time"></a>
 

@@ -19,21 +19,21 @@ flowchart LR
     end
     sql --> generator["Generator"]
     attribute --> generator
-    generator --> code["Constants and token methods"]
+    generator --> code["Constants, token methods and models"]
     project -->|"dotnet msbuild runs SqlSourceWriteManifest"| manifest["Manifest"]
     manifest --> tool["sqlsource describe"]
     sql -->|"listed in the manifest"| tool
     attribute -->|"read as syntax"| tool
     tool -->|"describes against"| database[("Database")]
     tool --> sidecar[".sql.json sidecar"]
-    sidecar -->|"checked"| generator
+    sidecar -->|"checked and read"| generator
 ```
 
-In a build, the compiler gives the generator the project's `.sql` files and their sidecars as additional files, its settings as MSBuild properties and item metadata, and the types that carry `[SqlSourceGenerate]`, an attribute the generator itself adds to the compilation.  The generator parses each file that a type claims and writes the type's file: a constant for each query, or a method for a query that has tokens.  It also reads the sidecar of each claimed file, and reports a query that needs an entry and has no current one, as [sidecars](generator.md#sidecars) describes.
+In a build, the compiler gives the generator the project's `.sql` files and their sidecars as additional files, its settings as MSBuild properties and item metadata, and the types that carry `[SqlSourceGenerate]`, an attribute the generator itself adds to the compilation.  The generator parses each file that a type claims and writes the type's file: a constant for each query, or a method for a query that has tokens.  It also reads the sidecar of each claimed file, and reports a query that needs an entry and has no current one, as [sidecars](generator.md#sidecars) describes.  From each entry that passed the checks it gives the query's parameters and columns their C# types, and writes the query's models, once for each full name across the project, as [models](generator.md#models) describes.
 
 Outside a build, `sqlsource describe` finds the run unit and evaluates its projects with `dotnet msbuild`, which runs `SqlSourceWriteManifest`.  It finds `[SqlSourceGenerate]` in a manifest's `Compile` files by syntax, with `AttributeReader`, and reads the manifest's `.sql` files that a type claims.  From those it plans the run with the generator's own code, asks each query's database through a describer, and writes a sidecar beside each `.sql` file.
 
-Nothing of a sidecar reaches the generated code: the generator checks the sidecars and reports what it finds.
+The models are the one part of the generated code that a sidecar decides: a type's own file, its constants and token methods, is the same with a sidecar or without one.
 
 ## Shared code
 
@@ -95,7 +95,7 @@ The `<file>.sql.json` file that `sqlsource describe` writes beside a `.sql` file
 
 ## Reading guide
 
-- [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a `.sql` file is parsed, how each claimed file's sidecar is read and checked, what is written for a type, how diagnostics travel, and the sidecar model the assembly holds.
+- [The generator](generator.md): the incremental pipeline and its steps, how the settings are read and resolved in two stages, how a `.sql` file is parsed, how each claimed file's sidecar is read and checked, the C# types and the models of a query, what is written for a type and for a model, how diagnostics travel, and the sidecar model the assembly holds.
 - [The MSBuild files and the manifest](msbuild-and-manifest.md): what the props and targets hand the compiler, how they trim each value, and the manifest, whose format is the contract between the package and the tool, with its known limits.
 - [The tool](tool.md): how `sqlsource` reads a command line and ends a run, the steps of a `describe` run from the run unit to the sidecars, what each folder does and uses of the generator, and how a run reports and logs.
 - [The PostgreSQL describer](postgres-describer.md): the contract every describer implements, the exchange its calls go through and how a capture is recorded and replayed, then how the PostgreSQL describer describes one query, builds its parameters and columns, matches a table and chooses each error, and why no query can make it run a statement.

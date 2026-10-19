@@ -1,6 +1,6 @@
 # PostgreSQL
 
-SqlSource reads PostgreSQL files by the `postgres` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, and about the C# types that a described query's columns and parameters get.  How SqlSource reads a PostgreSQL file, its comments and strings, is on [the dialects page](dialects.md).
+SqlSource reads PostgreSQL files by the `postgres` [dialect](dialects.md), and the `sqlsource` tool can describe their queries: it asks your database what each query's parameters and columns are, and writes the answer to the query's [sidecar](tool.md#sidecar-files).  This page is about describing, about the C# types that a described query's columns and parameters get, and about the models built from them.  How SqlSource reads a PostgreSQL file, its comments and strings, is on [the dialects page](dialects.md).
 
 ```xml
 <PropertyGroup>
@@ -104,7 +104,17 @@ SqlSource treats a column as possibly null when:
 - **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  Every column of such a query is possibly null.
 - **The query has an outer join, `MERGE`, `OLD` or `NEW`, and the column comes through a subquery or a `WITH` query, or from a table that an extension such as Citus or TimescaleDB manages.**  Such a column can be treated as possibly null even when its table column is `NOT NULL`.
 
-> **Coming in a later release.**  Generated models will make a property nullable for each column that can be null, and non-nullable for each that never is.  See [what works today](README.md#what-works-today).
+A column that can be null gets a nullable property in the query's [output model](#models), `int?` or `string?`, and a column that is never null a property that cannot be null, `int` or `string`.  Where you know better than these rules, the name of the column decides instead: an alias that ends in `!` gives a property that cannot be null, and one that ends in `?` a property that can.
+
+```sql postgres
+-- name: GetCustomerTotals
+SELECT c.id, c.name, sum(o.total) AS "total!"
+FROM customers c
+JOIN orders o ON o.customer_id = c.id
+GROUP BY c.id, c.name;
+```
+
+The sum of a group of `NOT NULL` totals is never null, though SqlSource treats it as possibly null: `"total!"` gives the property `Total` the type `decimal` and not `decimal?`.  Write the alias in quotes, since `!` and `?` are not part of a plain name, and the mark is left out of the property's name.  A `!` is your word, and nothing checks it.  Dapper does not read a column whose name has the mark into its model: see [known issues](#known-issues).  See [which properties can be null](generator.md#model-nullability).
 
 <a id="type-map"></a>
 
@@ -119,7 +129,7 @@ WHERE id = @id;
 
 Each column and each parameter of a described query gets a C# type: the type that Npgsql reads a value of its PostgreSQL type as.  If `id` is a `bigint`, `placed_at` a `timestamp with time zone`, `total` a `numeric(12,2)`, `tags` a `text[]` and `born` a `date`, they are `long`, `System.DateTime`, `decimal`, `string[]`, and `System.DateTime` on Npgsql 8 and 9 or `System.DateOnly` on Npgsql 10; `@id` is a `long`.  Whether a column can be null is decided [above](#nullability), not by its type.
 
-Today the build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They change no generated code yet: the [models](#models) of a later release will be built from them.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides): `timestamptz=System.DateTimeOffset`.
+The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides): `timestamptz=System.DateTimeOffset`.
 
 <a id="which-npgsql"></a>
 
@@ -208,7 +218,30 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 
 ## Models
 
-> **Coming in a later release.**  The generator will write a type for the parameters and a type for the result rows of each described PostgreSQL query.  See [what works today](README.md#what-works-today).
+```sql postgres
+-- name: FindOrders
+-- param: @since timestamptz
+-- param: @status text null
+SELECT o.id, o.placed_at, c.name AS customer_name
+FROM orders o
+LEFT JOIN customers c ON c.id = o.customer_id
+WHERE o.placed_at >= @since AND (@status IS NULL OR o.status = @status);
+```
+
+```csharp
+public sealed record FindOrdersParams(global::System.DateTime Since, string? Status);
+
+public sealed record FindOrdersDto(long Id, global::System.DateTime PlacedAt, string? CustomerName);
+```
+
+A described PostgreSQL query gets the [models](generator.md#models) that every described query gets, by the rules of the generator page; their namespace and documentation are left out above.  What PostgreSQL decides in them:
+
+- **Each property's type** is its column's or parameter's C# type, from [the type table](#type-table) under the version of Npgsql that the project references, or from the [type override](settings.md#setting-type-overrides).  Above, `id` is a `bigint` and `placed_at` a `timestamp with time zone`, both `NOT NULL`.
+- **A column's property can be null** by [which columns can be null](#nullability): `customer_name` comes from the optional side of the `LEFT JOIN`, so its property is a `string?`.  A column's alias can say otherwise with `!` or `?`.
+- **A parameter's property can be null** only when its `-- param:` marker says `null`, as `@status` does, since PostgreSQL does not say whether a parameter can be null.
+- **A column with no name**, which PostgreSQL calls `?column?`, as an expression or a literal without an alias, is [SQLSRC253](diagnostics.md#sqlsrc253), and the query gets no models until it is fixed.  Give it an alias.
+- **A query whose rows are a whole table** gets a model named after the table, with the table's schema before its name unless the schema is `public`: `users` gives `UsersDto`, and `billing.invoices` gives `BillingInvoicesDto`.  See [table models](generator.md#table-models).
+- **Updating Npgsql from 9 to 10** changes the types of the properties for `date`, `time`, `cidr`, `daterange` and `datemultirange`, as [which version of Npgsql](#which-npgsql) says, and so the models.
 
 <a id="query-methods"></a>
 
@@ -220,7 +253,8 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 
 ## Known issues
 
-- **Many columns that are never null are treated as possibly null.**  The rules [above](#nullability) leave out much that a person can see: `sum` or `max` of a `NOT NULL` column in a `GROUP BY` query, `count(x)`, `EXISTS (...)` as a column, the rows of `VALUES`, arithmetic on columns that are never null, a recursive `WITH` query, the columns of a view.  Nothing is wrong when that happens, and no generated code depends on it today.
+- **Many columns that are never null are treated as possibly null.**  The rules [above](#nullability) leave out much that a person can see: `sum` or `max` of a `NOT NULL` column in a `GROUP BY` query, `count(x)`, `EXISTS (...)` as a column, the rows of `VALUES`, arithmetic on columns that are never null, a recursive `WITH` query, the columns of a view.  Nothing is wrong when that happens, but the column's property in the query's model is nullable, and costs a null check in your code.  Where you know the column is never null, end its alias with `!`, as [above](#nullability), unless you read the rows with Dapper, which does not read such a column: see the next issue.
+- **A column whose alias ends in `!` or `?` is not read into its model by Dapper.**  The column keeps the mark in its name, `total!`, while the property is `Total`, and Dapper matches columns to properties by name: with a record model it throws when it reads the rows, and with a class model it leaves the property at its default value.  With Dapper, alias the column without the mark and take the nullability that the description gives, or read the row with your own code.  The query methods of a later release read the columns by position, and are not affected.
 - **Describing through a pooler can give the wrong error, or a wrong answer.**  Behind a pooler in transaction mode, most queries fail with [SQLSRC236](diagnostics.md#sqlsrc236), but some are reported as [SQLSRC231](diagnostics.md#sqlsrc231) with a message about the number of columns, and in rare cases a column can be recorded with the nullability of another statement that an earlier run left on the server.  Connect directly to the server, as [connecting](#connecting) says, and describe again with `--force`.
 - **A type of your own named like a built-in one changes the names of built-in types.**  When the connection's search path puts a schema that has a type named like a built-in, such as a domain `public.text`, before `pg_catalog`, the tool records the built-in type as `pg_catalog.text` and not `text`.  Two databases that differ only in this describe the same query differently, and `--check` against one reports the sidecars written against the other as out of date.  Rename the type, or keep `pg_catalog` first on the search path of the connection the tool uses, the same on every machine.
 - **A query over a table with many partitions is slow to describe.**  The tool looks at every partition of a partitioned table, whatever the query's conditions, when it works out which columns can be null.  On a table of thousands of partitions each such query takes longer to describe, and the [log](tool.md#logs) of the run grows.  Only describing is slower; nothing else is affected.
