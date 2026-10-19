@@ -4,7 +4,7 @@ This project runs the PostgreSQL describer and the `describe` command against a 
 
 ## Running
 
-The project needs Docker running, and its first run pulls the image.  It starts one container for the run, with the database `fixtures` and the schema `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql`, and a second database, `realistic`, for the realistic corpus below.
+The project needs Docker running, and its first run pulls the image.  It starts one container for the run, with the database `fixtures` and the schema `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql`, and a second database, `realistic`, for the realistic corpus below.  It also has the databases `app` and `billing` for the end-to-end tests, each built from the `schema.sql` and `seed.sql` in its folder of `tests/SqlSource.Tests.Postgres/EndToEnd/`.
 
 ```bash
 dotnet test --project tests/SqlSource.Tests.Postgres
