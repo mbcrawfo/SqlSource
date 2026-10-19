@@ -1,21 +1,50 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using System.Text;
+using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Paths;
+using SqlSource.Generation.Types;
+using SqlSource.Settings;
 
 namespace SqlSource.Generation.Models;
 
 /// <summary>
-/// Gathers the requests of every type by the full name of their model, and gives one model for each full name.
+/// Gathers the requests of every type by the full name of their model, and gives one model for each full name that
+/// can be generated.
 /// </summary>
+/// <remarks>
+/// <para>
+/// The first request of a full name is its model, and each later request that differs from it is <c>SQLSRC257</c> and
+/// joins no model.  The model is public when any request that joined it is.
+/// </para>
+/// <para>
+/// A model is not generated, and each query that joined it is told why, when a property has the model's name
+/// (<c>SQLSRC256</c>), when it is public and a property's type is not (<c>SQLSRC251</c>), or when its name cannot be
+/// used (<c>SQLSRC258</c>): the project has it, it is the namespace of another model, a part of its namespace is
+/// another model, or it is lower-case ASCII letters alone, which the compiler warns on.
+/// </para>
+/// </remarks>
 internal static class ModelCollector
 {
-    // A stable sort, so that two requests of one place, from two types whose names differ only by arity, keep the
-    // order of the compilation.
+    private const string TakenByTheModel = "is the name of its model";
+
+    // Each help is given without its period.
+    private const string AliasIt = "Give it an alias";
+
+    private const string RenameIt = "Rename it";
+
+    // The second case of SQLSRC251, before the model's full name and after it, and its help.
+    private const string NotPublicBefore = "that type is not public, and the model '";
+
+    private const string NotPublicAfter = "' is";
+
+    private const string MakeItPublic = "Make the type public, or make each type that claims the query's file internal";
+
     private static readonly IComparer<ModelSource> SourceOrder = Comparer<ModelSource>.Create(ModelSource.Comparison);
 
     /// <summary>
@@ -37,25 +66,100 @@ internal static class ModelCollector
                 .ToImmutableArray()
         );
 
+    /// <summary>The groups' full names, in their order: ordinal, and each once.</summary>
+    public static EquatableArray<string> FullNamesOf(EquatableArray<ModelGroup> groups) =>
+        new(groups.Select(static group => group.FullName).ToImmutableArray());
+
     /// <summary>
-    /// One model for each group, written from the group's first request and named after each query of the group.
-    /// The hint names are made unique ignoring case, since the compiler throws on two that are equal so.
+    /// One model for each group that can be generated, written from the group's first request and named after each
+    /// query that joined it, and the problems of the others.  The hint names are made unique ignoring case, since the
+    /// compiler throws on two that are equal so.
     /// </summary>
-    public static ModelSet Resolve(EquatableArray<ModelGroup> groups)
+    /// <param name="groups">The requests by full name, as <see cref="Group" /> gives them.</param>
+    /// <param name="taken">
+    /// The full names the project has, as <see cref="ModelNameChecker.FindTaken" /> gives them.
+    /// </param>
+    public static ModelSet Resolve(EquatableArray<ModelGroup> groups, EquatableArray<TakenName> taken)
     {
         if (groups.Count == 0)
         {
             return new ModelSet(EquatableArray<Model>.Empty, EquatableArray<DiagnosticInfo>.Empty);
         }
 
-        var hintNames = groups.Select(static group => HintName.ForModel(group.FullName)).ToImmutableArray();
-        var ambiguous = HintName.FindAmbiguous(hintNames);
-        var models = ImmutableArray.CreateBuilder<Model>(groups.Count);
-        var text = new StringBuilder();
-        for (var index = 0; index < groups.Count; index++)
+        var names = new Names(groups, taken);
+        var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
+        var emitted = new List<(ModelRequest First, List<ModelRequest> Joined, bool IsPublic)>(groups.Count);
+        var problems = new List<Problem>();
+        foreach (var group in groups)
         {
-            var requests = groups[index].Requests;
+            var requests = group.Requests;
             var first = requests[0];
+            var joined = new List<ModelRequest>(requests.Count) { first };
+            for (var index = 1; index < requests.Count; index++)
+            {
+                var later = requests[index];
+                if (FindDifference(first, later) is not { } difference)
+                {
+                    joined.Add(later);
+                    continue;
+                }
+
+                AddOnce(
+                    diagnostics,
+                    DiagnosticInfo.Create(
+                        SqlDiagnostics.ModelsDiffer,
+                        later.Source.MarkerLocation ?? later.Source.NameLocation,
+                        RoleOf(later.Role),
+                        group.FullName,
+                        later.Source.QueryName,
+                        RoleOf(first.Role),
+                        QueryOf(first.Source, later.Source),
+                        difference
+                    )
+                );
+            }
+
+            var isPublic = joined.Exists(static request => request.IsPublic);
+            problems.Clear();
+            FindProblems(first, isPublic, names, problems);
+            if (problems.Count == 0)
+            {
+                emitted.Add((first, joined, isPublic));
+                continue;
+            }
+
+            // Each distinct query once, though two types that claim it ask for its model twice.  Each query is told
+            // of its own property, whose column or parameter and type override can differ from the first query's.
+            var told = new List<LocationInfo>(joined.Count);
+            foreach (var request in joined)
+            {
+                if (told.Contains(request.Source.NameLocation))
+                {
+                    continue;
+                }
+
+                told.Add(request.Source.NameLocation);
+                foreach (var problem in problems)
+                {
+                    diagnostics.Add(Tell(problem, request, group.FullName));
+                }
+            }
+        }
+
+        return new ModelSet(Models(emitted), new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()));
+    }
+
+    private static EquatableArray<Model> Models(
+        List<(ModelRequest First, List<ModelRequest> Joined, bool IsPublic)> emitted
+    )
+    {
+        var hintNames = emitted.Select(static model => HintName.ForModel(model.First.FullName)).ToImmutableArray();
+        var ambiguous = HintName.FindAmbiguous(hintNames);
+        var models = ImmutableArray.CreateBuilder<Model>(emitted.Count);
+        var text = new StringBuilder();
+        for (var index = 0; index < emitted.Count; index++)
+        {
+            var (first, joined, isPublic) = emitted[index];
             models.Add(
                 new Model(
                     HintName.MakeUnique(hintNames[index], ambiguous),
@@ -63,21 +167,189 @@ internal static class ModelCollector
                     first.Name,
                     first.Role,
                     first.Kind,
-                    first.IsPublic,
+                    isPublic,
                     first.Properties,
-                    SummaryXml(first.Role, requests, text)
+                    SummaryXml(first.Role, joined, text)
                 )
             );
         }
 
-        return new ModelSet(new EquatableArray<Model>(models.ToImmutable()), EquatableArray<DiagnosticInfo>.Empty);
+        return new EquatableArray<Model>(models.MoveToImmutable());
     }
 
+    // The first difference of the later request from the first, as SQLSRC257 words it, or null when they give one
+    // model: the role, the kind, the sorting, the number of properties, then each property's name, type and
+    // nullability in turn.  Their documentation changes no C#, so it is not compared.
+    private static string? FindDifference(ModelRequest first, ModelRequest later)
+    {
+        if (first.Role != later.Role)
+        {
+            return "one is an input model and the other an output model";
+        }
+
+        if (first.Kind != later.Kind)
+        {
+            return "it is a '" + KindOf(later.Kind) + "' here and a '" + KindOf(first.Kind) + "' there";
+        }
+
+        if (first.IsSorted != later.IsSorted)
+        {
+            return later.IsSorted
+                ? "its properties are sorted here and not there"
+                : "its properties are sorted there and not here";
+        }
+
+        var (here, there) = (later.Properties, first.Properties);
+        if (here.Count != there.Count)
+        {
+            return "it has "
+                + here.Count.ToString(CultureInfo.InvariantCulture)
+                + (here.Count == 1 ? " property here and " : " properties here and ")
+                + there.Count.ToString(CultureInfo.InvariantCulture)
+                + " there";
+        }
+
+        for (var index = 0; index < here.Count; index++)
+        {
+            var (mine, theirs) = (here[index], there[index]);
+            if (!string.Equals(mine.Name, theirs.Name, StringComparison.Ordinal))
+            {
+                return "its property "
+                    + (index + 1).ToString(CultureInfo.InvariantCulture)
+                    + " is '"
+                    + mine.Name
+                    + "' here and '"
+                    + theirs.Name
+                    + "' there";
+            }
+
+            if (!string.Equals(mine.Type.Text, theirs.Type.Text, StringComparison.Ordinal))
+            {
+                return "the property '"
+                    + mine.Name
+                    + "' is '"
+                    + PostgresTypeMap.AsWritten(mine.Type.Text)
+                    + "' here and '"
+                    + PostgresTypeMap.AsWritten(theirs.Type.Text)
+                    + "' there";
+            }
+
+            if (mine.IsNullable != theirs.IsNullable)
+            {
+                return "the property '"
+                    + mine.Name
+                    + (mine.IsNullable ? "' is nullable here and not there" : "' is nullable there and not here");
+            }
+        }
+
+        return null;
+    }
+
+    // The problems that keep the model from being generated, in the order of their ids.
+    private static void FindProblems(ModelRequest first, bool isPublic, Names names, List<Problem> problems)
+    {
+        var properties = first.Properties;
+        if (isPublic)
+        {
+            for (var index = 0; index < properties.Count; index++)
+            {
+                if (!properties[index].Type.IsPublic)
+                {
+                    problems.Add(new Problem(ProblemKind.TypeNotPublic, index, null));
+                    break;
+                }
+            }
+        }
+
+        // CS0542.  The property names are distinct ignoring case, so one at most has the model's.
+        for (var index = 0; index < properties.Count; index++)
+        {
+            if (string.Equals(properties[index].Name, first.Name, StringComparison.Ordinal))
+            {
+                problems.Add(new Problem(ProblemKind.NamedAsTheModel, index, null));
+                break;
+            }
+        }
+
+        if (names.FindUnusable(first.FullName, first) is { } reason)
+        {
+            problems.Add(new Problem(ProblemKind.NameUnusable, -1, reason));
+        }
+    }
+
+    // The problem as the query of the request is told of it.  Every request that joined a model has its properties'
+    // names, types and nullability, so the property at the problem's index is the one the problem is about.
+    private static DiagnosticInfo Tell(Problem problem, ModelRequest request, string fullName)
+    {
+        var at = request.Source.NameLocation;
+        if (problem.Kind == ProblemKind.NameUnusable)
+        {
+            return DiagnosticInfo.Create(
+                SqlDiagnostics.ModelNameUnusable,
+                at,
+                fullName,
+                request.Source.QueryName,
+                problem.Reason ?? ""
+            );
+        }
+
+        var property = request.Properties[problem.Property];
+        var help = request.Role == ModelRole.Input ? RenameIt : AliasIt;
+        return problem.Kind == ProblemKind.TypeNotPublic
+            ? DiagnosticInfo.Create(
+                SqlDiagnostics.MappedTypeNotAccessible,
+                at,
+                property.Subject,
+                property.Type.Key,
+                PostgresTypeMap.AsWritten(property.Type.Text),
+                property.Type.Place ?? "",
+                NotPublicBefore + fullName + NotPublicAfter,
+                MakeItPublic
+            )
+            : DiagnosticInfo.Create(
+                SqlDiagnostics.PropertyNameTaken,
+                at,
+                property.Subject,
+                property.Name,
+                TakenByTheModel,
+                help
+            );
+    }
+
+    private static void AddOnce(ImmutableArray<DiagnosticInfo>.Builder diagnostics, DiagnosticInfo diagnostic)
+    {
+        if (!diagnostics.Contains(diagnostic))
+        {
+            diagnostics.Add(diagnostic);
+        }
+    }
+
+    private static string RoleOf(ModelRole role) => role == ModelRole.Input ? "input" : "output";
+
+    // A kind as a user writes it.
+    private static string KindOf(ModelKind kind) =>
+        kind switch
+        {
+            ModelKind.Record => "record",
+            ModelKind.SealedRecord => "sealed record",
+            ModelKind.Class => "class",
+            ModelKind.SealedClass => "sealed class",
+            _ => kind.ToString(),
+        };
+
+    // "'GetUser' in Users.sql", and its type too when the later request is of the same query.
+    private static string QueryOf(ModelSource first, ModelSource later) =>
+        "'"
+        + first.QueryName
+        + "' in "
+        + first.FileName
+        + (IsSameQuery(first, later) ? ", for the type " + first.ClaimingTypeName : "");
+
     // The first query's -- summary:, escaped, then on a line of its own the sentence that says what the model is and
-    // names each query once, in order:
+    // names each query that joined it once, in order:
     // "A row of the queries <c>A</c> from <c>F.sql</c> and <c>B</c> from <c>G.sql</c>."
     // Two types that claim one query ask for its model twice, and the requests of a query are next to each other.
-    private static string SummaryXml(ModelRole role, EquatableArray<ModelRequest> requests, StringBuilder text)
+    private static string SummaryXml(ModelRole role, List<ModelRequest> requests, StringBuilder text)
     {
         var queries = new List<ModelSource>(requests.Count);
         foreach (var source in requests.Select(static request => request.Source))
@@ -115,4 +387,100 @@ internal static class ModelCollector
 
     private static bool IsSameQuery(ModelSource left, ModelSource right) =>
         left.QueryIndex == right.QueryIndex && SqlPath.Comparer.Equals(left.NormalizedPath, right.NormalizedPath);
+
+    // What keeps a model from being generated: a property whose type is not public, in a public model (SQLSRC251), a
+    // property named as the model (SQLSRC256), or a name that cannot be used (SQLSRC258).
+    private enum ProblemKind
+    {
+        TypeNotPublic,
+        NamedAsTheModel,
+        NameUnusable,
+    }
+
+    // A problem of a model, with the index of the property it is about, or the reason its name cannot be used.
+    private readonly record struct Problem(ProblemKind Kind, int Property, string? Reason);
+
+    // What the project and the other models say of a model's full name.
+    private sealed class Names
+    {
+        // A string's default equality is ordinal.
+        private readonly HashSet<string> _fullNames = [];
+
+        // Every namespace a model is in, and each namespace those are in.
+        private readonly HashSet<string> _namespaces = [];
+
+        private readonly Dictionary<string, TakenName> _taken = [];
+
+        public Names(EquatableArray<ModelGroup> groups, EquatableArray<TakenName> taken)
+        {
+            foreach (var group in groups)
+            {
+                _ = _fullNames.Add(group.FullName);
+                var @namespace = group.Requests[0].Namespace;
+                for (var period = @namespace.IndexOf('.'); period > 0; period = @namespace.IndexOf('.', period + 1))
+                {
+                    _ = _namespaces.Add(@namespace.Substring(0, period));
+                }
+
+                if (@namespace.Length > 0)
+                {
+                    _ = _namespaces.Add(@namespace);
+                }
+            }
+
+            foreach (var name in taken)
+            {
+                _taken[name.FullName] = name;
+            }
+        }
+
+        // Why the model's name cannot be used, as SQLSRC258 words it, or null.
+        public string? FindUnusable(string fullName, ModelRequest first)
+        {
+            if (_taken.TryGetValue(fullName, out var taken))
+            {
+                return taken.Reason switch
+                {
+                    TakenReason.Type => "a type of this project has that full name",
+                    TakenReason.Namespace => "it is a namespace of this project",
+                    TakenReason.NamespacePartIsType or _ => "'"
+                        + taken.Part
+                        + "' is a type of this project, and a part of its namespace",
+                };
+            }
+
+            if (_namespaces.Contains(fullName))
+            {
+                return "it is the namespace of another model";
+            }
+
+            // Each part of the namespace from its start, the whole namespace last.
+            var @namespace = first.Namespace;
+            for (
+                var period = @namespace.IndexOf('.');
+                @namespace.Length > 0;
+                period = @namespace.IndexOf('.', period + 1)
+            )
+            {
+                var part = period < 0 ? @namespace : @namespace.Substring(0, period);
+                if (_fullNames.Contains(part))
+                {
+                    return "'" + part + "' is another model, and a part of its namespace";
+                }
+
+                if (period < 0)
+                {
+                    break;
+                }
+            }
+
+            return IsLowerCaseLetters(first.Name)
+                ? "the compiler warns on a type name of lower-case ASCII letters alone"
+                : null;
+        }
+
+        // CS8981: a name of ASCII lower-case letters alone may become a keyword.
+        private static bool IsLowerCaseLetters(string name) =>
+            name.Length > 0 && name.All(static character => character is >= 'a' and <= 'z');
+    }
 }

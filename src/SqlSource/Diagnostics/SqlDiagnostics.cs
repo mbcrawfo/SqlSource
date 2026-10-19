@@ -555,12 +555,12 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} to {3} as SQLSRC250's, {4} the case, a type this project cannot see or a type that is not public in a model
+    // that is, and {5} its help, without its period.
     public static readonly DiagnosticDescriptor MappedTypeNotAccessible = new(
         id: "SQLSRC251",
         title: "Mapped type is not accessible",
-        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and this project cannot see that type.  "
-            + "Make it, and each type it is nested in, public, or internal when it is this project's own, or give this "
-            + "project its assembly's internals with InternalsVisibleTo.",
+        messageFormat: "The type override maps '{1}' to '{2}' for {0}, in {3}, and {4}.  {5}.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -629,6 +629,34 @@ internal static class SqlDiagnostics
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
         helpLinkUri: HelpLinkBase + "sqlsrc256",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} and {3} are the roles of the later and the earlier model, "input" or "output", {1} the full name, {2} the
+    // later query's name, {4} the earlier query, as "'GetUser' in Users.sql", with ", for the type App.Repo" when the
+    // two are one query, and {5} the first difference.
+    public static readonly DiagnosticDescriptor ModelsDiffer = new(
+        id: "SQLSRC257",
+        title: "Two models of one name differ",
+        messageFormat: "The {0} model '{1}' of the query '{2}' is not the same as the {3} model of that name of the "
+            + "query {4}: {5}.  Give one of the two queries another model name, or make the two the same.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc257",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // {0} is the model's full name, {1} the query's name and {2} why the name cannot be used.
+    public static readonly DiagnosticDescriptor ModelNameUnusable = new(
+        id: "SQLSRC258",
+        title: "Model name cannot be used",
+        messageFormat: "The model '{0}' of the query '{1}' cannot be generated: {2}.  Give the query another model "
+            + "name, or set another model namespace.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc258",
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
@@ -701,6 +729,8 @@ internal static class SqlDiagnostics
             PropertyNameNotIdentifier,
             PropertyNameRepeated,
             PropertyNameTaken,
+            ModelsDiffer,
+            ModelNameUnusable,
             OutputModelWithoutRows
         );
 

@@ -94,4 +94,6 @@ SQLSRC253 | SqlSource | Error | Column has no name
 SQLSRC254 | SqlSource | Error | Name is not an identifier after PascalCase
 SQLSRC255 | SqlSource | Error | Two names give one property name
 SQLSRC256 | SqlSource | Error | Property name is taken
+SQLSRC257 | SqlSource | Error | Two models of one name differ
+SQLSRC258 | SqlSource | Error | Model name cannot be used
 SQLSRC259 | SqlSource | Error | Output model on a query without rows

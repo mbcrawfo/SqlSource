@@ -415,23 +415,39 @@ public sealed class TypeOverrideLevelTests
             .ShouldBe([new PropertyType("global::MyApp.OldThing", false, true, true, "int4", ThePropertyPlace)]);
     }
 
+    // Claimed by an internal type, so that its model is internal and compiles.  In a public model the type is
+    // SQLSRC251, which SharedModelTests holds.
     [Fact]
     public void Run_MappedTypeOfTheProjectThatIsInternal_IsNotPublic()
     {
         var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var source = Source.Replace(
+            "public partial class Sample",
+            "internal partial class Sample",
+            StringComparison.Ordinal
+        );
 
-        var run = Run("int4=MyApp.Inner", (file, [Entry(file, "GetUser", Int4)]));
+        var run = Run(source, "int4=MyApp.Inner", (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBeEmpty();
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
             .ShouldBe([new PropertyType("global::MyApp.Inner", true, false, false, "int4", ThePropertyPlace)]);
     }
 
     // The files with their sidecars, under the property's type override, or none.
     private static GeneratorRun Run(string? property, params (SqlFile File, SidecarEntry[] Entries)[] files) =>
+        Run(Source, property, files);
+
+    private static GeneratorRun Run(
+        string source,
+        string? property,
+        params (SqlFile File, SidecarEntry[] Entries)[] files
+    ) =>
         GeneratorHarness.Run(
             OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
+            [new SourceFile(GeneratorHarness.SourcePath, source)],
             [.. files.SelectMany(file => new[] { file.File, Sidecars.Of(file.File, file.Entries) })],
             references: [NpgsqlReferences.Npgsql10],
             dialect: "postgres",

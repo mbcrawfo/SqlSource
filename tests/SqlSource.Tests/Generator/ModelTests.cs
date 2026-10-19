@@ -662,29 +662,6 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
     }
 
-    // C# tells the two names apart, and the compiler, which compares the names of generated files ignoring case,
-    // would throw on two files whose names are equal so: each file's name is made unique.
-    [Fact]
-    public void Run_FullNamesThatDifferByCase_GetFilesOfTheirOwn()
-    {
-        var file = new SqlFile(
-            UsersPath,
-            "-- name: GetUser\n-- output-model: UserDto\nSELECT 1;\n\n-- name: GetOther\n-- output-model: UserDTO\n"
-                + "SELECT 2;\n"
-        );
-
-        var run = Run(file, Entry(file, "GetUser", [], [Column("id")]), Entry(file, "GetOther", [], [Column("other")]));
-
-        AssertClean(run);
-        var files = ModelFiles(run);
-        files.Length.ShouldBe(2);
-        files.ShouldAllBe(name => name.StartsWith("App.User", StringComparison.OrdinalIgnoreCase));
-        run.Sources[files.Single(name => name.StartsWith("App.UserDto", StringComparison.Ordinal))]
-            .ShouldContain("record UserDto(int Id);");
-        run.Sources[files.Single(name => name.StartsWith("App.UserDTO", StringComparison.Ordinal))]
-            .ShouldContain("record UserDTO(int Other);");
-    }
-
     // Review focus 1: the type that asks for the SQL alone gets no models, and the other type's are in its namespace.
     [Fact]
     public void Run_QueryClaimedAtSqlAndAtModels_GetsTheModelsTypesModels()

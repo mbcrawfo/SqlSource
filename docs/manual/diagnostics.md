@@ -130,6 +130,8 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC254](#sqlsrc254) | Name is not an identifier after PascalCase |
 | [SQLSRC255](#sqlsrc255) | Two names give one property name |
 | [SQLSRC256](#sqlsrc256) | Property name is taken |
+| [SQLSRC257](#sqlsrc257) | Two models of one name differ |
+| [SQLSRC258](#sqlsrc258) | Model name cannot be used |
 | [SQLSRC259](#sqlsrc259) | Output model on a query without rows |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
@@ -1674,6 +1676,14 @@ The type override maps a database type to a C# type that the project cannot use:
 
 Make the type, and each type it is nested in, `public`.  A type of the project itself can be `internal` instead.  For a type of another assembly, you can also add `[assembly: InternalsVisibleTo("YourProject")]` to the assembly that declares it, which lets the project see its `internal` types.  The query's constant or method is still generated.
 
+The same error is reported when the type is not `public` and the model that would have the column or parameter as a property is: a model is `public` when a `public` type claims its query, and a `public` type cannot have a property of a type that is not.  The message then also names the model.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC251: The type override maps 'uuid' to 'App.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and that type is not public, and the model 'App.Queries.GetUserDto' is.  Make the type public, or make each type that claims the query's file internal.
+```
+
+Make the type `public`, or make each type that claims the query's file `internal`, which makes its models `internal`.  The model is not generated until then, and the query's constant or method still is.
+
 See: [Type overrides](settings.md#setting-type-overrides)
 
 ## SQLSRC252
@@ -1754,13 +1764,81 @@ The query's constant or method is still generated.
 
 **Property name is taken**
 
-A column or a parameter gives a property name that a record or `object` already has a member of: `EqualityContract`, `Equals`, `GetHashCode`, `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`, `PrintMembers`, `Deconstruct` or `Clone`.  A column named `equals` or `to_string` is one.  The message names the column or parameter and the property name.
+A column or a parameter gives a property name that a record or `object` already has a member of: `EqualityContract`, `Equals`, `GetHashCode`, `ToString`, `GetType`, `MemberwiseClone`, `Finalize`, `ReferenceEquals`, `PrintMembers`, `Deconstruct` or `Clone`.  A column named `equals` or `to_string` is one.  So is a property name that is the name of its model, which C# does not allow a member to have: a column `total` of a query whose `-- output-model:` marker names its model `Total`.  The message names the column or parameter and the property name.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC256: The column 'to_string' gives the property name 'ToString', which a record or object already has.  Give it an alias.
+/work/App/Queries/Orders.sql(1,10): error SQLSRC256: The column 'total' gives the property name 'Total', which is the name of its model.  Give it an alias.
 ```
 
-Give the column an alias, or rename the parameter, then run `dotnet sqlsource describe`.  The query's constant or method is still generated.
+Give the column an alias, or rename the parameter, then run `dotnet sqlsource describe`.  For a property named as its model, you can instead give the model [another name](settings.md#setting-model-name).  The query's constant or method is still generated.
+
+## SQLSRC257
+
+**Two models of one name differ**
+
+Two queries give their models one full name, by an `-- input-model:` or `-- output-model:` marker, or by the suffixes and the namespace, and the two models are not the same.  Two queries share a model when the two agree on the properties' names, C# types and nullability, in the same order, on the model type, `record`, `sealed record`, `class` or `sealed class`, and on whether the properties are sorted: one model is generated, and its documentation names each query.  An input model and an output model of one name are never the same.  Two types that claim one file and give its query's model one name are two queries here too, so their settings must agree.  The queries are taken in the order of their files' paths, then of their order in a file, then of the types' names, and the error is at the later of the two, at its marker when it has one and at its name otherwise.  The message names the model, the earlier query, with the type when the two are one query, and the first difference.
+
+```console
+/work/App/Queries/Users.sql(6,1): error SQLSRC257: The output model 'App.Queries.UserRow' of the query 'GetUsers' is not the same as the output model of that name of the query 'GetUser' in Users.sql: it has 2 properties here and 3 there.  Give one of the two queries another model name, or make the two the same.
+```
+
+```sql error
+-- name: GetUser
+-- output-model: UserRow
+SELECT id, name, email FROM users WHERE id = @id;
+
+-- name: GetUsers
+-- output-model: UserRow
+SELECT id, name FROM users;
+```
+
+Give one of the two queries [another model name](settings.md#setting-model-name), or make the two models the same, then run `dotnet sqlsource describe` if you changed a query:
+
+```sql postgres
+-- name: GetUser
+-- output-model: UserRow
+SELECT id, name, email FROM users WHERE id = @id;
+
+-- name: GetUsers
+-- output-model: UserSummary
+SELECT id, name FROM users;
+```
+
+The earlier query's model is still generated, and the later query has no model of that kind until the two agree.  The query's constant or method is still generated.
+
+## SQLSRC258
+
+**Model name cannot be used**
+
+A model's full name is one that a generated type cannot have, because the code would not compile or would be warned on:
+
+- a type of the project has the full name, the type that carries `[SqlSourceGenerate]` among them;
+- it is a namespace of the project, or a part of the model's namespace is a type of the project, as a [model namespace](settings.md#setting-model-namespace) of `App.Queries` beside a class `App.Queries`;
+- it is the namespace of another model, or a part of its namespace is another model, as `App.Data` beside `App.Data.Row`, which reports both;
+- its name is lower-case ASCII letters alone, as `usersdto`, which the compiler warns on, since such a name could become a keyword.
+
+The model is not generated, and each query that would have it is told.  The message names the model, the query and the reason.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC258: The model 'App.Queries.usersdto' of the query 'GetUsers' cannot be generated: the compiler warns on a type name of lower-case ASCII letters alone.  Give the query another model name, or set another model namespace.
+```
+
+```sql error
+-- name: GetUsers
+-- output-model: usersdto
+SELECT id, name FROM users;
+```
+
+Give the query [another model name](settings.md#setting-model-name), or set another [model namespace](settings.md#setting-model-namespace):
+
+```sql postgres
+-- name: GetUsers
+-- output-model: UserDto
+SELECT id, name FROM users;
+```
+
+The query's constant or method is still generated.
 
 ## SQLSRC259
 

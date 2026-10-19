@@ -354,8 +354,28 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (requests, _) => ModelCollector.Group(requests))
             .WithTrackingName(TrackingNames.ModelGroups);
 
+        // The models' full names alone, which an edit that leaves every name alone gives again, equal.
+        var modelNames = modelGroups
+            .Select(static (groups, _) => ModelCollector.FullNamesOf(groups))
+            .WithTrackingName(TrackingNames.ModelNames);
+
+        // Those names that the project has already, as a type or a namespace.  Like the lookup of the mapped types, it
+        // runs on every run, since the driver gives a new compilation each time: a few lookups for each name, and none
+        // for a project without a model.  Its value is equal until a type or a namespace of a name appears or goes.
+        var takenModelNames = context
+            .CompilationProvider.Combine(modelNames)
+            .Select(
+                static (input, cancellationToken) =>
+                    ModelNameChecker.FindTaken(input.Left, input.Right, cancellationToken)
+            )
+            .WithTrackingName(TrackingNames.TakenModelNames);
+
+        // A step of its own, since it sees every request at once: it is where the requests of one full name are
+        // checked against each other, and each model's name against the other models' and the project's, which
+        // decides which models are generated and what is reported.
         var models = modelGroups
-            .Select(static (groups, _) => ModelCollector.Resolve(groups))
+            .Combine(takenModelNames)
+            .Select(static (input, _) => ModelCollector.Resolve(input.Left, input.Right))
             .WithTrackingName(TrackingNames.Models);
 
         // Whether a query of the project needs an entry of postgres, whose types the driver decides.  Without one, the

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Immutable;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using SqlSource.Generation.Emitting;
@@ -36,7 +37,7 @@ internal static class TypeModels
 
         var usable = TypeEmitter.FindUsableFiles(target, type.Files, null);
         var requests = ImmutableArray.CreateBuilder<ModelRequest>();
-        string? claimingType = null;
+        (string Key, string Name)? claimingType = null;
         for (var index = 0; index < type.Files.Count; index++)
         {
             var parsed = type.Files[index];
@@ -71,14 +72,15 @@ internal static class TypeModels
                 }
 
                 claimingType ??= ClaimingTypeOf(target);
+                var claiming = claimingType.Value;
                 if (query.Input is { } input)
                 {
-                    requests.Add(Request(target, settings, parsed, query, claimingType, ModelRole.Input, input));
+                    requests.Add(Request(target, settings, parsed, query, claiming, ModelRole.Input, input));
                 }
 
                 if (query.Output is { } output)
                 {
-                    requests.Add(Request(target, settings, parsed, query, claimingType, ModelRole.Output, output));
+                    requests.Add(Request(target, settings, parsed, query, claiming, ModelRole.Output, output));
                 }
             }
         }
@@ -91,7 +93,7 @@ internal static class TypeModels
         QuerySettings settings,
         ParsedSqlFile file,
         QueryModels query,
-        string claimingType,
+        (string Key, string Name) claimingType,
         ModelRole role,
         EquatableArray<ModelProperty> properties
     )
@@ -143,7 +145,8 @@ internal static class TypeModels
                 file.FileName,
                 query.Index,
                 query.Name,
-                claimingType,
+                claimingType.Key,
+                claimingType.Name,
                 query.NameLocation,
                 marker?.Location,
                 query.Summary
@@ -155,20 +158,29 @@ internal static class TypeModels
     private static EquatableArray<ModelProperty> Sort(EquatableArray<ModelProperty> properties) =>
         new(properties.OrderBy(static property => property.Name, StringComparer.Ordinal).ToImmutableArray());
 
-    // "App.Outer.Repository": the namespace and each type's name, as values.
-    private static string ClaimingTypeOf(TargetType target)
+    // The claiming type as a sort key and as a message names it: the namespace and each type's name, as values, with a
+    // generic type's arity after a hyphen, "App.Outer.Repository-1", as HintName.Create writes them, so that
+    // Repository and Repository<T> are told apart, or with its type parameters, "App.Outer.Repository<T>".
+    private static (string Key, string Name) ClaimingTypeOf(TargetType target)
     {
+        var key = new StringBuilder(target.NamespaceValue);
         var name = new StringBuilder(target.NamespaceValue);
         foreach (var declaration in target.Types)
         {
-            if (name.Length > 0)
+            if (key.Length > 0)
             {
+                _ = key.Append('.');
                 _ = name.Append('.');
             }
 
-            _ = name.Append(declaration.ValueName);
+            _ = key.Append(declaration.ValueName);
+            _ = name.Append(declaration.ValueName).Append(declaration.TypeParameters);
+            if (declaration.Arity > 0)
+            {
+                _ = key.Append('-').Append(declaration.Arity.ToString(CultureInfo.InvariantCulture));
+            }
         }
 
-        return name.ToString();
+        return (key.ToString(), name.ToString());
     }
 }

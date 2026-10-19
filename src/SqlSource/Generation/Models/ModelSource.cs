@@ -10,7 +10,12 @@ namespace SqlSource.Generation.Models;
 /// <param name="QueryIndex">The query's index among the queries of its file.</param>
 /// <param name="QueryName">The query's name.</param>
 /// <param name="ClaimingType">
-/// The type that asked for the model: its namespace and its names, from the outermost, joined by <c>.</c>, as values.
+/// The type that asked for the model: its namespace and its names, from the outermost, joined by <c>.</c>, as values,
+/// each generic type's name followed by <c>-</c> and its arity, as <c>App.Repository-1</c>.
+/// </param>
+/// <param name="ClaimingTypeName">
+/// The type that asked for the model as a message names it: its namespace and its names, as values, each generic
+/// type's name followed by its type parameters as declared, as <c>App.Repository&lt;T&gt;</c>.
 /// </param>
 /// <param name="NameLocation">Where the query's name is in its file.</param>
 /// <param name="MarkerLocation">
@@ -23,6 +28,7 @@ internal sealed record ModelSource(
     int QueryIndex,
     string QueryName,
     string ClaimingType,
+    string ClaimingTypeName,
     LocationInfo NameLocation,
     LocationInfo? MarkerLocation,
     string? Summary
@@ -31,7 +37,8 @@ internal sealed record ModelSource(
     /// <summary>
     /// The order of the requests of one model: by path, in the order of <see cref="SqlPath.Comparer" />, then by
     /// the query's index in its file, then by the claiming type, ordinally.  It decides which request comes first,
-    /// and so is the same whatever the order of the types and files of the compilation.
+    /// and so is the same whatever the order of the types and files of the compilation: the arity in the claiming
+    /// type tells <c>Repository</c> from <c>Repository&lt;T&gt;</c>.
     /// </summary>
     public static Comparison<ModelSource> Comparison { get; } =
         static (left, right) =>

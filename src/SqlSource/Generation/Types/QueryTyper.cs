@@ -29,6 +29,13 @@ internal static class QueryTyper
     // without its period.
     private const string Describe = "Run 'sqlsource describe'";
 
+    // The first case of SQLSRC251, and its help.  The model's step reports the second.
+    private const string NotVisible = "this project cannot see that type";
+
+    private const string MakeItVisible =
+        "Make it, and each type it is nested in, public, or internal when it is this project's own, or give this "
+        + "project its assembly's internals with InternalsVisibleTo";
+
     /// <summary>The types of the file's queries whose entries are usable, and the errors of the others.</summary>
     public static FileTypes Type(FileTypesInput input)
     {
@@ -218,7 +225,9 @@ internal static class QueryTyper
                 SqlDiagnostics.MappedTypeNotAccessible,
                 failure,
                 subject,
-                at
+                at,
+                NotVisible,
+                MakeItVisible
             ),
             TypeMappingKind.MappedTypeNotAPropertyType => MappedTypeFailure(
                 SqlDiagnostics.MappedTypeNotAPropertyType,
@@ -243,20 +252,18 @@ internal static class QueryTyper
         key.IndexOf('.') >= 0 || TypeKeys.TryNormalize(key.AsSpan(), out _) ? key : "pg_catalog." + key;
 
     // A failure of a mapped type keeps the type the override names in its text, which the message gives as a user
-    // writes it, and the place that wrote the entry in its detail.
+    // writes it, and the place that wrote the entry in its detail.  SQLSRC251 adds its case and help after them.
     private static DiagnosticInfo MappedTypeFailure(
         DiagnosticDescriptor descriptor,
         TypeMapping failure,
         string subject,
-        LocationInfo at
+        LocationInfo at,
+        params string[] more
     ) =>
         DiagnosticInfo.Create(
             descriptor,
             at,
-            subject,
-            failure.Key,
-            PostgresTypeMap.AsWritten(failure.Text ?? ""),
-            failure.Detail ?? ""
+            [subject, failure.Key, PostgresTypeMap.AsWritten(failure.Text ?? ""), failure.Detail ?? "", .. more]
         );
 
     // "column 'id'", as a message names a parameter or column.
