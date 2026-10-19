@@ -146,7 +146,7 @@ The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version
 
 The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
-The ids from `SQLSRC253` to `SQLSRC259` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC256` and `SQLSRC259` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for a type that is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
+The ids from `SQLSRC253` to `SQLSRC259` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, and `SQLSRC259` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
 
 `SQLSRC901` is not in this list because it is not a problem.  It is the id under which SqlSource turns off the compiler's warning CS0436 for the types it adds to every project, in a project that sees the internals of another one that uses SqlSource; see [Projects that share internals](generator.md#projects-that-share-internals).
 
@@ -1676,7 +1676,7 @@ The type override maps a database type to a C# type that the project cannot use:
 
 Make the type, and each type it is nested in, `public`.  A type of the project itself can be `internal` instead.  For a type of another assembly, you can also add `[assembly: InternalsVisibleTo("YourProject")]` to the assembly that declares it, which lets the project see its `internal` types.  The query's constant or method is still generated.
 
-The same error is reported when the type is not `public` and the model that would have the column or parameter as a property is: a model is `public` when a `public` type claims its query, and a `public` type cannot have a property of a type that is not.  The message then also names the model.
+The same error is reported when the type is not `public` and the model that would have the column or parameter as a property is: a model is `public` when a `public` type claims its query, as [accessibility](generator.md#model-accessibility) says, and a `public` type cannot have a property of a type that is not.  Each such property is an error of its own, and the message then also names the model.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC251: The type override maps 'uuid' to 'App.UserKey' for column 'id', in the property SqlSourceTypeOverrides, and that type is not public, and the model 'App.Queries.GetUserDto' is.  Make the type public, or make each type that claims the query's file internal.
@@ -1684,19 +1684,19 @@ The same error is reported when the type is not `public` and the model that woul
 
 Make the type `public`, or make each type that claims the query's file `internal`, which makes its models `internal`.  The model is not generated until then, and the query's constant or method still is.
 
-See: [Type overrides](settings.md#setting-type-overrides), and for a model, [accessibility](generator.md#model-accessibility)
+See: [Type overrides](settings.md#setting-type-overrides)
 
 ## SQLSRC252
 
 **Mapped type cannot be a property's type**
 
-The type override maps a database type to a C# type that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
+The type override maps a database type to a C# type that no property of a model can have: a `static` class, a `ref struct` such as `System.Span<T>`, `System.Void`, or `System.Nullable<T>` as the whole type.  A type argument or an array's element that is a `static` class, a `ref struct` or `System.Void` is refused too, and so is `System.Nullable<T>` with a `?` after it, as a type argument or an array's element: `System.Nullable<int>?[]`.  So is a type when it, a type it is nested in or one of its type arguments is marked `[Obsolete]` as an error, as `[Obsolete("Use UserKey.", true)]`, since no code can use it without an error; and so is one marked `[Obsolete]` or `[Experimental]` under a diagnostic id that is not an identifier, such as `MY-001` or `1234`, since a model could not turn off the warning, or the error of `[Experimental]`, that its use gives.  `[Experimental]` on the assembly or module that declares the type counts as on the type.  A type marked `[Obsolete]` or `[Experimental]` otherwise is accepted, and its model compiles without a warning.  The message names the column or parameter, the database type, the C# type and the place that wrote the entry.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC252: The type override maps 'int4' to 'System.Nullable<int>' for column 'id', in the metadata SqlSourceTypeOverrides of the file, and no property can have that type.  Choose another type, and for System.Nullable<T> name T, since a column that can be null makes its property nullable.
 ```
 
-Map the database type to another C# type.  For `System.Nullable<T>`, map it to `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  The query's constant or method is still generated.
+Map the database type to another C# type.  For `System.Nullable<T>`, map it to `T`: a column that can be null already gets a nullable property, and one that cannot gets `T`.  For a type marked `[Obsolete]` as an error, map it to the type that replaces it.  The query's constant or method is still generated.
 
 See: [Type overrides](settings.md#setting-type-overrides)
 
@@ -1736,7 +1736,19 @@ The PascalCase of a column's or a parameter's name, which names its property, is
 /work/App/Queries/Orders.sql(1,10): error SQLSRC254: The column 'unit-price' gives the property name 'Unit-price', which is not a C# identifier.  Give it an alias.
 ```
 
-Give the column an alias that is a name a C# property can have, such as `AS unit_price`, or rename the parameter, then run `dotnet sqlsource describe`.  The query's constant or method is still generated.
+```sql error
+-- name: GetLines
+SELECT id, "unit-price" FROM order_lines;
+```
+
+Give the column an alias that is a name a C# property can have, or rename the parameter, then run `dotnet sqlsource describe`:
+
+```sql postgres
+-- name: GetLines
+SELECT id, "unit-price" AS unit_price FROM order_lines;
+```
+
+The query's constant or method is still generated.
 
 See: [Property names](generator.md#property-names)
 
@@ -1777,7 +1789,19 @@ A column or a parameter gives a property name that a record or `object` already 
 /work/App/Queries/Orders.sql(1,10): error SQLSRC256: The column 'total' gives the property name 'Total', which is the name of its model.  Give it an alias.
 ```
 
-Give the column an alias, or rename the parameter, then run `dotnet sqlsource describe`.  For a property named as its model, you can instead give the model [another name](settings.md#setting-model-name).  The query's constant or method is still generated.
+```sql error
+-- name: GetUsers
+SELECT id, to_string FROM users;
+```
+
+Give the column an alias, or rename the parameter, then run `dotnet sqlsource describe`:
+
+```sql postgres
+-- name: GetUsers
+SELECT id, to_string AS display_name FROM users;
+```
+
+For a property named as its model, you can instead give the model [another name](settings.md#setting-model-name).  The query's constant or method is still generated.
 
 See: [Property names](generator.md#property-names)
 

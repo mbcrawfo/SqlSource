@@ -41,9 +41,12 @@ public sealed class QueryTypesTests
     // The name of GetUser in Users.
     private const string GetUserName = "/app/Repo/Users.sql(1,10)-(1,17)";
 
+    // The warning ids of a C# type whose use gives none.
+    private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
+
     private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
-    private static readonly PropertyType Int = new("int", true, true, false, "int4", null);
+    private static readonly PropertyType Int = new("int", true, true, NoWarnings, "int4", null);
 
     [Theory]
     [InlineData("none")]
@@ -73,7 +76,7 @@ public sealed class QueryTypesTests
         var run = Run(Driver(driver), Users, Entry(Users, "GetUser", [], [Column("born", Catalog("date"))]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run).ShouldBe([new PropertyType(expected, true, true, false, "date", null)]);
+        ColumnsOf(run).ShouldBe([new PropertyType(expected, true, true, NoWarnings, "date", null)]);
     }
 
     [Fact]
@@ -103,7 +106,8 @@ public sealed class QueryTypesTests
         );
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run).ShouldBe([new PropertyType("global::NpgsqlTypes.NpgsqlCube", true, true, false, "cube", null)]);
+        ColumnsOf(run)
+            .ShouldBe([new PropertyType("global::NpgsqlTypes.NpgsqlCube", true, true, NoWarnings, "cube", null)]);
     }
 
     [Fact]
@@ -200,7 +204,7 @@ public sealed class QueryTypesTests
                     "global::MyApp.Tag",
                     false,
                     true,
-                    false,
+                    NoWarnings,
                     "pg_class",
                     "a -- type-override: marker in the file header"
                 ),
@@ -366,7 +370,7 @@ public sealed class QueryTypesTests
                 new QueryTypes(
                     "GetUser",
                     Of<PropertyType>(),
-                    Of(Int, new PropertyType("string", false, true, false, "text", null))
+                    Of(Int, new PropertyType("string", false, true, NoWarnings, "text", null))
                 ),
                 new QueryTypes("DeleteUser", Of(Int), null),
             ]);
@@ -414,7 +418,7 @@ public sealed class QueryTypesTests
         var run = Run([NpgsqlReferences.Npgsql10], file, Entry(file, "GetUser", [], [Column("tags", tags)]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run).ShouldBe([new PropertyType(expected, false, true, false, key, place)]);
+        ColumnsOf(run).ShouldBe([new PropertyType(expected, false, true, NoWarnings, key, place)]);
     }
 
     private static MetadataReference[] Driver(string driver) =>

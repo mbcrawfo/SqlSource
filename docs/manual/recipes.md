@@ -216,7 +216,7 @@ The input model is the parameter object, and the output model is the type of a r
 
 - **Columns in snake_case need `DefaultTypeMap.MatchNamesWithUnderscores`**, as above: Dapper matches `customer_name` to `CustomerName` only with it.
 - **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.
-- **Sorted models are classes.**  Dapper matches a record's constructor to the columns by position, so a record whose properties are sorted no longer matches.  A class is matched by name:
+- **Sorted models are classes.**  Dapper matches a record's constructor to the columns by position and name, so a record whose properties are sorted no longer matches.  A class is matched by name:
 
   ```xml
   <PropertyGroup>

@@ -71,12 +71,12 @@ internal sealed class SqlMarkerScope(
     }
 
     /// <summary>
-    /// The name an <c>-- input-model:</c> marker gives, with the first such marker, the marker in effect, or null.
+    /// The name an <c>-- input-model:</c> marker gives, with the first marker that set it, or null.
     /// </summary>
     public (string Name, SqlMarker Marker)? InputModel { get; private set; }
 
     /// <summary>
-    /// The name an <c>-- output-model:</c> marker gives, with the first such marker, the marker in effect, or null.
+    /// The name an <c>-- output-model:</c> marker gives, with the first marker that set it, or null.
     /// </summary>
     public (string Name, SqlMarker Marker)? OutputModel { get; private set; }
 

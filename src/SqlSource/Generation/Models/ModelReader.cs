@@ -20,9 +20,9 @@ namespace SqlSource.Generation.Models;
 /// error, at the query's name: a column with no name (<c>SQLSRC253</c>), a name that is no identifier
 /// (<c>SQLSRC254</c>), a name equal ignoring case to an earlier one of the model (<c>SQLSRC255</c>), and a name that
 /// a record or <see cref="object" /> takes (<c>SQLSRC256</c>).  An <c>-- output-model:</c> marker on a query without
-/// rows is <c>SQLSRC259</c>, at the marker.  Every error of a query is reported, and a query with any has no models.
-/// None depends on a setting of a type, so each is found once for the file, whatever the number of types that claim
-/// it.
+/// rows is <c>SQLSRC259</c>, at the marker, also for a query whose types have an error, whose names are not read.
+/// Every error of a query is reported, and a query with any has no models.  None depends on a setting of a type, so
+/// each is found once for the file, whatever the number of types that claim it.
 /// </remarks>
 internal static class ModelReader
 {
@@ -44,11 +44,15 @@ internal static class ModelReader
 
     private const string TakenByARecord = "a record or object already has";
 
-    /// <summary>The models of the file's queries whose types have no error, and the errors of their names.</summary>
+    /// <summary>
+    /// The models of the file's queries whose types have no error, the errors of their names, and the
+    /// <c>SQLSRC259</c> of each query with a usable entry, whatever its types.
+    /// </summary>
     public static FileModels Read(TypedFile file)
     {
         var types = file.Types;
-        if (file.Input.File is not { } parsed || types.Queries.Count == 0)
+        var entries = file.Input.Check.UsableEntries;
+        if (file.Input.File is not { } parsed || entries.Count == 0)
         {
             return new FileModels(
                 types.NormalizedPath,
@@ -58,25 +62,34 @@ internal static class ModelReader
             );
         }
 
-        var entries = file.Input.Check.UsableEntries;
         var queries = ImmutableArray.CreateBuilder<QueryModels>(types.Queries.Count);
-        var reading = new Reading(ImmutableArray.CreateBuilder<DiagnosticInfo>(), new StringBuilder(), []);
-        var nextEntry = 0;
+        var seen = new Dictionary<string, (string Name, string Written, int Index)>(StringComparer.OrdinalIgnoreCase);
+        var reading = new Reading(ImmutableArray.CreateBuilder<DiagnosticInfo>(), new StringBuilder(), seen);
+        var nextTypes = 0;
         var nextQuery = 0;
-        foreach (var queryTypes in types.Queries)
+        foreach (var entry in entries)
         {
-            // The types, the entries and the queries are all in the order of the file, so each search starts after
-            // the last.
-            var entryAt = IndexOfEntry(entries, queryTypes.Name, nextEntry);
-            var queryAt = IndexOfQuery(parsed.Queries, queryTypes.Name, nextQuery);
-            if (entryAt < 0 || queryAt < 0)
+            // The entries, the queries and the types, which are of some of the entries, are all in the order of the
+            // file, so each search starts after the last.
+            var queryAt = IndexOfQuery(parsed.Queries, entry.Name, nextQuery);
+            if (queryAt < 0)
             {
                 continue;
             }
 
-            nextEntry = entryAt + 1;
             nextQuery = queryAt + 1;
-            if (ReadQuery(entries[entryAt], parsed.Queries[queryAt], queryAt, queryTypes, reading) is { } models)
+            var query = parsed.Queries[queryAt];
+            if (
+                nextTypes >= types.Queries.Count
+                || !string.Equals(types.Queries[nextTypes].Name, entry.Name, StringComparison.Ordinal)
+            )
+            {
+                // A query with a type error has no types, and its names are not read.
+                AddOutputModelWithoutRows(entry, query, reading);
+                continue;
+            }
+
+            if (ReadQuery(entry, query, queryAt, types.Queries[nextTypes++], reading) is { } models)
             {
                 queries.Add(models);
             }
@@ -114,11 +127,9 @@ internal static class ModelReader
         {
             output = ReadColumns(columns, columnTypes, query, reading);
         }
-        else if (query.OutputModel is { } marker)
+        else
         {
-            reading.Diagnostics.Add(
-                DiagnosticInfo.Create(SqlDiagnostics.OutputModelWithoutRows, marker.Location, query.Name)
-            );
+            AddOutputModelWithoutRows(entry, query, reading);
         }
 
         return reading.Diagnostics.Count != errors
@@ -134,6 +145,17 @@ internal static class ModelReader
                 output,
                 entry.MatchesTable
             );
+    }
+
+    // SQLSRC259, at the marker, when the query has an -- output-model: marker and its entry has no rows.
+    private static void AddOutputModelWithoutRows(SidecarEntry entry, SqlQuery query, Reading reading)
+    {
+        if (entry.Columns is null && query.OutputModel is { } marker)
+        {
+            reading.Diagnostics.Add(
+                DiagnosticInfo.Create(SqlDiagnostics.OutputModelWithoutRows, marker.Location, query.Name)
+            );
+        }
     }
 
     private static EquatableArray<ModelProperty> ReadParameters(
@@ -232,26 +254,22 @@ internal static class ModelReader
             return false;
         }
 
-        for (var seen = 0; seen < reading.Seen.Count; seen++)
+        if (reading.Seen.TryGetValue(name, out var earlier))
         {
-            var (earlierName, earlierWritten, earlierIndex) = reading.Seen[seen];
-            if (string.Equals(earlierName, name, StringComparison.OrdinalIgnoreCase))
-            {
-                reading.Diagnostics.Add(
-                    DiagnosticInfo.Create(
-                        SqlDiagnostics.PropertyNameRepeated,
-                        query.NameLocation,
-                        Subject(owner, earlierWritten) + " at position " + PositionOf(earlierIndex),
-                        Subject(owner, written) + " at position " + PositionOf(index),
-                        earlierName,
-                        isColumn ? AliasOne : RenameOne
-                    )
-                );
-                return false;
-            }
+            reading.Diagnostics.Add(
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.PropertyNameRepeated,
+                    query.NameLocation,
+                    Subject(owner, earlier.Written) + " at position " + PositionOf(earlier.Index),
+                    Subject(owner, written) + " at position " + PositionOf(index),
+                    earlier.Name,
+                    isColumn ? AliasOne : RenameOne
+                )
+            );
+            return false;
         }
 
-        reading.Seen.Add((name, written, index));
+        reading.Seen.Add(name, (name, written, index));
         if (PropertyNames.IsReserved(name))
         {
             reading.Diagnostics.Add(
@@ -328,19 +346,6 @@ internal static class ModelReader
     // The 1-based position of the index.
     private static string PositionOf(int index) => (index + 1).ToString(CultureInfo.InvariantCulture);
 
-    private static int IndexOfEntry(EquatableArray<SidecarEntry> entries, string name, int from)
-    {
-        for (var index = from; index < entries.Count; index++)
-        {
-            if (string.Equals(entries[index].Name, name, StringComparison.Ordinal))
-            {
-                return index;
-            }
-        }
-
-        return -1;
-    }
-
     private static int IndexOfQuery(EquatableArray<SqlQuery> queries, string name, int from)
     {
         for (var index = from; index < queries.Count; index++)
@@ -355,10 +360,11 @@ internal static class ModelReader
     }
 
     // Where one file's errors go, a builder its documentation is written in, and the property names a model has so
-    // far, each with its parameter's or column's name as the sidecar has it and its index.
+    // far, by name ignoring case, each with its name, its parameter's or column's name as the sidecar has it and its
+    // index.
     private readonly record struct Reading(
         ImmutableArray<DiagnosticInfo>.Builder Diagnostics,
         StringBuilder Text,
-        List<(string Name, string Written, int Index)> Seen
+        Dictionary<string, (string Name, string Written, int Index)> Seen
     );
 }

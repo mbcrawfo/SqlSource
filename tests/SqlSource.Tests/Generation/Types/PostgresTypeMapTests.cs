@@ -437,7 +437,7 @@ public sealed class PostgresTypeMapTests
         mapping.Text.ShouldBe(expected);
         mapping.IsValueType.ShouldBe(isValueType);
         mapping.IsPublic.ShouldBeTrue();
-        mapping.IsObsolete.ShouldBeFalse();
+        mapping.WarningIds.ShouldBeEmpty();
     }
 
     private static OverrideOf Overrides(params (string Key, string Text, bool IsValueType)[] entries) =>

@@ -4,7 +4,9 @@ namespace SqlSource.Generation.Types;
 /// <param name="Text">The C# type as a model writes it, a keyword or <c>global::</c>-qualified.</param>
 /// <param name="IsValueType">Whether the C# type is a value type.</param>
 /// <param name="IsPublic">Whether the C# type is accessible from any assembly.</param>
-/// <param name="IsObsolete">Whether the C# type is marked <c>[Obsolete]</c>.</param>
+/// <param name="WarningIds">
+/// The ids of the compiler's warnings that a use of the C# type gives, which its model disables, in ordinal order.
+/// </param>
 /// <param name="Key">
 /// The key that answered: of the type override's entry, or of the row of the base map, which may be the key of an
 /// array's element or of a domain's base.
@@ -17,7 +19,7 @@ internal sealed record PropertyType(
     string Text,
     bool IsValueType,
     bool IsPublic,
-    bool IsObsolete,
+    EquatableArray<string> WarningIds,
     string Key,
     string? Place
 );

@@ -10,13 +10,14 @@ namespace SqlSource.Generation.Types;
 /// <param name="IsPublic">
 /// Whether the type, its containing types and its arguments are all declared public.  False unless it is found.
 /// </param>
-/// <param name="IsObsolete">
-/// Whether the type, a containing type or an argument is marked <c>[Obsolete]</c>.  False unless it is found.
+/// <param name="WarningIds">
+/// The ids of the compiler's warnings that a use of the type gives, for the type, a containing type or an argument
+/// marked <c>[Obsolete]</c> or <c>[Experimental]</c>, in ordinal order, each once.  Empty unless it is found.
 /// </param>
 internal sealed record MappedType(
     string Name,
     MappedTypeStatus Status,
     bool IsValueType,
     bool IsPublic,
-    bool IsObsolete
+    EquatableArray<string> WarningIds
 );

@@ -1587,6 +1587,19 @@ public sealed class SqlFileParserTests
             ]);
     }
 
+    // The same name twice is no conflict, and the model's marker is the first, where SQLSRC257 and SQLSRC259 point.
+    [Fact]
+    public void Parse_OneNameForOneModelTwice_KeepsTheFirstMarker()
+    {
+        const string Text = "-- name: Q\n-- output-model: A\n-- output-model: A\nSELECT 1\n";
+
+        var block = Blocks(Text).ShouldHaveSingleItem();
+
+        block.OutputModel.ShouldBe(
+            new SqlModelName("A", new TextSpan(Text.IndexOf("-- output-model: A", StringComparison.Ordinal), 18))
+        );
+    }
+
     [Fact]
     public void Parse_InputModelOnAQueryWithoutParameters_IsAnError()
     {

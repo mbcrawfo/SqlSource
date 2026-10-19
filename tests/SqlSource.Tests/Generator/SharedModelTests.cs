@@ -548,6 +548,33 @@ public sealed class SharedModelTests
         );
     }
 
+    // Each property whose type is not public is an error of its own.
+    [Fact]
+    public void Run_TwoInternalMappedTypesInAPublicModel_AreTwoSqlsrc251AtTheQuery()
+    {
+        var file = new SqlFile(UsersPath, "-- name: GetUser\nSELECT id, name FROM users;\n");
+
+        var run = Run(
+            Source
+                + "\n\nnamespace MyApp\n{\n    internal readonly struct Inner;\n\n"
+                + "    internal sealed class Secret;\n}\n",
+            [file, Sidecar(file, "GetUser", [Column("id"), Column("name", Text)])],
+            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "int4=MyApp.Inner text=MyApp.Secret" }
+        );
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC251 {GetUserName}: The type override maps 'int4' to 'MyApp.Inner' for column 'id', in the property "
+                + "SqlSourceTypeOverrides, and that type is not public, and the model 'App.GetUserDto' is.  Make the "
+                + "type public, or make each type that claims the query's file internal.",
+            $"SQLSRC251 {GetUserName}: The type override maps 'text' to 'MyApp.Secret' for column 'name', in the "
+                + "property SqlSourceTypeOverrides, and that type is not public, and the model 'App.GetUserDto' is.  "
+                + "Make the type public, or make each type that claims the query's file internal.",
+        ]);
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
     // The two queries share the model, and each is told of its own column, key and place.
     [Fact]
     public void Run_InternalMappedTypeInASharedModel_IsSqlsrc251OfEachQuerysOwnColumn()

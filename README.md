@@ -113,7 +113,7 @@ More: [constants](https://github.com/mbcrawfo/SqlSource/blob/main/docs/manual/ge
 This step works with PostgreSQL only: for another database, or for queries that want only their SQL, skip it and set the output to `sql`, as [Just want to keep your SQL out of code files?](https://github.com/mbcrawfo/SqlSource/blob/main/README.md#just-want-to-keep-your-sql-out-of-code-files) shows.  The tool asks your database what the parameters and columns of each query are, without running the query, and writes the answers into a sidecar file beside the `.sql` file: `Users.sql.json`.
 
 - **Today** that checks every query against your schema: a table or a column that does not exist, or a parameter whose type cannot be worked out, is an error now and not when the query runs.
-- **The build reads the sidecars**, and reports an error for a query that has no entry in its sidecar, or whose entry is older than the query: run `describe` again after you change a query.  The models are built from them, as the query methods of a later release will be, so that the build never needs a database.
+- **The build reads the sidecars**, and reports an error for a query that has no entry in its sidecar, or whose entry is older than the query: run `describe` again after you change a query.  The models are built from them, so that the build never needs a database.
 
 Run the tool from the folder of your project or solution, or name it, as in `dotnet sqlsource describe src/App/App.csproj`:
 

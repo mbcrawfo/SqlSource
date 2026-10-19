@@ -373,6 +373,28 @@ public sealed class ModelNameTests
         ModelsOf(run).Diagnostics.ShouldBeEmpty();
     }
 
+    // An output model on a query without rows is an error whatever its types, so it is reported beside a type error.
+    [Fact]
+    public void Run_OutputModelOnNoRowsWithATypeError_IsSqlsrc259Too()
+    {
+        var file = new SqlFile(
+            UsersPath,
+            "-- name: DeleteUser\n-- output-model: UserRow\nDELETE FROM users WHERE id = @id;\n"
+        );
+        var regclass = TestSidecars.Postgres(name: "regclass", internalName: "regclass");
+
+        var run = Run(file, Entry(file, "DeleteUser", [TestSidecars.Parameter(0, "id", regclass)], null));
+
+        run.Diagnostics.Count.ShouldBe(2);
+        run.Diagnostics[0].ShouldStartWith("SQLSRC246 /app/Repo/Users.sql(1,10)-(1,20): ");
+        run.Diagnostics[1]
+            .ShouldBe(
+                "SQLSRC259 /app/Repo/Users.sql(2,1)-(2,25): The query 'DeleteUser' names an output model, and its "
+                    + "statement returns no rows.  Remove the -- output-model: marker."
+            );
+        ModelsOf(run).Queries.ShouldBeEmpty();
+    }
+
     // The second query of the file, with its summary, its two markers and the table its entry matches.
     [Fact]
     public void Run_Query_KeepsWhatItsModelsAreWrittenFrom()
@@ -408,14 +430,20 @@ public sealed class ModelNameTests
         models.Queries[0].Table.ShouldBeNull();
     }
 
-    private static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries) =>
-        GeneratorHarness.Run(
+    // Every run compiles, with no warning in the generated code, whatever its diagnostics.
+    private static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries)
+    {
+        var run = GeneratorHarness.Run(
             OutputKind.Models,
             [new SourceFile(GeneratorHarness.SourcePath, Source)],
             [file, Sidecars.Of(file, entries)],
             references: [NpgsqlReferences.Npgsql10],
             dialect: "postgres"
         );
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        return run;
+    }
 
     // An entry of the query for its current hash: with rows when it has columns, and without when they are null.
     private static SidecarEntry Entry(

@@ -11,7 +11,7 @@ namespace SqlSource.Generation.Types;
 /// </param>
 /// <param name="IsValueType">Whether the C# type is a value type.</param>
 /// <param name="IsPublic">Whether the C# type is accessible from any assembly.</param>
-/// <param name="IsObsolete">Whether the C# type is marked <c>[Obsolete]</c>.</param>
+/// <param name="WarningIds">The ids of the compiler's warnings that a use of the C# type gives.</param>
 /// <param name="Detail">
 /// What a failure's message adds, or null: for <see cref="TypeMappingKind.CastToOid" />,
 /// <see cref="TypeMappingKind.CastToText" /> and <see cref="TypeMappingKind.NeedsNpgsql10" />, the type to cast to,
@@ -25,15 +25,15 @@ internal sealed record TypeMapping(
     string? Text,
     bool IsValueType,
     bool IsPublic,
-    bool IsObsolete,
+    EquatableArray<string> WarningIds,
     string? Detail
 )
 {
-    /// <summary>A public C# type that is not obsolete.</summary>
+    /// <summary>A public C# type whose use gives no warning.</summary>
     public static TypeMapping Mapped(string key, string text, bool isValueType) =>
-        new(TypeMappingKind.Mapped, key, text, isValueType, true, false, null);
+        new(TypeMappingKind.Mapped, key, text, isValueType, true, EquatableArray<string>.Empty, null);
 
     /// <summary>A type with no C# type, for the reason <paramref name="kind" /> gives.</summary>
     public static TypeMapping Failed(TypeMappingKind kind, string key, string? detail = null) =>
-        new(kind, key, null, false, false, false, detail);
+        new(kind, key, null, false, false, EquatableArray<string>.Empty, detail);
 }

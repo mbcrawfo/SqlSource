@@ -145,7 +145,7 @@ internal static class QueryTyper
                 text,
                 mapping.IsValueType,
                 mapping.IsPublic,
-                mapping.IsObsolete,
+                mapping.WarningIds,
                 mapping.Key,
                 mapping.Detail
             );
@@ -371,8 +371,8 @@ internal static class QueryTyper
             };
             var place = PlaceOf(entry.Place);
             return kind == TypeMappingKind.Mapped
-                ? new TypeMapping(kind, entry.Key, name, mapped!.IsValueType, mapped.IsPublic, mapped.IsObsolete, place)
-                : new TypeMapping(kind, entry.Key, name, false, false, false, place);
+                ? new TypeMapping(kind, entry.Key, name, mapped!.IsValueType, mapped.IsPublic, mapped.WarningIds, place)
+                : new TypeMapping(kind, entry.Key, name, false, false, EquatableArray<string>.Empty, place);
         }
 
         // The place that wrote an entry, as SQLSRC250 to SQLSRC252 name it.  The attribute has no level for the type

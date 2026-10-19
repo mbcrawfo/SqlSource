@@ -47,6 +47,9 @@ public sealed class TypeOverrideLevelTests
 
     private const string ThePropertyPlace = "the property SqlSourceTypeOverrides";
 
+    // The warning ids of a C# type whose use gives none.
+    private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
+
     private static readonly PostgresType Timestamptz = Catalog("timestamptz");
 
     private static readonly PostgresType Int4 = Catalog("int4");
@@ -130,7 +133,7 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
-            .ShouldBe([new PropertyType("global::System.DateTime", true, true, false, "timestamptz", null)]);
+            .ShouldBe([new PropertyType("global::System.DateTime", true, true, NoWarnings, "timestamptz", null)]);
     }
 
     [Fact]
@@ -146,8 +149,8 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("short", true, true, false, "int4", "a -- type-override: marker of the query"),
-                new PropertyType(DateTimeOffset, true, true, false, "timestamptz", ThePropertyPlace),
+                new PropertyType("short", true, true, NoWarnings, "int4", "a -- type-override: marker of the query"),
+                new PropertyType(DateTimeOffset, true, true, NoWarnings, "timestamptz", ThePropertyPlace),
             ]);
     }
 
@@ -167,7 +170,7 @@ public sealed class TypeOverrideLevelTests
         var place = level == "property" ? ThePropertyPlace : "the metadata SqlSourceTypeOverrides of the file";
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, false, "int4", place)]);
+        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, NoWarnings, "int4", place)]);
     }
 
     // An array's own key is written as its element's with [], or as its name in the catalog, which is read as the
@@ -203,13 +206,13 @@ public sealed class TypeOverrideLevelTests
                     "global::System.Collections.Generic.List<int>",
                     false,
                     true,
-                    false,
+                    NoWarnings,
                     key,
                     ThePropertyPlace
                 ),
             ]);
         ColumnsOf(ofTheElement, "GetUser")
-            .ShouldBe([new PropertyType(elementType, false, true, false, element, ThePropertyPlace)]);
+            .ShouldBe([new PropertyType(elementType, false, true, NoWarnings, element, ThePropertyPlace)]);
     }
 
     // _int4 and int4[] are one key, so the query's entry replaces the property's whichever spelling each has, and
@@ -255,11 +258,11 @@ public sealed class TypeOverrideLevelTests
         own.Diagnostics.ShouldBeEmpty();
         ColumnsOf(own, "GetUser")
             .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, false, "public.user_id", ThePropertyPlace),
-                new PropertyType("long", true, true, false, "int4", ThePropertyPlace),
+                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.user_id", ThePropertyPlace),
+                new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace),
             ]);
         ColumnsOf(ofTheBase, "GetUser")
-            .ShouldBe([new PropertyType("long", true, true, false, "int4", ThePropertyPlace)]);
+            .ShouldBe([new PropertyType("long", true, true, NoWarnings, "int4", ThePropertyPlace)]);
     }
 
     [Fact]
@@ -277,7 +280,9 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
-            .ShouldBe([new PropertyType("global::NpgsqlTypes.NpgsqlRange<int>", true, true, false, "int4range", null)]);
+            .ShouldBe([
+                new PropertyType("global::NpgsqlTypes.NpgsqlRange<int>", true, true, NoWarnings, "int4range", null),
+            ]);
     }
 
     // The bare key of an extension's type matches it in any schema, and the qualified one in its schema alone.
@@ -293,8 +298,8 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
             .ShouldBe([
-                new PropertyType("global::System.Guid", true, true, false, "public.citext", ThePropertyPlace),
-                new PropertyType("global::System.Uri", false, true, false, "citext", ThePropertyPlace),
+                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.citext", ThePropertyPlace),
+                new PropertyType("global::System.Uri", false, true, NoWarnings, "citext", ThePropertyPlace),
             ]);
     }
 
@@ -400,19 +405,22 @@ public sealed class TypeOverrideLevelTests
         var run = Run("uuid=MyApp.Missing int4=System.Math", (file, [Entry(file, "GetUser", Catalog("text"))]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("string", false, true, false, "text", null)]);
+        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("string", false, true, NoWarnings, "text", null)]);
     }
 
     [Fact]
-    public void Run_MappedTypeMarkedObsolete_IsObsolete()
+    public void Run_MappedTypeMarkedObsolete_GivesTheObsoleteWarnings()
     {
         var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
 
         var run = Run("int4=MyApp.OldThing", (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(run, "GetUser")
-            .ShouldBe([new PropertyType("global::MyApp.OldThing", false, true, true, "int4", ThePropertyPlace)]);
+        var column = ColumnsOf(run, "GetUser").ShouldHaveSingleItem();
+        column.WarningIds.ShouldBe(["CS0612", "CS0618"]);
+        (column with { WarningIds = NoWarnings }).ShouldBe(
+            new PropertyType("global::MyApp.OldThing", false, true, NoWarnings, "int4", ThePropertyPlace)
+        );
     }
 
     // Claimed by an internal type, so that its model is internal and compiles.  In a public model the type is
@@ -433,7 +441,7 @@ public sealed class TypeOverrideLevelTests
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         ColumnsOf(run, "GetUser")
-            .ShouldBe([new PropertyType("global::MyApp.Inner", true, false, false, "int4", ThePropertyPlace)]);
+            .ShouldBe([new PropertyType("global::MyApp.Inner", true, false, NoWarnings, "int4", ThePropertyPlace)]);
     }
 
     // The files with their sidecars, under the property's type override, or none.

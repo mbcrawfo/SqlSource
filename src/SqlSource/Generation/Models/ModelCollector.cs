@@ -246,7 +246,8 @@ internal static class ModelCollector
         return null;
     }
 
-    // The problems that keep the model from being generated, in the order of their ids.
+    // The problems that keep the model from being generated, in the order of their ids: each property whose type is
+    // not public is one.
     private static void FindProblems(ModelRequest first, bool isPublic, Names names, List<Problem> problems)
     {
         var properties = first.Properties;
@@ -257,7 +258,6 @@ internal static class ModelCollector
                 if (!properties[index].Type.IsPublic)
                 {
                     problems.Add(new Problem(ProblemKind.TypeNotPublic, index, null));
-                    break;
                 }
             }
         }
@@ -334,8 +334,7 @@ internal static class ModelCollector
             ModelKind.Record => "record",
             ModelKind.SealedRecord => "sealed record",
             ModelKind.Class => "class",
-            ModelKind.SealedClass => "sealed class",
-            _ => kind.ToString(),
+            ModelKind.SealedClass or _ => "sealed class",
         };
 
     // "'GetUser' in Users.sql", and its type too when the later request is of the same query.
@@ -542,13 +541,13 @@ internal static class ModelCollector
                 }
             }
 
-            return IsLowerCaseLetters(first.Name)
+            return IsLowerCaseAsciiLetters(first.Name)
                 ? "the compiler warns on a type name of lower-case ASCII letters alone"
                 : null;
         }
 
         // CS8981: a name of ASCII lower-case letters alone may become a keyword.
-        private static bool IsLowerCaseLetters(string name) =>
+        private static bool IsLowerCaseAsciiLetters(string name) =>
             name.Length > 0 && name.All(static character => character is >= 'a' and <= 'z');
     }
 }
