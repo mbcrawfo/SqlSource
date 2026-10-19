@@ -124,6 +124,14 @@ internal static class RealisticDescribe
         return new DescribeRequest(query.Name, SampleSql.Build(query), query.Parameters);
     }
 
+    // The entry that a run writes for the case's one query from its description, as tools/describe-end-to-end.sh
+    // wrote the case's sidecar: the query as the plan of a run holds it, on the database "realistic".
+    public static SidecarEntry EntryOf(RealisticCase found, ServerInfo server, QueryDescription description)
+    {
+        var (planned, dialect) = FixtureReplay.Plan(found.AsFixture, TestContext.Current.CancellationToken);
+        return EntryBuilder.Build(planned, dialect, PostgresContainer.RealisticDatabase, server, description);
+    }
+
     // The case's description, described once in a run and kept by the case's name: each check of a case and the
     // noise budget ask for it.
     public static async Task<Outcome<QueryDescription, DescribeFailure>> DescribeOnceAsync(

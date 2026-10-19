@@ -9,8 +9,6 @@ using Shouldly;
 using SqlSource.Testing.Generator;
 using SqlSource.Tests.Postgres.Describer;
 using SqlSource.Tests.Postgres.Realistic.Describer;
-using SqlSource.Tool.Describing;
-using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
 
@@ -89,7 +87,6 @@ public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
     // The sidecar of the case's one query, described as a run describes it, against the database "realistic".
     private async Task<SqlFile> SidecarOfAsync(RealisticCase found, SqlFile query)
     {
-        var (planned, dialect) = FixtureReplay.Plan(found.AsFixture, TestContext.Current.CancellationToken);
         var opened = await Sessions.OpenAsync(
             postgres.RealisticConnectionString,
             database: PostgresContainer.RealisticDatabase
@@ -111,13 +108,6 @@ public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
             Assert.Fail($"{found} was refused:\n{RealisticDescribe.RenderFailure(described.Failure)}");
         }
 
-        var entry = EntryBuilder.Build(
-            planned,
-            dialect,
-            PostgresContainer.RealisticDatabase,
-            session.Server,
-            described.Value
-        );
-        return Sidecars.Of(query, entry);
+        return Sidecars.Of(query, RealisticDescribe.EntryOf(found, session.Server, described.Value));
     }
 }

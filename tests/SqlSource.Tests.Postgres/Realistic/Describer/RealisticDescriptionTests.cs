@@ -1,6 +1,9 @@
 using System.IO;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Snapshot;
+using SqlSource.Snapshot.Reading;
+using SqlSource.Tool.Describing.Describers;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Describer;
@@ -17,6 +20,14 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
     private const string KnownCase = "aggregate-cte-left-joined";
 
     private const string RecordScript = "tools/record-realistic.sh";
+
+    // The script that writes the sidecars of the realistic cases.
+    private const string SidecarScript = "tools/describe-end-to-end.sh";
+
+    // What a run knows of the server, but its version, which an entry compared here does not hold.
+    private static readonly ServerInfo AnyServer = new(AnyVersion, null, null, new EquatableArray<ServerSetting>([]));
+
+    private const string AnyVersion = "*";
 
     [Fact]
     public async Task DescribeAsync_KnownCase_IsDescribedAndRendered()
@@ -77,4 +88,40 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
             $"{found} is described otherwise than {path} says; {RecordScript} records it"
         );
     }
+
+    // The entry of each case with models is the one its sidecar holds, whole: what --check compares, and the
+    // provenance and the origins, which it does not.  Only the server's version and where the query's name stands in
+    // the text are left out.  A case that an earlier major describes otherwise is left out on it by its checkedFrom.
+    [Theory]
+    [MemberData(nameof(RealisticCasesTests.Cases), MemberType = typeof(RealisticCasesTests))]
+    public async Task DescribeAsync_Case_IsItsCommittedEntry(string name)
+    {
+        var found = RealisticDescribe.Start(name, postgres.Major);
+        postgres.SkipUnlessRecordedMajor("The committed entries");
+        Assert.SkipUnless(found.HasModels, $"{found} has no models, and so no sidecar.");
+        Assert.SkipUnless(
+            found.IsCheckedOn(postgres.Major),
+            $"{found} is checked from PostgreSQL {found.CheckedFrom?.Major}: {found.CheckedFrom?.Why}"
+        );
+        var token = TestContext.Current.CancellationToken;
+        var committed = SidecarReader
+            .Read(await File.ReadAllTextAsync(found.SidecarPath, token))
+            .Sidecar.ShouldNotBeNull($"{found.SidecarPath} cannot be read")
+            .Queries.ShouldHaveSingleItem(found.ToString());
+
+        var described = await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
+
+        _ = RealisticDescribe.ColumnsOf(found, described);
+        TextOf(RealisticDescribe.EntryOf(found, AnyServer, described.Value!))
+            .ShouldBe(
+                TextOf(committed with { ServerVersion = AnyVersion }),
+                $"{found} is described otherwise than {found.SidecarPath} holds: read the difference, then write the "
+                    + $"sidecars again with {SidecarScript}"
+            );
+    }
+
+    // The entry as the sidecar's writer writes it, alone in a file: the text of the field that differs reads as a
+    // diff of the sidecar.  The writer does not write where the name stands.
+    private static string TextOf(SidecarEntry entry) =>
+        SidecarWriter.Write(new Sidecar(SidecarFormat.Version, AnyVersion, new EquatableArray<SidecarEntry>([entry])));
 }
