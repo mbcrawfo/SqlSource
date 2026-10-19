@@ -73,6 +73,17 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
 
     public static TheoryData<string> LeftOutColumns => [.. WriteSideLeftOut.Keys];
 
+    // What Dapper and Npgsql throw before the server sees a left-out column, on 18.6 and on 14.24 alike: Dapper refuses
+    // a type it has no DbType for, and Npgsql a DbType it does not support (NotSupportedException), a timestamptz at
+    // another offset (ArgumentException) and a uint[] it has no type for (InvalidCastException).  Any other error, even
+    // a subclass of one of these, is not a failure to bind.
+    private static readonly Type[] BindingErrors =
+    [
+        typeof(NotSupportedException),
+        typeof(ArgumentException),
+        typeof(InvalidCastException),
+    ];
+
     [Fact]
     public async Task QueryAsync_ListAllTypes_ReadsBothRows()
     {
@@ -151,7 +162,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
             }
             else
             {
-                _ = error.ShouldBeAssignableTo<SystemException>(error.ToString());
+                error.GetType().ShouldBeOneOf(BindingErrors, error.ToString());
             }
         }
         finally
