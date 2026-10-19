@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
-# Writes every sidecar of the end-to-end queries and the realistic cases, the .sql.json files under
-# tests/SqlSource.Tests.Postgres/EndToEnd/Queries and tests/SqlSource.Tests.Postgres/Realistic/Cases, from nothing: it
-# deletes them, then runs `sqlsource describe --force` on the project against the databases "realistic", "app" and
-# "billing" of a PostgreSQL in a container.  It is no check: a person runs it after a change to a query, to a schema or
-# to a seed of tests/SqlSource.Tests.Postgres/EndToEnd or Realistic, and in the pull request that raises VersionPrefix,
-# since every sidecar holds the tool's version, and reads the diff of what it wrote before committing it.
+# Writes every sidecar of the end-to-end queries, the .sql.json files under
+# tests/SqlSource.Tests.Postgres/EndToEnd/Queries, from nothing: it deletes them, then runs `sqlsource describe --force`
+# on the project against the databases "app" and "billing" of a PostgreSQL in a container.  It is no check: a person
+# runs it after a change to a query, to a schema or to a seed of tests/SqlSource.Tests.Postgres/EndToEnd, and in the
+# pull request that raises VersionPrefix, since every sidecar holds the tool's version, and reads the diff of what it
+# wrote before committing it.
 # It starts its own container and runs the tool as a project, where the other recording scripts run a test: the test
 # project does not build until its sidecars are current.  The image is the default image of the tests, which the
 # sidecars are recorded on, so SQLSOURCE_TESTS_POSTGRES_IMAGE is ignored.  It needs Docker.
+# It writes the sidecars of the realistic cases, under tests/SqlSource.Tests.Postgres/Realistic/Cases, in the same run,
+# against a database "realistic" made from the schema.sql and seed.sql of Realistic/, and runs after a change to a
+# case, the schema or the seed of the corpus too.
 # Usage: describe-end-to-end.sh
 set -euo pipefail
 

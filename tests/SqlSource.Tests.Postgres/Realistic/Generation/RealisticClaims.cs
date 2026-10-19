@@ -46,16 +46,23 @@ internal static partial class RealisticClaims
         var claims = All.Where(claim => claim.Case == found.Name).ToList();
         if (claims.Count != 1)
         {
-            Assert.Fail($"{found} is claimed by {claims.Count} classes of {RepositoryPaths.RealisticQueries}");
+            Assert.Fail(ClaimedBy(found, claims.Count));
         }
 
         return claims[0];
     }
 
+    // How a failure says that a case has a count of claims it should not.
+    public static string ClaimedBy(RealisticCase found, int count) =>
+        $"{found} is claimed by {count} classes of {RepositoryPaths.RealisticQueries}";
+
+    // The attribute's name without what qualifies it: SqlSource.SqlSourceGenerate and global::SqlSourceGenerate claim
+    // as SqlSourceGenerate does.
     private static string NameOf(AttributeSyntax attribute) =>
         attribute.Name switch
         {
             QualifiedNameSyntax qualified => qualified.Right.Identifier.ValueText,
+            AliasQualifiedNameSyntax aliased => aliased.Name.Identifier.ValueText,
             SimpleNameSyntax simple => simple.Identifier.ValueText,
             _ => attribute.Name.ToString(),
         };

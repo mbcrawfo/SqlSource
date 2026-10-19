@@ -24,7 +24,7 @@ SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSou
 
 Every database image the tests run is pinned to a major and a minor, such as `postgres:18.6`, and never to a bare major such as `postgres:18`.  The recorded fixtures carry the version of the server they were recorded against, and a bare major moves to each new minor without a word, so the tests would run a server the recordings never saw.  This holds for the default image, for the image CI runs on the oldest supported version, and for the image of any engine added later.  `PostgresContainerTests` fails on an image whose tag is not a major and a minor, or whose server reports another version, and `FixtureVersionTests` fails on a fixture case recorded against any version but the default image's.
 
-Moving to a new minor is a change of its own: bump the tag, record the fixtures and the realistic corpus again on the new image, as in the next two sections, write the end-to-end sidecars again, as in [the end-to-end project](#the-end-to-end-project), since each entry holds the server's version, and read the diff, all in the same pull request.
+Moving to a new minor is a change of its own: bump the tag, record the fixtures and the realistic corpus again on the new image, as in the next two sections, write the sidecars of the end-to-end queries and the realistic cases again, as in [the end-to-end project](#the-end-to-end-project), since each entry holds the server's version, and read the diff, all in the same pull request.
 
 ## The describer's fixtures
 

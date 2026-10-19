@@ -22,6 +22,48 @@ public sealed class RealisticClaimsTests
             )
             .ShouldBe([new RealisticClaim("ABQuery", "a-b")]);
 
+    [Theory]
+    [InlineData("SqlSource.SqlSourceGenerate")]
+    [InlineData("global::SqlSourceGenerate")]
+    public void Parse_QualifiedAttributeName_IsItsClaim(string attribute) =>
+        RealisticClaims
+            .Parse(
+                $$"""
+                [{{attribute}}(Path = "../Cases/a-b/query.sql")]
+                internal static partial class ABQuery;
+                """
+            )
+            .ShouldBe([new RealisticClaim("ABQuery", "a-b")]);
+
+    [Fact]
+    public void Parse_ClassWithAnotherAttribute_IsNoClaim() =>
+        RealisticClaims
+            .Parse(
+                """
+                [Obsolete("../Cases/a-b/query.sql")]
+                internal static partial class ABQuery;
+
+                internal static partial class Plain;
+                """
+            )
+            .ShouldBeEmpty();
+
+    [Fact]
+    public void Parse_AttributeWithoutPath_ThrowsNamingTheClass()
+    {
+        var thrown = Should.Throw<InvalidOperationException>(() =>
+            RealisticClaims.Parse(
+                """
+                [SqlSourceGenerate(Output = GeneratorOutput.Models)]
+                internal static partial class XQuery;
+                """
+            )
+        );
+
+        thrown.Message.ShouldContain("XQuery");
+        thrown.Message.ShouldContain("no path");
+    }
+
     [Fact]
     public void Parse_PathOutsideCases_Throws()
     {
@@ -45,10 +87,7 @@ public sealed class RealisticClaimsTests
 
         var claims = RealisticClaims.All.Count(claim => claim.Case == name);
 
-        claims.ShouldBe(
-            found.HasModels ? 1 : 0,
-            $"{found} is claimed by {claims} classes of {RepositoryPaths.RealisticQueries}"
-        );
+        claims.ShouldBe(found.HasModels ? 1 : 0, RealisticClaims.ClaimedBy(found, claims));
     }
 
     [Fact]
