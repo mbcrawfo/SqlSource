@@ -41,8 +41,7 @@ internal static class RealisticParameters
     // A value as a model holds it: a column's NULL, which the driver reads as DBNull, is null.
     public static object? ValueOf(object value) => value is DBNull ? null : value;
 
-    // The input model of the sample: a record, built by its constructor with each parameter's value as the argument
-    // of the same name in PascalCase.
+    // The input model of the sample, built by ModelOf from the values the server reads its literals as.
     [SuppressMessage(
         "Security",
         "CA2100:Review SQL queries for security vulnerabilities",
@@ -63,10 +62,24 @@ internal static class RealisticParameters
             throw new InvalidOperationException("The select of the sample's literals gave no row.");
         }
 
-        var values = new Dictionary<string, object?>(StringComparer.Ordinal);
+        var values = new object?[parameters.Count];
         for (var ordinal = 0; ordinal < parameters.Count; ordinal++)
         {
-            values.Add(PropertyNames.PascalCase(parameters[ordinal].Name), ValueOf(reader.GetValue(ordinal)));
+            values[ordinal] = ValueOf(reader.GetValue(ordinal));
+        }
+
+        return ModelOf(input, parameters, values);
+    }
+
+    // An input model, a record, built by its constructor with each parameter's value, in the parameters' order, as
+    // the argument named as the parameter in PascalCase.  A value must be of the argument's type, and a null must be
+    // one the argument can hold: Invoke would give 0 for a null where the type is a value type that cannot be null.
+    public static object ModelOf(Type input, IReadOnlyList<SidecarParameter> parameters, IReadOnlyList<object?> values)
+    {
+        var byName = new Dictionary<string, (SidecarParameter Parameter, object? Value)>(StringComparer.Ordinal);
+        for (var ordinal = 0; ordinal < parameters.Count; ordinal++)
+        {
+            byName.Add(PropertyNames.PascalCase(parameters[ordinal].Name), (parameters[ordinal], values[ordinal]));
         }
 
         var constructor =
@@ -79,12 +92,33 @@ internal static class RealisticParameters
         var arguments = constructor
             .GetParameters()
             .Select(argument =>
-                argument.Name is { } argumentName && values.TryGetValue(argumentName, out var value)
-                    ? value
-                    : throw new InvalidOperationException(
+            {
+                if (argument.Name is not { } argumentName || !byName.TryGetValue(argumentName, out var given))
+                {
+                    throw new InvalidOperationException(
                         $"The constructor of {input.Name} takes {argument.Name}, which is no parameter of the query."
-                    )
-            )
+                    );
+                }
+
+                var type = argument.ParameterType;
+                if (given.Value is null && type.IsValueType && Nullable.GetUnderlyingType(type) is null)
+                {
+                    throw new InvalidOperationException(
+                        $"@{given.Parameter.Name} is NULL, and {input.Name}.{argumentName} is a {type.Name}, which "
+                            + "cannot be null."
+                    );
+                }
+
+                if (given.Value is { } value && !type.IsInstanceOfType(value))
+                {
+                    throw new InvalidOperationException(
+                        $"@{given.Parameter.Name} is read as a {value.GetType().Name}, and {input.Name}.{argumentName} "
+                            + $"is a {type.Name}."
+                    );
+                }
+
+                return given.Value;
+            })
             .ToArray();
         return constructor.Invoke(arguments);
     }

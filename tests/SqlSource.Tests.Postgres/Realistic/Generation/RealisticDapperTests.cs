@@ -63,16 +63,7 @@ public sealed class RealisticDapperTests(PostgresContainer postgres)
             return;
         }
 
-        if (found.Refusal is not null)
-        {
-            Assert.Skip($"{found} is refused as {found.Refusal}, so it has no models.");
-        }
-
-        if (found.Models is { } models)
-        {
-            Assert.Skip($"{found} has no models: the generator gives {models.Id}.");
-        }
-
+        RealisticModels.SkipUnlessHasModels(found);
         if (!found.RunsOn(major))
         {
             Assert.Skip($"{found} needs PostgreSQL {found.MinimumMajor} or later, and the server is {major}.");

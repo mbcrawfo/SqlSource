@@ -16,14 +16,7 @@ public sealed class RealisticModelNullabilityTests
     public void Model_Case_IsAsNullableAsItsTruthOrWider(string name)
     {
         var found = RealisticCases.ReadNamed(name);
-        if (!found.HasModels)
-        {
-            Assert.Skip(
-                found.Refusal is not null
-                    ? $"{found} is refused as {found.Refusal}, so it has no models."
-                    : $"{found} has no models: the generator gives {found.Models!.Id}."
-            );
-        }
+        RealisticModels.SkipUnlessHasModels(found);
 
         var model = RealisticModels.OutputModelOf(RealisticModels.EntryOf(found));
         var properties = RealisticModels.PropertiesOf(model);

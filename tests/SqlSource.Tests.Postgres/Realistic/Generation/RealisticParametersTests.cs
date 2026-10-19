@@ -7,7 +7,8 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
 
 // The parameters of the run through Dapper: a sample's literals read as the server reads them, a DBNull read as
-// null, and the input model's values passed under the names the SQL gives them.  It needs no server.
+// null, the input model built from the values of exactly its properties' types, and the input model's values passed
+// under the names the SQL gives them.  It needs no server.
 public sealed class RealisticParametersTests
 {
     private static readonly SidecarParameter[] Parameters =
@@ -47,6 +48,31 @@ public sealed class RealisticParametersTests
 
     [Fact]
     public void ValueOf_Value_IsTheValue() => RealisticParameters.ValueOf(10L).ShouldBe(10L);
+
+    [Fact]
+    public void ModelOf_Values_IsTheRecordBuiltByItsConstructor() =>
+        RealisticParameters.ModelOf(typeof(R), Parameters, [10L, null]).ShouldBe(new R(10, null));
+
+    // Invoke would give the constructor 0 for a null, so a NULL sample would send 0 and pass.
+    [Fact]
+    public void ModelOf_NullForAValueTypeThatCannotBeNull_ThrowsNamingIt()
+    {
+        var thrown = Should.Throw<InvalidOperationException>(() =>
+            RealisticParameters.ModelOf(typeof(R), Parameters, [null, "a"])
+        );
+
+        thrown.Message.ShouldContain("@limit");
+    }
+
+    [Fact]
+    public void ModelOf_ValueOfAnotherType_ThrowsNamingIt()
+    {
+        var thrown = Should.Throw<InvalidOperationException>(() =>
+            RealisticParameters.ModelOf(typeof(R), Parameters, [10, "a"])
+        );
+
+        thrown.Message.ShouldContain("@limit");
+    }
 
     [Fact]
     public void ArgumentsOf_Model_NamesEachValueAsTheSql()

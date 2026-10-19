@@ -7,6 +7,7 @@ using SqlSource.Generation.Models;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
 using SqlSource.Snapshot.Reading;
+using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;
 
@@ -22,6 +23,21 @@ internal static class RealisticModels
     public const string OutputSuffix = QuerySettings.DefaultOutputModelSuffix;
 
     private static readonly Assembly Models = typeof(RealisticModels).Assembly;
+
+    // Skips a check of the models for a case that has none, with the reason: the describer refuses it, or the
+    // generator does.
+    public static void SkipUnlessHasModels(RealisticCase found)
+    {
+        if (found.Refusal is not null)
+        {
+            Assert.Skip($"{found} is refused as {found.Refusal}, so it has no models.");
+        }
+
+        if (found.Models is { } models)
+        {
+            Assert.Skip($"{found} has no models: the generator gives {models.Id}.");
+        }
+    }
 
     // The one entry of the case's sidecar, which holds the case's one query.
     public static SidecarEntry EntryOf(RealisticCase found)
