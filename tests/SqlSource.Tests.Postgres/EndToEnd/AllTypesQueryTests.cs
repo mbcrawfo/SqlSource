@@ -189,6 +189,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
 
     // Npgsql gives the type of an array column as System.Array, and Dapper looks for a constructor of that exact type,
     // so it cannot construct a positional record with an array.  This is why AllTypesDto is a class.
+    // TD-0062: the generator's fix for a record with an array read through Dapper.
     [Fact]
     public async Task QueryAsync_RecordWithAnArray_DapperCannotConstructIt()
     {

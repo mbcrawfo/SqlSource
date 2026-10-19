@@ -212,7 +212,7 @@ public partial class OrderRepository(DbConnection connection)
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 ```
 
-The input model is the parameter object, and the output model is the type of a row.  Four things make Dapper read them:
+The input model is the parameter object, and the output model is the type of a row.  What makes Dapper read them:
 
 - **Columns in snake_case need `DefaultTypeMap.MatchNamesWithUnderscores`**, as above: Dapper matches `customer_name` to `CustomerName` only with it.
 - **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.
@@ -237,7 +237,76 @@ The input model is the parameter object, and the output model is the type of a r
   GROUP BY o.id;
   ```
 
-Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker), [shape of a model](settings.md#setting-model-type), and [known issues](generator.md#known-issues) for parameters in snake_case.
+- **A model with an array column is a class.**  Dapper cannot construct a record from a row that has an array, `integer[]` or `text[]`, whether the array can be null or not: it throws `InvalidOperationException` and reads no row.  A class is filled by its properties:
+
+  ```sql postgres
+  -- name: GetOrderTags
+  -- output-model-type: class
+  SELECT o.id, o.tags
+  FROM orders o
+  WHERE o.id = @orderId;
+  ```
+
+  A record with a range, a multirange, an `hstore`, a C# enum or a struct of your own is filled as any other.
+- **A type override to a type that Npgsql does not give needs a Dapper type handler.**  Dapper fills a property with the type Npgsql gives for its column, or through a handler.  `timestamptz=System.DateTimeOffset` makes a property a `DateTimeOffset` where Npgsql gives a `DateTime`.  A domain mapped to a struct of your own is the same: Npgsql gives the domain's base type, a `string` for a domain over `text`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
+
+  ```csharp
+  using System.Data;
+  using Dapper;
+
+  public sealed class UtcDateTimeOffsetHandler : SqlMapper.TypeHandler<DateTimeOffset>
+  {
+      public override DateTimeOffset Parse(object value) =>
+          value is DateTime dateTime ? new DateTimeOffset(dateTime) : (DateTimeOffset)value;
+
+      public override void SetValue(IDbDataParameter parameter, DateTimeOffset value) => parameter.Value = value;
+  }
+  ```
+
+  ```csharp
+  SqlMapper.AddTypeHandler(new UtcDateTimeOffsetHandler());
+  ```
+
+  A `DateTimeOffset` parameter is sent by Dapper's own mapping and not by the handler, as a `timestamptz`, which takes an offset of 0 alone: pass `value.ToUniversalTime()`.
+- **A PostgreSQL enum mapped to a C# enum needs `MapEnum<T>()` on the data source.**  An enum read as a `string`, the default, needs nothing:
+
+  ```csharp
+  var builder = new NpgsqlDataSourceBuilder(connectionString);
+  builder.MapEnum<OrderStatus>();
+  await using var dataSource = builder.Build();
+  ```
+
+  Dapper sends a C# enum parameter as its number, which a column of the enum refuses; send it as the next point says.
+- **Some parameters Dapper cannot send.**  Dapper refuses a parameter of these types, or sends it as a type that the column refuses:
+  - the unsigned numbers: `oid`, `xid`, `cid`, `xid8`, `regtype`, `regconfig` and `oidvector`;
+  - the network addresses: `inet`, `cidr`, `macaddr` and `macaddr8`;
+  - the geometric types: `point`, `line`, `lseg`, `box` and `circle`;
+  - the ranges: `int4range`, `int8range`, `numrange`, `tsrange`, `tstzrange` and `daterange`;
+  - `tid`, `pg_lsn`, `tsquery`, `int2vector` and `timetz`;
+  - a `string` for `json`, `jsonb`, `jsonpath`, `xml`, `refcursor`, `ltree`, `lquery`, `ltxtquery`, an enum or an array of an enum;
+  - a C# enum, as above.
+
+  For a `string`, cast the query parameter in the SQL, `@payload::jsonb`, and Dapper's text is read as the type.  For the others, give Dapper the parameters by hand, and that one as a `SqlMapper.ICustomQueryParameter` that adds an `NpgsqlParameter` with its `DataTypeName`, since Dapper refuses an `NpgsqlParameter` given as a value:
+
+  ```csharp
+  using System.Data;
+  using Dapper;
+  using Npgsql;
+
+  public sealed class TypedParameter(string dataTypeName, object? value) : SqlMapper.ICustomQueryParameter
+  {
+      public void AddParameter(IDbCommand command, string name) =>
+          command.Parameters.Add(
+              new NpgsqlParameter { ParameterName = name, DataTypeName = dataTypeName, Value = value ?? DBNull.Value }
+          );
+  }
+  ```
+
+  ```csharp
+  connection.QueryAsync<FindSessionsDto>(Sql.FindSessions, new { address = new TypedParameter("inet", address) });
+  ```
+
+Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker), [shape of a model](settings.md#setting-model-type), [the type override](settings.md#setting-type-overrides), and [known issues](generator.md#known-issues) for parameters in snake_case and for records with an array.
 
 <a id="table-name-at-run-time"></a>
 

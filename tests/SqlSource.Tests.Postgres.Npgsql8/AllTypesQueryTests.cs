@@ -15,6 +15,12 @@ namespace SqlSource.Tests.Postgres.Npgsql8;
 // of all_types read through Dapper into AllTypesDto.  The end-to-end project proves the same table on Npgsql 10.
 public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppContainer>
 {
+    // Dapper's settings are the process's, so the snake_case columns are matched from before the first test.
+    static AllTypesQueryTests()
+    {
+        DefaultTypeMap.MatchNamesWithUnderscores = true;
+    }
+
     [Fact]
     public void Npgsql_Loaded_IsVersion8() => typeof(NpgsqlConnection).Assembly.GetName().Version!.Major.ShouldBe(8);
 
@@ -37,7 +43,6 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
     [Fact]
     public async Task QueryAsync_ListAllTypes_ReadsBothRows()
     {
-        DefaultTypeMap.MatchNamesWithUnderscores = true;
         await using var source = NpgsqlDataSource.Create(app.ConnectionString);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
 

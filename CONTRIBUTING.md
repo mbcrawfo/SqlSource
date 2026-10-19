@@ -7,7 +7,7 @@ This repository holds SqlSource, a C# source generator that turns the `.sql` fil
 | Tool | Version | Notes |
 |----|----|----|
 | [.NET SDK](https://dotnet.microsoft.com/download) | 10.0.401 or a later 10.x release | Pinned in `global.json` |
-| [Docker](https://docs.docker.com/get-started/get-docker/) | Any current release | Runs the pinned lint images used by the scripts in `tools/`, and the PostgreSQL that `tests/SqlSource.Tests.Postgres` describes against |
+| [Docker](https://docs.docker.com/get-started/get-docker/) | Any current release | Runs the pinned lint images used by the scripts in `tools/`, and the PostgreSQL that `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8` run against |
 | `unzip` | Any | `tools/check-package.sh` lists the contents of the packages with it.  Present on macOS and most Linux distributions. |
 
 CSharpier and ReportGenerator are local .NET tools pinned in `dotnet-tools.json`.  Restore them once after cloning:
@@ -23,12 +23,13 @@ The two projects that ship are:
 - `src/SqlSource` is the source generator, and the package `SqlSource`.  [`docs/architecture/generator.md`](docs/architecture/generator.md) explains how it works.
 - `src/SqlSource.Tool` is the `sqlsource` command, a console application that references the generator's project and shares its code, and the package `SqlSource.Tool`.  [`docs/architecture/tool.md`](docs/architecture/tool.md) explains how it works.
 
-The four test projects and the two libraries they share, which [`tests/README.md`](tests/README.md) describes:
+The five test projects and the two libraries they share, which [`tests/README.md`](tests/README.md) describes:
 
 - `tests/SqlSource.Tests` runs every test of the generator.
 - `tests/SqlSource.Tests.RoslynFloor` compiles the generator driver tests a second time, on the oldest supported Roslyn.
 - `tests/SqlSource.Tool.Tests` runs the tests of the tool.
-- `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server, and needs Docker.
+- `tests/SqlSource.Tests.Postgres` runs the PostgreSQL describer against a real server, and is the end-to-end project, which builds models from its own queries and reads rows into them through Dapper.  It needs Docker.
+- `tests/SqlSource.Tests.Postgres.Npgsql8` reads every mapped type through Dapper on Npgsql 8, the oldest supported driver, and needs Docker.
 - `tests/SqlSource.Testing` and `tests/SqlSource.Tool.Testing` are the libraries of test helpers, which hold no tests.
 
 ## Build, test and run
@@ -38,13 +39,13 @@ dotnet build SqlSource.slnx
 dotnet test --solution SqlSource.slnx
 ```
 
-This runs every test project, `tests/SqlSource.Tests.Postgres` on the default PostgreSQL image.  CI also runs that project on PostgreSQL 14, the oldest supported:
+This runs every test project, the two PostgreSQL projects on the default PostgreSQL image.  CI also runs `tests/SqlSource.Tests.Postgres` on PostgreSQL 14, the oldest supported:
 
 ```bash
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres
 ```
 
-The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) and [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus).  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
+The PostgreSQL tests' readme has the procedures of that project: [moving to a new image minor](tests/SqlSource.Tests.Postgres/README.md#the-image), [re-recording the describer's fixtures](tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) with `tools/record-fixtures.sh`, [adding a realistic case](tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus) and recording it with `tools/record-realistic.sh`, and [writing the end-to-end sidecars again](tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) with `tools/describe-end-to-end.sh`.  To [add a fixture project](tests/README.md#fixture-projects), see `tests/README.md`.
 
 To run the tool from its source:
 
@@ -91,7 +92,7 @@ dotnet restore SqlSource.slnx
 
 ## Continuous integration
 
-CI runs the same checks as `pre-commit-validation.sh` on Linux, and the PostgreSQL tests again on PostgreSQL 14.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests on Windows and macOS every night, and by hand on a branch:
+CI runs the same checks as `pre-commit-validation.sh` on Linux, and `tests/SqlSource.Tests.Postgres` again on PostgreSQL 14.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and by hand on a branch:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>
