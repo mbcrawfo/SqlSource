@@ -74,8 +74,17 @@ internal static class RealisticParameters
     // An input model, a record, built by its constructor with each parameter's value, in the parameters' order, as
     // the argument named as the parameter in PascalCase.  A value must be of the argument's type, and a null must be
     // one the argument can hold: Invoke would give 0 for a null where the type is a value type that cannot be null.
+    // There is one value for each parameter.
     public static object ModelOf(Type input, IReadOnlyList<SidecarParameter> parameters, IReadOnlyList<object?> values)
     {
+        if (values.Count != parameters.Count)
+        {
+            throw new InvalidOperationException(
+                $"The input model {input.Name} is built from {values.Count} values, and the query has "
+                    + $"{parameters.Count} parameters."
+            );
+        }
+
         var byName = new Dictionary<string, (SidecarParameter Parameter, object? Value)>(StringComparer.Ordinal);
         for (var ordinal = 0; ordinal < parameters.Count; ordinal++)
         {

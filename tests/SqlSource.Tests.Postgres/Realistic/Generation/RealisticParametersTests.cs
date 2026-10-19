@@ -74,6 +74,19 @@ public sealed class RealisticParametersTests
         thrown.Message.ShouldContain("@limit");
     }
 
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public void ModelOf_ValuesNotOneForEachParameter_ThrowsNamingTheCounts(int count)
+    {
+        var thrown = Should.Throw<InvalidOperationException>(() =>
+            RealisticParameters.ModelOf(typeof(R), Parameters, new object?[count])
+        );
+
+        thrown.Message.ShouldContain($"{count} values");
+        thrown.Message.ShouldContain("2 parameters");
+    }
+
     [Fact]
     public void ArgumentsOf_Model_NamesEachValueAsTheSql()
     {

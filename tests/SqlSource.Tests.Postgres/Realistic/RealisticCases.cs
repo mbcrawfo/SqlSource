@@ -195,8 +195,8 @@ internal static class RealisticCases
     }
 
     // The major from which a case's sidecar is checked, for a case that an earlier major describes otherwise: one of
-    // the recorded majors, above the first recorded one the case runs on, its minimumMajor or else the lowest, since
-    // a checkedFrom at or below it leaves nothing out, and said why.
+    // the recorded majors, above the first recorded one the case runs on, since a checkedFrom at or below it leaves
+    // nothing out, and said why.
     private static CheckedFrom? CheckedFromOf(CaseJson read, string named)
     {
         if (read.CheckedFrom is not { } from)
@@ -224,15 +224,10 @@ internal static class RealisticCases
             );
         }
 
-        var lowest = PostgresContainer.RecordedMajors.Min();
-        if (read.MinimumMajor is { } minimum && minimum >= lowest && major <= minimum)
+        var first = FirstRecordedMajorOf(read.MinimumMajor);
+        if (major <= first)
         {
-            throw Fault(named, $"{Says} checkedFrom is not above its minimumMajor, {minimum}");
-        }
-
-        if (major <= lowest)
-        {
-            throw Fault(named, $"{Says} checkedFrom is not above {lowest}, the first recorded major the case runs on");
+            throw Fault(named, $"{Says} checkedFrom is not above {first}, the first recorded major the case runs on");
         }
 
         if (string.IsNullOrWhiteSpace(from.Why))
@@ -242,6 +237,14 @@ internal static class RealisticCases
 
         return new CheckedFrom(major, from.Why);
     }
+
+    // The lowest recorded major at or above the minimum, or the lowest of all when the case has no minimum or none
+    // is at or above it.
+    private static int FirstRecordedMajorOf(int? minimumMajor) =>
+        PostgresContainer
+            .RecordedMajors.Where(major => minimumMajor is not { } minimum || major >= minimum)
+            .DefaultIfEmpty(PostgresContainer.RecordedMajors.Min())
+            .Min();
 
     // Why Dapper cannot send a parameter of a case with models, which the run through Dapper leaves out for it.
     private static string? DapperOf(CaseJson read, string named)

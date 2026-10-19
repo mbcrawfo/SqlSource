@@ -215,7 +215,11 @@ public sealed class RealisticCasesTests
     )]
     [InlineData( /*lang=json,strict*/
         "{ \"minimumMajor\": 18, \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
-        "checkedFrom is not above its minimumMajor"
+        "checkedFrom is not above 18, the first recorded major the case runs on"
+    )]
+    [InlineData( /*lang=json,strict*/
+        "{ \"minimumMajor\": 17, \"columns\": [], \"checkedFrom\": { \"major\": 18, \"why\": \"w\" } }",
+        "checkedFrom is not above 18, the first recorded major the case runs on"
     )]
     [InlineData( /*lang=json,strict*/
         "{ \"columns\": [], \"checkedFrom\": { \"major\": 14, \"why\": \"w\" } }",
