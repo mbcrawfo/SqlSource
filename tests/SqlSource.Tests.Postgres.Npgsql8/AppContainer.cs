@@ -16,13 +16,6 @@ public sealed partial class AppContainer : IAsyncLifetime
 {
     private const string Database = "app";
 
-    private static readonly string EndToEnd = Path.Combine(
-        RepositoryRoot.Folder,
-        "tests",
-        "SqlSource.Tests.Postgres",
-        "EndToEnd"
-    );
-
     private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(DefaultImage())
         .WithDatabase("postgres")
         .Build();
@@ -44,9 +37,9 @@ public sealed partial class AppContainer : IAsyncLifetime
             }
 
             await using var app = NpgsqlDataSource.Create(ConnectionString);
-            foreach (var script in new[] { "schema.sql", "seed.sql" })
+            foreach (var path in new[] { EndToEndFiles.Schema(Database), EndToEndFiles.Seed(Database) })
             {
-                var sql = await File.ReadAllTextAsync(Path.Combine(EndToEnd, "app", script), token);
+                var sql = await File.ReadAllTextAsync(path, token);
                 await using var command = app.CreateCommand(sql);
                 _ = await command.ExecuteNonQueryAsync(token);
             }

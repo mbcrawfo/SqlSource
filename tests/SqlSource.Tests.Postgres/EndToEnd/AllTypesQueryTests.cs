@@ -236,7 +236,7 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
     }
 
     // The column of a property of AllTypesDto: Int4ArrayValue is int4_array_value.
-    private static string ColumnOf(string property) =>
+    internal static string ColumnOf(string property) =>
         string.Concat(
             property.Select(
                 static (letter, i) =>

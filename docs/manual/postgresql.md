@@ -215,7 +215,7 @@ The names are those of PostgreSQL's catalog, which are the [type override's](set
 
 ### What to know about some types
 
-- **`timestamptz`** is read as a `System.DateTime` whose `Kind` is `Utc`.  `timestamp`, and `date` on Npgsql 8 and 9, are read with the `Kind` `Unspecified`.  `infinity` and `-infinity` in a `timestamptz` are read as `DateTime.MaxValue` and `DateTime.MinValue`, with the `Kind` `Unspecified`.  To give a `timestamptz` the C# type `System.DateTimeOffset`, map it: `timestamptz=System.DateTimeOffset`.
+- **`timestamptz`** is read as a `System.DateTime` whose `Kind` is `Utc`.  `timestamp`, and `date` on Npgsql 8 and 9, are read with the `Kind` `Unspecified`.  `infinity` and `-infinity` in a `timestamptz` are read as `DateTime.MaxValue` and `DateTime.MinValue`, with the `Kind` `Unspecified`.  To give a `timestamptz` the C# type `System.DateTimeOffset`, map it: `timestamptz=System.DateTimeOffset`.  Rows read through Dapper then also need a type handler: see [the recipe](recipes.md#models-through-dapper).
 - **`numeric`** values `NaN`, `Infinity` and `-Infinity` cannot be read as a `decimal`, and reading one throws.  Keep them out of the column, or cast it to `float8` in the query, which reads them as a `double`.
 - **An `interval` with months or years** cannot be read as a `System.TimeSpan`, and reading one throws.  Your own ADO.NET code can read it as an `NpgsqlTypes.NpgsqlInterval`, with `reader.GetFieldValue<NpgsqlInterval>(i)`.
 - **`inet`** is read as a `System.Net.IPAddress`, which drops the netmask.  Your own ADO.NET code can read it as an `NpgsqlTypes.NpgsqlInet`, which keeps it, with `reader.GetFieldValue<NpgsqlInet>(i)`.

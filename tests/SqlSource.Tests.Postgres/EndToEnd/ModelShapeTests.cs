@@ -14,8 +14,9 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.EndToEnd;
 
 // The project runs the generator when it builds: the attribute it declares is in the assembly, and so is each model of
-// the queries of Queries/, with the name, the shape and the properties that its settings give it.  The tests read the
-// models by reflection, so a model that is not generated fails the build.  No server is needed.
+// the queries of Queries/, with the name, the shape and the properties that its settings give it.  The tests name each
+// model with typeof, so a model that is not generated fails the build, and read its shape by reflection.  No server is
+// needed.
 public sealed class ModelShapeTests
 {
     private const string Namespace = "SqlSource.Tests.Postgres.EndToEnd";

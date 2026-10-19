@@ -267,7 +267,7 @@ The input model is the parameter object, and the output model is the type of a r
   SqlMapper.AddTypeHandler(new UtcDateTimeOffsetHandler());
   ```
 
-  A `DateTimeOffset` parameter is sent by Dapper's own mapping and not by the handler, as a `timestamptz`, which takes an offset of 0 alone: pass `value.ToUniversalTime()`.
+  A `DateTimeOffset` parameter is sent as a `timestamptz`, which takes an offset of 0 alone.  Another offset throws `ArgumentException`, so pass `value.ToUniversalTime()`.
 - **A PostgreSQL enum mapped to a C# enum needs `MapEnum<T>()` on the data source.**  An enum read as a `string`, the default, needs nothing:
 
   ```csharp
