@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.IO;
@@ -42,6 +41,6 @@ internal sealed record RunFilters(ImmutableArray<FileFilter> Files, ImmutableArr
             }
         }
 
-        return new RunFilters(files.ToImmutable(), [.. databases.Distinct(StringComparer.OrdinalIgnoreCase)]);
+        return new RunFilters(files.ToImmutable(), [.. databases.Distinct(DatabaseName.Comparer)]);
     }
 }

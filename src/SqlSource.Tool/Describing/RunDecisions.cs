@@ -90,7 +90,7 @@ internal static class RunDecisions
         Func<PlannedFile, PlannedQuery, bool> counts
     )
     {
-        var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var names = new HashSet<string>(DatabaseName.Comparer);
         foreach (var file in plan.Files)
         {
             foreach (var query in file.Queries)

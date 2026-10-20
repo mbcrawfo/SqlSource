@@ -17,6 +17,11 @@ namespace SqlSource.Tool.Projects;
 /// </summary>
 internal static class RunProjects
 {
+    /// <summary>
+    /// The one comparer of project paths: two paths that differ only in case are one project.
+    /// </summary>
+    public static StringComparer PathComparer => StringComparer.OrdinalIgnoreCase;
+
     private static readonly ContinuationLine AddThePackage = new("help", "add the SqlSource package to the project");
 
     private static readonly ContinuationLine Restore = new("help", "run 'dotnet restore'");
@@ -64,7 +69,7 @@ internal static class RunProjects
         }
 
         // A project that --project leaves out is not asked about.
-        foreach (var left in all.Except(projects, StringComparer.OrdinalIgnoreCase))
+        foreach (var left in all.Except(projects, PathComparer))
         {
             RunEvents.Project(reporter.Trace, left, evaluation: null);
         }
@@ -130,13 +135,13 @@ internal static class RunProjects
         Reporter reporter
     )
     {
-        var selected = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var selected = new HashSet<string>(PathComparer);
+        var reported = new HashSet<string>(PathComparer);
         foreach (var name in named)
         {
             // Path.GetFullPath throws for an empty path, which is what an unset variable of a shell gives.
             var path = name.Text.Length == 0 ? name.Text : Path.GetFullPath(name.Text, workingDirectory);
-            if (projects.Contains(path, StringComparer.OrdinalIgnoreCase))
+            if (projects.Contains(path, PathComparer))
             {
                 _ = selected.Add(path);
             }

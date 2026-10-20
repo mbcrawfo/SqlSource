@@ -327,7 +327,7 @@ internal static class RunPlanner
     )
     {
         var names = new List<string>();
-        var known = new Dictionary<string, DatabaseWork>(StringComparer.OrdinalIgnoreCase);
+        var known = new Dictionary<string, DatabaseWork>(DatabaseName.Comparer);
         foreach (var file in files)
         {
             foreach (var query in file.Queries)
@@ -374,7 +374,7 @@ internal static class RunPlanner
                 )
                 {
                     problems |= QueryProblems.DatabaseDialectConflict;
-                    if ((reported ??= [with(StringComparer.OrdinalIgnoreCase)]).Add(name))
+                    if ((reported ??= [with(DatabaseName.Comparer)]).Add(name))
                     {
                         errors.Add(
                             ToolDiagnostic.At(
@@ -446,7 +446,7 @@ internal static class RunPlanner
 
     private static bool IsNamed(PlannedQuery query, RunFilters filters) =>
         filters.Databases.IsEmpty
-        || (query.Database is { } database && filters.Databases.Contains(database, StringComparer.OrdinalIgnoreCase));
+        || (query.Database is { } database && filters.Databases.Contains(database, DatabaseName.Comparer));
 
     // The claims of one file in one project: what each says, and the type that says it, in the order they came.
     private sealed class FileClaims

@@ -212,7 +212,7 @@ internal static class DatabaseRuns
                 .SelectMany(static file => file.Queries)
                 .Where(query =>
                     query.State == QueryState.ToDescribe
-                    && string.Equals(query.Planned.Database, database, StringComparison.OrdinalIgnoreCase)
+                    && DatabaseName.Comparer.Equals(query.Planned.Database, database)
                 ),
         ];
 

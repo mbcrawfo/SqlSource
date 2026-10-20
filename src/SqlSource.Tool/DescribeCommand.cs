@@ -183,7 +183,7 @@ internal static class DescribeCommand
 
         var messages = new List<string>();
         var units = 0;
-        var connections = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var connections = new HashSet<string>(DatabaseName.Comparer);
         var hasConnection = usage.Values.Any(static value => value.Option?.Name == ConnectionOption);
         foreach (var value in usage.Values)
         {
@@ -337,7 +337,7 @@ internal static class DescribeCommand
                 || databases.Length > 0
                 || ArgumentsOf(usage).Any(static argument => SqlPath.IsSqlFile(argument.Text)),
             connections.ToImmutable(),
-            [.. databases.DistinctBy(static value => value.Text, StringComparer.OrdinalIgnoreCase)]
+            [.. databases.DistinctBy(static value => value.Text, DatabaseName.Comparer)]
         );
     }
 

@@ -205,10 +205,7 @@ internal static class SidecarCheck
 
             if (
                 !databases.IsEmpty
-                && (
-                    entry.Database is not { } database
-                    || !databases.Contains(database, StringComparer.OrdinalIgnoreCase)
-                )
+                && (entry.Database is not { } database || !databases.Contains(database, DatabaseName.Comparer))
             )
             {
                 continue;

@@ -429,7 +429,7 @@ The model is `Sidecar`, its `SidecarEntry` for each query, and each entry's `Sid
 
 [`SidecarWriter`](../../src/SqlSource/Snapshot/SidecarWriter.cs) writes a sidecar as its file's text, in the layout and key order of the format design.  It writes a key when the format's condition for it holds, whatever the model has: an entry without rows has no `columns`.  `PackageVersion.Prefix` is the version the tool records in a sidecar: the first three parts of the assembly's version, so that no prerelease suffix reaches a committed file.  The generator compares it with the `toolVersion` of a sidecar up to its first `-` or `+`, `PackageVersion.PrefixOf`, which matters only for a `toolVersion` that carries a suffix, as a file edited by hand or written by something other than the tool can.
 
-[`SidecarComparer.FindDifference`](../../src/SqlSource/Snapshot/SidecarComparer.cs) gives the first difference between a committed entry and a described one, over what `describe --check` compares.  A parameter's or a column's `type` is compared whole, so a key of a type object is compared as soon as it is added to the model.
+[`SidecarComparer.FindDifference`](../../src/SqlSource/Snapshot/SidecarComparer.cs) gives the first difference between a committed entry and a described one, over what `describe --check` compares.  It compares the database by `DatabaseName.Comparer`, which ignores case, and every other text ordinally.  A parameter's or a column's `type` is compared whole, so a key of a type object is compared as soon as it is added to the model.
 
 ### Reading a sidecar
 
