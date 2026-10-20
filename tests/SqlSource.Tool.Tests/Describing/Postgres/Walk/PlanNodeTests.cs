@@ -140,6 +140,36 @@ public sealed class PlanNodeTests
         root.HasFilter.ShouldBeFalse();
     }
 
+    // The members partition pruning removed from an Append: their number, and 0 when the key is absent.
+    [Theory]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": 2}}]""",
+        2
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": 0}}]""",
+        0
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append"}}]""",
+        0
+    )]
+    public void Read_SubplansRemoved_IsTheirNumber(string text, int removed) =>
+        PlanNode.Read(text).ShouldNotBeNull().SubplansRemoved.ShouldBe(removed);
+
+    // A count that is no integer of zero or more is no plan the walk can read.
+    [Theory]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": "2"}}]"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": -1}}]"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": 1.5}}]"""
+    )]
+    public void Read_SubplansRemovedThatIsNoCount_IsNoPlan(string text) => PlanNode.Read(text).ShouldBeNull();
+
     // The keys PostgresPlans writes are read back as they were.
     [Fact]
     public void Read_TextOfAPlanATestWrote_KeepsTheAggregateKeys()
@@ -150,6 +180,13 @@ public sealed class PlanNodeTests
 
         (read.Strategy, read.HasGroupKey, read.HasFilter).ShouldBe(("Hashed", true, true));
     }
+
+    [Fact]
+    public void Read_TextOfAPlanATestWrote_KeepsSubplansRemoved() =>
+        PlanNode
+            .Read(Text(Append(Member("p_1", "t_1")) with { SubplansRemoved = 3 }))
+            .ShouldNotBeNull()
+            .SubplansRemoved.ShouldBe(3);
 
     [Theory]
     [InlineData("")]

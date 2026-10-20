@@ -20,12 +20,14 @@ A column of no origin is answered by the walk from the plan's `Output` ([`PlanEx
   - A set operation under a join or one that a node above computes over, a `GROUP BY` over a `UNION ALL` subquery's `count(*)` for one.
   - A branch's value of a type outside the three families of built-in types (`SetOperationTypes`), a domain's column for one, since the planner's cast to the result's type is not printed.
   - A nullable column that a branch's `WHERE` filters to values that are not `NULL` (`union-distinct-search-ordered-limited` `label`, `o.note ILIKE @pattern`).
+  - A branch's value that is an expression other than a constant, a test, `count(*)` or a ranking, whose type `PlanExpression.TypeOf` does not give, so that it never carries to the column: a partitioned table's root `Append`, into each of whose members the planner pushes the expression (`SELECT p.id + 1 FROM parts p` prints `(p_1.id + 1)` in each), and a `UNION` branch's `id + 1`.  No column of the corpus is noise of this kind.
 - **A recursive CTE** (`recursive-category-tree` `id`, `name`, `path`, `depth` and `product_count`).  Its columns reach the result through a `CTE Scan` of a `Recursive Union`, which prints them in the order the query needs and names none of the CTE's columns, and they have no origin to find them by; `product_count` is a `count(x)` too.
 - **`COALESCE` over both sides of a `FULL JOIN`** (`full-join-accounts-reservations` `account_id`, `coalesce(a.id, r.account_id)`).  Each row of a full join has one side at least, so a `COALESCE` of a `NOT NULL` column of each side is never `NULL`; the walk reads each argument alone, and a join extends each.
 - **The ordinal of `WITH ORDINALITY`** (`unnest-tags-with-ordinality` `ordinal`).  It is a column of a function in `FROM`, which has no origin, and the walk proves no column of a `Function Scan`.
 - **Grouping sets** (`rollup-by-status` `orders` and `level`).  A plan with a `Grouping Sets` key cannot be used, so every column keeps the heuristic, though a `count` and `grouping(...)` are never `NULL` in any group, the empty one included.  `orders` is a `count(DISTINCT o.id)`, a `count(x)` too.
 - **A column of a view**, which is `null` with `view` (`view-joined-left` `account_id` and `name`).  PostgreSQL records no `NOT NULL` for a view's column, and the walk answers a column with an origin only through the catalog.
 - **A `RETURNING` column of a value the statement writes**, which is the catalog's `true` for a nullable table column where the statement writes a value that is not `NULL` (`insert-select-returning` `note`, `update-from-aggregate-returning` `amount`, `data-modifying-cte-archive` `payload`).
+- **An expression over the columns of a partitioned `ModifyTable` target**, in a `RETURNING` list that names none of them plainly.  The target is an instance of the partitioned table itself, and `relations` asks only for the relations the plan scans, so no row of the table is fetched and the reference is not proved.
 
 ## Why it exists
 
@@ -47,11 +49,13 @@ Medium.  Nothing is wrong, but on realistic SQL about a fifth of the properties 
 - **`VALUES`**: the rows read from the SQL, for a statement that is a `VALUES` alone, since the plan prints none of them.
 - **A column of no origin through a scan**: a position the plan proves, a scan whose `Output` lists every column of the subquery, which its child's `Output` would have to show, or the subquery's column names from the server, which no call asks for.
 - **A set operation's `*SELECT* <k>` branch and a recursive CTE**: the branch's or the CTE's column names from the server, which no call asks for.
+- **A set operation's branch that is an expression of no literal's type**: the reader's proved type (`Expressions.ValueTypeOf`) in place of `PlanExpression.TypeOf` in `NullabilityWalk.SetOperations`' `ValueAt`.
 - **`COALESCE` over a `FULL JOIN`**: a `COALESCE` whose arguments include a column proved on each side of one `Full` join, with nothing above that join that extends it.
 - **The ordinal of `WITH ORDINALITY`**: a reading of a `Function Scan` that knows which of its columns is the ordinal.
 - **Grouping sets**: a plan with a `Grouping Sets` key used for a column of no origin whose form is never `NULL` in any group, `count(*)` and `grouping(...)`, while a column with an origin keeps the heuristic.
 - **A view's column**: the walk proving the entry the plan prints for it, a column of the tables the view expands to, as it proves a column of no origin.
 - **A `RETURNING` column of a written value**: the value the plan's `ModifyTable` writes into the column, proved as an expression, where no `BEFORE` trigger and no rule can change the row.
+- **An expression over a partitioned `ModifyTable` target**: `relations` asked for the target of a root `ModifyTable` too, as for a relation the plan scans.
 
 ## Trigger
 

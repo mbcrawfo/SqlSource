@@ -37,6 +37,10 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// <param name="HasFilter">
 /// Whether the node has a <c>Filter</c>, whatever it holds: an aggregate's <c>HAVING</c>.
 /// </param>
+/// <param name="SubplansRemoved">
+/// <c>Subplans Removed</c>, which an <c>Append</c> or a <c>Merge Append</c> prints when partition pruning removed
+/// members from the plan: their number, and 0 when the key is absent.  Such a node does not show every partition.
+/// </param>
 /// <param name="Plans"><c>Plans</c>: the children, empty when the node has none.</param>
 internal sealed record PlanNode(
     string NodeType,
@@ -53,6 +57,7 @@ internal sealed record PlanNode(
     string? Strategy,
     bool HasGroupKey,
     bool HasFilter,
+    int SubplansRemoved,
     IReadOnlyList<PlanNode> Plans
 )
 {
@@ -165,6 +170,7 @@ internal sealed record PlanNode(
             || !TryText(element, "CTE Name", out var cte)
             || !TryText(element, nameof(Command), out var command)
             || !TryText(element, nameof(Strategy), out var strategy)
+            || !TryCount(element, "Subplans Removed", out var removed)
             || !TryNodes(element, out var plans)
         )
         {
@@ -188,6 +194,7 @@ internal sealed record PlanNode(
                 && key.ValueKind == JsonValueKind.Array
                 && key.GetArrayLength() > 0,
             element.TryGetProperty("Filter", out _),
+            removed,
             plans
         );
     }
@@ -203,6 +210,18 @@ internal sealed record PlanNode(
 
         text = value.ValueKind == JsonValueKind.String ? value.GetString() : null;
         return text is not null;
+    }
+
+    // False when the key holds what is no integer of zero or more.  A key that is absent is 0.
+    private static bool TryCount(JsonElement element, string key, out int count)
+    {
+        count = 0;
+        if (!element.TryGetProperty(key, out var value))
+        {
+            return true;
+        }
+
+        return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out count) && count >= 0;
     }
 
     // False when the key holds what is no array of strings.  A key that is absent is null.

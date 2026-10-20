@@ -150,6 +150,28 @@ public sealed class ExpressionTests(PostgresContainer postgres)
         (await AnswersAsync("SELECT count(*) AS n FROM scratch_parts")).ShouldBe([NotNullExpression]);
     }
 
+    // No column names the partitioned table, so "tables" has no row of it and "relations", asked for the relations
+    // the plan scans, answers its partitions alone: a reference inside an expression is proved by every partition's
+    // row, and one to the column that may be NULL is not.
+    [Fact]
+    public async Task DescribeAsync_ExpressionsOverAPartitionedTableThatNoColumnNames_AreProvedByItsPartitions()
+    {
+        await postgres.ExecuteAsync(ScratchSchema.Partitioned);
+
+        (
+            await AnswersAsync(
+                "SELECT u.name, max(p.kind) AS top_kind, max(p.note) AS last_note "
+                    + "FROM users u JOIN scratch_parts p ON p.id = u.id GROUP BY u.name"
+            )
+        ).ShouldBe([NotNullCatalog, NotNullExpression, UnknownNoOrigin]);
+        (
+            await AnswersAsync(
+                "SELECT u.name, (p.id + 1) AS next, (p.note || 'x') AS noted "
+                    + "FROM users u JOIN scratch_parts p ON p.id = u.id"
+            )
+        ).ShouldBe([NotNullCatalog, NotNullExpression, UnknownNoOrigin]);
+    }
+
     // A count the path finds before pg_catalog's may be another schema's, which can return NULL.
     [Fact]
     public async Task DescribeAsync_CountShadowedOnTheSearchPath_StaysUnknown()

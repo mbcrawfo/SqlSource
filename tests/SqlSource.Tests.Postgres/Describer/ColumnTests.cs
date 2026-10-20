@@ -533,6 +533,24 @@ public sealed class ColumnTests(PostgresContainer postgres)
         Of(columns).ShouldBe([NullableCatalog, NullableCatalog]);
     }
 
+    // No column names the partitioned table, so a reference inside an expression is proved by its partitions' rows,
+    // and a foreign partition, whose remote rows nothing holds to its NOT NULL, proves nothing.
+    [Fact]
+    public async Task DescribeAsync_ExpressionOverAPartitionedTableWithAForeignPartition_StaysUnknown()
+    {
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
+        await postgres.ExecuteAsync(ForeignPartitionTables(connection));
+
+        // The premise: a query of the parent returns the remote row's NULL.
+        (await postgres.ScalarAsync("SELECT p.v IS NULL FROM fp_parted p WHERE p.id = 1")).ShouldBe(true);
+
+        var columns = await ColumnsOfAsync(
+            "SELECT u.name, (p.v || 'x') AS t FROM users u JOIN fp_parted p ON p.id = u.id"
+        );
+
+        Of(columns).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
+    }
+
     // A foreign table of this test alone, through the same loopback server, whose remote row holds NULL in v, which
     // the foreign table says is NOT NULL and PostgreSQL does not enforce.  Made by SQL that can be run again.
     private static string ForeignTable(NpgsqlConnectionStringBuilder connection) =>

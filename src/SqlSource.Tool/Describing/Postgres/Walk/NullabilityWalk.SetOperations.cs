@@ -12,11 +12,12 @@ internal static partial class NullabilityWalk
     // through nodes that pass a child's column on, is answered from the set operation's inputs: false with
     // set-operation when the inputs the operation returns rows of prove it, and as it was built otherwise.  A UNION's
     // Append returns every member's rows, and so does any Append, a partitioned table's or one nested in another: every
-    // member must prove it.  An INTERSECT returns rows that both inputs hold, as NULL equals NULL there: one input
-    // proves it.  An EXCEPT returns rows of its left input: that one proves it.  PostgreSQL 14 plans the last two as a
-    // SetOp over an Append whose members print a flag last, 0 for the left input and 1 for the right; 18 as a SetOp
-    // with the left input as its Outer child and the right as its Inner.  A recursive CTE's union, and any other shape,
-    // proves nothing.
+    // member must prove it, and an Append that partition pruning removed a member of proves nothing, since the rows of
+    // another execution may come from that one.  An INTERSECT returns rows that both inputs hold, as NULL equals NULL
+    // there: one input proves it.  An EXCEPT returns rows of its left input: that one proves it.  PostgreSQL 14 plans
+    // the last two as a SetOp over an Append whose members print a flag last, 0 for the left input and 1 for the right;
+    // 18 as a SetOp with the left input as its Outer child and the right as its Inner.  A recursive CTE's union, and
+    // any other shape, proves nothing.
     //
     // A branch's value counts only when its type carries to the result's (SetOperationTypes): the planner casts a
     // branch to the result's type, and the plan does not print the cast.  The result's type is the row description's,
@@ -226,7 +227,8 @@ internal static partial class NullabilityWalk
 
             if (PlanNodeTypes.Appends.Contains(node.NodeType))
             {
-                return MemberNodesOf(node) is [_, ..] members
+                return node.SubplansRemoved == 0
+                    && MemberNodesOf(node) is [_, ..] members
                     && members.All(member => ColumnAt(member, ordinal, type, Reach.Branch, depth + 1));
             }
 

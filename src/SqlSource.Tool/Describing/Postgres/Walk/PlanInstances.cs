@@ -64,6 +64,11 @@ internal enum InstanceKind
 /// The tables every partition of a <see cref="InstanceKind.Partitioned" /> instance is a partition of, by OID, nearest
 /// first; empty for the other kinds.
 /// </param>
+/// <param name="Members">
+/// The relations the members of a <see cref="InstanceKind.Partitioned" /> instance's <c>Append</c> scan, its leaf
+/// partitions, by schema and name in the order of the plan; empty for the other kinds, and for an <c>Append</c> that
+/// pruning removed a member of (<see cref="PlanNode.SubplansRemoved" />), whose members are not every partition.
+/// </param>
 /// <param name="Child">
 /// The root of the plan a <see cref="InstanceKind.Plan" /> instance scans, or null for the other kinds and for a
 /// scan whose plan cannot be told.
@@ -74,6 +79,7 @@ internal sealed record PlanInstance(
     string? Schema,
     string? Relation,
     IReadOnlyList<long> Parents,
+    IReadOnlyList<PostgresRelationName> Members,
     PlanNode? Child
 );
 
@@ -266,7 +272,15 @@ internal sealed class PlanInstances
             Add(
                 partitioned.Alias,
                 depth,
-                new PlanInstance(InstanceKind.Partitioned, extended, null, null, partitioned.Parents, null)
+                new PlanInstance(
+                    InstanceKind.Partitioned,
+                    extended,
+                    null,
+                    null,
+                    partitioned.Parents,
+                    node.SubplansRemoved == 0 ? PlanPartitions.RelationsOf(node) : [],
+                    null
+                )
             );
         }
         else if (SetOperations.Contains(node.NodeType))
@@ -278,12 +292,12 @@ internal sealed class PlanInstances
             Add(
                 alias,
                 depth,
-                new PlanInstance(InstanceKind.Relation, extended, node.Schema, node.RelationName, [], null)
+                new PlanInstance(InstanceKind.Relation, extended, node.Schema, node.RelationName, [], [], null)
             );
         }
         else if (node.Alias is { } scan && node.NodeType is PlanNodeTypes.SubqueryScan or PlanNodeTypes.CteScan)
         {
-            Add(scan, depth, new PlanInstance(InstanceKind.Plan, extended, null, null, [], ChildOf(node)));
+            Add(scan, depth, new PlanInstance(InstanceKind.Plan, extended, null, null, [], [], ChildOf(node)));
         }
 
         foreach (var child in node.JoinChildren)

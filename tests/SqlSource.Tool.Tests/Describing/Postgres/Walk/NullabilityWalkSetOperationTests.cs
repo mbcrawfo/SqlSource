@@ -108,6 +108,15 @@ public sealed class NullabilityWalkSetOperationTests
         AnswersOf(outcome).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
     }
 
+    // An Append that partition pruning removed a member of shows not every partition, and another execution may read
+    // the removed one's rows.
+    [Fact]
+    public void Run_AppendWithSubplansRemoved_KeepsNoOrigin() =>
+        AnswersOf(
+                RunSet(AppendOf(Scan("u_1", "u_1.name"), Scan("u_2", "u_2.name")) with { SubplansRemoved = 1 }, TextOid)
+            )
+            .ShouldBe([UnknownNoOrigin]);
+
     // SELECT xmin FROM u UNION ALL SELECT xmin FROM o: a system column of a table is never NULL, and each branch's is
     // of the column's type.
     [Fact]

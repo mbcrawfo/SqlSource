@@ -31,6 +31,7 @@ internal static class PostgresPlans
             null,
             false,
             false,
+            0,
             []
         );
 
@@ -51,6 +52,7 @@ internal static class PostgresPlans
             null,
             false,
             false,
+            0,
             [outer with { ParentRelationship = Outer }, inner with { ParentRelationship = Inner }]
         );
 
@@ -71,6 +73,7 @@ internal static class PostgresPlans
             null,
             false,
             false,
+            0,
             [child with { ParentRelationship = relationship }]
         );
 
@@ -132,6 +135,11 @@ internal static class PostgresPlans
         if (node.HasFilter)
         {
             map["Filter"] = "filter";
+        }
+
+        if (node.SubplansRemoved > 0)
+        {
+            map["Subplans Removed"] = node.SubplansRemoved;
         }
 
         if (node.Plans.Count > 0)

@@ -326,7 +326,8 @@ internal static partial class NullabilityWalk
         /// The declared type of the column a reference names, a domain where the column is one, when the walk proves
         /// that it is not <c>NULL</c>; or null.  A system column, which "tables" reads no attribute of and no user
         /// column may be named as, is of its own type when the catalog's answer of a <c>NOT NULL</c> column of its
-        /// table would be not nullable.
+        /// table would be not nullable.  When the instance's rows are a partitioned table's partitions
+        /// (<see cref="RowsOf" />), each must prove the column, and all of one type.
         /// </summary>
         public long? ProvedTypeOf(OutputReference reference)
         {
@@ -336,18 +337,35 @@ internal static partial class NullabilityWalk
                 || (onlyAlias is not null && !string.Equals(alias, onlyAlias, StringComparison.Ordinal))
                 || !instances.TryFind(alias, out var instance)
                 || instance.NullExtended
-                || TableOf(instance) is not { } table
+                || RowsOf(instance) is not [_, ..] rows
             )
             {
                 return null;
             }
 
-            var attribute = table.Columns.FirstOrDefault(column =>
-                string.Equals(column.Name, reference.Column, StringComparison.Ordinal)
+            long? type = null;
+            foreach (var row in rows)
+            {
+                if (ProvedTypeIn(row, reference.Column) is not { } own || (type is { } seen && seen != own))
+                {
+                    return null;
+                }
+
+                type = own;
+            }
+
+            return type;
+        }
+
+        // The type of the column of the name in the table's row, when the catalog's rule proves it not NULL.
+        private static long? ProvedTypeIn(PostgresTableRow table, string column)
+        {
+            var attribute = table.Columns.FirstOrDefault(found =>
+                string.Equals(found.Name, column, StringComparison.Ordinal)
             );
             if (attribute is null)
             {
-                return ColumnNullability.KeepsNotNull(table) ? SystemColumnTypeOf(reference.Column) : null;
+                return ColumnNullability.KeepsNotNull(table) ? SystemColumnTypeOf(column) : null;
             }
 
             return ColumnNullability.Of(new ColumnOrigin(table, attribute), gated: false).Nullable == false
@@ -366,21 +384,54 @@ internal static partial class NullabilityWalk
                 _ => null,
             };
 
-        // The table "tables" answered of an instance: a relation's by its schema and its name, and a partitioned
-        // table's by the nearest of the tables its partitions are partitions of, whose NOT NULL every partition keeps.
-        // A scan of another plan has none.
-        private PostgresTableRow? TableOf(PlanInstance instance) =>
-            instance.Kind switch
+        // The rows "tables" and "relations" answered of an instance, each of which must prove a reference to it: a
+        // relation's by its schema and its name; and a partitioned table's, the nearest of the tables its partitions
+        // are partitions of, whose NOT NULL every partition keeps, or when none of those has a row the row of the
+        // relation each member of its Append scans: "tables" answers only a table a column names, and "relations" the
+        // relations the plan scans, its partitions and never their parent.  The members are leaf partitions, and every
+        // row the instance gives is one of theirs; a member without a row leaves none, and so does an Append that
+        // pruning removed a member of, which PlanInstance.Members leaves empty.  A scan of another plan has none.
+        private List<PostgresTableRow> RowsOf(PlanInstance instance)
+        {
+            switch (instance.Kind)
             {
-                InstanceKind.Relation => _scope.Tables.Values.FirstOrDefault(row =>
-                    string.Equals(row.Schema, instance.Schema, StringComparison.Ordinal)
-                    && string.Equals(row.Name, instance.Relation, StringComparison.Ordinal)
-                ),
-                InstanceKind.Partitioned => instance
-                    .Parents.Select(oid => _scope.Tables.GetValueOrDefault(oid))
-                    .FirstOrDefault(static row => row is not null),
-                InstanceKind.Plan => null,
-                _ => throw new InvalidOperationException($"Unknown kind {instance.Kind}."),
-            };
+                case InstanceKind.Relation:
+                    return RowOf(instance.Schema, instance.Relation) is { } relation ? [relation] : [];
+                case InstanceKind.Partitioned:
+                    if (
+                        instance
+                            .Parents.Select(oid => _scope.Tables.GetValueOrDefault(oid))
+                            .FirstOrDefault(static row => row is not null) is
+                        { } parent
+                    )
+                    {
+                        return [parent];
+                    }
+
+                    var members = new List<PostgresTableRow>(instance.Members.Count);
+                    foreach (var member in instance.Members)
+                    {
+                        if (RowOf(member.Schema, member.Name) is not { } row)
+                        {
+                            return [];
+                        }
+
+                        members.Add(row);
+                    }
+
+                    return members;
+                case InstanceKind.Plan:
+                    return [];
+                default:
+                    throw new InvalidOperationException($"Unknown kind {instance.Kind}.");
+            }
+        }
+
+        // The row of the relation of the schema and the name, or null.
+        private PostgresTableRow? RowOf(string? schema, string? name) =>
+            _scope.Tables.Values.FirstOrDefault(row =>
+                string.Equals(row.Schema, schema, StringComparison.Ordinal)
+                && string.Equals(row.Name, name, StringComparison.Ordinal)
+            );
     }
 }
