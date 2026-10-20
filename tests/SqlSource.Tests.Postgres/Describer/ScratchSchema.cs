@@ -31,4 +31,21 @@ internal static class ScratchSchema
         CREATE OR REPLACE FUNCTION shadow.nulls(int8, integer) RETURNS int8 LANGUAGE sql AS 'SELECT NULL::int8';
         CREATE OR REPLACE AGGREGATE shadow.count(integer) (sfunc = shadow.nulls, stype = int8);
         """;
+
+    /// <summary>
+    /// An aggregate <c>shadow.max(timestamptz)</c> and an operator <c>shadow.*</c> of <c>(numeric, numeric)</c> that
+    /// always return <c>NULL</c>.  On a path that names <c>shadow</c> before <c>pg_catalog</c> each is chosen over the
+    /// catalog's by the same argument types, and the plan prints it bare, as the catalog's would print.  Their
+    /// functions are PL/pgSQL, since the planner inlines a function of SQL and the plan would then show the constant.
+    /// </summary>
+    public const string ShadowOperators = """
+        CREATE SCHEMA IF NOT EXISTS shadow;
+        CREATE OR REPLACE FUNCTION shadow.null_timestamptz(timestamptz, timestamptz) RETURNS timestamptz
+            LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END';
+        CREATE OR REPLACE AGGREGATE shadow.max(timestamptz) (sfunc = shadow.null_timestamptz, stype = timestamptz);
+        CREATE OR REPLACE FUNCTION shadow.null_numeric(numeric, numeric) RETURNS numeric
+            LANGUAGE plpgsql AS 'BEGIN RETURN NULL; END';
+        DROP OPERATOR IF EXISTS shadow.* (numeric, numeric);
+        CREATE OPERATOR shadow.* (leftarg = numeric, rightarg = numeric, function = shadow.null_numeric);
+        """;
 }
