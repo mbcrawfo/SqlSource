@@ -65,6 +65,7 @@ internal static class DescribeRun
         var connections = Connections.Resolve(
             [.. selected.Select(static database => database.Name)],
             [.. RunDecisions.DescribableDatabases(plan).Select(static database => database.Name)],
+            [.. plan.Databases.Select(static database => database.Name)],
             options.Connections,
             host.GetEnvironmentVariable
         );
@@ -113,7 +114,7 @@ internal static class DescribeRun
             selected,
             files,
             connections,
-            DatabaseNames(options),
+            options.Databases,
             options.Mode
         );
         foreach (var line in lines)

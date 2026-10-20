@@ -190,8 +190,8 @@ public sealed class CheckFilterTests : IDisposable
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
 
-        var result = await DescribeAsync("--check", "--database", "nowhere");
+        var result = await DescribeAsync("--check", "--database", "biling");
 
-        result.ShouldBe(new CliResult(0, "nowhere: 0 same, 0 differ, 0 failed\n", ""));
+        result.ShouldBe(new CliResult(0, "biling: 0 same, 0 differ, 0 failed\n", ""));
     }
 }

@@ -143,7 +143,7 @@ An entry is current when its hash and its database are the query's (`SidecarEntr
 
 `RunDecisions.SelectedDatabases` gives the databases with a selected query that needs an entry, and `RunDecisions.DescribableDatabases` those of them with such a query that the plan did not fail.  [`Connections.Resolve`](../../src/SqlSource.Tool/Describing/Connections.cs) finds a `DatabaseConnection` for every selected database.  For each it takes the value of `--connection` for its name, ignoring case, else the variable of its name (`ConnectionVariables.For`), else `SQLSOURCE_CONNECTION` when it is the one describable database.  A database whose every selected query the plan failed is still selected, with its line in the summary, but it is none the variable could be meant for, since only an error of the plan brings it into the run.  A database whose variable another selected database shares has no connection, unless both have one on the command line.  A variable that is empty or white space is not set, since redacting white space would turn every space of a describer's text into the mark.
 
-`Connections` reports nothing, and lists the names of `--connection` that are no selected database for the help of `SQLSRC213`.  The rules a user sees are in the manual's [connections](../manual/tool.md#connections).
+`Connections` reports nothing.  It keeps the names of `--connection` that are no selected database for the help of `SQLSRC213`: `UnusedNames` holds those close to a database of the plan, selected or not, by `NearName.IsNear` ignoring case, and `UnusedPositions` the `ConnectionArgument.Position` of the rest, since a name far from every database may be the start of a secret.  The rules a user sees are in the manual's [connections](../manual/tool.md#connections).
 
 ### Describing
 
@@ -169,7 +169,7 @@ A run that writes hands the outcomes to [`SidecarStore.Apply`](../../src/SqlSour
 
 ### The summary
 
-`DescribeRun` hands `Cli` the counts that `run.end` holds, from `RunSummary.Counts`, before it writes the summary, so that a summary that cannot be written, as when standard output is closed, does not lose them.  [`RunSummary.Lines`](../../src/SqlSource.Tool/Describing/RunSummary.cs) gives one line for each selected database and one for each name of `--database` that is none, and counts the selected queries that need an entry.  The lines are in the manual's [summary](../manual/tool.md#the-summary).
+`DescribeRun` hands `Cli` the counts that `run.end` holds, from `RunSummary.Counts`, before it writes the summary, so that a summary that cannot be written, as when standard output is closed, does not lose them.  [`RunSummary.Lines`](../../src/SqlSource.Tool/Describing/RunSummary.cs) gives one line for each selected database and one for each name of `--database` that is none, and counts the selected queries that need an entry.  A name of `--database` that is no database of the plan is printed only when it is close to one, by `NearName.IsNear` ignoring case; any other is `--database at position <n>`, with the position of the first value of that name.  A name that equals a database of the plan has that database's label.  The lines are in the manual's [summary](../manual/tool.md#the-summary).
 
 ### Where a connection's value goes
 

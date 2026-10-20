@@ -102,20 +102,65 @@ public sealed class SummaryTests : IDisposable
         result.Error.ShouldContain("    query: GetUser: not in this run\n");
     }
 
-    // A filter that matched nothing is visible.
+    // A filter that matched nothing is visible.  The name is printed because it is near a database of the plan.
     [Fact]
-    public async Task Run_DatabaseNameThatNoQueryHas_HasThreeZerosAndNoEngine()
+    public async Task Run_DatabaseCloseToADatabase_IsNamed()
     {
-        var result = await _scene.DescribeAsync("--database", "postgres", "--database", "nowhere");
+        var result = await _scene.DescribeAsync("--database", "postgres", "--database", "biling");
 
         result.ShouldBe(
             new CliResult(
                 1,
-                "postgres (postgres): 1 described, 0 skipped, 0 failed\nnowhere: 0 described, 0 skipped, 0 failed\n",
+                "postgres (postgres): 1 described, 0 skipped, 0 failed\nbiling: 0 described, 0 skipped, 0 failed\n",
                 result.Error
             )
         );
         result.Error.ShouldContain("    query: GetInvoice: not in this run\n");
+    }
+
+    [Fact]
+    public async Task Run_DatabaseCloseToADatabaseUnderCheck_IsNamedWithTheWordsOfACheck()
+    {
+        var result = await _scene.DescribeAsync("--check", "--database", "biling");
+
+        result.Out.ShouldBe("biling: 0 same, 0 differ, 0 failed\n");
+    }
+
+    // A secret typed after --database passes the rule of a database name, and is printed by its position instead.
+    [Fact]
+    public async Task Run_DatabaseFarFromEveryDatabase_IsNamedByItsPosition()
+    {
+        var result = await _scene.DescribeAsync("--database", Secrets.Marker);
+
+        result.Out.ShouldBe("--database at position 3: 0 described, 0 skipped, 0 failed\n");
+        result.Error.ShouldNotContain(Secrets.Marker);
+    }
+
+    [Fact]
+    public async Task Run_DatabaseFarFromEveryDatabaseUnderCheck_IsNamedByItsPositionWithTheWordsOfACheck()
+    {
+        var result = await _scene.DescribeAsync("--check", "--database", Secrets.Marker);
+
+        result.Out.ShouldBe("--database at position 4: 0 same, 0 differ, 0 failed\n");
+        result.Error.ShouldNotContain(Secrets.Marker);
+    }
+
+    // The database is one for the plan, which keeps the first spelling: so is its position.
+    [Fact]
+    public async Task Run_DatabaseGivenTwiceFarFromEveryDatabase_IsNamedByTheFirstPosition()
+    {
+        var result = await _scene.DescribeAsync("--database", "a", "--database", "A");
+
+        result.Out.ShouldBe("--database at position 3: 0 described, 0 skipped, 0 failed\n");
+    }
+
+    // A database of the plan counts as one to be near, though no query of it is selected.
+    [Fact]
+    public async Task Run_DatabaseCloseToADatabaseWithNoSelectedQuery_IsNamedAsTyped()
+    {
+        var result = await _scene.DescribeAsync("Invoices.sql", "--database", "postgress");
+
+        result.Out.ShouldBe("postgress: 0 described, 0 skipped, 0 failed\n");
     }
 
     [Fact]
