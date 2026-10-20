@@ -148,8 +148,9 @@ internal static class TypeKeys
     /// but that every name of <c>pg_catalog</c> that starts with <c>_</c> is an array's, so <c>pg_catalog.newtype</c>
     /// gives <c>newtype</c>, <c>pg_catalog._int4</c> gives <c>int4[]</c> and <c>pg_catalog._pg_class</c> gives
     /// <c>pg_class[]</c>.  A quoted name there that holds a name the map knows is that name, and one that holds
-    /// <c>_</c> and a name is that name's key with <c>[]</c>, with the name quoted as before when the map does not
-    /// know it: <c>pg_catalog."_Odd"</c> gives <c>"Odd"[]</c>.  Any other quoted name stays as written.  Any other
+    /// <c>_</c> and a name is that name's key with <c>[]</c>, with a name the map does not know written as
+    /// <see cref="WritePart" /> writes it: <c>pg_catalog."_odd"</c> gives <c>odd[]</c> and <c>pg_catalog."_Odd"</c>
+    /// gives <c>"Odd"[]</c>.  Any other quoted name stays as written.  Any other
     /// qualified key is given as written, unchecked: <c>public._tag</c> is not <c>public.tag[]</c>, since a type of
     /// another schema may be named with a <c>_</c> (TD-0059).  Returns false for anything else, with an empty
     /// <paramref name="normalized" />.
@@ -252,6 +253,7 @@ internal static class TypeKeys
             return inside;
         }
 
+        // The span is over the one array that is made, so the text costs a single allocation.
         var text = new char[inside.Length];
         var length = 0;
         var index = 0;
@@ -263,7 +265,7 @@ internal static class TypeKeys
             index += inside[index] == '"' ? 2 : 1;
         }
 
-        return new string(text, 0, length).AsSpan();
+        return new ReadOnlySpan<char>(text, 0, length);
     }
 
     /// <summary>

@@ -111,12 +111,18 @@ public sealed class TypeKeysTests
     [InlineData("pg_catalog.\"_int4\"", "int4[]")]
     [InlineData("pg_catalog.\"New Type\"", "\"New Type\"")]
     [InlineData("pg_catalog.\"_Odd\"", "\"Odd\"[]")]
+    [InlineData("pg_catalog.\"_odd\"", "odd[]")]
+    [InlineData("pg_catalog.\"newtype\"", "\"newtype\"")]
+    [InlineData("\"_int4\"[]", "_int4[]")]
+    [InlineData("pg_catalog.\"int4\"[]", "int4[]")]
+    [InlineData("pg_catalog.\"_x\"[]", "\"_x\"[]")]
     public void TryNormalize_QuotedCatalogName_IsItsKey(string key, string expected) => ShouldNormalize(key, expected);
 
     [Theory]
     [InlineData("\"a.b\".c[]", "\"a.b\"", "c", true)]
     [InlineData("int4", "", "int4", false)]
     [InlineData("s.\"x[]\"", "s", "\"x[]\"", false)]
+    [InlineData("s.\"\"\"\"", "s", "\"\"\"\"", false)]
     public void TrySplit_WrittenKey_GivesItsParts(string key, string schema, string name, bool isArray)
     {
         TypeKeys.TrySplit(key.AsSpan(), out var actualSchema, out var actualName, out var actualIsArray).ShouldBeTrue();
@@ -138,6 +144,7 @@ public sealed class TypeKeysTests
     [InlineData("\"say \"\"hi\"\"\"", "say \"hi\"")]
     [InlineData("\"my schema\"", "my schema")]
     [InlineData("plain", "plain")]
+    [InlineData("\"\"\"\"", "\"")]
     public void TextOf_QuotedPart_IsItsTextUndoubled(string part, string expected) =>
         TypeKeys.TextOf(part.AsSpan()).ToString().ShouldBe(expected);
 
