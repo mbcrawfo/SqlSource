@@ -173,15 +173,15 @@ public sealed class TypeOverrideLevelTests
         ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("short", true, true, NoWarnings, "int4", place)]);
     }
 
-    // An array's own key is written as its element's with [], or as its name in the catalog, which is read as the
-    // same key for a type of pg_catalog, and for an extension's type in any schema when it is bare.  Without either,
-    // the element's entry gives the array its element type.
+    // An entry for an array is written with its element's key and [], or with its name in the catalog, which is read
+    // as the same key for a type of pg_catalog, and for an extension's type in any schema when it is bare.  It wins
+    // over the element's entry, which without it gives the array its element type.
     [Theory]
     [InlineData("int4", "int4=long int4[]=System.Collections.Generic.List<int>", "int4[]")]
     [InlineData("int4", "int4=long _int4=System.Collections.Generic.List<int>", "int4[]")]
     [InlineData("citext", "citext=System.Uri citext[]=System.Collections.Generic.List<int>", "citext[]")]
     [InlineData("citext", "citext=System.Uri _citext=System.Collections.Generic.List<int>", "citext[]")]
-    public void Run_ArraysOwnKey_WinsOverItsElements(string element, string overrides, string key)
+    public void Run_ArraysKey_WinsOverItsElements(string element, string overrides, string key)
     {
         var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
         var schema = element == "citext" ? "public" : "pg_catalog";
@@ -195,11 +195,11 @@ public sealed class TypeOverrideLevelTests
         var (elementOverride, elementType) =
             element == "citext" ? ("citext=System.Uri", "global::System.Uri[]") : ("int4=long", "long[]");
 
-        var own = Run(overrides, (file, [Entry(file, "GetUser", array)]));
+        var ofTheArray = Run(overrides, (file, [Entry(file, "GetUser", array)]));
         var ofTheElement = Run(elementOverride, (file, [Entry(file, "GetUser", array)]));
 
-        own.Diagnostics.ShouldBeEmpty();
-        ColumnsOf(own, "GetUser")
+        ofTheArray.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(ofTheArray, "GetUser")
             .ShouldBe([
                 new PropertyType(
                     "global::System.Collections.Generic.List<int>",

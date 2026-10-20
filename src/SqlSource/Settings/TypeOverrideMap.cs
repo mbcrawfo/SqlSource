@@ -76,7 +76,7 @@ internal static class TypeOverrideMap
     public static TypeOverride? Winner(EquatableArray<TypeOverride> map, string key)
     {
         var parts = new KeyParts(key);
-        return BestOf(map, parts, default).Entry;
+        return BestOf(map, parts).Entry;
     }
 
     /// <summary>
@@ -90,11 +90,12 @@ internal static class TypeOverrideMap
         return at < entries.Count && Order(new KeyParts(entries[at].Key), parts) == 0 ? at : ~at;
     }
 
-    // The better of best and each entry that matches key: equal to it ignoring case, from the first such entry on,
-    // with its quoted parts equal to key's.  A key's entries sit together in the order of the map, so the walk stops
+    // The best of the entries that match key: equal to it ignoring case, from the first such entry on, with its
+    // quoted parts equal to key's, or none.  A key's entries sit together in the order of the map, so the walk stops
     // at the first that is not equal to it ignoring case.
-    private static Match BestOf(EquatableArray<TypeOverride> map, in KeyParts key, Match best)
+    private static Match BestOf(EquatableArray<TypeOverride> map, in KeyParts key)
     {
+        Match best = default;
         for (var at = LowerBound(map, key, ignoringCaseOnly: true); at < map.Count; at++)
         {
             var entry = new KeyParts(map[at].Key);
