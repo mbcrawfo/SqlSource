@@ -396,6 +396,80 @@ public sealed class PlanExpressionTests
     public void ProvedTypeOf_AggregateOverAGroupWithARow_IsItsResult(string entry, long expected) =>
         PlanExpression.ProvedTypeOf(entry, Grouped(groupsHaveRows: true)).ShouldBe(expected);
 
+    // The walk's answers for the subplans of the tests below: the value of SubPlan 3 as a scalar, and the first column
+    // of SubPlan 2, with "a.id" and "a.x" proved integers.
+    private static ExpressionContext SubPlans(long? scalar, long? column, bool catalogFunctions = true) =>
+        new(
+            catalogFunctions,
+            static reference => reference.Alias == "a" && reference.Column is "id" or "x" ? BuiltInTypes.Int4 : null,
+            ScalarSubPlanTypeOf: name => name == "SubPlan 3" ? scalar : null,
+            SubPlanColumnTypeOf: (name, number) => name == "SubPlan 2" && number == 1 ? column : null
+        );
+
+    [Theory]
+    [InlineData("(SubPlan 3)", BuiltInTypes.Int8, null, false)]
+    [InlineData("((SubPlan 3))", BuiltInTypes.Int8, null, false)]
+    [InlineData("(SubPlan 3)", null, null, null)]
+    [InlineData("(hashed SubPlan 3)", BuiltInTypes.Int8, null, null)]
+    [InlineData("(SubPlan 4)", BuiltInTypes.Int8, null, null)]
+    [InlineData("EXISTS(SubPlan 1)", null, null, false)]
+    [InlineData("(EXISTS(SubPlan 1))", null, null, false)]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", null, BuiltInTypes.Int4, false)]
+    [InlineData("(ANY (a.id = (SubPlan 2).col1))", null, BuiltInTypes.Int4, false)]
+    [InlineData("(ANY (a.id < (SubPlan 2).col1))", null, BuiltInTypes.Int4, false)]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", null, null, null)]
+    [InlineData("(ANY (a.id = (SubPlan 2).col1))", null, null, null)]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", null, BuiltInTypes.Text, null)]
+    [InlineData("(ANY (a.id = (SubPlan 2).col1))", null, BuiltInTypes.Text, null)]
+    [InlineData("(ANY (a.email = (hashed SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.email = (SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id + (SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id = ((SubPlan 2).col1)::integer))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id = (SubPlan 2).col01))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id = (SubPlan 2).column1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id = (rescan SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY ((a.id = (SubPlan 2).col1) AND (a.x = (SubPlan 2).col2)))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ALL (a.id = (SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("((a.id = (SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(a.id = (SubPlan 2).col1)", null, BuiltInTypes.Int4, null)]
+    [InlineData("MERGE_ACTION()", null, null, false)]
+    [InlineData("merge_action()", null, null, null)]
+    [InlineData("\"MERGE_ACTION\"()", null, null, null)]
+    [InlineData("MERGE_ACTION(1)", null, null, null)]
+    [InlineData("EXISTS(SubPlan 1) AND true", null, null, null)]
+    [InlineData("EXISTS(hashed SubPlan 1)", null, null, null)]
+    [InlineData("ARRAY(SubPlan 1)", null, null, null)]
+    [InlineData("(rescan SubPlan 1)", BuiltInTypes.Int8, null, null)]
+    public void NullableOf_SubPlanForms_AreReadThroughTheirCallbacks(
+        string entry,
+        long? scalar,
+        long? column,
+        bool? expected
+    ) => PlanExpression.NullableOf(entry, SubPlans(scalar, column)).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("(SubPlan 3)", BuiltInTypes.Int8)]
+    [InlineData("EXISTS(SubPlan 1)", BuiltInTypes.Bool)]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", BuiltInTypes.Bool)]
+    [InlineData("MERGE_ACTION()", BuiltInTypes.Text)]
+    public void ProvedTypeOf_SubPlanForm_IsItsType(string entry, long expected) =>
+        PlanExpression.ProvedTypeOf(entry, SubPlans(BuiltInTypes.Int8, BuiltInTypes.Int4)).ShouldBe(expected);
+
+    // An ANY reads an operator, which is the catalog's only when the session finds pg_catalog first; the rest are
+    // syntax.
+    [Theory]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", null)]
+    [InlineData("(SubPlan 3)", false)]
+    [InlineData("EXISTS(SubPlan 1)", false)]
+    [InlineData("MERGE_ACTION()", false)]
+    public void NullableOf_SubPlanFormWhenTheCatalogIsNotFirst_IsReadOnlyWithoutAnOperator(
+        string entry,
+        bool? expected
+    ) =>
+        PlanExpression
+            .NullableOf(entry, SubPlans(BuiltInTypes.Int8, BuiltInTypes.Int4, catalogFunctions: false))
+            .ShouldBe(expected);
+
     [Fact]
     public void Groups_Entry_IsTheTextInsideEachPairOfParenthesesOutermostFirst() =>
         PlanExpression

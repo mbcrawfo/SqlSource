@@ -310,20 +310,9 @@ internal sealed class PlanInstances
             return node.SubqueryChild;
         }
 
-        var name = CtePlanPrefix + node.CteName;
-        return
-            node.CteName is not null
-            && _tree
-                .SelfAndDescendants()
-                .Where(child =>
-                    child.ParentRelationship == PlanRelationships.InitPlan
-                    && string.Equals(child.SubplanName, name, StringComparison.Ordinal)
-                )
-                .Take(2)
-                .ToArray()
-                is [var plan]
-            ? plan
-            : null;
+        return node.CteName is null
+            ? null
+            : _tree.OnlyPlanNamed(PlanRelationships.InitPlan, CtePlanPrefix + node.CteName);
     }
 
     private void Add(string alias, int depth, PlanInstance instance)

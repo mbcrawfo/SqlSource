@@ -16,7 +16,7 @@ The realistic corpus, [`tests/SqlSource.Tests.Postgres/Realistic/`](../../tests/
 - **`EXISTS (...)` as a column** (`exists-as-column`), which is never `NULL`.
 - **An aggregate other than `count`** that cannot be `NULL` where it is: a `sum` or a `max` of a `NOT NULL` column over a group that has a row, `array_agg` and `string_agg` of an inner join's group (`array-and-string-agg`, `group-by-having`, `cte-chain`).
 - **`VALUES`** (`values-statement`, `insert-multirow-values`), whose rows the plan does not print.
-- **A strict function or operator over values that are not `NULL`**, `quantity * unit_price` (`order-report-four-tables`), `date_trunc(...)` (`aggregate-cte-joined-inner`), the range intersection `r.during * tstzrange(@from, @to)` (`reservations-in-range`), and a function that never returns `NULL` where it is called, `merge_action()` (`merge-returning`).
+- **A strict function or operator over values that are not `NULL`**, `quantity * unit_price` (`order-report-four-tables`), `date_trunc(...)` (`aggregate-cte-joined-inner`), and the range intersection `r.during * tstzrange(@from, @to)` (`reservations-in-range`).
 
 A few columns of the corpus are noise of other kinds, which the design below does not take up: a column of a view is `null` with `view` (`view-joined-left`), and a `RETURNING` column of a nullable table column is the catalog's `true` where the statement writes a value that is not `NULL` (`insert-select-returning`, `update-from-aggregate-returning`, `data-modifying-cte-archive`).
 

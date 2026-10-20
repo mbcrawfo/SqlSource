@@ -51,6 +51,12 @@ internal static class PlanRelationships
     public const string SubPlan = "SubPlan";
 }
 
+/// <summary>The values of <c>Strategy</c> of an <c>Aggregate</c>.</summary>
+internal static class AggregateStrategies
+{
+    public const string Plain = "Plain";
+}
+
 /// <summary>The values of <c>Join Type</c>.</summary>
 internal static class PlanJoinTypes
 {

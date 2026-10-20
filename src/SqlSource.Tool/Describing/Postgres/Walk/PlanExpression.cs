@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
@@ -44,6 +45,15 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// <c>WITHIN GROUP</c> makes it no such form: a filter may leave a group no row, and a window's frame may be empty.
 /// Inside a group that a child of the node printed (<see cref="ExpressionContext.GroupFromChild" />) no aggregate is
 /// read, since the child computed it under its own grouping.
+/// </para>
+/// <para>
+/// A subquery is a <c>SubPlan</c> that the plan prints by its name, and the walk says what its plan proves.
+/// <c>(SubPlan n)</c> is of the type <see cref="ExpressionContext.ScalarSubPlanTypeOf" /> gives.  <c>EXISTS(SubPlan
+/// n)</c> is a boolean that is never <c>NULL</c>, and so is <c>(ANY (L op (SubPlan n).colk))</c>, with
+/// <c>hashed</c> or without, when <c>L</c> is proved, <see cref="ExpressionContext.SubPlanColumnTypeOf" /> gives the
+/// type of column <c>k</c>, and <c>op</c> over the two is a comparison of <see cref="TotalFunctions" />.
+/// <c>MERGE_ACTION()</c> is a text that is never <c>NULL</c>.  <c>ARRAY</c>, <c>ALL</c>, a comparison of rows and the
+/// <c>rescan</c> of a multiple assignment are no form.
 /// </para>
 /// <para>
 /// A function name is the catalog's only when the plan prints it unqualified and the session finds
@@ -537,8 +547,16 @@ internal static class PlanExpression
                     return null;
                 }
 
+                if (SubPlanAt(from + 1, to - 1) is { Hashed: false } scalar)
+                {
+                    return _context.ScalarSubPlanTypeOf?.Invoke(scalar.Name);
+                }
+
                 var outside = EnterGroup(from, to);
-                var proved = OperatorAt(from + 1, to - 1) is null ? Proved(from + 1, to - 1) : CatalogForm(from, to);
+                var proved =
+                    OperatorAt(from + 1, to - 1) is null && !IsWord(from + 1, "ANY")
+                        ? Proved(from + 1, to - 1)
+                        : CatalogForm(from, to);
                 _groupsHaveRows = outside;
                 return proved;
             }
@@ -546,6 +564,19 @@ internal static class PlanExpression
             if (Constant(from, to) == false || IsCountOrRanking(from, to))
             {
                 return TypeOid(from, to);
+            }
+
+            // EXISTS(SubPlan n) starts false and turns true at the subplan's first row, and MERGE_ACTION() is the
+            // action a MERGE took or an error: neither is a function a search path can find, and a function of the name
+            // prints in quotes.
+            if (IsWord(from, "EXISTS") && ClosesAtTheEnd(from, to) && SubPlanAt(from + 2, to - 1) is { Hashed: false })
+            {
+                return BuiltInTypes.Bool;
+            }
+
+            if (IsWord(from, "MERGE_ACTION") && ClosesAtTheEnd(from, to) && to - from == 3)
+            {
+                return BuiltInTypes.Text;
             }
 
             if (OutputReference.Parse(Text(from, to)) is { } reference)
@@ -567,10 +598,82 @@ internal static class PlanExpression
 
             if (IsGroup(from, to))
             {
+                if (IsWord(from + 1, "ANY"))
+                {
+                    return Any(from + 2, to - 1);
+                }
+
                 return OperatorAt(from + 1, to - 1) is { } at ? Operator(from + 1, at, to - 1) : null;
             }
 
             return Is(from, Kind.Open) ? Cast(from, to) : Function(from, to) ?? Aggregate(from, to);
+        }
+
+        // The group of ANY's one comparison, (L op (SubPlan n).colk) or with hashed, which is NULL only when a
+        // comparison of L with a row of the subplan is: the executor ORs them, and the hashed form is NULL only for a
+        // NULL on either side.  L and the subplan's column must be proved, and op a comparison of the table over their
+        // types.  A comparison of rows, or a column with a cast, is none.
+        private long? Any(int from, int to)
+        {
+            if (
+                !IsGroup(from, to)
+                || Vetoed(from, to)
+                || OperatorAt(from + 1, to - 1) is not { } at
+                || SubPlanColumnAt(at + 1, to - 1) is not var (name, column)
+            )
+            {
+                return null;
+            }
+
+            var outside = EnterGroup(from, to);
+            var left = Proved(from + 1, at);
+            _groupsHaveRows = outside;
+            return
+                left is { } proved
+                && _context.SubPlanColumnTypeOf?.Invoke(name, column) is { } right
+                && TotalFunctions.OperatorResult(Text(at), proved, right) == BuiltInTypes.Bool
+                ? BuiltInTypes.Bool
+                : null;
+        }
+
+        // SubPlan n, or hashed SubPlan n, as the whole span: the name of a subplan as the plan prints it inside the
+        // parentheses of its value.
+        private (string Name, bool Hashed)? SubPlanAt(int from, int to)
+        {
+            var hashed = IsWord(from, "hashed");
+            var at = hashed ? from + 1 : from;
+            return to - at == 2 && IsWord(at, "SubPlan") && Is(at + 1, Kind.Number)
+                ? ("SubPlan " + Text(at + 1), hashed)
+                : null;
+        }
+
+        // (SubPlan n).colk, or with hashed, as the whole span: the subplan's name and the column's number from 1.
+        private (string Name, int Column)? SubPlanColumnAt(int from, int to)
+        {
+            if (!Is(from, Kind.Open))
+            {
+                return null;
+            }
+
+            var close = _closes[from];
+            if (
+                close + 3 != to
+                || SubPlanAt(from + 1, close) is not { } subPlan
+                || !Is(close + 1, Kind.Dot)
+                || !Is(close + 2, Kind.Word)
+            )
+            {
+                return null;
+            }
+
+            var word = Text(close + 2);
+            return
+                word.StartsWith("col", StringComparison.Ordinal)
+                && int.TryParse(word.AsSpan(3), NumberStyles.None, CultureInfo.InvariantCulture, out var column)
+                && column > 0
+                && string.Equals(word, "col" + column.ToString(CultureInfo.InvariantCulture), StringComparison.Ordinal)
+                ? (subPlan.Name, column)
+                : null;
         }
 
         // Whether the walk says the group may not be read.  The entry as a whole is never asked.
@@ -721,8 +824,11 @@ internal static class PlanExpression
         }
 
         // Whether the span is a lower-case bare name and the parentheses of its call, to the end.
-        private bool IsCall(int from, int to) =>
-            IsLowerWord(from) && from + 1 < to && Is(from + 1, Kind.Open) && _closes[from + 1] == to - 1;
+        private bool IsCall(int from, int to) => IsLowerWord(from) && ClosesAtTheEnd(from, to);
+
+        // Whether the token after the first opens parentheses that the span's last token closes.
+        private bool ClosesAtTheEnd(int from, int to) =>
+            from + 1 < to && Is(from + 1, Kind.Open) && _closes[from + 1] == to - 1;
 
         // The type of each argument of [from, to), between the commas of depth zero, when every one is proved; none
         // for an empty span; or null.

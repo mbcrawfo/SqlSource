@@ -408,7 +408,7 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            var expressions = new Expressions(plans.Scope, node, instances, plans.OnlyAliasOf(node));
+            var expressions = new Expressions(plans, node, instances, plans.OnlyAliasOf(node));
             var entry = output[ordinal];
             if (OutputReference.Parse(entry) is { } reference)
             {
@@ -416,7 +416,7 @@ internal static partial class NullabilityWalk
                     && SetOperationTypes.Carries(attribute, type);
             }
 
-            return expressions.NullableOf(entry) == false
+            return expressions.NullableOf(entry, TotalFunctions.UnknownType) == false
                 && PlanExpression.TypeOf(entry, plans.Scope.CatalogFunctionsFirst) is { } constant
                 && SetOperationTypes.Carries(constant, type);
         }

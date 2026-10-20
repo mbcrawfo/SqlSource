@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -105,6 +106,24 @@ internal sealed record PlanNode(
     /// </summary>
     public IEnumerable<PlanNode> SelfAndDescendants() =>
         Plans.SelectMany(static child => child.SelfAndDescendants()).Prepend(this);
+
+    /// <summary>
+    /// The one node of those at and under this one, through every <c>Parent Relationship</c>, that hangs here by the
+    /// relationship under the <c>Subplan Name</c>; null when none does, or when several do, which says nothing.
+    /// </summary>
+    /// <param name="relationship"><c>InitPlan</c> or <c>SubPlan</c>.</param>
+    /// <param name="subplanName">The name: <c>SubPlan 1</c>, or <c>CTE</c> and a CTE's name.</param>
+    public PlanNode? OnlyPlanNamed(string relationship, string subplanName) =>
+        SelfAndDescendants()
+            .Where(node =>
+                node.ParentRelationship == relationship
+                && string.Equals(node.SubplanName, subplanName, StringComparison.Ordinal)
+            )
+            .Take(2)
+            .ToArray()
+            is [var only]
+            ? only
+            : null;
 
     /// <summary>
     /// The root of a plan's text, or null: the text is an array of one object whose <c>Plan</c> is the root, and

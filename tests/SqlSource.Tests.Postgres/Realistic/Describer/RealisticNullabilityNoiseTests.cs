@@ -14,7 +14,7 @@ public sealed class RealisticNullabilityNoiseTests(PostgresContainer postgres)
 {
     // The budget of each recorded major, by the major.  One is lowered in the change that lowers the noise, as the
     // test below demands, and raised only in a change that adds cases, by how much and why in that commit.
-    private static readonly Dictionary<int, int> Budgets = new() { [14] = 50, [18] = 51 };
+    private static readonly Dictionary<int, int> Budgets = new() { [14] = 48, [18] = 48 };
 
     [Fact]
     public void Budgets_RecordedMajors_EachHoldOneAndNoOtherDoes() =>

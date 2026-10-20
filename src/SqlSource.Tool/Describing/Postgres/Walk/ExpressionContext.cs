@@ -29,7 +29,8 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// </param>
 /// <param name="ScalarSubPlanTypeOf">
 /// The type of the value of the <c>SubPlan</c> of a name, <c>SubPlan 1</c>, when its plan always returns one row whose
-/// value the walk proves not <c>NULL</c>; or null.
+/// value the walk proves not <c>NULL</c>; or null.  The walk answers it only for a subplan that is the whole entry, of
+/// the column's type.
 /// </param>
 /// <param name="SubPlanColumnTypeOf">
 /// The type of a column, by its number from 1, of the root of the <c>SubPlan</c> of a name, when the walk proves it

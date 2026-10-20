@@ -6,8 +6,8 @@ using SqlSource.Tool.Describing.Postgres.Walk;
 namespace SqlSource.Tool.Tests;
 
 // Plans as a server would answer "explain", written by a test: a scan of a table, a join of two nodes, a node over
-// one child, and an aggregate.  Text gives the plan as EXPLAIN (VERBOSE, FORMAT JSON) writes it, for a test of the
-// session.
+// one child, an aggregate, and a subquery's plan.  Text gives the plan as EXPLAIN (VERBOSE, FORMAT JSON) writes it,
+// for a test of the session.
 internal static class PostgresPlans
 {
     public const string Outer = "Outer";
@@ -81,6 +81,14 @@ internal static class PostgresPlans
             Strategy = strategy,
             HasGroupKey = groupKey,
             Output = output.Length == 0 ? null : output,
+        };
+
+    // The root of a subquery's plan as a child of the node that evaluates it, under its name: "SubPlan 1".
+    public static PlanNode SubPlan(string name, PlanNode root) =>
+        root with
+        {
+            ParentRelationship = "SubPlan",
+            SubplanName = name,
         };
 
     // An Append over the members the test gives, which keep the relationship they have: see Member.
