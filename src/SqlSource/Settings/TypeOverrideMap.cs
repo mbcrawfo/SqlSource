@@ -14,7 +14,7 @@ namespace SqlSource.Settings;
 /// <remarks>
 /// The levels merge per key, the exception to the rule that a level replaces the one below it whole: a level
 /// replaces only the keys it names.  An entry of <c>default</c> stays in a merged map, so that it hides the key of
-/// a level merged under it later, and only the map in effect leaves it out.
+/// a level merged under it later and so that <see cref="Find" /> weighs it in its place like any other entry.
 /// </remarks>
 internal static class TypeOverrideMap
 {
@@ -60,47 +60,17 @@ internal static class TypeOverrideMap
         return new EquatableArray<TypeOverride>(merged.ToImmutable());
     }
 
-    /// <summary>The map in effect: <paramref name="merged" /> without its entries of <c>default</c>.</summary>
-    public static EquatableArray<TypeOverride> InEffect(EquatableArray<TypeOverride>? merged)
-    {
-        if (merged is not { } map)
-        {
-            return EquatableArray<TypeOverride>.Empty;
-        }
-
-        var kept = 0;
-        foreach (var entry in map)
-        {
-            kept += entry.Type is null ? 0 : 1;
-        }
-
-        if (kept == map.Count)
-        {
-            return map;
-        }
-
-        var inEffect = ImmutableArray.CreateBuilder<TypeOverride>(kept);
-        for (var index = 0; index < map.Count; index++)
-        {
-            if (map[index].Type is not null)
-            {
-                inEffect.Add(map[index]);
-            }
-        }
-
-        return new EquatableArray<TypeOverride>(inEffect.MoveToImmutable());
-    }
-
     /// <summary>
-    /// The entry for <paramref name="key" />, a type's key as it is written, or null: the entry whose key is equal
-    /// to it exactly or, failing that, the first in the order of the map whose key is equal to it ignoring case and
-    /// whose quoted parts are equal to the key's exactly.
+    /// The entry for <paramref name="key" />, a type's key as it is written, or null when no entry matches it or the
+    /// one that wins is <c>default</c>.  An entry matches when its key is equal to it ignoring case and its quoted
+    /// parts are equal to the key's exactly.  Of those, the entry of the most specific place wins, then one equal to
+    /// the key exactly, then the first in the order of the map.
     /// </summary>
     public static TypeOverride? Find(EquatableArray<TypeOverride> map, string key)
     {
         var parts = new KeyParts(key);
-        var at = LowerBound(map, parts, ignoringCaseOnly: true);
-        return at < map.Count ? BestOfEqualIgnoringCase(map, at, parts) : null;
+        var best = BestOf(map, parts, default);
+        return best.Entry?.Type is null ? null : best.Entry;
     }
 
     /// <summary>
@@ -114,12 +84,12 @@ internal static class TypeOverrideMap
         return at < entries.Count && Order(new KeyParts(entries[at].Key), parts) == 0 ? at : ~at;
     }
 
-    // Walks the entries from at, the first that is not less than key ignoring case, while they are equal to it ignoring
-    // case.  An entry equal to key exactly wins, and failing that the first whose quoted parts are equal to key's.
-    private static TypeOverride? BestOfEqualIgnoringCase(EquatableArray<TypeOverride> map, int at, in KeyParts key)
+    // The better of best and each entry that matches key: equal to it ignoring case, from the first such entry on,
+    // with its quoted parts equal to key's.  A key's entries sit together in the order of the map, so the walk stops
+    // at the first that is not equal to it ignoring case.
+    private static Match BestOf(EquatableArray<TypeOverride> map, in KeyParts key, Match best)
     {
-        TypeOverride? match = null;
-        for (; at < map.Count; at++)
+        for (var at = LowerBound(map, key, ignoringCaseOnly: true); at < map.Count; at++)
         {
             var entry = new KeyParts(map[at].Key);
             if (Compare(entry, key, StringComparison.OrdinalIgnoreCase) != 0)
@@ -127,18 +97,14 @@ internal static class TypeOverrideMap
                 break;
             }
 
-            if (Compare(entry, key, StringComparison.Ordinal) == 0)
+            if (QuotedPartsAreEqual(entry, key))
             {
-                return map[at];
-            }
-
-            if (match is null && QuotedPartsAreEqual(entry, key))
-            {
-                match = map[at];
+                var match = new Match(map[at], Compare(entry, key, StringComparison.Ordinal) == 0);
+                best = match.IsBetterThan(best) ? match : best;
             }
         }
 
-        return match;
+        return best;
     }
 
     // Whether each part of entry that is quoted has the text of the same part of key exactly.  The two are equal
@@ -207,6 +173,32 @@ internal static class TypeOverrideMap
         }
 
         return low;
+    }
+
+    // An entry that matches a type's key, the rank of its place, and whether it is equal to the key exactly.  The
+    // default is no match.
+    private readonly struct Match(TypeOverride entry, bool isExact)
+    {
+        public TypeOverride? Entry { get; } = entry;
+
+        public int Rank { get; } = RankOf(entry.Place);
+
+        public bool IsExact { get; } = isExact;
+
+        // The entry of the more specific place, then the one equal to the key exactly.  On a tie the earlier match
+        // stays, so the first in the order of the map wins.
+        public bool IsBetterThan(Match other) =>
+            other.Entry is null || Rank > other.Rank || (Rank == other.Rank && IsExact && !other.IsExact);
+
+        // How specific a place is, the most specific highest.  The attribute has no level for the type override.
+        private static int RankOf(SettingPlace place) =>
+            place switch
+            {
+                SettingPlace.Query => 3,
+                SettingPlace.FileHeader => 2,
+                SettingPlace.Metadata => 1,
+                SettingPlace.Property or SettingPlace.Attribute or _ => 0,
+            };
     }
 
     // A key split once into its parts, as TypeKeys.TrySplit gives them, so that a search splits the key it looks for

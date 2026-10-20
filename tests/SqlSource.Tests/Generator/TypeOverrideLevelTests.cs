@@ -324,6 +324,55 @@ public sealed class TypeOverrideLevelTests
             ]);
     }
 
+    // The query's default of the type's key takes the type out of the property's entry whose key differs from it by
+    // case, so the domain gets its base's C# type.
+    [Fact]
+    public void Run_DefaultOfAQueryThatDiffersByCase_HidesThePropertysEntry()
+    {
+        var file = new SqlFile(
+            "/app/Repo/Users.sql",
+            "-- name: GetUser\n-- type-override: public.status = default\nSELECT 1;\n"
+        );
+        var status = TestSidecars.Postgres(
+            name: "status",
+            kind: SidecarValues.Kind.Domain,
+            schema: "public",
+            internalName: "status",
+            baseType: Int4
+        );
+
+        var run = Run("public.Status=System.Guid", (file, [Entry(file, "GetUser", status)]));
+
+        run.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("int", true, true, NoWarnings, "int4", null)]);
+    }
+
+    // The query's entry replaces the property's for the type, though the property's key is spelled exactly as the
+    // type's and the query's differs from it by case.
+    [Fact]
+    public void Run_EntryOfAQueryThatDiffersByCase_ReplacesThePropertysExactOne()
+    {
+        var file = new SqlFile(
+            "/app/Repo/Users.sql",
+            "-- name: GetUser\n-- type-override: public.User_Status = System.Uri\nSELECT 1;\n"
+        );
+
+        var run = Run("public.user_status=System.Guid", (file, [Entry(file, "GetUser", EnumType("user_status"))]));
+
+        run.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(run, "GetUser")
+            .ShouldBe([
+                new PropertyType(
+                    "global::System.Uri",
+                    false,
+                    true,
+                    NoWarnings,
+                    "public.User_Status",
+                    "a -- type-override: marker of the query"
+                ),
+            ]);
+    }
+
     // A quoted key is exact, so it does not map the type whose name differs from its text by case.
     [Fact]
     public void Run_QuotedKey_DoesNotMapATypeThatDiffersByCase()

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
 using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.MSBuild;
@@ -15,9 +16,9 @@ namespace SqlSource.Generation.Types;
 /// </summary>
 /// <remarks>
 /// A query's parameters are typed before its columns, each in order, and its first failure is its one error, at its
-/// name: the query then has no types.  The map of the type override in effect is merged once for each distinct level
-/// of markers, since the queries without markers of their own share their file header's.  A project without the
-/// override asks no map at all.
+/// name: the query then has no types.  The map of a query's type override is merged once for each distinct level of
+/// markers, since the queries without markers of their own share their file header's.  A map without an entry that
+/// names a C# type, as in a project without the override, is not asked at all.
 /// </remarks>
 internal static class QueryTyper
 {
@@ -273,8 +274,9 @@ internal static class QueryTyper
     // "column 'id'", as a message names a parameter or column.
     private static string Subject(string owner, string name) => owner + " '" + name + "'";
 
-    // The lookup of the override in effect for the markers, made once for each distinct level of markers, by
-    // reference: a query without markers of its own holds its file header's level.
+    // The lookup of the type override for the markers, made once for each distinct level of markers, by reference:
+    // a query without markers of its own holds its file header's level.  None when no entry names a C# type, since
+    // a default alone gives every type the base map's.
     private static OverrideOf? LookupOf(
         SettingsLevel markers,
         FileTypesInput input,
@@ -290,7 +292,9 @@ internal static class QueryTyper
         }
 
         var map = QuerySettings.ResolveTypeOverrides(markers, input.Metadata, input.Property);
-        OverrideOf? made = map.Count == 0 ? null : new OverrideLookup(map, input.MappedTypes).Find;
+        OverrideOf? made = map.Any(static entry => entry.Type is not null)
+            ? new OverrideLookup(map, input.MappedTypes).Find
+            : null;
         lookups.Add((markers, made));
         return made;
     }
@@ -319,7 +323,8 @@ internal static class QueryTyper
     /// <summary>
     /// The type override's answer for a type, at one level of the map's walk: the entry of the type's key, then, for
     /// a type of an extension outside <c>pg_catalog</c>, of its bare name, then, for an array, of its element's key
-    /// with <c>[]</c>, looked up the same way.  An entry's type is the one the compilation resolved, or the failure
+    /// with <c>[]</c>, looked up the same way.  A key whose winning entry is <c>default</c> has none, so the walk
+    /// goes on as for a key without an entry.  An entry's type is the one the compilation resolved, or the failure
     /// of its status.
     /// </summary>
     /// <remarks>

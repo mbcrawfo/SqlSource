@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Immutable;
 using System.Linq;
 using Shouldly;
@@ -82,7 +83,7 @@ public sealed class TypeOverrideMapTests
     }
 
     [Fact]
-    public void Over_DefaultAbove_HidesTheKeyBelowAndInEffectDropsIt()
+    public void Over_DefaultAbove_HidesTheKeyBelowAndFindFindsNothing()
     {
         var lower = Map(
             Entry("int4", "long", SettingPlace.Property),
@@ -90,12 +91,13 @@ public sealed class TypeOverrideMapTests
         );
         var higher = Map(Entry("timestamptz", null, SettingPlace.FileHeader));
 
-        var merged = TypeOverrideMap.Over(higher, lower);
+        var merged = TypeOverrideMap.Over(higher, lower)!.Value;
 
         merged.ShouldBe(
             Map(Entry("int4", "long", SettingPlace.Property), Entry("timestamptz", null, SettingPlace.FileHeader))
         );
-        TypeOverrideMap.InEffect(merged).ShouldBe(Map(Entry("int4", "long", SettingPlace.Property)));
+        TypeOverrideMap.Find(merged, "timestamptz").ShouldBeNull();
+        TypeOverrideMap.Find(merged, "int4")!.Type.ShouldBe("long");
     }
 
     // A default kept in a merged map still hides a key of a level merged under it later.
@@ -106,9 +108,10 @@ public sealed class TypeOverrideMapTests
         var metadata = Map(Entry("int4", null, SettingPlace.Metadata));
         var markers = Map(Entry("text", "string", SettingPlace.Query));
 
-        TypeOverrideMap
-            .InEffect(TypeOverrideMap.Over(markers, TypeOverrideMap.Over(metadata, property)))
-            .ShouldBe(Map(Entry("text", "string", SettingPlace.Query)));
+        var merged = TypeOverrideMap.Over(markers, TypeOverrideMap.Over(metadata, property))!.Value;
+
+        merged.ShouldBe(Map(Entry("int4", null, SettingPlace.Metadata), Entry("text", "string", SettingPlace.Query)));
+        TypeOverrideMap.Find(merged, "int4").ShouldBeNull();
     }
 
     [Fact]
@@ -123,15 +126,6 @@ public sealed class TypeOverrideMapTests
         TypeOverrideMap.Over(null, map).ShouldBe(map);
     }
 
-    [Fact]
-    public void InEffect_Null_IsEmpty() => TypeOverrideMap.InEffect(null).ShouldBe(EquatableArray<TypeOverride>.Empty);
-
-    [Fact]
-    public void InEffect_OnlyDefaults_IsEmpty() =>
-        TypeOverrideMap
-            .InEffect(Map(Entry("int4", null, SettingPlace.Query), Entry("text", null, SettingPlace.Query)))
-            .ShouldBe(EquatableArray<TypeOverride>.Empty);
-
     [Theory]
     [InlineData("int4", "long")]
     [InlineData("INT4", "long")]
@@ -143,18 +137,17 @@ public sealed class TypeOverrideMapTests
     [InlineData("zzz", null)]
     public void Find_Key_IsFoundIgnoringCase(string key, string? type)
     {
-        var map = TypeOverrideMap.InEffect(
-            Map(
-                Entry("int4", "long", SettingPlace.Property),
-                Entry("public.USER_STATUS", "global::App.Status", SettingPlace.Property),
-                Entry("text", "string", SettingPlace.Property)
-            )
+        var map = Map(
+            Entry("int4", "long", SettingPlace.Property),
+            Entry("public.USER_STATUS", "global::App.Status", SettingPlace.Property),
+            Entry("text", "string", SettingPlace.Property)
         );
 
         TypeOverrideMap.Find(map, key)?.Type.ShouldBe(type);
         (TypeOverrideMap.Find(map, key) is null).ShouldBe(type is null);
     }
 
+    // Of two entries of one place that match, the one equal to the type's key exactly wins.
     [Theory]
     [InlineData("public.Status", "global::App.A")]
     [InlineData("public.status", "global::App.B")]
@@ -191,6 +184,52 @@ public sealed class TypeOverrideMapTests
         );
 
         TypeOverrideMap.Find(map, "public.STATUS")!.Type.ShouldBe("global::App.B");
+    }
+
+    // A query's default of the type's key spelled in another case still takes the type out of the entries below.
+    [Theory]
+    [InlineData("public.status")]
+    [InlineData("public.Status")]
+    public void Find_DefaultAboveThatDiffersByCase_FindsNothing(string key)
+    {
+        var merged = TypeOverrideMap.Over(
+            Map(Entry("public.status", null, SettingPlace.Query)),
+            Map(Entry("public.Status", "global::App.A", SettingPlace.Property))
+        )!;
+
+        TypeOverrideMap.Find(merged.Value, key).ShouldBeNull();
+    }
+
+    // The entry of the more specific place wins, though the one below is spelled exactly as the type's key.
+    [Theory]
+    [InlineData("Metadata", "Property")]
+    [InlineData("FileHeader", "Metadata")]
+    [InlineData("Query", "FileHeader")]
+    [InlineData("Query", "Property")]
+    public void Find_PlainEntryAboveAnExactOne_Wins(string higher, string lower)
+    {
+        var above = Entry("public.User_Status", "global::App.B", Enum.Parse<SettingPlace>(higher));
+        var merged = TypeOverrideMap.Over(
+            Map(above),
+            Map(Entry("public.user_status", "global::App.A", Enum.Parse<SettingPlace>(lower)))
+        )!;
+
+        TypeOverrideMap.Find(merged.Value, "public.user_status").ShouldBe(above);
+    }
+
+    // A quoted entry above that does not match the type leaves the plain one below in force.
+    [Fact]
+    public void Find_QuotedEntryAboveThatDoesNotMatch_LeavesTheOneBelow()
+    {
+        var merged = TypeOverrideMap.Over(
+            Map(Entry("public.\"Status\"", "global::App.A", SettingPlace.Query)),
+            Map(Entry("public.status", "global::App.B", SettingPlace.Property))
+        )!;
+
+        TypeOverrideMap
+            .Find(merged.Value, "public.status")
+            .ShouldBe(Entry("public.status", "global::App.B", SettingPlace.Property));
+        TypeOverrideMap.Find(merged.Value, "public.Status")!.Type.ShouldBe("global::App.A");
     }
 
     [Theory]
