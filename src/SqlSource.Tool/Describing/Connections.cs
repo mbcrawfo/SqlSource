@@ -124,13 +124,13 @@ internal sealed class Connections
         }
 
         var unused = given.Where(argument => !byDatabase.ContainsKey(argument.Name)).ToList();
-        var isNear = unused.ToLookup(argument => IsNearAny(argument.Name, planned));
+        var byNearness = unused.ToLookup(argument => IsNearAny(argument.Name, planned));
         return new Connections(
             byDatabase,
             [.. selected],
             [.. describable],
-            [.. isNear[true].Select(static argument => argument.Name)],
-            [.. isNear[false].Select(static argument => argument.Position)],
+            [.. byNearness[true].Select(static argument => argument.Name)],
+            [.. byNearness[false].Select(static argument => argument.Position)],
             unnamed is not null && describable.Count > 1
         );
     }

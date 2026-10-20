@@ -92,7 +92,6 @@ public sealed class UsageCheckTests
 
     [Theory]
     [InlineData("-" + Secrets.Word)]
-    [InlineData("-pS3cret")]
     public void Check_TokenThatStartsWithAHyphenAndIsFarFromEveryOption_IsAnOptionNamedByItsPosition(string token) =>
         UsageCheck.Check(Root(), ["describe", token]).Messages.ShouldBe(["sqlsource: unknown option at position 2"]);
 
@@ -385,12 +384,9 @@ public sealed class UsageCheckTests
                 continue;
             }
 
-            // The command checks the values that UsageCheck read and runs with the ones System.CommandLine read,
-            // so the two must give each option the same values too.
-            if (
-                !usage.IsReadTheSameBy(parsed)
-                || !HasTheSameValues(usage, parsed, "--project", "--database", "--connection")
-            )
+            // The command reads the values of its options from what UsageCheck read, and System.CommandLine gives the
+            // log's path, so the two must give --project, --database, --connection and --log the same values too.
+            if (!usage.IsReadTheSameBy(parsed) || !DescribeCommand.ReadsValuesAs(usage, parsed))
             {
                 disagreements.Add(string.Join(' ', args));
             }
@@ -447,13 +443,4 @@ public sealed class UsageCheckTests
     [Fact]
     public void CheckUsage_AnotherCommand_GivesNoLine() =>
         DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), ["--version"])).ShouldBeEmpty();
-
-    private static bool HasTheSameValues(Usage usage, ParseResult parsed, params string[] options) =>
-        usage.Command.Name != DescribeCommand.Name
-        || options.All(name =>
-            usage
-                .Values.Where(value => value.Option?.Name == name)
-                .Select(value => value.Text)
-                .SequenceEqual(parsed.GetValue<string[]>(name) ?? [])
-        );
 }

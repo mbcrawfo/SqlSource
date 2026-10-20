@@ -145,7 +145,7 @@ public sealed class SummaryTests : IDisposable
         result.Error.ShouldNotContain(Secrets.Marker);
     }
 
-    // The database is one for the plan, which keeps the first spelling: so is its position.
+    // The filter keeps the first spelling of a name, and the line names the position of that value.
     [Fact]
     public async Task Run_DatabaseGivenTwiceFarFromEveryDatabase_IsNamedByTheFirstPosition()
     {

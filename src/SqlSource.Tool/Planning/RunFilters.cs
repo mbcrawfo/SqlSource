@@ -38,7 +38,7 @@ internal sealed record RunFilters(ImmutableArray<FileFilter> Files, ImmutableArr
             var path = Path.GetFullPath(given.Text, workingDirectory);
             if (SqlPath.Normalize(path) is { } normalized && seen.Add(normalized))
             {
-                files.Add(new FileFilter(path, normalized, given.NamedAsPath(path)));
+                files.Add(new FileFilter(normalized, given.NamedAsPath(path)));
             }
         }
 

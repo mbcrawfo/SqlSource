@@ -285,7 +285,7 @@ internal static class DescribeCommand
     /// </summary>
     /// <remarks>
     /// The run reads these values from <see cref="Usage" />, and the log's <c>arguments</c> is redacted from it,
-    /// while System.CommandLine bound the values that the log's path and the help come from.  If the two disagree on
+    /// while System.CommandLine gives the log's path and the flags.  If the two disagree on
     /// which token is the value of an option, a token could be printed where the other reader would not print it,
     /// so <c>Cli</c> runs nothing then.
     /// </remarks>

@@ -28,7 +28,7 @@ internal static class LoggedArguments
     public static LogValue Of(Usage usage, IReadOnlyList<string> args)
     {
         var logged = args.ToArray();
-        foreach (var value in usage.Values.Where(static value => IsReplaced(value)))
+        foreach (var value in usage.Values.Where(IsReplaced))
         {
             // The token is the value, or the option, a separator and the value.
             var token = args[value.Position - 1];

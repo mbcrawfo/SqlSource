@@ -251,7 +251,8 @@ public sealed class SecretTests : IDisposable
     {
         var result = await _scene.DescribeAsync("--database", Secrets.Marker);
 
-        result.Out.ShouldBe("--database at position 3: 0 described, 0 skipped, 0 failed\n");
+        // SummaryTests holds the exact line.
+        result.Out.ShouldNotContain(Secrets.Marker);
         result.Error.ShouldNotContain(Secrets.Marker);
     }
 

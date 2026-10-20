@@ -64,7 +64,7 @@ public sealed class RunLogTests : IDisposable
     [Fact]
     public async Task RunStart_Arguments_HoldNoValueOfDatabaseOrConnection()
     {
-        _ = await _scene.DescribeAsync(
+        var result = await _scene.DescribeAsync(
             "App.csproj",
             "Users.sql",
             "--database",
@@ -76,6 +76,7 @@ public sealed class RunLogTests : IDisposable
             "--force"
         );
 
+        result.ExitCode.ShouldBe(0);
         Strings(LogReader.Read(Log)[0].GetProperty("arguments"))
             .ShouldBe([
                 "describe",
@@ -95,7 +96,7 @@ public sealed class RunLogTests : IDisposable
     [Fact]
     public async Task RunStart_Arguments_HoldATokenOfAPathByTheRuleOfWhatIsPrinted()
     {
-        _ = await _scene.DescribeAsync(
+        var result = await _scene.DescribeAsync(
             "App.csproj",
             "Users.sql",
             "a=b.sql",
@@ -105,8 +106,45 @@ public sealed class RunLogTests : IDisposable
             "--force"
         );
 
+        // The run goes on to the projects, and x;y is none of them.
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("SQLSRC207");
         Strings(LogReader.Read(Log)[0].GetProperty("arguments"))
             .ShouldBe(["describe", "App.csproj", "Users.sql", "***", "--project=***", "--log", "run.log", "--force"]);
+    }
+
+    [Fact]
+    public async Task RunStart_Arguments_HoldAProjectValueOfASeparateTokenByTheRuleOfWhatIsPrinted()
+    {
+        var result = await _scene.DescribeAsync("--project", "x;y", "--log", "run.log");
+
+        result.ExitCode.ShouldBe(1);
+        Strings(LogReader.Read(Log)[0].GetProperty("arguments"))
+            .ShouldBe(["describe", "--project", "***", "--log", "run.log"]);
+    }
+
+    [Theory]
+    [InlineData("--database=")]
+    [InlineData("--database:")]
+    public async Task RunStart_Arguments_KeepTheOptionAndTheSeparatorOfADatabase(string option)
+    {
+        _ = await _scene.DescribeAsync(option + "billing", "--log", "run.log");
+
+        Strings(LogReader.Read(Log)[0].GetProperty("arguments"))
+            .ShouldBe(["describe", option + "***", "--log", "run.log"]);
+    }
+
+    // A path with "=" or ";" is more likely a connection string typed in the wrong place than a path.
+    [Fact]
+    public async Task Run_LogPathWithAnEqualsSign_IsRefusedByItsPositionAndNoFileIsMade()
+    {
+        var result = await _scene.DescribeAsync("--log", "a=b.log");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldBe(
+            "sqlsource: the value of option '--log' at position 3 holds '=' or ';', which a log's path may not\n"
+        );
+        File.Exists(_scene.Run.Folder.PathOf("a=b.log")).ShouldBeFalse();
     }
 
     [Theory]

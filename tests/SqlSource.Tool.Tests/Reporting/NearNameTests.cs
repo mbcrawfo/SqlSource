@@ -12,12 +12,16 @@ public sealed class NearNameTests
     [InlineData("--forse", "--force")]
     // One transposition of neighbours counts as one edit.
     [InlineData("--conncetion", "--connection")]
+    [InlineData("ba", "ab")]
+    // The distance is 2 and no more.
+    [InlineData("--forxx", "--force")]
     public void IsNear_NameWithinTheDistance_IsTrue(string given, string known) =>
         NearName.IsNear(given, known, ignoreCase: false).ShouldBeTrue();
 
     [Theory]
     [InlineData("-pS3cret", "--project")]
     [InlineData("-s3cret", "-h")]
+    [InlineData("--xxxce", "--force")]
     // Two names that differ by more than the distance in length are far apart without being compared.
     [InlineData("--connection", "-c")]
     [InlineData("-", "--project")]

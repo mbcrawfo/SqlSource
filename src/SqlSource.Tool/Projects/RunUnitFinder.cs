@@ -29,12 +29,10 @@ internal static class RunUnitFinder
         var path = Path.TrimEndingDirectorySeparator(
             argument is null ? workingDirectory : Path.GetFullPath(argument.Text, workingDirectory)
         );
-        // The working directory is no token of the command line, and a message quotes it.
-        var named = argument?.NamedAsPath(path) ?? $"'{OneLine.Of(path)}'";
 
         if (Directory.Exists(path))
         {
-            return FindIn(path, named, byPosition: argument is { MayBePrintedAsPath: false });
+            return FindIn(path, argument);
         }
 
         if (File.Exists(path) && KindOf(path) is { } kind)
@@ -42,11 +40,17 @@ internal static class RunUnitFinder
             return Outcome<RunUnit, ToolDiagnostic>.Of(new RunUnit(kind, path));
         }
 
-        return No(ToolDiagnostics.NotARunUnit, named);
+        return No(ToolDiagnostics.NotARunUnit, NamedOf(argument, path));
     }
 
-    private static Outcome<RunUnit, ToolDiagnostic> FindIn(string directory, string named, bool byPosition)
+    // The working directory is no token of the command line, and a message quotes it.
+    private static string NamedOf(UsageValue? argument, string path) =>
+        argument?.NamedAsPath(path) ?? UsageValue.Quoted(path);
+
+    private static Outcome<RunUnit, ToolDiagnostic> FindIn(string directory, UsageValue? argument)
     {
+        var named = NamedOf(argument, directory);
+
         (string File, RunUnitKind? Kind)[] units;
         try
         {
@@ -67,7 +71,7 @@ internal static class RunUnitFinder
             return No(
                 ToolDiagnostics.DirectoryCannotBeRead,
                 named,
-                byPosition ? "the system would not list its files" : exception.Message
+                argument is { MayBePrintedAsPath: false } ? "the system would not list its files" : exception.Message
             );
         }
 
