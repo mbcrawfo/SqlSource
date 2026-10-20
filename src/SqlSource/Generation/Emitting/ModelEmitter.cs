@@ -78,7 +78,39 @@ internal static class ModelEmitter
             _ = AppendType(builder, properties[index]).Append(' ').Append(properties[index].Name);
         }
 
-        _ = builder.Append(");\n");
+        _ = builder.Append(')');
+        if (!model.HasArrayColumn)
+        {
+            _ = builder.Append(";\n");
+            return;
+        }
+
+        // Dapper takes a constructor without parameters first, and sets each init property of the row it reads.
+        var memberIndent = indent + Indent;
+        _ = builder.Append('\n').Append(indent).Append("{\n");
+        _ = builder
+            .Append(memberIndent)
+            .Append("// Dapper reads a row with an array column through this constructor, then sets each property.\n")
+            .Append(memberIndent)
+            .Append("private ")
+            .Append(model.Name)
+            .Append("() : this(");
+        for (var index = 0; index < properties.Count; index++)
+        {
+            if (index > 0)
+            {
+                _ = builder.Append(", ");
+            }
+
+            var property = properties[index];
+            _ = AppendType(builder.Append("default("), property).Append(')');
+            if (!property.IsNullable && !property.Type.IsValueType)
+            {
+                _ = builder.Append('!');
+            }
+        }
+
+        _ = builder.Append(") { }\n").Append(indent).Append("}\n");
     }
 
     // A property of a reference type that is not nullable starts as default!, so that the class compiles under

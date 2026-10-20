@@ -11,6 +11,10 @@ namespace SqlSource.Generation.Models;
 /// <param name="IsPublic">Whether the model is public; otherwise it is internal.</param>
 /// <param name="Properties">The model's properties, in order.</param>
 /// <param name="SummaryXml">The model's summary, as escaped XML, its lines separated by line feeds.</param>
+/// <param name="HasArrayColumn">
+/// Whether a property of any query that shares the model is an array column.  A record that has one gets a private
+/// constructor without parameters, which is how Dapper reads it.
+/// </param>
 internal sealed record Model(
     string HintName,
     string NamespaceText,
@@ -19,5 +23,6 @@ internal sealed record Model(
     ModelKind Kind,
     bool IsPublic,
     EquatableArray<ModelProperty> Properties,
-    string SummaryXml
+    string SummaryXml,
+    bool HasArrayColumn
 );
