@@ -1,9 +1,0 @@
-kind: rows
-plan: not-needed
-table-match: several-tables
-column 0 order_id: bigint | nullable false | catalog | public.orders.id
-column 1 account_id: integer | nullable false | catalog | public.orders.account_id
-column 2 name: character varying(100) | nullable false | catalog | public.accounts.name
-column 3 amount: public.positive_amount | nullable true | catalog | billing.invoices.amount
-column 4 issued_on: date | nullable false | catalog | billing.invoices.issued_on
-column 5 shipped_at: timestamp with time zone | nullable true | catalog | public.orders.shipped_at

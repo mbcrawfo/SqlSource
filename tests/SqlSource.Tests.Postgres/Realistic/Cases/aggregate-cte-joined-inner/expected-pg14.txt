@@ -1,9 +1,0 @@
-kind: rows
-plan: walked
-table-match: no-origin
-parameter @from: timestamp with time zone (inferred)
-column 0 id: integer | nullable false | catalog | public.accounts.id
-column 1 name: character varying(100) | nullable false | catalog | public.accounts.name
-column 2 month_start: timestamp with time zone | nullable null | no-origin | -
-column 3 total: numeric | nullable null | no-origin | -
-column 4 change: numeric | nullable null | no-origin | -

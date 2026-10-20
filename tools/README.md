@@ -1,6 +1,6 @@
 # Tools
 
-This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, and three recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
 ## Linters
 
@@ -58,5 +58,4 @@ The last run sets `DOTNET_ROLL_FORWARD` to `LatestMajor`, which starts the tool 
 None of these is a check, and a person runs them.  `pre-commit-validation.sh` and `build.yml` run none of them.  Each reads the default image from the line of `tests/SqlSource.Tests.Postgres/PostgresContainer.cs` that declares `DefaultImage`.
 
 - `tools/record-fixtures.sh` records the cases of the PostgreSQL describer's fixtures; [the describer's fixtures](../tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) has the procedure.
-- `tools/record-realistic.sh` records the expectations of the realistic corpus, once for each recorded major; [the realistic corpus](../tests/SqlSource.Tests.Postgres/README.md#the-realistic-corpus) has the procedure.
 - `tools/describe-end-to-end.sh` writes every sidecar of the end-to-end queries, of the realistic cases and of `examples/PostgresExamples`, from nothing, on the default image alone; [the end-to-end project](../tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) has the procedure.  It runs no test, since the project does not build until its sidecars are current: it starts a container itself with `docker run`, applies `Realistic/schema.sql` and `Realistic/seed.sql` of `tests/SqlSource.Tests.Postgres` to a database `realistic`, the schemas and seeds of `app` and `billing`, and the examples' schema to a database `examples`, with `psql`, and runs the tool from its source with `describe --force`.

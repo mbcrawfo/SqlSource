@@ -1,9 +1,0 @@
-kind: rows
-plan: not-needed
-table-match: several-tables
-parameter @status: public.account_status (inferred)
-column 0 id: bigint | nullable false | catalog | public.reservations.id
-column 1 account_id: integer | nullable false | catalog | public.reservations.account_id
-column 2 during: tstzrange | nullable false | catalog | public.reservations.during
-column 3 name: character varying(100) | nullable false | catalog | public.accounts.name
-column 4 email: public.email_t | nullable true | catalog | public.accounts.email

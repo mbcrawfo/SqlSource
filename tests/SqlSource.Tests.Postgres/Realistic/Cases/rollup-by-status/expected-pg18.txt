@@ -1,8 +1,0 @@
-kind: rows
-plan: unavailable
-table-match: no-origin
-column 0 status: public.account_status | nullable true | heuristic | public.accounts.status
-column 1 month: timestamp with time zone | nullable null | no-origin | -
-column 2 orders: bigint | nullable null | no-origin | -
-column 3 revenue: numeric | nullable null | no-origin | -
-column 4 level: integer | nullable null | no-origin | -

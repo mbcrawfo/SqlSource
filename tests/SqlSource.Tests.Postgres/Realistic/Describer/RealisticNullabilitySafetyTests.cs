@@ -7,7 +7,7 @@ namespace SqlSource.Tests.Postgres.Realistic.Describer;
 
 // That the describer's nullability is safe over each realistic case: it says not null of no column that can be NULL,
 // checked against the case's truth and against the seed by RealisticNullabilityOracle.  Neither reads what the
-// describer recorded of the case, so a recording of a wrong not null still fails here.  A case is described once in
+// committed sidecar holds of the case, so a committed wrong not null still fails here.  A case is described once in
 // a run, and each theory reads the one description.
 [Collection(UsesPostgres.Name)]
 public sealed class RealisticNullabilitySafetyTests(PostgresContainer postgres)

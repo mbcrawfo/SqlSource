@@ -1,5 +1,0 @@
-failure: SQLSRC229
-argument: orders
-argument: ListAccountsWithOrderRows
-argument: record[]
-help: cast the column to a concrete type, or give the expression an alias and a cast

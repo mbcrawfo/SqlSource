@@ -1,9 +1,0 @@
-kind: rows
-plan: walked
-table-match: no-origin
-parameter @from: timestamp with time zone (inferred)
-column 0 id: integer | nullable false | catalog | public.accounts.id
-column 1 name: character varying(100) | nullable false | catalog | public.accounts.name
-column 2 kind: text | nullable true | outer-join | public.events.kind
-column 3 at: timestamp with time zone | nullable true | outer-join | public.events.at
-column 4 ip: text | nullable null | no-origin | -

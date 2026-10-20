@@ -1,9 +1,0 @@
-kind: rows
-plan: walked
-table-match: no-origin
-column 0 account_id: integer | nullable false | catalog | public.orders.account_id
-column 1 product_ids: integer[] | nullable null | no-origin | -
-column 2 product_names: text | nullable null | no-origin | -
-column 3 category_slugs: text[] | nullable null | no-origin | -
-column 4 coupons: text | nullable null | no-origin | -
-column 5 units: bigint | nullable null | no-origin | -

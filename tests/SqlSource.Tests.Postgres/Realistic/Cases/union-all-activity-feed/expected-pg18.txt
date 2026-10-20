@@ -1,8 +1,0 @@
-kind: rows
-plan: walked
-table-match: no-origin
-parameter @account_id: integer (declared)
-column 0 kind: text | nullable false | set-operation | -
-column 1 ref_id: bigint | nullable null | no-origin | -
-column 2 at: timestamp with time zone | nullable null | no-origin | -
-column 3 detail: text | nullable null | no-origin | -

@@ -1,9 +1,0 @@
-kind: rows
-plan: walked
-table-match: no-origin
-column 0 account_id: integer | nullable null | no-origin | -
-column 1 name: character varying(100) | nullable true | outer-join | public.accounts.name
-column 2 email: public.email_t | nullable true | outer-join | public.accounts.email
-column 3 reservation_id: bigint | nullable true | outer-join | public.reservations.id
-column 4 during: tstzrange | nullable true | outer-join | public.reservations.during
-column 5 duration: interval | nullable null | no-origin | -
