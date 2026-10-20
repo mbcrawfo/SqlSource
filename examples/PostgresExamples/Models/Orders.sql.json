@@ -179,7 +179,7 @@
       ]
     },
     "CountShippedOrders": {
-      "hash": "3119a253efcccc488fbeb6cc0a4a45fa2e483a1daf3f79cd9225f986f6667e24",
+      "hash": "ff5451aeaac7558e15de4116fb44c0a298e27c16e3b5d0c4b4eac03e85e2eace",
       "engine": "postgres",
       "database": "postgres",
       "serverVersion": "18.6",

@@ -22,7 +22,7 @@ ORDER BY o.id;
 -- column: shipped not null
 SELECT u.id, count(o.shipped_at) AS shipped
 FROM users AS u
-JOIN orders AS o ON o.user_id = u.id
+LEFT JOIN orders AS o ON o.user_id = u.id
 GROUP BY u.id
 ORDER BY u.id;
 
