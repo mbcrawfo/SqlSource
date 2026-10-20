@@ -15,8 +15,6 @@ namespace SqlSource.Tests.Generator;
 // 10, with an entry written for each query's current hash.
 public sealed class ColumnMarkerTests
 {
-    private const string UsersPath = "/app/Repo/Users.sql";
-
     [Fact]
     public void Run_ColumnMarkers_OverrideTheNullabilityTheEntryGives()
     {
@@ -61,7 +59,7 @@ public sealed class ColumnMarkerTests
     public void Run_ColumnMarkers_LeaveTheColumnNamesAlone()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetTotals\n-- column: total not null\n-- column: note null\n"
                 + "SELECT sum(amount) AS total, max(note) AS note FROM payments;\n"
         );
@@ -100,8 +98,8 @@ public sealed class ColumnMarkerTests
         var run = Run(file, Entry(file, "GetUser", [], [Column("total!", nullable: true)]));
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC260 /app/Repo/Users.sql(2,1)-(2,26): The -- column: marker for 'total' names a column whose alias "
-                + "already ends in ! or ?.  Remove the mark from the alias, or the marker.",
+            $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,26): The -- column: marker for 'total' names a column "
+                + "whose alias already ends in ! or ?.  Remove the mark from the alias, or the marker.",
         ]);
         run.SeverityOf("SQLSRC260").ShouldBe(Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
         ModelsOf(run).Queries.ShouldBeEmpty();
@@ -118,8 +116,8 @@ public sealed class ColumnMarkerTests
         var run = Run(file, Entry(file, "GetUser", [], [Column("note?", Text, nullable: false)]));
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC260 /app/Repo/Users.sql(2,1)-(2,{end}): The -- column: marker for '{name}' names a column whose "
-                + "alias already ends in ! or ?.  Remove the mark from the alias, or the marker.",
+            $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,{end}): The -- column: marker for '{name}' names a column "
+                + "whose alias already ends in ! or ?.  Remove the mark from the alias, or the marker.",
         ]);
         ModelsOf(run).Queries.ShouldBeEmpty();
     }
@@ -132,8 +130,8 @@ public sealed class ColumnMarkerTests
         var run = Run(file, Entry(file, "GetUser", [], [Column("id"), Column("total")]));
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC260 /app/Repo/Users.sql(3,1)-(3,25): The -- column: marker for 'totl' names no column of the "
-                + "query's result.  Name a column as the query returns it.",
+            $"SQLSRC260 {GeneratorHarness.UsersPath}(3,1)-(3,25): The -- column: marker for 'totl' names no column of "
+                + "the query's result.  Name a column as the query returns it.",
         ]);
         ModelsOf(run).Queries.ShouldBeEmpty();
     }
@@ -146,8 +144,8 @@ public sealed class ColumnMarkerTests
         var run = Run(file, Entry(file, "GetUser", [Parameter("id")], null));
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC260 /app/Repo/Users.sql(2,1)-(2,19): The -- column: marker for 'id' names no column of the "
-                + "query's result.  Name a column as the query returns it.",
+            $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,19): The -- column: marker for 'id' names no column of "
+                + "the query's result.  Name a column as the query returns it.",
         ]);
         ModelsOf(run).Queries.ShouldBeEmpty();
     }
@@ -163,8 +161,8 @@ public sealed class ColumnMarkerTests
         var run = Run(file, Entry(file, "GetUser", [], [Column("relation", regclass)]));
 
         run.Diagnostics.Count.ShouldBe(2);
-        run.Diagnostics[0].ShouldStartWith("SQLSRC246 /app/Repo/Users.sql(1,10)-(1,17): ");
-        run.Diagnostics[1].ShouldStartWith("SQLSRC260 /app/Repo/Users.sql(2,1)-(2,21): ");
+        run.Diagnostics[0].ShouldStartWith($"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,17): ");
+        run.Diagnostics[1].ShouldStartWith($"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,21): ");
         ModelsOf(run).Queries.ShouldBeEmpty();
     }
 
@@ -173,7 +171,7 @@ public sealed class ColumnMarkerTests
     public void Run_ErrorsInOneQuery_AreEachReportedAndLeaveTheOthersModels()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- column: a null\n-- column: b! null\nSELECT 1;\n\n"
                 + "-- name: GetOther\n-- column: id null\nSELECT 2;\n"
         );
@@ -181,10 +179,10 @@ public sealed class ColumnMarkerTests
         var run = Run(file, Entry(file, "GetUser", [], [Column("b!")]), Entry(file, "GetOther", [], [Column("id")]));
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC260 /app/Repo/Users.sql(2,1)-(2,18): The -- column: marker for 'a' names no column of the query's "
-                + "result.  Name a column as the query returns it.",
-            "SQLSRC260 /app/Repo/Users.sql(3,1)-(3,19): The -- column: marker for 'b!' names a column whose alias "
-                + "already ends in ! or ?.  Remove the mark from the alias, or the marker.",
+            $"SQLSRC260 {GeneratorHarness.UsersPath}(2,1)-(2,18): The -- column: marker for 'a' names no column of the "
+                + "query's result.  Name a column as the query returns it.",
+            $"SQLSRC260 {GeneratorHarness.UsersPath}(3,1)-(3,19): The -- column: marker for 'b!' names a column whose "
+                + "alias already ends in ! or ?.  Remove the mark from the alias, or the marker.",
         ]);
         var query = ModelsOf(run).Queries.ShouldHaveSingleItem();
         query.Name.ShouldBe("GetOther");
@@ -196,7 +194,7 @@ public sealed class ColumnMarkerTests
     public void Run_ColumnMarkerOnAQueryAtSql_IsIgnored()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- output: sql\n-- column: nope null\nSELECT 1;\n\n-- name: GetOther\nSELECT 2;\n"
         );
 
@@ -208,7 +206,7 @@ public sealed class ColumnMarkerTests
 
     // A file of one query, GetUser, with these markers.
     private static SqlFile Query(string markers, string sql) =>
-        new(UsersPath, "-- name: GetUser\n" + markers + sql + "\n");
+        new(GeneratorHarness.UsersPath, "-- name: GetUser\n" + markers + sql + "\n");
 
     // Every run compiles, with no warning in the generated code, whatever its diagnostics.
     private static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries)

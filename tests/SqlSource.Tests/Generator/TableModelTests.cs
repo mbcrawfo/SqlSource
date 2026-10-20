@@ -19,13 +19,14 @@ public sealed class TableModelTests
 
     private const string BPath = "/app/Repo/B.sql";
 
-    private const string UsersPath = "/app/Repo/Users.sql";
-
     private const string GetBName = "/app/Repo/B.sql(1,10)-(1,14)";
 
     private const string Help257 = "  Give one of the two queries another model name, or make the two the same.";
 
-    private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n");
+    private static readonly SqlFile Users = new(
+        GeneratorHarness.UsersPath,
+        "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
+    );
 
     private static readonly SidecarTable PublicUsers = new("public", "users");
 

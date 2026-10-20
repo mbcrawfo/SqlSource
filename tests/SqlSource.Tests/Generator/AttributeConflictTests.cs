@@ -19,7 +19,7 @@ public sealed class AttributeConflictTests
     private const string InternalsVisible =
         "[assembly: System.Runtime.CompilerServices.InternalsVisibleTo(\"TestAssembly\")]\n";
 
-    private static readonly SqlFile Users = new("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
     [Theory]
     [InlineData("using SqlSource;\n[SqlSourceGenerate]\ninternal partial class Sample { }", "(2,2)-(2,19)")]

@@ -117,7 +117,7 @@ public sealed class TypeOverrideLevelTests
         var marker = level == "query" ? "-- type-override: timestamptz = default\n" : "";
         var metadata = level == "metadata" ? "timestamptz=default" : "timestamptz=long";
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             header + "-- name: GetUser\n" + marker + "SELECT 1;\n",
             Metadata: level == "property"
                 ? null
@@ -137,7 +137,10 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_QueryThatMapsOneKey_KeepsTheOthersOfTheProperty()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n-- type-override: int4 = short\nSELECT 1;\n");
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- type-override: int4 = short\nSELECT 1;\n"
+        );
 
         var run = Run(
             "int4=long timestamptz=System.DateTimeOffset",
@@ -159,7 +162,7 @@ public sealed class TypeOverrideLevelTests
     {
         const string Value = "int4=long int4=short";
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\nSELECT 1;\n",
             Metadata: level == "metadata" ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = Value } : null
         );
@@ -181,7 +184,7 @@ public sealed class TypeOverrideLevelTests
     [InlineData("citext", "citext=System.Uri _citext=System.Collections.Generic.List<int>", "citext[]")]
     public void Run_ArraysKey_WinsOverItsElements(string element, string overrides, string key)
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
         var schema = element == "citext" ? "public" : "pg_catalog";
         var array = TestSidecars.Postgres(
             name: element + "[]",
@@ -222,7 +225,7 @@ public sealed class TypeOverrideLevelTests
     [InlineData("-- type-override: int4[] = default\n", "int[]")]
     public void Run_ArrayKeySpelledTwoWaysAtTwoLevels_IsOneKey(string marker, string expected)
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n" + marker + "SELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n" + marker + "SELECT 1;\n");
         var array = TestSidecars.Postgres(
             name: "int4[]",
             kind: SidecarValues.Kind.Array,
@@ -248,7 +251,7 @@ public sealed class TypeOverrideLevelTests
         var marker = level == "query" ? Marker : "";
         var text = header + "-- name: GetUser\n" + marker + "SELECT 1;\n";
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             text,
             Metadata: level == "metadata" ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = Value } : null
         );
@@ -267,7 +270,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_DefaultForAnArraysOwnKey_IsSqlsrc261()
     {
         const string Text = "-- name: GetUser\nSELECT 1;\n";
-        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var file = new SqlFile(GeneratorHarness.UsersPath, Text);
 
         var run = Run(
             "public._user_status=default",
@@ -286,7 +289,7 @@ public sealed class TypeOverrideLevelTests
         const string Text =
             "-- name: GetUser\n-- type-override: public.user_status[] = System.Collections.Generic.List<string>\n"
             + "SELECT 1;\n";
-        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var file = new SqlFile(GeneratorHarness.UsersPath, Text);
 
         var run = Run(
             "public._user_status=System.Guid",
@@ -303,7 +306,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_ElementsKeyWithBrackets_IsTheArraysOneKeyAtEveryLevel()
     {
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             "-- name: GetFirst\n-- type-override: public.user_status[] = default\nSELECT 1;\n\n"
                 + "-- name: GetSecond\nSELECT 2;\n"
         );
@@ -331,7 +334,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_ArraysOwnKeyOfAnExtensionsType_IsSqlsrc261NamingItsQualifiedKey()
     {
         const string Text = "-- name: GetUser\nSELECT 1;\n";
-        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var file = new SqlFile(GeneratorHarness.UsersPath, Text);
         var citext = TestSidecars.Postgres(name: "citext", schema: "public", internalName: "citext");
 
         var run = Run(
@@ -347,7 +350,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_ArraysOwnKeyOnAParameter_NamesTheParameter()
     {
         const string Text = "-- name: GetUser\nSELECT 1;\n";
-        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var file = new SqlFile(GeneratorHarness.UsersPath, Text);
         var entry = TestSidecars.Entry(
             "GetUser",
             Sidecars.HashOf(file, "GetUser", SqlDialect.PostgreSql),
@@ -376,7 +379,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_TypeNamedWithAnUnderscore_IsMappedByItsOwnKeyAndItsArrayByThatKeyWithBrackets()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
         var tag = Composite("public", "_tag");
 
         var run = Run("public._tag=System.Uri", (file, [Entry(file, "GetUser", tag, ArrayOf(tag, "__tag"))]));
@@ -392,7 +395,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_DomainOverAnArrayWhoseOwnKeyHasAnEntry_IsSqlsrc261()
     {
         const string Text = "-- name: GetUser\nSELECT 1;\n";
-        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var file = new SqlFile(GeneratorHarness.UsersPath, Text);
         var statuses = TestSidecars.Postgres(
             name: "statuses",
             kind: SidecarValues.Kind.Domain,
@@ -416,7 +419,7 @@ public sealed class TypeOverrideLevelTests
         const string Text =
             "-- name: GetUser\n-- type-override: public._user_status = System.Guid\n"
             + "-- type-override: public.user_status[] = System.Uri\nSELECT 1;\n";
-        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var file = new SqlFile(GeneratorHarness.UsersPath, Text);
 
         var run = Run(null, (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))]));
 
@@ -434,7 +437,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_DomainsKey_WinsOverItsBases()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
         var userId = TestSidecars.Postgres(
             name: "user_id",
             kind: SidecarValues.Kind.Domain,
@@ -459,7 +462,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_MappingOfASubtype_DoesNotReachItsRange()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
         var range = TestSidecars.Postgres(
             name: "int4range",
             kind: SidecarValues.Kind.Range,
@@ -480,7 +483,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_QualifiedKeyOfAnExtensionsType_WinsForItsSchemaAlone()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
         var inPublic = TestSidecars.Postgres(name: "citext", schema: "public", internalName: "citext");
         var inExt = TestSidecars.Postgres(name: "ext.citext", schema: "ext", internalName: "citext");
 
@@ -498,7 +501,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_KeysThatDifferOnlyByCase_EachMapsItsOwnType()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
         var upper = EnumType("Status");
         var lower = EnumType("status");
 
@@ -521,7 +524,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_DefaultOfAQueryThatDiffersByCase_HidesThePropertysEntry()
     {
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- type-override: public.status = default\nSELECT 1;\n"
         );
         var status = TestSidecars.Postgres(
@@ -544,7 +547,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_EntryOfAQueryThatDiffersByCase_ReplacesThePropertysExactOne()
     {
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- type-override: public.User_Status = System.Uri\nSELECT 1;\n"
         );
 
@@ -569,7 +572,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_QuotedKey_DoesNotMapATypeThatDiffersByCase()
     {
         const string Text = "-- name: GetUser\nSELECT 1;\n";
-        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var file = new SqlFile(GeneratorHarness.UsersPath, Text);
         var upper = Composite("public", "Status");
         var lower = Composite("public", "status");
 
@@ -594,7 +597,7 @@ public sealed class TypeOverrideLevelTests
         var header = level == "header" ? "-- type-override: " + value + "\n\n" : "";
         var marker = level == "query" ? "-- type-override: " + value + "\n" : "";
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             header + "-- name: GetUser\n" + marker + "SELECT 1;\n",
             Metadata: level == "metadata" ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = value } : null
         );
@@ -616,7 +619,7 @@ public sealed class TypeOverrideLevelTests
     public void Run_KeysThatDifferByCaseInOneScope_AreNoConflict()
     {
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             "-- type-override: public.Status = System.Guid\n-- type-override: public.status = System.Uri\n\n"
                 + "-- name: GetUser\nSELECT 1;\n"
         );
@@ -648,7 +651,7 @@ public sealed class TypeOverrideLevelTests
             + marker
             + "SELECT 2;\n\n-- name: GetText\nSELECT 3;\n";
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             text,
             Metadata: level == "metadata"
                 ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = "int4=MyApp.Missing" }
@@ -690,12 +693,12 @@ public sealed class TypeOverrideLevelTests
     )]
     public void Run_MappedTypeThatCannotBeUsed_IsReportedAtTheQuery(string type, string id, string reason)
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
         var run = Run("int4=" + type, (file, [Entry(file, "GetUser", Int4)]));
 
         run.Diagnostics.ShouldBe([
-            $"{id} /app/Repo/Users.sql(1,10)-(1,17): The type override maps 'int4' to '{type}' for column "
+            $"{id} {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'int4' to '{type}' for column "
                 + $"'c0', in the property SqlSourceTypeOverrides, {reason}",
         ]);
     }
@@ -704,7 +707,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_MappedTypeNotFoundForAParameter_NamesTheParameter()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
         var entry = TestSidecars.Entry(
             "GetUser",
             Sidecars.HashOf(file, "GetUser", SqlDialect.PostgreSql),
@@ -719,8 +722,8 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldStartWith(
-                "SQLSRC250 /app/Repo/Users.sql(1,10)-(1,17): The type override maps 'int4' to 'MyApp.Missing' "
-                    + "for parameter 'id', in the property SqlSourceTypeOverrides,"
+                $"SQLSRC250 {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'int4' to "
+                    + "'MyApp.Missing' for parameter 'id', in the property SqlSourceTypeOverrides,"
             );
     }
 
@@ -729,7 +732,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_BadMappingNoQueryUses_IsNotReported()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
         var run = Run("uuid=MyApp.Missing int4=System.Math", (file, [Entry(file, "GetUser", Catalog("text"))]));
 
@@ -740,7 +743,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_MappedTypeMarkedObsolete_GivesTheObsoleteWarnings()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
         var run = Run("int4=MyApp.OldThing", (file, [Entry(file, "GetUser", Int4)]));
 
@@ -757,7 +760,7 @@ public sealed class TypeOverrideLevelTests
     [Fact]
     public void Run_MappedTypeOfTheProjectThatIsInternal_IsNotPublic()
     {
-        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
         var source = Source.Replace(
             "public partial class Sample",
             "internal partial class Sample",
@@ -852,6 +855,6 @@ public sealed class TypeOverrideLevelTests
     private static string NameOf(string text, string queryName)
     {
         var line = Array.IndexOf(text.Split('\n'), "-- name: " + queryName) + 1;
-        return $"/app/Repo/Users.sql({line},10)-({line},{10 + queryName.Length})";
+        return $"{GeneratorHarness.UsersPath}({line},10)-({line},{10 + queryName.Length})";
     }
 }

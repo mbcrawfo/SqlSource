@@ -13,10 +13,8 @@ namespace SqlSource.Tests.Generator;
 // postgres on Npgsql 10, as the runs of ModelTests are.
 public sealed class ModelWarningTests
 {
-    private const string UsersPath = "/app/Repo/Users.sql";
-
     private static readonly SqlFile Users = new(
-        UsersPath,
+        GeneratorHarness.UsersPath,
         "-- name: GetUser\nSELECT id, name FROM users WHERE id = @id;\n"
     );
 
@@ -223,8 +221,9 @@ public sealed class ModelWarningTests
 
         run.Diagnostics.ShouldHaveSingleItem()
             .ShouldStartWith(
-                "SQLSRC252 /app/Repo/Users.sql(1,10)-(1,17): The type override maps 'text' to 'MyApp.GoneName' for "
-                    + "column 'name', in the property SqlSourceTypeOverrides, and no property can have that type."
+                $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'text' to "
+                    + "'MyApp.GoneName' for column 'name', in the property SqlSourceTypeOverrides, and no property "
+                    + "can have that type."
             );
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();

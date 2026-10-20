@@ -45,8 +45,8 @@ public sealed class QueryTyperTests
     private static FileTypesInput InputOf(PostgresType column, TypeOverride entry)
     {
         var file = SqlFileReader.Read(
-            new InMemoryAdditionalText("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
-            "app/Repo/Users.sql",
+            new InMemoryAdditionalText(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
+            GeneratorHarness.UsersNormalizedPath,
             SqlDialect.PostgreSql,
             null,
             false,

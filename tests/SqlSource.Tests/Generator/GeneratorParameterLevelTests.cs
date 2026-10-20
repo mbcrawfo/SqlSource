@@ -51,7 +51,7 @@ public sealed class GeneratorParameterLevelTests
             + (query is null ? string.Empty : "-- generator: " + query + "\n")
             + "SELECT * FROM {{table}}; -- kept\n";
         var file = new SqlFile(
-            "/app/Repo/Users.sql",
+            GeneratorHarness.UsersPath,
             sql,
             Metadata: metadata is null
                 ? null
@@ -138,7 +138,7 @@ public sealed class GeneratorParameterLevelTests
             [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
             [
                 new SqlFile(
-                    "/app/Repo/Users.sql",
+                    GeneratorHarness.UsersPath,
                     "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n",
                     Metadata: new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "keep-comments nope" }
                 ),
@@ -232,7 +232,7 @@ public sealed class GeneratorParameterLevelTests
         GeneratorHarness.Run(
             output,
             [new SourceFile(GeneratorHarness.SourcePath, Source(attribute))],
-            [new SqlFile("/app/Repo/Users.sql", "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n")],
+            [new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}}; -- kept\n")],
             generatorParameters: property
         );
 }

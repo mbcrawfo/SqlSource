@@ -12,8 +12,6 @@ namespace SqlSource.Tests.Generation.Types;
 
 public sealed class MappedTypeNamesTests
 {
-    private const string Path = "/app/Repo/Users.sql";
-
     [Fact]
     public void Collect_NoOverride_GivesNoNames()
     {
@@ -40,7 +38,7 @@ public sealed class MappedTypeNamesTests
         );
         var files = TestModels.Array(
             new FileSettings(
-                "app/Repo/Users.sql",
+                GeneratorHarness.UsersNormalizedPath,
                 Level(new TypeOverride("text", "global::MyApp.Name", SettingPlace.Metadata)),
                 EquatableArray<InvalidSetting>.Empty
             )
@@ -63,8 +61,8 @@ public sealed class MappedTypeNamesTests
 
     private static ParsedSqlFile Read(string text) =>
         SqlFileReader.Read(
-            new InMemoryAdditionalText(Path, text),
-            SqlPath.Normalize(Path)!,
+            new InMemoryAdditionalText(GeneratorHarness.UsersPath, text),
+            SqlPath.Normalize(GeneratorHarness.UsersPath)!,
             SqlDialect.Ansi,
             null,
             false,

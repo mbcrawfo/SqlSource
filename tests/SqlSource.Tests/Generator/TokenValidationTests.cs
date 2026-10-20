@@ -56,7 +56,7 @@ public sealed class TokenValidationTests
             + (queryGeneratorParameter is null ? string.Empty : "-- generator: " + queryGeneratorParameter + "\n")
             + "SELECT * FROM {{table}};\n";
 
-        var run = Run(OutputKind.Sql, property, new SqlFile("/app/Repo/Users.sql", sql));
+        var run = Run(OutputKind.Sql, property, new SqlFile(GeneratorHarness.UsersPath, sql));
 
         run.Diagnostics.ShouldBeEmpty();
         run.CompilationErrors.ShouldBeEmpty();
@@ -92,7 +92,7 @@ public sealed class TokenValidationTests
             ],
             [
                 new SqlFile(
-                    "/app/Repo/Users.sql",
+                    GeneratorHarness.UsersPath,
                     "-- name: Plain\nSELECT {{a}};\n-- name: Checked\n-- generator: default\nSELECT {{b}};\n"
                 ),
             ],

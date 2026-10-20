@@ -15,7 +15,7 @@ namespace SqlSource.Tests.Generator;
 // of the models.
 public sealed class ModelRunsTests
 {
-    private static readonly SqlFile Users = new("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
     [Fact]
     public void Entry_ParametersAndColumns_AreNumberedByTheirPlace()

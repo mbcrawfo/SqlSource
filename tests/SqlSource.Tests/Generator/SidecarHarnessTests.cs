@@ -14,14 +14,12 @@ namespace SqlSource.Tests.Generator;
 // The harness hands the generator a sidecar beside a .sql file, and computes a query's hash as the generator does.
 public sealed class SidecarHarnessTests
 {
-    private const string SqlPath = "/app/Repo/Users.sql";
-
     private const string QuerySql = "-- name: Q\nSELECT @id;\n";
 
     [Fact]
     public void HashOf_Query_IsTheHashOfItsSqlUnderTheDialect()
     {
-        var file = new SqlFile(SqlPath, QuerySql);
+        var file = new SqlFile(GeneratorHarness.UsersPath, QuerySql);
 
         var parsed = SqlFileParser.Parse(QuerySql, "Users.sql", SqlDialect.PostgreSql);
         var block = parsed.Blocks.Single();
@@ -34,11 +32,11 @@ public sealed class SidecarHarnessTests
     [Fact]
     public void Current_File_ReadsBackWithAnEntryOfEachQuery()
     {
-        var file = new SqlFile(SqlPath, "-- name: Q\nSELECT @id;\n\n-- name: R\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT @id;\n\n-- name: R\nSELECT 1;\n");
 
         var sidecar = Sidecars.Current(file, SqlDialect.PostgreSql, "Q", "R");
 
-        sidecar.Path.ShouldBe(SqlPath + ".json");
+        sidecar.Path.ShouldBe(GeneratorHarness.UsersPath + ".json");
         var read = SidecarReader.Read(sidecar.Text!).Sidecar!;
         read.FormatVersion.ShouldBe(SidecarFormat.Version);
         read.ToolVersion.ShouldBe(PackageVersion.Prefix);
@@ -55,7 +53,7 @@ public sealed class SidecarHarnessTests
     public void Current_FileWithADialectMarker_UsesTheMarkersDialect()
     {
         var text = "-- dialect: mssql\n-- name: Q\nSELECT @id;\n";
-        var file = new SqlFile(SqlPath, text);
+        var file = new SqlFile(GeneratorHarness.UsersPath, text);
 
         var sidecar = Sidecars.Current(file, SqlDialect.PostgreSql, "Q");
 
@@ -71,7 +69,7 @@ public sealed class SidecarHarnessTests
     [Fact]
     public void HashOf_FileThatDoesNotParse_ThrowsThatItDoesNotParse()
     {
-        var file = new SqlFile(SqlPath, "-- name: Q\nSELECT 1;\n\n-- name: Q\nSELECT 2;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Q\nSELECT 1;\n\n-- name: Q\nSELECT 2;\n");
 
         var thrown = Should.Throw<InvalidOperationException>(() => Sidecars.HashOf(file, "Q"));
 

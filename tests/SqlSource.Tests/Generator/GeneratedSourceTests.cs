@@ -13,7 +13,7 @@ namespace SqlSource.Tests.Generator;
 
 public sealed class GeneratedSourceTests
 {
-    private static readonly SqlFile Users = new("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
     [Fact]
     public void Run_NoAttributedType_EmitsOnlyTheAttribute()
@@ -46,7 +46,7 @@ public sealed class GeneratedSourceTests
             }
             """,
             new SqlFile(
-                "/app/Repo/Users.sql",
+                GeneratorHarness.UsersPath,
                 """
                 -- Queries for users.
                 -- name: GetUser
@@ -431,7 +431,7 @@ public sealed class GeneratedSourceTests
             [SqlSourceGenerate(Path = @"{{path}}", SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- name: FromRepo\nSELECT 1;\n"),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: FromRepo\nSELECT 1;\n"),
             new SqlFile("/app/Repo/Sub/Users.sql", "-- name: FromSub\nSELECT 2;\n"),
             new SqlFile("/app/Queries/Users.sql", "-- name: FromQueriesUsers\nSELECT 3;\n"),
             new SqlFile("/app/Queries/Orders.sql", "-- name: FromQueriesOrders\nSELECT 4;\n")
@@ -517,7 +517,7 @@ public sealed class GeneratedSourceTests
             }
             """,
             new SqlFile(
-                "/app/Repo/Users.sql",
+                GeneratorHarness.UsersPath,
                 """
                 -- name: GetUser
                 SELECT 1;
@@ -616,7 +616,7 @@ public sealed class GeneratedSourceTests
                 public static string List() => Sql.ListFrom("users");
             }
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- name: ListFrom\nSELECT * FROM {{table}};\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}};\n")
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -649,7 +649,7 @@ public sealed class GeneratedSourceTests
             }
             """,
             new SqlFile(
-                "/app/Repo/Users.sql",
+                GeneratorHarness.UsersPath,
                 "-- name: Whole\n{{sql}}\n"
                     + "-- name: Eight\nSELECT {{a}}{{b}}, {{c}}, {{d}}, {{e}}, {{f}}, {{g}}, {{h}}, {{a}};\n"
             )
@@ -704,7 +704,7 @@ public sealed class GeneratedSourceTests
             }
             """,
             new SqlFile(
-                "/app/Repo/Users.sql",
+                GeneratorHarness.UsersPath,
                 "-- name: Probe\nSELECT {{"
                     + name
                     + "}}, {{"
@@ -769,7 +769,7 @@ public sealed class GeneratedSourceTests
             [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
-            new SqlFile("/app/Repo/Users.sql", Sql + "\n")
+            new SqlFile(GeneratorHarness.UsersPath, Sql + "\n")
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -797,7 +797,7 @@ public sealed class GeneratedSourceTests
             [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- summary: a < b & c\n" + Sql + "\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- summary: a < b & c\n" + Sql + "\n")
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -830,7 +830,7 @@ public sealed class GeneratedSourceTests
             [SqlSourceGenerate]
             public partial struct Other;
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n-- summary: x < y & z\nSELECT 1 WHERE a < b;\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- summary: x < y & z\nSELECT 1 WHERE a < b;\n")
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -854,7 +854,7 @@ public sealed class GeneratedSourceTests
             [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample;
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- summary: a\fb\nSELECT '\f\u001A';\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- summary: a\fb\nSELECT '\f\u001A';\n")
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -932,7 +932,7 @@ public sealed class GeneratedSourceTests
             [SqlSourceGenerate(SqlLocation = SqlLocation.{{location}})]
             public partial class Sample;
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- name: " + name + "\nSELECT 1;\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: " + name + "\nSELECT 1;\n")
         );
 
         run.Diagnostics.ShouldBeEmpty();
@@ -962,7 +962,7 @@ public sealed class GeneratedSourceTests
             [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class Sample : Base;
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- name: ListFrom\nSELECT * FROM {{table}};\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: ListFrom\nSELECT * FROM {{table}};\n")
         );
 
         run.Diagnostics.ShouldBeEmpty();

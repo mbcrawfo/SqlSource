@@ -20,8 +20,6 @@ namespace SqlSource.Tests.Generator;
 // with an entry written for each query's current hash, and every model must compile without a warning.
 public sealed class ModelTests
 {
-    private const string UsersPath = "/app/Repo/Users.sql";
-
     private const string OtherPath = "/app/Repo/Other.sql";
 
     private const string OutputSealedRecord = """
@@ -144,7 +142,7 @@ public sealed class ModelTests
         """;
 
     private static readonly SqlFile Users = new(
-        UsersPath,
+        GeneratorHarness.UsersPath,
         "-- name: GetUser\nSELECT id, name FROM users WHERE id = @id;\n"
     );
 
@@ -379,7 +377,7 @@ public sealed class ModelTests
     public void Run_ModelMarkers_NameTheModels()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- input-model: UserKey\n-- output-model: UserRow\n"
                 + "SELECT id FROM users WHERE id = @id;\n"
         );
@@ -395,7 +393,7 @@ public sealed class ModelTests
     public void Run_ModelMarkersWithAPeriod_AreFullNames()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- input-model: Data.Keys.UserKey\n-- output-model: Data.Rows.UserRow\n"
                 + "SELECT id FROM users WHERE id = @id;\n"
         );
@@ -497,7 +495,7 @@ public sealed class ModelTests
     public void Run_MarkerWithAPeriod_IgnoresTheModelNamespace()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- output-model: Data.UserRow\nSELECT id FROM users WHERE id = @id;\n"
         );
 
@@ -537,7 +535,7 @@ public sealed class ModelTests
     public void Run_DeclaredOnlyParameter_IsLast()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- param: @limit int\nSELECT id FROM users WHERE name = @name AND id = @id;\n"
         );
 
@@ -599,7 +597,7 @@ public sealed class ModelTests
     public void Run_ModelWithASummary_DocumentsItFirst()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- summary: Loads one user\n-- summary: by <id> & name.\n"
                 + "SELECT id FROM users WHERE id = @id;\n"
         );
@@ -798,7 +796,7 @@ public sealed class ModelTests
                 public partial class Second;
             }
             """;
-        var file = new SqlFile(UsersPath, "-- name: Sql\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: Sql\nSELECT 1;\n");
 
         var run = Run(source, [file, Sidecars.Of(file, Entry(file, "Sql", [], [Column("one")]))]);
 
@@ -910,7 +908,10 @@ public sealed class ModelTests
     [Fact]
     public void Run_SharedModelWhereOneQueryHasAnArray_HasTheConstructor()
     {
-        var a = new SqlFile(UsersPath, "-- name: GetA\n-- output-model: TagsRow\nSELECT tags FROM a;\n");
+        var a = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetA\n-- output-model: TagsRow\nSELECT tags FROM a;\n"
+        );
         var b = new SqlFile(
             OtherPath,
             "-- name: GetB\n-- output-model: TagsRow\n-- type-override: text = string[]\nSELECT tag FROM b;\n"

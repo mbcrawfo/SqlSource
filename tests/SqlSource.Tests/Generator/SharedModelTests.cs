@@ -21,10 +21,8 @@ public sealed class SharedModelTests
 
     private const string BPath = "/app/Repo/B.sql";
 
-    private const string UsersPath = "/app/Repo/Users.sql";
-
     // The name of GetUser in Users, of GetA in A and of GetB in B.
-    private const string GetUserName = "/app/Repo/Users.sql(1,10)-(1,17)";
+    private const string GetUserName = $"{GeneratorHarness.UsersPath}(1,10)-(1,17)";
 
     private const string GetAName = "/app/Repo/A.sql(1,10)-(1,14)";
 
@@ -34,7 +32,10 @@ public sealed class SharedModelTests
 
     private const string Help258 = "  Give the query another model name, or set another model namespace.";
 
-    private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n");
+    private static readonly SqlFile Users = new(
+        GeneratorHarness.UsersPath,
+        "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n"
+    );
 
     [Fact]
     public void Run_TwoQueriesOfOneModelName_ShareOneModel()
@@ -349,7 +350,7 @@ public sealed class SharedModelTests
     public void Run_FullNamesThatDifferByCase_GetFilesOfTheirOwn()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- output-model: UserDto\nSELECT 1;\n\n-- name: GetOther\n-- output-model: UserDTO\n"
                 + "SELECT 2;\n"
         );
@@ -393,7 +394,7 @@ public sealed class SharedModelTests
     [Fact]
     public void Run_ModelNamedAsTheAttributedType_IsSqlsrc258()
     {
-        var file = new SqlFile(UsersPath, "-- name: GetUser\n-- output-model: Sample\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- output-model: Sample\nSELECT 1;\n");
 
         var run = Run(Source, [file, Sidecar(file, "GetUser", [Column("id")])]);
 
@@ -408,7 +409,7 @@ public sealed class SharedModelTests
     public void Run_ModelNamedAsANamespaceOfTheProject_IsSqlsrc258()
     {
         var source = Source + "\n\nnamespace App.Rows\n{\n    public class Row;\n}\n";
-        var file = new SqlFile(UsersPath, "-- name: GetUser\n-- output-model: Rows\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- output-model: Rows\nSELECT 1;\n");
 
         var run = Run(source, [file, Sidecar(file, "GetUser", [Column("id")])]);
 
@@ -442,7 +443,7 @@ public sealed class SharedModelTests
     public void Run_ModelNamedAsAnotherModelsNamespace_IsSqlsrc258ForBoth()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetA\n-- output-model: Data\nSELECT 1;\n\n-- name: GetB\n-- output-model: App.Data.Row\n"
                 + "SELECT 2;\n"
         );
@@ -453,10 +454,10 @@ public sealed class SharedModelTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC258 /app/Repo/Users.sql(1,10)-(1,14): The model 'App.Data' of the query 'GetA' cannot be generated: "
-                + $"it is the namespace of another model.{Help258}",
-            "SQLSRC258 /app/Repo/Users.sql(5,10)-(5,14): The model 'App.Data.Row' of the query 'GetB' cannot be "
-                + $"generated: 'App.Data' is another model, and a part of its namespace.{Help258}",
+            $"SQLSRC258 {GeneratorHarness.UsersPath}(1,10)-(1,14): The model 'App.Data' of the query 'GetA' cannot be "
+                + $"generated: it is the namespace of another model.{Help258}",
+            $"SQLSRC258 {GeneratorHarness.UsersPath}(5,10)-(5,14): The model 'App.Data.Row' of the query 'GetB' cannot "
+                + $"be generated: 'App.Data' is another model, and a part of its namespace.{Help258}",
         ]);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
@@ -487,7 +488,7 @@ public sealed class SharedModelTests
     [Fact]
     public void Run_ColumnNamedAsItsModel_IsSqlsrc256()
     {
-        var file = new SqlFile(UsersPath, "-- name: GetUser\n-- output-model: Total\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- output-model: Total\nSELECT 1;\n");
 
         var run = Run(Source, [file, Sidecar(file, "GetUser", [Column("total")])]);
 
@@ -501,7 +502,10 @@ public sealed class SharedModelTests
     [Fact]
     public void Run_ParameterNamedAsItsModel_IsSqlsrc256()
     {
-        var file = new SqlFile(UsersPath, "-- name: GetUser\n-- input-model: Id\nSELECT 1 WHERE @id = 1;\n");
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\n-- input-model: Id\nSELECT 1 WHERE @id = 1;\n"
+        );
 
         var run = Run(Source, [file, Sidecars.Of(file, Entry(file, "GetUser", [Parameter("id")], null))]);
 
@@ -533,7 +537,7 @@ public sealed class SharedModelTests
     [Fact]
     public void Run_TwoInternalMappedTypesInAPublicModel_AreTwoSqlsrc251AtTheQuery()
     {
-        var file = new SqlFile(UsersPath, "-- name: GetUser\nSELECT id, name FROM users;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT id, name FROM users;\n");
 
         var run = Run(
             Source
