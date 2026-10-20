@@ -1,10 +1,11 @@
 using System;
 using System.Collections.Generic;
+using System.Data.Common;
 using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Npgsql;
+using SqlSource.Testing;
 using Testcontainers.PostgreSql;
 using Xunit;
 
@@ -72,6 +73,9 @@ public sealed class PostgresContainer : IAsyncLifetime
     public string ConnectionStringOf(string database) =>
         new NpgsqlConnectionStringBuilder(ConnectionString) { Database = database }.ConnectionString;
 
+    // A data source of the named database of the container.
+    private DbDataSource SourceOf(string database) => NpgsqlDataSource.Create(ConnectionStringOf(database));
+
     // Runs one statement of the test's own on the database "fixtures".
     public async Task ExecuteAsync(string sql)
     {
@@ -112,48 +116,25 @@ public sealed class PostgresContainer : IAsyncLifetime
         try
         {
             await using var source = NpgsqlDataSource.Create(ConnectionString);
-            await using var command = source.CreateCommand(
-                await File.ReadAllTextAsync(RepositoryPaths.PostgresSchema, token)
-            );
-            _ = await command.ExecuteNonQueryAsync(token);
-
-            await using (var create = source.CreateCommand($"CREATE DATABASE {RealisticDatabase}"))
-            {
-                _ = await create.ExecuteNonQueryAsync(token);
-            }
+            await EndToEndFiles.RunAsync(source, RepositoryPaths.PostgresSchema, token);
 
             // The seed relies on a hole of PostgreSQL: the NOT NULL of a domain is not checked again for a NULL that
             // is already of the domain, which gives invoice 4 its NULL amount.  A major that closes it fails the seed
             // here, and so the start of the container, and the truths of table-statement, cte-materialized,
             // distinct-on-latest-per-account and view-joined-left, which count on that NULL, are to be read again.
-            await using var realistic = NpgsqlDataSource.Create(RealisticConnectionString);
-            foreach (var path in new[] { RepositoryPaths.RealisticSchema, RepositoryPaths.RealisticSeed })
-            {
-                await using var script = realistic.CreateCommand(await File.ReadAllTextAsync(path, token));
-                _ = await script.ExecuteNonQueryAsync(token);
-            }
+            await EndToEndFiles.CreateAsync(
+                source,
+                RealisticDatabase,
+                SourceOf,
+                [RepositoryPaths.RealisticSchema, RepositoryPaths.RealisticSeed],
+                token
+            );
 
             // The databases of the end-to-end tests: each is created, then built from its schema and its seed, in the
             // order that tools/describe-end-to-end.sh applies them.
             foreach (var database in EndToEndDatabases)
             {
-                await using (var create = source.CreateCommand($"CREATE DATABASE {database}"))
-                {
-                    _ = await create.ExecuteNonQueryAsync(token);
-                }
-
-                await using var endToEnd = NpgsqlDataSource.Create(ConnectionStringOf(database));
-                foreach (
-                    var path in new[]
-                    {
-                        RepositoryPaths.EndToEndSchema(database),
-                        RepositoryPaths.EndToEndSeed(database),
-                    }
-                )
-                {
-                    await using var script = endToEnd.CreateCommand(await File.ReadAllTextAsync(path, token));
-                    _ = await script.ExecuteNonQueryAsync(token);
-                }
+                await EndToEndFiles.CreateAsync(source, database, SourceOf, token);
             }
 
             await using var opened = await source.OpenConnectionAsync(token);
