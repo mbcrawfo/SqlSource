@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0066`
+Next id: `TD-0067`
 
 ## Active items
 
@@ -47,6 +47,7 @@ Next id: `TD-0066`
 | [TD-0063](TD-0063-duplicated-and-uneven-patterns-in-src.md) | Open | 2026-10-19 | Low | Duplicated and uneven patterns in `src/`: rules of the generator that the tool copies, the database's comparer and level resolved by hand, marker lists kept in step by hand, a 450-line `Initialize`, and small duplicates |
 | [TD-0064](TD-0064-duplicated-helpers-of-the-model-and-container-tests.md) | Open | 2026-10-19 | Low | The model tests' harness copied into seven classes of `Generator/`, a describer opened and a database seeded in several ways, two large classes that mix subjects, and magic strings |
 | [TD-0065](TD-0065-tests-that-depend-on-the-process-the-clock-or-the-repository.md) | Open | 2026-10-19 | Low | Tests that run `dotnet` with no timeout or from the path, run on the machine's clock, poll with four limits, read the repository by two routes, or leave objects on the shared server in three ways |
+| [TD-0066](TD-0066-type-name-with-a-line-break-has-no-key.md) | Open | 2026-10-20 | Low | A type whose schema or name holds a line break has no key of the type override, since an MSBuild value makes one space of it and a marker ends at it, and the help of its `SQLSRC246` suggests an entry that cannot be written |
 
 ## Columns
 
