@@ -225,12 +225,12 @@ The input model is the parameter object, and the output model is the type of a r
   </PropertyGroup>
   ```
 
-- **Set a column's nullability with a `-- column:` marker, not with `!` or `?` at the end of its alias.**  A mark stays in the name of the column, `total!`, and Dapper does not match it to the property `Total`.  The marker leaves the name alone:
+- **Set a column's nullability with a `-- column:` marker, not with `!` or `?` at the end of its alias.**  A mark stays in the name of the column, `note_count!`, and Dapper does not match it to the property `NoteCount`.  The marker leaves the name alone:
 
   ```sql postgres
-  -- name: GetOrderTotal
-  -- column: total not null
-  SELECT o.id, sum(l.amount) AS total
+  -- name: GetOrderNoteCount
+  -- column: note_count not null
+  SELECT o.id, count(l.note) AS note_count
   FROM orders o
   JOIN order_lines l ON l.order_id = o.id
   WHERE o.id = @orderId

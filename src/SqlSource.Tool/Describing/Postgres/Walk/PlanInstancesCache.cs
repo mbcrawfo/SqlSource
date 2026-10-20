@@ -8,8 +8,7 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// </summary>
 /// <remarks>
 /// Built from the tree and the answer of <c>partitions</c> alone, which are all <see cref="PlanInstances" /> reads,
-/// so that it can be built before <c>relations</c> is asked, which
-/// <see cref="NullabilityWalk.MayAnswerFromBranches" /> decides, and used again by <see cref="NullabilityWalk.Run" />.
+/// and used by <see cref="NullabilityWalk.Run" />.
 /// </remarks>
 /// <param name="tree">The root of the whole plan, where the <c>InitPlan</c> of a CTE is looked for.</param>
 /// <param name="partitions">

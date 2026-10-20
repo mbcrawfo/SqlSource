@@ -98,7 +98,7 @@ SqlSource can tell that a column is never null when it is:
 - **`merge_action()`** in the `RETURNING` list of a `MERGE`, on PostgreSQL 18.
 - **A column of a `UNION`, an `INTERSECT` or an `EXCEPT`** at the top of the query, when every value it can return there is never null by the rules above: every branch of a `UNION`, either side of an `INTERSECT`, the left side of an `EXCEPT`.
 
-`count(*)` and the rankings, constants, tests, the arithmetic, comparisons, functions, casts, aggregates and subqueries above, `merge_action()`, and `COALESCE`, `GREATEST`, `LEAST` and `CASE` each count only where an outer join cannot leave them null.  A table's column counts as never null inside them only when the query also returns a column of that table as it is.
+`count(*)` and the rankings, constants, tests, the arithmetic, comparisons, functions, casts, aggregates and subqueries above, `merge_action()`, and `COALESCE`, `GREATEST`, `LEAST` and `CASE` each count only where an outer join cannot leave them null.
 
 SqlSource treats a column as possibly null when:
 
@@ -116,19 +116,19 @@ SqlSource treats a column as possibly null when:
 A column that can be null gets a nullable property in the query's [output model](#models), `int?` or `string?`, and a column that is never null a property that cannot be null, `int` or `string`.  Where you know better than these rules, you decide instead: an alias that ends in `!` gives a property that cannot be null, and one that ends in `?` a property that can, or a `-- column:` marker says the same and leaves the column's name alone.
 
 ```sql postgres
--- name: GetCustomerTotals
-SELECT c.id, c.name, sum(o.total) AS "total!"
+-- name: GetCustomerNotes
+SELECT c.id, c.name, count(o.note) AS "note_count!"
 FROM customers c
 JOIN orders o ON o.customer_id = c.id
 GROUP BY c.id, c.name;
 ```
 
-The sum of a group of `NOT NULL` totals is never null, though SqlSource treats it as possibly null: `"total!"` gives the property `Total` the type `decimal` and not `decimal?`.  Write the alias in quotes, since `!` and `?` are not part of a plain name, and the mark is left out of the property's name.  A `!` is your word, and nothing checks it.  The mark stays in the column's name, which Dapper matches to the property's by name, so with Dapper write a `-- column:` marker and no mark:
+A count is never null, though SqlSource treats `count(o.note)` as possibly null: `"note_count!"` gives the property `NoteCount` the type `long` and not `long?`.  Write the alias in quotes, since `!` and `?` are not part of a plain name, and the mark is left out of the property's name.  A `!` is your word, and nothing checks it.  The mark stays in the column's name, which Dapper matches to the property's by name, so with Dapper write a `-- column:` marker and no mark:
 
 ```sql postgres
--- name: GetCustomerTotals
--- column: total not null
-SELECT c.id, c.name, sum(o.total) AS total
+-- name: GetCustomerNotes
+-- column: note_count not null
+SELECT c.id, c.name, count(o.note) AS note_count
 FROM customers c
 JOIN orders o ON o.customer_id = c.id
 GROUP BY c.id, c.name;
@@ -273,7 +273,7 @@ A described PostgreSQL query gets the [models](generator.md#models) that every d
 
 ## Known issues
 
-- **Many columns that are never null are treated as possibly null.**  The rules [above](#nullability) leave out much that a person can see: `sum` or `max` of a `NOT NULL` column in a `GROUP BY` query that returns no column of its table, `count(x)`, `EXISTS (...)` as a column before PostgreSQL 18, the rows of `VALUES`, a function not listed there, a recursive `WITH` query, the columns of a view.  Nothing is wrong when that happens, but the column's property in the query's model is nullable, and costs a null check in your code.  Where you know the column is never null, end its alias with `!`, or, when you read the rows with Dapper, write a `-- column:` marker that says `not null`, as [above](#nullability).
+- **Many columns that are never null are treated as possibly null.**  The rules [above](#nullability) leave out much that a person can see: `count(x)`, `EXISTS (...)` as a column before PostgreSQL 18, the rows of `VALUES`, a function not listed there, a recursive `WITH` query, the columns of a view.  Nothing is wrong when that happens, but the column's property in the query's model is nullable, and costs a null check in your code.  Where you know the column is never null, end its alias with `!`, or, when you read the rows with Dapper, write a `-- column:` marker that says `not null`, as [above](#nullability).
 - **Describing through a pooler can give the wrong error, or a wrong answer.**  Behind a pooler in transaction mode, most queries fail with [SQLSRC236](diagnostics.md#sqlsrc236), but some are reported as [SQLSRC231](diagnostics.md#sqlsrc231) with a message about the number of columns, and in rare cases a column can be recorded with the nullability of another statement that an earlier run left on the server.  Connect directly to the server, as [connecting](#connecting) says, and describe again with `--force`.
 - **A type of your own named like a built-in one changes the names of built-in types.**  When the connection's search path puts a schema that has a type named like a built-in, such as a domain `public.text`, before `pg_catalog`, the tool records the built-in type as `pg_catalog.text` and not `text`.  Two databases that differ only in this describe the same query differently, and `--check` against one reports the sidecars written against the other as out of date.  Rename the type, or keep `pg_catalog` first on the search path of the connection the tool uses, the same on every machine.
 - **A query over a table with many partitions is slow to describe.**  The tool looks at every partition of a partitioned table, whatever the query's conditions, when it works out which columns can be null.  On a table of thousands of partitions each such query takes longer to describe, and the [log](tool.md#logs) of the run grows.  Only describing is slower; nothing else is affected.

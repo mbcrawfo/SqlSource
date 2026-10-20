@@ -179,6 +179,8 @@ Use the file's `AnswersAsync` and `NullabilityAnswers` (`NotNullExpression`, `Un
 - [ ] **Step 3:** Run `RealisticNullabilityNoiseTests` on 18 and on 14.24; set `Budgets` to `[14] = 44, [18] = 42`, or to what the failure message gives, which must be lower than 53 and 54; a column of the spec's table that stays unproved is named in the commit with the reason.  Run the whole `tests/SqlSource.Tests.Postgres` on both: PASS, the safety tests and the oracle included.
 - [ ] **Step 4:** Count the PR's files (`git diff --stat origin/main | tail -1`): over 150 means the recordings move to a second PR (Global Constraints).  `./pre-commit-validation.sh`; commit `Record the answers of part D and lower the noise budgets`.
 
+- Found while building Task 5: `aggregate-cte-joined-inner` `month_start` and `total` turn false too, which the spec's table does not list.  The planner inlines the CTE and removes its trivial `Subquery Scan`, so the walk reaches the grouped `HashAggregate` over inner joins and proves both; the budgets end at 42 on 14 and 40 on 18, below the spec's 44 and 42.  The spec is not edited.
+
 ### Task 8: Documents
 
 **Files:** `docs/architecture/postgres-nullability.md`, `src/SqlSource.Tool/AGENTS.md`, `docs/manual/postgresql.md`, `docs/tech-debt/TD-0051-columns-that-cannot-be-null-are-answered-nullable.md`, `docs/tech-debt/README.md`.

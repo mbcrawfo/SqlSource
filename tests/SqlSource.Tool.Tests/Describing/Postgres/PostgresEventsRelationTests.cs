@@ -43,14 +43,15 @@ public sealed class PostgresEventsRelationTests
                     ],
                     null
                 )
-            );
+            )
+            .Relations(asked.Relations);
 
         await DescribeAsync(script, log, Listing);
 
         log.Events.Select(written => written.Name)
             .SkipWhile(static name => name != "explain")
-            .Take(3)
-            .ShouldBe(["explain", "partitions", "walk.node"]);
+            .Take(4)
+            .ShouldBe(["explain", "partitions", "relations", "walk.node"]);
         var partitions = log.Events.Single(static written => written.Name == "partitions").Members;
         NamesOf(partitions).ShouldBe(["query", "relations", "rows", "durationMs"]);
         Member(partitions, "query").ShouldBe((LogValue)"ListUsers");

@@ -259,6 +259,138 @@
       }
     },
     {
+      "method": "relations",
+      "request": {
+        "relations": [
+          {
+            "schema": "public",
+            "name": "bookings"
+          },
+          {
+            "schema": "public",
+            "name": "orders"
+          }
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16421,
+            "relkind": "r",
+            "schema": "public",
+            "name": "orders",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "d",
+                "generated": "",
+                "typeOid": 20,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "user_id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "total",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1700,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 4,
+                "name": "placed_at",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1184,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 5,
+                "name": "note",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 25,
+                "notNullValidated": null
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          },
+          {
+            "oid": 16439,
+            "relkind": "r",
+            "schema": "public",
+            "name": "bookings",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "d",
+                "generated": "",
+                "typeOid": 20,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "user_id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "during",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 3910,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 4,
+                "name": "slots",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 4451,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1009,
+                "notNullValidated": true
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          }
+        ],
+        "error": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"

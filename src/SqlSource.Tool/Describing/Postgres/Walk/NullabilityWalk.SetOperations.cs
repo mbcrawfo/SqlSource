@@ -76,14 +76,6 @@ internal static partial class NullabilityWalk
         return false;
     }
 
-    /// <summary>
-    /// Whether the walk may answer a column of no origin of the plan from a set operation's branches: the root reaches
-    /// one, and prints no Output or its plan holds one that is no partitioned table's <c>Append</c>.
-    /// </summary>
-    /// <param name="cache">The instances of the plan's plans, whose tree is the plan.</param>
-    public static bool MayAnswerFromBranches(PlanInstancesCache cache) =>
-        ReachesSetOperation(cache.Tree) && (cache.Tree.Output is null || cache.Of(cache.Tree).HasSetOperation);
-
     // The types to answer a set operation's columns with, when the walk takes that path: a column has no origin, there
     // is a type for each column, the root prints no Output or its plan holds a set operation, and the root reaches
     // one.  A root that prints Output must print an entry for each column, and one of another statement's plan is read

@@ -58,6 +58,7 @@ public sealed class PostgresSessionRelationTests
         );
         _ = script.Explains(1, 0, PostgresScript.PlanOf(PartitionedUsers));
         _ = script.Partitions(PartitionsOfUsers, partitions);
+        _ = script.Relations([new PostgresRelationName("public", "o"), .. PartitionsOfUsers.Relations]);
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
@@ -204,16 +205,20 @@ public sealed class PostgresSessionRelationTests
         AnswersOf(description).ShouldBe([NotNullCatalog, NotNullSetOperation]);
     }
 
-    // The root reaches no set operation: the one under the join is not taken on, and nothing more is asked.
+    // The root reaches no set operation: the one under the join is not taken on.  The relation "tables" did not answer
+    // is asked all the same, since a column has no origin.
     [Fact]
-    public async Task DescribeAsync_SetOperationUnderAJoin_AsksNoRelations()
+    public async Task DescribeAsync_SetOperationUnderAJoin_AsksRelationsAndKeepsTheColumn()
     {
         var plan = Join("Left", Scan("users", "users.id"), UnionPlan(partitioned: false)) with
         {
             Output = ["users.id", "orders.user_id"],
         };
 
-        var (description, _) = await DescribeUnionAsync(plan, static _ => { });
+        var (description, _) = await DescribeUnionAsync(
+            plan,
+            static script => script.Relations([new PostgresRelationName("public", "orders")], PostgresTables.Orders)
+        );
 
         AnswersOf(description).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
     }
@@ -239,6 +244,70 @@ public sealed class PostgresSessionRelationTests
 
         exchange.Unused.ShouldBeEmpty();
         AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([NullableHeuristic]);
+    }
+
+    // Orders with a placed_at that is never NULL, which "tables" does not answer for a query that returns none of its
+    // columns.
+    private static readonly PostgresTableRow PlacedOrders = PostgresTables.TableOf(
+        16415,
+        "orders",
+        PostgresTables.Attribute(2, "user_id", PostgresRows.Int4.Oid, notNull: true),
+        PostgresTables.Attribute(3, "placed_at", PostgresRows.Timestamptz.Oid, notNull: true)
+    );
+
+    private const string LastPlacedAt =
+        "SELECT u.id, max(o.placed_at) AS last_placed_at FROM users u JOIN orders o ON o.user_id = u.id GROUP BY u.id";
+
+    // The plain columns are all of users and the expression names orders, which "tables" did not answer: with no set
+    // operation in the plan, "relations" is asked for it after "explain", and max(o.placed_at) of a group is proved.
+    [Fact]
+    public async Task DescribeAsync_ExpressionOverARelationNoColumnNames_AsksRelations()
+    {
+        var users = PostgresTables.Users;
+        var plan = Aggregate(
+            "Hashed",
+            true,
+            Join("Inner", Scan("users", "users.id"), Scan("orders", "orders.placed_at")) with
+            {
+                Output = ["users.id", "orders.placed_at"],
+            },
+            "users.id",
+            "max(orders.placed_at)"
+        ) with
+        {
+            Output = ["users.id", "max(orders.placed_at)"],
+        };
+        var script = new PostgresScript().Open();
+        _ = script.Prepares(1, LastPlacedAt, [], new([], null));
+        _ = script.Columns(
+            1,
+            0,
+            PostgresTables.UsersId,
+            PostgresTables.ExpressionOf(1, "last_placed_at", PostgresRows.Timestamptz.Oid)
+        );
+        _ = script.Tables([users.Oid], users);
+        _ = script.Resolves([23, 1184], PostgresRows.Int4, PostgresRows.Timestamptz);
+        _ = script.Checks(
+            LastPlacedAt,
+            [],
+            PostgresTables.ExpressionOf(0, "id", PostgresRows.Int4.Oid),
+            PostgresTables.ExpressionOf(1, "last_placed_at", PostgresRows.Timestamptz.Oid)
+        );
+        _ = script.Explains(1, 0, PostgresScript.PlanOf(plan));
+        _ = script.Relations([new PostgresRelationName("public", "orders")], PlacedOrders);
+        var exchange = script.Frees(1).Play();
+        var log = new RecordingLog();
+        await using var session = await PostgresScript.SessionAsync(exchange, log);
+
+        var described = await session.DescribeAsync(Of(LastPlacedAt), TestContext.Current.CancellationToken);
+
+        exchange.Unused.ShouldBeEmpty();
+        var description = described.Value.ShouldNotBeNull();
+        description.Plan.ShouldBe(SidecarValues.Plan.Walked);
+        AnswersOf(description).ShouldBe([NotNullCatalog, NotNullExpression]);
+        log.Events.Select(written => written.Name)
+            .Where(name => name is "explain" or "relations" or "walk")
+            .ShouldBe(["explain", "relations", "walk"]);
     }
 
     // A "relations" that fails is logged and never reported: the walk goes on without its rows.

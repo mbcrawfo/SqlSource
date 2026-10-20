@@ -334,7 +334,7 @@ Each of these is an error at the query's name, and the query has no models until
 
 ```sql postgres
 -- name: GetCustomerTotals
-SELECT customer_id, sum(total) AS "total!"
+SELECT customer_id, count(note) AS "note_count!"
 FROM orders
 GROUP BY customer_id;
 ```
@@ -342,7 +342,7 @@ GROUP BY customer_id;
 A property that can be null has its C# type with `?`: `int?`, which is `System.Nullable<int>`, or `string?`, a nullable reference.
 
 - **A column's property can be null when the tool recorded that the column can be.**  For PostgreSQL, [which columns can be null](postgresql.md#nullability) says when that is.  A column that the tool showed is never null gets a property that cannot be null.
-- **A column whose name ends in `!` gets a property that cannot be null, and one whose name ends in `?` a property that can**, whatever the tool recorded.  Write the mark at the end of the column's alias, in quotes.  Above, with `total` a `numeric` column that is `NOT NULL`, the sum of a group is never null, though SqlSource cannot show it: `"total!"` gives the property `Total` the type `decimal` and not `decimal?`.  A `!` is your word that the column is never null, and nothing checks it.  The mark stays in the name of the column the query returns, `total!`, so a library that matches a row's columns to properties by name, as Dapper does, does not match it to `Total`: with a record model Dapper throws when it reads the rows, and with a class model it leaves the property at its default value.  Read such rows with a [`-- column:` marker](#column-marker) instead.
+- **A column whose name ends in `!` gets a property that cannot be null, and one whose name ends in `?` a property that can**, whatever the tool recorded.  Write the mark at the end of the column's alias, in quotes.  Above, a count is never null, though SqlSource treats `count(note)` as possibly null: `"note_count!"` gives the property `NoteCount` the type `long` and not `long?`.  A `!` is your word that the column is never null, and nothing checks it.  The mark stays in the name of the column the query returns, `note_count!`, so a library that matches a row's columns to properties by name, as Dapper does, does not match it to `NoteCount`: with a record model Dapper throws when it reads the rows, and with a class model it leaves the property at its default value.  Read such rows with a [`-- column:` marker](#column-marker) instead.
 - **A column that a `-- column:` marker names gets the nullability the marker gives**, whatever the tool recorded, and keeps its name: see below.
 - **A parameter's property can be null only when its [`-- param:` marker](parameters-and-tokens.md#param-marker) says `null`.**
 
@@ -352,13 +352,13 @@ A property that can be null has its C# type with `?`: `int?`, which is `System.N
 
 ```sql postgres
 -- name: GetCustomerTotals
--- column: total not null
-SELECT customer_id, sum(total) AS total
+-- column: note_count not null
+SELECT customer_id, count(note) AS note_count
 FROM orders
 GROUP BY customer_id;
 ```
 
-A `-- column:` marker inside a query sets the nullability of one of its columns and leaves the column's name alone.  Above, the query returns the column `total`, as it would without the marker, and its property `Total` has the type `decimal` and not `decimal?`.  Use the marker where the rows are read by the names of their columns, as Dapper reads them: a mark at the end of an alias changes the column's name, and the marker does not.
+A `-- column:` marker inside a query sets the nullability of one of its columns and leaves the column's name alone.  Above, the query returns the column `note_count`, as it would without the marker, and its property `NoteCount` has the type `long` and not `long?`.  Use the marker where the rows are read by the names of their columns, as Dapper reads them: a mark at the end of an alias changes the column's name, and the marker does not.
 
 - **The value is the column's name, then `null` or `not null`.**  `null` gives a property that can be null, and `not null` one that cannot.  One marker names one column: write one for each.  Two markers for one column are fine when they say the same, and [SQLSRC112](diagnostics.md#sqlsrc112) when they do not.
 - **The name is the column's as the query returns it**, its alias or its own name, compared ignoring case.  Write it in double quotes when it has white space, or when it is the word `null` or `not`, and double a quote inside it: `-- column: "total due" not null`.  A value that is not one name, plain or quoted, followed by `null` or `not null` is [SQLSRC111](diagnostics.md#sqlsrc111): so is `-- column: total due not null`, without its quotes.

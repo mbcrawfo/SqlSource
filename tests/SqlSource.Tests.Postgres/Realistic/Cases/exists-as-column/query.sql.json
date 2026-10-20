@@ -88,8 +88,8 @@
             "schema": "pg_catalog",
             "internalName": "bool"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": null,
           "computed": null
@@ -103,8 +103,8 @@
             "schema": "pg_catalog",
             "internalName": "bool"
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": null,
           "computed": null
