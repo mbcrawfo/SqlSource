@@ -29,12 +29,15 @@ public sealed class RedactionTests : IDisposable
 
     public void Dispose() => _scene.Dispose();
 
-    // Whichever way the option was written, the token keeps the option and the name and loses the value.
+    // Whichever way the option was written, the token keeps the option and loses the value, and with it the name.
     [Theory]
-    [InlineData("--connection|postgres=***", "--connection", "postgres=" + Secrets.ConnectionWithMarker)]
-    [InlineData("--connection=postgres=***", "--connection=postgres=" + Secrets.ConnectionWithMarker)]
-    [InlineData("--connection:postgres=***", "--connection:postgres=" + Secrets.ConnectionWithMarker)]
-    public async Task Run_ConnectionOnTheCommandLine_IsLoggedWithItsNameAndNoValue(string logged, params string[] args)
+    [InlineData("--connection|***", "--connection", "postgres=" + Secrets.ConnectionWithMarker)]
+    [InlineData("--connection=***", "--connection=postgres=" + Secrets.ConnectionWithMarker)]
+    [InlineData("--connection:***", "--connection:postgres=" + Secrets.ConnectionWithMarker)]
+    public async Task Run_ConnectionOnTheCommandLine_IsLoggedWithNeitherItsNameNorItsValue(
+        string logged,
+        params string[] args
+    )
     {
         var result = await _scene.DescribeAsync(["--log", "run.log", .. args]);
 

@@ -26,9 +26,9 @@ internal static class DescribeCommand
 
     private const string PathArgument = "path";
 
-    private const string ProjectOption = "--project";
+    internal const string ProjectOption = "--project";
 
-    private const string DatabaseOption = "--database";
+    internal const string DatabaseOption = "--database";
 
     internal const string ConnectionOption = "--connection";
 

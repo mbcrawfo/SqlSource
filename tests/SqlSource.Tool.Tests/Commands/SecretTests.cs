@@ -315,17 +315,24 @@ public sealed class SecretTests : IDisposable
         _scene.Run.Processes.Requests.ShouldBeEmpty();
     }
 
-    // Where a path stands: the unit, a .sql file, and the value of --project.  The error says where, and nothing else.
+    // Where a path stands: the unit, a .sql file, and the value of --project.  The error says where, and nothing else,
+    // and neither does the log, which holds the token by its position.
     [Theory]
     [InlineData("203", new[] { Secrets.ConnectionWithMarker })]
     [InlineData("212", new[] { Secrets.ConnectionWithMarker + ".sql" })]
     [InlineData("207", new[] { "--project", Secrets.ConnectionWithMarker })]
     public async Task Run_ConnectionStringWherePathsStand_IsNeverPrinted(string id, string[] args)
     {
-        var result = await _scene.DescribeAsync(args);
+        var result = await _scene.DescribeAsync([.. args, "--log", "run.log"]);
 
         ShouldHold(result, id);
         result.Error.ShouldContain("The path at position ");
+        var log = await File.ReadAllTextAsync(
+            _scene.Run.Folder.PathOf("run.log"),
+            TestContext.Current.CancellationToken
+        );
+        log.ShouldNotContain(Secrets.Marker);
+        log.ShouldContain("\"run.start\"");
     }
 
     // The rule for an unknown option: nothing after it is read.

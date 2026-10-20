@@ -59,6 +59,67 @@ public sealed class RunLogTests : IDisposable
         end.GetProperty("durationMs").GetInt64().ShouldBe(50);
     }
 
+    // run.start comes before the plan, which decides whether a database name is printed: a --database value and a
+    // --connection value are never written, and the other values by the rule of what is printed.
+    [Fact]
+    public async Task RunStart_Arguments_HoldNoValueOfDatabaseOrConnection()
+    {
+        _ = await _scene.DescribeAsync(
+            "App.csproj",
+            "Users.sql",
+            "--database",
+            "billing",
+            "--connection",
+            "billing=" + Secrets.ConnectionWithMarker,
+            "--log",
+            "run.log",
+            "--force"
+        );
+
+        Strings(LogReader.Read(Log)[0].GetProperty("arguments"))
+            .ShouldBe([
+                "describe",
+                "App.csproj",
+                "Users.sql",
+                "--database",
+                "***",
+                "--connection",
+                "***",
+                "--log",
+                "run.log",
+                "--force",
+            ]);
+    }
+
+    // The rule of what is printed as a path: a token that holds "=" or ";" may be a connection string.
+    [Fact]
+    public async Task RunStart_Arguments_HoldATokenOfAPathByTheRuleOfWhatIsPrinted()
+    {
+        _ = await _scene.DescribeAsync(
+            "App.csproj",
+            "Users.sql",
+            "a=b.sql",
+            "--project=x;y",
+            "--log",
+            "run.log",
+            "--force"
+        );
+
+        Strings(LogReader.Read(Log)[0].GetProperty("arguments"))
+            .ShouldBe(["describe", "App.csproj", "Users.sql", "***", "--project=***", "--log", "run.log", "--force"]);
+    }
+
+    [Theory]
+    [InlineData("--connection=")]
+    [InlineData("--connection:")]
+    public async Task RunStart_Arguments_KeepTheOptionAndTheSeparatorOfAConnection(string option)
+    {
+        _ = await _scene.DescribeAsync(option + "billing=" + Secrets.ConnectionWithMarker, "--log", "run.log");
+
+        Strings(LogReader.Read(Log)[0].GetProperty("arguments"))
+            .ShouldBe(["describe", option + "***", "--log", "run.log"]);
+    }
+
     [Fact]
     public async Task Run_ErrorWithLog_IsADiagnosticEventWithItsPlaceItsMessageAndItsLines()
     {
