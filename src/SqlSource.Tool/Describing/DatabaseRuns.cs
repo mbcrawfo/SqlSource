@@ -142,7 +142,7 @@ internal static class DatabaseRuns
         var guard = run.Guard;
         var value = guard.Secret;
         var server = guard.Call(() => run.Session.Server);
-        RunEvents.Opened(run.Trace, database, server);
+        guard.Call(() => RunEvents.Opened(run.Trace, database, server));
         foreach (var query in queries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -283,6 +283,18 @@ internal static class DatabaseRuns
             try
             {
                 return call() ?? throw new InvalidOperationException(Nothing);
+            }
+            catch (Exception exception) when (!IsCancellation(exception))
+            {
+                throw Fault(exception);
+            }
+        }
+
+        public void Call(Action call)
+        {
+            try
+            {
+                call();
             }
             catch (Exception exception) when (!IsCancellation(exception))
             {

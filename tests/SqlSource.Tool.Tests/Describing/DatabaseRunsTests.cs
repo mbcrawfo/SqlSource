@@ -388,6 +388,24 @@ public sealed class DatabaseRunsTests : IDisposable
         _describer.Closed.ShouldBe(1);
     }
 
+    // The settings of the server are a describer's text: the event that names them is built inside the guard, so that
+    // a setting without a name is the describer's fault and not a bare exception.
+    [Fact]
+    public async Task Run_ServerWithASettingThatHasNoName_IsOneSqlsrc200AndClosesTheSession()
+    {
+        _describer.Server = _describer.Server with
+        {
+            Settings = new EquatableArray<ServerSetting>([new ServerSetting(null!, "x")]),
+        };
+
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
+        fault.Diagnostic.Arguments[0].ShouldBe("System.NullReferenceException");
+        fault.Message.ShouldNotContain(Secrets.Word);
+        _describer.Closed.ShouldBe(1);
+    }
+
     // A value that spans lines is in the stack trace across the lines it is cut into.
     [Fact]
     public async Task Run_DescriberThatThrowsWithAConnectionOfSeveralLines_IsAFaultWithoutIt()

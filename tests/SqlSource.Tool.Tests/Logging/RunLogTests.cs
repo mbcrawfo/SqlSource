@@ -573,18 +573,50 @@ public sealed class RunLogTests : IDisposable
         Directory.GetFiles(_scene.Run.Folder.Path, "*.log").ShouldBeEmpty();
     }
 
-    // "/dev/full" takes no byte: every write fails as on a full disk.  Linux has it; the build server runs there.
+    // A log that cannot take a line, as when the disk is full, must not end the run: the run finishes and says so once.
     [Fact]
     public async Task Run_LogThatStopsBeingWritable_FinishesTheRunAndIsOneSqlsrc218()
     {
-        Assert.SkipUnless(File.Exists("/dev/full"), "The system has no device that is always full.");
+        _scene.Run.CreateFile = static _ => new FullStream();
 
-        var result = await _scene.DescribeAsync("--log", "/dev/full");
+        var result = await _scene.DescribeAsync("--log", "run.log");
 
         result.ExitCode.ShouldBe(1);
         result.Out.ShouldBe("postgres (postgres): 2 described, 0 skipped, 0 failed\n");
-        result.Error.ShouldStartWith("/dev/full : error SQLSRC218: '/dev/full' could not be written: ");
+        result.Error.ShouldStartWith($"{Log} : error SQLSRC218: '{Log}' could not be written: No space left on device");
         result.Error.Split("error SQLSRC").Length.ShouldBe(2);
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
+    }
+
+    // A stream that takes no byte, whatever the system.
+    private sealed class FullStream : Stream
+    {
+        public override bool CanRead => false;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => true;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+
+        public override void Write(byte[] buffer, int offset, int count) => throw Full();
+
+        public override void Write(ReadOnlySpan<byte> buffer) => throw Full();
+
+        public override void Flush() => throw Full();
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        private static IOException Full() => new("No space left on device");
     }
 }

@@ -9,6 +9,10 @@ namespace SqlSource.Tool.Testing;
 // A host for a test that calls a part of the tool and not the whole command: nothing is written anywhere.
 internal static class Hosts
 {
+    // The files of a host: the same as the released tool's, which makes or empties the file on disk.
+    public static Stream CreateFile(string path) =>
+        new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
+
     public static ToolHost Create(
         string workingDirectory,
         IProcessRunner processes,
@@ -26,7 +30,8 @@ internal static class Hosts
             processorCount,
             DescriberRegistry.Empty,
             static _ => LiveExchange.Instance,
-            TimeProvider.System
+            TimeProvider.System,
+            CreateFile
         );
 
     // The environment of the test process, for a run of the real "dotnet".
@@ -41,6 +46,7 @@ internal static class Hosts
             Environment.ProcessorCount,
             DescriberRegistry.Empty,
             static _ => LiveExchange.Instance,
-            TimeProvider.System
+            TimeProvider.System,
+            CreateFile
         );
 }

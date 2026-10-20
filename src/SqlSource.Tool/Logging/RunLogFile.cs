@@ -19,8 +19,10 @@ namespace SqlSource.Tool.Logging;
 /// Every object starts with <c>event</c> and <c>time</c>, the moment in UTC with milliseconds.  A string over
 /// <see cref="MaxStringBytes" />, counted in UTF-8, is cut to that size between two characters, and its object
 /// gains <c>"truncated": true</c>.  The writer owns these three names: a member of the event itself, not of a map
-/// inside it, that is named <c>event</c>, <c>time</c> or <c>truncated</c> is written with one underscore before
-/// the name, so that no line has a key twice and no reader takes a caller's member for the run's.
+/// inside it, that is named <c>event</c>, <c>time</c> or <c>truncated</c> is written with an underscore before
+/// the name, and with another for as long as a member of the event has the name that results (<c>event</c> beside
+/// <c>_event</c> is written <c>__event</c>), so that no line has a key twice and no reader takes a caller's member
+/// for the run's.
 /// </para>
 /// <para>
 /// Several threads may write: an event is one write, under a lock.  A write that the system refuses does not end
@@ -72,8 +74,14 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     /// </summary>
     /// <param name="given">The path as the option or the variable gave it.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
+    /// <param name="createFile">Makes or empties the file at the full path and gives its stream.</param>
     /// <param name="time">The clock of the run.</param>
-    public static Outcome<RunLogFile, ToolDiagnostic> Open(string given, string workingDirectory, TimeProvider time)
+    public static Outcome<RunLogFile, ToolDiagnostic> Open(
+        string given,
+        string workingDirectory,
+        Func<string, Stream> createFile,
+        TimeProvider time
+    )
     {
         var path = given;
         try
@@ -85,9 +93,7 @@ internal sealed class RunLogFile : IRunLog, IDisposable
                 return NotOpened(path, "a log is not written over a .sql file, a sidecar, a project or a solution");
             }
 
-            return new Outcome<RunLogFile, ToolDiagnostic>(
-                new RunLogFile(path, new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read), time)
-            );
+            return new Outcome<RunLogFile, ToolDiagnostic>(new RunLogFile(path, createFile(path), time));
         }
         catch (Exception exception)
             when (exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
@@ -127,7 +133,7 @@ internal sealed class RunLogFile : IRunLog, IDisposable
                     );
                     foreach (var member in members)
                     {
-                        json.WritePropertyName(Fit(Unreserved(member.Name), ref cut));
+                        json.WritePropertyName(Fit(Unreserved(member.Name, members), ref cut));
                         WriteValue(json, member.Value, ref cut);
                     }
 
@@ -174,8 +180,25 @@ internal sealed class RunLogFile : IRunLog, IDisposable
         }
     }
 
-    // The three names the writer adds to a line are its own: a caller's member of one of them gets an underscore.
-    private static string Unreserved(string name) => name is "event" or "time" or "truncated" ? "_" + name : name;
+    // The three names the writer adds to a line are its own: a caller's member of one of them gets underscores
+    // before its name, as many as it takes to reach a name that no member of the event has.
+    private static string Unreserved(string name, LogMember[] members)
+    {
+        if (name is not ("event" or "time" or "truncated"))
+        {
+            return name;
+        }
+
+        // The names the event has, so that each candidate is one lookup.
+        var taken = members.Select(static member => member.Name).ToHashSet(StringComparer.Ordinal);
+        var underscores = 1;
+        while (taken.Contains(new string('_', underscores) + name))
+        {
+            underscores++;
+        }
+
+        return new string('_', underscores) + name;
+    }
 
     private static void WriteValue(Utf8JsonWriter json, LogValue value, ref bool cut)
     {

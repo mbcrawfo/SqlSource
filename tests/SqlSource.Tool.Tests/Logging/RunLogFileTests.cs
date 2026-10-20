@@ -83,6 +83,26 @@ public sealed class RunLogFileTests : IDisposable
     }
 
     [Fact]
+    public void Write_MemberNamedEventBesideOneNamedUnderscoreEvent_WritesEachUnderADistinctKey()
+    {
+        using var log = new RunLogFile("/log", _stream, _clock);
+
+        log.Write("e", new LogMember("event", 1), new LogMember("_event", 2));
+
+        Written().ShouldBe(Head + ",\"__event\":1,\"_event\":2}\n");
+    }
+
+    [Fact]
+    public void Write_MemberNamedEventBesideOnesNamedUnderscoreEventAndTwoUnderscoresEvent_TakesTheNextFreeName()
+    {
+        using var log = new RunLogFile("/log", _stream, _clock);
+
+        log.Write("e", new LogMember("event", 1), new LogMember("_event", 2), new LogMember("__event", 3));
+
+        Written().ShouldBe(Head + ",\"___event\":1,\"_event\":2,\"__event\":3}\n");
+    }
+
+    [Fact]
     public void Write_MemberOfANestedMapNamedLikeTheWritersOwn_KeepsItsName()
     {
         using var log = new RunLogFile("/log", _stream, _clock);
@@ -195,7 +215,7 @@ public sealed class RunLogFileTests : IDisposable
     {
         var expected = _folder.WriteFile("run.log", "of an earlier run\n");
 
-        using var log = RunLogFile.Open("run.log", _folder.Path, _clock).Value.ShouldNotBeNull();
+        using var log = RunLogFile.Open("run.log", _folder.Path, Hosts.CreateFile, _clock).Value.ShouldNotBeNull();
 
         log.Path.ShouldBe(expected);
         log.Write("e");
@@ -211,7 +231,7 @@ public sealed class RunLogFileTests : IDisposable
     {
         _ = _folder.CreateFolder("folder");
 
-        var opened = RunLogFile.Open(given, _folder.Path, _clock);
+        var opened = RunLogFile.Open(given, _folder.Path, Hosts.CreateFile, _clock);
         opened.Value?.Dispose();
 
         opened.Succeeded.ShouldBeFalse();
@@ -236,7 +256,7 @@ public sealed class RunLogFileTests : IDisposable
     {
         var existing = _folder.WriteFile(given, "of the run\n");
 
-        var opened = RunLogFile.Open(given, _folder.Path, _clock);
+        var opened = RunLogFile.Open(given, _folder.Path, Hosts.CreateFile, _clock);
         opened.Value?.Dispose();
 
         opened.Failure.ShouldBe(
@@ -253,7 +273,7 @@ public sealed class RunLogFileTests : IDisposable
     [Fact]
     public void Open_PathOfAFileOfTheRunThatIsNotThere_MakesNothing()
     {
-        var opened = RunLogFile.Open("New.sql", _folder.Path, _clock);
+        var opened = RunLogFile.Open("New.sql", _folder.Path, Hosts.CreateFile, _clock);
         opened.Value?.Dispose();
 
         opened.Succeeded.ShouldBeFalse();
@@ -263,7 +283,7 @@ public sealed class RunLogFileTests : IDisposable
     [Fact]
     public void Open_PathThatOnlyEndsLikeAFileOfTheRun_IsALog()
     {
-        var opened = RunLogFile.Open("run.sql.log", _folder.Path, _clock);
+        var opened = RunLogFile.Open("run.sql.log", _folder.Path, Hosts.CreateFile, _clock);
         using var log = opened.Value;
 
         opened.Succeeded.ShouldBeTrue();
