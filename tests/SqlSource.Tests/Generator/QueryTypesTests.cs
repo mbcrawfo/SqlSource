@@ -282,6 +282,25 @@ public sealed class QueryTypesTests
         ]);
     }
 
+    // The help writes the key as the type override reads it, so a name that needs quotes is given with them.
+    [Fact]
+    public void Run_CompositeWhoseNameNeedsQuotes_HelpQuotesIt()
+    {
+        var item = TestSidecars.Postgres(
+            name: "Order Item",
+            kind: SidecarValues.Kind.Composite,
+            schema: "my schema",
+            internalName: "Order Item"
+        );
+
+        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("item", item)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'item' has the type 'Order Item', which SqlSource cannot give a C# "
+                + "type.  Map it with the type override, as \"my schema\".\"Order Item\"=<a C# type>.",
+        ]);
+    }
+
     // The first failure stops the query, and the parameters are typed before the columns: the column of cube, which
     // Npgsql 8 cannot read either, is not reported.  The other query of the file is typed.
     [Fact]

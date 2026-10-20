@@ -416,6 +416,10 @@ public sealed class PostgresTypeMapTests
     [InlineData("pg_catalog", "int4", "int4")]
     [InlineData("public", "user_status", "public.user_status")]
     [InlineData("ext", "citext", "ext.citext")]
+    [InlineData("public", "Status", "public.\"Status\"")]
+    [InlineData("my schema", "order-status", "\"my schema\".\"order-status\"")]
+    [InlineData("public", "say \"hi\"", "public.\"say \"\"hi\"\"\"")]
+    [InlineData("pg_catalog", "Odd", "\"Odd\"")]
     public void KeyOf_Type_IsItsInternalNameQualifiedOutsideTheCatalog(
         string schema,
         string internalName,
