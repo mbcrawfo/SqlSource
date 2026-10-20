@@ -17,28 +17,22 @@ public sealed class PostgresErrorsTests
     [Fact]
     public void Open_ErrorWithASqlState_IsSqlsrc224AtNoStepWithTheServersLine()
     {
-        var error = new PostgresServerError(
-            "28P01",
-            "password authentication failed for user \"app\"",
-            null,
-            null,
-            null
-        );
+        var error = new PostgresServerError("28P01", ConnectionErrors.PasswordRefused, null, null, null);
 
         var failure = PostgresErrors.Open(error, "billing");
 
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
         failure.Arguments.ShouldBe(["billing"]);
         failure.Step.ShouldBeNull();
-        failure.ServerLines.ShouldBe(["28P01: password authentication failed for user \"app\""]);
+        failure.ServerLines.ShouldBe(["28P01: the server refused the password"]);
         failure.Help.ShouldBe(PostgresErrors.OpenHelp);
     }
 
     [Fact]
     public void Open_ErrorWithoutASqlState_HasTheMessageAlone() =>
         PostgresErrors
-            .Open(new PostgresServerError(null, "Failed to connect to 127.0.0.1:1", null, null, null), "app")
-            .ServerLines.ShouldBe(["Failed to connect to 127.0.0.1:1"]);
+            .Open(new PostgresServerError(null, ConnectionErrors.ConnectTimedOut, null, null, null), "app")
+            .ServerLines.ShouldBe(["the connection to the server timed out"]);
 
     // The refusal is the tool's own message and no server said it: the line is that message alone.
     [Fact]
@@ -454,19 +448,19 @@ public sealed class PostgresErrorsTests
         failure.Help.ShouldBeNull();
     }
 
-    // A connection that dropped: the driver's message, and no SQLSTATE.
+    // A connection that dropped: the describer's own text, and no SQLSTATE.
     [Fact]
     public void Prepare_ErrorWithoutASqlState_IsSqlsrc225WithTheMessageAlone()
     {
         var failure = PostgresErrors.Prepare(
-            new PostgresServerError(null, "Exception while reading from stream", null, null, null),
+            new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null),
             Query(),
             Prepared(1),
             "app"
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
-        failure.ServerLines.ShouldBe(["Exception while reading from stream"]);
+        failure.ServerLines.ShouldBe([PostgresConnection.LostConnection]);
     }
 
     // The server counts a character outside the basic plane once, and so does the tool: the fifth character of the
@@ -491,14 +485,14 @@ public sealed class PostgresErrorsTests
     public void Types_Error_IsSqlsrc225AtResolveType()
     {
         var failure = PostgresErrors.Types(
-            new PostgresServerError(null, "Exception while reading from stream", null, null, null),
+            new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null),
             Query()
         );
 
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
-        failure.Arguments.ShouldBe(["Q", "Exception while reading from stream"]);
+        failure.Arguments.ShouldBe(["Q", PostgresConnection.LostConnection]);
         failure.Step.ShouldBe(DescribeStep.ResolveType);
-        failure.ServerLines.ShouldBe(["Exception while reading from stream"]);
+        failure.ServerLines.ShouldBe([PostgresConnection.LostConnection]);
     }
 
     // Nothing the server said: a table, a column or a type went while the query was described.  So there is no

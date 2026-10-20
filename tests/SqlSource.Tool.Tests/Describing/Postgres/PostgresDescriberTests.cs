@@ -67,7 +67,7 @@ public sealed class PostgresDescriberTests
     [Fact]
     public async Task OpenAsync_ReplayedError_IsSqlsrc224ForTheDatabase()
     {
-        var error = new PostgresServerError("3D000", "database \"nope\" does not exist", null, null, null);
+        var error = new PostgresServerError("3D000", ConnectionErrors.NoSuchDatabase, null, null, null);
         var exchange = new PostgresScript()
             .Answer("open", PostgresOpenRequest.Instance, new PostgresOpenAnswer(null, null, null, error))
             .Play();
@@ -78,7 +78,7 @@ public sealed class PostgresDescriberTests
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
         failure.Arguments.ShouldBe([PostgresScript.Database]);
-        failure.ServerLines.ShouldBe(["3D000: database \"nope\" does not exist"]);
+        failure.ServerLines.ShouldBe(["3D000: the server has no such database"]);
     }
 
     // A user causes each of these, so none is an exception, and the driver's own text, whose inner exception

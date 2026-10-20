@@ -250,7 +250,7 @@ public sealed class PostgresEventsColumnTests
     public async Task DescribeAsync_ColumnsThatFails_WritesItsErrorInThePlaceOfTheColumns()
     {
         var log = new RecordingLog();
-        var lost = new PostgresServerError(null, "the connection to the server was lost", null, null, null);
+        var lost = new PostgresServerError(null, PostgresConnection.LostConnection, null, null, null);
         var script = new PostgresScript()
             .Open()
             .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer([23], null))
