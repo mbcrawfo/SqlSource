@@ -174,14 +174,13 @@ public sealed class TypeOverrideLevelTests
     }
 
     // An array's own key is written as its element's with [], or as its name in the catalog, which is read as the
-    // same key, and for an array of an extension's type in any schema, bare or qualified.  Without either, the
-    // element's entry gives the array its element type.
+    // same key for a type of pg_catalog, and for an extension's type in any schema when it is bare.  Without either,
+    // the element's entry gives the array its element type.
     [Theory]
     [InlineData("int4", "int4=long int4[]=System.Collections.Generic.List<int>", "int4[]")]
     [InlineData("int4", "int4=long _int4=System.Collections.Generic.List<int>", "int4[]")]
     [InlineData("citext", "citext=System.Uri citext[]=System.Collections.Generic.List<int>", "citext[]")]
     [InlineData("citext", "citext=System.Uri _citext=System.Collections.Generic.List<int>", "citext[]")]
-    [InlineData("citext", "citext=System.Uri public._citext=System.Collections.Generic.List<int>", "public._citext")]
     public void Run_ArraysOwnKey_WinsOverItsElements(string element, string overrides, string key)
     {
         var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
@@ -237,6 +236,171 @@ public sealed class TypeOverrideLevelTests
 
         run.Diagnostics.ShouldBeEmpty();
         TextsOf(run)["GetUser"].ShouldBe(expected);
+    }
+
+    // The database names the array of public.user_status public._user_status, and an entry for that name maps
+    // nothing at any level: the query is reported, with the key to write, and has no types.
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void Run_ArraysOwnKeyOutsideTheCatalog_IsSqlsrc261NamingTheKeyToWrite(string level, string place)
+    {
+        const string Value = "public._user_status=System.Guid";
+        const string Marker = "-- type-override: public._user_status = System.Guid\n";
+        var header = level == "header" ? Marker + "\n" : "";
+        var marker = level == "query" ? Marker : "";
+        var text = header + "-- name: GetUser\n" + marker + "SELECT 1;\n";
+        var file = new SqlFile(
+            "/app/Repo/Users.sql",
+            text,
+            Metadata: level == "metadata" ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = Value } : null
+        );
+
+        var run = Run(
+            level == "property" ? Value : null,
+            (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))])
+        );
+
+        run.Diagnostics.ShouldBe([ArrayEntryError(text, "public._user_status", place, "public.user_status[]")]);
+        TextsOf(run).ShouldBeEmpty();
+    }
+
+    // A default maps nothing either, so the entry is reported though it names no C# type.
+    [Fact]
+    public void Run_DefaultForAnArraysOwnKey_IsSqlsrc261()
+    {
+        const string Text = "-- name: GetUser\nSELECT 1;\n";
+        var file = new SqlFile("/app/Repo/Users.sql", Text);
+
+        var run = Run(
+            "public._user_status=default",
+            (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))])
+        );
+
+        run.Diagnostics.ShouldBe([
+            ArrayEntryError(Text, "public._user_status", ThePropertyPlace, "public.user_status[]"),
+        ]);
+    }
+
+    // The entry that maps nothing is the user's to remove, though another entry maps the array.
+    [Fact]
+    public void Run_ArraysOwnKeyBesideItsElementsKey_IsStillSqlsrc261()
+    {
+        const string Text =
+            "-- name: GetUser\n-- type-override: public.user_status[] = System.Collections.Generic.List<string>\n"
+            + "SELECT 1;\n";
+        var file = new SqlFile("/app/Repo/Users.sql", Text);
+
+        var run = Run(
+            "public._user_status=System.Guid",
+            (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))])
+        );
+
+        run.Diagnostics.ShouldBe([
+            ArrayEntryError(Text, "public._user_status", ThePropertyPlace, "public.user_status[]"),
+        ]);
+    }
+
+    // The element's key with [] is the array's one key, so a query's default replaces the property's entry for it.
+    [Fact]
+    public void Run_ElementsKeyWithBrackets_IsTheArraysOneKeyAtEveryLevel()
+    {
+        var file = new SqlFile(
+            "/app/Repo/Users.sql",
+            "-- name: GetFirst\n-- type-override: public.user_status[] = default\nSELECT 1;\n\n"
+                + "-- name: GetSecond\nSELECT 2;\n"
+        );
+        var array = ArrayOf(EnumType("user_status"), "_user_status");
+
+        var run = Run(
+            "public.user_status[]=System.Collections.Generic.List<string>",
+            (file, [Entry(file, "GetFirst", array), Entry(file, "GetSecond", array)])
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        TextsOf(run)
+            .ShouldBe(
+                new Dictionary<string, string>
+                {
+                    ["GetFirst"] = "string[]",
+                    ["GetSecond"] = "global::System.Collections.Generic.List<string>",
+                },
+                ignoreOrder: true
+            );
+    }
+
+    // The qualified name of an extension's array maps nothing, as any array's outside pg_catalog does.
+    [Fact]
+    public void Run_ArraysOwnKeyOfAnExtensionsType_IsSqlsrc261NamingItsQualifiedKey()
+    {
+        const string Text = "-- name: GetUser\nSELECT 1;\n";
+        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var citext = TestSidecars.Postgres(name: "citext", schema: "public", internalName: "citext");
+
+        var run = Run(
+            "public._citext=System.Collections.Generic.List<int>",
+            (file, [Entry(file, "GetUser", ArrayOf(citext, "_citext"))])
+        );
+
+        run.Diagnostics.ShouldBe([ArrayEntryError(Text, "public._citext", ThePropertyPlace, "public.citext[]")]);
+    }
+
+    // A composite named with a leading _ is no array, so its own key maps it, and its array, which the database names
+    // public.__tag, gets its element's type.
+    [Fact]
+    public void Run_TypeNamedWithAnUnderscore_IsMappedByItsOwnKeyAndItsArrayByThatKeyWithBrackets()
+    {
+        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var tag = Composite("public", "_tag");
+
+        var run = Run("public._tag=System.Uri", (file, [Entry(file, "GetUser", tag, ArrayOf(tag, "__tag"))]));
+
+        run.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(run, "GetUser")
+            .Select(column => column.Text)
+            .ShouldBe(["global::System.Uri", "global::System.Uri[]"]);
+    }
+
+    // The lookup reaches the array through the domain's base.
+    [Fact]
+    public void Run_DomainOverAnArrayWhoseOwnKeyHasAnEntry_IsSqlsrc261()
+    {
+        const string Text = "-- name: GetUser\nSELECT 1;\n";
+        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var statuses = TestSidecars.Postgres(
+            name: "statuses",
+            kind: SidecarValues.Kind.Domain,
+            schema: "public",
+            internalName: "statuses",
+            baseType: ArrayOf(EnumType("user_status"), "_user_status")
+        );
+
+        var run = Run("public._user_status=System.Guid", (file, [Entry(file, "GetUser", statuses)]));
+
+        run.Diagnostics.ShouldBe([
+            ArrayEntryError(Text, "public._user_status", ThePropertyPlace, "public.user_status[]"),
+        ]);
+    }
+
+    // The database's name of an array and its element's key with [] are two keys, so two lines of one scope that
+    // give them two C# types are no conflict, and the first is reported where the array is used.
+    [Fact]
+    public void Run_CatalogsNameAndElementsKeyInOneScope_AreNoConflict()
+    {
+        const string Text =
+            "-- name: GetUser\n-- type-override: public._user_status = System.Guid\n"
+            + "-- type-override: public.user_status[] = System.Uri\nSELECT 1;\n";
+        var file = new SqlFile("/app/Repo/Users.sql", Text);
+
+        var run = Run(null, (file, [Entry(file, "GetUser", ArrayOf(EnumType("user_status"), "_user_status"))]));
+
+        run.Diagnostics.ShouldBe([
+            ArrayEntryError(
+                Text,
+                "public._user_status",
+                "a -- type-override: marker of the query",
+                "public.user_status[]"
+            ),
+        ]);
     }
 
     // A domain's key wins over its base's, and the base's entry reaches every domain over it.
@@ -631,6 +795,23 @@ public sealed class TypeOverrideLevelTests
             schema: schema,
             internalName: internalName
         );
+
+    // The array of the element, in its schema, under the name the database gives it.
+    private static PostgresType ArrayOf(PostgresType element, string internalName) =>
+        TestSidecars.Postgres(
+            name: element.Name + "[]",
+            kind: SidecarValues.Kind.Array,
+            schema: element.Schema,
+            internalName: internalName,
+            element: element
+        );
+
+    // SQLSRC261 at the query GetUser of Users, for column c0, the entry's key, the place that wrote it and the key to
+    // write.
+    private static string ArrayEntryError(string text, string key, string place, string write) =>
+        $"SQLSRC261 {NameOf(text, "GetUser")}: The type override's entry for '{key}', in {place}, maps nothing: "
+        + $"'{key}' is the database's own name of the array type of column 'c0', and an entry names that array as "
+        + $"its element's key with [].  Write the entry for '{write}' instead.";
 
     // The C# type of the one column of each query that has types, by the query's name.
     private static Dictionary<string, string> TextsOf(GeneratorRun run) =>

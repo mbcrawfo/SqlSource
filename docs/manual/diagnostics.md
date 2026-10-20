@@ -135,6 +135,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC259](#sqlsrc259) | Output model on a query without rows |
 | [SQLSRC260](#sqlsrc260) | Column marker names no usable column |
 
+**An entry of the type override that maps nothing**
+
+| Id | Title |
+|----|----|
+| [SQLSRC261](#sqlsrc261) | Entry names an array as the catalog does |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` to `SQLSRC236` are the errors of describing a query against PostgreSQL, which this version of the tool does for the `postgres` dialect.  It reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
@@ -146,6 +152,8 @@ The ids `SQLSRC246` and `SQLSRC249` are reported by the build, about the C# type
 The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version of the `Npgsql` package that the project references, directly or through another package.  The C# types of a PostgreSQL query depend on it.  Each is reported once for the project, with no file and line, and only when a query needs an entry in its sidecar under the `postgres` dialect.
 
 The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
+
+`SQLSRC261` is reported at a query that has a column or a parameter of an array of a type outside `pg_catalog`, when the type override has an entry for the array's name in the database.  It names the column or parameter, the entry, the place that wrote it and the key to write.
 
 The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259` and `SQLSRC260`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, `SQLSRC259` and `SQLSRC260` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259` and `SQLSRC260`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
 
@@ -1944,3 +1952,17 @@ SELECT sum(amount) AS total, max(note) AS note FROM payments;
 The query's constant or method is still generated.
 
 See: [Setting a column's nullability with a marker](generator.md#column-marker)
+
+## SQLSRC261
+
+**Entry names an array as the catalog does**
+
+The type override has an entry for the name the database gives an array type, and a column or a parameter of the query has that array type.  PostgreSQL names the array of a type with `_` before the type's name, so the array of `public.user_status` is `public._user_status`.  An entry for that name maps nothing, `default` included, since the type override names an array of a type outside `pg_catalog` as its element's key with `[]`: `public.user_status[]`.  A type whose own name starts with `_` and is no array, such as a composite type `public._tag`, is still mapped by its own name, and its array by `public._tag[]`.  The message names the column or parameter, the entry, the place that wrote it and the key to write.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC261: The type override's entry for 'public._user_status', in the property SqlSourceTypeOverrides, maps nothing: 'public._user_status' is the database's own name of the array type of column 'statuses', and an entry names that array as its element's key with [].  Write the entry for 'public.user_status[]' instead.
+```
+
+Rename the entry to the key the message gives: `public.user_status[]=System.Collections.Generic.List<string>`.  When the type override already has an entry for that key, remove the one the message names.  The query's constant or method is still generated.
+
+See: [Type overrides](settings.md#setting-type-overrides)

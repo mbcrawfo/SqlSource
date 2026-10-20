@@ -62,15 +62,21 @@ internal static class TypeOverrideMap
 
     /// <summary>
     /// The entry for <paramref name="key" />, a type's key as it is written, or null when no entry matches it or the
-    /// one that wins is <c>default</c>.  An entry matches when its key is equal to it ignoring case and its quoted
-    /// parts are equal to the key's exactly.  Of those, the entry of the most specific place wins, then one equal to
-    /// the key exactly, then the first in the order of the map.
+    /// one that wins is <c>default</c>.  It is <see cref="Winner" />'s entry when that names a C# type.
     /// </summary>
-    public static TypeOverride? Find(EquatableArray<TypeOverride> map, string key)
+    public static TypeOverride? Find(EquatableArray<TypeOverride> map, string key) =>
+        Winner(map, key) is { Type: not null } entry ? entry : null;
+
+    /// <summary>
+    /// The entry that wins for <paramref name="key" />, a type's key as it is written, an entry of <c>default</c>
+    /// included, or null when no entry matches it.  An entry matches when its key is equal to it ignoring case and its
+    /// quoted parts are equal to the key's exactly.  Of those, the entry of the most specific place wins, then one
+    /// equal to the key exactly, then the first in the order of the map.
+    /// </summary>
+    public static TypeOverride? Winner(EquatableArray<TypeOverride> map, string key)
     {
         var parts = new KeyParts(key);
-        var best = BestOf(map, parts, default);
-        return best.Entry?.Type is null ? null : best.Entry;
+        return BestOf(map, parts, default).Entry;
     }
 
     /// <summary>

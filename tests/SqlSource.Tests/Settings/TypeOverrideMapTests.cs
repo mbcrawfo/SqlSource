@@ -258,6 +258,34 @@ public sealed class TypeOverrideMapTests
     public void Find_EmptyMap_FindsNothing() =>
         TypeOverrideMap.Find(EquatableArray<TypeOverride>.Empty, "int4").ShouldBeNull();
 
+    // The default that wins is the winner, though Find gives nothing for it.
+    [Fact]
+    public void Winner_DefaultThatWins_IsGivenWhereFindGivesNull()
+    {
+        var map = Map(Entry("public._tag", null, SettingPlace.Property));
+
+        TypeOverrideMap.Winner(map, "public._tag")!.Type.ShouldBeNull();
+        TypeOverrideMap.Find(map, "public._tag").ShouldBeNull();
+    }
+
+    [Fact]
+    public void Winner_EntryOfAHigherPlace_WinsOverTheOneBelow()
+    {
+        var above = Entry("public._tag", null, SettingPlace.Query);
+        var merged = TypeOverrideMap.Over(
+            Map(above),
+            Map(Entry("public._tag", "global::App.A", SettingPlace.Property))
+        )!;
+
+        TypeOverrideMap.Winner(merged.Value, "public._tag").ShouldBe(above);
+    }
+
+    [Fact]
+    public void Winner_NoEntryMatches_IsNull() =>
+        TypeOverrideMap
+            .Winner(Map(Entry("public.tag[]", "global::App.A", SettingPlace.Property)), "public._tag")
+            .ShouldBeNull();
+
     private static TypeOverride Entry(string key, string? type, SettingPlace place) => new(key, type, place);
 
     private static EquatableArray<TypeOverride> Map(params TypeOverride[] entries) =>

@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.MSBuild;
@@ -17,8 +16,8 @@ namespace SqlSource.Generation.Types;
 /// <remarks>
 /// A query's parameters are typed before its columns, each in order, and its first failure is its one error, at its
 /// name: the query then has no types.  The map of a query's type override is merged once for each distinct level of
-/// markers, since the queries without markers of their own share their file header's.  A map without an entry that
-/// names a C# type, as in a project without the override, is not asked at all.
+/// markers, since the queries without markers of their own share their file header's.  An empty map, as in a project
+/// without the override, is not asked at all.
 /// </remarks>
 internal static class QueryTyper
 {
@@ -236,6 +235,14 @@ internal static class QueryTyper
                 subject,
                 at
             ),
+            TypeMappingKind.ArrayNamedByItsOwnKey => DiagnosticInfo.Create(
+                SqlDiagnostics.ArrayEntryMapsNothing,
+                at,
+                subject,
+                key,
+                failure.Detail ?? "",
+                failure.Text ?? ""
+            ),
             TypeMappingKind.Mapped or TypeMappingKind.Unreadable or _ => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeHasNoCSharpType,
                 at,
@@ -275,8 +282,8 @@ internal static class QueryTyper
     private static string Subject(string owner, string name) => owner + " '" + name + "'";
 
     // The lookup of the type override for the markers, made once for each distinct level of markers, by reference:
-    // a query without markers of its own holds its file header's level.  None when no entry names a C# type, since
-    // a default alone gives every type the base map's.
+    // a query without markers of its own holds its file header's level.  None for an empty map.  A map of defaults
+    // alone is asked, since a default of an array's own key maps nothing and is reported.
     private static OverrideOf? LookupOf(
         SettingsLevel markers,
         FileTypesInput input,
@@ -292,9 +299,7 @@ internal static class QueryTyper
         }
 
         var map = QuerySettings.ResolveTypeOverrides(markers, input.Metadata, input.Property);
-        OverrideOf? made = map.Any(static entry => entry.Type is not null)
-            ? new OverrideLookup(map, input.MappedTypes).Find
-            : null;
+        OverrideOf? made = map.Count > 0 ? new OverrideLookup(map, input.MappedTypes).Find : null;
         lookups.Add((markers, made));
         return made;
     }
@@ -321,29 +326,49 @@ internal static class QueryTyper
     );
 
     /// <summary>
-    /// The type override's answer for a type, at one level of the map's walk: the entry of the type's key, then, for
-    /// a type of an extension outside <c>pg_catalog</c>, of its bare name, then, for an array, of its element's key
-    /// with <c>[]</c>, looked up the same way.  A key whose winning entry is <c>default</c> has none, so the walk
-    /// goes on as for a key without an entry.  An entry's type is the one the compilation resolved, or the failure
-    /// of its status.
+    /// The type override's answer for a type, at one level of the map's walk: for an array, the entry of its
+    /// element's key with <c>[]</c>, and for any other type, the entry of its key, each then, for a type of an
+    /// extension outside <c>pg_catalog</c>, of its bare name.  A key whose winning entry is <c>default</c> has none,
+    /// so the walk goes on as for a key without an entry.  An entry's type is the one the compilation resolved, or
+    /// the failure of its status.
     /// </summary>
     /// <remarks>
-    /// An array of <c>pg_catalog</c> is found by its element's key alone: its own, <c>_int4</c> or
-    /// <c>pg_catalog._pg_class</c>, is read as <c>int4[]</c> or <c>pg_class[]</c>, so no map holds it.  An array of
-    /// another schema keeps its own key, <c>public._tag</c>, which is another key than <c>public.tag[]</c>.
+    /// An array is found by its element's key with <c>[]</c> alone, in every schema, and never by its own key, its
+    /// name in the catalog.  For an array of <c>pg_catalog</c> the two are one: <c>_int4</c> and
+    /// <c>pg_catalog._pg_class</c> are read as <c>int4[]</c> and <c>pg_class[]</c>, so no map holds its own.  An
+    /// array of another schema keeps its own key, <c>public._user_status</c>, which is another key than
+    /// <c>public.user_status[]</c> and could name a type of that name that is no array.  An entry of it that wins,
+    /// <c>default</c> included, is the array's failure, <see cref="TypeMappingKind.ArrayNamedByItsOwnKey" />, which
+    /// names the key to write.  An array without its element has no key to write, and is left to the base map.
     /// </remarks>
     private sealed class OverrideLookup(EquatableArray<TypeOverride> map, EquatableArray<MappedType> mappedTypes)
     {
         public TypeMapping? Find(PostgresType type)
         {
-            var entry =
-                EntryOf(type, string.Empty)
-                ?? (
-                    type.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal) && type.Element is { } element
-                        ? EntryOf(element, "[]")
-                        : null
+            if (!type.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal))
+            {
+                return EntryOf(type, string.Empty) is { } entry ? MappingOf(entry) : null;
+            }
+
+            if (type.Element is not { } element)
+            {
+                return null;
+            }
+
+            if (TypeOverrideMap.Winner(map, PostgresTypeMap.KeyOf(type)) is { } own)
+            {
+                return new TypeMapping(
+                    TypeMappingKind.ArrayNamedByItsOwnKey,
+                    own.Key,
+                    PostgresTypeMap.KeyOf(element) + "[]",
+                    false,
+                    false,
+                    EquatableArray<string>.Empty,
+                    PlaceOf(own.Place)
                 );
-            return entry is null ? null : MappingOf(entry);
+            }
+
+            return EntryOf(element, "[]") is { } ofElement ? MappingOf(ofElement) : null;
         }
 
         // The entry of the type's key with the suffix, or for a type of an extension, of its bare name with it:
@@ -381,8 +406,8 @@ internal static class QueryTyper
                 : new TypeMapping(kind, entry.Key, name, false, false, EquatableArray<string>.Empty, place);
         }
 
-        // The place that wrote an entry, as SQLSRC250 to SQLSRC252 name it.  The attribute has no level for the type
-        // override.
+        // The place that wrote an entry, as SQLSRC250 to SQLSRC252 and SQLSRC261 name it.  The attribute has no level
+        // for the type override.
         private static string PlaceOf(SettingPlace place) =>
             place switch
             {
