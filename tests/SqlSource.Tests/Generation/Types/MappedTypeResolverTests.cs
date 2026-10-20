@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Immutable;
+using System.Linq;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation.Types;
@@ -12,7 +14,10 @@ namespace SqlSource.Tests.Generation.Types;
 
 public sealed class MappedTypeResolverTests
 {
+    // Nullable annotations are on, as in a generated model, so that a constraint can forbid null.
     private const string ProjectSource = """
+        #nullable enable
+
         public sealed class TopLevel;
 
         namespace MyApp
@@ -71,6 +76,97 @@ public sealed class MappedTypeResolverTests
             // CS9211 here, and CS9204 at each use.
             [System.Diagnostics.CodeAnalysis.Experimental("")]
             public sealed class Unnamed;
+
+            public interface IShape;
+
+            public sealed class Circle : IShape;
+
+            public sealed class Square;
+
+            public readonly struct Dot : IShape;
+
+            public class Base;
+
+            public sealed class Derived : Base;
+
+            public abstract class Sketch;
+
+            public sealed class NoDefault
+            {
+                private NoDefault() { }
+            }
+
+            public sealed class Form
+            {
+                public required string Title { get; init; }
+            }
+
+            public sealed class SetForm
+            {
+                [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+                public SetForm() => Title = "";
+
+                public required string Title { get; init; }
+            }
+
+            public sealed class ValueBox<T>
+                where T : struct;
+
+            public sealed class RefBox<T>
+                where T : class;
+
+            public sealed class MaybeRefBox<T>
+                where T : class?;
+
+            public sealed class RawBox<T>
+                where T : unmanaged;
+
+            public sealed class KeyBox<T>
+                where T : notnull;
+
+            public sealed class NewBox<T>
+                where T : new();
+
+            public sealed class ShapeBox<T>
+                where T : IShape;
+
+            public sealed class BaseBox<T>
+                where T : Base;
+
+            public sealed class SelfBox<T>
+                where T : System.IComparable<T>;
+
+            public sealed class PairBox<T, U>
+                where U : T;
+
+            public interface IMakes
+            {
+                static abstract int Make();
+            }
+
+            public interface IMakesByDefault
+            {
+                static virtual int Make() => 0;
+            }
+
+            public interface IMadeHere : IMakes
+            {
+                static int IMakes.Make() => 1;
+            }
+
+            public enum Color
+            {
+                Red,
+            }
+
+            public sealed class EnumBox<T>
+                where T : System.Enum;
+
+            public class Nest<T>
+            {
+                public sealed class Inner<U>
+                    where U : T;
+            }
         }
 
         namespace Common
@@ -278,8 +374,111 @@ public sealed class MappedTypeResolverTests
             );
     }
 
+    // A generic type is found exactly when the compiler takes it as a property's type, in a file with nullable
+    // annotations on as a model's is, without an error or a warning: for each kind of constraint, a type argument
+    // that meets it and one that does not.  A constraint that forbids null is a warning to break.
+    [Theory]
+    [InlineData("global::MyApp.ValueBox<int>", true)]
+    [InlineData("global::MyApp.ValueBox<global::MyApp.Dot>", true)]
+    [InlineData("global::MyApp.RefBox<string>", true)]
+    [InlineData("global::MyApp.RefBox<int[]>", true)]
+    [InlineData("global::MyApp.RefBox<global::MyApp.IShape>", true)]
+    [InlineData("global::MyApp.MaybeRefBox<string?>", true)]
+    [InlineData("global::MyApp.RawBox<int>", true)]
+    [InlineData("global::MyApp.RawBox<global::MyApp.Dot>", true)]
+    [InlineData("global::MyApp.KeyBox<string>", true)]
+    [InlineData("global::MyApp.KeyBox<int>", true)]
+    [InlineData("global::System.Collections.Generic.Dictionary<int, string?>", true)]
+    [InlineData("global::MyApp.NewBox<global::MyApp.Circle>", true)]
+    [InlineData("global::MyApp.NewBox<int>", true)]
+    [InlineData("global::MyApp.NewBox<int?>", true)]
+    [InlineData("global::MyApp.NewBox<global::MyApp.UserId>", true)]
+    [InlineData("global::MyApp.NewBox<global::MyApp.SetForm>", true)]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Circle>", true)]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Dot>", true)]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.IShape>", true)]
+    [InlineData("global::MyApp.BaseBox<global::MyApp.Derived>", true)]
+    [InlineData("global::MyApp.BaseBox<global::MyApp.Base>", true)]
+    [InlineData("global::MyApp.SelfBox<int>", true)]
+    [InlineData("global::MyApp.SelfBox<string>", true)]
+    [InlineData("global::MyApp.PairBox<object, string>", true)]
+    [InlineData("global::MyApp.PairBox<object, int>", true)]
+    [InlineData("global::MyApp.PairBox<string?, string?>", true)]
+    [InlineData("global::MyApp.PairBox<string?, string>", true)]
+    [InlineData("global::MyApp.Nest<global::MyApp.Base>.Inner<global::MyApp.Derived>", true)]
+    [InlineData("global::MyApp.ValueBox<int>[]", true)]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.ValueBox<int>?>", true)]
+    [InlineData("global::System.Collections.Generic.List<global::System.Nullable<string>>", false)]
+    [InlineData("global::MyApp.ValueBox<string>", false)]
+    [InlineData("global::MyApp.ValueBox<int?>", false)]
+    [InlineData("global::MyApp.ValueBox<global::System.Nullable<int>>", false)]
+    [InlineData("global::MyApp.RefBox<int>", false)]
+    [InlineData("global::MyApp.RefBox<string?>", false)]
+    [InlineData("global::MyApp.RawBox<string>", false)]
+    [InlineData("global::MyApp.RawBox<global::System.Collections.Generic.KeyValuePair<int, string>>", false)]
+    [InlineData("global::MyApp.RawBox<int?>", false)]
+    [InlineData("global::MyApp.KeyBox<string?>", false)]
+    [InlineData("global::MyApp.KeyBox<int?>", false)]
+    [InlineData("global::System.Collections.Generic.Dictionary<int?, string>", false)]
+    [InlineData("global::System.Collections.Generic.Dictionary<string?, int>", false)]
+    [InlineData("global::MyApp.EnumBox<global::MyApp.Color>", true)]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMakesByDefault>", true)]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMadeHere>", true)]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMakes[]>", true)]
+    [InlineData("global::System.Collections.Generic.List<global::System.Numerics.INumber<int>[]>", true)]
+    [InlineData("global::System.Collections.Generic.Dictionary<int, string>.KeyCollection", true)]
+    [InlineData("global::System.Collections.Immutable.ImmutableArray<int>.Builder", true)]
+    [InlineData("global::System.Collections.Immutable.ImmutableArray<int>", true)]
+    [InlineData("global::System.Collections.Generic.IEnumerable<string>", true)]
+    [InlineData("global::System.Memory<byte>", true)]
+    [InlineData("global::System.Collections.Generic.KeyValuePair<string, int?>", true)]
+    [InlineData("global::System.Collections.Generic.List<global::System.Nullable<int>>", true)]
+    [InlineData("global::MyApp.PairBox<object?, int?>", true)]
+    [InlineData("global::MyApp.PairBox<global::System.ValueType?, int?>", true)]
+    [InlineData("global::MyApp.EnumBox<global::MyApp.Color?>", false)]
+    [InlineData("global::MyApp.PairBox<global::System.Enum, global::MyApp.Color?>", false)]
+    [InlineData("global::MyApp.PairBox<object, int?>", false)]
+    [InlineData("global::System.Collections.Generic.List<global::System.Numerics.INumber<int>>", false)]
+    [InlineData("global::System.Collections.Generic.List<global::MyApp.IMakes>", false)]
+    [InlineData("global::MyApp.NewBox<string>", false)]
+    [InlineData("global::MyApp.NewBox<global::MyApp.Sketch>", false)]
+    [InlineData("global::MyApp.NewBox<global::MyApp.NoDefault>", false)]
+    [InlineData("global::MyApp.NewBox<global::MyApp.Form>", false)]
+    [InlineData("global::MyApp.NewBox<int[]>", false)]
+    [InlineData("global::MyApp.NewBox<global::MyApp.IShape>", false)]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Square>", false)]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Dot?>", false)]
+    [InlineData("global::MyApp.ShapeBox<global::MyApp.Circle?>", false)]
+    [InlineData("global::MyApp.BaseBox<object>", false)]
+    [InlineData("global::MyApp.SelfBox<global::MyApp.UserId>", false)]
+    [InlineData("global::MyApp.PairBox<string, object>", false)]
+    [InlineData("global::MyApp.PairBox<string, string?>", false)]
+    [InlineData("global::MyApp.Nest<global::MyApp.Derived>.Inner<global::MyApp.Base>", false)]
+    [InlineData("global::System.Collections.Generic.Dictionary<string, global::MyApp.ValueBox<string>>", false)]
+    [InlineData("global::MyApp.ValueBox<string>[]", false)]
+    [InlineData("global::MyApp.ValueBox<int?[]>", false)]
+    public void Resolve_GenericName_IsFoundWhenItsArgumentsMeetTheConstraints(string name, bool meets)
+    {
+        var types = MappedTypeResolver.Resolve(Project.Value, Names(name), TestContext.Current.CancellationToken);
+
+        var reports = CompilerReports(name);
+        if (meets)
+        {
+            reports.ShouldBeEmpty();
+        }
+        else
+        {
+            reports.ShouldNotBeEmpty();
+        }
+
+        types
+            .ShouldHaveSingleItem()
+            .Status.ShouldBe(meets ? MappedTypeStatus.Found : MappedTypeStatus.NotAPropertyType);
+    }
+
     // Of two failures in one name, the first in the order of the statuses is the whole's: a missing argument over an
-    // inaccessible one, an ambiguous argument over a static one, and an inaccessible argument over a static one.
+    // inaccessible one, an ambiguous argument over a static one, and an inaccessible argument over a static one or a
+    // broken constraint.
     [Theory]
     [InlineData(
         "global::System.Collections.Generic.Dictionary<global::Other.Hidden, global::MyApp.Missing>",
@@ -291,6 +490,10 @@ public sealed class MappedTypeResolverTests
     )]
     [InlineData(
         "global::System.Collections.Generic.Dictionary<global::MyApp.Helpers, global::Other.Hidden>",
+        nameof(MappedTypeStatus.NotAccessible)
+    )]
+    [InlineData(
+        "global::System.Collections.Generic.Dictionary<global::Other.Hidden, global::MyApp.ValueBox<string>>",
         nameof(MappedTypeStatus.NotAccessible)
     )]
     public void Resolve_NameWithTwoFailures_GivesTheFirstInTheOrderOfTheStatuses(string name, string status)
@@ -357,6 +560,37 @@ public sealed class MappedTypeResolverTests
 
         MappedTypeResolver.Find(types, "long").ShouldBeNull();
         MappedTypeResolver.Find(EquatableArray<MappedType>.Empty, "int").ShouldBeNull();
+    }
+
+    // The errors and warnings that the compiler gives for a property of the type, as a model declares one.
+    private static string[] CompilerReports(string name)
+    {
+        var tree = CSharpSyntaxTree.ParseText(
+            $$"""
+            #nullable enable
+            namespace Check;
+
+            /// <summary>A model.</summary>
+            public sealed class Model
+            {
+                /// <summary>A column.</summary>
+                public {{name}} Value { get; init; } = default!;
+            }
+            """,
+            GeneratorHarness.ParseOptions,
+            "/app/Check.cs",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+        var compilation = Project.Value.AddSyntaxTrees(tree);
+
+        return
+        [
+            .. compilation
+                .GetSemanticModel(tree)
+                .GetDiagnostics(cancellationToken: TestContext.Current.CancellationToken)
+                .Where(static diagnostic => diagnostic.Severity >= DiagnosticSeverity.Warning)
+                .Select(static diagnostic => diagnostic.ToString()),
+        ];
     }
 
     private static EquatableArray<string> Names(params string[] names) => new(ImmutableArray.Create(names));

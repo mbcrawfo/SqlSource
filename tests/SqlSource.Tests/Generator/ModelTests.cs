@@ -1036,6 +1036,37 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBeEmpty();
     }
 
+    // A type argument that breaks a constraint of its type parameter is CS0453 in a model, so the type is refused.
+    [Fact]
+    public void Run_GenericTypeWithABrokenConstraint_IsSqlsrc252AndHasNoModel()
+    {
+        var source =
+            Source
+            + """
+
+                namespace MyApp
+                {
+                    public sealed class ValueBox<T>
+                        where T : struct;
+                }
+                """;
+
+        var run = Run(
+            source,
+            [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("name", Text)]))],
+            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=MyApp.ValueBox<string>" }
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem()
+            .ShouldStartWith(
+                "SQLSRC252 /app/Repo/Users.sql(1,10)-(1,17): The type override maps 'text' to 'MyApp.ValueBox<string>' "
+                    + "for column 'name', in the property SqlSourceTypeOverrides, and no property can have that type."
+            );
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
     // An attribute of the name with arguments of another shape, here arrays, is read as giving no id and as not an
     // error, and never throws.
     public static TheoryData<string> MalformedAttributes =>

@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0067`
+Next id: `TD-0068`
 
 ## Active items
 
@@ -39,12 +39,12 @@ Next id: `TD-0067`
 | [TD-0050](TD-0050-a-catalog-types-name-depends-on-the-search-path.md) | Open | 2026-10-14 | Low | The name of a type of `pg_catalog` that has no modifier is `format_type(oid, -1)`, which qualifies it when a user type of the same name stands before `pg_catalog` on the session's `search_path`, so such a name depends on the session |
 | [TD-0051](TD-0051-columns-that-cannot-be-null-are-answered-nullable.md) | Open | 2026-10-15 | Medium | The PostgreSQL describer answers nullable or unknown for about a fifth of the realistic corpus's columns that cannot be `NULL`, 42 on PostgreSQL 14 and 40 on 18: `count(x)` and polymorphic functions, functions outside its tables, `EXISTS` on 14, window aggregates, `VALUES`, an expression through a subquery the planner keeps apart, a `UNION` branch the planner keeps as a scan, recursive CTEs, grouping sets, views and `RETURNING` of a written value; `RealisticNullabilityNoiseTests` holds the count |
 | [TD-0052](TD-0052-explain-plans-every-partition.md) | Open | 2026-10-15 | Low | The PostgreSQL describer asks for a query's plan with partition pruning off, so that the members of a partitioned table's `Append` show for the `NULL`s of its parameters, and a query over a table of many partitions is planned, and logged, with every partition |
-| [TD-0056](TD-0056-mapped-generic-constraints-are-not-checked.md) | Open | 2026-10-18 | Low | The type arguments of a C# type that the type override names are not checked against the constraints of its type parameters, so a mapping such as `System.Collections.Generic.List<System.Nullable<string>>` is accepted, and its model will not compile |
 | [TD-0060](TD-0060-model-added-or-removed-writes-the-models-after-it-again.md) | Open | 2026-10-18 | Low | A model added or removed writes again, and adds again the source of, every model sorted after it by full name, since the nodes after the `SelectMany` of `Models` are matched by their place |
 | [TD-0063](TD-0063-duplicated-and-uneven-patterns-in-src.md) | Open | 2026-10-19 | Low | Duplicated and uneven patterns in `src/`: rules of the generator that the tool copies, the database's comparer and level resolved by hand, marker lists kept in step by hand, a 450-line `Initialize`, and small duplicates |
 | [TD-0064](TD-0064-duplicated-helpers-of-the-model-and-container-tests.md) | Open | 2026-10-19 | Low | The model tests' harness copied into seven classes of `Generator/`, a describer opened and a database seeded in several ways, two large classes that mix subjects, and magic strings |
 | [TD-0065](TD-0065-tests-that-depend-on-the-process-the-clock-or-the-repository.md) | Open | 2026-10-19 | Low | Tests that run `dotnet` with no timeout or from the path, run on the machine's clock, poll with four limits, read the repository by two routes, or leave objects on the shared server in three ways |
 | [TD-0066](TD-0066-type-name-with-a-line-break-has-no-key.md) | Open | 2026-10-20 | Low | A type whose schema or name holds a line break has no key of the type override, since an MSBuild value makes one space of it and a marker ends at it, and the help of its `SQLSRC246` suggests an entry that cannot be written |
+| [TD-0067](TD-0067-nullability-inside-a-mapped-type-argument-is-not-checked.md) | Open | 2026-10-20 | Low | The nullability inside a type argument of a C# type that the type override names is not checked against the constraints of its type parameter, so a mapping such as `List<string?>` for a parameter constrained to `IEnumerable<string>` gives its model a warning |
 
 ## Columns
 
