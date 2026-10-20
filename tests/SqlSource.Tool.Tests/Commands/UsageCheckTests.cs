@@ -87,9 +87,24 @@ public sealed class UsageCheckTests
     [Theory]
     [InlineData("-")]
     [InlineData("--")]
-    [InlineData("-" + Secrets.Word)]
-    public void Check_AnyTokenThatStartsWithAHyphen_IsAnOption(string token) =>
+    public void Check_TokenThatStartsWithAHyphenAndIsCloseToAnOption_IsNamed(string token) =>
         UsageCheck.Check(Root(), ["describe", token]).Messages.ShouldBe([$"sqlsource: unknown option '{token}'"]);
+
+    [Theory]
+    [InlineData("-" + Secrets.Word)]
+    [InlineData("-pS3cret")]
+    public void Check_TokenThatStartsWithAHyphenAndIsFarFromEveryOption_IsAnOptionNamedByItsPosition(string token) =>
+        UsageCheck.Check(Root(), ["describe", token]).Messages.ShouldBe(["sqlsource: unknown option at position 2"]);
+
+    [Fact]
+    public void Check_UnknownOptionFarFromEveryOption_IsNamedByItsPosition() =>
+        UsageCheck
+            .Check(Root(), ["describe", "App.csproj", "-pS3cret"])
+            .Messages.ShouldBe(["sqlsource: unknown option at position 3"]);
+
+    [Fact]
+    public void Check_UnknownOptionCloseToAnOptionOfAnotherCommand_IsNamed() =>
+        UsageCheck.Check(Root(), ["--forse", "describe"]).Messages.ShouldBe(["sqlsource: unknown option '--forse'"]);
 
     [Theory]
     [InlineData("--connection=", "--connection")]
@@ -272,8 +287,14 @@ public sealed class UsageCheckTests
     public void Check_UnknownOptionWithALineBreak_IsNamedOnOneLine() =>
         // A line that starts in the first column and looks like an error is read as one by a build.
         UsageCheck
+            .Check(Root(), ["describe", "--forc\ne"])
+            .Messages.ShouldBe(["sqlsource: unknown option '--forc e'"]);
+
+    [Fact]
+    public void Check_UnknownOptionWithALineBreakFarFromEveryOption_IsNamedByItsPosition() =>
+        UsageCheck
             .Check(Root(), ["describe", "--oops\nsrc/App.cs(1,1): error CS0000: forged"])
-            .Messages.ShouldBe(["sqlsource: unknown option '--oops src/App.cs(1,1)'"]);
+            .Messages.ShouldBe(["sqlsource: unknown option at position 2"]);
 
     [Fact]
     public void Check_ValuesOfOptionsAndArguments_AreGivenWithTheirPositions()

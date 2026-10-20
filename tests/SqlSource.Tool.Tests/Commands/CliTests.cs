@@ -77,7 +77,7 @@ public sealed class CliTests : IDisposable
         // The second may be the value of the first.
         var result = await _run.RunAsync("--pasword", "-" + Secrets.Word);
 
-        result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--pasword'\n"));
+        result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option at position 1\n"));
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public sealed class CliTests : IDisposable
     {
         var result = await _run.RunAsync("describe", "one", "two", "--oops");
 
-        result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--oops'\n"));
+        result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option at position 4\n"));
     }
 
     [Fact]

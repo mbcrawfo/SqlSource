@@ -268,6 +268,15 @@ public sealed class SecretTests : IDisposable
         result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--conection'\n"));
     }
 
+    // A password typed the way mysql takes one is far from every option, so only its position is printed.
+    [Fact]
+    public async Task Run_SecretTypedAsAShortOption_IsNamedByItsPosition()
+    {
+        var result = await _scene.DescribeAsync("-p" + Secrets.Marker);
+
+        result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option at position 2\n"));
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("1")]

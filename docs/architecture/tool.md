@@ -28,7 +28,7 @@ A command line is read twice: by [`UsageCheck`](../../src/SqlSource.Tool/UsageCh
 
 `UsageCheck.Check` walks the tokens once, with the options of the command it is in.  A token that starts with `-` is an option, named by the text before its first `=` or `:`.
 
-- An unknown option ends the walk with one message that names it, and drops the messages found before it, since the token after it may be its value.
+- An unknown option ends the walk with one message, and drops the messages found before it, since the token after it may be its value.  The message names the option when it is within two edits (`NearName.MaxDistance`, the optimal string alignment distance, which counts the swap of two neighbouring characters as one) of a name or alias of any option of the tool, of the root or of any command, whichever command the walk is in: `--forse` is named, `--force describe` too.  Any other token may be a secret typed as an option, such as `-pS3cret`, so the message is `unknown option at position <n>`, counted from one.
 - A flag that is given a value, an option that is given none, `--name=` with nothing after it, and a second value of an option that takes one, are each a message.  A value is the text after the separator, or else the next token, unless that token names an option of the command or is `--`, which System.CommandLine takes for no value either.
 - The first token that names a subcommand, before any argument, moves the walk into it, with the options of the root that are recursive.
 - An argument past the number the command takes is `unexpected argument at position <n>`, counted from one.
