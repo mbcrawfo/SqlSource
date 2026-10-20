@@ -100,7 +100,7 @@ internal static class DatabaseRuns
         // list is copied there, since reading it is the describer's code too; then everything said of this database
         // goes through a trace that removes both.
         var parts = new Guard(new ConnectionSecret(value), host.GetEnvironmentVariable, cancellationToken).Call(() =>
-            (IReadOnlyList<string>)[.. describer.SecretsOf(value)]
+            (IReadOnlyList<string>)[.. describer.SecretsOf(value) ?? throw new InvalidOperationException(Guard.Nothing)]
         );
         var engine = SqlDialectName.Canonical(database.Dialect);
         var secret = new ConnectionSecret(value, parts, [database.Name, engine]);

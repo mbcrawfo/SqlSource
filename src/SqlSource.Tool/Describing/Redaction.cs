@@ -53,7 +53,8 @@ internal static class Redaction
     /// Each text is cleaned as it is, then put on one line as <see cref="Reporter" /> prints it, and cleaned again:
     /// a line break written as a space can make a part that holds a space.  A format and an argument, or two
     /// arguments, can make the value together, so the message is formatted from the cleaned arguments, as
-    /// <see cref="Reporter" /> formats it, and searched too.  When it holds the secret, the error gets a copy of its
+    /// <see cref="Reporter" /> formats it, and searched too, as it is and on one line, since a format may hold a line
+    /// break.  When it holds the secret, the error gets a copy of its
     /// descriptor whose format is <c>{0}</c>, and the cleaned message is its one argument.
     /// </remarks>
     public static ToolDiagnostic Of(ToolDiagnostic diagnostic, ConnectionSecret secret)
@@ -79,7 +80,7 @@ internal static class Redaction
             diagnostic.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
             values
         );
-        return secret.IsIn(message)
+        return IsInAsPrinted(message, secret)
             ? cleaned with
             {
                 Descriptor = WithWholeMessage(diagnostic.Descriptor),
@@ -94,7 +95,8 @@ internal static class Redaction
     /// </summary>
     public static bool HoldsToken(string text, string part) => NextToken(text, part, 0) >= 0;
 
-    // The same descriptor when no text of it holds the secret, which is every descriptor but a broken describer's.
+    // The same descriptor when no text of it holds the secret, as it is or on one line, which is every descriptor but
+    // a broken describer's.  One that does has each text cleaned as AsPrinted cleans it.
     private static DiagnosticDescriptor OfDescriptor(DiagnosticDescriptor descriptor, ConnectionSecret secret)
     {
         var culture = CultureInfo.InvariantCulture;
@@ -102,16 +104,16 @@ internal static class Redaction
         var format = descriptor.MessageFormat.ToString(culture);
         var description = descriptor.Description.ToString(culture);
         string[] texts = [descriptor.Id, title, format, descriptor.Category, description, descriptor.HelpLinkUri];
-        return texts.Any(secret.IsIn)
+        return texts.Any(text => IsInAsPrinted(text, secret))
             ? new DiagnosticDescriptor(
-                Of(descriptor.Id, secret),
-                Of(title, secret),
-                Of(format, secret),
-                Of(descriptor.Category, secret),
+                AsPrinted(descriptor.Id, secret),
+                AsPrinted(title, secret),
+                AsPrinted(format, secret),
+                AsPrinted(descriptor.Category, secret),
                 descriptor.DefaultSeverity,
                 descriptor.IsEnabledByDefault,
-                Of(description, secret),
-                Of(descriptor.HelpLinkUri, secret),
+                AsPrinted(description, secret),
+                AsPrinted(descriptor.HelpLinkUri, secret),
                 [.. descriptor.CustomTags]
             )
             : descriptor;
@@ -139,6 +141,11 @@ internal static class Redaction
     /// put there: a line break written as a space can make a part that holds a space.
     /// </summary>
     public static string AsPrinted(string text, ConnectionSecret secret) => Of(OneLine.Of(Of(text, secret)), secret);
+
+    // Whether the text holds the secret as it is or on one line, where a line break written as a space can make a
+    // part that holds a space.  The search of AsPrinted.
+    private static bool IsInAsPrinted(string text, ConnectionSecret secret) =>
+        secret.IsIn(text) || secret.IsIn(OneLine.Of(text));
 
     private static string Of(string text, string value, IEnumerable<string> parts)
     {

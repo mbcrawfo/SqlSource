@@ -541,6 +541,15 @@ public sealed class DatabaseRunsTests : IDisposable
             .ShouldBe(["System.InvalidOperationException", "A describer returned nothing."]);
     }
 
+    // The list of the parts is a return like any other.
+    [Fact]
+    public async Task Run_DescriberThatGivesNoSecrets_IsAFault()
+    {
+        _describer.Secrets = null!;
+
+        await ShouldBeTheFaultOfNothingAsync();
+    }
+
     [Fact]
     public async Task Run_DescriberThatFailsWithNoFailure_IsAFault()
     {

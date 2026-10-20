@@ -263,6 +263,31 @@ public sealed class RedactionTests : IDisposable
         printed.ShouldNotContain("my pass");
     }
 
+    // A format that a describer built holds a password with a space, cut by a line break, and nothing of the whole
+    // value: the message is searched on one line too, and printed as its one argument.
+    [Fact]
+    public void Of_FormatThatHoldsAPasswordSplitByALineBreak_IsTheMarkInTheMessage()
+    {
+        var diagnostic = ToolDiagnostic.Create(WithFormat("rejected {0}, said my\npass"), "x");
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Host=db;Password=my pass", ["my pass"])));
+
+        printed.ShouldStartWith("sqlsource : error SQLSRC999: rejected x, said ***\n");
+        printed.ShouldNotContain("pass");
+    }
+
+    // The descriptor of a failure is searched the same way, before an error is made of it.
+    [Fact]
+    public void Of_FailureWhoseFormatHoldsAPasswordSplitByALineBreak_HasTheMarkInTheFormat()
+    {
+        var failure = FakeDescriber.Failure("GetUser") with { Descriptor = WithFormat("rejected {0}, said my\npass") };
+
+        Redaction
+            .Of(failure, new ConnectionSecret("Host=db;Password=my pass", ["my pass"]))
+            .Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture)
+            .ShouldBe("rejected {0}, said ***");
+    }
+
     // The label of a line is printed on one line too.
     [Fact]
     public void Of_LineWhoseLabelHoldsAPasswordSplitByALineBreak_IsTheMarkInTheLabel()
