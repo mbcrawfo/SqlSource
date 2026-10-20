@@ -17,20 +17,33 @@ namespace SqlSource.Tool.Testing;
 // working directory that is a temporary folder, and an environment that is a dictionary.
 internal sealed class CliRun : IDisposable
 {
+    private readonly string? _realWorkingDirectory;
+
     public TempFolder Folder { get; } = new();
 
+    // The environment of the run.  A real run does not read it: it has the test process's own.
     public Dictionary<string, string> Environment { get; } = [];
 
-    // Answers every "dotnet msbuild" of the run.  A project it was told nothing about uses SqlSource.
+    // Answers every "dotnet msbuild" of the run.  A project it was told nothing about uses SqlSource.  A real run
+    // does not use it: it starts the real "dotnet".
     public FakeProcessRunner Processes { get; } = new();
 
     // The describers of the run.  None unless a test adds one, where the released tool has PostgreSQL's.
     public List<IQueryDescriber> Describers { get; } = [];
 
     public CliRun()
+        : this(null) { }
+
+    private CliRun(string? realWorkingDirectory)
     {
+        _realWorkingDirectory = realWorkingDirectory;
         Exchange = new CapturingExchange(LiveExchange.Instance, Capture);
     }
+
+    // A run on the real host: the working directory is the one given, "dotnet msbuild" is the real one and the
+    // environment is the test process's, as the command line runs.  The tool's own tests fake MSBuild, which the
+    // end-to-end tests exist not to do.
+    public static CliRun Real(string workingDirectory) => new(workingDirectory);
 
     // What every describer of the run asked and was answered.  The engine is a name only: a run may have several.
     public DescribeCapture Capture { get; } = new(SidecarValues.Engine.Postgres);
@@ -91,7 +104,11 @@ internal sealed class CliRun : IDisposable
     private static StringWriter NewWriter() => new(CultureInfo.InvariantCulture) { NewLine = "\n" };
 
     private ToolHost CreateHost(TextWriter output, TextWriter error) =>
-        Hosts.Create(Folder.Path, Processes, Folder.CreateFolder("tmp"), environment: Environment) with
+        (
+            _realWorkingDirectory is null
+                ? Hosts.Create(Folder.Path, Processes, Folder.CreateFolder("tmp"), environment: Environment)
+                : Hosts.Real(_realWorkingDirectory, Folder.CreateFolder("tmp"))
+        ) with
         {
             Out = Out ?? output,
             Error = error,

@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot.Reading;
 using SqlSource.Tests.Postgres.Realistic;
+using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -91,8 +92,13 @@ public sealed class CheckTests(PostgresContainer postgres)
         othersResult.Out.ShouldBe(others);
     }
 
-    private static Task<CliResult> CheckAsync(IEnumerable<string> args) =>
-        EndToEndTool.RunAsync(RepositoryPaths.Root, ["describe", "--check", RepositoryPaths.EndToEndProject, .. args]);
+    // "describe --check" over the real project, on the real MSBuild and the PostgreSQL describer.
+    private static async Task<CliResult> CheckAsync(IEnumerable<string> args)
+    {
+        using var run = CliRun.Real(RepositoryPaths.Root);
+        run.Describers.Add(new PostgresDescriber());
+        return await run.RunAsync(["describe", "--check", RepositoryPaths.EndToEndProject, .. args]);
+    }
 
     private string[] Connection(string database) =>
         ["--connection", database + "=" + postgres.ConnectionStringOf(database)];
