@@ -24,8 +24,9 @@ internal enum MappedTypeStatus
     /// <summary>
     /// The type cannot be a property's type: a static class, a <c>ref struct</c>, an open generic,
     /// <c>System.Void</c>, <c>System.Nullable&lt;T&gt;</c> as the whole type, a type marked <c>[Obsolete]</c> as an
-    /// error, whose use no pragma lets compile, or a type marked under an id that is not an identifier, whose
-    /// diagnostic no pragma can name.
+    /// error, whose use no pragma lets compile, a type marked under an id that is not an identifier, whose
+    /// diagnostic no pragma can name, or a generic type with an argument that breaks a constraint of its type
+    /// parameter, or that is an interface with a static abstract member.
     /// </summary>
     NotAPropertyType,
 }
