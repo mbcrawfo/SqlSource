@@ -188,29 +188,26 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
     }
 
     // Npgsql gives the type of an array column as System.Array, and Dapper looks for a constructor of that exact type,
-    // so it cannot construct a positional record with an array, whether it can be null or not.  This is why AllTypesDto
-    // is a class.
-    // TD-0062: the generator's fix for a record with an array read through Dapper.
-    [Theory]
-    [InlineData(nameof(Int4Array), "int4_array_value")]
-    [InlineData(nameof(NotNullInt4Array), "int4_array_value")]
-    [InlineData(nameof(TextArray), "text_array_value")]
-    public async Task QueryAsync_RecordWithAnArray_DapperCannotConstructIt(string record, string column)
+    // so the positional constructor of the record never matches the row.  Dapper reads it through the constructor
+    // without parameters that the generator gives a record with an array, and sets each property.
+    [Fact]
+    public async Task QueryAsync_RecordWithAnArray_ReadsIt()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
-        var sql = $"SELECT {column} FROM all_types WHERE id = {AllTypesRows.FullRowId}";
 
-        var error = await Should.ThrowAsync<InvalidOperationException>(() =>
-            record switch
-            {
-                nameof(Int4Array) => connection.QueryAsync<Int4Array>(sql),
-                nameof(NotNullInt4Array) => connection.QueryAsync<NotNullInt4Array>(sql),
-                _ => connection.QueryAsync<TextArray>(sql),
-            }
-        );
+        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).ToList();
 
-        error.Message.ShouldContain($"(System.Array {column})");
+        var full = rows.Single(static row => row.Id == AllTypesRows.FullRowId);
+        var empty = rows.Single(static row => row.Id == AllTypesRows.NullRowId);
+        full.Int4ArrayValue.ShouldBe([1, 2, 3]);
+        full.TextArrayValue.ShouldBe(["a", "b c", "Zoë"]);
+        full.DateArrayValue.ShouldBe([new DateOnly(2024, 1, 1), new DateOnly(2024, 12, 31)]);
+        empty.Int4ArrayValue.ShouldBeNull();
+        empty.TextArrayValue.ShouldBeNull();
+        empty.DateArrayValue.ShouldBeNull();
+        (full with { Id = 9 }).Int4ArrayValue.ShouldBeSameAs(full.Int4ArrayValue);
+        (full with { }).ShouldBe(full);
     }
 
     // The input model with the values of the full row, property by property by name, and the id of the new row.  A
@@ -248,27 +245,6 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
 
     private static string[] NamesOf(Type model) =>
         [.. model.GetProperties(BindingFlags.Public | BindingFlags.Instance).Select(static property => property.Name)];
-
-    [SuppressMessage(
-        "Performance",
-        "CA1812:Avoid uninstantiated internal classes",
-        Justification = "Dapper would make it, and the test proves that it cannot."
-    )]
-    private sealed record Int4Array(int[]? Int4ArrayValue);
-
-    [SuppressMessage(
-        "Performance",
-        "CA1812:Avoid uninstantiated internal classes",
-        Justification = "Dapper would make it, and the test proves that it cannot."
-    )]
-    private sealed record NotNullInt4Array(int[] Int4ArrayValue);
-
-    [SuppressMessage(
-        "Performance",
-        "CA1812:Avoid uninstantiated internal classes",
-        Justification = "Dapper would make it, and the test proves that it cannot."
-    )]
-    private sealed record TextArray(string[]? TextArrayValue);
 
     // The parameters of one column, as the input model has them, and the id of the row.
     [SuppressMessage(

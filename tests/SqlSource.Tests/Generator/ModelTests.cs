@@ -1100,7 +1100,6 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs"]);
     }
 
-    // A query at Sql needs no entry, and has no models.
     [Fact]
     public void Run_RecordWithAnArrayColumn_HasAPrivateConstructorWithoutParameters()
     {
@@ -1116,6 +1115,21 @@ public sealed class ModelTests
 
         AssertClean(run);
         run.Sources["App.GetUserDto-Model.g.cs"].ShouldBe(OutputRecordWithArrays);
+    }
+
+    [Fact]
+    public void Run_NonSealedRecordWithAnArrayColumn_HasAPrivateConstructorWithoutParameters()
+    {
+        var run = Run(
+            Users,
+            [Entry(Users, "GetUser", [], [Column("id"), Column("scores", IntArray, nullable: true)])],
+            new Dictionary<string, string?> { ["SqlSourceOutputModelType"] = "record" }
+        );
+
+        AssertClean(run);
+        var model = run.Sources["App.GetUserDto-Model.g.cs"];
+        model.ShouldContain("public record GetUserDto(int Id, int[]? Scores)");
+        model.ShouldContain("private GetUserDto() : this(default(int), default(int[]?)) { }");
     }
 
     [Fact]
@@ -1239,6 +1253,7 @@ public sealed class ModelTests
         withoutParameters.CompilationErrors.ShouldContain(error => error.Contains("CS0122", StringComparison.Ordinal));
     }
 
+    // A query at Sql needs no entry, and has no models.
     [Fact]
     public void Run_OutputSql_EmitsNoModel()
     {

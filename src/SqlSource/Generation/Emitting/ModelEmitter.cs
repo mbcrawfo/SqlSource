@@ -85,7 +85,8 @@ internal static class ModelEmitter
             return;
         }
 
-        // Dapper takes a constructor without parameters first, and sets each init property of the row it reads.
+        // Dapper finds no public constructor that matches the row, falls back to the private constructor without
+        // parameters, and sets each property through its init accessor.
         var memberIndent = indent + Indent;
         _ = builder.Append('\n').Append(indent).Append("{\n");
         _ = builder
