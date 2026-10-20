@@ -251,6 +251,47 @@ public sealed class QueryTypesTests
         ]);
     }
 
+    // The range's help writes its key as the type override reads it, so a name that needs quotes is given with them.
+    [Fact]
+    public void Run_UserDefinedRangeWhoseNameNeedsQuotes_HelpQuotesIt()
+    {
+        var floatRange = TestSidecars.Postgres(
+            name: "FloatRange",
+            kind: SidecarValues.Kind.Range,
+            schema: "my schema",
+            internalName: "FloatRange",
+            subtype: Catalog("float8")
+        );
+
+        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("span", floatRange)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'span' has the type 'FloatRange', which SqlSource cannot give a C# "
+                + "type.  Map it with the type override, as \"my schema\".\"FloatRange\"=NpgsqlTypes.NpgsqlRange<T> "
+                + "with the data source's EnableUnmappedTypes().",
+        ]);
+    }
+
+    // A name of pg_catalog that needs quotes is no key of the map, so the help qualifies it, and a dot inside its
+    // quotes is no schema's.  Only a composite or a base type of another kind than the map's reaches this help.
+    [Fact]
+    public void Run_CatalogCompositeWhoseNameHoldsADot_HelpQualifiesItWithTheCatalog()
+    {
+        var odd = TestSidecars.Postgres(
+            name: "Odd.Name",
+            kind: SidecarValues.Kind.Composite,
+            schema: "pg_catalog",
+            internalName: "Odd.Name"
+        );
+
+        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("odd", odd)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'odd' has the type 'Odd.Name', which SqlSource cannot give a C# "
+                + "type.  Map it with the type override, as pg_catalog.\"Odd.Name\"=<a C# type>.",
+        ]);
+    }
+
     // No engine in scope writes a parameter without a type, so only a sidecar edited by hand has one.
     [Fact]
     public void Run_ParameterWithoutAType_IsSqlsrc246()

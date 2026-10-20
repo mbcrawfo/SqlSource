@@ -420,11 +420,8 @@ public sealed class PostgresTypeMapTests
     [InlineData("my schema", "order-status", "\"my schema\".\"order-status\"")]
     [InlineData("public", "say \"hi\"", "public.\"say \"\"hi\"\"\"")]
     [InlineData("pg_catalog", "Odd", "\"Odd\"")]
-    public void KeyOf_Type_IsItsInternalNameQualifiedOutsideTheCatalog(
-        string schema,
-        string internalName,
-        string key
-    ) => PostgresTypeMap.KeyOf(TestSidecars.Postgres(schema: schema, internalName: internalName)).ShouldBe(key);
+    public void KeyOf_Type_IsWrittenAsTheTypeOverrideReadsIt(string schema, string internalName, string key) =>
+        PostgresTypeMap.KeyOf(TestSidecars.Postgres(schema: schema, internalName: internalName)).ShouldBe(key);
 
     // A cell is the C# type the mapping gives, or "!" and the kind of its failure.
     private static void ShouldMapTo(TypeMapping mapping, string expected, bool isValueType, string key)
