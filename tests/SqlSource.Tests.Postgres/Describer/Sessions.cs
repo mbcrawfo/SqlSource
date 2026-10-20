@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
@@ -10,6 +9,7 @@ using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
@@ -23,12 +23,7 @@ internal static class Sessions
         IDescribeExchange? exchange = null,
         IRunLog? log = null,
         string database = PostgresContainer.Database
-    ) =>
-        new PostgresDescriber().OpenAsync(
-            new OpenRequest(database, connection, exchange ?? LiveExchange.Instance, TimeProvider.System),
-            log ?? NullRunLog.Instance,
-            TestContext.Current.CancellationToken
-        );
+    ) => new PostgresDescriber().OpenAsync(database, connection, exchange, log);
 
     // A session that must open, as the describer's own type.
     public static async Task<PostgresSession> OpenSessionAsync(
@@ -88,7 +83,7 @@ internal static class Sessions
         string connection,
         string sql,
         IDescribeExchange? exchange = null
-    ) => ShouldDescribeAsync(connection, Requests.Of(sql), exchange);
+    ) => ShouldDescribeAsync(connection, DescribeRequests.Of(sql), exchange);
 
     // Describes one query as DescribeAsync does, through a capture of every call over the exchange, the live one
     // unless the test brings one.

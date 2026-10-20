@@ -7,7 +7,7 @@ using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
-using static SqlSource.Tool.Tests.PostgresRequests;
+using static SqlSource.Tool.Testing.DescribeRequests;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -67,7 +67,7 @@ public sealed class PostgresErrorsTests
             .ServerLines(new PostgresServerError("42601", "syntax error", null, null, position), 31)
             .ShouldBe(["42601: syntax error"]);
 
-    private static DescribeRequest Query(params SqlQueryParameter[] parameters) => Of("SELECT 1", parameters);
+    private static DescribeRequest Query(params SqlQueryParameter[] parameters) => Listed("SELECT 1", parameters);
 
     [Fact]
     public void SeveralStatements_Query_IsSqlsrc230WithItsHelp()
@@ -318,7 +318,7 @@ public sealed class PostgresErrorsTests
     {
         var failure = PostgresErrors.Prepare(
             Error(state, message, 47),
-            Of(
+            Listed(
                 "SELECT id FROM orders WHERE placed_at > now() - @age AND n = @n AND q = @q",
                 Inferred("age"),
                 Declared("n", "int"),
@@ -342,7 +342,7 @@ public sealed class PostgresErrorsTests
         PostgresErrors
             .Prepare(
                 Error("42883", "operator does not exist: integer = text", 40),
-                Of("SELECT id FROM accounts WHERE id = @x", Inferred("x")),
+                Listed("SELECT id FROM accounts WHERE id = @x", Inferred("x")),
                 Prepared(1, "unknown"),
                 "app"
             )
@@ -363,7 +363,7 @@ public sealed class PostgresErrorsTests
         PostgresErrors
             .Prepare(
                 Error("42883", "operator does not exist: integer + text"),
-                Of(sql, Inferred("x"), Inferred("y")),
+                Listed(sql, Inferred("x"), Inferred("y")),
                 Prepared(1, "unknown", "unknown"),
                 "app"
             )
@@ -383,7 +383,7 @@ public sealed class PostgresErrorsTests
         PostgresErrors
             .Prepare(
                 Error("42883", "operator does not exist: integer + text"),
-                Of(sql, Inferred("x")),
+                Listed(sql, Inferred("x")),
                 Prepared(1, "unknown"),
                 "app"
             )
@@ -394,7 +394,7 @@ public sealed class PostgresErrorsTests
         PostgresErrors
             .Prepare(
                 Error("42883", "function lowr(text) does not exist"),
-                Of("SELECT lowr(name) FROM accounts WHERE id = @id::int", Inferred("id")),
+                Listed("SELECT lowr(name) FROM accounts WHERE id = @id::int", Inferred("id")),
                 Prepared(1, "unknown"),
                 "app"
             )

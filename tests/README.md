@@ -31,6 +31,7 @@ The libraries are never run as tests, hold no tests and are never packed:
 - the fakes of a process and a project: `FakeProcessRunner`, `FakeProject` and `TestProject`;
 - the start of the built tool, `Programs`;
 - `LogReader`, `Secrets`, `SidecarFiles` and `TempFolder`;
+- `Describers`, which opens a describer's session as a run does, and `DescribeRequests`, which builds the `DescribeRequest` of a test;
 - `PasswordFiles`, which skips a test of a password file;
 - the named answers of a column's nullability, `NullabilityAnswers`, and PostgreSQL's type modifiers, `Typmods`;
 - in `Fixtures/`, the harness of a describer's fixtures, `FixtureCase`, `FixtureCases`, `FixtureReplay` and the case writer `FixtureCaseFiles`, and `FixtureProjects`, which copies a fixture project.
@@ -39,7 +40,7 @@ The two libraries are apart because the tool raises Roslyn to a current version,
 
 Where a test goes is a rule of [`AGENTS.md`](AGENTS.md): the tests mirror the source folders.  `tests/SqlSource.Tool.Tests/Commands/` holds the tests that run a whole command line, and `tests/SqlSource.Tool.Tests/Fixtures/` the tests of the fixtures' harness, which is in `tests/SqlSource.Tool.Testing/Fixtures/`.  The helpers of the tests of `Describing/Postgres/` are these files of `tests/SqlSource.Tool.Tests`:
 
-- `PostgresScript.cs`, `PostgresRows.cs`, `PostgresTables.cs`, `PostgresPlans.cs`, `PostgresRequests.cs` and `FakePostgresServer.cs` are the helpers;
+- `PostgresScript.cs`, `PostgresRows.cs`, `PostgresTables.cs`, `PostgresPlans.cs` and `FakePostgresServer.cs` are the helpers;
 - `PostgresSessionCases.cs`, `PostgresEventCases.cs` and `PostgresWalkColumns.cs` hold what the classes split from one share, those named `PostgresSession*`, `PostgresEvents*` and `NullabilityWalk*`.
 
 `CaptureInputs.cs` of the same project is for the tests that record and replay a capture, in `Describing/Capture/` and in `Describing/Describers/`, and `FileModes.cs` says whether a file mode can keep a file's owner out of it, for a test that skips when it cannot.

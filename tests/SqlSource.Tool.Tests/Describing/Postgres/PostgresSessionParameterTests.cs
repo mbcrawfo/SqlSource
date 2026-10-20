@@ -7,7 +7,7 @@ using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
-using static SqlSource.Tool.Tests.PostgresRequests;
+using static SqlSource.Tool.Testing.DescribeRequests;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -33,7 +33,7 @@ public sealed class PostgresSessionParameterTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of(
+            Listed(
                 "SELECT 1 FROM users WHERE id = @id AND name = @name",
                 Inferred("id"),
                 Declared("name", "varchar(50)"),
@@ -67,7 +67,7 @@ public sealed class PostgresSessionParameterTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of(
+            Listed(
                 "SELECT id FROM users WHERE id = @id AND name = @name;",
                 Inferred("id"),
                 Declared("name", "varchar(50)")
@@ -126,7 +126,7 @@ public sealed class PostgresSessionParameterTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of(
+            Listed(
                 "UPDATE users SET name = @name WHERE id = @id",
                 Inferred("name"),
                 Inferred("id"),
@@ -161,7 +161,7 @@ public sealed class PostgresSessionParameterTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("DELETE FROM samples", Declared("tenant", "int")),
+            Listed("DELETE FROM samples", Declared("tenant", "int")),
             TestContext.Current.CancellationToken
         );
 
@@ -186,7 +186,7 @@ public sealed class PostgresSessionParameterTests
 
         _ = await Should.ThrowAsync<InvalidOperationException>(() =>
             session.DescribeAsync(
-                Of("SELECT @a, @b", Inferred("a"), Inferred("b")),
+                Listed("SELECT @a, @b", Inferred("a"), Inferred("b")),
                 TestContext.Current.CancellationToken
             )
         );
@@ -209,7 +209,7 @@ public sealed class PostgresSessionParameterTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT row_to_json(@p)", Inferred("p")),
+            Listed("SELECT row_to_json(@p)", Inferred("p")),
             TestContext.Current.CancellationToken
         );
 
@@ -231,7 +231,7 @@ public sealed class PostgresSessionParameterTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT @p", Declared("p", "record")),
+            Listed("SELECT @p", Declared("p", "record")),
             TestContext.Current.CancellationToken
         );
 
@@ -253,7 +253,7 @@ public sealed class PostgresSessionParameterTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT @p::int", Inferred("p")),
+            Listed("SELECT @p::int", Inferred("p")),
             TestContext.Current.CancellationToken
         );
 
@@ -289,7 +289,7 @@ public sealed class PostgresSessionParameterTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT 1 AS one, ROW(1, 2) AS pair, ROW(3) AS other"),
+            Listed("SELECT 1 AS one, ROW(1, 2) AS pair, ROW(3) AS other"),
             TestContext.Current.CancellationToken
         );
 
@@ -315,7 +315,7 @@ public sealed class PostgresSessionParameterTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT @p", Declared("p", "record")),
+            Listed("SELECT @p", Declared("p", "record")),
             TestContext.Current.CancellationToken
         );
 

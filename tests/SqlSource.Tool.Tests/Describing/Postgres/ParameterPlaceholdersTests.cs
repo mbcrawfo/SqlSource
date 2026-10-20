@@ -3,7 +3,7 @@ using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
-using static SqlSource.Tool.Tests.PostgresRequests;
+using static SqlSource.Tool.Testing.DescribeRequests;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 

@@ -1,4 +1,3 @@
-using System;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -6,7 +5,6 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -20,14 +18,9 @@ public sealed class CapturingExchangeTests
 
     private Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync() =>
         _describer.OpenAsync(
-            new OpenRequest(
-                "billing",
-                Secrets.ConnectionWithMarker,
-                new CapturingExchange(LiveExchange.Instance, _capture),
-                TimeProvider.System
-            ),
-            NullRunLog.Instance,
-            TestContext.Current.CancellationToken
+            "billing",
+            Secrets.ConnectionWithMarker,
+            new CapturingExchange(LiveExchange.Instance, _capture)
         );
 
     [Fact]
