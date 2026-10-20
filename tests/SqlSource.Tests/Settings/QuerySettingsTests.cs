@@ -131,7 +131,8 @@ public sealed class QuerySettingsTests
         settings.CollectionType.ShouldBe(CollectionKind.IReadOnlyList);
     }
 
-    // The type override is the exception: each level replaces only the keys it names.
+    // The type override is the exception: each level replaces only the keys it names, and a default stays, so that
+    // the lookup of a type finds it in its place.
     [Fact]
     public void ResolveTypeOverrides_Levels_MergePerKeyAcrossTheLevels()
     {
@@ -150,6 +151,7 @@ public sealed class QuerySettingsTests
             .ResolveTypeOverrides(markers, metadata, property)
             .ShouldBe([
                 new TypeOverride("int4", "int", SettingPlace.Metadata),
+                new TypeOverride("text", null, SettingPlace.Metadata),
                 new TypeOverride("timestamptz", "global::System.DateTime", SettingPlace.Query),
             ]);
     }

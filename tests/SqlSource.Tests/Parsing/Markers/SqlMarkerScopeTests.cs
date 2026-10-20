@@ -100,6 +100,53 @@ public sealed class SqlMarkerScopeTests
             .ShouldBe([new TypeOverride("int4", "global::System.Int32", SettingPlace.FileHeader)]);
     }
 
+    // Names that differ by case are two types of a catalog that quotes them, so they are two keys.
+    [Fact]
+    public void Read_TypeOverrideKeysThatDifferByCase_AreTwoEntries()
+    {
+        var (scope, errors) = Scope(
+            SqlScopeKind.Query,
+            "-- type-override: public.Status = App.A",
+            "-- type-override: public.status = App.B"
+        );
+
+        errors.ShouldBeEmpty();
+        scope
+            .Level.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([
+                new TypeOverride("public.Status", "global::App.A", SettingPlace.Query),
+                new TypeOverride("public.status", "global::App.B", SettingPlace.Query),
+            ]);
+    }
+
+    // The marker reader hands the rest of the line over as written, quotes and spaces inside them included.
+    [Fact]
+    public void Read_TypeOverrideWithAQuotedKey_IsReadWithTheKeyIntact()
+    {
+        var (scope, errors) = Scope(SqlScopeKind.Query, "-- type-override: \"my schema\".\"order status\" = App.A");
+
+        errors.ShouldBeEmpty();
+        scope
+            .Level.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("\"my schema\".\"order status\"", "global::App.A", SettingPlace.Query)]);
+    }
+
+    // A quoted part and a plain one that read as one text are one key.
+    [Fact]
+    public void Read_QuotedAndPlainSpellingOfOneKeyWithTwoValues_ConflictAtTheSecond()
+    {
+        var (scope, errors) = Scope(
+            SqlScopeKind.Query,
+            "-- type-override: public.status = App.A",
+            "-- type-override: public.\"status\" = App.B"
+        );
+
+        errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
+        scope
+            .Level.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("public.status", "global::App.A", SettingPlace.Query)]);
+    }
+
     // _int4 is the catalog's name of int4[], and the two are one key.
     [Fact]
     public void Read_ArrayKeySpelledTwoWaysWithTwoValuesInOneScope_ConflictAtTheSecond()

@@ -303,6 +303,144 @@ public sealed class TypeOverrideLevelTests
             ]);
     }
 
+    // Keys that differ only by case are two keys, each for its own type.
+    [Fact]
+    public void Run_KeysThatDifferOnlyByCase_EachMapsItsOwnType()
+    {
+        var file = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var upper = EnumType("Status");
+        var lower = EnumType("status");
+
+        var run = Run(
+            "public.Status=System.Guid public.status=System.Uri",
+            (file, [Entry(file, "GetUser", upper, lower)])
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(run, "GetUser")
+            .ShouldBe([
+                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.Status", ThePropertyPlace),
+                new PropertyType("global::System.Uri", false, true, NoWarnings, "public.status", ThePropertyPlace),
+            ]);
+    }
+
+    // The query's default of the type's key takes the type out of the property's entry whose key differs from it by
+    // case, so the domain gets its base's C# type.
+    [Fact]
+    public void Run_DefaultOfAQueryThatDiffersByCase_HidesThePropertysEntry()
+    {
+        var file = new SqlFile(
+            "/app/Repo/Users.sql",
+            "-- name: GetUser\n-- type-override: public.status = default\nSELECT 1;\n"
+        );
+        var status = TestSidecars.Postgres(
+            name: "status",
+            kind: SidecarValues.Kind.Domain,
+            schema: "public",
+            internalName: "status",
+            baseType: Int4
+        );
+
+        var run = Run("public.Status=System.Guid", (file, [Entry(file, "GetUser", status)]));
+
+        run.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(run, "GetUser").ShouldBe([new PropertyType("int", true, true, NoWarnings, "int4", null)]);
+    }
+
+    // The query's entry replaces the property's for the type, though the property's key is spelled exactly as the
+    // type's and the query's differs from it by case.
+    [Fact]
+    public void Run_EntryOfAQueryThatDiffersByCase_ReplacesThePropertysExactOne()
+    {
+        var file = new SqlFile(
+            "/app/Repo/Users.sql",
+            "-- name: GetUser\n-- type-override: public.User_Status = System.Uri\nSELECT 1;\n"
+        );
+
+        var run = Run("public.user_status=System.Guid", (file, [Entry(file, "GetUser", EnumType("user_status"))]));
+
+        run.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(run, "GetUser")
+            .ShouldBe([
+                new PropertyType(
+                    "global::System.Uri",
+                    false,
+                    true,
+                    NoWarnings,
+                    "public.User_Status",
+                    "a -- type-override: marker of the query"
+                ),
+            ]);
+    }
+
+    // A quoted key is exact, so it does not map the type whose name differs from its text by case.
+    [Fact]
+    public void Run_QuotedKey_DoesNotMapATypeThatDiffersByCase()
+    {
+        const string Text = "-- name: GetUser\nSELECT 1;\n";
+        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var upper = Composite("public", "Status");
+        var lower = Composite("public", "status");
+
+        var run = Run("public.\"Status\"=System.Guid", (file, [Entry(file, "GetUser", upper, lower)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {NameOf(Text, "GetUser")}: The column 'c1' has the type 'status', "
+                + "which SqlSource cannot give a C# type.  Map it with the type override, as "
+                + "public.status=<a C# type>.",
+        ]);
+    }
+
+    // The quotes let the key name a schema and a type that a plain key cannot, and the MSBuild value splits after
+    // them.
+    [Theory]
+    [MemberData(nameof(Places))]
+    public void Run_QuotedSchemaAndName_MapsTheType(string level, string place)
+    {
+        const string Key = "\"my schema\".\"order-status\"";
+        var isMSBuild = level is "property" or "metadata";
+        var value = isMSBuild ? Key + "=System.Guid int4=long" : Key + " = System.Guid";
+        var header = level == "header" ? "-- type-override: " + value + "\n\n" : "";
+        var marker = level == "query" ? "-- type-override: " + value + "\n" : "";
+        var file = new SqlFile(
+            "/app/Repo/Users.sql",
+            header + "-- name: GetUser\n" + marker + "SELECT 1;\n",
+            Metadata: level == "metadata" ? new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = value } : null
+        );
+        var status = Composite("my schema", "order-status");
+
+        var run = Run(
+            level == "property" ? value : null,
+            (file, isMSBuild ? [Entry(file, "GetUser", status, Int4)] : [Entry(file, "GetUser", status)])
+        );
+
+        run.Diagnostics.ShouldBeEmpty();
+        var guid = new PropertyType("global::System.Guid", true, true, NoWarnings, Key, place);
+        ColumnsOf(run, "GetUser")
+            .ShouldBe(isMSBuild ? [guid, new PropertyType("long", true, true, NoWarnings, "int4", place)] : [guid]);
+    }
+
+    // Two markers of one header, whose keys differ by case, are two keys and not a repeat of one.
+    [Fact]
+    public void Run_KeysThatDifferByCaseInOneScope_AreNoConflict()
+    {
+        var file = new SqlFile(
+            "/app/Repo/Users.sql",
+            "-- type-override: public.Status = System.Guid\n-- type-override: public.status = System.Uri\n\n"
+                + "-- name: GetUser\nSELECT 1;\n"
+        );
+
+        var run = Run(null, (file, [Entry(file, "GetUser", EnumType("Status"), EnumType("status"))]));
+
+        run.Diagnostics.ShouldBeEmpty();
+        const string Place = "a -- type-override: marker in the file header";
+        ColumnsOf(run, "GetUser")
+            .ShouldBe([
+                new PropertyType("global::System.Guid", true, true, NoWarnings, "public.Status", Place),
+                new PropertyType("global::System.Uri", false, true, NoWarnings, "public.status", Place),
+            ]);
+    }
+
     // Both queries of int4 are reported, each at its name, and the query of text is typed.
     [Theory]
     [MemberData(nameof(Places))]
@@ -476,6 +614,23 @@ public sealed class TypeOverrideLevelTests
 
     private static PostgresType Catalog(string internalName) =>
         TestSidecars.Postgres(name: internalName, internalName: internalName);
+
+    private static PostgresType EnumType(string internalName) =>
+        TestSidecars.Postgres(
+            name: internalName,
+            kind: SidecarValues.Kind.Enum,
+            schema: "public",
+            internalName: internalName,
+            labels: ["new", "old"]
+        );
+
+    private static PostgresType Composite(string schema, string internalName) =>
+        TestSidecars.Postgres(
+            name: internalName,
+            kind: SidecarValues.Kind.Composite,
+            schema: schema,
+            internalName: internalName
+        );
 
     // The C# type of the one column of each query that has types, by the query's name.
     private static Dictionary<string, string> TextsOf(GeneratorRun run) =>
