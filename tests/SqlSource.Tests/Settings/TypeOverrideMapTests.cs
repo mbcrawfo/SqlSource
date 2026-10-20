@@ -27,7 +27,7 @@ public sealed class TypeOverrideMapTests
     }
 
     [Fact]
-    public void Over_KeysOfBoth_AreMergedInTheOrderOfTheKeysIgnoringCase()
+    public void Over_KeysThatDifferByCase_AreTwoKeys()
     {
         var lower = Map(
             Entry("bool", "bool", SettingPlace.Property),
@@ -46,10 +46,20 @@ public sealed class TypeOverrideMapTests
                     Entry("bool", "bool", SettingPlace.Property),
                     Entry("int4", "long", SettingPlace.Metadata),
                     Entry("PUBLIC.status", "global::App.T", SettingPlace.Metadata),
+                    Entry("public.Status", "global::App.S", SettingPlace.Property),
                     Entry("text", "string", SettingPlace.Metadata)
                 )
             );
     }
+
+    [Fact]
+    public void Over_QuotedAndPlainSpellingOfOneText_AreOneKey() =>
+        TypeOverrideMap
+            .Over(
+                Map(Entry("public.\"status\"", "long", SettingPlace.Query)),
+                Map(Entry("public.status", "int", SettingPlace.Property))
+            )
+            .ShouldBe(Map(Entry("public.\"status\"", "long", SettingPlace.Query)));
 
     [Fact]
     public void Over_DefaultAbove_HidesTheKeyBelowAndInEffectDropsIt()
@@ -123,6 +133,66 @@ public sealed class TypeOverrideMapTests
 
         TypeOverrideMap.Find(map, key)?.Type.ShouldBe(type);
         (TypeOverrideMap.Find(map, key) is null).ShouldBe(type is null);
+    }
+
+    [Theory]
+    [InlineData("public.Status", "global::App.A")]
+    [InlineData("public.status", "global::App.B")]
+    [InlineData("public.\"Status\"", "global::App.A")]
+    [InlineData("public.STATUS", "global::App.A")] // Neither is exact: the first in the order of the map.
+    public void Find_KeysThatDifferByCase_PreferTheExactOne(string key, string type)
+    {
+        var map = Map(
+            Entry("public.Status", "global::App.A", SettingPlace.Query),
+            Entry("public.status", "global::App.B", SettingPlace.Query)
+        );
+
+        TypeOverrideMap.Find(map, key)!.Type.ShouldBe(type);
+    }
+
+    [Theory]
+    [InlineData("public.Status", "global::App.A")]
+    [InlineData("public.status", null)]
+    [InlineData("Public.Status", "global::App.A")] // The schema is plain.
+    public void Find_QuotedPart_MatchesItsCaseAlone(string key, string? type)
+    {
+        var map = Map(Entry("public.\"Status\"", "global::App.A", SettingPlace.Query));
+
+        TypeOverrideMap.Find(map, key)?.Type.ShouldBe(type);
+        (TypeOverrideMap.Find(map, key) is null).ShouldBe(type is null);
+    }
+
+    [Fact]
+    public void Find_QuotedAndPlainEntriesEqualIgnoringCase_TakesTheOneThatMatches()
+    {
+        var map = Map(
+            Entry("public.\"Status\"", "global::App.A", SettingPlace.Query),
+            Entry("public.status", "global::App.B", SettingPlace.Query)
+        );
+
+        TypeOverrideMap.Find(map, "public.STATUS")!.Type.ShouldBe("global::App.B");
+    }
+
+    [Theory]
+    [InlineData("\"a.b\".c", "global::App.A")]
+    [InlineData("a.\"b.c\"", "global::App.B")]
+    public void Find_DotInsideQuotes_IsPartOfThePart(string key, string type)
+    {
+        var map = Map(
+            Entry("a.\"b.c\"", "global::App.B", SettingPlace.Query),
+            Entry("\"a.b\".c", "global::App.A", SettingPlace.Query)
+        );
+
+        TypeOverrideMap.Find(map, key)!.Type.ShouldBe(type);
+    }
+
+    [Fact]
+    public void Find_QuotedSchemaAndName_IsFound()
+    {
+        var map = Map(Entry("\"my schema\".\"order-status\"", "global::App.A", SettingPlace.Query));
+
+        TypeOverrideMap.Find(map, "\"my schema\".\"order-status\"")!.Type.ShouldBe("global::App.A");
+        TypeOverrideMap.Find(map, "\"My Schema\".\"order-status\"").ShouldBeNull();
     }
 
     [Fact]

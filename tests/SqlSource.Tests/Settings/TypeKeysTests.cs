@@ -115,6 +115,7 @@ public sealed class TypeKeysTests
     [InlineData("pg_catalog.\"newtype\"", "\"newtype\"")]
     [InlineData("\"_int4\"[]", "_int4[]")]
     [InlineData("pg_catalog.\"int4\"[]", "int4[]")]
+    [InlineData("pg_catalog.\"_int4\"[]", "_int4[]")]
     [InlineData("pg_catalog.\"_x\"[]", "\"_x\"[]")]
     public void TryNormalize_QuotedCatalogName_IsItsKey(string key, string expected) => ShouldNormalize(key, expected);
 

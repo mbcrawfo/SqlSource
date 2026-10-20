@@ -150,7 +150,9 @@ internal static class TypeKeys
     /// <c>pg_class[]</c>.  A quoted name there that holds a name the map knows is that name, and one that holds
     /// <c>_</c> and a name is that name's key with <c>[]</c>, with a name the map does not know written as
     /// <see cref="WritePart" /> writes it: <c>pg_catalog."_odd"</c> gives <c>odd[]</c> and <c>pg_catalog."_Odd"</c>
-    /// gives <c>"Odd"[]</c>.  Any other quoted name stays as written.  Any other
+    /// gives <c>"Odd"[]</c>, and with <c>[]</c> a name that holds <c>_</c> and a name the map knows is <c>_</c>, that
+    /// name and <c>[]</c>, as a plain one is: <c>pg_catalog."_int4"[]</c> gives <c>_int4[]</c>.  Any other quoted name
+    /// stays as written.  Any other
     /// qualified key is given as written, unchecked: <c>public._tag</c> is not <c>public.tag[]</c>, since a type of
     /// another schema may be named with a <c>_</c> (TD-0059).  Returns false for anything else, with an empty
     /// <paramref name="normalized" />.
@@ -324,10 +326,18 @@ internal static class TypeKeys
             return isArray ? known + "[]" : known;
         }
 
-        if (!isArray && text.Length > 1 && text[0] == '_')
+        if (text.Length > 1 && text[0] == '_')
         {
             var ofElement = text.Substring(1);
-            return (TryGetExactName(ofElement, out var knownElement) ? knownElement : WritePart(ofElement)) + "[]";
+            var isKnownElement = TryGetExactName(ofElement, out var knownElement);
+
+            // The catalog's name of an array, with [], is the array of arrays' key, as it is for a plain name.
+            if (isArray)
+            {
+                return isKnownElement ? "_" + knownElement + "[]" : name.ToString() + "[]";
+            }
+
+            return (isKnownElement ? knownElement : WritePart(ofElement)) + "[]";
         }
 
         return isArray ? name.ToString() + "[]" : name.ToString();
