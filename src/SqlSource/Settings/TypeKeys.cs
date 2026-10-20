@@ -147,12 +147,14 @@ internal static class TypeKeys
     /// <c>pg_catalog.</c>, plain in any case or quoted in lower case, is taken off and what is left is not checked,
     /// but that every name of <c>pg_catalog</c> that starts with <c>_</c> is an array's, so <c>pg_catalog.newtype</c>
     /// gives <c>newtype</c>, <c>pg_catalog._int4</c> gives <c>int4[]</c> and <c>pg_catalog._pg_class</c> gives
-    /// <c>pg_class[]</c>.  A quoted name there that holds a name the map knows is that name, and one that holds
-    /// <c>_</c> and a name is that name's key with <c>[]</c>, with a name the map does not know written as
-    /// <see cref="WritePart" /> writes it: <c>pg_catalog."_odd"</c> gives <c>odd[]</c> and <c>pg_catalog."_Odd"</c>
-    /// gives <c>"Odd"[]</c>, and with <c>[]</c> a name that holds <c>_</c> and a name the map knows is <c>_</c>, that
-    /// name and <c>[]</c>, as a plain one is: <c>pg_catalog."_int4"[]</c> gives <c>_int4[]</c>.  Any other quoted name
-    /// stays as written.  Any other
+    /// <c>pg_class[]</c>.  A plain name there that the map knows, or with <c>[]</c> <c>_</c> and one, is given in
+    /// lower case, as it is without the schema, so <c>pg_catalog.INT4</c> gives <c>int4</c>; any other plain name
+    /// stays as written, and has no alias: <c>pg_catalog.Integer</c> gives <c>Integer</c>.  A quoted name there that
+    /// holds a name the map knows is that name, and one that holds <c>_</c> and a name is that name's key with
+    /// <c>[]</c>, with a name the map does not know written as <see cref="WritePart" /> writes it:
+    /// <c>pg_catalog."_odd"</c> gives <c>odd[]</c> and <c>pg_catalog."_Odd"</c> gives <c>"Odd"[]</c>, and with
+    /// <c>[]</c> a name that holds <c>_</c> and a name the map knows is <c>_</c>, that name and <c>[]</c>, as a plain
+    /// one is: <c>pg_catalog."_int4"[]</c> gives <c>_int4[]</c>.  Any other quoted name stays as written.  Any other
     /// qualified key is given as written, unchecked: <c>public._tag</c> is not <c>public.tag[]</c>, since a type of
     /// another schema may be named with a <c>_</c> (TD-0059).  Returns false for anything else, with an empty
     /// <paramref name="normalized" />.
@@ -188,7 +190,18 @@ internal static class TypeKeys
         }
         else
         {
-            normalized = isArray ? name.ToString() + "[]" : name.ToString();
+            // A name the map knows is given in lower case, as it is without the schema; any other stays as written.
+            var text = name.ToString();
+            if (Names.TryGetValue(text, out var known))
+            {
+                text = known;
+            }
+            else if (isArray && TryReadArrayName(text, out var element))
+            {
+                text = "_" + element;
+            }
+
+            normalized = isArray ? text + "[]" : text;
         }
 
         return true;

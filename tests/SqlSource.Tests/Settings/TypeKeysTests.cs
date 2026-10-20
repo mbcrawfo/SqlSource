@@ -59,6 +59,17 @@ public sealed class TypeKeysTests
     public void TryNormalize_QualifiedKey_IsKeptUnchecked(string key, string expected) =>
         ShouldNormalize(key, expected);
 
+    // A plain name of pg_catalog is read in lower case when the map knows it, as it is without the schema, so the two
+    // spellings are one key.  A name the map does not know stays as written.
+    [Theory]
+    [InlineData("pg_catalog.INT4", "int4")]
+    [InlineData("PG_CATALOG.Timestamptz[]", "timestamptz[]")]
+    [InlineData("pg_catalog._INT4[]", "_int4[]")]
+    [InlineData("pg_catalog.NewType", "NewType")]
+    [InlineData("pg_catalog.Integer", "Integer")]
+    public void TryNormalize_KnownCatalogNameWithItsSchema_IsItsName(string key, string expected) =>
+        ShouldNormalize(key, expected);
+
     [Theory]
     [InlineData("")]
     [InlineData("timestampz")]
