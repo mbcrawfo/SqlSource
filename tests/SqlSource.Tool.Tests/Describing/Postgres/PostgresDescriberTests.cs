@@ -18,6 +18,22 @@ public sealed class PostgresDescriberTests
     public void Dialect_OfTheDescriber_IsPostgreSql() =>
         new PostgresDescriber().Dialect.ShouldBe(SqlDialect.PostgreSql);
 
+    [Fact]
+    public void SecretsOf_ConnectionWithBothPasswords_IsBoth() =>
+        new PostgresDescriber()
+            .SecretsOf("Host=h;Password=pw;SSL Password=kp")
+            .ShouldBe(["pw", "kp"], ignoreOrder: true);
+
+    // A string the driver cannot read has no parts it knows, and opening it fails in its own place.
+    [Fact]
+    public void SecretsOf_ConnectionTheDriverCannotRead_IsNone() =>
+        new PostgresDescriber().SecretsOf("Nonsense=1").ShouldBeEmpty();
+
+    // A keyword the builder knows with a value it cannot read: the builder throws, whatever else the string holds.
+    [Fact]
+    public void SecretsOf_ConnectionWithAValueTheDriverCannotRead_IsNone() =>
+        new PostgresDescriber().SecretsOf("Password=pw;Port=abc").ShouldBeEmpty();
+
     // The list is closed: nothing else reaches a SET LOCAL, and a describer that would send it is never made.
     [Theory]
     [InlineData("work_mem=1")]
@@ -51,7 +67,7 @@ public sealed class PostgresDescriberTests
     [Fact]
     public async Task OpenAsync_ReplayedError_IsSqlsrc224ForTheDatabase()
     {
-        var error = new PostgresServerError("3D000", "database \"nope\" does not exist", null, null, null);
+        var error = new PostgresServerError("3D000", ConnectionErrors.NoSuchDatabase, null, null, null);
         var exchange = new PostgresScript()
             .Answer("open", PostgresOpenRequest.Instance, new PostgresOpenAnswer(null, null, null, error))
             .Play();
@@ -62,7 +78,7 @@ public sealed class PostgresDescriberTests
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
         failure.Arguments.ShouldBe([PostgresScript.Database]);
-        failure.ServerLines.ShouldBe(["3D000: database \"nope\" does not exist"]);
+        failure.ServerLines.ShouldBe(["3D000: the server has no such database"]);
     }
 
     // A user causes each of these, so none is an exception, and the driver's own text, whose inner exception
@@ -82,5 +98,20 @@ public sealed class PostgresDescriberTests
         failure
             .Arguments.Concat(failure.ServerLines)
             .ShouldAllBe(text => !text.Contains(Secrets.Marker, StringComparison.Ordinal));
+    }
+
+    // The describer refuses Multiplexing=true before it connects, so the port that nothing listens on is never tried.
+    [Fact]
+    public async Task OpenAsync_Multiplexing_IsSqlsrc236WithTheRefusalAsItsLine()
+    {
+        var opened = await PostgresScript.OpenAsync(
+            LiveExchange.Instance,
+            connection: "Host=127.0.0.1;Port=1;Multiplexing=true"
+        );
+
+        opened.Value.ShouldBeNull();
+        var failure = opened.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.ServerLines.ShouldBe(["Multiplexing=true does not keep one session"]);
     }
 }

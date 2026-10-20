@@ -143,13 +143,7 @@ public sealed class PostgresSessionColumnTests
     [Fact]
     public async Task DescribeAsync_ColumnsThatFails_IsSqlsrc225AtDescribeColumnsAndFreesTheStatement()
     {
-        var dropped = new PostgresServerError(
-            "57P01",
-            "terminating connection due to administrator command",
-            null,
-            null,
-            9
-        );
+        var dropped = new PostgresServerError("42P01", "relation \"t\" does not exist", null, null, 9);
         var script = new PostgresScript().Open();
         _ = script.Prepares(1, "SELECT 1", [], new([], null));
         _ = script.Answer(
@@ -165,7 +159,7 @@ public sealed class PostgresSessionColumnTests
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
         failure.Step.ShouldBe(DescribeStep.DescribeColumns);
-        failure.ServerLines.ShouldBe(["57P01: terminating connection due to administrator command"]);
+        failure.ServerLines.ShouldBe(["42P01: relation \"t\" does not exist"]);
         exchange.Unused.ShouldBeEmpty();
     }
 
@@ -530,13 +524,7 @@ public sealed class PostgresSessionColumnTests
     [Fact]
     public async Task DescribeAsync_SpellingsRefused_IsSqlsrc225AtResolveType()
     {
-        var dropped = new PostgresServerError(
-            "57P01",
-            "terminating connection due to administrator command",
-            null,
-            null,
-            null
-        );
+        var dropped = new PostgresServerError("57P01", ConnectionErrors.SessionEnded, null, null, null);
         PostgresColumnRow[] columns =
         [
             PostgresTables.ExpressionOf(0, "v", PostgresRows.Varchar.Oid, length: 10) with
@@ -561,7 +549,7 @@ public sealed class PostgresSessionColumnTests
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
         failure.Step.ShouldBe(DescribeStep.ResolveType);
-        failure.ServerLines.ShouldBe(["57P01: terminating connection due to administrator command"]);
+        failure.ServerLines.ShouldBe(["57P01: the server ended the session"]);
         exchange.Unused.ShouldBeEmpty();
     }
 }

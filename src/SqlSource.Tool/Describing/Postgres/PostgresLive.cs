@@ -207,7 +207,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresOpenAnswer(null, null, null, PostgresConnection.ErrorOf(exception));
+            return new PostgresOpenAnswer(null, null, null, ConnectionErrors.AtOpen(exception));
         }
     }
 
@@ -254,7 +254,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresPrepareAnswer(null, PostgresConnection.ErrorOf(exception));
+            return new PostgresPrepareAnswer(null, ConnectionErrors.Of(exception));
         }
     }
 
@@ -297,7 +297,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresColumnsAnswer(null, PostgresConnection.ErrorOf(exception));
+            return new PostgresColumnsAnswer(null, ConnectionErrors.Of(exception));
         }
     }
 
@@ -312,7 +312,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresTablesAnswer(null, PostgresConnection.ErrorOf(exception));
+            return new PostgresTablesAnswer(null, ConnectionErrors.Of(exception));
         }
     }
 
@@ -330,7 +330,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresTablesAnswer(null, PostgresConnection.ErrorOf(exception));
+            return new PostgresTablesAnswer(null, ConnectionErrors.Of(exception));
         }
     }
 
@@ -431,7 +431,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresPartitionsAnswer(null, PostgresConnection.ErrorOf(exception));
+            return new PostgresPartitionsAnswer(null, ConnectionErrors.Of(exception));
         }
     }
 
@@ -482,7 +482,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresTypesAnswer(null, PostgresConnection.ErrorOf(exception));
+            return new PostgresTypesAnswer(null, ConnectionErrors.Of(exception));
         }
     }
 
@@ -517,7 +517,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresSpellingsAnswer(null, PostgresConnection.ErrorOf(exception));
+            return new PostgresSpellingsAnswer(null, ConnectionErrors.Of(exception));
         }
     }
 
@@ -560,7 +560,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresCheckAnswer(null, PostgresConnection.ErrorOf(exception), null, null, false);
+            return new PostgresCheckAnswer(null, ConnectionErrors.Of(exception), null, null, false);
         }
         catch (Exception refused) when (IsDriverRefusal(refused))
         {
@@ -596,7 +596,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresCheckAnswer(null, PostgresConnection.ErrorOf(exception), null, null, false);
+            return new PostgresCheckAnswer(null, ConnectionErrors.Of(exception), null, null, false);
         }
     }
 
@@ -668,7 +668,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresExplainAnswer(null, PostgresConnection.ErrorOf(exception));
+            return new PostgresExplainAnswer(null, ConnectionErrors.Of(exception));
         }
     }
 
@@ -698,7 +698,7 @@ internal sealed class PostgresLive(PostgresConnection connection)
         }
         catch (NpgsqlException exception)
         {
-            return new PostgresDeallocateAnswer(PostgresConnection.ErrorOf(exception));
+            return new PostgresDeallocateAnswer(ConnectionErrors.Of(exception));
         }
     }
 }

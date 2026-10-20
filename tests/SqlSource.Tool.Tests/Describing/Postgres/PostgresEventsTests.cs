@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
@@ -238,7 +239,7 @@ public sealed class PostgresEventsTests
             .Checks(Query.Sql, CheckedParameters)
             .Frees(1);
 
-        await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."));
+        await DescribeAsync(script, new SessionRunLog(log, new ConnectionSecret("users"), "postgres."));
 
         log.Events.Select(written => written.Name)
             .ShouldBe([
@@ -261,7 +262,7 @@ public sealed class PostgresEventsTests
             .Open()
             .Prepares(1, PreparedSql, PreparedTypes, new PostgresPrepareAnswer(null, rejected));
 
-        await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."));
+        await DescribeAsync(script, new SessionRunLog(log, new ConnectionSecret("users"), "postgres."));
 
         var (name, members) = log.Events.ShouldHaveSingleItem();
         name.ShouldBe("postgres.prepare");

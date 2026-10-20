@@ -18,7 +18,8 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// not written: an exception of a failed connect names the endpoint, which the log must not hold.  The levels
 /// at which the other categories are forwarded trust Npgsql's messages not to name the host, the user or the
 /// database; <c>docs/tech-debt/TD-0048</c> says what that rests on.  The log the describer is given removes the
-/// connection's whole value from a message, as <c>docs/tech-debt/TD-0034</c> says, and no part of one.
+/// connection's whole value from a message, and its passwords where they stand as tokens, and no other part of
+/// it, as <c>docs/tech-debt/TD-0034</c> says.
 /// </para>
 /// </remarks>
 /// <param name="log">The describer's log.  It is the run's, and is not closed here.</param>

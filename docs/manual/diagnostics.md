@@ -1130,21 +1130,33 @@ Mend the file.  `dotnet sln list` reads it the same way.
 
 **Database could not be opened**
 
-The tool could not open a session with the database of a query that must be described: nothing answers at the address, the server refused the user or the password, the database does not exist, the driver cannot read the connection string, or a file that the connection string names cannot be used.  The lines that start with `server:` are what the server or the driver said, as they said it.
+The tool could not open a session with the database of a query that must be described: nothing answers at the address, the server refused the user or the password, the database does not exist, the driver cannot read the connection string, or a file that the connection string names cannot be used.  The `server:` line says what went wrong in the tool's own words, after the server's SQLSTATE when the server gave one.  It names neither the host nor the user: what the server or the driver said would name them, or quote the connection string or a path in it.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC224: The database 'app' could not be opened
     query: GetUser, database app, postgres
-    server: 28P01: password authentication failed for user "app"
+    server: 28P01: the server refused the password
     help: check that the database is running and that the connection string names it
 ```
 
 **Fix:** start the database, or correct the connection string that `--connection` or the database's variable gives.  The error is reported once, at the first query of the database that the run would have described, and each of them counts as failed.
 
-Some `server:` lines are the tool's own, since what the driver said would quote the connection string or a path in it:
+The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the error, listed in [PostgreSQL's error codes](https://www.postgresql.org/docs/current/errcodes-appendix.html).
 
 | The `server:` line | What it means |
 |----|----|
+| `28P01: the server refused the password` | The password is wrong for the user.  When the server asks for a password, PostgreSQL says the same of a user that does not exist |
+| `28000: the server refused to authenticate the user`, or another SQLSTATE that starts with `28` | The server refuses the user, as when its `pg_hba.conf` has no entry for this machine, the user and the database, the user may not log in, or the user does not exist |
+| `3D000: the server has no such database` | The database that the connection string names is not on the server |
+| `42501: the user may not connect to the database` | The user has no `CONNECT` privilege on the database |
+| `53300: the server has too many connections` | The server, the user or the database has reached its limit of connections: try again later, or raise the limit |
+| `57P03: the server is not accepting connections now` | The server is starting, stopping or recovering: try again when it is up |
+| `08P01: the server refused the connection`, or another SQLSTATE that starts with `08` | The server would not make the connection |
+| `<SQLSTATE>: the server refused to open a session` | Any other error of the server while the session was opened: its SQLSTATE says which |
+| `the server asks for a password and the connection string gives none` | The server asks for a password, and neither the connection string, `PGPASSWORD` nor a password file gives one |
+| `the connection to the server timed out` | Nothing answered at the address in time: the address drops what is sent to it, a firewall between drops the connection, or the server is too slow to answer |
+| `Npgsql could not reach the server: ConnectionRefused` | The connection could not be made.  The word after the colon is the system's reason, such as `ConnectionRefused` when nothing listens at the port, or `HostNotFound` or `TryAgain` for a host name that is not found |
+| `Npgsql could not open a connection to the server (<name of the error>)` | Any other failure of the driver while it opened the session.  The name in parentheses is the driver's or the system's name of the error, such as one of a TLS handshake that failed |
 | `Npgsql cannot read the connection string` | The string is not written as Npgsql wants one: `Host=localhost;Database=app;Username=app;Password=...` |
 | `a file that the connection string or the environment names cannot be read` | A client certificate, a key or a password file (`SslCertificate`, `SslKey`, `Passfile`, or `PGSSLCERT`, `PGSSLKEY`, `PGPASSFILE`) is not there, its folder is not there, or the tool may not open it |
 | `a file that the connection string or the environment names is not what Npgsql expects: it is not in the right form, or its password is wrong` | Such a file was read and could not be used, as when a line of a password file is no entry |
@@ -1191,9 +1203,9 @@ A statement that the server cannot prepare, though its SQL is valid, such as `CA
 
 It is also given when a table, a column or a type that the query uses was dropped while the tool described it, since another session changed the schema between two of the tool's questions.  The message says what went, as in `the table of the column 'id' no longer exists`; there is no `server:` line, since the server said nothing, and the help says to run the tool again.
 
-It is also what a connection that the server ended while the queries were described is reported as.  The query that finds it out has what the server said last, `57P01: terminating connection due to administrator command` for a backend that was ended, or the driver's message with no SQLSTATE when the server said nothing.  Every query of that database after it has the line `the connection to the server was lost`, with no SQLSTATE: start the run again.
+It is also what a connection that the server ended while the queries were described is reported as.  The query that finds it out has the server's SQLSTATE and `the server ended the session`, as in `57P01: the server ended the session` for a backend that was ended, and it names neither the host nor the user.  When the server said nothing, the line is `the connection to the server was lost`, or `the server did not answer in time` when Npgsql stopped waiting for its answer, with no SQLSTATE.  Every query of that database after it has the line `the connection to the server was lost`, with no SQLSTATE: start the run again.
 
-The step `check parameters` gives it too, for an error of the tool's comparison with Npgsql that says nothing of how Npgsql reads the SQL: a connection that was lost, or an error of the server that is not of class `42` (syntax errors and access rule violations), such as a statement that was cancelled or timed out.  The `server:` line is what the server or the driver said, and the message ends with it.  An error of class `42` there is [SQLSRC231](#sqlsrc231), since a `@` that the two read differently gives one.  Start the run again.
+The step `check parameters` gives it too, for an error of the tool's comparison with Npgsql that says nothing of how Npgsql reads the SQL: a connection that was lost, or an error of the server that is not of class `42` (syntax errors and access rule violations), such as a statement that was cancelled or timed out.  The `server:` line is what the server said, or one of the lines above for a connection that was lost or ended, and the message ends with it.  An error of class `42` there is [SQLSRC231](#sqlsrc231), since a `@` that the two read differently gives one.  Start the run again.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'ListUsers': canceling statement due to statement timeout

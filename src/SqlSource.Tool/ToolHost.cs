@@ -20,6 +20,9 @@ namespace SqlSource.Tool;
 /// <param name="Describers">The describers of the run, by dialect.</param>
 /// <param name="Exchange">Gives the exchange that the describer of a database, by its name, calls through.</param>
 /// <param name="Time">The clock: the time of a log's events, and how long a step took.</param>
+/// <param name="CreateFile">
+/// Makes the file at a full path for writing, or empties the one that is there, and gives its stream.
+/// </param>
 internal sealed record ToolHost(
     TextWriter Out,
     TextWriter Error,
@@ -30,7 +33,8 @@ internal sealed record ToolHost(
     int ProcessorCount,
     DescriberRegistry Describers,
     Func<string, IDescribeExchange> Exchange,
-    TimeProvider Time
+    TimeProvider Time,
+    Func<string, Stream> CreateFile
 )
 {
     /// <summary>
@@ -48,6 +52,14 @@ internal sealed record ToolHost(
             Environment.ProcessorCount,
             new DescriberRegistry([new PostgresDescriber()]),
             static _ => LiveExchange.Instance,
-            TimeProvider.System
+            TimeProvider.System,
+            NewFile
         );
+
+    /// <summary>
+    /// The <see cref="CreateFile"/> of a real run: makes the file on disk, or empties the one that is there, opened
+    /// for writing and shared for reading.
+    /// </summary>
+    internal static Stream NewFile(string path) =>
+        new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
 }

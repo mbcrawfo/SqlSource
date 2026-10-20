@@ -95,13 +95,19 @@ internal static class DatabaseRuns
             return;
         }
 
-        // From here on the run holds the connection's value, and what a describer gives may hold it: everything
-        // said of this database goes through a trace that removes it.
-        var trace = reporter.Trace.Without(value);
+        // From here on the run holds the connection's value, and what a describer gives may hold it or a password
+        // of it.  The describer says which parts are secret, under a guard that knows only the whole value, and its
+        // list is copied there, since reading it is the describer's code too; then everything said of this database
+        // goes through a trace that removes both.
+        var parts = new Guard(new ConnectionSecret(value), host.GetEnvironmentVariable, cancellationToken).Call(() =>
+            (IReadOnlyList<string>)[.. describer.SecretsOf(value) ?? throw new InvalidOperationException(Guard.Nothing)]
+        );
         var engine = SqlDialectName.Canonical(database.Dialect);
-        var guard = new Guard(value, host.GetEnvironmentVariable, cancellationToken);
+        var secret = new ConnectionSecret(value, parts, [database.Name, engine]);
+        var trace = reporter.Trace.Without(secret);
+        var guard = new Guard(secret, host.GetEnvironmentVariable, cancellationToken);
         var request = new OpenRequest(database.Name, value, host.Exchange(database.Name), host.Time);
-        var log = new SessionRunLog(reporter.Trace.Log, value, engine + ".");
+        var log = new SessionRunLog(reporter.Trace.Log, secret, engine + ".");
         var opened = await guard.CallAsync(() => describer.OpenAsync(request, log, cancellationToken));
         // The value and not Succeeded, here and where a query is described: a describer may have given null for
         // either, and an outcome that holds neither is a fault.
@@ -109,9 +115,9 @@ internal static class DatabaseRuns
         {
             var failure = Redaction.Of(
                 guard.Call(() => opened.Failure ?? throw new InvalidOperationException(Guard.Nothing)),
-                value
+                secret
             );
-            reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, first, database, server: null), value));
+            reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, first, database, server: null), secret));
             RunEvents.NotOpened(trace, database, failure.Descriptor.Id);
             Fail(queries, failure.Descriptor.Id, trace);
             return;
@@ -140,9 +146,9 @@ internal static class DatabaseRuns
     )
     {
         var guard = run.Guard;
-        var value = guard.Secret;
+        var secret = guard.Secret;
         var server = guard.Call(() => run.Session.Server);
-        RunEvents.Opened(run.Trace, database, server);
+        guard.Call(() => RunEvents.Opened(run.Trace, database, server));
         foreach (var query in queries)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -158,7 +164,10 @@ internal static class DatabaseRuns
             if (result.Value is { } description)
             {
                 query.Entry = guard.Call(() =>
-                    NoSecretIn(EntryBuilder.Build(planned, database.Dialect, database.Name, server, description), value)
+                    NoSecretIn(
+                        EntryBuilder.Build(planned, database.Dialect, database.Name, server, description),
+                        secret.Value
+                    )
                 );
                 query.State = QueryState.Described;
                 RunEvents.Query(run.Trace, query, duration);
@@ -167,9 +176,9 @@ internal static class DatabaseRuns
             {
                 var failure = Redaction.Of(
                     guard.Call(() => result.Failure ?? throw new InvalidOperationException(Guard.Nothing)),
-                    value
+                    secret
                 );
-                run.Reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), value));
+                run.Reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), secret));
                 query.State = QueryState.Failed;
                 RunEvents.Query(run.Trace, query, error: failure.Descriptor.Id);
             }
@@ -177,8 +186,8 @@ internal static class DatabaseRuns
     }
 
     // What a describer gave goes into a sidecar, which is committed: a value in it is a bug of the describer.
-    private static SidecarEntry NoSecretIn(SidecarEntry entry, string secret) =>
-        EntrySecretCheck.Holds(entry, secret)
+    private static SidecarEntry NoSecretIn(SidecarEntry entry, string value) =>
+        EntrySecretCheck.Holds(entry, value)
             ? throw new InvalidOperationException(
                 $"The describer put the connection's value in its description of the query '{entry.Name}'."
             )
@@ -228,16 +237,19 @@ internal static class DatabaseRuns
     );
 
     // Runs what a describer gives or does.  Whatever it throws is a bug of the describer and is thrown again as
-    // the SQLSRC200 to report, without the connection's value.
+    // the SQLSRC200 to report, without the connection's value and the parts it knows.
     private sealed class Guard(
-        string secret,
+        ConnectionSecret secret,
         Func<string, string?> getEnvironmentVariable,
         CancellationToken cancellationToken
     )
     {
         public const string Nothing = "A describer returned nothing.";
 
-        public string Secret => secret;
+        // What a call that gives nothing gives Call<T>, so that both are guarded in one place.
+        private static readonly object Done = new();
+
+        public ConnectionSecret Secret => secret;
 
         public async Task<T> CallAsync<T>(Func<Task<T>> call)
             where T : class
@@ -289,6 +301,13 @@ internal static class DatabaseRuns
                 throw Fault(exception);
             }
         }
+
+        public void Call(Action call) =>
+            Call(() =>
+            {
+                call();
+                return Done;
+            });
 
         private bool IsCancellation(Exception exception) =>
             exception is OperationCanceledException && cancellationToken.IsCancellationRequested;

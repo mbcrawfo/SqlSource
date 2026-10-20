@@ -99,8 +99,8 @@ public sealed class SecretTests : IDisposable
     }
 
     // The describer of PostgreSQL itself, given a connection that nothing answers: the port 1 of this machine
-    // refuses at once.  What the driver says is printed, and the value is nowhere: not printed, not in the log, not
-    // in the capture.
+    // refuses at once.  The describer's own text is printed, and neither the value nor the host is anywhere: not
+    // printed, not in the log, not in the capture.
     [Fact]
     public async Task Run_PostgresDescriberThatCannotOpen_PrintsSqlsrc224AndNothingOfTheValue()
     {
@@ -112,14 +112,17 @@ public sealed class SecretTests : IDisposable
         var result = await _scene.DescribeAsync("--log", "run.log");
 
         ShouldHold(result, "224");
-        result.Error.ShouldContain("    server: Failed to connect to 127.0.0.1:1");
+        result.Error.ShouldContain("    server: Npgsql could not reach the server: ConnectionRefused");
+        result.Error.ShouldNotContain("127.0.0.1");
         var log = await File.ReadAllTextAsync(
             _scene.Run.Folder.PathOf("run.log"),
             TestContext.Current.CancellationToken
         );
         log.ShouldNotContain(Secrets.Marker);
+        log.ShouldNotContain("127.0.0.1");
         log.ShouldContain("\"id\":\"SQLSRC224\"");
         CaptureJson.Write(_scene.Run.Capture).ShouldNotContain(Secrets.Marker);
+        CaptureJson.Write(_scene.Run.Capture).ShouldNotContain("127.0.0.1");
     }
 
     [Fact]
@@ -422,6 +425,27 @@ public sealed class SecretTests : IDisposable
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
+    }
+
+    // A description is searched for the whole value alone: a password that equals a column's name is the catalog's.
+    [Fact]
+    public async Task Run_PasswordTheDescriberGaveThatIsAColumnsName_DescribesAndWritesTheSidecar()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = "Host=db;Password=password";
+        _scene.Describer.Secrets = ["password"];
+        _scene.Describer.Descriptions["Good"] = FakeDescriber.Rows with
+        {
+            Columns = new EquatableArray<SidecarColumn>([
+                new SidecarColumn(0, "password", new OtherEngineType("text"), null, null, null, null, null),
+            ]),
+        };
+
+        var result = await _scene.DescribeAsync();
+
+        result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
+        (
+            await File.ReadAllTextAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken)
+        ).ShouldContain("\"name\": \"password\"");
     }
 
     // --check prints what differs, and a text of the describer is among it.  The guard on a description comes first,

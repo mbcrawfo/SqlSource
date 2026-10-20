@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -288,6 +289,79 @@ public sealed class DatabaseRunsTests : IDisposable
             );
     }
 
+    // A driver's message for a wrong password can quote the password alone.
+    [Fact]
+    public async Task Run_SessionThatCannotBeOpenedAndHoldsAPasswordTheDescriberGave_IsPrintedWithoutIt()
+    {
+        _describer.Secrets = ["hunter2"];
+        _describer.OpenFailure = FakeDescriber.Failure(
+            "(open)",
+            step: null,
+            help: null,
+            "28P01: password 'hunter2' was refused"
+        );
+
+        _ = await RunAsync(given: ["postgres=Host=db;Password=hunter2"]);
+
+        _error.ToString().ShouldContain("    server: 28P01: password '***' was refused\n");
+        _error.ToString().ShouldNotContain("hunter2");
+    }
+
+    // The run prints the database's name and the engine's whatever the describer does, so a password equal to them
+    // is not removed from them.
+    [Fact]
+    public async Task Run_QueryThatFailsWithAPasswordThatIsTheDatabasesNameAndTheEngines_PrintsTheQueryLineAsItIs()
+    {
+        _describer.Secrets = ["postgres"];
+        _describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
+
+        _ = await RunAsync(given: ["postgres=Host=db;Password=postgres"]);
+
+        _error.ToString().ShouldContain("    query: GetUser, database postgres, postgres 16.4, FakeDriver 1.2.3\n");
+    }
+
+    // The same for the database's name alone, which is not the engine's.
+    [Fact]
+    public async Task Run_QueryThatFailsWithAPasswordThatIsTheDatabasesName_PrintsTheQueryLineAsItIs()
+    {
+        _describer.Secrets = ["billing"];
+        _describer.Failures["GetInvoice"] = FakeDescriber.Failure("GetInvoice");
+
+        _ = await RunAsync(given: ["postgres=Host=db;Password=billing", "billing=Host=db;Password=billing"]);
+
+        _error.ToString().ShouldContain("    query: GetInvoice, database billing, postgres 16.4, FakeDriver 1.2.3\n");
+    }
+
+    // The guard that asks for the parts knows only the whole value.
+    [Fact]
+    public async Task Run_DescriberThatThrowsWhenAskedForTheSecrets_IsOneFaultWithoutTheValue()
+    {
+        _describer.SecretsException = new InvalidOperationException($"cannot read {Secrets.ConnectionWithWord}");
+
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault.InnerException.ShouldBeNull();
+        fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
+        fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.InvalidOperationException", "cannot read ***"]);
+        _error.ToString().ShouldBeEmpty();
+        _describer.Opened.ShouldBeEmpty();
+    }
+
+    // The list of the parts is the describer's too, and it is read under the same guard.
+    [Fact]
+    public async Task Run_DescriberWhoseSecretsThrowWhenTheyAreRead_IsOneFaultWithoutTheValue()
+    {
+        _describer.Secrets = new ThrowsWhenRead($"cannot list {Secrets.ConnectionWithWord}");
+
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault.InnerException.ShouldBeNull();
+        fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
+        fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.InvalidOperationException", "cannot list ***"]);
+        _error.ToString().ShouldBeEmpty();
+        _describer.Opened.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task Run_QueryThatFails_IsReportedInTheFormatOfADescribersErrorAndTheSessionGoesOn()
     {
@@ -388,6 +462,23 @@ public sealed class DatabaseRunsTests : IDisposable
         _describer.Closed.ShouldBe(1);
     }
 
+    // The settings of the server are a describer's text: the event that names them is built inside the guard, so that
+    // a setting without a name is the describer's fault and not a bare exception.
+    [Fact]
+    public async Task Run_ServerWithASettingThatHasNoName_IsOneSqlsrc200AndClosesTheSession()
+    {
+        _describer.Server = _describer.Server with
+        {
+            Settings = new EquatableArray<ServerSetting>([new ServerSetting(null!, "x")]),
+        };
+
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
+        fault.Diagnostic.Arguments[0].ShouldBe("System.NullReferenceException");
+        _describer.Closed.ShouldBe(1);
+    }
+
     // A value that spans lines is in the stack trace across the lines it is cut into.
     [Fact]
     public async Task Run_DescriberThatThrowsWithAConnectionOfSeveralLines_IsAFaultWithoutIt()
@@ -448,6 +539,15 @@ public sealed class DatabaseRunsTests : IDisposable
         fault
             .Diagnostic.Arguments.ToArray()
             .ShouldBe(["System.InvalidOperationException", "A describer returned nothing."]);
+    }
+
+    // The list of the parts is a return like any other.
+    [Fact]
+    public async Task Run_DescriberThatGivesNoSecrets_IsAFault()
+    {
+        _describer.Secrets = null!;
+
+        await ShouldBeTheFaultOfNothingAsync();
     }
 
     [Fact]
@@ -570,6 +670,26 @@ public sealed class DatabaseRunsTests : IDisposable
         _ = await RunExpectingTheValueInTheDescriptionAsync(Secrets.ConnectionWithWord);
     }
 
+    // A description is searched for the whole value alone: a password that equals a name of the catalog is no fault.
+    [Fact]
+    public async Task Run_DescriptionWithAPasswordTheDescriberGaveAsAColumnsName_IsDescribed()
+    {
+        _describer.Secrets = ["admin"];
+        _describer.Descriptions["GetUser"] = FakeDescriber.NoRows with
+        {
+            ResultKind = SidecarResultKind.Rows,
+            Columns = new EquatableArray<SidecarColumn>([
+                new SidecarColumn(0, "admin", new OtherEngineType("int4"), null, null, null, null, null),
+            ]),
+        };
+
+        _ = await RunAsync(given: ["postgres=Host=db;Password=admin", "billing=Host=db;Password=admin"]);
+
+        _error.ToString().ShouldBeEmpty();
+        _files[0].Queries[0].State.ShouldBe(QueryState.Described);
+        _files[0].Queries[0].Entry.ShouldNotBeNull().Columns.ShouldNotBeNull()[0].Name.ShouldBe("admin");
+    }
+
     // The writer escapes a quote and a backslash, so the value is in the file as it escapes it.
     [Fact]
     public async Task Run_DescriptionWithAValueOfAQuoteAndABackslashInTheServersVersion_IsAFault()
@@ -652,19 +772,29 @@ public sealed class DatabaseRunsTests : IDisposable
         _describer.Closed.ShouldBe(1);
     }
 
-    [Fact]
-    public void Of_TextThatHoldsTheSecretTwice_HasTheMarkInBothPlaces() =>
-        Redaction.Of("a s3cret and a s3cret", "s3cret").ShouldBe("a *** and a ***");
-
     // A describer whose OpenAsync is not async.
     private sealed class ThrowsBeforeItReturns : IQueryDescriber
     {
         public SqlDialect Dialect => SqlDialect.PostgreSql;
+
+        public IReadOnlyList<string> SecretsOf(string connection) => [];
 
         public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
             OpenRequest request,
             IRunLog log,
             CancellationToken cancellationToken
         ) => throw new InvalidOperationException($"cannot parse {request.Connection}");
+    }
+
+    // A list of a describer's parts that throws whenever it is read.
+    private sealed class ThrowsWhenRead(string message) : IReadOnlyList<string>
+    {
+        public int Count => throw new InvalidOperationException(message);
+
+        public string this[int index] => throw new InvalidOperationException(message);
+
+        public IEnumerator<string> GetEnumerator() => throw new InvalidOperationException(message);
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

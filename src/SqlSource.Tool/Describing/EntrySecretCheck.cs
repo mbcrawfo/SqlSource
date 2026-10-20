@@ -21,6 +21,12 @@ namespace SqlSource.Tool.Describing;
 /// as <c>postgres</c>, is no fault.
 /// </para>
 /// <para>
+/// The search is for the whole value alone, and not for the secret parts of a <see cref="ConnectionSecret" />.  An
+/// entry holds the names of a catalog and no driver's message, so a part found there would mostly be a name that
+/// equals a password, the password <c>password</c> beside a column <c>password</c>, and <c>SQLSRC200</c> would end
+/// the run for a common schema.
+/// </para>
+/// <para>
 /// A member of an entry that a describer gives must be left out of that second text.  One that is kept there holds
 /// the value in both texts, and the value in it is then never found.  So the second entry is made with the
 /// constructors and not with <c>with</c>: a new member of an entry or of a parameter does not compile here until it

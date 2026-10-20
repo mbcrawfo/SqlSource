@@ -32,8 +32,10 @@ internal sealed record PostgresOpenAnswer(
 internal sealed record PostgresSetting(string Name, string Value);
 
 /// <summary>
-/// What the server said of a call it refused, each part null where the server gave none.  A failure that is not
-/// the server's, a connection that was refused for one, has the driver's message alone.
+/// What the server said of a call it refused, each part null where the server gave none.  An error of <c>open</c>, one
+/// that ended the session and one of a connection that was lost or timed out have a fixed text of the describer's own
+/// in place of the message, and keep nothing else but the SQLSTATE (<see cref="ConnectionErrors" />).  Npgsql's
+/// refusal of a text at <c>check</c> keeps Npgsql's message, which speaks of the query.
 /// </summary>
 /// <param name="SqlState">The five characters of the SQLSTATE.</param>
 /// <param name="Message">The primary message.</param>

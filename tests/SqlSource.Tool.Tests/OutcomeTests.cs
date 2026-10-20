@@ -17,6 +17,16 @@ public sealed class OutcomeTests
     }
 
     [Fact]
+    public void Constructor_Value_IsASuccessThatHoldsIt()
+    {
+        var outcome = new Outcome<string, string>("v");
+
+        outcome.Succeeded.ShouldBeTrue();
+        outcome.Value.ShouldBe("v");
+        outcome.Failure.ShouldBeNull();
+    }
+
+    [Fact]
     public void Failed_Reason_DidNotSucceedAndHasTheReasonAndNoValue()
     {
         var outcome = Outcome<string, string>.Failed("why");

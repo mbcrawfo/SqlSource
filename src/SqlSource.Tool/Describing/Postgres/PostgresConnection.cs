@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -80,6 +82,22 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// </summary>
     public const string GssUnavailable = "GSS authentication is not available on this machine";
 
+    /// <summary>
+    /// Every text that the describer throws as an <see cref="NpgsqlException" /> of its own, with no inner exception:
+    /// the constants above.  <see cref="ConnectionErrors" /> passes each as it is, and answers any other message by
+    /// a text of its own.
+    /// </summary>
+    public static IReadOnlyList<string> OwnTexts { get; } =
+    [
+        UnreadableConnectionString,
+        LostConnection,
+        MultiplexingRefused,
+        UnreadableFile,
+        UnusableFile,
+        UnsupportedSettings,
+        GssUnavailable,
+    ];
+
     // The type of the runtime whose static constructor loads the GSS library: Interop+NetSecurityNative+GssInitializer.
     // It is initialized by the static constructor of Interop+NetSecurityNative, so the exception that comes out is for
     // that type, with this one as its inner exception.
@@ -88,6 +106,27 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     private NpgsqlDataSource? _source;
     private NpgsqlConnection? _connection;
     private ILoggerFactory? _driverLog;
+
+    /// <summary>
+    /// The passwords of a connection string, <c>Password</c> and <c>SSL Password</c>, as the driver reads it, or
+    /// none when it cannot read it.  A password the driver takes from <c>PGPASSWORD</c> or a password file is not
+    /// in the string.
+    /// </summary>
+    public static IReadOnlyList<string> SecretsOf(string connection)
+    {
+        NpgsqlConnectionStringBuilder builder;
+        try
+        {
+            builder = [with(connection)];
+        }
+        catch (ArgumentException)
+        {
+            // The driver's word for a string it cannot read, which opening the session reports in its own place.
+            return [];
+        }
+
+        return [.. new[] { builder.Password, builder.SslPassword }.OfType<string>()];
+    }
 
     /// <summary>The version of the driver, as <c>major.minor.patch</c>.</summary>
     public static string? DriverVersion => typeof(NpgsqlConnection).Assembly.GetName().Version?.ToString(3);
@@ -138,8 +177,8 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// <description>
     /// <c>RootCertificate</c>: read in the validation callback of the TLS handshake, and
     /// <c>NegotiateEncryption</c> wraps whatever it throws in an <see cref="NpgsqlException" /> whose message is
-    /// <c>Exception while performing SSL handshake</c>, with the path in its inner exception alone.  It passes
-    /// as it is.
+    /// <c>Exception while performing SSL handshake</c>, with the path in its inner exception alone.  It is thrown
+    /// as it is, and <see cref="ConnectionErrors.AtOpen" /> answers it by the type of its innermost exception.
     /// </description>
     /// </item>
     /// <item>
@@ -166,8 +205,9 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     /// </list>
     /// <para>
     /// Broad types are not caught: an <see cref="IOException" /> that is none of these, or an
-    /// <see cref="InvalidOperationException" />, is a bug and surfaces as one.  An <see cref="NpgsqlException" /> that
-    /// quotes a path passes as it is: <c>docs/tech-debt/TD-0034</c>.  A server that misbehaves can also reach the
+    /// <see cref="InvalidOperationException" />, is a bug and surfaces as one.  An <see cref="NpgsqlException" /> of
+    /// the driver's is thrown as it is, whatever it quotes, and no answer keeps its text
+    /// (<see cref="ConnectionErrors" />).  A server that misbehaves can also reach the
     /// catch of <see cref="FormatException" />, through Npgsql's decode of a SCRAM salt or its parse of an OID while
     /// it loads the types, and is then reported with the file's message, <see cref="UnusableFile" />.
     /// </para>
@@ -334,18 +374,6 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     {
         await using var batch = await BatchOfOneAsync(sql, cancellationToken);
         _ = await batch.ExecuteNonQueryAsync(cancellationToken);
-    }
-
-    /// <summary>What the driver threw, as the answer of a call holds it.</summary>
-    public static PostgresServerError ErrorOf(NpgsqlException exception)
-    {
-        if (exception is not PostgresException server)
-        {
-            return new PostgresServerError(null, exception.Message, null, null, null);
-        }
-
-        int? position = server.Position > 0 ? server.Position : null;
-        return new PostgresServerError(server.SqlState, server.MessageText, server.Detail, server.Hint, position);
     }
 
     public async ValueTask DisposeAsync()

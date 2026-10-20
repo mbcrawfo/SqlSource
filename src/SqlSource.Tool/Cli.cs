@@ -261,7 +261,7 @@ public static class Cli
             return true;
         }
 
-        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.Time);
+        var opened = RunLogFile.Open(logPath, host.WorkingDirectory, host.CreateFile, host.Time);
         if (!opened.Succeeded)
         {
             state.Reporter.Report(opened.Failure);

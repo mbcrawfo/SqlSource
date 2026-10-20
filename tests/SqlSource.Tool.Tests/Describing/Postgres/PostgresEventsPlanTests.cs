@@ -3,6 +3,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
@@ -217,7 +218,7 @@ public sealed class PostgresEventsPlanTests
 
         await DescribeAsync(
             JoinedScript(new PostgresExplainAnswer(JoinedPlan, null)),
-            new SessionRunLog(log, "Seq Scan", "postgres."),
+            new SessionRunLog(log, new ConnectionSecret("Seq Scan"), "postgres."),
             Joined
         );
 
