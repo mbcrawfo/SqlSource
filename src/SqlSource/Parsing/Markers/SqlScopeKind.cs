@@ -1,4 +1,4 @@
-namespace SqlSource.Parsing;
+namespace SqlSource.Parsing.Markers;
 
 /// <summary>
 /// What a <see cref="SqlMarkerScope" /> is the scope of.  It decides which markers the scope takes, and a scope

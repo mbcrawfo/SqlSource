@@ -7,7 +7,7 @@ using SqlSource.Parsing;
 namespace SqlSource.Tests.Postgres.Realistic;
 
 // A case's sample values: checked against the parameters of its query, and put in its SQL so that the server can run
-// it over the seed.  Every check of the corpus that executes a query runs it so.
+// it over the seed, as the oracle's check does.  The run through Dapper sends them as parameters instead.
 internal static class RealisticSamples
 {
     // The SQL with each parameter replaced by its sample literal, cast to the type described for it, so that the

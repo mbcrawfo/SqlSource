@@ -22,7 +22,7 @@ The libraries are never run as tests, hold no tests and are never packed:
 
 | Project | Roslyn | Holds |
 |----|----|----|
-| `tests/SqlSource.Testing` | 4.8.0, since RoslynFloor references it | The harness of the generator's driver tests (`Generator/`, with `Sidecars`, which hands the generator a sidecar, `StepOutputs`, which reads what a step gave, and `NpgsqlReferences`, the drivers the probe of Npgsql is tested against), `TestSidecars` (`Snapshot/`), `RepositoryRoot`, `EndToEndFiles`, the schema and seed of each end-to-end database, and `AllTypesRows` (`EndToEnd/`), the expectations of the rows of `all_types` for both PostgreSQL projects, which compares the values of `NpgsqlTypes` without a reference to Npgsql, since the two run different versions of it.  It downloads Npgsql 8.0.3, 9.0.3 and 10.0.3 with `PackageDownload`, and `NpgsqlReferences` reads their metadata from the NuGet folder, `NuGetPackageRoot`, without loading them, so a restore needs to reach the package source or find them in the NuGet cache |
+| `tests/SqlSource.Testing` | 4.8.0, since RoslynFloor references it | The harness of the generator's driver tests (`Generator/`, with `Sidecars`, which hands the generator a sidecar, `StepOutputs`, which reads what a step gave, and `NpgsqlReferences`, the drivers the probe of Npgsql is tested against), `TestSidecars` (`Snapshot/`), `RepositoryRoot` and `EndToEndFiles`, the paths of the schema and seed of each end-to-end database, at the library's root, and `AllTypesRows` (`EndToEnd/`), the expectations of the rows of `all_types` for both PostgreSQL projects, which compares the values of `NpgsqlTypes` without a reference to Npgsql, since the two run different versions of it.  It downloads Npgsql 8.0.3, 9.0.3 and 10.0.3 with `PackageDownload`, and `NpgsqlReferences` reads their metadata from the NuGet folder, `NuGetPackageRoot`, without loading them, so a restore needs to reach the package source or find them in the NuGet cache |
 | `tests/SqlSource.Tool.Testing` | A current version, the tool's | The helpers that the tool's tests and the PostgreSQL tests share |
 
 `tests/SqlSource.Tool.Testing` holds:
@@ -33,7 +33,7 @@ The libraries are never run as tests, hold no tests and are never packed:
 - `LogReader`, `Secrets`, `SidecarFiles` and `TempFolder`;
 - `PasswordFiles`, which skips a test of a password file;
 - the named answers of a column's nullability, `NullabilityAnswers`, and PostgreSQL's type modifiers, `Typmods`;
-- the harness of a describer's fixtures, in `Fixtures/`: its case writer `FixtureCaseFiles` and `FixtureProjects`.
+- in `Fixtures/`, the harness of a describer's fixtures, `FixtureCase`, `FixtureCases`, `FixtureReplay` and the case writer `FixtureCaseFiles`, and `FixtureProjects`, which copies a fixture project.
 
 The two libraries are apart because the tool raises Roslyn to a current version, which would reach RoslynFloor through one library.  Their types stay `internal`: `src/SqlSource` and `src/SqlSource.Tool` grant them `InternalsVisibleTo`, and each library grants it to the projects that reference it.
 
@@ -81,12 +81,12 @@ graph TD
 
 What each test project takes from the libraries:
 
-- `tests/SqlSource.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, and `tests/SqlSource.Tests.RoslynFloor` references it for the same.
+- `tests/SqlSource.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, `TestSidecars` and `RepositoryRoot`, and `tests/SqlSource.Tests.RoslynFloor` references it for the harness.
 - `tests/SqlSource.Tool.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, which `GeneratorParityTests` runs with the tool over the same sources, and `tests/SqlSource.Tool.Testing` for the helpers it shares with `tests/SqlSource.Tests.Postgres`.
-- `tests/SqlSource.Tests.Postgres` references `tests/SqlSource.Testing` for `RepositoryRoot`, `EndToEndFiles` and `AllTypesRows`, and `tests/SqlSource.Tool.Testing` for the fixture harness, the command harness of the tool's tests, `CliRun` and what it needs, `Programs` and `FixtureProjects`.
+- `tests/SqlSource.Tests.Postgres` references `tests/SqlSource.Testing` for `RepositoryRoot`, `EndToEndFiles`, `AllTypesRows`, `TestSidecars`, and `GeneratorHarness` and `Sidecars` of the harness, and `tests/SqlSource.Tool.Testing` for the fixture harness, the command harness of the tool's tests, `CliRun` and what it needs, `Programs` and `FixtureProjects`.
 - `tests/SqlSource.Tests.Postgres.Npgsql8` references `tests/SqlSource.Testing` for `RepositoryRoot`, `EndToEndFiles` and `AllTypesRows`, and nothing that brings Npgsql 10.
 
-`tests/SqlSource.Tests`, `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8` also use the generator the way a consumer does.  Their attributed types, in the `EndToEnd/` of the first two and at the root of the third, are compiled with the generator loaded, and each project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  Each gets them by path and the generator through a project reference.  [`tools/check-package-install.sh`](../tools/README.md#check-package-installsh) is what installs the packed package.
+`tests/SqlSource.Tests`, `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8` also use the generator the way a consumer does.  Their attributed types, in the `EndToEnd/` of the first two, in `Realistic/Generation/RealisticQueries.cs` of the second and at the root of the third, are compiled with the generator loaded, and each project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  Each gets them by path and the generator through a project reference.  [`tools/check-package-install.sh`](../tools/README.md#check-package-installsh) is what installs the packed package.
 
 ## The Npgsql 8 project
 
@@ -94,7 +94,7 @@ What each test project takes from the libraries:
 
 ## Fixture projects
 
-`tests/SqlSource.Tool.Tests/Fixtures/Projects/` holds small projects that are no part of the solution.  `ManifestTargetTests` and `FixtureProjectTests` copy one to a temporary folder outside the repository, with the package's two MSBuild files and `global.json` beside it, and run `dotnet msbuild` on it for real, the second through the tool's own code.  So these tests need the SDK that `global.json` pins, and take a second or two each.
+`tests/SqlSource.Tool.Tests/Fixtures/Projects/` holds small projects that are no part of the solution.  `ManifestTargetTests`, `FixtureProjectTests` and `TerminationTests` copy one to a temporary folder outside the repository, with the package's two MSBuild files and `global.json` beside it, and run `dotnet msbuild` on it for real, the second through the tool's own code and the third through the tool started as a process.  So these tests need the SDK that `global.json` pins, and take a second or two each.
 
 MSBuild reads the environment for its properties, and the workflow has a variable named `CONFIGURATION`, so in CI a fixture is evaluated as `Release`.  A test of a fixture expects no `Debug`, in a constant or in a path.
 

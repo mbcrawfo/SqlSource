@@ -148,9 +148,9 @@
     <!--
         What SqlSourceWriteManifest depends on.  A target's DependsOnTargets is read before the target runs, so the
         list is a property and is set here, where the file is imported: this and the nesting below are the elements of
-        the file that are not a target, and the second line here holds the file's one condition.  The trims make the
-        manifest hold trimmed values, and make a target of a project that hooks SqlSourceTrimMetadataOfFiles to add a
-        .sql file run first.
+        the file that are not a target, and the second line here holds the one condition outside a target.  The trims
+        make the manifest hold trimmed values, and make a target of a project that hooks SqlSourceTrimMetadataOfFiles
+        to add a .sql file run first.
 
         AddImplicitDefineConstants is a target of the SDK and not a contract: TD-0027.  It adds the constants of the
         framework, NET10_0 and NET8_0_OR_GREATER among them, which the SDK otherwise adds only on the way to a
@@ -188,8 +188,7 @@
         Writes the project manifest: what the compiler is given, for the sqlsource tool, which runs this target by
         name.  It hooks nothing on purpose, so no build runs it, and nothing of a build runs before it but the two
         trims and, for a project of the SDK, AddImplicitDefineConstants: a .sql file that a target adds is in the
-        manifest only when that target hooks
-        SqlSourceTrimMetadataOfFiles.  TD-0025.
+        manifest only when that target hooks SqlSourceTrimMetadataOfFiles.  TD-0025.
 
         The file is lines of key=value, and its format is a contract with the tool: the rules are in
         src/SqlSource/AGENTS.md, and the reasons in docs/architecture/msbuild-and-manifest.md.  The tool names the

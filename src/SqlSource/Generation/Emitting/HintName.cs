@@ -7,8 +7,9 @@ using System.Text;
 namespace SqlSource.Generation.Emitting;
 
 /// <summary>
-/// The name of a type's generated file.  The compiler compares these names ignoring case and throws on the second of
-/// two that are equal, which costs every type its generated code, so a name that would clash is made unique.
+/// The names of the generated files, a type's and a model's.  The compiler compares these names ignoring case and
+/// throws on the second of two that are equal, which costs every type its generated code, so a name that would clash
+/// is made unique.
 /// </summary>
 internal static class HintName
 {

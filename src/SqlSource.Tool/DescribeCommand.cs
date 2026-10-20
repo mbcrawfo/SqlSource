@@ -17,7 +17,8 @@ namespace SqlSource.Tool;
 
 /// <summary>
 /// The <c>describe</c> command.  It finds the unit and the projects, builds the plan of the run and reports what is
-/// wrong with it, and hands the plan to <see cref="DescribeRun" />, which describes and writes.
+/// wrong with it, and hands the plan to <see cref="DescribeRun" />, which describes, and writes or, under
+/// <c>--check</c>, compares.
 /// </summary>
 internal static class DescribeCommand
 {
@@ -306,7 +307,7 @@ internal static class DescribeCommand
 
     /// <summary>
     /// Builds the plan of the run that a command line asks for, and reports what is wrong with it.  Null when there
-    /// is nothing to plan: no unit, or no project that could be read.
+    /// is nothing to plan: no unit, or no project of it that uses SqlSource and could be read.
     /// </summary>
     /// <remarks>
     /// The summary of a run prints counts for each selected database and not which queries it selected, so a test

@@ -11,14 +11,15 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Planning;
 
-// What is wrong with a plan: each row of the spec's table, with its id, its place and what it does to the plan.
+// What is wrong with a plan: each row of its table in docs/superpowers/specs/2026-10-09-query-generation-phase-2-4-
+// work-list-design.md, with its id, its place and what it does to the plan.
 public sealed class RunPlannerErrorTests : IDisposable
 {
     private readonly TempFolder _folder = new();
 
     public void Dispose() => _folder.Dispose();
 
-    // A project whose dialect can be described, with one type that claims the folder "Q".
+    // A project of the given dialect, postgres unless a test names another, with one type that claims the folder "Q".
     private TestProject Project(string name = "App", string dialect = "postgres")
     {
         var project = new TestProject(_folder, name);
@@ -281,7 +282,7 @@ public sealed class RunPlannerErrorTests : IDisposable
         Plans.Result(project).Errors.Select(error => error.Descriptor.Id).ShouldBe(["SQLSRC209", "SQLSRC210"]);
     }
 
-    // Two types claim the file, one for its models and one for everything: a message names the greater.
+    // Two types claim the file with two outputs: a message names the greater.
     [Theory]
     [InlineData("Models", "CodeGen", "codegen")]
     [InlineData("Models", "Sql", "models")]

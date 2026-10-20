@@ -149,8 +149,8 @@ internal static class AttributeReader
             || expression.IsKind(SyntaxKind.DefaultLiteralExpression);
     }
 
-    // GeneratorOutput.Models, however GeneratorOutput is qualified.  Another member is not set: the compiler
-    // rejects it.
+    // A member of GeneratorOutput, GeneratorOutput.Models for one, however GeneratorOutput is qualified.  A name
+    // that is no member of it is not set: the compiler rejects it.
     private static bool TryReadOutput(ExpressionSyntax expression, out OutputKind? output)
     {
         output = null;

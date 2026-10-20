@@ -1,7 +1,7 @@
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres.Walk;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Columns;
 
 /// <summary>
 /// Whether a column can be <c>NULL</c>, as far as the catalog can answer, and where the answer came from.  The

@@ -14,8 +14,8 @@ namespace SqlSource.Snapshot.Reading;
 /// <see cref="SidecarTokenizer.MaxDepth" /> levels.  The second reads <c>formatVersion</c> before anything else: a
 /// reader of this format cannot say whether a file of another is well formed, so such a file is read as its version
 /// alone.  Then it reads the model.  An unknown key is skipped with its value at every level, a key the format marks
-/// "always" that is absent is read as null, and the first error ends the read.  A file the tool wrote is tokenized
-/// twice and no more: keep it so.
+/// "always" that is absent is read as null unless a reader cannot do without it, and the first error ends the read.
+/// A file the tool wrote is tokenized twice and no more: keep it so.
 /// </remarks>
 internal static class SidecarReader
 {

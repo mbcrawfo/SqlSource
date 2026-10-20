@@ -15,8 +15,8 @@ namespace SqlSource.Testing.Generator;
 // project that does not set it, for a test that needs that, of the default, of the output's levels or of a reader.
 // An entry of the same name in the properties wins.
 //
-// The keys are spelled out here, not taken from the generator, so that a change to the generator's spelling fails a
-// test.
+// The keys and the values of the output are spelled out here, not taken from the generator, so that a change to the
+// generator's spelling fails a test.
 internal sealed class TestOptionsProvider(
     OutputKind? output,
     string? generatorParameters,
@@ -77,7 +77,6 @@ internal sealed class TestOptionsProvider(
         return new Options(values);
     }
 
-    // Spelled out, as the keys are, so that a change to the generator's spelling fails a test.
     private static string? Spell(OutputKind? output) =>
         output switch
         {

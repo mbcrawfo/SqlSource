@@ -31,7 +31,7 @@ GitHub Actions workflows.  [`workflows/README.md`](workflows/README.md) says wha
   - It is bound to three names: `name: CI` in `workflows/ci.yml`, the `coverage` artifact that `workflows/build.yml` uploads, and `SummaryGithub.md` inside it.  Change one and change the workflow in the same commit.
 - **Version values reach MSBuild as the job-level environment variables `BuildNumber` and `VersionSuffix`**, not as `-p:` flags, so that the format check, build, test and pack steps cannot disagree.
 - **An expression cannot yield an empty string from the middle of `&&`/`||`.**  `cond && '' || x` always yields `x`.  Put the empty string last, as `publish.yml` does.
-- Files here are limited to 120 characters per line.  Fold long commands with `>-` or `\`.
+- The workflow files are limited to 120 characters per line; `tools/editorconfig-checker.sh` skips the Markdown files here.  Fold long commands with `>-` or `\`.
 - Run `tools/actionlint.sh` after any change.  A change to `publish.yml` or `coverage-comment.yml` is never exercised before merge: a manual run of `publish.yml` on a branch skips every job, and a pull request runs the `coverage-comment.yml` on `main`, so actionlint and a careful read are the only checks; say in the pull request that the change is untried.
 
 > Maintenance: this file names specific files and folders.  If you rename, move, or remove them, update this file in the same commit.

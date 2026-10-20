@@ -7,7 +7,7 @@ namespace SqlSource.Diagnostics;
 
 /// <summary>
 /// Every diagnostic the generator reports.  Each is an error that a consumer cannot turn off, unless its descriptor
-/// says why it is a warning a project may configure; <c>SqlDiagnosticsTests</c> lists those by id.
+/// says why a project may configure it, as a warning or as information; <c>SqlDiagnosticsTests</c> lists those by id.
 /// </summary>
 /// <remarks>
 /// Adding, removing or changing one also changes <c>AnalyzerReleases.Unshipped.md</c> and
@@ -486,8 +486,8 @@ internal static class SqlDiagnostics
     );
 
     // {0} is the column or parameter, as "column 'id'", {1} its type as the database spells it, and {2} the help,
-    // without its period: the cast for a type Npgsql reads once it is cast, and otherwise the type override's entry
-    // for its key.
+    // without its period: the cast for a type Npgsql reads once it is cast, 'sqlsource describe' for a type that only
+    // a sidecar edited by hand or written by a newer tool has, and otherwise the type override's entry for its key.
     public static readonly DiagnosticDescriptor TypeHasNoCSharpType = new(
         id: "SQLSRC246",
         title: "Type has no C# type",

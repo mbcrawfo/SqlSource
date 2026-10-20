@@ -1,4 +1,4 @@
-namespace SqlSource.Settings;
+namespace SqlSource.Settings.ClrTypes;
 
 /// <summary>
 /// One array rank of a <see cref="ClrTypeName" />: <c>[]</c>, <c>[,]</c>, or either after a <c>?</c>.

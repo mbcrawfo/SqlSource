@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Columns;
 
 /// <summary>
 /// Which type a column has.  The row description flattens a domain to its base type with the domain's modifier,

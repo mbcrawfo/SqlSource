@@ -3,10 +3,11 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Columns;
 using SqlSource.Tool.Testing;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Columns;
 
 // One column of a sidecar from one row of "columns".
 public sealed class PostgresColumnsTests

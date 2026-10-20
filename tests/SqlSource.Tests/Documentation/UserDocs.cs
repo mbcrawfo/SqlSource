@@ -84,8 +84,8 @@ internal static partial class UserDocs
     // Whether a link names a file of this repository on GitHub, in any of the forms of its URLs that show one.
     public static bool IsRepositoryLink(string target) => RepositoryLinkPattern().IsMatch(target);
 
-    // What is wrong with the form of a link to the repository on GitHub: it must be `blob/main/`, the URL that does
-    // not change with a branch or a commit.  Null when the form is right, and for a link to anything else.
+    // What is wrong with the form of a link to the repository on GitHub: it must be `blob/main/` or `tree/main/`, the
+    // URLs that do not change with a branch or a commit.  Null when the form is right, and for a link to anything else.
     public static string? RepositoryLinkProblem(string target) =>
         RepositoryLinkPattern().Match(target) is { Success: true } match && !IsMain(match)
             ? $"use {RepositoryUrl}<path>: only blob/main and tree/main are followed"

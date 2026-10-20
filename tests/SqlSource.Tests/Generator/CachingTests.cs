@@ -306,8 +306,7 @@ public sealed class CachingTests
 
         AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
 
-        // No file was read: the two inputs of the read, the file with what its parse depends on and the claimed
-        // paths, are the ones it had.
+        // No file was read.
         ParseInputs(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -551,8 +550,7 @@ public sealed class CachingTests
 
         AllReasons(result, TrackingNames.ProjectSettings).ShouldBe([IncrementalStepRunReason.Modified]);
 
-        // No file was read: the two inputs of the read, the file with what its parse depends on and the claimed
-        // paths, are the ones it had.
+        // No file was read.
         ParseInputs(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -650,8 +648,7 @@ public sealed class CachingTests
 
         AllReasons(result, TrackingNames.CommentPaths).ShouldBe([IncrementalStepRunReason.Cached]);
 
-        // No file was read: the two inputs of the read, the file with what its parse depends on and the claimed
-        // paths, are the ones it had.
+        // No file was read.
         ParseInputs(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
@@ -1450,10 +1447,10 @@ public sealed class CachingTests
         static bool IsShared(SyntaxTree tree) => tree.FilePath.EndsWith("Row-Model.g.cs", StringComparison.Ordinal);
     }
 
-    // The accepted cost of SelectMany: its nodes are matched by their place in the list, which is sorted by the
-    // models' full names, not by name.  A model added sorted first takes the place of the one that was first, and
-    // every model after it moves down a place, so each is emitted again.  This pins the cost so that it is not made
-    // worse unseen.
+    // The accepted cost of SelectMany (TD-0060): its nodes are matched by their place in the list, not by name, and
+    // the list is sorted by the models' full names.  A model added sorted first takes the place of the one that was
+    // first, and every model after it moves down a place, so each is emitted again.  This pins the cost so that it is
+    // not made worse unseen.
     [Fact]
     public void Run_ModelAdded_EmitsTheModelsAfterItAgain()
     {
@@ -1518,8 +1515,7 @@ public sealed class CachingTests
         OutputReasons(result).Distinct().ShouldBe([IncrementalStepRunReason.Cached]);
     }
 
-    // The collection type is read by the methods of a type and by no model, so the requests of each type come out
-    // equal and nothing after them runs.
+    // No model reads the collection type, so the requests of each type come out equal and nothing after them runs.
     [Fact]
     public void Run_CollectionTypePropertyChanged_EmitsNoModelAgain()
     {

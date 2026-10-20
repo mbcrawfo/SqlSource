@@ -52,7 +52,8 @@ public sealed class SidecarReaderTests
     private const string SqlServerType = /*lang=json*/
         "{'name': 'int', 'maxLength': 4, 'precision': 10, 'scale': 0}";
 
-    // Valid with every object's keys in the opposite order, so that the version and each entry's engine come last.
+    // Valid with every object's keys in the opposite order: the version comes last, and each entry's engine and hash
+    // after its arrays.
     // SidecarReaderRobustnessTests damages it too.
     internal static readonly string Reordered = CreateReordered();
 
@@ -834,7 +835,7 @@ public sealed class SidecarReaderTests
             "name"
         );
 
-    // An unknown kind is the "unsupported type" of phase 5, at the column: the reader keeps it and asks nothing more.
+    // An unknown kind is kept, for the type map to judge at the column: the reader asks nothing more.
     [Fact]
     public void Read_KindTheReaderDoesNotKnow_KeepsItAndRequiresNoNestedType()
     {

@@ -1,4 +1,4 @@
-namespace SqlSource.Settings;
+namespace SqlSource.Settings.ClrTypes;
 
 /// <summary>One type argument of a <see cref="ClrNamePart" />.</summary>
 /// <param name="Type">The argument's type.</param>

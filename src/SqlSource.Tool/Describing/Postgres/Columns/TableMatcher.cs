@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Columns;
 
 /// <summary>
 /// Whether a query's result is exactly one relation's column list, so that the generator can name the model after

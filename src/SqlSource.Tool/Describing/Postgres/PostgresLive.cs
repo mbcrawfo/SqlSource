@@ -234,8 +234,8 @@ internal sealed class PostgresLive(PostgresConnection connection)
     {
         try
         {
-            // The one text that holds a user's SQL: the driver is given it as one statement and may not split it.  The
-            // read gives it again as a parameter's value, which is never parsed.
+            // One of the two texts that hold a user's SQL, with that of "check": the driver is given it as one
+            // statement and may not split it.  The read gives it again as a parameter's value, which is never parsed.
             var text = ParameterPlaceholders.PrepareText(asked.Statement, asked.Types, asked.Sql);
             await connection.ExecuteAsOneStatementAsync(text, token);
 

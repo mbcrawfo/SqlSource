@@ -9,8 +9,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Generator;
 
-// The settings that have no effect yet on generated code are accepted at every level they have, and a value none of
-// them takes is reported where it was written.  The output's levels change only the diagnostics so far.
+// The settings of models and methods are accepted at every level they have, and a value none of them takes is
+// reported where it was written.  Without a dialect no query can have models, so they change only the diagnostics.
 //
 // Every run leaves the output unset, since the output's levels are among what these tests compare.  The project
 // sets no dialect either, so a query whose output is the default, codegen, is SQLSRC209 at its name.
@@ -188,8 +188,8 @@ public sealed class SettingLevelTests
         run.Sources.Keys.ShouldNotContain("App.Sample.g.cs");
     }
 
-    // The markers that have no effect yet, in a preamble and in a query: the type's file is the one of the same file
-    // without them.  The output's markers and the tokens' defaults change only the diagnostics.
+    // The markers that change no type's file without a dialect, in a preamble and in a query: the type's file is the
+    // one of the same file without them.  The output's markers and the tokens' defaults change only the diagnostics.
     [Theory]
     [MemberData(nameof(MarkersWithoutAnEffect))]
     public void Run_MarkersWithoutAnEffect_GiveTheFileOfTheSameQueryWithoutThem(

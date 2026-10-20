@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using System.Text;
 using Microsoft.CodeAnalysis.CSharp;
 
-namespace SqlSource.Settings;
+namespace SqlSource.Settings.ClrTypes;
 
 /// <summary>
 /// A C# type as the type override names it: a keyword, or a name qualified from the global namespace, with its type

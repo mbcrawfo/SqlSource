@@ -362,8 +362,8 @@ public sealed class SharedModelTests
         run.Sources["App.GetUserDto-Model.g.cs"].ShouldContain("    public sealed record GetUserDto(int Id);\n");
     }
 
-    // Review focus 2: C# tells the two names apart, and the compiler, which compares the names of generated files
-    // ignoring case, would throw on two files whose names are equal so: each file's name is made unique.
+    // C# tells the two names apart, and the compiler, which compares the names of generated files ignoring case,
+    // would throw on two files whose names are equal so: each file's name is made unique.
     [Fact]
     public void Run_FullNamesThatDifferByCase_GetFilesOfTheirOwn()
     {

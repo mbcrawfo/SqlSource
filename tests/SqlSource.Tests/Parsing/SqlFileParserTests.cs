@@ -1392,7 +1392,7 @@ public sealed class SqlFileParserTests
             ]);
     }
 
-    // A comment that only starts like a marker is a marker now, and says so at its value.
+    // A comment that only starts like a marker is one, and is reported at its value.
     [Theory]
     [InlineData("output", "the rows we need")]
     [InlineData("output", "model")]

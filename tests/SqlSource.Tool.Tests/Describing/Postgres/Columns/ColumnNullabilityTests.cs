@@ -1,9 +1,9 @@
 using Shouldly;
 using SqlSource.Snapshot;
-using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Columns;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Columns;
 
 // The arms of ColumnNullability.Of, in its order: the first that fits a column is its answer.
 public sealed class ColumnNullabilityTests

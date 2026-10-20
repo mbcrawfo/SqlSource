@@ -1,4 +1,4 @@
-namespace SqlSource.Settings;
+namespace SqlSource.Settings.ClrTypes;
 
 /// <summary>
 /// One part of a <see cref="ClrTypeName" /> between periods: a namespace's name or a type's, with the type's

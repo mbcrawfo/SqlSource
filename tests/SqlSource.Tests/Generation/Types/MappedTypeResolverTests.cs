@@ -3,7 +3,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation.Types;
-using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
 using SqlSource.Testing.Generator;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;

@@ -12,8 +12,8 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // A project that sees the internals of another one that uses SqlSource, as a test project sees the project it tests.
-// Both hold the generated attribute and enum, and the compiler warns (CS0436) at every use of either name in this
-// project's own code.  The package turns that warning off, for the generated types only.
+// Both hold the generated attribute and enums, and the compiler warns (CS0436) at every use of one of their names
+// in this project's own code.  The package turns that warning off, for the generated types only.
 public sealed class AttributeConflictTests
 {
     private const string InternalsVisible =
@@ -194,7 +194,7 @@ public sealed class AttributeConflictTests
         Places(build).ShouldHaveSingleItem().ShouldStartWith("CS0436 ");
     }
 
-    // The other project, compiled with the generator: it holds the attribute and the enum too.
+    // The other project, compiled with the generator: it holds the attribute and the enums too.
     private static MetadataReference Other(OutputKind? output) =>
         GeneratorHarness.CreateReference(output, "Other", InternalsVisible + "public class InOther { }\n");
 

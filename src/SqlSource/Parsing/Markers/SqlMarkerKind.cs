@@ -1,4 +1,4 @@
-namespace SqlSource.Parsing;
+namespace SqlSource.Parsing.Markers;
 
 /// <summary>
 /// The marker comments the parser gives meaning to.

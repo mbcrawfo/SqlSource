@@ -1,6 +1,6 @@
 using System;
 
-namespace SqlSource.Parsing;
+namespace SqlSource.Parsing.Markers;
 
 /// <summary>
 /// Recognises marker comments.

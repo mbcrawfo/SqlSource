@@ -7,7 +7,7 @@ using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
-using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
 
 namespace SqlSource.Generation.Types;
 

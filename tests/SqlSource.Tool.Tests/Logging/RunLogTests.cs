@@ -122,7 +122,7 @@ public sealed class RunLogTests : IDisposable
                 "sidecar",
                 "run.end",
             ]);
-        // The second describe took 25 ms more on the clock than the first: every event has the time it was written.
+        // The run before this one took 50 ms, and ListUsers 25 ms more: every event has the time it was written.
         Text(events[6], "time").ShouldBe("2026-10-09T14:02:11.487Z");
     }
 

@@ -5,7 +5,7 @@ namespace SqlSource.Settings;
 /// </summary>
 /// <param name="Parameters">The list of generator parameters.</param>
 /// <param name="Output">
-/// What is generated for the query.  So far it decides only whether the query needs an entry in its file's sidecar.
+/// What is generated for the query: whether it needs an entry in its file's sidecar, and whether it gets models.
 /// </param>
 /// <param name="InputModelSuffix">What ends the name of the type of the query's parameters.</param>
 /// <param name="OutputModelSuffix">What ends the name of the type of a row of the query's result.</param>
@@ -38,8 +38,8 @@ internal readonly record struct QuerySettings(
 
     /// <summary>
     /// Resolves each setting from the most specific level that has it: the markers of the query and its file, then
-    /// the attribute, then the metadata of the file's item, then the project's property, then the default.  Only
-    /// <see cref="Parameters" /> and <see cref="Output" /> have an effect yet.  The type override is not among them:
+    /// the attribute, then the metadata of the file's item, then the project's property, then the default.
+    /// <see cref="CollectionType" /> has no effect yet.  The type override is not among them:
     /// <see cref="ResolveTypeOverrides" /> gives it.
     /// </summary>
     public static QuerySettings Resolve(

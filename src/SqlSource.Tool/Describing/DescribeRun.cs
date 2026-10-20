@@ -10,7 +10,8 @@ using SqlSource.Tool.Reporting;
 namespace SqlSource.Tool.Describing;
 
 /// <summary>
-/// A run of <c>describe</c> after its plan: the steps of the spec, in order, each a unit of its own.
+/// A run of <c>describe</c> after its plan: the steps of "a describe run" in docs/architecture/tool.md, in order, each
+/// a unit of its own.
 /// </summary>
 /// <remarks>
 /// The step that gives each file's outcome, <see cref="FileOutcomes" />, and the one that applies the outcomes to

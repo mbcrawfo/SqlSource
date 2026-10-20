@@ -90,8 +90,8 @@ public sealed class SidecarWriterTests
         text.ShouldContain("\"database\": \"a" + escape + "b\",\n", Case.Sensitive);
     }
 
-    // Every other character is written as it is: a solidus, DEL, a line separator, a letter outside ASCII, a pair of
-    // surrogates and one alone.
+    // Every other character is written as it is: a solidus, a space, DEL, a line separator, a letter outside ASCII and
+    // a surrogate alone.
     [Theory]
     [InlineData(0x2F)]
     [InlineData(0x20)]

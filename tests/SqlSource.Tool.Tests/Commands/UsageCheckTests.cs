@@ -294,8 +294,8 @@ public sealed class UsageCheckTests
             ]);
     }
 
-    // The same as the test above it, for the commands of the tool itself, whose "describe" takes several paths and
-    // has rules of its own.
+    // The same as Check_EveryAcceptedCommandLine_IsReadTheSameBySystemCommandLine, for the commands of the tool
+    // itself, whose "describe" takes several paths and has rules of its own.
     [Fact]
     public void Check_EveryAcceptedCommandLineOfTheTool_IsReadTheSameBySystemCommandLine()
     {

@@ -16,8 +16,9 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Describer;
 
 // The whole "describe" command in process, as Cli.Run runs it, with the PostgreSQL describer against the container:
-// one postgres project in the run's folder whose .sql files are of the database "app", and that database's
-// connection on the command line.  The tool's own tests run the same command with a describer of their own.
+// one postgres project in the run's folder whose .sql files name the database "app", and a connection for "app" on
+// the command line to the container's database "fixtures", the one the describer's fixtures were recorded on.  The
+// tool's own tests run the same command with a describer of their own.
 [Collection(UsesPostgres.Name)]
 public sealed class DescribeCommandTests : IDisposable
 {

@@ -191,8 +191,7 @@ public sealed class FilterRunTests : IDisposable
         File.Exists(SidecarFormat.PathFor(_plain)).ShouldBeFalse();
     }
 
-    // The plan drops a setting or a claim it could not read, so after an error a file can look as if it needs no
-    // entry.  A run that reported anything deletes nothing.
+    // A run that reported anything deletes nothing: an error of a describer as much as one of the plan.
     [Fact]
     public async Task Run_FileThatNeedsNoEntry_KeepsItsSidecarInARunThatReportedAnError()
     {

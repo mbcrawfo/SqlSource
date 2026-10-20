@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0063`
+Next id: `TD-0066`
 
 ## Active items
 
@@ -46,6 +46,9 @@ Next id: `TD-0063`
 | [TD-0059](TD-0059-array-of-another-schema-has-two-keys.md) | Open | 2026-10-18 | Low | An array of a type outside `pg_catalog` has two keys of the type override, `public._user_status` and `public.user_status[]`: the first wins over the second at any level, and two entries for them in one scope are not `SQLSRC112` |
 | [TD-0060](TD-0060-model-added-or-removed-writes-the-models-after-it-again.md) | Open | 2026-10-18 | Low | A model added or removed writes again, and adds again the source of, every model sorted after it by full name, since the nodes after the `SelectMany` of `Models` are matched by their place |
 | [TD-0062](TD-0062-record-models-with-arrays-and-dapper.md) | Open | 2026-10-19 | Low | Dapper cannot read rows into a record model with an array column, since Npgsql gives the column's type as `System.Array` and no constructor takes it, so such a model read through Dapper must be a class |
+| [TD-0063](TD-0063-duplicated-and-uneven-patterns-in-src.md) | Open | 2026-10-19 | Low | Duplicated and uneven patterns in `src/`: rules of the generator that the tool copies, the database's comparer and level resolved by hand, marker lists kept in step by hand, a 450-line `Initialize`, and small duplicates |
+| [TD-0064](TD-0064-duplicated-helpers-of-the-model-and-container-tests.md) | Open | 2026-10-19 | Low | The model tests' harness copied into seven classes of `Generator/`, a describer opened and a database seeded in several ways, two large classes that mix subjects, and magic strings |
+| [TD-0065](TD-0065-tests-that-depend-on-the-process-the-clock-or-the-repository.md) | Open | 2026-10-19 | Low | Tests that run `dotnet` with no timeout or from the path, run on the machine's clock, poll with four limits, read the repository by two routes, or leave objects on the shared server in three ways |
 
 ## Columns
 

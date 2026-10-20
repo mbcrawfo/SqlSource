@@ -7,8 +7,8 @@ namespace SqlSource.Tool.Tests.Projects;
 
 public sealed class ManifestReaderTests
 {
-    // The example of docs/superpowers/specs/2026-10-09-query-generation-phase-2-3-project-manifest-design.md, with
-    // every line the target writes.
+    // The example of docs/superpowers/specs/2026-10-09-query-generation-phase-2-3-project-manifest-design.md, grown
+    // to a line for every setting of the project and of its first file, a second file and a second Compile item.
     private const string Example = """
         SqlSourceManifest=1
         Project=/work/src/App/App.csproj

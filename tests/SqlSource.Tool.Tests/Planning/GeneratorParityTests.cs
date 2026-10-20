@@ -18,7 +18,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tool.Tests.Planning;
 
 // The plan must agree with the generator on which type claims which file with which output: a query the tool does
-// not describe is a build error from phase 5, and one it describes for nothing costs a description.  The generator
+// not describe is a build error, SQLSRC241, and one it describes for nothing costs a description.  The generator
 // reads symbols and the tool reads syntax, so each case runs both over the same sources and file list and compares
 // what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text.
 public sealed class GeneratorParityTests : IDisposable

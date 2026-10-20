@@ -1,6 +1,6 @@
 using Microsoft.CodeAnalysis.Text;
 
-namespace SqlSource.Parsing;
+namespace SqlSource.Parsing.Markers;
 
 /// <summary>
 /// A marker comment found in a <c>.sql</c> file.

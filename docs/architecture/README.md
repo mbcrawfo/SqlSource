@@ -67,7 +67,7 @@ A statement with rows in whose SQL the PostgreSQL describer's `OuterJoinGate.IsG
 
 ### Hint name
 
-The name of a type's generated file, which `HintName` builds from the type's namespace and names, as `<namespace>.<type>.g.cs`.  The compiler compares hint names ignoring case and throws on a clash, so a name that would clash gets a hash added.
+The name of a generated file, which `HintName` builds from identifier values: `<namespace>.<type>.g.cs` for a type's file, from its namespace and names, and `<full name>-Model.g.cs` for a model's, from its namespace and name.  The compiler compares hint names ignoring case and throws on a clash, so a name that would clash gets a hash added.
 
 ### Manifest
 

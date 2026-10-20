@@ -1,10 +1,10 @@
 using System;
 using System.Linq;
 using Shouldly;
-using SqlSource.Settings;
+using SqlSource.Settings.ClrTypes;
 using Xunit;
 
-namespace SqlSource.Tests.Settings;
+namespace SqlSource.Tests.Settings.ClrTypes;
 
 // The forms of the grammar are TypeOverrideGrammarTests'.  These are the parts of a name that the resolution of a
 // mapped type walks.
