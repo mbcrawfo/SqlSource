@@ -104,6 +104,90 @@ public sealed class PlanNodeTests
     public void Read_NodeWithGroupingSets_SaysSo(string text) =>
         PlanNode.Read(text).ShouldNotBeNull().HasGroupingSets.ShouldBeTrue();
 
+    // An aggregate's strategy, whether it groups by a key, and whether it has a HAVING.
+    [Fact]
+    public void Read_AggregateKeys_AreRead()
+    {
+        var grouped = PlanNode
+            .Read( /*lang=json,strict*/
+                """
+                [{"Plan": {"Node Type": "Aggregate", "Strategy": "Sorted", "Group Key": ["a.id"],
+                    "Filter": "(count(*) > 1)"}}]
+                """
+            )
+            .ShouldNotBeNull();
+        var plain = PlanNode
+            .Read( /*lang=json,strict*/
+                """[{"Plan": {"Node Type": "Aggregate", "Strategy": "Plain", "Group Key": []}}]"""
+            )
+            .ShouldNotBeNull();
+
+        grouped.Strategy.ShouldBe("Sorted");
+        grouped.HasGroupKey.ShouldBeTrue();
+        grouped.HasFilter.ShouldBeTrue();
+        plain.Strategy.ShouldBe("Plain");
+        plain.HasGroupKey.ShouldBeFalse();
+        plain.HasFilter.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Read_NodeWithoutAggregateKeys_HasNone()
+    {
+        var root = PlanNode.Read(Swapped).ShouldNotBeNull();
+
+        root.Strategy.ShouldBeNull();
+        root.HasGroupKey.ShouldBeFalse();
+        root.HasFilter.ShouldBeFalse();
+    }
+
+    // The members partition pruning removed from an Append: their number, and 0 when the key is absent.
+    [Theory]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": 2}}]""",
+        2
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": 0}}]""",
+        0
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append"}}]""",
+        0
+    )]
+    public void Read_SubplansRemoved_IsTheirNumber(string text, int removed) =>
+        PlanNode.Read(text).ShouldNotBeNull().SubplansRemoved.ShouldBe(removed);
+
+    // A count that is no integer of zero or more is no plan the walk can read.
+    [Theory]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": "2"}}]"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": -1}}]"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Append", "Subplans Removed": 1.5}}]"""
+    )]
+    public void Read_SubplansRemovedThatIsNoCount_IsNoPlan(string text) => PlanNode.Read(text).ShouldBeNull();
+
+    // The keys PostgresPlans writes are read back as they were.
+    [Fact]
+    public void Read_TextOfAPlanATestWrote_KeepsTheAggregateKeys()
+    {
+        var aggregate = Over("Aggregate", Scan("a")) with { Strategy = "Hashed", HasGroupKey = true, HasFilter = true };
+
+        var read = PlanNode.Read(Text(aggregate)).ShouldNotBeNull();
+
+        (read.Strategy, read.HasGroupKey, read.HasFilter).ShouldBe(("Hashed", true, true));
+    }
+
+    [Fact]
+    public void Read_TextOfAPlanATestWrote_KeepsSubplansRemoved() =>
+        PlanNode
+            .Read(Text(Append(Member("p_1", "t_1")) with { SubplansRemoved = 3 }))
+            .ShouldNotBeNull()
+            .SubplansRemoved.ShouldBe(3);
+
     [Theory]
     [InlineData("")]
     [InlineData("not json")]
@@ -138,6 +222,9 @@ public sealed class PlanNodeTests
     )]
     [InlineData( /*lang=json,strict*/
         """[{"Plan": {"Node Type": "SetOp", "Command": 1}}]"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Aggregate", "Strategy": 1}}]"""
     )]
     [InlineData( /*lang=json,strict*/
         """[{"Plan": {"Node Type": "Result", "Plans": {}}}]"""

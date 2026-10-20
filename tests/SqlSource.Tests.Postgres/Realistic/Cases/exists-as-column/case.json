@@ -1,4 +1,8 @@
 {
+  "checkedFrom": {
+    "major": 18,
+    "why": "only PostgreSQL 18 proves an EXISTS column never NULL, and the sidecar is written on 18"
+  },
   "columns": [
     { "name": "id", "nullable": false },
     { "name": "name", "nullable": false },

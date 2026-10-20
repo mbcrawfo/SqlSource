@@ -177,7 +177,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
 
         var entry = root.Output.ShouldNotBeNull()[ordinal];
         entry.ShouldBe(printed);
-        PlanExpression.NullableOf(entry, catalogFunctions: true, static _ => false).ShouldBe(expected);
+        PlanExpression.NullableOf(entry, new ExpressionContext(true, static _ => null)).ShouldBe(expected);
     }
 
     // The root of a set operation prints its first branch, whatever the operation.
@@ -374,8 +374,186 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
             found.Add(await reader.GetFieldValueAsync<uint>(0, token), reader.GetString(1));
         }
 
-        expected.Count.ShouldBe(15);
+        expected.Count.ShouldBe(19);
         found.ShouldBe(expected, ignoreOrder: true);
+    }
+
+    // Each operator and function TotalFunctions reads is pg_catalog's own, of exactly that name and those argument
+    // types, returning that type, and implemented by the C function the row names: an operator by a function of
+    // pg_catalog whose prosrc that is, and a plain function returning one value whose own prosrc it is.  Every row
+    // that is not so is listed.
+    [Fact]
+    public async Task Catalog_TotalFunctions_ArePgCatalogsOwn()
+    {
+        var operators = TotalFunctions.Operators.ToArray();
+        var functions = TotalFunctions.Functions.ToArray();
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        var token = TestContext.Current.CancellationToken;
+        var mismatches = new List<string>();
+
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT r.ordinal
+                FROM unnest($1::text[], $2::oid[], $3::oid[], $4::oid[], $5::text[]) WITH ORDINALITY
+                    AS r (name, oprleft, oprright, result, implementation, ordinal)
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_operator AS o
+                    JOIN pg_catalog.pg_proc AS p ON p.oid = o.oprcode
+                    WHERE o.oprnamespace = 'pg_catalog'::regnamespace
+                        AND o.oprname = r.name
+                        AND o.oprleft = r.oprleft
+                        AND o.oprright = r.oprright
+                        AND o.oprresult = r.result
+                        AND p.pronamespace = 'pg_catalog'::regnamespace
+                        AND p.prolang = (SELECT l.oid FROM pg_catalog.pg_language AS l WHERE l.lanname = 'internal')
+                        AND p.prosrc = r.implementation
+                )
+                ORDER BY r.ordinal
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(
+                new NpgsqlParameter { Value = operators.Select(static row => row.Name).ToArray() }
+            );
+            _ = command.Parameters.Add(Oids(operators.Select(static row => row.Left)));
+            _ = command.Parameters.Add(Oids(operators.Select(static row => row.Right)));
+            _ = command.Parameters.Add(Oids(operators.Select(static row => row.Result)));
+            _ = command.Parameters.Add(
+                new NpgsqlParameter { Value = operators.Select(static row => row.Implementation).ToArray() }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                var (name, left, right, result, implementation) = operators[reader.GetInt64(0) - 1];
+                mismatches.Add($"operator {name}({left}, {right}) -> {result} by {implementation}");
+            }
+        }
+
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT r.ordinal
+                FROM unnest($1::text[], $2::text[], $3::oid[], $4::text[]) WITH ORDINALITY
+                    AS r (name, arguments, result, implementation, ordinal)
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_proc AS p
+                    WHERE p.pronamespace = 'pg_catalog'::regnamespace
+                        AND p.proname = r.name
+                        AND p.proargtypes = r.arguments::oidvector
+                        AND p.prorettype = r.result
+                        AND p.prokind = 'f'
+                        AND NOT p.proretset
+                        AND p.prolang = (SELECT l.oid FROM pg_catalog.pg_language AS l WHERE l.lanname = 'internal')
+                        AND p.prosrc = r.implementation
+                )
+                ORDER BY r.ordinal
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(
+                new NpgsqlParameter { Value = functions.Select(static row => row.Name).ToArray() }
+            );
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = functions.Select(static row => string.Join(' ', row.Arguments)).ToArray(),
+                }
+            );
+            _ = command.Parameters.Add(Oids(functions.Select(static row => row.Result)));
+            _ = command.Parameters.Add(
+                new NpgsqlParameter { Value = functions.Select(static row => row.Implementation).ToArray() }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                var (name, arguments, result, implementation) = functions[reader.GetInt64(0) - 1];
+                mismatches.Add($"function {name}({string.Join(", ", arguments)}) -> {result} by {implementation}");
+            }
+        }
+
+        mismatches.ShouldBeEmpty();
+        operators.Length.ShouldBe(178);
+        functions.Length.ShouldBe(5);
+
+        static NpgsqlParameter Oids(IEnumerable<long> oids) =>
+            new() { Value = oids.Select(static oid => (uint)oid).ToArray(), DataTypeName = "oid[]" };
+    }
+
+    // Each aggregate TotalFunctions reads is pg_catalog's own, of exactly that name and those argument types, returning
+    // that type, a plain aggregate of one value and no ordered set, whose transition function and final one are the
+    // internal functions of pg_catalog the row names, or no final one for "-".  Every row that is not so is listed.
+    [Fact]
+    public async Task Catalog_TotalAggregates_ArePgCatalogsOwn()
+    {
+        var aggregates = TotalFunctions.Aggregates.ToArray();
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand(
+            """
+            SELECT r.ordinal
+            FROM unnest($1::text[], $2::text[], $3::oid[], $4::text[], $5::text[]) WITH ORDINALITY
+                AS r (name, arguments, result, transition, final, ordinal)
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_proc AS p
+                JOIN pg_catalog.pg_aggregate AS a ON a.aggfnoid = p.oid
+                JOIN pg_catalog.pg_proc AS t ON t.oid = a.aggtransfn
+                LEFT JOIN pg_catalog.pg_proc AS f ON f.oid = a.aggfinalfn
+                WHERE p.pronamespace = 'pg_catalog'::regnamespace
+                    AND p.proname = r.name
+                    AND p.proargtypes = r.arguments::oidvector
+                    AND p.prorettype = r.result
+                    AND p.prokind = 'a'
+                    AND NOT p.proretset
+                    AND a.aggkind = 'n'
+                    AND t.pronamespace = 'pg_catalog'::regnamespace
+                    AND t.prolang = (SELECT l.oid FROM pg_catalog.pg_language AS l WHERE l.lanname = 'internal')
+                    AND t.proname = r.transition
+                    AND (
+                        (r.final = '-' AND a.aggfinalfn = 0)
+                        OR (
+                            f.pronamespace = 'pg_catalog'::regnamespace
+                            AND f.prolang = (SELECT l.oid FROM pg_catalog.pg_language AS l WHERE l.lanname = 'internal')
+                            AND f.proname = r.final
+                        )
+                    )
+            )
+            ORDER BY r.ordinal
+            """
+        );
+        _ = command.Parameters.Add(new NpgsqlParameter { Value = aggregates.Select(static row => row.Name).ToArray() });
+        _ = command.Parameters.Add(
+            new NpgsqlParameter { Value = aggregates.Select(static row => string.Join(' ', row.Arguments)).ToArray() }
+        );
+        _ = command.Parameters.Add(
+            new NpgsqlParameter
+            {
+                Value = aggregates.Select(static row => (uint)row.Result).ToArray(),
+                DataTypeName = "oid[]",
+            }
+        );
+        _ = command.Parameters.Add(
+            new NpgsqlParameter { Value = aggregates.Select(static row => row.Transition).ToArray() }
+        );
+        _ = command.Parameters.Add(
+            new NpgsqlParameter { Value = aggregates.Select(static row => row.Final).ToArray() }
+        );
+
+        var token = TestContext.Current.CancellationToken;
+        var mismatches = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+        {
+            var (name, arguments, result, transition, final) = aggregates[reader.GetInt64(0) - 1];
+            mismatches.Add($"aggregate {name}({string.Join(", ", arguments)}) -> {result} by {transition} and {final}");
+        }
+
+        mismatches.ShouldBeEmpty();
+        aggregates.Length.ShouldBe(38);
     }
 
     // The types that carry a modifier are every type of the catalog with a typmod input, but the arrays, whose
@@ -492,6 +670,146 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         join.Output.ShouldNotBeNull().Take(3).ShouldBe(["u.id", "('x'::text)", "COALESCE(o.note, 'z'::text)"]);
         var scan = path.Single(static node => node.Alias == "o");
         scan.Output.ShouldNotBeNull().ShouldContain("'x'::text");
+    }
+
+    // An operator, a function and a cast print with the implicit casts of their arguments, and bare where the session
+    // would resolve the same one from its name and those argument types.  The text is the same on 14 and on 18.
+    [Theory]
+    [InlineData("u.balance * 2", "(balance * '2'::numeric)")]
+    [InlineData("u.id::bigint * 2", "((id)::bigint * 2)")]
+    [InlineData("lower(u.name) || '!'", "(lower((name)::text) || '!'::text)")]
+    [InlineData("length(u.name)", "length((name)::text)")]
+    [InlineData("date_trunc('day', u.created_at)", "date_trunc('day'::text, created_at)")]
+    [InlineData("u.created_at::date", "(created_at)::date")]
+    [InlineData("u.name = 'x'", "((name)::text = 'x'::text)")]
+    public async Task Explain_TotalForm_PrintsWhatTheReaderReads(string expression, string expected)
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var root = await ExplainAsync($"SELECT {expression} FROM users u");
+
+        root.Output.ShouldBe([expected]);
+    }
+
+    // An aggregate under GROUP BY is computed at the Aggregate that has a Group Key, which prints it bare; the node
+    // above prints it in parentheses.  The Aggregate has no Grouping Sets.
+    [Fact]
+    public async Task Explain_GroupedAggregate_IsComputedAtANodeWithAGroupKey()
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var text = await ExplainTextAsync(
+            "SELECT u.id, max(u.name), sum(u.balance) FROM users u JOIN orders o ON o.user_id = u.id "
+                + "GROUP BY u.id ORDER BY 3"
+        );
+
+        var root = PlanNode.Read(text).ShouldNotBeNull();
+        root.NodeType.ShouldBe("Sort");
+        root.Output.ShouldBe(["u.id", "(max((u.name)::text))", "(sum(u.balance))"]);
+        var aggregate = root.Plans.Single();
+        aggregate.NodeType.ShouldBe("Aggregate");
+        aggregate.HasGroupKey.ShouldBeTrue();
+        aggregate.HasGroupingSets.ShouldBeFalse();
+        aggregate.HasFilter.ShouldBeFalse();
+        aggregate.Strategy.ShouldBeOneOf("Sorted", "Hashed");
+        aggregate.Output.ShouldBe(["u.id", "max((u.name)::text)", "sum(u.balance)"]);
+
+        // The key as the server prints it, which PlanNode reads only as present.
+        using var document = JsonDocument.Parse(text);
+        document
+            .RootElement[0]
+            .GetProperty("Plan")
+            .GetProperty("Plans")[0]
+            .GetProperty("Group Key")
+            .EnumerateArray()
+            .Select(static key => key.GetString())
+            .ShouldBe(["u.id"]);
+    }
+
+    // A scalar subquery is a SubPlan whose plan is an Aggregate of the Plain strategy, with no Group Key, and the
+    // column prints (SubPlan <n>) at the node that evaluates it.
+    [Fact]
+    public async Task Explain_ScalarSubquery_IsASubPlanOfAPlainAggregate()
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var root = await ExplainAsync(
+            "SELECT u.id, (SELECT count(*) FROM orders o WHERE o.user_id = u.id) AS n FROM users u"
+        );
+
+        root.Output.ShouldBe(["u.id", "(SubPlan 1)"]);
+        var subPlan = All(root).Single(static node => node.SubplanName == "SubPlan 1");
+        subPlan.ParentRelationship.ShouldBe("SubPlan");
+        subPlan.NodeType.ShouldBe("Aggregate");
+        subPlan.Strategy.ShouldBe("Plain");
+        subPlan.HasGroupKey.ShouldBeFalse();
+        subPlan.HasFilter.ShouldBeFalse();
+        subPlan.Output.ShouldBe(["count(*)"]);
+    }
+
+    // A subquery in an expression is a SubPlan of every kind.  14 prints each as (SubPlan <n>), or (hashed SubPlan
+    // <n>) where the planner hashes it; 18 prints EXISTS, IN or ANY and ARRAY each its own way, and a scalar
+    // subquery as 14 does.  The uncorrelated IN is hashed on both by a rule of size and not of cost: the planner
+    // hashes an IN whose subplan takes no parameter of the query above when the subplan's estimated rows times their
+    // width fit in the memory a hash may take (subplan_is_hashable, under work_mem and hash_mem_multiplier).  A scan of
+    // one integer column of the small orders table fits by far under the server's default work_mem, which the test
+    // container keeps, so the row does not move with the costs or the statistics.
+    [Theory]
+    [InlineData("EXISTS (SELECT 1 FROM orders o WHERE o.user_id > u.id)", "(SubPlan 1)", "EXISTS(SubPlan 1)")]
+    [InlineData(
+        "u.id IN (SELECT o.user_id FROM orders o WHERE o.placed_at > u.created_at)",
+        "(SubPlan 1)",
+        "(ANY (u.id = (SubPlan 1).col1))"
+    )]
+    [InlineData(
+        "u.id IN (SELECT o.user_id FROM orders o)",
+        "(hashed SubPlan 1)",
+        "(ANY (u.id = (hashed SubPlan 1).col1))"
+    )]
+    [InlineData("ARRAY(SELECT o.id FROM orders o WHERE o.user_id = u.id)", "(SubPlan 1)", "ARRAY(SubPlan 1)")]
+    public async Task Explain_Sublinks_PrintEachKindOnEighteen(
+        string expression,
+        string printedOn14,
+        string printedOn18
+    )
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+        var printed = postgres.Major == 14 ? printedOn14 : printedOn18;
+
+        var root = await ExplainAsync($"SELECT {expression} FROM users u");
+
+        root.Output.ShouldBe([printed]);
+        All(root).Count(static node => node.ParentRelationship == "SubPlan").ShouldBe(1);
+    }
+
+    // A system column of a table prints as a column, qualified by the table's name on an INSERT's RETURNING.
+    [Fact]
+    public async Task Explain_SystemColumn_PrintsAsAColumn()
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var root = await ExplainAsync(
+            "INSERT INTO users (name) VALUES ('x') ON CONFLICT DO NOTHING RETURNING id, (xmax = 0) AS inserted"
+        );
+
+        root.NodeType.ShouldBe("ModifyTable");
+        root.Output.ShouldBe(["users.id", "(users.xmax = 0)"]);
+    }
+
+    // merge_action() is not a function but the grammar's own form, and prints in upper case.  A MERGE has a RETURNING
+    // from 17.
+    [Fact]
+    public async Task Explain_MergeAction_PrintsUpperCase()
+    {
+        postgres.SkipBelow(17, "MERGE ... RETURNING and merge_action() need PostgreSQL 17");
+
+        var root = await ExplainAsync(
+            "MERGE INTO users u USING (SELECT 1 AS id) s ON s.id = u.id WHEN MATCHED THEN DO NOTHING "
+                + "RETURNING merge_action(), u.id"
+        );
+
+        root.NodeType.ShouldBe("ModifyTable");
+        root.Output.ShouldBe(["MERGE_ACTION()", "u.id"]);
     }
 
     // The node and every node under it through the sides of a join or the one input of another node.

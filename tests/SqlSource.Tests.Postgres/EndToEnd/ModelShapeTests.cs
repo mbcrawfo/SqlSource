@@ -225,7 +225,7 @@ public sealed class ModelShapeTests
             $"{Namespace}.ListMarkedNamesDto",
             Shape.SealedRecord,
             ("Id", typeof(int?), true),
-            ("UpperName", typeof(string), false)
+            ("InitcapName", typeof(string), false)
         );
 
     [Fact]

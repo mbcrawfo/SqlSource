@@ -108,6 +108,33 @@ public sealed class NullabilityWalkSetOperationTests
         AnswersOf(outcome).ShouldBe([NotNullSetOperation, NotNullSetOperation]);
     }
 
+    // An Append that partition pruning removed a member of shows not every partition, and another execution may read
+    // the removed one's rows.
+    [Fact]
+    public void Run_AppendWithSubplansRemoved_KeepsNoOrigin() =>
+        AnswersOf(
+                RunSet(AppendOf(Scan("u_1", "u_1.name"), Scan("u_2", "u_2.name")) with { SubplansRemoved = 1 }, TextOid)
+            )
+            .ShouldBe([UnknownNoOrigin]);
+
+    // SELECT xmin FROM u UNION ALL SELECT xmin FROM o: a system column of a table is never NULL, and each branch's is
+    // of the column's type.
+    [Fact]
+    public void Run_UnionAllOfASystemColumnOfEachBranch_IsFalseFromTheBranches() =>
+        AnswersOf(RunSet(AppendOf(Scan("u", "u.xmin"), Scan("o", "o.xmin")), BuiltInTypes.Xid))
+            .ShouldBe([NotNullSetOperation]);
+
+    // A system column of a relation that "tables" and "relations" did not answer, or of the side a LEFT JOIN extends.
+    [Fact]
+    public void Run_UnionAllOfASystemColumnNotProvedInABranch_KeepsNoOrigin()
+    {
+        var extended = Join("Left", Scan("u", "u.id"), Scan("o", "o.xmin")) with { Output = ["o.xmin"] };
+
+        AnswersOf(RunSet(AppendOf(Scan("u", "u.xmin"), Scan("w", "w.xmin")), BuiltInTypes.Xid))
+            .ShouldBe([UnknownNoOrigin]);
+        AnswersOf(RunSet(AppendOf(Scan("u", "u.xmin"), extended), BuiltInTypes.Xid)).ShouldBe([UnknownNoOrigin]);
+    }
+
     private static readonly Dictionary<string, string> BranchesThatMayBeNullRows = new(StringComparer.Ordinal)
     {
         {

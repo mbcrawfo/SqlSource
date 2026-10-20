@@ -5,8 +5,9 @@ using SqlSource.Tool.Describing.Postgres.Walk;
 
 namespace SqlSource.Tool.Tests;
 
-// Plans as a server would answer "explain", written by a test: a scan of a table, a join of two nodes, and a node
-// over one child.  Text gives the plan as EXPLAIN (VERBOSE, FORMAT JSON) writes it, for a test of the session.
+// Plans as a server would answer "explain", written by a test: a scan of a table, a join of two nodes, a node over
+// one child, an aggregate, and a subquery's plan.  Text gives the plan as EXPLAIN (VERBOSE, FORMAT JSON) writes it,
+// for a test of the session.
 internal static class PostgresPlans
 {
     public const string Outer = "Outer";
@@ -27,6 +28,10 @@ internal static class PostgresPlans
             null,
             null,
             false,
+            null,
+            false,
+            false,
+            0,
             []
         );
 
@@ -44,6 +49,10 @@ internal static class PostgresPlans
             null,
             null,
             false,
+            null,
+            false,
+            false,
+            0,
             [outer with { ParentRelationship = Outer }, inner with { ParentRelationship = Inner }]
         );
 
@@ -61,8 +70,29 @@ internal static class PostgresPlans
             null,
             null,
             false,
+            null,
+            false,
+            false,
+            0,
             [child with { ParentRelationship = relationship }]
         );
+
+    // An Aggregate over one child, of a strategy, with a Group Key or without.
+    public static PlanNode Aggregate(string strategy, bool groupKey, PlanNode child, params string[] output) =>
+        Over("Aggregate", child) with
+        {
+            Strategy = strategy,
+            HasGroupKey = groupKey,
+            Output = output.Length == 0 ? null : output,
+        };
+
+    // The root of a subquery's plan as a child of the node that evaluates it, under its name: "SubPlan 1".
+    public static PlanNode SubPlan(string name, PlanNode root) =>
+        root with
+        {
+            ParentRelationship = "SubPlan",
+            SubplanName = name,
+        };
 
     // An Append over the members the test gives, which keep the relationship they have: see Member.
     public static PlanNode Append(params PlanNode[] members) => Over("Append", Scan("x")) with { Plans = members };
@@ -89,10 +119,27 @@ internal static class PostgresPlans
         Add(map, "Subplan Name", node.SubplanName);
         Add(map, "CTE Name", node.CteName);
         Add(map, "Command", node.Command);
+        Add(map, "Strategy", node.Strategy);
         Add(map, "Output", node.Output);
         if (node.HasGroupingSets)
         {
             map["Grouping Sets"] = System.Array.Empty<object>();
+        }
+
+        // What the key and the filter hold is the planner's own: a node of a test has one of each.
+        if (node.HasGroupKey)
+        {
+            map["Group Key"] = new[] { "key" };
+        }
+
+        if (node.HasFilter)
+        {
+            map["Filter"] = "filter";
+        }
+
+        if (node.SubplansRemoved > 0)
+        {
+            map["Subplans Removed"] = node.SubplansRemoved;
         }
 
         if (node.Plans.Count > 0)

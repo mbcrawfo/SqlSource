@@ -44,16 +44,28 @@ internal static class ColumnNullability
             { Table.Relkind: "f" } => (null, SidecarValues.NullableSource.ForeignTable),
             _ when gated => (true, SidecarValues.NullableSource.Heuristic),
 
-            // A child of an inheritance parent may have dropped the NOT NULL it inherited, nothing enforces it on the
-            // remote rows of a foreign partition, and the RETURNING rows of an INSTEAD rule are its action's.
-            {
-                Table: { Relkind: "r", Relhassubclass: true }
-                    or { Relkind: "p", HasForeignPartition: true }
-                    or { Relkind: "r" or "p", HasInsteadRule: true }
-            } => (true, SidecarValues.NullableSource.Catalog),
+            { Table: { Relkind: "r" or "p" } table } when !KeepsNotNull(table) => (
+                true,
+                SidecarValues.NullableSource.Catalog
+            ),
             { } found => (
                 found.Attribute is not { NotNull: true, NotNullValidated: not false },
                 SidecarValues.NullableSource.Catalog
             ),
         };
+
+    /// <summary>
+    /// Whether every row a query reads of the table or the partitioned table is held to its <c>NOT NULL</c>, so that
+    /// a validated <c>NOT NULL</c> column of it is answered not nullable: a child of an inheritance parent may have
+    /// dropped the <c>NOT NULL</c> it inherited, nothing enforces it on the remote rows of a foreign partition, and
+    /// the <c>RETURNING</c> rows of an <c>INSTEAD</c> rule are its action's.  False for any other kind of relation.
+    /// </summary>
+    public static bool KeepsNotNull(PostgresTableRow table) =>
+        table
+            is { Relkind: "r" or "p" }
+                and not (
+                    { Relkind: "r", Relhassubclass: true }
+                    or { Relkind: "p", HasForeignPartition: true }
+                    or { HasInsteadRule: true }
+                );
 }

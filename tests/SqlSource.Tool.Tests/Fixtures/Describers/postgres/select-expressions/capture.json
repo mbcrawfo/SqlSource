@@ -354,6 +354,78 @@
       }
     },
     {
+      "method": "relations",
+      "request": {
+        "relations": [
+          {
+            "schema": "public",
+            "name": "bookings"
+          }
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16439,
+            "relkind": "r",
+            "schema": "public",
+            "name": "bookings",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "id",
+                "notNull": true,
+                "identity": "d",
+                "generated": "",
+                "typeOid": 20,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 2,
+                "name": "user_id",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 23,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 3,
+                "name": "during",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 3910,
+                "notNullValidated": true
+              },
+              {
+                "attnum": 4,
+                "name": "slots",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 4451,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": true,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1009,
+                "notNullValidated": true
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          }
+        ],
+        "error": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"

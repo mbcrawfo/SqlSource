@@ -19,6 +19,10 @@ internal static class BuiltInTypes
     public const long Int2vector = 22;
     public const long Int4 = 23;
     public const long Text = 25;
+    public const long Oid = 26;
+    public const long Tid = 27;
+    public const long Xid = 28;
+    public const long Cid = 29;
     public const long Oidvector = 30;
     public const long Float4 = 700;
     public const long Float8 = 701;

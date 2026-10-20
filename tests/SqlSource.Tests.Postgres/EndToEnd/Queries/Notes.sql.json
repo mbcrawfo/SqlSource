@@ -165,7 +165,7 @@
       ]
     },
     "ListMarkedNames": {
-      "hash": "58ee064cd41ffc05631e32a1ac257edeb7bfc74d859fd5ccfcd11ea1e0c00aab",
+      "hash": "595f4b4cf58361d8165cd617874a6eaee4a5f9d38b4a41a0a04995c154961705",
       "engine": "postgres",
       "database": "app",
       "serverVersion": "18.6",
@@ -196,7 +196,7 @@
         },
         {
           "ordinal": 1,
-          "name": "upper_name!",
+          "name": "initcap_name!",
           "type": {
             "name": "text",
             "kind": "base",

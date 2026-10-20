@@ -142,6 +142,10 @@ internal sealed class PostgresScript
     public PostgresScript Relations(PostgresRelationsRequest request, PostgresTablesAnswer answer) =>
         Answer("relations", request, answer);
 
+    // "relations" for the relations the test names, in schema and name order, answering the rows it gives.
+    public PostgresScript Relations(IReadOnlyList<PostgresRelationName> names, params PostgresTableRow[] tables) =>
+        Relations(new PostgresRelationsRequest(names), new PostgresTablesAnswer(tables, null));
+
     // Made when the script is whole.
     public ReplayingExchange Play() => new(_capture);
 

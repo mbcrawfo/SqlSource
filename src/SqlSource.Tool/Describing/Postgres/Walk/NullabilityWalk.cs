@@ -145,15 +145,16 @@ internal static partial class NullabilityWalk
 
         var onlyAlias = plans.OnlyAliasOf(root);
         var expressions =
-            fits && !instances.HasSetOperation ? new Expressions(scope, root, instances, onlyAlias) : null;
+            fits && !instances.HasSetOperation ? new Expressions(plans, root, instances, onlyAlias) : null;
 
         var walked = new List<WalkedColumn>(columns.Count);
         for (var index = 0; index < columns.Count; index++)
         {
+            var type = scope.ColumnTypes.Count == columns.Count ? scope.ColumnTypes[index] : TotalFunctions.UnknownType;
             walked.Add(
                 origins[index] switch
                 {
-                    null => ExpressionOf(columns[index], entries[index], expressions),
+                    null => ExpressionOf(columns[index], entries[index], type, expressions),
                     { } origin when scope.Gated => ColumnOf(
                         columns[index],
                         origin,
@@ -202,8 +203,8 @@ internal static partial class NullabilityWalk
     private static WalkedColumn Kept(SidecarColumn column, string? entry) => new(column, entry, null, false, false);
 
     // A column of no origin: the answer of its entry as an expression, or what it was built with.
-    private static WalkedColumn ExpressionOf(SidecarColumn column, string entry, Expressions? expressions) =>
-        expressions?.NullableOf(entry) is { } nullable
+    private static WalkedColumn ExpressionOf(SidecarColumn column, string entry, long type, Expressions? expressions) =>
+        expressions?.NullableOf(entry, type) is { } nullable
             ? new WalkedColumn(
                 column with
                 {
@@ -303,184 +304,6 @@ internal static partial class NullabilityWalk
             mapped,
             resolved == Resolution.Extended
         );
-    }
-
-    // The entries of a plan read as expressions, with a reference inside one answered as the walk answers a column:
-    // through an instance that no join extends, to a column of a relation that "tables" answered, by the catalog's
-    // rule.  A bare name is the plan's one relation's (PlanInstances.BareAlias): a plan of several prints every name
-    // with its alias but the columns of a relation the planner proved empty, a Result under an outer join, and
-    // at a ModifyTable that may return the old or the new row only the target's alias is a relation.  An entry is read
-    // in a plan where no join null-extends a side, or where the walk follows it to the node that computes it and no
-    // join null-extends that node: a node prints a value computed under it in one pair of parentheses, at every node
-    // up to the root.
-    private sealed class Expressions(WalkScope scope, PlanNode root, PlanInstances instances, string? onlyAlias)
-    {
-        private const int MaxDepth = 256;
-
-        private readonly bool _nothingExtends = instances.Nodes.All(static visited =>
-            visited.NullExtends == NullExtension.None
-        );
-
-        public bool? NullableOf(string entry) =>
-            _nothingExtends
-                ? PlanExpression.NullableOf(entry, scope.CatalogFunctionsFirst, ProvedNotNull)
-                : NullableAt(root, entry, 0);
-
-        // What the entry of the node's Output says, read where it is computed: a child that prints the entry, or the
-        // entry without the parentheses that wrap it whole, is where it comes from, and the walk goes on there; and an
-        // entry that no child prints is the node's own, unknown if a join null-extends the node.  A child that prints
-        // no Output, an Append or a Bitmap Index Scan, may compute any value, so it and every node under it must be
-        // preserved.  Where the entry is computed, a value it takes from a child that computed it is in parentheses:
-        // one that is not preserved is read as unknown, so that a pulled-up constant of the side a join extends,
-        // ('x'::text) inside a CASE the root computes, proves nothing, while a COALESCE with a constant still does.
-        private bool? NullableAt(PlanNode node, string entry, int depth)
-        {
-            if (FollowedChildrenOf(node, depth) is not { } children)
-            {
-                return null;
-            }
-
-            bool? answer = null;
-            foreach (var (child, printed) in Printing(children, entry))
-            {
-                var passed = NullableAt(child, printed, depth + 1);
-                if (passed is null)
-                {
-                    return null;
-                }
-
-                answer = answer is null or false ? passed : answer;
-            }
-
-            if (answer is not null)
-            {
-                return answer;
-            }
-
-            return instances.IsExtended(node)
-                ? null
-                : PlanExpression.NullableOf(
-                    entry,
-                    scope.CatalogFunctionsFirst,
-                    ProvedNotNull,
-                    group => Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1))
-                );
-        }
-
-        // Whether the entry of the node's Output is computed where no join null-extends, and so is every value it is
-        // computed from, followed as NullableAt follows it.
-        private bool Preserved(PlanNode node, string entry, int depth)
-        {
-            if (FollowedChildrenOf(node, depth) is not { } children)
-            {
-                return false;
-            }
-
-            var printing = Printing(children, entry).ToArray();
-            if (printing.Length > 0)
-            {
-                return printing.All(found => Preserved(found.Child, found.Printed, depth + 1));
-            }
-
-            return !instances.IsExtended(node)
-                && PlanExpression
-                    .Groups(entry)
-                    .All(group =>
-                        Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1))
-                    );
-        }
-
-        // The children an entry of the node is followed into, its Outer and Inner ones; or null, which NullableAt and
-        // Preserved read as unknown, when the walk is too deep or a child that prints no Output is not preserved.
-        private PlanNode[]? FollowedChildrenOf(PlanNode node, int depth)
-        {
-            if (depth > MaxDepth)
-            {
-                return null;
-            }
-
-            PlanNode[] children = [.. node.JoinChildren];
-            return children.Any(OpaqueAndNotPreserved) ? null : children;
-        }
-
-        // A child that prints no Output, and is extended or has a join under it that extends.
-        private bool OpaqueAndNotPreserved(PlanNode child) =>
-            child.Output is null && (instances.IsExtended(child) || PlanInstances.ExtendsUnder(child));
-
-        // Each child that prints the value, and how: as it is, wrapped whole in parentheses, or without the
-        // parentheses that wrap it whole.
-        private static IEnumerable<(PlanNode Child, string Printed)> Printing(PlanNode[] children, string value)
-        {
-            var inner = PlanExpression.Unwrapped(value);
-            var wrapped = "(" + value + ")";
-            foreach (var child in children)
-            {
-                if (child.Output is not { } output)
-                {
-                    continue;
-                }
-
-                if (output.Contains(value, StringComparer.Ordinal))
-                {
-                    yield return (child, value);
-                }
-                else if (output.Contains(wrapped, StringComparer.Ordinal))
-                {
-                    yield return (child, wrapped);
-                }
-                else if (inner is not null && output.Contains(inner, StringComparer.Ordinal))
-                {
-                    yield return (child, inner);
-                }
-            }
-        }
-
-        private bool ProvedNotNull(OutputReference reference) => ProvedTypeOf(reference) is not null;
-
-        /// <summary>
-        /// The declared type of the column a reference names, a domain where the column is one, when the walk proves
-        /// that it is not <c>NULL</c>; or null.
-        /// </summary>
-        public long? ProvedTypeOf(OutputReference reference)
-        {
-            var alias = reference.Alias ?? (scope.OldAndNewMayBeNamed ? null : instances.BareAlias);
-            if (
-                alias is null
-                || (onlyAlias is not null && !string.Equals(alias, onlyAlias, StringComparison.Ordinal))
-                || !instances.TryFind(alias, out var instance)
-                || instance.NullExtended
-                || TableOf(instance) is not { } table
-            )
-            {
-                return null;
-            }
-
-            var attribute = table.Columns.FirstOrDefault(column =>
-                string.Equals(column.Name, reference.Column, StringComparison.Ordinal)
-            );
-            return
-                attribute is not null
-                && ColumnNullability.Of(new ColumnOrigin(table, attribute), gated: false).Nullable == false
-                ? attribute.TypeOid
-                : null;
-        }
-
-        // The table "tables" answered of an instance: a relation's by its schema and its name, and a partitioned
-        // table's by the nearest of the tables its partitions are partitions of, whose NOT NULL every partition keeps.
-        // A scan of another plan has none.
-        private PostgresTableRow? TableOf(PlanInstance instance) =>
-            instance.Kind switch
-            {
-                InstanceKind.Relation => scope.Tables.Values.FirstOrDefault(row =>
-                    string.Equals(row.Schema, instance.Schema, StringComparison.Ordinal)
-                    && string.Equals(row.Name, instance.Relation, StringComparison.Ordinal)
-                ),
-                InstanceKind.Partitioned => instance
-                    .Parents.Select(oid => scope.Tables.GetValueOrDefault(oid))
-                    .FirstOrDefault(static row => row is not null),
-                InstanceKind.Plan => null,
-                _ => throw new InvalidOperationException($"Unknown kind {instance.Kind}."),
-            };
     }
 
     // What a reference through a scan of another plan resolves to.
