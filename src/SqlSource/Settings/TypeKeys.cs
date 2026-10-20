@@ -138,12 +138,16 @@ internal static class TypeKeys
 
     /// <summary>
     /// Reads a key, <c>[part "."] part ["[]"]</c>, where a part is plain, letters, digits, <c>_</c> and <c>$</c>, or
-    /// quoted, in double quotes with <c>""</c> for a quote, which can hold any character and keeps its case.  An
-    /// unqualified part must be a name the base map knows, an alias of one, or <c>_</c> and a name it knows, and is
-    /// given as the name in lower case: <c>integer[]</c> gives <c>int4[]</c>.  A quoted one must hold the name
+    /// quoted, in double quotes with <c>""</c> for a quote, which can hold any character and keeps its case.  Returns
+    /// false for anything else, with an empty <paramref name="normalized" />.
+    /// <para>
+    /// An unqualified part must be a name the base map knows, an alias of one, or <c>_</c> and a name it knows, and
+    /// is given as the name in lower case: <c>integer[]</c> gives <c>int4[]</c>.  A quoted one must hold the name
     /// exactly, in lower case, and has no alias: <c>"char"</c> gives <c>char</c>, and <c>"Int4"</c> and
     /// <c>"integer"</c> are not keys.  <c>_</c> and a name it knows is the catalog's name of an array, and is given as
     /// the array's key, so <c>_int4</c> and <c>"_int4"</c> give <c>int4[]</c>, and <c>_int4[]</c> stays as written.
+    /// </para>
+    /// <para>
     /// <c>pg_catalog.</c>, plain in any case or quoted in lower case, is taken off and what is left is not checked,
     /// but that every name of <c>pg_catalog</c> that starts with <c>_</c> is an array's, so <c>pg_catalog.newtype</c>
     /// gives <c>newtype</c>, <c>pg_catalog._int4</c> gives <c>int4[]</c> and <c>pg_catalog._pg_class</c> gives
@@ -154,10 +158,12 @@ internal static class TypeKeys
     /// <c>[]</c>, with a name the map does not know written as <see cref="WritePart" /> writes it:
     /// <c>pg_catalog."_odd"</c> gives <c>odd[]</c> and <c>pg_catalog."_Odd"</c> gives <c>"Odd"[]</c>, and with
     /// <c>[]</c> a name that holds <c>_</c> and a name the map knows is <c>_</c>, that name and <c>[]</c>, as a plain
-    /// one is: <c>pg_catalog."_int4"[]</c> gives <c>_int4[]</c>.  Any other quoted name stays as written.  Any other
-    /// qualified key is given as written, unchecked: <c>public._tag</c> is not <c>public.tag[]</c>, since a type of
-    /// another schema may be named with a <c>_</c> (TD-0059).  Returns false for anything else, with an empty
-    /// <paramref name="normalized" />.
+    /// one is: <c>pg_catalog."_int4"[]</c> gives <c>_int4[]</c>.  Any other quoted name stays as written.
+    /// </para>
+    /// <para>
+    /// Any other qualified key is given as written, unchecked: <c>public._tag</c> is not <c>public.tag[]</c>, since a
+    /// type of another schema may be named with a <c>_</c> (TD-0059).
+    /// </para>
     /// </summary>
     public static bool TryNormalize(ReadOnlySpan<char> key, out string normalized)
     {

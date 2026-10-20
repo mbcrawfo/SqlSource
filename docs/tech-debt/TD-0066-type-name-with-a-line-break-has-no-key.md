@@ -15,7 +15,7 @@ The trim makes the package's other values readable when they are written over se
 
 ## Impact
 
-Low.  Such a type cannot be given a C# type with the type override, and the help of its error suggests an entry that cannot be written.  A domain over such a type can still be mapped by its base type, and a composite's fields can be selected as columns of their own.
+Low.  Such a type cannot be given a C# type with the type override, and the help of its error suggests an entry that cannot be written.  Such a type that is a domain still gets its base type's C# type, so map its base type; and a composite's fields can be selected as columns of their own.
 
 ## Proposed fix
 
