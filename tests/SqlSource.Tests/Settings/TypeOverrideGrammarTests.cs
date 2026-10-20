@@ -313,6 +313,21 @@ public sealed class TypeOverrideGrammarTests
         invalid.ShouldBe(["\"my schema.x=int int8=long"]);
     }
 
+    // Quotes belong to a key, so a stray one in a type is an entry that is not valid by itself.
+    [Fact]
+    public void ReadList_QuoteInTheType_IsInvalidAloneAndTheRestApply()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("a=string\"x int4=long int8=long", SettingPlace.Property, invalid)
+            .ShouldBe([
+                new TypeOverride("int4", "long", SettingPlace.Property),
+                new TypeOverride("int8", "long", SettingPlace.Property),
+            ]);
+        invalid.ShouldBe(["a=string\"x"]);
+    }
+
     [Fact]
     public void ReadList_KeysThatDifferByCase_AreTwoEntries()
     {

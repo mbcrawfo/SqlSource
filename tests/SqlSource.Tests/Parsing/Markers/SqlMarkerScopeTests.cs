@@ -119,6 +119,18 @@ public sealed class SqlMarkerScopeTests
             ]);
     }
 
+    // The marker reader hands the rest of the line over as written, quotes and spaces inside them included.
+    [Fact]
+    public void Read_TypeOverrideWithAQuotedKey_IsReadWithTheKeyIntact()
+    {
+        var (scope, errors) = Scope(SqlScopeKind.Query, "-- type-override: \"my schema\".\"order status\" = App.A");
+
+        errors.ShouldBeEmpty();
+        scope
+            .Level.TypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("\"my schema\".\"order status\"", "global::App.A", SettingPlace.Query)]);
+    }
+
     // A quoted part and a plain one that read as one text are one key.
     [Fact]
     public void Read_QuotedAndPlainSpellingOfOneKeyWithTwoValues_ConflictAtTheSecond()

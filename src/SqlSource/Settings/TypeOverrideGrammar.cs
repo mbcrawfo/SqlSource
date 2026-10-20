@@ -126,7 +126,7 @@ internal static class TypeOverrideGrammar
     }
 
     // The next run of text outside white space, where white space inside <>, [] or double quotes belongs to the run,
-    // and a bracket inside double quotes is not counted.  Empty at the end.
+    // and a bracket inside double quotes is not counted.  Only the key opens a double quote.  Empty at the end.
     private static ReadOnlySpan<char> NextEntry(ref ReadOnlySpan<char> rest)
     {
         var start = 0;
@@ -138,21 +138,23 @@ internal static class TypeOverrideGrammar
         var end = start;
         var open = 0;
         var quoted = false;
+        var inType = false;
         while (end < rest.Length && (open > 0 || quoted || !char.IsWhiteSpace(rest[end])))
         {
-            if (rest[end] == '"')
+            // Quotes belong to the key: once its = is read, a " is a character of the type, which is invalid.
+            if (rest[end] == '"' && !inType)
             {
                 quoted = !quoted;
             }
-            else if (quoted)
+            else if (!quoted && rest[end] == '=')
             {
-                // Inside quotes, nothing but the closing quote means anything.
+                inType = true;
             }
-            else if (rest[end] is '<' or '[')
+            else if (!quoted && rest[end] is '<' or '[')
             {
                 open++;
             }
-            else if (rest[end] is '>' or ']' && open > 0)
+            else if (!quoted && rest[end] is '>' or ']' && open > 0)
             {
                 open--;
             }
