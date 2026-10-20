@@ -751,7 +751,7 @@ See: [Environment variables](tool.md#environment-variables)
 
 **No project or solution found**
 
-`sqlsource describe` was given a folder, or none and so the current one, that holds no `.sln`, `.slnx` or `.csproj` file.  The tool looks in that folder alone, not in the folders below it.
+`sqlsource describe` was given a folder, or none and so the current one, that holds no `.sln`, `.slnx` or `.csproj` file.  The tool looks in that folder alone, not in the folders below it.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
 
 Run the command from the folder of the project or the solution, or name the one to run on:
 
@@ -765,7 +765,7 @@ See: [Arguments](tool.md#arguments)
 
 **More than one project or solution found**
 
-`sqlsource describe` was given a folder, or none and so the current one, that holds more than one `.sln`, `.slnx` or `.csproj` file.  The tool does not choose between them, as `dotnet build` does not.
+`sqlsource describe` was given a folder, or none and so the current one, that holds more than one `.sln`, `.slnx` or `.csproj` file.  The tool does not choose between them, as `dotnet build` does not.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
 
 Name the one to run on:
 
@@ -779,7 +779,7 @@ See: [Arguments](tool.md#arguments)
 
 **Path is not a project or a solution**
 
-The path given to `sqlsource describe` does not exist, or is a file that is not a `.sln`, `.slnx` or `.csproj` file.  A solution filter, `.slnf`, and a project of another language are not read.  The message holds the full path the tool looked at: a relative path is resolved against the current folder.  An empty path is this error too, which is what a variable that is not set gives in a shell.
+The path given to `sqlsource describe` does not exist, or is a file that is not a `.sln`, `.slnx` or `.csproj` file.  A solution filter, `.slnf`, and a project of another language are not read.  The message holds the full path the tool looked at: a relative path is resolved against the current folder.  An empty path is this error too, which is what a variable that is not set gives in a shell.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
 
 Give the path of a solution, of a C# project, or of a folder that holds exactly one of them.
 
@@ -839,7 +839,7 @@ See: [Install the tool](tool.md#install-the-tool)
 
 **Project is not in the run**
 
-A path given with `--project` is not a C# project of the solution that the run is on.  When the run is on a project, the option may name that project and no other.  The message holds the full path the tool looked at: a relative path is resolved against the current folder, not against the folder of the solution.
+A path given with `--project` is not a C# project of the solution that the run is on.  When the run is on a project, the option may name that project and no other.  The message holds the full path the tool looked at: a relative path is resolved against the current folder, not against the folder of the solution.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
 
 ```console
 $ dotnet sqlsource describe App.slnx --project Tools.csproj
@@ -923,7 +923,7 @@ See: [Database](settings.md#setting-database)
 
 **File is not in the run**
 
-A path given to `sqlsource describe` that ends in `.sql` restricts the run to that file.  The run holds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it is on, and this path is none of them.  The message holds the full path the tool looked at: a relative path is resolved against the current folder.
+A path given to `sqlsource describe` that ends in `.sql` restricts the run to that file.  The run holds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it is on, and this path is none of them.  The message holds the full path the tool looked at: a relative path is resolved against the current folder.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
 
 ```console
 $ dotnet sqlsource describe Queries/User.sql
@@ -1104,7 +1104,7 @@ Update the tool, with `dotnet tool update SqlSource.Tool --prerelease`, to the v
 
 **Directory cannot be read**
 
-`sqlsource describe` was given a folder, or none and so the current one, and the operating system would not list its files.  The message ends with the reason the system gave.
+`sqlsource describe` was given a folder, or none and so the current one, and the operating system would not list its files.  The message ends with the reason the system gave.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.  The reason is then only that the system would not list the files, since the system's own words repeat the path.
 
 ```console
 $ dotnet sqlsource describe /srv/locked

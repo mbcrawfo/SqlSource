@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.CommandLine;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -51,7 +52,13 @@ public sealed class RunProjectsTests : IDisposable
         _error.Dispose();
     }
 
+    private static readonly Option<string[]> ProjectOption = new("--project");
+
+    // As the values of --project come from the command line: each follows the option, from position 3.
     private Task<ImmutableArray<ProjectManifest>> FindAsync(RunUnit unit, params string[] named) =>
+        FindValuesAsync(unit, [.. named.Select((text, index) => new UsageValue(ProjectOption, text, 3 + (2 * index)))]);
+
+    private Task<ImmutableArray<ProjectManifest>> FindValuesAsync(RunUnit unit, params UsageValue[] named) =>
         RunProjects.FindAsync(
             unit,
             named,
@@ -97,6 +104,10 @@ public sealed class RunProjectsTests : IDisposable
 
     private string Sqlsrc207(string path, string? unit = null) =>
         $"sqlsource : error SQLSRC207: '{path}' is not a project of '{unit ?? _solution}'\n"
+        + Expected.See("SQLSRC207");
+
+    private string Sqlsrc207ByPosition(int position) =>
+        $"sqlsource : error SQLSRC207: The path at position {position} is not a project of '{_solution}'\n"
         + Expected.See("SQLSRC207");
 
     [Fact]
@@ -286,6 +297,36 @@ public sealed class RunProjectsTests : IDisposable
 
         _runner.Requests.ShouldBeEmpty();
         _error.ToString().ShouldBe(Sqlsrc207(_folder.PathOf(path)));
+    }
+
+    // A connection string typed after --project: it is named by its position, and never repeated.
+    [Theory]
+    [InlineData("Host=db;Password=" + Secrets.Marker)]
+    [InlineData("Other;" + Secrets.Marker + ".csproj")]
+    public async Task FindAsync_ProjectWithASemicolon_IsNamedByItsPosition(string text)
+    {
+        var manifests = await FindValuesAsync(
+            new RunUnit(RunUnitKind.Solution, _solution),
+            new UsageValue(ProjectOption, text, 4)
+        );
+
+        manifests.ShouldBeEmpty();
+        _runner.Requests.ShouldBeEmpty();
+        _error.ToString().ShouldBe(Sqlsrc207ByPosition(4));
+    }
+
+    // The first token that names a project the run does not hold is the one that is reported.
+    [Fact]
+    public async Task FindAsync_ProjectGivenTwiceAndNotInTheRun_IsNamedByTheFirstToken()
+    {
+        var manifests = await FindValuesAsync(
+            new RunUnit(RunUnitKind.Solution, _solution),
+            new UsageValue(ProjectOption, "a=b/../Missing.csproj", 3),
+            new UsageValue(ProjectOption, "Missing.csproj", 5)
+        );
+
+        manifests.ShouldBeEmpty();
+        _error.ToString().ShouldBe(Sqlsrc207ByPosition(3));
     }
 
     // What --project "$UNSET" gives.

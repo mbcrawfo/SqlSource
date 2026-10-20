@@ -22,10 +22,11 @@ internal sealed record RunFilters(ImmutableArray<FileFilter> Files, ImmutableArr
 
     /// <summary>
     /// The filters of a command line.  A path is resolved against the working directory and compared as the
-    /// generator compares paths, so another case, <c>./</c>, <c>..</c> and either separator name the same file.
+    /// generator compares paths, so another case, <c>./</c>, <c>..</c> and either separator name the same file.  A
+    /// file that several paths name is named by the first.
     /// </summary>
     public static RunFilters Create(
-        IEnumerable<string> sqlPaths,
+        IEnumerable<UsageValue> sqlPaths,
         IEnumerable<string> databases,
         string workingDirectory
     )
@@ -34,10 +35,10 @@ internal sealed record RunFilters(ImmutableArray<FileFilter> Files, ImmutableArr
         var seen = new HashSet<string>(SqlPath.Comparer);
         foreach (var given in sqlPaths)
         {
-            var path = Path.GetFullPath(given, workingDirectory);
+            var path = Path.GetFullPath(given.Text, workingDirectory);
             if (SqlPath.Normalize(path) is { } normalized && seen.Add(normalized))
             {
-                files.Add(new FileFilter(path, normalized));
+                files.Add(new FileFilter(path, normalized, given.NamedAsPath(path)));
             }
         }
 

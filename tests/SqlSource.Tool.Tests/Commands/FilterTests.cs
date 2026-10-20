@@ -130,6 +130,38 @@ public sealed class FilterTests : IDisposable
             .ShouldBe(["GetUser", "GetInvoice", "Plain"]);
     }
 
+    // A connection string typed where a path stands, whose end looks like a file: its position is all that is said.
+    [Fact]
+    public async Task Plan_SqlPathWithAnEqualsSign_IsNamedByItsPosition()
+    {
+        var (_, result) = await _run.PlanAsync("describe", "a=b.sql");
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                "sqlsource : error SQLSRC212: The path at position 2 is not a .sql file that a type of the run claims\n"
+                    + Expected.See("SQLSRC212")
+            )
+        );
+    }
+
+    // The path is the same file, and the token that came first names it.
+    [Fact]
+    public async Task Plan_SqlPathGivenTwice_IsNamedByTheFirstToken()
+    {
+        var (_, result) = await _run.PlanAsync("describe", "a=b/../Q/Missing.sql", "Q/Missing.sql");
+
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                "sqlsource : error SQLSRC212: The path at position 2 is not a .sql file that a type of the run claims\n"
+                    + Expected.See("SQLSRC212")
+            )
+        );
+    }
+
     [Fact]
     public async Task Run_OneSqlPathGivenThreeWaysThatNoTypeClaims_IsSqlsrc212Once()
     {

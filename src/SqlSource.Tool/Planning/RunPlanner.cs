@@ -440,7 +440,7 @@ internal static class RunPlanner
         errors.AddRange(
             filters
                 .Files.Where(filter => !planned.Contains(filter.NormalizedPath))
-                .Select(static filter => ToolDiagnostic.Create(ToolDiagnostics.FileNotInRun, filter.Path))
+                .Select(static filter => ToolDiagnostic.Create(ToolDiagnostics.FileNotInRun, filter.Named))
         );
     }
 

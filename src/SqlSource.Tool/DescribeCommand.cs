@@ -366,8 +366,8 @@ internal static class DescribeCommand
     )
     {
         // With file filters and no unit, the unit is found from the working directory, not from the files.
-        var paths = ArgumentsOf(usage).Select(static argument => argument.Text).ToList();
-        var unitPath = paths.FirstOrDefault(static path => !SqlPath.IsSqlFile(path));
+        var paths = ArgumentsOf(usage);
+        var unitPath = paths.FirstOrDefault(static path => !SqlPath.IsSqlFile(path.Text));
         var found = RunUnitFinder.Find(unitPath, host.WorkingDirectory);
         if (!found.Succeeded)
         {
@@ -379,7 +379,7 @@ internal static class DescribeCommand
         RunEvents.Unit(reporter.Trace, unit, wasGiven: unitPath is not null);
         var manifests = await RunProjects.FindAsync(
             unit,
-            [.. ValuesOf(usage, ProjectOption).Select(static value => value.Text)],
+            ValuesOf(usage, ProjectOption),
             host,
             reporter,
             cancellationToken
@@ -396,7 +396,7 @@ internal static class DescribeCommand
         }
 
         var filters = RunFilters.Create(
-            paths.Where(SqlPath.IsSqlFile),
+            paths.Where(static path => SqlPath.IsSqlFile(path.Text)),
             ValuesOf(usage, DatabaseOption).Select(static value => value.Text),
             host.WorkingDirectory
         );

@@ -69,6 +69,16 @@ public sealed class ToolDiagnosticsTests
             )
             .ShouldBe("sqlsource failed unexpectedly: System.Exception: boom");
 
+        // These start with a path that is already named, in quotes or by its position, as the tool passes it.
+        var namesItsPath = new[]
+        {
+            ToolDiagnostics.NoRunUnit,
+            ToolDiagnostics.SeveralRunUnits,
+            ToolDiagnostics.NotARunUnit,
+            ToolDiagnostics.ProjectNotInRun,
+            ToolDiagnostics.FileNotInRun,
+            ToolDiagnostics.DirectoryCannotBeRead,
+        };
         foreach (
             var descriptor in ToolDiagnostics
                 .All.Remove(ToolDiagnostics.UnexpectedFailure)
@@ -80,7 +90,7 @@ public sealed class ToolDiagnosticsTests
             string.Format(
                     CultureInfo.InvariantCulture,
                     descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                    "/work/app",
+                    namesItsPath.Contains(descriptor) ? "'/work/app'" : "/work/app",
                     "the reason",
                     "a third",
                     "a fourth"
@@ -113,7 +123,7 @@ public sealed class ToolDiagnosticsTests
         string.Format(
                 CultureInfo.InvariantCulture,
                 ToolDiagnostics.ProjectNotInRun.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                "/work/Other/Other.csproj",
+                "'/work/Other/Other.csproj'",
                 "/work/App.slnx"
             )
             .ShouldBe("'/work/Other/Other.csproj' is not a project of '/work/App.slnx'");
@@ -133,7 +143,7 @@ public sealed class ToolDiagnosticsTests
         string.Format(
                 CultureInfo.InvariantCulture,
                 ToolDiagnostics.DirectoryCannotBeRead.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                "/srv/locked",
+                "'/srv/locked'",
                 "Access is denied."
             )
             .ShouldBe("'/srv/locked' cannot be read: Access is denied.");
@@ -192,7 +202,7 @@ public sealed class ToolDiagnosticsTests
         string.Format(
                 CultureInfo.InvariantCulture,
                 ToolDiagnostics.FileNotInRun.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                "/work/App/User.sql"
+                "'/work/App/User.sql'"
             )
             .ShouldBe("'/work/App/User.sql' is not a .sql file that a type of the run claims");
 

@@ -29,7 +29,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor NoRunUnit = new(
         id: "SQLSRC201",
         title: "No project or solution found",
-        messageFormat: "'{0}' holds no .sln, .slnx or .csproj file",
+        messageFormat: "{0} holds no .sln, .slnx or .csproj file",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -40,7 +40,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor SeveralRunUnits = new(
         id: "SQLSRC202",
         title: "More than one project or solution found",
-        messageFormat: "'{0}' holds more than one .sln, .slnx or .csproj file.  Name the one to run on.",
+        messageFormat: "{0} holds more than one .sln, .slnx or .csproj file.  Name the one to run on.",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -51,7 +51,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor NotARunUnit = new(
         id: "SQLSRC203",
         title: "Path is not a project or a solution",
-        messageFormat: "'{0}' is not a .sln, .slnx or .csproj file, or a directory that holds one",
+        messageFormat: "{0} is not a .sln, .slnx or .csproj file, or a directory that holds one",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -95,7 +95,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor ProjectNotInRun = new(
         id: "SQLSRC207",
         title: "Project is not in the run",
-        messageFormat: "'{0}' is not a project of '{1}'",
+        messageFormat: "{0} is not a project of '{1}'",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -153,7 +153,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor FileNotInRun = new(
         id: "SQLSRC212",
         title: "File is not in the run",
-        messageFormat: "'{0}' is not a .sql file that a type of the run claims",
+        messageFormat: "{0} is not a .sql file that a type of the run claims",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -263,7 +263,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor DirectoryCannotBeRead = new(
         id: "SQLSRC222",
         title: "Directory cannot be read",
-        messageFormat: "'{0}' cannot be read: {1}",
+        messageFormat: "{0} cannot be read: {1}",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
