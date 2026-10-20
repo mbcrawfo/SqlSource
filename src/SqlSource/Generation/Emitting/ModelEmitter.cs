@@ -86,13 +86,23 @@ internal static class ModelEmitter
         }
 
         // Dapper finds no public constructor that matches the row, falls back to the private constructor without
-        // parameters, and sets each property through its init accessor.  Each argument is a typed default(T), since
-        // this(default!) would be ambiguous with the copy constructor of a record with one property (CS0121).
+        // parameters, and sets each property through its init accessor.  The constructor has a summary, which keeps
+        // the generated code free of documentation warnings, and EditorBrowsable(Never), so that an editor does not
+        // offer it.  Each argument is a typed default(T), since this(default!) would be ambiguous with the copy
+        // constructor of a record with one property (CS0121).
         var memberIndent = indent + Indent;
         _ = builder.Append('\n').Append(indent).Append("{\n");
+        AppendSummary(
+            builder,
+            memberIndent,
+            "Creates the record for materializers such as Dapper, which set each property after construction.  It\n"
+                + "leaves each property at its default value, null for a reference type even where it cannot be null,\n"
+                + "until it is assigned."
+        );
         _ = builder
             .Append(memberIndent)
-            .Append("// Dapper reads a row with an array column through this constructor, then sets each property.\n")
+            .Append("[global::System.ComponentModel.EditorBrowsable(")
+            .Append("global::System.ComponentModel.EditorBrowsableState.Never)]\n")
             .Append(memberIndent)
             .Append("private ")
             .Append(model.Name)
