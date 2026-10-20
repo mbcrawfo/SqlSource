@@ -403,8 +403,7 @@ public sealed class SecretTests : IDisposable
         result.Error.ShouldNotContain(Secrets.Marker);
         result.Error.ShouldStartWith(
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: The "
-                + "description of the query 'Bad' holds the connection's value or a password of it.  The describer "
-                + "put it there, or the password equals a name of the database.\n"
+                + "describer put the connection's value in its description of the query 'Bad'.\n"
         );
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
     }
@@ -423,6 +422,27 @@ public sealed class SecretTests : IDisposable
 
         result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeTrue();
+    }
+
+    // A description is searched for the whole value alone: a password that equals a column's name is the catalog's.
+    [Fact]
+    public async Task Run_PasswordTheDescriberGaveThatIsAColumnsName_DescribesAndWritesTheSidecar()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION"] = "Host=db;Password=password";
+        _scene.Describer.Secrets = ["password"];
+        _scene.Describer.Descriptions["Good"] = FakeDescriber.Rows with
+        {
+            Columns = new EquatableArray<SidecarColumn>([
+                new SidecarColumn(0, "password", new OtherEngineType("text"), null, null, null, null, null),
+            ]),
+        };
+
+        var result = await _scene.DescribeAsync();
+
+        result.ShouldBe(new CliResult(0, "postgres (postgres): 2 described, 0 skipped, 0 failed\n", ""));
+        (
+            await File.ReadAllTextAsync(SidecarFormat.PathFor(_users), TestContext.Current.CancellationToken)
+        ).ShouldContain("\"name\": \"password\"");
     }
 
     // --check prints what differs, and a text of the describer is among it.  The guard on a description comes first,
@@ -459,8 +479,7 @@ public sealed class SecretTests : IDisposable
         result.Error.ShouldNotContain(Secrets.Marker);
         result.Error.ShouldStartWith(
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: The "
-                + "description of the query 'Good' holds the connection's value or a password of it.  The describer "
-                + "put it there, or the password equals a name of the database.\n"
+                + "describer put the connection's value in its description of the query 'Good'.\n"
         );
         result.Error.ShouldNotContain("SQLSRC219");
     }

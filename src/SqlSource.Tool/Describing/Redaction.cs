@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -26,16 +27,7 @@ internal static class Redaction
     /// The text with the whole value wherever it stands, and then each part where it stands as a token, written as
     /// <see cref="Mark" />.
     /// </summary>
-    public static string Of(string text, ConnectionSecret secret)
-    {
-        var cleaned = secret.Value.Length == 0 ? text : text.Replace(secret.Value, Mark, StringComparison.Ordinal);
-        foreach (var part in secret.Parts)
-        {
-            cleaned = OfToken(cleaned, part);
-        }
-
-        return cleaned;
-    }
+    public static string Of(string text, ConnectionSecret secret) => Of(text, secret.Value, secret.Parts);
 
     /// <summary>
     /// The failure with the secret taken out of its descriptor and of what the server said.  Its arguments and its
@@ -57,19 +49,20 @@ internal static class Redaction
     /// The error with the secret taken out of its arguments, of the text of each line under it, and of its message.
     /// </summary>
     /// <remarks>
-    /// A format and an argument, or two arguments, can make the value together, so the message is formatted as
-    /// <see cref="Reporter" /> formats it, from the cleaned arguments, and searched too.  When it holds the secret,
-    /// the error gets a copy of its descriptor whose format is <c>{0}</c>, and the cleaned message is its one
-    /// argument.
+    /// Each text is cleaned as it is, then put on one line as <see cref="Reporter" /> prints it, and cleaned again:
+    /// a line break written as a space can make a part that holds a space.  A format and an argument, or two
+    /// arguments, can make the value together, so the message is formatted from the cleaned arguments, as
+    /// <see cref="Reporter" /> formats it, and searched too.  When it holds the secret, the error gets a copy of its
+    /// descriptor whose format is <c>{0}</c>, and the cleaned message is its one argument.
     /// </remarks>
     public static ToolDiagnostic Of(ToolDiagnostic diagnostic, ConnectionSecret secret)
     {
-        string[] arguments = [.. diagnostic.Arguments.Select(argument => Of(argument, secret))];
+        string[] arguments = [.. diagnostic.Arguments.Select(argument => AsPrinted(argument, secret))];
         var cleaned = diagnostic with
         {
             Arguments = new EquatableArray<string>([.. arguments]),
             Lines = new EquatableArray<ContinuationLine>([
-                .. diagnostic.Lines.Select(line => line with { Text = Of(line.Text, secret) }),
+                .. diagnostic.Lines.Select(line => line with { Text = AsPrinted(line.Text, secret) }),
             ]),
         };
 
@@ -134,17 +127,31 @@ internal static class Redaction
         );
     }
 
+    // The text as Reporter prints it, with the secret taken out before and after it is put on one line.
+    private static string AsPrinted(string text, ConnectionSecret secret) => Of(OneLine.Of(Of(text, secret)), secret);
+
+    private static string Of(string text, string value, IEnumerable<string> parts)
+    {
+        var cleaned = value.Length == 0 ? text : text.Replace(value, Mark, StringComparison.Ordinal);
+        foreach (var part in parts)
+        {
+            cleaned = OfToken(cleaned, part);
+        }
+
+        return cleaned;
+    }
+
     // The cut dropped the kind of each line break, so the value and each part are searched as they are and with
     // their breaks as the one the lines are joined with.  A value that was in two lines leaves one.
     private static EquatableArray<string> OfLines(EquatableArray<string> lines, ConnectionSecret secret)
     {
         const string Break = "\n";
         var joined = string.Join(Break, lines);
-        var broken = new ConnectionSecret(
+        var cleaned = Of(
+            Of(joined, secret),
             secret.Value.ReplaceLineEndings(Break),
             secret.Parts.Select(static part => part.ReplaceLineEndings(Break))
         );
-        var cleaned = Of(Of(joined, secret), broken);
         return string.Equals(cleaned, joined, StringComparison.Ordinal)
             ? lines
             : new EquatableArray<string>([.. cleaned.Split(Break)]);

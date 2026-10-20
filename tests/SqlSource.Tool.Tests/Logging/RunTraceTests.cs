@@ -33,4 +33,18 @@ public sealed class RunTraceTests
 
         output.ToString().ShouldBe("sqlsource: setting ***, table latest_orders\n");
     }
+
+    // The line break is written as a space, which can make a password that holds one.
+    [Fact]
+    public void Say_PasswordWithASpaceSplitByALineBreak_IsTheMark()
+    {
+        using var output = new StringWriter { NewLine = "\n" };
+        var trace = new RunTrace(NullRunLog.Instance, output).Without(
+            new ConnectionSecret("Host=db;Password=my pass", ["my pass"])
+        );
+
+        trace.Say("x my\npass y");
+
+        output.ToString().ShouldBe("sqlsource: x *** y\n");
+    }
 }

@@ -26,9 +26,8 @@ namespace SqlSource.Tool.Describing;
 /// <para>
 /// This is the one place outside <c>Cli</c> that catches every exception: a describer's, which is a bug of the
 /// describer and may hold the connection's value.  It is thrown again as a <see cref="DescriberFaultException" />
-/// without the value, and the run ends.  A description that holds the value or a password of it, which would be
-/// written into a sidecar, ends the run the same way (<see cref="EntrySecretCheck" />).  A run that was cancelled
-/// ends as one.
+/// without the value, and the run ends.  A description that holds the value, which would be written into a sidecar,
+/// is such a bug too (<see cref="EntrySecretCheck" />).  A run that was cancelled ends as one.
 /// </para>
 /// </remarks>
 internal static class DatabaseRuns
@@ -102,9 +101,9 @@ internal static class DatabaseRuns
         var parts = new Guard(new ConnectionSecret(value), host.GetEnvironmentVariable, cancellationToken).Call(() =>
             describer.SecretsOf(value)
         );
-        var secret = new ConnectionSecret(value, parts);
-        var trace = reporter.Trace.Without(secret);
         var engine = SqlDialectName.Canonical(database.Dialect);
+        var secret = new ConnectionSecret(value, parts, [database.Name, engine]);
+        var trace = reporter.Trace.Without(secret);
         var guard = new Guard(secret, host.GetEnvironmentVariable, cancellationToken);
         var request = new OpenRequest(database.Name, value, host.Exchange(database.Name), host.Time);
         var log = new SessionRunLog(reporter.Trace.Log, secret, engine + ".");
@@ -166,7 +165,7 @@ internal static class DatabaseRuns
                 query.Entry = guard.Call(() =>
                     NoSecretIn(
                         EntryBuilder.Build(planned, database.Dialect, database.Name, server, description),
-                        secret
+                        secret.Value
                     )
                 );
                 query.State = QueryState.Described;
@@ -185,13 +184,11 @@ internal static class DatabaseRuns
         }
     }
 
-    // What a describer gave goes into a sidecar, which is committed: a value or a password in it is a bug of the
-    // describer, or a password that equals a name the describer gave.
-    private static SidecarEntry NoSecretIn(SidecarEntry entry, ConnectionSecret secret) =>
-        EntrySecretCheck.Holds(entry, secret)
+    // What a describer gave goes into a sidecar, which is committed: a value in it is a bug of the describer.
+    private static SidecarEntry NoSecretIn(SidecarEntry entry, string value) =>
+        EntrySecretCheck.Holds(entry, value)
             ? throw new InvalidOperationException(
-                $"The description of the query '{entry.Name}' holds the connection's value or a password of it.  "
-                    + "The describer put it there, or the password equals a name of the database."
+                $"The describer put the connection's value in its description of the query '{entry.Name}'."
             )
             : entry;
 

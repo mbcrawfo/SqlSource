@@ -20,11 +20,14 @@ internal sealed class RunTrace(IRunLog log, TextWriter? verbose = null, Connecti
 
     /// <summary>
     /// Says one line under <c>--verbose</c>, and nothing without it.  The text is kept on one line: it holds
-    /// paths and names that the tool did not write.
+    /// paths and names that the tool did not write.  A secret is taken out before and after, since a line break
+    /// written as a space can make a part that holds a space.
     /// </summary>
     /// <param name="text">The line, without its prefix.</param>
     public void Say(string text) =>
-        verbose?.WriteLine(Prefix + OneLine.Of(secret is null ? text : Redaction.Of(text, secret)));
+        verbose?.WriteLine(
+            Prefix + (secret is null ? OneLine.Of(text) : Redaction.Of(OneLine.Of(Redaction.Of(text, secret)), secret))
+        );
 
     /// <summary>
     /// The same trace with one connection's secret removed from everything said through it.  What the run says of

@@ -292,18 +292,31 @@ public sealed class DatabaseRunsTests : IDisposable
     [Fact]
     public async Task Run_SessionThatCannotBeOpenedAndHoldsAPasswordTheDescriberGave_IsPrintedWithoutIt()
     {
-        _describer.Secrets = ["pw"];
+        _describer.Secrets = ["hunter2"];
         _describer.OpenFailure = FakeDescriber.Failure(
             "(open)",
             step: null,
             help: null,
-            "28P01: password 'pw' was refused"
+            "28P01: password 'hunter2' was refused"
         );
 
-        _ = await RunAsync(given: ["postgres=Host=db;Password=pw"]);
+        _ = await RunAsync(given: ["postgres=Host=db;Password=hunter2"]);
 
         _error.ToString().ShouldContain("    server: 28P01: password '***' was refused\n");
-        _error.ToString().ShouldNotContain("'pw'");
+        _error.ToString().ShouldNotContain("hunter2");
+    }
+
+    // The run prints the database's name and the engine's whatever the describer does, so a password equal to them
+    // is not removed from them.
+    [Fact]
+    public async Task Run_QueryThatFailsWithAPasswordThatIsTheDatabasesNameAndTheEngines_PrintsTheQueryLineAsItIs()
+    {
+        _describer.Secrets = ["postgres"];
+        _describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser");
+
+        _ = await RunAsync(given: ["postgres=Host=db;Password=postgres"]);
+
+        _error.ToString().ShouldContain("    query: GetUser, database postgres, postgres 16.4, FakeDriver 1.2.3\n");
     }
 
     // The guard that asks for the parts knows only the whole value.
@@ -581,8 +594,7 @@ public sealed class DatabaseRunsTests : IDisposable
             .Diagnostic.Arguments.ToArray()
             .ShouldBe([
                 "System.InvalidOperationException",
-                "The description of the query 'GetUser' holds the connection's value or a password of it.  The "
-                    + "describer put it there, or the password equals a name of the database.",
+                "The describer put the connection's value in its description of the query 'GetUser'.",
             ]);
         fault.Diagnostic.Arguments.ShouldAllBe(argument => !argument.Contains(Secrets.Word));
         _files[0].Queries[0].State.ShouldNotBe(QueryState.Described);
@@ -622,9 +634,9 @@ public sealed class DatabaseRunsTests : IDisposable
         _ = await RunExpectingTheValueInTheDescriptionAsync(Secrets.ConnectionWithWord);
     }
 
-    // A password that equals a name the describer gave is in the description, and the run cannot tell it from a leak.
+    // A description is searched for the whole value alone: a password that equals a name of the catalog is no fault.
     [Fact]
-    public async Task Run_DescriptionWithAPasswordTheDescriberGaveAsAColumnsName_IsAFault()
+    public async Task Run_DescriptionWithAPasswordTheDescriberGaveAsAColumnsName_IsDescribed()
     {
         _describer.Secrets = ["admin"];
         _describer.Descriptions["GetUser"] = FakeDescriber.NoRows with
@@ -635,7 +647,11 @@ public sealed class DatabaseRunsTests : IDisposable
             ]),
         };
 
-        _ = await RunExpectingTheValueInTheDescriptionAsync("Host=db;Password=admin");
+        _ = await RunAsync(given: ["postgres=Host=db;Password=admin", "billing=Host=db;Password=admin"]);
+
+        _error.ToString().ShouldBeEmpty();
+        _files[0].Queries[0].State.ShouldBe(QueryState.Described);
+        _files[0].Queries[0].Entry.ShouldNotBeNull().Columns.ShouldNotBeNull()[0].Name.ShouldBe("admin");
     }
 
     // The writer escapes a quote and a backslash, so the value is in the file as it escapes it.

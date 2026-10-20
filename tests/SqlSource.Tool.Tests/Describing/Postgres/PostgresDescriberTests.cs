@@ -29,6 +29,11 @@ public sealed class PostgresDescriberTests
     public void SecretsOf_ConnectionTheDriverCannotRead_IsNone() =>
         new PostgresDescriber().SecretsOf("Nonsense=1").ShouldBeEmpty();
 
+    // A keyword the builder knows with a value it cannot read: the builder throws, whatever else the string holds.
+    [Fact]
+    public void SecretsOf_ConnectionWithAValueTheDriverCannotRead_IsNone() =>
+        new PostgresDescriber().SecretsOf("Password=pw;Port=abc").ShouldBeEmpty();
+
     // The list is closed: nothing else reaches a SET LOCAL, and a describer that would send it is never made.
     [Theory]
     [InlineData("work_mem=1")]

@@ -207,6 +207,21 @@ public sealed class RedactionTests : IDisposable
         printed.ShouldNotContain("Password=x");
     }
 
+    // Reporter writes a line break as a space, which can make a password that holds a space.
+    [Fact]
+    public void Of_PasswordWithASpaceSplitByALineBreak_IsTheMarkInTheArgumentAndTheLine()
+    {
+        var diagnostic = ToolDiagnostic
+            .Create(WithFormat("rejected {0}"), "my\npass")
+            .WithLines(new ContinuationLine("server", "said my\r\npass"));
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Host=db;Password=my pass", ["my pass"])));
+
+        printed.ShouldContain("rejected ***\n");
+        printed.ShouldContain("    server: said ***\n");
+        printed.ShouldNotContain("my pass");
+    }
+
     // What the run itself writes of a database is a describer's text too.
     [Fact]
     public async Task Run_DescriberThatGivesItsConnectionAsItsServer_HasTheMarkInDatabaseOpen()
