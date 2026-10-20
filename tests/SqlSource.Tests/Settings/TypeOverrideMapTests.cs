@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Linq;
 using Shouldly;
 using SqlSource.Settings;
 using Xunit;
@@ -60,6 +61,25 @@ public sealed class TypeOverrideMapTests
                 Map(Entry("public.status", "int", SettingPlace.Property))
             )
             .ShouldBe(Map(Entry("public.\"status\"", "long", SettingPlace.Query)));
+
+    // A shorter list of parts is first when the first parts are equal, and a key that is not an array before an array.
+    [Theory]
+    [InlineData("public", "A")]
+    [InlineData("public.tag", "B")]
+    [InlineData("public.tag[]", "C")]
+    [InlineData("public.x", "D")]
+    public void Over_ShorterPartsAndNonArrayFirst_AreOrderedAndFound(string key, string type)
+    {
+        var merged = TypeOverrideMap
+            .Over(
+                Map(Entry("public.tag[]", "C", SettingPlace.Query), Entry("public.x", "D", SettingPlace.Query)),
+                Map(Entry("public", "A", SettingPlace.Property), Entry("public.tag", "B", SettingPlace.Property))
+            )!
+            .Value;
+
+        merged.Select(entry => entry.Key).ShouldBe(["public", "public.tag", "public.tag[]", "public.x"]);
+        TypeOverrideMap.Find(merged, key)!.Type.ShouldBe(type);
+    }
 
     [Fact]
     public void Over_DefaultAbove_HidesTheKeyBelowAndInEffectDropsIt()

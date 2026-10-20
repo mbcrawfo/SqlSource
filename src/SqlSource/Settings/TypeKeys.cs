@@ -331,7 +331,7 @@ internal static class TypeKeys
             var ofElement = text.Substring(1);
             var isKnownElement = TryGetExactName(ofElement, out var knownElement);
 
-            // The catalog's name of an array, with [], is the array of arrays' key, as it is for a plain name.
+            // With [], the catalog's name is kept with its _, as a plain one is.
             if (isArray)
             {
                 return isKnownElement ? "_" + knownElement + "[]" : name.ToString() + "[]";

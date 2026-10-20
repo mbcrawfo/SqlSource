@@ -41,7 +41,7 @@ internal static class TypeOverrideMap
         var (high, low) = (0, 0);
         while (high < over.Count && low < under.Count)
         {
-            var order = Order(over[high].Key, under[low].Key);
+            var order = Order(new KeyParts(over[high].Key), new KeyParts(under[low].Key));
             merged.Add(order <= 0 ? over[high] : under[low]);
             high += order <= 0 ? 1 : 0;
             low += order >= 0 ? 1 : 0;
@@ -98,8 +98,9 @@ internal static class TypeOverrideMap
     /// </summary>
     public static TypeOverride? Find(EquatableArray<TypeOverride> map, string key)
     {
-        var at = LowerBound(map, key, ignoringCaseOnly: true);
-        return at < map.Count ? BestOfEqualIgnoringCase(map, at, key) : null;
+        var parts = new KeyParts(key);
+        var at = LowerBound(map, parts, ignoringCaseOnly: true);
+        return at < map.Count ? BestOfEqualIgnoringCase(map, at, parts) : null;
     }
 
     /// <summary>
@@ -108,23 +109,30 @@ internal static class TypeOverrideMap
     /// </summary>
     public static int IndexOf(List<TypeOverride> entries, string key)
     {
-        var at = LowerBound(entries, key, ignoringCaseOnly: false);
-        return at < entries.Count && Order(entries[at].Key, key) == 0 ? at : ~at;
+        var parts = new KeyParts(key);
+        var at = LowerBound(entries, parts, ignoringCaseOnly: false);
+        return at < entries.Count && Order(new KeyParts(entries[at].Key), parts) == 0 ? at : ~at;
     }
 
     // Walks the entries from at, the first that is not less than key ignoring case, while they are equal to it ignoring
     // case.  An entry equal to key exactly wins, and failing that the first whose quoted parts are equal to key's.
-    private static TypeOverride? BestOfEqualIgnoringCase(EquatableArray<TypeOverride> map, int at, string key)
+    private static TypeOverride? BestOfEqualIgnoringCase(EquatableArray<TypeOverride> map, int at, in KeyParts key)
     {
         TypeOverride? match = null;
-        for (; at < map.Count && Compare(map[at].Key, key, StringComparison.OrdinalIgnoreCase) == 0; at++)
+        for (; at < map.Count; at++)
         {
-            if (Compare(map[at].Key, key, StringComparison.Ordinal) == 0)
+            var entry = new KeyParts(map[at].Key);
+            if (Compare(entry, key, StringComparison.OrdinalIgnoreCase) != 0)
+            {
+                break;
+            }
+
+            if (Compare(entry, key, StringComparison.Ordinal) == 0)
             {
                 return map[at];
             }
 
-            if (match is null && QuotedPartsAreEqual(map[at].Key, key))
+            if (match is null && QuotedPartsAreEqual(entry, key))
             {
                 match = map[at];
             }
@@ -133,26 +141,18 @@ internal static class TypeOverrideMap
         return match;
     }
 
-    // Whether each part of entryKey that is quoted has the text of the same part of key exactly.  The two are equal
+    // Whether each part of entry that is quoted has the text of the same part of key exactly.  The two are equal
     // ignoring case, so they have the same parts.
-    private static bool QuotedPartsAreEqual(string entryKey, string key)
-    {
-        if (
-            !TypeKeys.TrySplit(entryKey.AsSpan(), out var entrySchema, out var entryName, out _)
-            || !TypeKeys.TrySplit(key.AsSpan(), out var schema, out var name, out _)
-        )
-        {
-            return true;
-        }
-
-        return PartMatches(entrySchema, schema) && PartMatches(entryName, name);
-    }
+    private static bool QuotedPartsAreEqual(in KeyParts entry, in KeyParts key) =>
+        !entry.IsWellFormed
+        || !key.IsWellFormed
+        || (PartMatches(entry.Schema, key.Schema) && PartMatches(entry.Name, key.Name));
 
     private static bool PartMatches(ReadOnlySpan<char> entryPart, ReadOnlySpan<char> part) =>
         !TypeKeys.IsQuoted(entryPart) || TypeKeys.TextOf(entryPart).SequenceEqual(TypeKeys.TextOf(part));
 
     // The order of the map: ignoring case, then exactly to break a tie.
-    private static int Order(string a, string b)
+    private static int Order(in KeyParts a, in KeyParts b)
     {
         var order = Compare(a, b, StringComparison.OrdinalIgnoreCase);
         return order != 0 ? order : Compare(a, b, StringComparison.Ordinal);
@@ -161,27 +161,24 @@ internal static class TypeOverrideMap
     // Compares the keys as lists of their parts, [name] or [schema, name], lexicographically by the text of each part,
     // a shorter list first, and then a key that is not an array before one that is.  A key that is not well formed
     // does not reach the map, and would be compared as a whole.
-    private static int Compare(string a, string b, StringComparison comparison)
+    private static int Compare(in KeyParts a, in KeyParts b, StringComparison comparison)
     {
-        if (
-            !TypeKeys.TrySplit(a.AsSpan(), out var schemaA, out var nameA, out var isArrayA)
-            || !TypeKeys.TrySplit(b.AsSpan(), out var schemaB, out var nameB, out var isArrayB)
-        )
+        if (!a.IsWellFormed || !b.IsWellFormed)
         {
-            return string.Compare(a, b, comparison);
+            return string.Compare(a.Text, b.Text, comparison);
         }
 
-        var order = ComparePart(schemaA.IsEmpty ? nameA : schemaA, schemaB.IsEmpty ? nameB : schemaB, comparison);
-        if (order == 0 && (schemaA.IsEmpty || schemaB.IsEmpty))
+        var order = ComparePart(a.First, b.First, comparison);
+        if (order == 0 && (a.Schema.IsEmpty || b.Schema.IsEmpty))
         {
-            order = schemaB.IsEmpty.CompareTo(schemaA.IsEmpty);
+            order = b.Schema.IsEmpty.CompareTo(a.Schema.IsEmpty);
         }
         else if (order == 0)
         {
-            order = ComparePart(nameA, nameB, comparison);
+            order = ComparePart(a.Name, b.Name, comparison);
         }
 
-        return order != 0 ? order : isArrayA.CompareTo(isArrayB);
+        return order != 0 ? order : a.IsArray.CompareTo(b.IsArray);
     }
 
     private static int ComparePart(ReadOnlySpan<char> a, ReadOnlySpan<char> b, StringComparison comparison) =>
@@ -190,16 +187,15 @@ internal static class TypeOverrideMap
     // The index of the first entry that is not less than key, in the order of the map or, with ignoringCaseOnly, in
     // the order of the keys ignoring case.  Generic over the list, so that a map, which is a struct, is searched
     // without being boxed.
-    private static int LowerBound<TList>(TList entries, string key, bool ignoringCaseOnly)
+    private static int LowerBound<TList>(TList entries, in KeyParts key, bool ignoringCaseOnly)
         where TList : IReadOnlyList<TypeOverride>
     {
         var (low, high) = (0, entries.Count);
         while (low < high)
         {
             var middle = low + ((high - low) / 2);
-            var order = ignoringCaseOnly
-                ? Compare(entries[middle].Key, key, StringComparison.OrdinalIgnoreCase)
-                : Order(entries[middle].Key, key);
+            var entry = new KeyParts(entries[middle].Key);
+            var order = ignoringCaseOnly ? Compare(entry, key, StringComparison.OrdinalIgnoreCase) : Order(entry, key);
             if (order < 0)
             {
                 low = middle + 1;
@@ -211,5 +207,33 @@ internal static class TypeOverrideMap
         }
 
         return low;
+    }
+
+    // A key split once into its parts, as TypeKeys.TrySplit gives them, so that a search splits the key it looks for
+    // once and each entry once for each comparison.
+    private readonly ref struct KeyParts
+    {
+        public KeyParts(string text)
+        {
+            Text = text;
+            IsWellFormed = TypeKeys.TrySplit(text.AsSpan(), out var schema, out var name, out var isArray);
+            Schema = schema;
+            Name = name;
+            IsArray = isArray;
+        }
+
+        public string Text { get; }
+
+        public bool IsWellFormed { get; }
+
+        // Empty for an unqualified key.
+        public ReadOnlySpan<char> Schema { get; }
+
+        public ReadOnlySpan<char> Name { get; }
+
+        public bool IsArray { get; }
+
+        // The part a list of parts is compared by first.
+        public ReadOnlySpan<char> First => Schema.IsEmpty ? Name : Schema;
     }
 }
