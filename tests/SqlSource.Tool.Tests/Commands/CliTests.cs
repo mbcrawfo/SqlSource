@@ -304,7 +304,7 @@ public sealed class CliTests : IDisposable
 
     // A run that waits on a database and does not look at its token can still be ended from the keyboard.
     [Fact]
-    public void Interrupt_FirstTime_CancelsTheRunAndKeepsTheProcess_SecondTime_LetsTheProcessEnd()
+    public void Interrupt_FirstThenSecondTime_CancelsTheRunThenLetsTheProcessEnd()
     {
         using var interrupt = new CancellationTokenSource();
         var signals = 0;
@@ -352,7 +352,7 @@ public sealed class CliTests : IDisposable
     // Windows ends the process when the handler of a closed console or of a shutdown returns, so the handler
     // returns only when the run has ended.  A second signal waits for nothing: the process is to end now.
     [Fact]
-    public void Terminate_FirstTime_CancelsTheRunAndWaitsForItsEnd_SecondTime_LetsTheProcessEndAtOnce()
+    public void Terminate_FirstThenSecondTime_WaitsForTheRunThenLetsTheProcessEndAtOnce()
     {
         using var interrupt = new CancellationTokenSource();
         var signals = 0;

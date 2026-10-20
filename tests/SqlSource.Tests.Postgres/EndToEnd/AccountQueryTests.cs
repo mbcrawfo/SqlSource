@@ -105,7 +105,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task QueryAsync_ListClosedBefore_NullParameter_ReadsEveryAccount()
+    public async Task QueryAsync_ListClosedBeforeWithANullParameter_ReadsEveryAccount()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
@@ -123,7 +123,7 @@ public sealed class AccountQueryTests(PostgresContainer postgres)
     }
 
     [Fact]
-    public async Task QueryAsync_ListClosedBefore_Date_ReadsTheClosedAccount()
+    public async Task QueryAsync_ListClosedBeforeADate_ReadsTheClosedAccount()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
