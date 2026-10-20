@@ -230,16 +230,12 @@ public static class Cli
         }
 
         var parsed = root.Parse(args, Parser);
-        if (
-            parsed.Errors.Count > 0
-            || !usage.IsReadTheSameBy(parsed)
-            || !DescribeCommand.ReadsConnectionsAs(usage, parsed)
-        )
+        if (parsed.Errors.Count > 0 || !usage.IsReadTheSameBy(parsed) || !DescribeCommand.ReadsValuesAs(usage, parsed))
         {
             // UsageCheck lets nothing through that System.CommandLine rejects or reads another way, as far as
             // the tests know.  If something is, nothing runs, and System.CommandLine's message is not written:
-            // it may repeat a token.  The values of --connection are held too: the log's arguments is
-            // redacted from one reading and the describer is handed the other.
+            // it may repeat a token.  The values of the options that take one are held too: the run reads them
+            // from Usage, and the log's arguments is redacted from it, while System.CommandLine gives the log's path.
             await host.Error.WriteLineAsync("sqlsource: the command line is not valid");
             return null;
         }
@@ -301,7 +297,7 @@ public static class Cli
                 host.Error,
                 new RunTrace(events, DescribeCommand.IsVerbose(parsed) ? host.Out : null)
             );
-            DescribeCommand.Bind(parsed, host, state.Reporter, counts => state.Databases = counts);
+            DescribeCommand.Bind(parsed, commandLine.Usage, host, state.Reporter, counts => state.Databases = counts);
         }
 
         var invocation = new InvocationConfiguration

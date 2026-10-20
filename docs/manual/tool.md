@@ -236,7 +236,7 @@ A relative path is taken from the current folder.
 | `--force` | Describes every query of the run again, current or not: see [after a schema change](#after-a-schema-change) |
 | `--check` | Describes every query of the run, compares with the sidecars, writes nothing: see [check in CI](#check-in-ci).  With `--force` too, it is `--check` |
 | `--verbose` | Prints what the run decides as it goes: see [`--verbose`](#verbose) |
-| `--log <path>` | Writes a record of the run to a file: see [logs](#logs) |
+| `--log <path>` | Writes a record of the run to a file; a path that holds `=` or `;` is refused: see [logs](#logs) |
 
 A run with `--project`, `--database` or a `.sql` path writes only the sidecars of the files whose queries it selected, and deletes none.
 
@@ -293,7 +293,7 @@ $ dotnet sqlsource describe --log sqlsource.log
 
 `--log <path>`, or the variable `SQLSOURCE_LOG`, writes a record of the run to a file, one JSON object on each line.  It is what to attach to an issue when the tool does something you did not expect.
 
-- **The file is overwritten by each run.**  The tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip on the command line never empties a file of your project ([SQLSRC218](diagnostics.md#sqlsrc218)).
+- **The file is overwritten by each run.**  The tool refuses a path that ends in `.sql`, `.sql.json`, `.csproj`, `.sln` or `.slnx`, so that a slip on the command line never empties a file of your project ([SQLSRC218](diagnostics.md#sqlsrc218)).  It refuses a path that holds `=` or `;` too, which is more likely a connection string typed in the wrong place than a path.
 - **A run that reports an error and writes no log** ends with the line `sqlsource: run again with --log <file> for a record of what the run did`.  A `--check` whose only errors are sidecars out of date does not print it.
 
 **Read a log before you share it.**  The tool writes each connection value as `***` wherever it finds it whole: the value of each `--connection` on the command line, and the value of each connection, from the command line or a variable, wherever the database driver repeats it in a message.  It writes each password of a connection string as `***` too, where it stands apart from other letters, digits and underscores and is at least four characters long.  A value that was changed, such as the value with a space trimmed, can appear with its passwords hidden and the rest of it as written.  A password shorter than four characters, one that is the name of its logical database or of its dialect, such as `postgres`, one that the driver reads from the environment, such as `PGPASSWORD`, or from a password file ([known issues](#known-issues)), and a connection string typed where a path or another option goes, can appear as written: search the log for your password before you share it.  The log also holds:

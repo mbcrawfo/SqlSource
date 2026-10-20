@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -78,7 +79,7 @@ internal static class DescribeRun
         var outcomes = FileOutcomes.Decide(files, mayDelete, SidecarOnDisk.Read);
         if (options.Mode == RunMode.Check)
         {
-            var checks = SidecarCheck.Compare(files, outcomes, options.Databases);
+            var checks = SidecarCheck.Compare(files, outcomes, DatabaseNames(options));
             for (var index = 0; index < checks.Length; index++)
             {
                 var check = checks[index];
@@ -112,7 +113,7 @@ internal static class DescribeRun
             selected,
             files,
             connections,
-            options.Databases,
+            DatabaseNames(options),
             options.Mode
         );
         foreach (var line in lines)
@@ -120,6 +121,10 @@ internal static class DescribeRun
             await host.Out.WriteLineAsync(line);
         }
     }
+
+    // The names of --database, for the steps that take no position.
+    private static ImmutableArray<string> DatabaseNames(DescribeOptions options) =>
+        [.. options.Databases.Select(static value => value.Text)];
 
     // What the log says of a sidecar that was checked: "differs" when a difference was reported for the file; "same"
     // only when every selected query of the file that needs an entry was described, so that each was compared; and

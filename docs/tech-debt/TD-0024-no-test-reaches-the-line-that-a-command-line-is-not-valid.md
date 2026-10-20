@@ -2,7 +2,7 @@
 
 ## Problem
 
-[`Cli`](../../src/SqlSource.Tool/Cli.cs) writes `sqlsource: the command line is not valid`, and not System.CommandLine's own message, which may repeat a token, when System.CommandLine rejects a command line or reads it another way than [`UsageCheck`](../../src/SqlSource.Tool/UsageCheck.cs) did.  It writes it too when System.CommandLine binds the values of `--connection` otherwise than `UsageCheck` did ([`DescribeCommand.ReadsConnectionsAs`](../../src/SqlSource.Tool/DescribeCommand.cs)), since the log's `arguments` is redacted from the one reading and the describer is handed the other.  No command line of the tool as it is does either, so no test reaches the line; `UsageCheckTests` holds `ReadsConnectionsAs` as a function, and no test runs it through `Cli`.
+[`Cli`](../../src/SqlSource.Tool/Cli.cs) writes `sqlsource: the command line is not valid`, and not System.CommandLine's own message, which may repeat a token, when System.CommandLine rejects a command line or reads it another way than [`UsageCheck`](../../src/SqlSource.Tool/UsageCheck.cs) did.  It writes it too when System.CommandLine binds the values of `--project`, `--database`, `--connection` or `--log` otherwise than `UsageCheck` did ([`DescribeCommand.ReadsValuesAs`](../../src/SqlSource.Tool/DescribeCommand.cs)), since the run reads these values from `Usage`, the log's `arguments` is redacted from it, and System.CommandLine gives the log's path.  No command line of the tool as it is does either, so no test reaches the line; `UsageCheckTests` holds `ReadsValuesAs` as a function, and no test runs it through `Cli`.
 
 ## Why it exists
 

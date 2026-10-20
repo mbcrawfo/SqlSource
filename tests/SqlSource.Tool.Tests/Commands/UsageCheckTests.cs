@@ -177,31 +177,25 @@ public sealed class UsageCheckTests
     }
 
     [Fact]
-    public void ReadsConnectionsAs_ParseThatBindsOtherValues_IsFalse()
+    public void ReadsValuesAs_ParseThatBindsOtherValues_IsFalse()
     {
         var root = Cli.BuildCommands();
         var usage = UsageCheck.Check(root, ["describe", "--connection", "a=" + Secrets.Word, "--connection", "b=2"]);
 
         DescribeCommand
-            .ReadsConnectionsAs(
-                usage,
-                root.Parse(["describe", "--connection", "a=" + Secrets.Word, "--connection", "b=2"])
-            )
+            .ReadsValuesAs(usage, root.Parse(["describe", "--connection", "a=" + Secrets.Word, "--connection", "b=2"]))
             .ShouldBeTrue();
         DescribeCommand
-            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=x", "--connection", "b=2"]))
+            .ReadsValuesAs(usage, root.Parse(["describe", "--connection", "a=x", "--connection", "b=2"]))
             .ShouldBeFalse();
         DescribeCommand
-            .ReadsConnectionsAs(
-                usage,
-                root.Parse(["describe", "--connection", "b=2", "--connection", "a=" + Secrets.Word])
-            )
+            .ReadsValuesAs(usage, root.Parse(["describe", "--connection", "b=2", "--connection", "a=" + Secrets.Word]))
             .ShouldBeFalse();
         DescribeCommand
-            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=" + Secrets.Word]))
+            .ReadsValuesAs(usage, root.Parse(["describe", "--connection", "a=" + Secrets.Word]))
             .ShouldBeFalse();
         DescribeCommand
-            .ReadsConnectionsAs(
+            .ReadsValuesAs(
                 usage,
                 root.Parse([
                     "describe",
@@ -214,9 +208,42 @@ public sealed class UsageCheckTests
                 ])
             )
             .ShouldBeFalse();
+        DescribeCommand.ReadsValuesAs(UsageCheck.Check(root, ["--version"]), root.Parse(["--version"])).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ReadsValuesAs_ProjectReadInAnotherOrder_IsFalse()
+    {
+        var root = Cli.BuildCommands();
+        var usage = UsageCheck.Check(root, ["describe", "--project", "b", "--project", "a"]);
+
         DescribeCommand
-            .ReadsConnectionsAs(UsageCheck.Check(root, ["--version"]), root.Parse(["--version"]))
+            .ReadsValuesAs(usage, root.Parse(["describe", "--project", "b", "--project", "a"]))
             .ShouldBeTrue();
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--project", "a", "--project", "b"]))
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ReadsValuesAs_DatabaseAndLogReadAsOtherValues_IsFalse()
+    {
+        var root = Cli.BuildCommands();
+        var usage = UsageCheck.Check(root, ["describe", "--database", "a", "--log", "run.log"]);
+
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--database", "a", "--log", "run.log"]))
+            .ShouldBeTrue();
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--database", "b", "--log", "run.log"]))
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--database", "a", "--log", "other.log"]))
+            .ShouldBeFalse();
+        DescribeCommand.ReadsValuesAs(usage, root.Parse(["describe", "--database", "a"])).ShouldBeFalse();
+        DescribeCommand
+            .ReadsValuesAs(UsageCheck.Check(root, ["describe"]), root.Parse(["describe", "--log", "run.log"]))
+            .ShouldBeFalse();
     }
 
     // The two readers of a command line must agree, or a token that this one took for a value is the path of the
@@ -402,6 +429,20 @@ public sealed class UsageCheckTests
         DescribeCommand
             .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
             .ShouldBe([$"sqlsource: the value of option '--database' at position {position} is not a database name"]);
+
+    [Theory]
+    [InlineData(3, "describe", "--log", "a=" + Secrets.Word + ".log")]
+    [InlineData(2, "describe", "--log=a;" + Secrets.Word + ".log")]
+    public void CheckUsage_LogPathWithAnEqualsSignOrASemicolon_IsNamedByItsPosition(
+        int position,
+        params string[] args
+    ) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([
+                $"sqlsource: the value of option '--log' at position {position} holds '=' or ';', which a log's path "
+                    + "may not",
+            ]);
 
     [Fact]
     public void CheckUsage_AnotherCommand_GivesNoLine() =>
