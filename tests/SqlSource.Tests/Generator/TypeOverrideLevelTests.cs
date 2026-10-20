@@ -344,6 +344,35 @@ public sealed class TypeOverrideLevelTests
         run.Diagnostics.ShouldBe([ArrayEntryError(Text, "public._citext", ThePropertyPlace, "public.citext[]")]);
     }
 
+    // The parameter is named in the message as a column is.
+    [Fact]
+    public void Run_ArraysOwnKeyOnAParameter_NamesTheParameter()
+    {
+        const string Text = "-- name: GetUser\nSELECT 1;\n";
+        var file = new SqlFile("/app/Repo/Users.sql", Text);
+        var entry = TestSidecars.Entry(
+            "GetUser",
+            Sidecars.HashOf(file, "GetUser", SqlDialect.PostgreSql),
+            "postgres",
+            "main",
+            "18.0",
+            SidecarResultKind.None,
+            parameters: [TestSidecars.Parameter(0, "statuses", ArrayOf(EnumType("user_status"), "_user_status"))]
+        );
+
+        var run = Run("public._user_status=System.Guid", (file, [entry]));
+
+        run.Diagnostics.ShouldBe([
+            ArrayEntryError(
+                Text,
+                "public._user_status",
+                ThePropertyPlace,
+                "public.user_status[]",
+                "parameter 'statuses'"
+            ),
+        ]);
+    }
+
     // A composite named with a leading _ is no array, so its own key maps it, and its array, which the database names
     // public.__tag, gets its element's type.
     [Fact]
@@ -806,11 +835,17 @@ public sealed class TypeOverrideLevelTests
             element: element
         );
 
-    // SQLSRC261 at the query GetUser of Users, for column c0, the entry's key, the place that wrote it and the key to
-    // write.
-    private static string ArrayEntryError(string text, string key, string place, string write) =>
+    // SQLSRC261 at the query GetUser of Users, for column c0 unless the subject is given, the entry's key, the place
+    // that wrote it and the key to write.
+    private static string ArrayEntryError(
+        string text,
+        string key,
+        string place,
+        string write,
+        string subject = "column 'c0'"
+    ) =>
         $"SQLSRC261 {NameOf(text, "GetUser")}: The type override's entry for '{key}', in {place}, maps nothing: "
-        + $"'{key}' is the database's own name of the array type of column 'c0', and an entry names that array as "
+        + $"'{key}' is the database's own name of the array type of {subject}, and an entry names that array as "
         + $"its element's key with [].  Write the entry for '{write}' instead.";
 
     // The C# type of the one column of each query that has types, by the query's name.
