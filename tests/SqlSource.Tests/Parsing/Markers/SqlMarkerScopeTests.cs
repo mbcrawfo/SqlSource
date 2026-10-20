@@ -3,10 +3,11 @@ using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Parsing.Markers;
 using SqlSource.Settings;
 using Xunit;
 
-namespace SqlSource.Tests.Parsing;
+namespace SqlSource.Tests.Parsing.Markers;
 
 public sealed class SqlMarkerScopeTests
 {

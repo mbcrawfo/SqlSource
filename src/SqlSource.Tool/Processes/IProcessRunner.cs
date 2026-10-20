@@ -14,7 +14,8 @@ internal interface IProcessRunner
     /// <see cref="ProcessResult.NotStarted" />, with the reason as its error output.
     /// </summary>
     /// <exception cref="System.OperationCanceledException">
-    /// The token was cancelled.  The process, and every process it started, was killed first.
+    /// The token was cancelled.  The process, and every process it started, was killed first as far as the system
+    /// allowed, and the process was waited for, a few seconds at most.
     /// </exception>
     Task<ProcessResult> RunAsync(ProcessRequest request, CancellationToken cancellationToken);
 }

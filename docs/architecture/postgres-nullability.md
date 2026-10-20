@@ -8,7 +8,7 @@ A column's answer is built in three layers.  The catalog says what a column of a
 
 ### The catalog
 
-[`ColumnNullability.Of`](../../src/SqlSource.Tool/Describing/Postgres/ColumnNullability.cs) gives the answer and its source from a column's origin and whether the query is [gated](README.md#gated-query), by the first arm that fits:
+[`ColumnNullability.Of`](../../src/SqlSource.Tool/Describing/Postgres/Columns/ColumnNullability.cs) gives the answer and its source from a column's origin and whether the query is [gated](README.md#gated-query), by the first arm that fits:
 
 | The column | `nullable` | `nullableSource` |
 |----|----|----|

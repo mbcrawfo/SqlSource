@@ -662,7 +662,7 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
     }
 
-    // Review focus 1: the type that asks for the SQL alone gets no models, and the other type's are in its namespace.
+    // The type that asks for the SQL alone gets no models, and the other type's are in its namespace.
     [Fact]
     public void Run_QueryClaimedAtSqlAndAtModels_GetsTheModelsTypesModels()
     {
@@ -688,7 +688,7 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBe(["Other.GetUserDto-Model.g.cs", "Other.GetUserParams-Model.g.cs"]);
     }
 
-    // Review focus 4: a type with a diagnostic of its own gets no models, and the other type claiming the file does.
+    // A type with a diagnostic of its own gets no models, and the other type claiming the file does.
     [Fact]
     public void Run_TypeWithADiagnostic_GetsNoModels()
     {
@@ -716,8 +716,8 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs"]);
     }
 
-    // Review focus 4: First claims both files, and loses Users.sql to SQLSRC008, since Other.sql comes first and has a
-    // query of the same name.  Second claims Users.sql alone, and gets its models.
+    // First claims both files, and loses Users.sql to SQLSRC008, since Other.sql comes first and has a query of the
+    // same name.  Second claims Users.sql alone, and gets its models.
     [Fact]
     public void Run_FileExcludedBySqlsrc008_GetsNoModelsForThatType()
     {
@@ -756,8 +756,8 @@ public sealed class ModelTests
         run.Sources["Other.GetUserDto-Model.g.cs"].ShouldContain("record GetUserDto(int Id);");
     }
 
-    // Review focus 4: a query named Sql is SQLSRC009 for First, whose members are nested in a class of that name, and
-    // not for Second, whose members are its own.
+    // A query named Sql is SQLSRC009 for First, whose members are nested in a class of that name, and not for
+    // Second, whose members are its own.
     [Fact]
     public void Run_FileExcludedBySqlsrc009_GetsNoModelsForThatType()
     {
@@ -786,7 +786,7 @@ public sealed class ModelTests
         ModelFiles(run).ShouldBe(["Other.SqlDto-Model.g.cs"]);
     }
 
-    // Review focus 5: the pragma, the order and = default! where it is needed, in a class in the global namespace.
+    // The pragma, the order and = default! where it is needed, in a class in the global namespace.
     [Fact]
     public void Run_GlobalClassSortedWithAnObsoleteType_CompilesWithoutAWarning()
     {

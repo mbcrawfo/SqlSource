@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using SqlSource.Snapshot;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Columns;
 
 /// <summary>
 /// A column of a sidecar, from what <c>columns</c> answered for it and the rows of <c>types</c>.

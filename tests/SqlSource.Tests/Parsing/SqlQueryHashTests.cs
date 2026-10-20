@@ -4,9 +4,9 @@ using Xunit;
 
 namespace SqlSource.Tests.Parsing;
 
-// The hash ties a query to its entry in a sidecar.  Its input is fixed: the engine's name, a line
-// feed, the SQL without comments and with each token as {{name:default}}, a line feed, and a line for each parameter
-// that a marker declares.
+// The hash ties a query to its entry in a sidecar.  Its input is fixed: the engine's name, a line feed, the SQL
+// without comments and with each token as {{name:default}}, {{name:}} or {{name}}, a line feed, and a line for each
+// parameter that a marker declares.
 public sealed class SqlQueryHashTests
 {
     private const string Simple = "-- name: Q\nSELECT 1;\n";

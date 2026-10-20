@@ -7,7 +7,8 @@ using Xunit.Sdk;
 
 namespace SqlSource.Tests.Postgres;
 
-// The container itself: the image the variable names, the database of the fixtures, and its schema applied.
+// The container itself: the image the variable names, the database of the fixtures with its schema applied, the
+// databases of the end-to-end tests seeded, and the skips by the server's major.
 [Collection(UsesPostgres.Name)]
 public sealed class PostgresContainerTests(PostgresContainer postgres)
 {

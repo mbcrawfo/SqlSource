@@ -6,7 +6,8 @@ using SqlSource.Settings;
 namespace SqlSource.Generation;
 
 /// <summary>
-/// One query of a <c>.sql</c> file.  It becomes a constant, or a method when its SQL has a token.
+/// One query of a <c>.sql</c> file.  It becomes a constant, or a method when its SQL has a token, and its models when
+/// its output asks for them.
 /// </summary>
 /// <param name="Name">The query's name, a valid C# identifier.</param>
 /// <param name="NameLocation">

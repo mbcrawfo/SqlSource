@@ -10,7 +10,8 @@ namespace SqlSource.Parsing;
 /// <param name="Occurrences">Where each token is in the SQL, in order.</param>
 /// <param name="Tokens">The query's tokens, each name once.</param>
 /// <param name="Variables">
-/// The names the SQL declares as local variables, or null when the dialect has none or the SQL has no parameter.
+/// The names the SQL declares as local variables, or null when the dialect has none, the SQL has no parameter or it
+/// declares none.
 /// </param>
 internal readonly record struct SqlScannedQuery(
     SqlBlockText Sql,

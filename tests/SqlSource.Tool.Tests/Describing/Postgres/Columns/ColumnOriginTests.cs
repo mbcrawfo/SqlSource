@@ -1,9 +1,10 @@
 using System;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Columns;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Columns;
 
 // Where a column comes from, by the table OID and the attribute number of its row description.
 public sealed class ColumnOriginTests

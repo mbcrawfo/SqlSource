@@ -1,9 +1,10 @@
 using System;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Columns;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Columns;
 
 // The protocol reports a domain column as its base type, so only the catalog knows that the column is a domain.
 public sealed class ColumnTypesTests

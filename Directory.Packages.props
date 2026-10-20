@@ -15,15 +15,15 @@
         -->
         <PackageVersion Include="JsonSchema.Net" Version="9.4.0" />
         <!--
-            Central transitive pinning applies this pin to every project, and the Roslyn 5.9.0 that
-            tests/SqlSource.Tests references requires at least this version.
+            Central transitive pinning applies this pin to every project, and the Roslyn 5.9.0 that src/SqlSource.Tool
+            and the tests reference requires at least this version.
         -->
         <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="5.9.0" />
         <!--
             4.8.0 is the compiler in the .NET 8 SDK and Visual Studio 2022 17.8, the oldest hosts SqlSource supports.
             Raising it drops those hosts: do not raise it without changing the support target in README.md.
-            tests/SqlSource.Tests overrides it to run on a current compiler.  tests/SqlSource.Tests.RoslynFloor does
-            not, and runs the generator tests on this version.
+            src/SqlSource.Tool and the tests override it to run on a current compiler.
+            tests/SqlSource.Tests.RoslynFloor does not, and runs the generator tests on this version.
         -->
         <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
         <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />

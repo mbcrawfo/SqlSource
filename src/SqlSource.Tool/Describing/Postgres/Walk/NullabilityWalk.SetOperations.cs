@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing.Postgres.Columns;
 
 namespace SqlSource.Tool.Describing.Postgres.Walk;
 
@@ -59,8 +60,8 @@ internal static partial class NullabilityWalk
 
     /// <summary>
     /// Whether the root reaches an <c>Append</c>, a <c>Merge Append</c> or a <c>SetOp</c> through nodes that may pass
-    /// a child's column on: a node with one <c>Outer</c> child, no join type and no grouping set.  An
-    /// <c>InitPlan</c> or a <c>SubPlan</c> computes a value and is no child of the row.
+    /// a child's column on: a node with one <c>Outer</c> child, no join type, no grouping set, and that is no
+    /// <c>ModifyTable</c>.  An <c>InitPlan</c> or a <c>SubPlan</c> computes a value and is no child of the row.
     /// </summary>
     public static bool ReachesSetOperation(PlanNode root)
     {

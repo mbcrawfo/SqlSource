@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace SqlSource.Tool.Describing.Postgres;
+namespace SqlSource.Tool.Describing.Postgres.Columns;
 
 /// <summary>
 /// The column of a relation that a column of a result comes from (a table, a partitioned table, a view, a

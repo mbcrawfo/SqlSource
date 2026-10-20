@@ -887,8 +887,9 @@ public sealed class GeneratedSourceTests
     [Fact]
     public void Run_ProjectThatSeesTheInternalsOfAnotherWithTheGenerator_GetsNoWarningInGeneratedCode()
     {
-        // Both assemblies hold the generated attribute and enum.  This one sees both copies, and the compiler warns
-        // (CS0436) wherever the name is used: inside the generated attribute itself, unless that file says otherwise.
+        // Both assemblies hold the generated attribute and enums.  This one sees both copies, and the compiler warns
+        // (CS0436) wherever one of their names is used: inside the generated file itself, unless that file says
+        // otherwise.
         var other = GeneratorHarness.CreateReference(
             OutputKind.Sql,
             "Other",

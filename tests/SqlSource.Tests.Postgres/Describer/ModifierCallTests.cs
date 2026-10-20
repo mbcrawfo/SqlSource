@@ -3,6 +3,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
@@ -49,7 +50,7 @@ public sealed class ModifierCallTests(PostgresContainer postgres)
         answer
             .Rows.ShouldNotBeNull()
             .Select(static row => (row.Oid, row.Typtypmod))
-            .ShouldBe([(23L, -1), (1043L, -1), (domain, 258)]);
+            .ShouldBe([(23L, -1), (1043L, -1), (domain, Typmods.Varchar254)]);
     }
 
     [Fact]

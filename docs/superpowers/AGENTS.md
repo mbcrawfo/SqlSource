@@ -1,6 +1,6 @@
 # AGENTS.md - docs/superpowers
 
-Design and planning artifacts produced by the Superpowers brainstorming and writing-plans workflow, named `YYYY-MM-DD-<topic>`: `specs/` holds the validated designs (`*-design.md`) and `plans/` the implementation plans derived from them.
+Design and planning artifacts produced by the Superpowers brainstorming and writing-plans workflow, named `YYYY-MM-DD-<topic>`: `specs/` holds the validated designs (`*-design.md`) and their appendices, and `plans/` the implementation plans derived from them.
 
 ## Intent
 

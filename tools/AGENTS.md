@@ -3,7 +3,7 @@
 This file holds the rules for changing the check scripts, the consumer project in `package-install/` and the two recording scripts.  [`README.md`](README.md) says what each of them does.
 
 - **A check added here is added to both callers in the same commit**: `pre-commit-validation.sh` at the root and the `build` or `lint` job of `.github/workflows/build.yml`.  A check that needs the .NET SDK goes in `build`; one that needs only Docker goes in `lint`.
-- **A new version of a linter is a change to the tag and the digest of its image in the script, and nothing else.**
+- **A new version of a linter is a change to the tag and the digest of its image in the script, and nothing else**, except that editorconfig-checker's also changes `Version` in `.editorconfig-checker.json` to match.
 - **`package-install/` is a consumer, not a project of the solution.**  Do not add it to `SqlSource.slnx` or build it where it is.  A change to what a consumer sees from the generator or its MSBuild files adds a line to `package-install/Program.cs` and to `package-install/expected-output.txt` together.
 - **Its multi-line values are deliberate.**  Do not put the values of `SqlSourceGeneratorParameters` and `SqlSourceDialect` in `package-install/Consumer.csproj` and `package-install/Directory.Build.targets` on one line: they are the test ([what they prove](README.md#check-package-installsh)).
 - **`package-install/Queries/AddedByATarget.sql` is meant to be missing from the manifest.**  Do not delete the file or loosen the manifest check to make a run pass; the check fails when the manifest lists it, so paying off the debt it shows changes the script in the same commit ([the gap](README.md#check-package-installsh)).

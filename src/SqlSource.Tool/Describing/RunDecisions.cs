@@ -105,7 +105,7 @@ internal static class RunDecisions
         return [.. plan.Databases.Where(database => names.Contains(database.Name))];
     }
 
-    // The rows of the spec's table, in its order.
+    // The rows of the table under "deciding" in docs/architecture/tool.md, in its order.
     private static QueryWork Decide(PlannedQuery query, bool ready, SidecarOnDisk? onDisk, bool force, bool newerFails)
     {
         if (!query.NeedsEntry)

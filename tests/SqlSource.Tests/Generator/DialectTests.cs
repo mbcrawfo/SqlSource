@@ -103,7 +103,7 @@ public sealed class DialectTests
     // In the marker the value is the rest of the line, read as the property is.
     [InlineData("mysql, no-backslash-escapes", null, null)]
     [InlineData("MySQL ,  NO_BACKSLASH_ESCAPES", null, null)]
-    // A value with the option wins over one without it.
+    // The value that wins has the option, and the one it beats has none.
     [InlineData("mariadb,no-backslash-escapes", "mysql", "postgres")]
     [InlineData(null, "mysql,no-backslash-escapes", "mysql")]
     public void Run_OptionOfADialect_IsReadFromTheMarkerTheMetadataAndTheProperty(

@@ -200,7 +200,7 @@ public sealed class ConnectionTests
             .ShouldBe(new DatabaseConnection("app_v2", "SQLSOURCE_CONNECTION_APP_V2", null, null, "app-v2"));
     }
 
-    // The one on the command line too: the spec gives neither a connection.
+    // The one on the command line too: neither has a connection.
     [Fact]
     public void For_TwoNamesWithOneVariableAndOneOnTheCommandLine_NeitherHasAConnection()
     {

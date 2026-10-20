@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.Text;
+using SqlSource.Parsing.Markers;
 using SqlSource.Parsing.Tokens;
 
 namespace SqlSource.Parsing;

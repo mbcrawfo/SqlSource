@@ -16,9 +16,8 @@ using OutputKind = SqlSource.Settings.OutputKind;
 
 namespace SqlSource.Tests.Generator;
 
-// The C# type of each parameter and column of a usable entry, read from what the step of the types gave, since
-// nothing of the generator emits them yet.  Each run is at Models under postgres, with an entry written for the
-// query's current hash.
+// The C# type of each parameter and column of a usable entry, read from what the step of the types gave.  Each run
+// is at Models under postgres, with an entry written for the query's current hash.
 public sealed class QueryTypesTests
 {
     private const string UsersPath = "/app/Repo/Users.sql";

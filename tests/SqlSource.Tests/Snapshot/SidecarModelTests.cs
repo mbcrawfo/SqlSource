@@ -8,7 +8,7 @@ namespace SqlSource.Tests.Snapshot;
 
 public sealed class SidecarModelTests
 {
-    // Phase 5 caches these records in the generator's pipeline, so two that hold the same values must be equal.
+    // The generator caches these records in its pipeline, so two that hold the same values must be equal.
     [Fact]
     public void Sidecar_SameValuesInSeparateInstances_AreEqual()
     {

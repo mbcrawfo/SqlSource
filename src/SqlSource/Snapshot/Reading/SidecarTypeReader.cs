@@ -71,7 +71,7 @@ internal static class SidecarTypeReader
         };
     }
 
-    // A type inside a type is as deep as the text nests, and the text nests 64 levels at most.
+    // A type inside a type is as deep as the text nests, which is SidecarTokenizer.MaxDepth levels at most.
     private static PostgresType? ReadPostgres(SidecarCursor cursor, TextSpan brace, bool isParameter)
     {
         var keys = isParameter ? PostgresParameterKeys : PostgresKeys;

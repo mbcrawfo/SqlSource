@@ -4,9 +4,10 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Columns;
 using Xunit;
 
-namespace SqlSource.Tool.Tests.Describing.Postgres;
+namespace SqlSource.Tool.Tests.Describing.Postgres.Columns;
 
 // The six checks of the table match, in the format's order: the first that fails is the answer.
 public sealed class TableMatcherTests

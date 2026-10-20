@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using Microsoft.CodeAnalysis.Text;
 using SqlSource.Settings;
 
-namespace SqlSource.Parsing;
+namespace SqlSource.Parsing.Markers;
 
 /// <summary>
 /// The generator parameters given by the <c>-- generator:</c> markers of one scope: a block, or a file's preamble.

@@ -15,8 +15,7 @@ using OutputKind = SqlSource.Settings.OutputKind;
 namespace SqlSource.Tests.Generator;
 
 // The checks of each claimed file's sidecar against what the types that claim the file need: each diagnostic, where
-// it is, and which entries the checks leave usable.  The usable entries are read from what the step of the checks
-// gave, since nothing of the generator reads them yet.
+// it is, and which entries the checks leave usable, read from what the step of the checks gave.
 public sealed class SidecarTests
 {
     private const string UsersPath = "/app/Repo/Users.sql";
@@ -608,7 +607,7 @@ public sealed class SidecarTests
         UsableEntries(reversed).ShouldBeEmpty();
     }
 
-    // The anti-goal: whatever a sidecar holds, an entry that failed a check is never usable.
+    // Whatever a sidecar holds, an entry that failed a check is never usable.
     [Fact]
     public void Run_EveryCheck_GivesNoUsableEntryThatFailedOne()
     {

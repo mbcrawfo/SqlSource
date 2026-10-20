@@ -4,7 +4,7 @@ using System.Collections.Immutable;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 
-namespace SqlSource.Parsing;
+namespace SqlSource.Parsing.Markers;
 
 /// <summary>
 /// What the markers of one scope give: a file's preamble, or one query.  <see cref="SqlFileParser" /> hands it each

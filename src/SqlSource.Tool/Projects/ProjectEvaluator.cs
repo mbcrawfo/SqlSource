@@ -19,10 +19,11 @@ namespace SqlSource.Tool.Projects;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Two runs of <c>dotnet msbuild</c> for a project, and three for one with several target frameworks.  The first
-/// evaluates the project and runs no target; the last runs the target <c>SqlSourceWriteManifest</c> of the package,
-/// which writes a file the tool named.  So the tool reads nothing that MSBuild prints but the JSON of
-/// <c>-getProperty</c> and <c>-getItem</c>, writes nothing into a project, and never restores or builds one.
+/// One run of <c>dotnet msbuild</c> evaluates a project and runs no target, and a second does the same under the
+/// first of several target frameworks.  The last, for a project that uses SqlSource alone, runs the target
+/// <c>SqlSourceWriteManifest</c> of the package, which writes a file the tool named.  So the tool reads nothing that
+/// MSBuild prints but the JSON of <c>-getProperty</c> and <c>-getItem</c>, writes nothing into a project, and never
+/// restores or builds one.
 /// </para>
 /// <para>
 /// Nothing is reported here.  An error travels in the <see cref="ProjectEvaluation" />, so that the caller reports
@@ -305,7 +306,7 @@ internal static class ProjectEvaluator
         ];
     }
 
-    // The first row that holds, of the table in the spec of sub-phase 2.3.
+    // The first that holds, in the order that "evaluating a project" in docs/architecture/tool.md gives.
     private static ProjectState StateOf(Answer answer, string project)
     {
         if (string.Equals(answer.Imported, "true", StringComparison.OrdinalIgnoreCase))

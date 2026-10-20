@@ -1,4 +1,4 @@
-namespace SqlSource.Parsing;
+namespace SqlSource.Parsing.Markers;
 
 /// <summary>
 /// What one <c>-- param:</c> marker declares.

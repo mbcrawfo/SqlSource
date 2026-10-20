@@ -118,7 +118,7 @@ public sealed class ModelNameTests
         ModelsOf(run).Queries.ShouldBeEmpty();
     }
 
-    // The names differ only by case, which Dapper does not tell apart.
+    // Two spellings of one name, a_b and aB, give one property name, 'AB'.
     [Fact]
     public void Run_TwoParametersOneName_IsSqlsrc255()
     {

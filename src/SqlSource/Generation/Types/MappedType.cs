@@ -4,7 +4,7 @@ namespace SqlSource.Generation.Types;
 /// A C# type that the type override names, as the compilation resolves it.  It holds no symbol, so it is equal from
 /// one edit to the next until the type itself changes.
 /// </summary>
-/// <param name="Name">The type as <see cref="Settings.ClrTypeName.Text" /> writes it.</param>
+/// <param name="Name">The type as <see cref="Settings.ClrTypes.ClrTypeName.Text" /> writes it.</param>
 /// <param name="Status">Whether the type is found, and if not, why.</param>
 /// <param name="IsValueType">Whether the type is a value type.  False unless it is found.</param>
 /// <param name="IsPublic">

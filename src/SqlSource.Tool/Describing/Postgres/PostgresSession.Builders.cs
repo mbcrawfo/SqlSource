@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.Postgres.Columns;
 using SqlSource.Tool.Describing.Postgres.Walk;
 
 namespace SqlSource.Tool.Describing.Postgres;

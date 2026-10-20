@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
+using SqlSource.Parsing.Markers;
 using Xunit;
 
 namespace SqlSource.Tests.Diagnostics;

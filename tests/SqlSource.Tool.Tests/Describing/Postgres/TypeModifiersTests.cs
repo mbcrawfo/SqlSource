@@ -4,8 +4,9 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
-// A type modifier as pg_attribute.atttypmod holds it, decoded by type.  Every number below was read from a PostgreSQL
-// 18 server with `SELECT atttypmod FROM pg_attribute`.
+// A type modifier as pg_attribute.atttypmod holds it, decoded by type.  Every number given to a type with facets was
+// read from a PostgreSQL 18 server with `SELECT atttypmod FROM pg_attribute`; int4 and text have no modifier, so
+// theirs are made up.
 public sealed class TypeModifiersTests
 {
     [Theory]

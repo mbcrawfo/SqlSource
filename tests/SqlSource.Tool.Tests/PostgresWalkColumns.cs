@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.Postgres.Columns;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
 

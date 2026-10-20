@@ -1,8 +1,9 @@
 namespace SqlSource.Tests.Postgres.Describer;
 
-// What the tests of the UsesPostgres collection add to its one server beyond the fixture, made by SQL that can be run
-// again, and left: the container is thrown away, and the fixtures are recorded in one of their own.  Each object has
-// its text here alone, so a class that runs it first makes the same object as any other would.
+// The objects that more than one test class of the UsesPostgres collection adds to its one server beyond the
+// fixture, made by SQL that can be run again, and left: the container is thrown away, and the fixtures are recorded
+// in one of their own.  Each object has its text here alone, so a class that runs it first makes the same object as
+// any other would.
 internal static class ScratchSchema
 {
     /// <summary>

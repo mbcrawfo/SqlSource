@@ -140,7 +140,10 @@ internal static class RunEvents
     /// <param name="trace">The run's.</param>
     /// <param name="query">The query, in the state it ended in.</param>
     /// <param name="durationMs">How long its describe took, for one that was described.</param>
-    /// <param name="error">The id of the error, for one that failed where a database was asked.</param>
+    /// <param name="error">
+    /// The id of the error, for one that failed when its database was run: no describer, no connection, no session,
+    /// or its describe.
+    /// </param>
     public static void Query(RunTrace trace, QueryWork query, long? durationMs = null, string? error = null)
     {
         var planned = query.Planned;

@@ -10,9 +10,9 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres;
 
-// One PostgreSQL for every test of the collection UsesPostgres: the image, the database "fixtures", and the fixture
-// schema applied to it once.  Testcontainers removes the container when the tests end, and its reaper does when
-// the process is killed.
+// One PostgreSQL for every test of the collection UsesPostgres: the image, the database "fixtures" with the fixture
+// schema, and the databases "realistic", "app" and "billing" with their schemas and seeds, each made once.
+// Testcontainers removes the container when the tests end, and its reaper does when the process is killed.
 public sealed class PostgresContainer : IAsyncLifetime
 {
     // The one place that the tests and the scripts read the image from: tools/record-fixtures.sh,

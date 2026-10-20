@@ -1,3 +1,5 @@
+using SqlSource.Settings.ClrTypes;
+
 namespace SqlSource.Settings;
 
 /// <summary>
