@@ -157,7 +157,7 @@ A few types are read as another C# type by Npgsql 10 than by Npgsql 8 and 9, so 
 
 ### The types
 
-The names are those of PostgreSQL's catalog, which are the [type override's](settings.md#setting-type-overrides) keys, with the other spellings PostgreSQL accepts in parentheses.  A type's length, precision or scale does not change its C# type, but for `bit` and `varbit`.  A cell "Same" is the C# type of Npgsql 8 and 9.
+The names are those of PostgreSQL's catalog, which are the [type override's](settings.md#setting-type-overrides) keys, with the other spellings PostgreSQL accepts in parentheses.  A type of your own schema is written in a key with its schema, `public.user_status`, and a schema or a name created in double quotes keeps its quotes there: `public."Order Status"`.  A type's length, precision or scale does not change its C# type, but for `bit` and `varbit`.  A cell "Same" is the C# type of Npgsql 8 and 9.
 
 | PostgreSQL type | Npgsql 8 and 9 | Npgsql 10 | Without Npgsql |
 |----|----|----|----|

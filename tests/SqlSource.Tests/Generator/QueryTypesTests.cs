@@ -273,7 +273,8 @@ public sealed class QueryTypesTests
     }
 
     // A name of pg_catalog that needs quotes is no key of the map, so the help qualifies it, and a dot inside its
-    // quotes is no schema's.  Only a composite or a base type of another kind than the map's reaches this help.
+    // quotes is no schema's.  Only a composite, or a base type outside pg_catalog, reaches this help: a base type of
+    // pg_catalog gets the help to cast it to text.
     [Fact]
     public void Run_CatalogCompositeWhoseNameHoldsADot_HelpQualifiesItWithTheCatalog()
     {

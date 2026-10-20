@@ -74,7 +74,7 @@ internal static class TypeOverrideGrammar
     /// <summary>
     /// Reads an MSBuild value.  Each entry that is not valid is added to <paramref name="invalid" /> as written, and
     /// the other entries apply.  Of two entries for one key, the last wins, so that a project can add to a value it
-    /// was given.  The entries are sorted by key, ignoring case; empty when none is valid.
+    /// was given.  The entries are in the order of <see cref="TypeOverrideMap" />; empty when none is valid.
     /// </summary>
     public static EquatableArray<TypeOverride> ReadList(string text, SettingPlace place, List<string> invalid)
     {
