@@ -1,5 +1,4 @@
 using System;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -74,12 +73,6 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     /// <param name="given">The path as the option or the variable gave it.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
     /// <param name="time">The clock of the run.</param>
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "The log is its caller's to close: Cli.OpenLog keeps it and Cli.RunAsync closes it.  The "
-            + "analyzer follows a disposable that is returned itself and not one that is returned in an Outcome."
-    )]
     public static Outcome<RunLogFile, ToolDiagnostic> Open(string given, string workingDirectory, TimeProvider time)
     {
         var path = given;
@@ -92,7 +85,7 @@ internal sealed class RunLogFile : IRunLog, IDisposable
                 return NotOpened(path, "a log is not written over a .sql file, a sidecar, a project or a solution");
             }
 
-            return Outcome<RunLogFile, ToolDiagnostic>.Of(
+            return new Outcome<RunLogFile, ToolDiagnostic>(
                 new RunLogFile(path, new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read), time)
             );
         }

@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
@@ -158,12 +157,6 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
     ) =>
         new(Rejected, new EquatableArray<string>([argument]), step, new EquatableArray<string>([.. serverLines]), help);
 
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "The session is its caller's to close: the run closes what it opened.  The analyzer follows "
-            + "a disposable that is returned itself and not one that is returned in an Outcome."
-    )]
     public async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,
         IRunLog log,
@@ -216,7 +209,7 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
         var server = FakeCalls.Seam(
             answer.Server ?? throw new InvalidOperationException("The answer to 'open' holds no server and no error.")
         );
-        return Outcome<IDescribeSession, DescribeFailure>.Of(new Session(this, request.Exchange, log, server));
+        return new Outcome<IDescribeSession, DescribeFailure>(new Session(this, request.Exchange, log, server));
     }
 
     // The server is what "open" answered, so that a replayed session has the server of its capture.

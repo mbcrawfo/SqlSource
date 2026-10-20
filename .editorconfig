@@ -52,6 +52,9 @@ end_of_line = lf
 
 [*.cs]
 indent_size = 4
+# A constructor takes ownership of a disposable it is given, which is how an Outcome of a disposable passes CA2000 with
+# no suppression (docs/architecture/tool.md).
+dotnet_code_quality.CA2000.dispose_ownership_transfer_at_constructor = true
 
 ###############################
 # Severity                    #

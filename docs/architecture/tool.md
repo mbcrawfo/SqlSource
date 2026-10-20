@@ -198,6 +198,10 @@ Each folder is a namespace of its own.  "From the generator" is what the folder 
 
 `Logging/` and three folders use each other: `Describing/` and `Projects/` write events, and `Logging/` reads their records and redacts with `Redaction`; a reporter carries a trace, and a trace writes with `OneLine` of `Reporting/`.
 
+### An outcome of a disposable
+
+A method that returns an [`Outcome`](../../src/SqlSource.Tool/Outcome.cs) of a value that must be disposed, such as `RunLogFile.Open` and `PostgresSession.OpenAsync`, makes it with the constructor, `new Outcome<RunLogFile, ToolDiagnostic>(log)`, and never with `Outcome.Of`, and it carries no `SuppressMessage`.  `.editorconfig` sets `dotnet_code_quality.CA2000.dispose_ownership_transfer_at_constructor` for `*.cs`, so `CA2000` treats a disposable given to a constructor as handed over, and still checks the rest of the method, the `FileStream` that the log is made from included.  The cost is that the analyzer no longer follows a disposable given to the constructor of a type that is not disposable, such as a record that holds one without owning it.  Such code is rare here, and `CA2213` and `CA1001` still check a type's own disposable fields.
+
 ## Logging and reporting
 
 A run says three kinds of thing: its errors, through the reporter; its summary, on standard output; and what it decided, through its trace, to the log and under `--verbose`.

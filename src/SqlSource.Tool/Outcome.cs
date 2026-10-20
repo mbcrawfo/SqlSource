@@ -20,6 +20,18 @@ internal sealed record Outcome<TValue, TFailure>
         Succeeded = succeeded;
     }
 
+    /// <summary>
+    /// A success that holds <paramref name="value"/>.
+    /// </summary>
+    /// <remarks>
+    /// How an <c>Outcome</c> of a value that must be disposed is made, in place of <see cref="Of"/>: the
+    /// <c>.editorconfig</c> tells <c>CA2000</c> that a constructor takes ownership of what it is given, so the method
+    /// that returns the <c>Outcome</c> needs no suppression.  <c>docs/architecture/tool.md</c> says what that costs.
+    /// </remarks>
+    /// <param name="value">What there is.</param>
+    public Outcome(TValue value)
+        : this(value, default, succeeded: true) { }
+
     public TValue? Value { get; }
 
     public TFailure? Failure { get; }
