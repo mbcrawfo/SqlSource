@@ -1145,17 +1145,17 @@ The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the erro
 
 | The `server:` line | What it means |
 |----|----|
-| `28P01: the server refused the password` | The password is wrong for the user.  PostgreSQL says the same of a user that does not exist |
-| `28000: the server refused to authenticate the user`, or another SQLSTATE that starts with `28` | The server refuses the user, as when its `pg_hba.conf` has no entry for this machine, the user and the database, or the user may not log in |
+| `28P01: the server refused the password` | The password is wrong for the user.  When the server asks for a password, PostgreSQL says the same of a user that does not exist |
+| `28000: the server refused to authenticate the user`, or another SQLSTATE that starts with `28` | The server refuses the user, as when its `pg_hba.conf` has no entry for this machine, the user and the database, the user may not log in, or the user does not exist |
 | `3D000: the server has no such database` | The database that the connection string names is not on the server |
 | `42501: the user may not connect to the database` | The user has no `CONNECT` privilege on the database |
-| `53300: the server has too many connections` | The server, the user or the database has reached its limit of connections: try again later |
+| `53300: the server has too many connections` | The server, the user or the database has reached its limit of connections: try again later, or raise the limit |
 | `57P03: the server is not accepting connections now` | The server is starting, stopping or recovering: try again when it is up |
-| `08004: the server refused the connection`, or another SQLSTATE that starts with `08` | The server would not make the connection |
+| `08P01: the server refused the connection`, or another SQLSTATE that starts with `08` | The server would not make the connection |
 | `<SQLSTATE>: the server refused to open a session` | Any other error of the server while the session was opened: its SQLSTATE says which |
 | `the server asks for a password and the connection string gives none` | The server asks for a password, and neither the connection string, `PGPASSWORD` nor a password file gives one |
-| `the connection to the server timed out` | Nothing answered at the address in time: the host or the port is wrong, or something between drops the connection |
-| `Npgsql could not reach the server: ConnectionRefused` | The connection could not be made.  The word after the colon is the system's reason, such as `ConnectionRefused` when nothing listens at the port, or `HostNotFound` for a host name that is not found |
+| `the connection to the server timed out` | Nothing answered at the address in time: the address drops what is sent to it, a firewall between drops the connection, or the server is too slow to answer |
+| `Npgsql could not reach the server: ConnectionRefused` | The connection could not be made.  The word after the colon is the system's reason, such as `ConnectionRefused` when nothing listens at the port, or `HostNotFound` or `TryAgain` for a host name that is not found |
 | `Npgsql could not open a connection to the server (<name of the error>)` | Any other failure of the driver while it opened the session.  The name in parentheses is the driver's or the system's name of the error, such as one of a TLS handshake that failed |
 | `Npgsql cannot read the connection string` | The string is not written as Npgsql wants one: `Host=localhost;Database=app;Username=app;Password=...` |
 | `a file that the connection string or the environment names cannot be read` | A client certificate, a key or a password file (`SslCertificate`, `SslKey`, `Passfile`, or `PGSSLCERT`, `PGSSLKEY`, `PGPASSFILE`) is not there, its folder is not there, or the tool may not open it |
