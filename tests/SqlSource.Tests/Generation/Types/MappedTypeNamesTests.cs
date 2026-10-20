@@ -27,7 +27,7 @@ public sealed class MappedTypeNamesTests
     }
 
     // The property, a file's metadata, a file's header and a query each name a type.  The header's reaches both
-    // queries, so it is named twice.  An entry of default names none.
+    // queries, so it is met twice and given once.  An entry of default names none.
     [Fact]
     public void Collect_EveryLevel_GivesEachTypeOnceInOrdinalOrder()
     {
