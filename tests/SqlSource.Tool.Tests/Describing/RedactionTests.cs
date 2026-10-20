@@ -1,10 +1,14 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -108,6 +112,99 @@ public sealed class RedactionTests : IDisposable
             .GetProperty("with")
             .GetString()
             .ShouldBe("<***>");
+    }
+
+    // A password that the describer said is secret is removed where it stands as a token.
+    [Fact]
+    public async Task Run_DescriberThatLogsAPasswordItSaidIsSecret_HasTheMarkThereAndTheWordInsideANameLeft()
+    {
+        _scene.Describer.Secrets = ["test"];
+        _scene.Describer.OnOpen = (log, _) =>
+            log.Write("connect", new LogMember("message", "password test refused, table latest_orders"));
+
+        _ = await LoggedWithAsync("Host=db;Password=test");
+
+        LogReader
+            .Read(Log)
+            .Single(e => e.GetProperty("event").GetString() == "postgres.connect")
+            .GetProperty("message")
+            .GetString()
+            .ShouldBe("password *** refused, table latest_orders");
+    }
+
+    [Fact]
+    public async Task Run_VerboseWithAServerVersionThatHoldsAPassword_SaysTheMark()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = "Host=db;Password=" + Secrets.Marker;
+        _scene.Describer.Secrets = [Secrets.Marker];
+        _scene.Describer.Server = _scene.Describer.Server with { Version = "16.4 " + Secrets.Marker };
+
+        var result = await _scene.DescribeAsync("--verbose");
+
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Out.ShouldContain("sqlsource: database 'postgres': server 16.4 ***\n");
+    }
+
+    [Fact]
+    public void Of_FailureWhoseServerLinesHoldAPart_HasTheMarkThereAndTheWordInsideANameLeft()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=test", ["test"]);
+        var failure = FakeDescriber.Failure("GetUser", "28P01: password test refused", "at latest_orders");
+
+        Redaction.Of(failure, secret).ServerLines.ShouldBe(["28P01: password *** refused", "at latest_orders"]);
+    }
+
+    // A describer cuts what a server said into lines, so a part with a line break is in two of them.
+    [Fact]
+    public void Of_FailureWithAPartOfTwoLinesCutOverTwo_HasTheMarkOnce()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=a\r\nb", ["a\r\nb"]);
+        var failure = FakeDescriber.Failure("GetUser", "x a", "b y");
+
+        Redaction.Of(failure, secret).ServerLines.ShouldBe(["x *** y"]);
+    }
+
+    // A descriptor of the fake's id with the format a describer built.  The id is no constant, so release tracking
+    // has no row for it.
+    private static DiagnosticDescriptor WithFormat(string format) =>
+        new(
+            FakeDescriber.Rejected.Id,
+            "Query was rejected",
+            format,
+            "SqlSource",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            helpLinkUri: "https://example.test/sqlsrc999"
+        );
+
+    private static string Printed(ToolDiagnostic diagnostic)
+    {
+        using var error = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
+        new Reporter(error).Report(diagnostic);
+        return error.ToString();
+    }
+
+    // Neither the format nor the argument holds the value: together they do.
+    [Fact]
+    public void Of_ValueThatTheFormatAndAnArgumentMakeTogether_IsRemovedFromTheMessage()
+    {
+        var diagnostic = ToolDiagnostic.Create(WithFormat("half: Pass{0}"), "word=x");
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Password=x")));
+
+        printed.ShouldContain("half: ***\n");
+        printed.ShouldNotContain("Password=x");
+    }
+
+    [Fact]
+    public void Of_ValueThatTwoArgumentsMakeTogether_IsRemovedFromTheMessage()
+    {
+        var diagnostic = ToolDiagnostic.Create(WithFormat("rejected {0}{1} today"), "Pass", "word=x");
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Password=x")));
+
+        printed.ShouldContain("rejected *** today\n");
+        printed.ShouldNotContain("Password=x");
     }
 
     // What the run itself writes of a database is a describer's text too.

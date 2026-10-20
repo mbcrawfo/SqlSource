@@ -44,31 +44,49 @@ public sealed class EntrySecretCheckTests
 
     [Fact]
     public void Holds_EntryWithoutTheValue_IsFalse() =>
-        EntrySecretCheck.Holds(Entry, Secrets.Connection).ShouldBeFalse();
+        EntrySecretCheck.Holds(Entry, new ConnectionSecret(Secrets.Connection)).ShouldBeFalse();
 
     [Fact]
     public void Holds_ValueInTheServersVersion_IsTrue() =>
-        EntrySecretCheck.Holds(Entry with { ServerVersion = Secrets.Connection }, Secrets.Connection).ShouldBeTrue();
+        EntrySecretCheck
+            .Holds(Entry with { ServerVersion = Secrets.Connection }, new ConnectionSecret(Secrets.Connection))
+            .ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInTheSchemaOfTheMatchedTable_IsTrue() =>
         EntrySecretCheck
-            .Holds(Entry with { MatchesTable = new SidecarTable(Secrets.Connection, "users") }, Secrets.Connection)
+            .Holds(
+                Entry with
+                {
+                    MatchesTable = new SidecarTable(Secrets.Connection, "users"),
+                },
+                new ConnectionSecret(Secrets.Connection)
+            )
             .ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInTheNameOfTheMatchedTable_IsTrue() =>
         EntrySecretCheck
-            .Holds(Entry with { MatchesTable = new SidecarTable("public", Secrets.Connection) }, Secrets.Connection)
+            .Holds(
+                Entry with
+                {
+                    MatchesTable = new SidecarTable("public", Secrets.Connection),
+                },
+                new ConnectionSecret(Secrets.Connection)
+            )
             .ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInThePlan_IsTrue() =>
-        EntrySecretCheck.Holds(Entry with { Plan = Secrets.Connection }, Secrets.Connection).ShouldBeTrue();
+        EntrySecretCheck
+            .Holds(Entry with { Plan = Secrets.Connection }, new ConnectionSecret(Secrets.Connection))
+            .ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInTheTableMatch_IsTrue() =>
-        EntrySecretCheck.Holds(Entry with { TableMatch = Secrets.Connection }, Secrets.Connection).ShouldBeTrue();
+        EntrySecretCheck
+            .Holds(Entry with { TableMatch = Secrets.Connection }, new ConnectionSecret(Secrets.Connection))
+            .ShouldBeTrue();
 
     [Fact]
     public void Holds_ValueInTheTypeOfAParameter_IsTrue() =>
@@ -78,7 +96,7 @@ public sealed class EntrySecretCheckTests
                 {
                     Parameters = Parameters(Id with { Type = new OtherEngineType(Secrets.Connection) }),
                 },
-                Secrets.Connection
+                new ConnectionSecret(Secrets.Connection)
             )
             .ShouldBeTrue();
 
@@ -90,7 +108,7 @@ public sealed class EntrySecretCheckTests
                 {
                     Parameters = Parameters(Id with { TypeSource = Secrets.Connection }),
                 },
-                Secrets.Connection
+                new ConnectionSecret(Secrets.Connection)
             )
             .ShouldBeTrue();
 
@@ -102,9 +120,35 @@ public sealed class EntrySecretCheckTests
                 {
                     Columns = new EquatableArray<SidecarColumn>([Email with { Name = Secrets.Connection }]),
                 },
-                Secrets.Connection
+                new ConnectionSecret(Secrets.Connection)
             )
             .ShouldBeTrue();
+
+    private static SidecarEntry WithColumn(string name) =>
+        Entry with
+        {
+            Columns = new EquatableArray<SidecarColumn>([Email with { Name = name }]),
+        };
+
+    // A password equal to a name of the database: the describer gave it, so it is a fault like any other.
+    [Fact]
+    public void Holds_PasswordPartAsAColumnsWholeName_IsTrue() =>
+        EntrySecretCheck
+            .Holds(WithColumn("admin"), new ConnectionSecret("Host=db;Password=admin", ["admin"]))
+            .ShouldBeTrue();
+
+    [Fact]
+    public void Holds_PasswordPartInsideAColumnsName_IsFalse() =>
+        EntrySecretCheck
+            .Holds(WithColumn("is_admin_x"), new ConnectionSecret("Host=db;Password=admin", ["admin"]))
+            .ShouldBeFalse();
+
+    // The engine holds the word whatever the describer gave.
+    [Fact]
+    public void Holds_PasswordPartThatTheEngineHolds_IsFalse() =>
+        EntrySecretCheck
+            .Holds(WithColumn("postgres"), new ConnectionSecret("Host=db;Password=postgres", ["postgres"]))
+            .ShouldBeFalse();
 
     // What the plan gives is in the file whatever the describer does.
     [Theory]
@@ -114,5 +158,5 @@ public sealed class EntrySecretCheckTests
     [InlineData("main")]
     [InlineData("id")]
     public void Holds_ValueThatThePlanGave_IsFalse(string value) =>
-        EntrySecretCheck.Holds(Entry, value).ShouldBeFalse();
+        EntrySecretCheck.Holds(Entry, new ConnectionSecret(value)).ShouldBeFalse();
 }

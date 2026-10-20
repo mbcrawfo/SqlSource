@@ -288,6 +288,39 @@ public sealed class DatabaseRunsTests : IDisposable
             );
     }
 
+    // A driver's message for a wrong password can quote the password alone.
+    [Fact]
+    public async Task Run_SessionThatCannotBeOpenedAndHoldsAPasswordTheDescriberGave_IsPrintedWithoutIt()
+    {
+        _describer.Secrets = ["pw"];
+        _describer.OpenFailure = FakeDescriber.Failure(
+            "(open)",
+            step: null,
+            help: null,
+            "28P01: password 'pw' was refused"
+        );
+
+        _ = await RunAsync(given: ["postgres=Host=db;Password=pw"]);
+
+        _error.ToString().ShouldContain("    server: 28P01: password '***' was refused\n");
+        _error.ToString().ShouldNotContain("'pw'");
+    }
+
+    // The guard that asks for the parts knows only the whole value.
+    [Fact]
+    public async Task Run_DescriberThatThrowsWhenAskedForTheSecrets_IsOneFaultWithoutTheValue()
+    {
+        _describer.SecretsException = new InvalidOperationException($"cannot read {Secrets.ConnectionWithWord}");
+
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault.InnerException.ShouldBeNull();
+        fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
+        fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.InvalidOperationException", "cannot read ***"]);
+        _error.ToString().ShouldBeEmpty();
+        _describer.Opened.ShouldBeEmpty();
+    }
+
     [Fact]
     public async Task Run_QueryThatFails_IsReportedInTheFormatOfADescribersErrorAndTheSessionGoesOn()
     {
@@ -548,7 +581,8 @@ public sealed class DatabaseRunsTests : IDisposable
             .Diagnostic.Arguments.ToArray()
             .ShouldBe([
                 "System.InvalidOperationException",
-                "The describer put the connection's value in its description of the query 'GetUser'.",
+                "The description of the query 'GetUser' holds the connection's value or a password of it.  The "
+                    + "describer put it there, or the password equals a name of the database.",
             ]);
         fault.Diagnostic.Arguments.ShouldAllBe(argument => !argument.Contains(Secrets.Word));
         _files[0].Queries[0].State.ShouldNotBe(QueryState.Described);
@@ -586,6 +620,22 @@ public sealed class DatabaseRunsTests : IDisposable
         };
 
         _ = await RunExpectingTheValueInTheDescriptionAsync(Secrets.ConnectionWithWord);
+    }
+
+    // A password that equals a name the describer gave is in the description, and the run cannot tell it from a leak.
+    [Fact]
+    public async Task Run_DescriptionWithAPasswordTheDescriberGaveAsAColumnsName_IsAFault()
+    {
+        _describer.Secrets = ["admin"];
+        _describer.Descriptions["GetUser"] = FakeDescriber.NoRows with
+        {
+            ResultKind = SidecarResultKind.Rows,
+            Columns = new EquatableArray<SidecarColumn>([
+                new SidecarColumn(0, "admin", new OtherEngineType("int4"), null, null, null, null, null),
+            ]),
+        };
+
+        _ = await RunExpectingTheValueInTheDescriptionAsync("Host=db;Password=admin");
     }
 
     // The writer escapes a quote and a backslash, so the value is in the file as it escapes it.
@@ -672,12 +722,14 @@ public sealed class DatabaseRunsTests : IDisposable
 
     [Fact]
     public void Of_TextThatHoldsTheSecretTwice_HasTheMarkInBothPlaces() =>
-        Redaction.Of("a s3cret and a s3cret", "s3cret").ShouldBe("a *** and a ***");
+        Redaction.Of("a s3cret and a s3cret", new ConnectionSecret("s3cret")).ShouldBe("a *** and a ***");
 
     // A describer whose OpenAsync is not async.
     private sealed class ThrowsBeforeItReturns : IQueryDescriber
     {
         public SqlDialect Dialect => SqlDialect.PostgreSql;
+
+        public IReadOnlyList<string> SecretsOf(string connection) => [];
 
         public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
             OpenRequest request,

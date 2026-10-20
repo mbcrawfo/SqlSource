@@ -1,6 +1,8 @@
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.IO;
+using System.Linq;
 using System.Security.Cryptography;
 using System.Threading;
 using System.Threading.Tasks;
@@ -88,6 +90,27 @@ internal sealed class PostgresConnection(string connectionString, IRunLog log) :
     private NpgsqlDataSource? _source;
     private NpgsqlConnection? _connection;
     private ILoggerFactory? _driverLog;
+
+    /// <summary>
+    /// The passwords of a connection string, <c>Password</c> and <c>SSL Password</c>, as the driver reads it, or
+    /// none when it cannot read it.  A password the driver takes from <c>PGPASSWORD</c> or a password file is not
+    /// in the string.
+    /// </summary>
+    public static IReadOnlyList<string> SecretsOf(string connection)
+    {
+        NpgsqlConnectionStringBuilder builder;
+        try
+        {
+            builder = [with(connection)];
+        }
+        catch (ArgumentException)
+        {
+            // The driver's word for a string it cannot read, which opening the session reports in its own place.
+            return [];
+        }
+
+        return [.. new[] { builder.Password, builder.SslPassword }.OfType<string>()];
+    }
 
     /// <summary>The version of the driver, as <c>major.minor.patch</c>.</summary>
     public static string? DriverVersion => typeof(NpgsqlConnection).Assembly.GetName().Version?.ToString(3);

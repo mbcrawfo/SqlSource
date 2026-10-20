@@ -403,7 +403,8 @@ public sealed class SecretTests : IDisposable
         result.Error.ShouldNotContain(Secrets.Marker);
         result.Error.ShouldStartWith(
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: The "
-                + "describer put the connection's value in its description of the query 'Bad'.\n"
+                + "description of the query 'Bad' holds the connection's value or a password of it.  The describer "
+                + "put it there, or the password equals a name of the database.\n"
         );
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
     }
@@ -458,7 +459,8 @@ public sealed class SecretTests : IDisposable
         result.Error.ShouldNotContain(Secrets.Marker);
         result.Error.ShouldStartWith(
             "sqlsource : error SQLSRC200: sqlsource failed unexpectedly: System.InvalidOperationException: The "
-                + "describer put the connection's value in its description of the query 'Good'.\n"
+                + "description of the query 'Good' holds the connection's value or a password of it.  The describer "
+                + "put it there, or the password equals a name of the database.\n"
         );
         result.Error.ShouldNotContain("SQLSRC219");
     }

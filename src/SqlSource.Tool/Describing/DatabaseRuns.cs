@@ -26,8 +26,9 @@ namespace SqlSource.Tool.Describing;
 /// <para>
 /// This is the one place outside <c>Cli</c> that catches every exception: a describer's, which is a bug of the
 /// describer and may hold the connection's value.  It is thrown again as a <see cref="DescriberFaultException" />
-/// without the value, and the run ends.  A description that holds the value, which would be written into a sidecar,
-/// is such a bug too (<see cref="EntrySecretCheck" />).  A run that was cancelled ends as one.
+/// without the value, and the run ends.  A description that holds the value or a password of it, which would be
+/// written into a sidecar, ends the run the same way (<see cref="EntrySecretCheck" />).  A run that was cancelled
+/// ends as one.
 /// </para>
 /// </remarks>
 internal static class DatabaseRuns
@@ -95,13 +96,18 @@ internal static class DatabaseRuns
             return;
         }
 
-        // From here on the run holds the connection's value, and what a describer gives may hold it: everything
-        // said of this database goes through a trace that removes it.
-        var trace = reporter.Trace.Without(value);
+        // From here on the run holds the connection's value, and what a describer gives may hold it or a password
+        // of it.  The describer says which parts are secret, under a guard that knows only the whole value; then
+        // everything said of this database goes through a trace that removes both.
+        var parts = new Guard(new ConnectionSecret(value), host.GetEnvironmentVariable, cancellationToken).Call(() =>
+            describer.SecretsOf(value)
+        );
+        var secret = new ConnectionSecret(value, parts);
+        var trace = reporter.Trace.Without(secret);
         var engine = SqlDialectName.Canonical(database.Dialect);
-        var guard = new Guard(value, host.GetEnvironmentVariable, cancellationToken);
+        var guard = new Guard(secret, host.GetEnvironmentVariable, cancellationToken);
         var request = new OpenRequest(database.Name, value, host.Exchange(database.Name), host.Time);
-        var log = new SessionRunLog(reporter.Trace.Log, value, engine + ".");
+        var log = new SessionRunLog(reporter.Trace.Log, secret, engine + ".");
         var opened = await guard.CallAsync(() => describer.OpenAsync(request, log, cancellationToken));
         // The value and not Succeeded, here and where a query is described: a describer may have given null for
         // either, and an outcome that holds neither is a fault.
@@ -109,9 +115,9 @@ internal static class DatabaseRuns
         {
             var failure = Redaction.Of(
                 guard.Call(() => opened.Failure ?? throw new InvalidOperationException(Guard.Nothing)),
-                value
+                secret
             );
-            reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, first, database, server: null), value));
+            reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, first, database, server: null), secret));
             RunEvents.NotOpened(trace, database, failure.Descriptor.Id);
             Fail(queries, failure.Descriptor.Id, trace);
             return;
@@ -140,7 +146,7 @@ internal static class DatabaseRuns
     )
     {
         var guard = run.Guard;
-        var value = guard.Secret;
+        var secret = guard.Secret;
         var server = guard.Call(() => run.Session.Server);
         guard.Call(() => RunEvents.Opened(run.Trace, database, server));
         foreach (var query in queries)
@@ -158,7 +164,10 @@ internal static class DatabaseRuns
             if (result.Value is { } description)
             {
                 query.Entry = guard.Call(() =>
-                    NoSecretIn(EntryBuilder.Build(planned, database.Dialect, database.Name, server, description), value)
+                    NoSecretIn(
+                        EntryBuilder.Build(planned, database.Dialect, database.Name, server, description),
+                        secret
+                    )
                 );
                 query.State = QueryState.Described;
                 RunEvents.Query(run.Trace, query, duration);
@@ -167,20 +176,22 @@ internal static class DatabaseRuns
             {
                 var failure = Redaction.Of(
                     guard.Call(() => result.Failure ?? throw new InvalidOperationException(Guard.Nothing)),
-                    value
+                    secret
                 );
-                run.Reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), value));
+                run.Reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), secret));
                 query.State = QueryState.Failed;
                 RunEvents.Query(run.Trace, query, error: failure.Descriptor.Id);
             }
         }
     }
 
-    // What a describer gave goes into a sidecar, which is committed: a value in it is a bug of the describer.
-    private static SidecarEntry NoSecretIn(SidecarEntry entry, string secret) =>
+    // What a describer gave goes into a sidecar, which is committed: a value or a password in it is a bug of the
+    // describer, or a password that equals a name the describer gave.
+    private static SidecarEntry NoSecretIn(SidecarEntry entry, ConnectionSecret secret) =>
         EntrySecretCheck.Holds(entry, secret)
             ? throw new InvalidOperationException(
-                $"The describer put the connection's value in its description of the query '{entry.Name}'."
+                $"The description of the query '{entry.Name}' holds the connection's value or a password of it.  "
+                    + "The describer put it there, or the password equals a name of the database."
             )
             : entry;
 
@@ -228,16 +239,16 @@ internal static class DatabaseRuns
     );
 
     // Runs what a describer gives or does.  Whatever it throws is a bug of the describer and is thrown again as
-    // the SQLSRC200 to report, without the connection's value.
+    // the SQLSRC200 to report, without the connection's value and the parts it knows.
     private sealed class Guard(
-        string secret,
+        ConnectionSecret secret,
         Func<string, string?> getEnvironmentVariable,
         CancellationToken cancellationToken
     )
     {
         public const string Nothing = "A describer returned nothing.";
 
-        public string Secret => secret;
+        public ConnectionSecret Secret => secret;
 
         public async Task<T> CallAsync<T>(Func<Task<T>> call)
             where T : class

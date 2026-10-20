@@ -108,6 +108,12 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
 
     public Dictionary<string, Exception> Exceptions { get; } = [with(StringComparer.Ordinal)];
 
+    // The parts of a connection that it says are secret, whatever the connection.
+    public IReadOnlyList<string> Secrets { get; set; } = [];
+
+    // Thrown in place of the parts, for a describer that throws when it is asked for them.
+    public Exception? SecretsException { get; set; }
+
     public DescribeFailure? OpenFailure { get; set; }
 
     public Exception? OpenException { get; set; }
@@ -156,6 +162,9 @@ internal sealed class FakeDescriber(SqlDialect dialect = SqlDialect.PostgreSql) 
         params string[] serverLines
     ) =>
         new(Rejected, new EquatableArray<string>([argument]), step, new EquatableArray<string>([.. serverLines]), help);
+
+    public IReadOnlyList<string> SecretsOf(string connection) =>
+        SecretsException is { } exception ? throw exception : Secrets;
 
     public async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,

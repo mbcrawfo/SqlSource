@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 using Shouldly;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
@@ -136,7 +137,7 @@ public sealed class NpgsqlRunLoggerTests
     [Fact]
     public void Log_MessageThatHoldsTheConnection_IsWrittenWithoutIt()
     {
-        var log = new SessionRunLog(_recording, Secrets.Connection, "postgres.");
+        var log = new SessionRunLog(_recording, new ConnectionSecret(Secrets.Connection), "postgres.");
         var factory = NpgsqlRunLogger.For(log).ShouldNotBeNull();
 
         factory
@@ -164,7 +165,9 @@ public sealed class NpgsqlRunLoggerTests
     public void For_LogThatKeepsNothing_GivesNoFactory()
     {
         NpgsqlRunLogger.For(NullRunLog.Instance).ShouldBeNull();
-        NpgsqlRunLogger.For(new SessionRunLog(NullRunLog.Instance, "x", "postgres.")).ShouldBeNull();
+        NpgsqlRunLogger
+            .For(new SessionRunLog(NullRunLog.Instance, new ConnectionSecret("x"), "postgres."))
+            .ShouldBeNull();
     }
 
     [Fact]

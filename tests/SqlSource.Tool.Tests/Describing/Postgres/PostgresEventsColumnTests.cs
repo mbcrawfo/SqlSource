@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
@@ -316,7 +317,7 @@ public sealed class PostgresEventsColumnTests
         var log = new RecordingLog();
         var script = ListingScript().Checks(Listing.Sql, [], PostgresTables.UsersId, CountColumn).PlansNothing(1, 0);
 
-        await DescribeAsync(script, new SessionRunLog(log, "users", "postgres."), Listing);
+        await DescribeAsync(script, new SessionRunLog(log, new ConnectionSecret("users"), "postgres."), Listing);
 
         var id = log.Events.First(written => written.Name == "postgres.column").Members;
         Member(id, "origin")

@@ -5,8 +5,9 @@ using SqlSource.Tool.Describing;
 namespace SqlSource.Tool.Logging;
 
 /// <summary>
-/// A log over the run's that writes every occurrence of one database's connection value as <c>***</c>: in the
-/// event's name and in every string of it at any depth, the names of members included.
+/// A log over the run's that writes one database's connection secret as <c>***</c>: the whole value wherever it
+/// stands, and each secret part where it stands as a token, in the event's name and in every string of it at any
+/// depth, the names of members included.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,14 +16,14 @@ namespace SqlSource.Tool.Logging;
 /// The run writes its own events of a database through one too, without a prefix: they hold what a describer gave.
 /// </para>
 /// <para>
-/// The whole value is removed and nothing less: the tool does not read a connection string, so it knows no part
-/// of one.  <c>docs/tech-debt/TD-0034</c> says what that leaves.
+/// The parts are those the describer said are secret (<see cref="ConnectionSecret" />): the tool does not read a
+/// connection string itself.  <c>docs/tech-debt/TD-0034</c> says what that leaves.
 /// </para>
 /// </remarks>
 /// <param name="inner">The log of the run.</param>
-/// <param name="secret">The connection's value.</param>
+/// <param name="secret">The connection's value and its secret parts.</param>
 /// <param name="prefix">What stands before each event's name: the engine and a dot, for a describer.</param>
-internal sealed class SessionRunLog(IRunLog inner, string secret, string? prefix = null) : IRunLog
+internal sealed class SessionRunLog(IRunLog inner, ConnectionSecret secret, string? prefix = null) : IRunLog
 {
     public bool Writes => inner.Writes;
 

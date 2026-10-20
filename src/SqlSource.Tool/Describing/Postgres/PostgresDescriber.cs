@@ -29,6 +29,8 @@ internal sealed class PostgresDescriber(IReadOnlyList<string> explainSettings) :
 
     public SqlDialect Dialect => SqlDialect.PostgreSql;
 
+    public IReadOnlyList<string> SecretsOf(string connection) => PostgresConnection.SecretsOf(connection);
+
     public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,
         IRunLog log,

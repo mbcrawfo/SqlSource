@@ -11,8 +11,8 @@ namespace SqlSource.Tool.Logging;
 /// </summary>
 /// <param name="log">The log of the run.</param>
 /// <param name="verbose">Standard output, when the run is verbose.</param>
-/// <param name="secret">A connection's value that is removed from every line, or null.</param>
-internal sealed class RunTrace(IRunLog log, TextWriter? verbose = null, string? secret = null)
+/// <param name="secret">A connection's secret that is removed from every line, or null.</param>
+internal sealed class RunTrace(IRunLog log, TextWriter? verbose = null, ConnectionSecret? secret = null)
 {
     private const string Prefix = "sqlsource: ";
 
@@ -27,10 +27,11 @@ internal sealed class RunTrace(IRunLog log, TextWriter? verbose = null, string? 
         verbose?.WriteLine(Prefix + OneLine.Of(secret is null ? text : Redaction.Of(text, secret)));
 
     /// <summary>
-    /// The same trace with one connection's value removed from everything said through it.  What the run says of
+    /// The same trace with one connection's secret removed from everything said through it.  What the run says of
     /// a database once it has the connection goes through one: a server's version, a driver's name and a setting
     /// are a describer's text, as a failure's lines are.
     /// </summary>
-    /// <param name="value">The connection's value.</param>
-    public RunTrace Without(string value) => new(new SessionRunLog(log, value), verbose, value);
+    /// <param name="connection">The connection's value and its secret parts.</param>
+    public RunTrace Without(ConnectionSecret connection) =>
+        new(new SessionRunLog(log, connection), verbose, connection);
 }

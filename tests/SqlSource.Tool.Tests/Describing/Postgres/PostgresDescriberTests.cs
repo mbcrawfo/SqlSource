@@ -18,6 +18,17 @@ public sealed class PostgresDescriberTests
     public void Dialect_OfTheDescriber_IsPostgreSql() =>
         new PostgresDescriber().Dialect.ShouldBe(SqlDialect.PostgreSql);
 
+    [Fact]
+    public void SecretsOf_ConnectionWithBothPasswords_IsBoth() =>
+        new PostgresDescriber()
+            .SecretsOf("Host=h;Password=pw;SSL Password=kp")
+            .ShouldBe(["pw", "kp"], ignoreOrder: true);
+
+    // A string the driver cannot read has no parts it knows, and opening it fails in its own place.
+    [Fact]
+    public void SecretsOf_ConnectionTheDriverCannotRead_IsNone() =>
+        new PostgresDescriber().SecretsOf("Nonsense=1").ShouldBeEmpty();
+
     // The list is closed: nothing else reaches a SET LOCAL, and a describer that would send it is never made.
     [Theory]
     [InlineData("work_mem=1")]
