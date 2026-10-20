@@ -8,7 +8,7 @@
 
 **Tech Stack:** C# (`net8.0`), System.CommandLine, xUnit v3, Shouldly.
 
-**Spec:** [`docs/tech-debt/TD-0023-unknown-option-and-path-are-printed-as-given.md`](../../tech-debt/TD-0023-unknown-option-and-path-are-printed-as-given.md), its Problem and Proposed fix sections, with the run's notes: this reverses the choice that `Run_ConnectionStringGivenWithoutAName_IsNeverPrinted` pinned.
+**Spec:** [`docs/tech-debt/TD-0023-path-without-an-equals-sign-is-printed-as-given.md`](../../tech-debt/TD-0023-path-without-an-equals-sign-is-printed-as-given.md), its Problem and Proposed fix sections, with the run's notes: this reverses the choice that `Run_ConnectionStringGivenWithoutAName_IsNeverPrinted` pinned.
 
 ## Global Constraints
 
