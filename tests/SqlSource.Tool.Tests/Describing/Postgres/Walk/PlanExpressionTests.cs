@@ -161,6 +161,139 @@ public sealed class PlanExpressionTests
             .NullableOf(entry, catalogFunctions: true, static _ => false, static group => group != "'x'::text")
             .ShouldBe(expected);
 
+    // The walk's typed proof of the references of the tests below: each column's declared type, and none for another.
+    private static long? Typed(OutputReference reference) =>
+        (reference.Alias is null ? reference.Column : reference.Alias + "." + reference.Column) switch
+        {
+            "u.balance" or "l.unit_price" => BuiltInTypes.Numeric,
+            "l.quantity" or "u.id" or "id" => BuiltInTypes.Int4,
+            "u.name" or "name" => BuiltInTypes.Varchar,
+            "created_at" => BuiltInTypes.Timestamptz,
+            "products.xmax" => BuiltInTypes.Xid,
+            "status" => UserStatus,
+            _ => null,
+        };
+
+    // An enum of the user's.
+    private const long UserStatus = 16_390;
+
+    private static ExpressionContext Context(bool catalogFunctions) => new(catalogFunctions, Typed);
+
+    [Theory]
+    [InlineData("((l.quantity)::numeric * l.unit_price)")]
+    [InlineData("((id)::bigint * 2)")]
+    [InlineData("((id + 1) * 3)")]
+    [InlineData("(lower((name)::text) || '!'::text)")]
+    [InlineData("length((name)::text)")]
+    [InlineData("date_trunc('day'::text, created_at)")]
+    [InlineData("(created_at)::date")]
+    [InlineData("((name)::text = 'x'::text)")]
+    [InlineData("(products.xmax = 0)")]
+    [InlineData("(((l.quantity)::numeric * l.unit_price))")]
+    public void NullableOf_TotalOperatorOverProvedValues_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: true)).ShouldBe(false);
+
+    [Theory]
+    [InlineData("(l.quantity * l.unit_price)")]
+    [InlineData("(u.note * 2)")]
+    [InlineData("upper(r.during)")]
+    [InlineData("(r.during * tstzrange($1, $2))")]
+    [InlineData("(l.quantity OPERATOR(public.*) l.unit_price)")]
+    [InlineData("public.lower((name)::text)")]
+    [InlineData("(- id)")]
+    [InlineData("((id)::bigint * 2) * NULL::bigint")]
+    [InlineData("(id)::bigint * 2")]
+    [InlineData("((id)::bigint * NULL::bigint)")]
+    [InlineData("((u.id) * 2)")]
+    [InlineData("(u.id)")]
+    [InlineData("((u.id))::bigint")]
+    [InlineData("(id * 2 + 1)")]
+    [InlineData("lower((name)::text, 'x'::text)")]
+    [InlineData("lower()")]
+    [InlineData("Lower((name)::text)")]
+    [InlineData("\"lower\"((name)::text)")]
+    [InlineData("((name)::text = 'x'::text COLLATE \"C\")")]
+    [InlineData("max((name)::text)")]
+    [InlineData("(count(id) + 1)")]
+    public void NullableOf_OperatorOrFunctionNotInTheTable_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: true)).ShouldBeNull();
+
+    [Theory]
+    [InlineData("((l.quantity)::numeric * l.unit_price)")]
+    [InlineData("((id)::bigint * 2)")]
+    [InlineData("((id + 1) * 3)")]
+    [InlineData("(lower((name)::text) || '!'::text)")]
+    [InlineData("length((name)::text)")]
+    [InlineData("date_trunc('day'::text, created_at)")]
+    [InlineData("(created_at)::date")]
+    [InlineData("((name)::text = 'x'::text)")]
+    [InlineData("(products.xmax = 0)")]
+    [InlineData("(((l.quantity)::numeric * l.unit_price))")]
+    public void NullableOf_TotalFormWhenTheCatalogIsNotFirst_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: false)).ShouldBeNull();
+
+    [Theory]
+    [InlineData("(status)::text")]
+    [InlineData("(id)::text")]
+    [InlineData("(created_at)::text")]
+    [InlineData("(name)::date")]
+    [InlineData("(id)::public.bigint")]
+    public void NullableOf_CastOutsideAFamily_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: true)).ShouldBeNull();
+
+    // A form of the table takes the new forms as its arguments, and COALESCE and CASE take them too.
+    [Theory]
+    [InlineData("COALESCE(u.note, ((id)::bigint * 2))")]
+    [InlineData("CASE WHEN (id > 1) THEN (id * 2) ELSE length((name)::text) END")]
+    [InlineData("upper(lower((name)::text))")]
+    [InlineData("((count(*) * 2) > 1)")]
+    [InlineData("((u.id > 1) = true)")]
+    public void NullableOf_TotalFormAsAnArgument_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: true)).ShouldBe(false);
+
+    // A group the walk says may not be read is unknown in an operator as anywhere else.
+    [Theory]
+    [InlineData("((id * 2) + 1)")]
+    [InlineData("(((id * 2))::bigint + 1)")]
+    public void NullableOf_OperatorOverAGroupTheWalkVetoes_IsUnknown(string entry) =>
+        PlanExpression
+            .NullableOf(
+                entry,
+                Context(catalogFunctions: true) with
+                {
+                    GroupPreserved = static group => group != "id * 2",
+                }
+            )
+            .ShouldBeNull();
+
+    [Theory]
+    [InlineData("((id)::bigint * 2)", BuiltInTypes.Int8)]
+    [InlineData("((name)::text = 'x'::text)", BuiltInTypes.Bool)]
+    [InlineData("(created_at)::date", BuiltInTypes.Date)]
+    [InlineData("length((name)::text)", BuiltInTypes.Int4)]
+    [InlineData("(id)::numeric(10,2)", BuiltInTypes.Numeric)]
+    [InlineData("(name)::character varying(3)", BuiltInTypes.Varchar)]
+    [InlineData("'x'::text", BuiltInTypes.Text)]
+    [InlineData("count(*)", BuiltInTypes.Int8)]
+    public void ProvedTypeOf_TotalOperator_IsItsResult(string entry, long expected) =>
+        PlanExpression.ProvedTypeOf(entry, Context(catalogFunctions: true)).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("COALESCE(id, 0)")]
+    [InlineData("id")]
+    [InlineData("count(id)")]
+    [InlineData("(l.quantity * l.unit_price)")]
+    public void ProvedTypeOf_FormOfNoKnownType_IsNull(string entry) =>
+        PlanExpression.ProvedTypeOf(entry, Context(catalogFunctions: true)).ShouldBeNull();
+
+    // A reference that the old overload's walk proves is of no known type, and feeds no operator, function or cast.
+    [Theory]
+    [InlineData("(u.id * 2)")]
+    [InlineData("(u.id)::bigint")]
+    [InlineData("lower(u.name)")]
+    public void NullableOf_ReferenceProvedWithoutAType_FeedsNoOperator(string entry) =>
+        PlanExpression.NullableOf(entry, catalogFunctions: true, AllProved).ShouldBeNull();
+
     [Fact]
     public void Groups_Entry_IsTheTextInsideEachPairOfParenthesesOutermostFirst() =>
         PlanExpression

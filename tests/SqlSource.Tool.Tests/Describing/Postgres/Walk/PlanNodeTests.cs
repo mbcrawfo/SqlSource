@@ -104,6 +104,53 @@ public sealed class PlanNodeTests
     public void Read_NodeWithGroupingSets_SaysSo(string text) =>
         PlanNode.Read(text).ShouldNotBeNull().HasGroupingSets.ShouldBeTrue();
 
+    // An aggregate's strategy, whether it groups by a key, and whether it has a HAVING.
+    [Fact]
+    public void Read_AggregateKeys_AreRead()
+    {
+        var grouped = PlanNode
+            .Read( /*lang=json,strict*/
+                """
+                [{"Plan": {"Node Type": "Aggregate", "Strategy": "Sorted", "Group Key": ["a.id"],
+                    "Filter": "(count(*) > 1)"}}]
+                """
+            )
+            .ShouldNotBeNull();
+        var plain = PlanNode
+            .Read( /*lang=json,strict*/
+                """[{"Plan": {"Node Type": "Aggregate", "Strategy": "Plain", "Group Key": []}}]"""
+            )
+            .ShouldNotBeNull();
+
+        grouped.Strategy.ShouldBe("Sorted");
+        grouped.HasGroupKey.ShouldBeTrue();
+        grouped.HasFilter.ShouldBeTrue();
+        plain.Strategy.ShouldBe("Plain");
+        plain.HasGroupKey.ShouldBeFalse();
+        plain.HasFilter.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Read_NodeWithoutAggregateKeys_HasNone()
+    {
+        var root = PlanNode.Read(Swapped).ShouldNotBeNull();
+
+        root.Strategy.ShouldBeNull();
+        root.HasGroupKey.ShouldBeFalse();
+        root.HasFilter.ShouldBeFalse();
+    }
+
+    // The keys PostgresPlans writes are read back as they were.
+    [Fact]
+    public void Read_TextOfAPlanATestWrote_KeepsTheAggregateKeys()
+    {
+        var aggregate = Over("Aggregate", Scan("a")) with { Strategy = "Hashed", HasGroupKey = true, HasFilter = true };
+
+        var read = PlanNode.Read(Text(aggregate)).ShouldNotBeNull();
+
+        (read.Strategy, read.HasGroupKey, read.HasFilter).ShouldBe(("Hashed", true, true));
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData("not json")]
@@ -138,6 +185,9 @@ public sealed class PlanNodeTests
     )]
     [InlineData( /*lang=json,strict*/
         """[{"Plan": {"Node Type": "SetOp", "Command": 1}}]"""
+    )]
+    [InlineData( /*lang=json,strict*/
+        """[{"Plan": {"Node Type": "Aggregate", "Strategy": 1}}]"""
     )]
     [InlineData( /*lang=json,strict*/
         """[{"Plan": {"Node Type": "Result", "Plans": {}}}]"""

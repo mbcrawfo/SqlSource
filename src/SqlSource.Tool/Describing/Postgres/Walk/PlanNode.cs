@@ -28,6 +28,14 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// <c>Except All</c>.
 /// </param>
 /// <param name="HasGroupingSets">Whether the node has a <c>Grouping Sets</c> key, whatever it holds.</param>
+/// <param name="Strategy">
+/// <c>Strategy</c>, which an <c>Aggregate</c> has, <c>Plain</c>, <c>Sorted</c>, <c>Hashed</c> or <c>Mixed</c>, and a
+/// <c>SetOp</c> too.
+/// </param>
+/// <param name="HasGroupKey">Whether the node has a <c>Group Key</c> that names a key at least.</param>
+/// <param name="HasFilter">
+/// Whether the node has a <c>Filter</c>, whatever it holds: an aggregate's <c>HAVING</c>.
+/// </param>
 /// <param name="Plans"><c>Plans</c>: the children, empty when the node has none.</param>
 internal sealed record PlanNode(
     string NodeType,
@@ -41,6 +49,9 @@ internal sealed record PlanNode(
     string? CteName,
     string? Command,
     bool HasGroupingSets,
+    string? Strategy,
+    bool HasGroupKey,
+    bool HasFilter,
     IReadOnlyList<PlanNode> Plans
 )
 {
@@ -134,6 +145,7 @@ internal sealed record PlanNode(
             || !TryText(element, "Subplan Name", out var subplan)
             || !TryText(element, "CTE Name", out var cte)
             || !TryText(element, nameof(Command), out var command)
+            || !TryText(element, nameof(Strategy), out var strategy)
             || !TryNodes(element, out var plans)
         )
         {
@@ -152,6 +164,11 @@ internal sealed record PlanNode(
             cte,
             command,
             element.TryGetProperty("Grouping Sets", out _),
+            strategy,
+            element.TryGetProperty("Group Key", out var key)
+                && key.ValueKind == JsonValueKind.Array
+                && key.GetArrayLength() > 0,
+            element.TryGetProperty("Filter", out _),
             plans
         );
     }

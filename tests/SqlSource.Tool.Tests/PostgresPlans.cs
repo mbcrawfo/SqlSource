@@ -27,6 +27,9 @@ internal static class PostgresPlans
             null,
             null,
             false,
+            null,
+            false,
+            false,
             []
         );
 
@@ -44,6 +47,9 @@ internal static class PostgresPlans
             null,
             null,
             false,
+            null,
+            false,
+            false,
             [outer with { ParentRelationship = Outer }, inner with { ParentRelationship = Inner }]
         );
 
@@ -60,6 +66,9 @@ internal static class PostgresPlans
             null,
             null,
             null,
+            false,
+            null,
+            false,
             false,
             [child with { ParentRelationship = relationship }]
         );
@@ -89,10 +98,22 @@ internal static class PostgresPlans
         Add(map, "Subplan Name", node.SubplanName);
         Add(map, "CTE Name", node.CteName);
         Add(map, "Command", node.Command);
+        Add(map, "Strategy", node.Strategy);
         Add(map, "Output", node.Output);
         if (node.HasGroupingSets)
         {
             map["Grouping Sets"] = System.Array.Empty<object>();
+        }
+
+        // What the key and the filter hold is the planner's own: a node of a test has one of each.
+        if (node.HasGroupKey)
+        {
+            map["Group Key"] = new[] { "key" };
+        }
+
+        if (node.HasFilter)
+        {
+            map["Filter"] = "filter";
         }
 
         if (node.Plans.Count > 0)

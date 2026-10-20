@@ -323,7 +323,7 @@ internal static partial class NullabilityWalk
 
         public bool? NullableOf(string entry) =>
             _nothingExtends
-                ? PlanExpression.NullableOf(entry, scope.CatalogFunctionsFirst, ProvedNotNull)
+                ? PlanExpression.NullableOf(entry, new ExpressionContext(scope.CatalogFunctionsFirst, ProvedTypeOf))
                 : NullableAt(root, entry, 0);
 
         // What the entry of the node's Output says, read where it is computed: a child that prints the entry, or the
@@ -361,9 +361,12 @@ internal static partial class NullabilityWalk
                 ? null
                 : PlanExpression.NullableOf(
                     entry,
-                    scope.CatalogFunctionsFirst,
-                    ProvedNotNull,
-                    group => Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1))
+                    new ExpressionContext(
+                        scope.CatalogFunctionsFirst,
+                        ProvedTypeOf,
+                        group =>
+                            Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1))
+                    )
                 );
         }
 
@@ -435,11 +438,11 @@ internal static partial class NullabilityWalk
             }
         }
 
-        private bool ProvedNotNull(OutputReference reference) => ProvedTypeOf(reference) is not null;
-
         /// <summary>
         /// The declared type of the column a reference names, a domain where the column is one, when the walk proves
-        /// that it is not <c>NULL</c>; or null.
+        /// that it is not <c>NULL</c>; or null.  A system column, which "tables" reads no attribute of and no user
+        /// column may be named as, is of its own type when the catalog's answer of a <c>NOT NULL</c> column of its
+        /// table would be not nullable.
         /// </summary>
         public long? ProvedTypeOf(OutputReference reference)
         {
@@ -458,12 +461,26 @@ internal static partial class NullabilityWalk
             var attribute = table.Columns.FirstOrDefault(column =>
                 string.Equals(column.Name, reference.Column, StringComparison.Ordinal)
             );
-            return
-                attribute is not null
-                && ColumnNullability.Of(new ColumnOrigin(table, attribute), gated: false).Nullable == false
+            if (attribute is null)
+            {
+                return ColumnNullability.KeepsNotNull(table) ? SystemColumnTypeOf(reference.Column) : null;
+            }
+
+            return ColumnNullability.Of(new ColumnOrigin(table, attribute), gated: false).Nullable == false
                 ? attribute.TypeOid
                 : null;
         }
+
+        // The type of a system column of a table by its name, or null for any other name.
+        private static long? SystemColumnTypeOf(string name) =>
+            name switch
+            {
+                "tableoid" => BuiltInTypes.Oid,
+                "ctid" => BuiltInTypes.Tid,
+                "xmin" or "xmax" => BuiltInTypes.Xid,
+                "cmin" or "cmax" => BuiltInTypes.Cid,
+                _ => null,
+            };
 
         // The table "tables" answered of an instance: a relation's by its schema and its name, and a partitioned
         // table's by the nearest of the tables its partitions are partitions of, whose NOT NULL every partition keeps.

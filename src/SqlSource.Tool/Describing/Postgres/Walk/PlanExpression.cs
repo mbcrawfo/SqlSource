@@ -23,14 +23,26 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// that can be <c>NULL</c>; the tests <c>IS NULL</c>, <c>IS NOT NULL</c> and <c>IS DISTINCT FROM</c>, and the
 /// <c>NOT</c> of the last, which is how <c>IS NOT DISTINCT FROM</c> prints; <c>COALESCE</c>, <c>GREATEST</c> and
 /// <c>LEAST</c> with an argument that cannot be <c>NULL</c>; and a <c>CASE</c> with an <c>ELSE</c> whose every result
-/// cannot be.  A <c>CASE</c> written without an <c>ELSE</c> prints <c>ELSE NULL::type</c>.  A cast of anything but a
-/// literal is none: the text does not say which function casts.
+/// cannot be.  A <c>CASE</c> written without an <c>ELSE</c> prints <c>ELSE NULL::type</c>.
+/// </para>
+/// <para>
+/// A value is also proved with its type (<see cref="ProvedTypeOf" />): a constant, a test, <c>count(*)</c> or a
+/// ranking of the type <see cref="TypeOf" /> gives, and a reference that is part of the entry of the type the walk
+/// proves.  Over such values, an operator in parentheses of its own, <c>(A op B)</c>, and a function,
+/// <c>name(a, ...)</c>, are not <c>NULL</c> when <see cref="TotalFunctions" /> holds their name with exactly the
+/// argument types read, of the result it gives: the plan prints each argument with its implicit cast, so its type is
+/// what the text shows.  A cast, <c>(E)::T</c>, is not <c>NULL</c> when <c>E</c> is proved of a type that is
+/// <c>T</c> or in one family of <see cref="SetOperationTypes" /> with it; any other cast is unknown.
+/// <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c> and <c>CASE</c> are not <c>NULL</c> but of no known type, so they
+/// feed no operator, and a reference in parentheses of its own, <c>(u.id)</c>, is unknown.
 /// </para>
 /// <para>
 /// A function name is the catalog's only when the plan prints it unqualified and the session finds
 /// <c>pg_catalog</c>'s functions first (<see cref="PostgresSearchPath" />): the plan prints a function bare whenever
-/// the search path finds it, so <c>count(*)</c> may be another schema's aggregate.  <c>COALESCE</c>,
-/// <c>GREATEST</c>, <c>LEAST</c>, <c>CASE</c> and the tests are syntax, and no search path changes them.
+/// the search path finds it, so <c>count(*)</c> may be another schema's aggregate.  An operator, a cast and a
+/// literal's type are read only then too, since the plan prints an operator and a type's name bare whenever the path
+/// finds them.  <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c>, <c>CASE</c> and the tests are syntax, and no search
+/// path changes them.
 /// </para>
 /// <para>
 /// The text alone cannot tell a value the root computes from one a node under a join computed and printed by its
@@ -72,50 +84,74 @@ internal static class PlanExpression
 
     private static readonly HashSet<string> Variadic = [with(StringComparer.Ordinal), "COALESCE", "GREATEST", "LEAST"];
 
+    // A context that proves no reference and reads no name as the catalog's.
+    private static readonly ExpressionContext NoContext = new(false, static _ => null);
+
     /// <summary>What the entry says of its column.</summary>
     /// <param name="entry">The entry as the plan prints it.</param>
-    /// <param name="catalogFunctions">Whether an unqualified function name is <c>pg_catalog</c>'s.</param>
-    /// <param name="provedNotNull">
-    /// Whether the walk proves a reference that is an argument not <c>NULL</c>.  A reference that is the whole entry
-    /// is never asked.
-    /// </param>
-    /// <param name="groupPreserved">
-    /// Whether a span in parentheses inside the entry, given as the text inside them, may be read as what it says, or
-    /// null when every one may.  The walk says no for a value a node under a join that null-extends computed, which
-    /// the node that computes the entry takes from it and prints in parentheses: such a span is unknown, whatever its
-    /// form.  The entry as a whole is never asked.
-    /// </param>
+    /// <param name="context">What the walk says of the plan the entry is read in.</param>
     /// <returns>
     /// False when the server can never return <c>NULL</c> for the entry, true for a <c>NULL</c> constant, and null
     /// when the entry as a whole is no form this class knows.
     /// </returns>
+    public static bool? NullableOf(string entry, ExpressionContext context) =>
+        Tokens.Read(entry) is { Count: > 0 } tokens ? new Reader(entry, tokens, context).Form(0, tokens.Count) : null;
+
+    /// <summary>
+    /// What the entry says of its column, as <see cref="NullableOf(string, ExpressionContext)" /> answers, with a
+    /// reference the walk proves of no known type.
+    /// </summary>
+    /// <param name="entry">The entry as the plan prints it.</param>
+    /// <param name="catalogFunctions">Whether an unqualified function name is <c>pg_catalog</c>'s.</param>
+    /// <param name="provedNotNull">
+    /// Whether the walk proves a reference that is part of the entry not <c>NULL</c>.  A reference that is the whole
+    /// entry is never asked.
+    /// </param>
+    /// <param name="groupPreserved">As <see cref="ExpressionContext.GroupPreserved" /> says.</param>
     public static bool? NullableOf(
         string entry,
         bool catalogFunctions,
         Func<OutputReference, bool> provedNotNull,
         Func<string, bool>? groupPreserved = null
     ) =>
-        Tokens.Read(entry) is { Count: > 0 } tokens
-            ? new Reader(entry, tokens, catalogFunctions, provedNotNull, groupPreserved).Form(0, tokens.Count)
-            : null;
+        NullableOf(
+            entry,
+            new ExpressionContext(
+                catalogFunctions,
+                reference => provedNotNull(reference) ? TotalFunctions.UnknownType : null,
+                groupPreserved
+            )
+        );
+
+    /// <summary>
+    /// The type of an entry that is, as a whole, a value proved not <c>NULL</c> of a known type, or null: a constant,
+    /// a test, <c>count(*)</c> or a ranking as <see cref="TypeOf" /> types them, or an operator, a function or a cast
+    /// of the forms the remarks give.  <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c> and <c>CASE</c> are not
+    /// <c>NULL</c> but of no known type, and a reference that is the whole entry is never asked.
+    /// </summary>
+    /// <param name="entry">The entry as the plan prints it.</param>
+    /// <param name="context">What the walk says of the plan the entry is read in.</param>
+    /// <returns>The OID of the type, or null.</returns>
+    public static long? ProvedTypeOf(string entry, ExpressionContext context) =>
+        Tokens.Read(entry) is { Count: > 0 } tokens ? new Reader(entry, tokens, context).Proved(0, tokens.Count) : null;
 
     /// <summary>
     /// The type of an entry that is a whole constant or a form of this class whose type is fixed, or null.  The forms
-    /// are those of <see cref="NullableOf" /> with a type that does not depend on its arguments: a quoted literal with
-    /// a cast to a built-in type, a number, <c>true</c> or <c>false</c>, a test, <c>count</c> and the rankings.
-    /// <c>NULL::type</c>, <c>COALESCE</c>, <c>CASE</c>, a reference and a cast of anything else have none, and neither
-    /// has a text that merely starts with a form.  A literal's type, and a function's, is known only when the
-    /// session finds <c>pg_catalog</c> first, since the plan prints a type's name and a function's bare whenever the
-    /// path finds them.  The <c>bigint</c> of <c>count</c> with an argument is an assumption about which
-    /// <c>count</c> the server chose, and never by itself a proof that the entry is not <c>NULL</c>: that is
-    /// <see cref="NullableOf" />'s to say.
+    /// are those of <see cref="NullableOf(string, ExpressionContext)" /> with a type that does not depend on its
+    /// arguments: a quoted literal with a cast to a built-in type, a number, <c>true</c> or <c>false</c>, a test,
+    /// <c>count</c> and the rankings.  <c>NULL::type</c>, <c>COALESCE</c>, <c>CASE</c>, a reference and a cast of
+    /// anything else have none, and neither has a text that merely starts with a form.  A literal's type, and a
+    /// function's, is known only when the session finds <c>pg_catalog</c> first, since the plan prints a type's name
+    /// and a function's bare whenever the path finds them.  The <c>bigint</c> of <c>count</c> with an argument is an
+    /// assumption about which <c>count</c> the server chose, and never by itself a proof that the entry is not
+    /// <c>NULL</c>: that is <see cref="NullableOf(string, ExpressionContext)" />'s to say.
     /// </summary>
     /// <param name="entry">The entry as the plan prints it.</param>
     /// <param name="catalogFunctions">Whether an unqualified function or type name is <c>pg_catalog</c>'s.</param>
     /// <returns>The OID of the type, or null when the entry as a whole is no form that has one.</returns>
     public static long? TypeOf(string entry, bool catalogFunctions) =>
         Tokens.Read(entry) is { Count: > 0 } tokens
-            ? new Reader(entry, tokens, catalogFunctions, static _ => false, null).TypeOid(0, tokens.Count)
+            ? new Reader(entry, tokens, NoContext with { CatalogFunctions = catalogFunctions }).TypeOid(0, tokens.Count)
             : null;
 
     /// <summary>
@@ -130,7 +166,7 @@ internal static class PlanExpression
             return null;
         }
 
-        var reader = new Reader(entry, tokens, false, static _ => false, null);
+        var reader = new Reader(entry, tokens, NoContext);
         return reader.CastOf() is { } close ? entry[tokens[0].End..tokens[close].Start] : null;
     }
 
@@ -141,7 +177,7 @@ internal static class PlanExpression
     public static string? Unwrapped(string entry) =>
         Tokens.Read(entry) is [{ Kind: Kind.Open, Start: 0 }, .., { Kind: Kind.Close } last] tokens
         && last.End == entry.Length
-        && new Reader(entry, tokens, false, static _ => false, null).WrapsWhole(tokens.Count)
+        && new Reader(entry, tokens, NoContext).WrapsWhole(tokens.Count)
             ? entry[1..^1]
             : null;
 
@@ -375,26 +411,16 @@ internal static class PlanExpression
     {
         private readonly string _entry;
         private readonly List<Token> _tokens;
-        private readonly bool _catalogFunctions;
-        private readonly Func<OutputReference, bool> _provedNotNull;
-        private readonly Func<string, bool>? _groupPreserved;
+        private readonly ExpressionContext _context;
 
         // The index of the token that closes each opening parenthesis or bracket, and -1 for any other.
         private readonly int[] _closes;
 
-        public Reader(
-            string entry,
-            List<Token> tokens,
-            bool catalogFunctions,
-            Func<OutputReference, bool> provedNotNull,
-            Func<string, bool>? groupPreserved
-        )
+        public Reader(string entry, List<Token> tokens, ExpressionContext context)
         {
             _entry = entry;
             _tokens = tokens;
-            _catalogFunctions = catalogFunctions;
-            _provedNotNull = provedNotNull;
-            _groupPreserved = groupPreserved;
+            _context = context;
             _closes = new int[tokens.Count];
             var open = new Stack<int>();
             for (var index = 0; index < tokens.Count; index++)
@@ -411,7 +437,10 @@ internal static class PlanExpression
             }
         }
 
-        /// <summary>False, true or null, as <see cref="NullableOf" /> answers, for the span as a whole.</summary>
+        /// <summary>
+        /// False, true or null, as <see cref="NullableOf(string, ExpressionContext)" /> answers, for the span as a
+        /// whole.
+        /// </summary>
         public bool? Form(int from, int to)
         {
             if (to <= from)
@@ -421,15 +450,17 @@ internal static class PlanExpression
 
             if (IsGroup(from, to))
             {
-                if (
-                    (from > 0 || to < _tokens.Count)
-                    && _groupPreserved?.Invoke(_entry[_tokens[from].End.._tokens[to - 1].Start]) == false
-                )
+                if (Vetoed(from, to))
                 {
                     return null;
                 }
 
-                return IsTest(from + 1, to - 1) ? false : Form(from + 1, to - 1);
+                if (IsTest(from + 1, to - 1))
+                {
+                    return false;
+                }
+
+                return Form(from + 1, to - 1) ?? (Proved(from, to) is null ? null : false);
             }
 
             if (Constant(from, to) is { } constant)
@@ -439,7 +470,7 @@ internal static class PlanExpression
 
             if (IsCountOrRanking(from, to))
             {
-                return _catalogFunctions ? false : null;
+                return _context.CatalogFunctions ? false : null;
             }
 
             if (IsVariadicCall(from, to))
@@ -447,7 +478,183 @@ internal static class PlanExpression
                 return AnyArgumentIsNotNull(from + 2, to - 1) ? false : null;
             }
 
-            return IsCase(from, to) && CaseResultsAreNotNull(from, to) ? false : null;
+            if (IsCase(from, to) && CaseResultsAreNotNull(from, to))
+            {
+                return false;
+            }
+
+            // A reference is no form: it is proved only as part of one.
+            return !IsReference(from, to) && Proved(from, to) is not null ? false : null;
+        }
+
+        /// <summary>
+        /// The type of the span as a whole when it is a value that is never <c>NULL</c> of a known type, or null.  A
+        /// constant, a test, <c>count(*)</c> or a ranking is of the type <see cref="TypeOid" /> gives; a reference
+        /// that is part of the entry is of the type the walk proves; an operator, a function or a cast of
+        /// <c>pg_catalog</c> over such values is of the type <see cref="TotalFunctions" /> or the cast gives.  A
+        /// value of no known type, <see cref="TotalFunctions.UnknownType" />, matches no operator, function or cast.
+        /// </summary>
+        public long? Proved(int from, int to)
+        {
+            if (to <= from)
+            {
+                return null;
+            }
+
+            if (IsGroup(from, to))
+            {
+                if (Vetoed(from, to))
+                {
+                    return null;
+                }
+
+                if (IsTest(from + 1, to - 1))
+                {
+                    return BuiltInTypes.Bool;
+                }
+
+                // A reference in parentheses of its own is a value a node took from elsewhere: the reference is no
+                // proof of it.
+                if (IsReference(from + 1, to - 1))
+                {
+                    return null;
+                }
+
+                return OperatorAt(from + 1, to - 1) is null ? Proved(from + 1, to - 1) : CatalogForm(from, to);
+            }
+
+            if (Constant(from, to) == false || IsCountOrRanking(from, to))
+            {
+                return TypeOid(from, to);
+            }
+
+            if (OutputReference.Parse(Text(from, to)) is { } reference)
+            {
+                return from > 0 || to < _tokens.Count ? _context.ProvedTypeOf(reference) : null;
+            }
+
+            return CatalogForm(from, to);
+        }
+
+        // An operator in a group of its own, a cast or a function call, each the catalog's only when the session finds
+        // pg_catalog first, and so is the name of the type a cast prints: the one place that reads any of them.
+        private long? CatalogForm(int from, int to)
+        {
+            if (!_context.CatalogFunctions)
+            {
+                return null;
+            }
+
+            if (IsGroup(from, to))
+            {
+                return OperatorAt(from + 1, to - 1) is { } at ? Operator(from + 1, at, to - 1) : null;
+            }
+
+            return Is(from, Kind.Open) ? Cast(from, to) : Function(from, to);
+        }
+
+        // Whether the walk says the group may not be read.  The entry as a whole is never asked.
+        private bool Vetoed(int from, int to) =>
+            (from > 0 || to < _tokens.Count)
+            && _context.GroupPreserved?.Invoke(_entry[_tokens[from].End.._tokens[to - 1].Start]) == false;
+
+        private bool IsReference(int from, int to) => to > from && OutputReference.Parse(Text(from, to)) is not null;
+
+        // The index of the one operator between two operands of [from, to), the one token of no other kind at depth
+        // zero; or null when there is none or several.  EXPLAIN prints each operator in parentheses of its own, so a
+        // span with two is no single operator.
+        private int? OperatorAt(int from, int to)
+        {
+            int? found = null;
+            for (var at = from; at < to; at = Next(at))
+            {
+                if (!Is(at, Kind.Other))
+                {
+                    continue;
+                }
+
+                if (found is not null)
+                {
+                    return null;
+                }
+
+                found = at;
+            }
+
+            return found;
+        }
+
+        // A binary operator of the table over two proved operands; a prefix operator, with no left operand, is none.
+        private long? Operator(int from, int at, int to)
+        {
+            if (Proved(from, at) is not { } left || Proved(at + 1, to) is not { } right)
+            {
+                return null;
+            }
+
+            return TotalFunctions.OperatorResult(Text(at), left, right);
+        }
+
+        // (E)::T, where E is proved of a type that carries to T within a family of SetOperationTypes: pg_cast holds
+        // one row for a pair, the server ships one for every ordered pair of a family and pins it, and none returns
+        // NULL for a value that is not.  T is a built-in type's name, with a modifier allowed.
+        private long? Cast(int from, int to)
+        {
+            var close = _closes[from];
+            if (
+                close < 0
+                || close + 2 >= to
+                || !Is(close + 1, Kind.Cast)
+                || !IsTypeName(close + 2, to)
+                || Vetoed(from, close + 1)
+                || BuiltInType(close + 2, to) is not { } target
+                || Proved(from + 1, close) is not { } source
+            )
+            {
+                return null;
+            }
+
+            return SetOperationTypes.Carries(source, target) ? target : null;
+        }
+
+        // name(a, ...) with a lower-case bare name, to the end, a function of the table over proved arguments.  A name
+        // with a schema or in quotes is not the one the session resolves from the bare name.
+        private long? Function(int from, int to)
+        {
+            if (!IsLowerWord(from) || from + 1 >= to || !Is(from + 1, Kind.Open) || _closes[from + 1] != to - 1)
+            {
+                return null;
+            }
+
+            // The arguments are between the commas of depth zero; a call of none has none.
+            var close = to - 1;
+            var arguments = new List<long>();
+            var start = from + 2;
+            for (var at = start; at < close; at = Next(at))
+            {
+                if (Is(at, Kind.Comma))
+                {
+                    if (Proved(start, at) is not { } argument)
+                    {
+                        return null;
+                    }
+
+                    arguments.Add(argument);
+                    start = at + 1;
+                }
+            }
+
+            if (start < close || arguments.Count > 0)
+            {
+                if (Proved(start, close) is not { } last)
+                {
+                    return null;
+                }
+
+                arguments.Add(last);
+            }
+
+            return TotalFunctions.FunctionResult(Text(from), arguments);
         }
 
         /// <summary>The OID, or null, as <see cref="TypeOf" /> answers, for the span as a whole.</summary>
@@ -483,7 +690,7 @@ internal static class PlanExpression
             // The plan prints a type's name bare whenever the search path finds it, text and date as any other: a
             // user's type of that name in a schema ahead of pg_catalog prints the same.
             if (
-                _catalogFunctions
+                _context.CatalogFunctions
                 && to - from >= 3
                 && Is(from, Kind.String)
                 && Is(from + 1, Kind.Cast)
@@ -493,7 +700,7 @@ internal static class PlanExpression
                 return BuiltInType(from + 2, to);
             }
 
-            if (_catalogFunctions && IsCountOrRanking(from, to, anyArgument: true))
+            if (_context.CatalogFunctions && IsCountOrRanking(from, to, anyArgument: true))
             {
                 return Text(from) is "percent_rank" or "cume_dist" ? BuiltInTypes.Float8 : BuiltInTypes.Int8;
             }
@@ -732,7 +939,10 @@ internal static class PlanExpression
             to > from
             && (
                 Form(from, to) == false
-                || (OutputReference.Parse(Text(from, to)) is { } reference && _provedNotNull(reference))
+                || (
+                    OutputReference.Parse(Text(from, to)) is { } reference
+                    && _context.ProvedTypeOf(reference) is not null
+                )
             );
 
         private bool IsCase(int from, int to) => to - from >= 2 && IsWord(from, "CASE") && IsWord(to - 1, "END");

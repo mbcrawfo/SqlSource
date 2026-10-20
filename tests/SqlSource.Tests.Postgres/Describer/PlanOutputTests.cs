@@ -374,8 +374,114 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
             found.Add(await reader.GetFieldValueAsync<uint>(0, token), reader.GetString(1));
         }
 
-        expected.Count.ShouldBe(15);
+        expected.Count.ShouldBe(19);
         found.ShouldBe(expected, ignoreOrder: true);
+    }
+
+    // Each operator and function TotalFunctions reads is pg_catalog's own, of exactly that name and those argument
+    // types, returning that type, and implemented by the C function the row names: an operator by a function of
+    // pg_catalog whose prosrc that is, and a plain function returning one value whose own prosrc it is.  Every row
+    // that is not so is listed.
+    [Fact]
+    public async Task Catalog_TotalFunctions_ArePgCatalogsOwn()
+    {
+        var operators = TotalFunctions.Operators.ToArray();
+        var functions = TotalFunctions.Functions.ToArray();
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        var token = TestContext.Current.CancellationToken;
+        var mismatches = new List<string>();
+
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT r.ordinal
+                FROM unnest($1::text[], $2::oid[], $3::oid[], $4::oid[], $5::text[]) WITH ORDINALITY
+                    AS r (name, oprleft, oprright, result, implementation, ordinal)
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_operator AS o
+                    JOIN pg_catalog.pg_proc AS p ON p.oid = o.oprcode
+                    WHERE o.oprnamespace = 'pg_catalog'::regnamespace
+                        AND o.oprname = r.name
+                        AND o.oprleft = r.oprleft
+                        AND o.oprright = r.oprright
+                        AND o.oprresult = r.result
+                        AND p.pronamespace = 'pg_catalog'::regnamespace
+                        AND p.prolang = (SELECT l.oid FROM pg_catalog.pg_language AS l WHERE l.lanname = 'internal')
+                        AND p.prosrc = r.implementation
+                )
+                ORDER BY r.ordinal
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(
+                new NpgsqlParameter { Value = operators.Select(static row => row.Name).ToArray() }
+            );
+            _ = command.Parameters.Add(Oids(operators.Select(static row => row.Left)));
+            _ = command.Parameters.Add(Oids(operators.Select(static row => row.Right)));
+            _ = command.Parameters.Add(Oids(operators.Select(static row => row.Result)));
+            _ = command.Parameters.Add(
+                new NpgsqlParameter { Value = operators.Select(static row => row.Implementation).ToArray() }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                var (name, left, right, result, implementation) = operators[reader.GetInt64(0) - 1];
+                mismatches.Add($"operator {name}({left}, {right}) -> {result} by {implementation}");
+            }
+        }
+
+        await using (
+            var command = source.CreateCommand(
+                """
+                SELECT r.ordinal
+                FROM unnest($1::text[], $2::text[], $3::oid[], $4::text[]) WITH ORDINALITY
+                    AS r (name, arguments, result, implementation, ordinal)
+                WHERE NOT EXISTS (
+                    SELECT 1
+                    FROM pg_catalog.pg_proc AS p
+                    WHERE p.pronamespace = 'pg_catalog'::regnamespace
+                        AND p.proname = r.name
+                        AND p.proargtypes = r.arguments::oidvector
+                        AND p.prorettype = r.result
+                        AND p.prokind = 'f'
+                        AND NOT p.proretset
+                        AND p.prolang = (SELECT l.oid FROM pg_catalog.pg_language AS l WHERE l.lanname = 'internal')
+                        AND p.prosrc = r.implementation
+                )
+                ORDER BY r.ordinal
+                """
+            )
+        )
+        {
+            _ = command.Parameters.Add(
+                new NpgsqlParameter { Value = functions.Select(static row => row.Name).ToArray() }
+            );
+            _ = command.Parameters.Add(
+                new NpgsqlParameter
+                {
+                    Value = functions.Select(static row => string.Join(' ', row.Arguments)).ToArray(),
+                }
+            );
+            _ = command.Parameters.Add(Oids(functions.Select(static row => row.Result)));
+            _ = command.Parameters.Add(
+                new NpgsqlParameter { Value = functions.Select(static row => row.Implementation).ToArray() }
+            );
+            await using var reader = await command.ExecuteReaderAsync(token);
+            while (await reader.ReadAsync(token))
+            {
+                var (name, arguments, result, implementation) = functions[reader.GetInt64(0) - 1];
+                mismatches.Add($"function {name}({string.Join(", ", arguments)}) -> {result} by {implementation}");
+            }
+        }
+
+        mismatches.ShouldBeEmpty();
+        operators.Length.ShouldBe(178);
+        functions.Length.ShouldBe(5);
+
+        static NpgsqlParameter Oids(IEnumerable<long> oids) =>
+            new() { Value = oids.Select(static oid => (uint)oid).ToArray(), DataTypeName = "oid[]" };
     }
 
     // The types that carry a modifier are every type of the catalog with a typmod input, but the arrays, whose
@@ -530,11 +636,22 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         root.Output.ShouldBe(["u.id", "(max((u.name)::text))", "(sum(u.balance))"]);
         var aggregate = root.Plans.Single();
         aggregate.NodeType.ShouldBe("Aggregate");
+        aggregate.HasGroupKey.ShouldBeTrue();
         aggregate.HasGroupingSets.ShouldBeFalse();
+        aggregate.HasFilter.ShouldBeFalse();
+        aggregate.Strategy.ShouldBeOneOf("Sorted", "Hashed");
         aggregate.Output.ShouldBe(["u.id", "max((u.name)::text)", "sum(u.balance)"]);
-        var node = Nodes(text).Single(static node => node.GetProperty("Node Type").GetString() == "Aggregate");
-        node.GetProperty("Group Key").EnumerateArray().Select(static key => key.GetString()).ShouldBe(["u.id"]);
-        node.TryGetProperty("Grouping Sets", out _).ShouldBeFalse();
+
+        // The key as the server prints it, which PlanNode reads only as present.
+        using var document = JsonDocument.Parse(text);
+        document
+            .RootElement[0]
+            .GetProperty("Plan")
+            .GetProperty("Plans")[0]
+            .GetProperty("Group Key")
+            .EnumerateArray()
+            .Select(static key => key.GetString())
+            .ShouldBe(["u.id"]);
     }
 
     // A scalar subquery is a SubPlan whose plan is an Aggregate of the Plain strategy, with no Group Key, and the
@@ -544,19 +661,18 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
     {
         postgres.SkipUnlessRecordedMajor("The printed forms");
 
-        var text = await ExplainTextAsync(
+        var root = await ExplainAsync(
             "SELECT u.id, (SELECT count(*) FROM orders o WHERE o.user_id = u.id) AS n FROM users u"
         );
 
-        var root = PlanNode.Read(text).ShouldNotBeNull();
         root.Output.ShouldBe(["u.id", "(SubPlan 1)"]);
         var subPlan = All(root).Single(static node => node.SubplanName == "SubPlan 1");
         subPlan.ParentRelationship.ShouldBe("SubPlan");
         subPlan.NodeType.ShouldBe("Aggregate");
+        subPlan.Strategy.ShouldBe("Plain");
+        subPlan.HasGroupKey.ShouldBeFalse();
+        subPlan.HasFilter.ShouldBeFalse();
         subPlan.Output.ShouldBe(["count(*)"]);
-        var node = Nodes(text).Single(static node => node.TryGetProperty("Subplan Name", out _));
-        node.GetProperty("Strategy").GetString().ShouldBe("Plain");
-        node.TryGetProperty("Group Key", out _).ShouldBeFalse();
     }
 
     // A subquery in an expression is a SubPlan of every kind.  14 prints each as (SubPlan <n>), or (hashed SubPlan
@@ -618,27 +734,6 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
 
         root.NodeType.ShouldBe("ModifyTable");
         root.Output.ShouldBe(["MERGE_ACTION()", "u.id"]);
-    }
-
-    // Every node of the plan text, as the server wrote it, for a key that PlanNode does not read.
-    private static List<JsonElement> Nodes(string text)
-    {
-        var nodes = new List<JsonElement>();
-        using var document = JsonDocument.Parse(text);
-        Collect(document.RootElement[0].GetProperty("Plan").Clone());
-        return nodes;
-
-        void Collect(JsonElement node)
-        {
-            nodes.Add(node);
-            if (node.TryGetProperty("Plans", out var plans))
-            {
-                foreach (var child in plans.EnumerateArray())
-                {
-                    Collect(child);
-                }
-            }
-        }
     }
 
     // The node and every node under it through the sides of a join or the one input of another node.
