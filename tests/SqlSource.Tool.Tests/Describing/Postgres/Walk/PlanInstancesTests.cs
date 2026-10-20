@@ -405,7 +405,7 @@ public sealed class PlanInstancesTests
     }
 
     // The Append of a partitioned table's partitions is one instance of the table under the alias the nodes above
-    // print, with the tables every partition is a partition of, and no set operation.
+    // print, with the tables every partition is a partition of, the relations its members scan, and no set operation.
     [Fact]
     public void Find_AppendOfPartitionsOfOneTable_IsAPartitionedInstance()
     {
@@ -421,6 +421,10 @@ public sealed class PlanInstancesTests
         instances.TryFind("p", out var partitioned).ShouldBeTrue();
         (partitioned.Kind, partitioned.NullExtended).ShouldBe((InstanceKind.Partitioned, true));
         partitioned.Parents.ShouldBe([16800, 16801]);
+        partitioned.Members.ShouldBe([
+            new PostgresRelationName("public", "parts_1"),
+            new PostgresRelationName("public", "parts_2"),
+        ]);
         instances.TryFind("p_1", out _).ShouldBeFalse();
     }
 

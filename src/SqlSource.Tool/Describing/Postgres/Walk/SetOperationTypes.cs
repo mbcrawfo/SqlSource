@@ -55,4 +55,7 @@ internal static class SetOperationTypes
     public static bool Carries(long from, long to) =>
         from == to
         || (FamilyOf.TryGetValue(from, out var family) && FamilyOf.TryGetValue(to, out var other) && family == other);
+
+    /// <summary>Whether the type is in one of the <see cref="Families" />.</summary>
+    public static bool InFamily(long type) => FamilyOf.ContainsKey(type);
 }

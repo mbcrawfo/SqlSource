@@ -15,6 +15,13 @@ public sealed class PlanExpressionTests
 
     private static readonly Func<OutputReference, bool> AllProved = static _ => true;
 
+    // The context of a walk that proves each reference the predicate names, of no known type, and reads every group.
+    private static ExpressionContext Untyped(
+        bool catalogFunctions,
+        Func<OutputReference, bool> proved,
+        Func<string, bool>? groupPreserved = null
+    ) => new(catalogFunctions, reference => proved(reference) ? TotalFunctions.UnknownType : null, groupPreserved);
+
     [Theory]
     [InlineData("count(*)")]
     [InlineData("(count(*))")]
@@ -40,7 +47,7 @@ public sealed class PlanExpressionTests
     [InlineData("'{}'::text[]")]
     [InlineData("'it''s'::text")]
     public void NullableOf_FormOfAFunctionOrAConstant_IsNotNull(string entry) =>
-        PlanExpression.NullableOf(entry, catalogFunctions: true, NoneProved).ShouldBe(false);
+        PlanExpression.NullableOf(entry, Untyped(catalogFunctions: true, NoneProved)).ShouldBe(false);
 
     [Theory]
     [InlineData("(u.deleted_at IS NULL)")]
@@ -55,14 +62,14 @@ public sealed class PlanExpressionTests
     [InlineData("CASE WHEN CASE WHEN (id > 1) THEN true ELSE false END THEN 'then'::text ELSE 'else END'::text END")]
     [InlineData("CASE WHEN (name = ' END '::text) THEN 'a'::text ELSE 'b'::text END")]
     public void NullableOf_FormThatCallsNoFunction_IsNotNull(string entry) =>
-        PlanExpression.NullableOf(entry, catalogFunctions: false, NoneProved).ShouldBe(false);
+        PlanExpression.NullableOf(entry, Untyped(catalogFunctions: false, NoneProved)).ShouldBe(false);
 
     [Theory]
     [InlineData("NULL::text")]
     [InlineData("NULL::character varying(254)")]
     [InlineData("(NULL::integer)")]
     public void NullableOf_NullConstant_IsNullable(string entry) =>
-        PlanExpression.NullableOf(entry, catalogFunctions: true, NoneProved).ShouldBe(true);
+        PlanExpression.NullableOf(entry, Untyped(catalogFunctions: true, NoneProved)).ShouldBe(true);
 
     [Theory]
     [InlineData("(count(DISTINCT name))")]
@@ -104,7 +111,7 @@ public sealed class PlanExpressionTests
     [InlineData("CASE WHEN a THEN 'a'::text ELSE 'b'::text END || 'c'::text")]
     [InlineData("")]
     public void NullableOf_NearMiss_IsUnknown(string entry) =>
-        PlanExpression.NullableOf(entry, catalogFunctions: true, AllProved).ShouldBeNull();
+        PlanExpression.NullableOf(entry, Untyped(catalogFunctions: true, AllProved)).ShouldBeNull();
 
     [Theory]
     [InlineData("count(*)")]
@@ -112,7 +119,7 @@ public sealed class PlanExpressionTests
     [InlineData("(row_number() OVER (?))")]
     [InlineData("COALESCE(count(*), NULL::bigint)")]
     public void NullableOf_FunctionWhenTheCatalogIsNotFirst_IsUnknown(string entry) =>
-        PlanExpression.NullableOf(entry, catalogFunctions: false, NoneProved).ShouldBeNull();
+        PlanExpression.NullableOf(entry, Untyped(catalogFunctions: false, NoneProved)).ShouldBeNull();
 
     [Theory]
     [InlineData("GREATEST(u.created_at, u.deleted_at)")]
@@ -120,13 +127,13 @@ public sealed class PlanExpressionTests
     [InlineData("COALESCE(u.deleted_at, u.created_at)")]
     [InlineData("CASE WHEN (x > 1) THEN u.created_at ELSE 'epoch'::timestamp with time zone END")]
     public void NullableOf_ReferenceArgumentTheWalkProves_IsNotNull(string entry) =>
-        PlanExpression.NullableOf(entry, catalogFunctions: false, CreatedAt).ShouldBe(false);
+        PlanExpression.NullableOf(entry, Untyped(catalogFunctions: false, CreatedAt)).ShouldBe(false);
 
     [Theory]
     [InlineData("GREATEST(u.deleted_at, u.closed_at)")]
     [InlineData("CASE WHEN (x > 1) THEN u.created_at ELSE u.deleted_at END")]
     public void NullableOf_ReferenceArgumentTheWalkDoesNotProve_IsUnknown(string entry) =>
-        PlanExpression.NullableOf(entry, catalogFunctions: false, CreatedAt).ShouldBeNull();
+        PlanExpression.NullableOf(entry, Untyped(catalogFunctions: false, CreatedAt)).ShouldBeNull();
 
     [Fact]
     public void NullableOf_WholeEntryIsAReference_IsUnknownAndNotAsked()
@@ -135,12 +142,14 @@ public sealed class PlanExpressionTests
 
         var answer = PlanExpression.NullableOf(
             "u.created_at",
-            catalogFunctions: true,
-            reference =>
-            {
-                asked = true;
-                return true;
-            }
+            Untyped(
+                catalogFunctions: true,
+                reference =>
+                {
+                    asked = true;
+                    return true;
+                }
+            )
         );
 
         answer.ShouldBeNull();
@@ -158,7 +167,320 @@ public sealed class PlanExpressionTests
     [InlineData("('x'::text)", false)]
     public void NullableOf_GroupTheWalkVetoes_IsReadAsUnknown(string entry, bool? expected) =>
         PlanExpression
-            .NullableOf(entry, catalogFunctions: true, static _ => false, static group => group != "'x'::text")
+            .NullableOf(entry, Untyped(catalogFunctions: true, NoneProved, static group => group != "'x'::text"))
+            .ShouldBe(expected);
+
+    // The walk's typed proof of the references of the tests below: each column's declared type, and none for another.
+    private static long? Typed(OutputReference reference) =>
+        (reference.Alias is null ? reference.Column : reference.Alias + "." + reference.Column) switch
+        {
+            "u.balance" or "l.unit_price" => BuiltInTypes.Numeric,
+            "l.quantity" or "u.id" or "id" or "p.id" => BuiltInTypes.Int4,
+            "u.name" or "name" => BuiltInTypes.Varchar,
+            "p.name" => BuiltInTypes.Text,
+            "created_at" => BuiltInTypes.Timestamptz,
+            "products.xmax" => BuiltInTypes.Xid,
+            "status" => UserStatus,
+            _ => null,
+        };
+
+    // An enum of the user's.
+    private const long UserStatus = 16_390;
+
+    private static ExpressionContext Context(bool catalogFunctions) => new(catalogFunctions, Typed);
+
+    [Theory]
+    [InlineData("((l.quantity)::numeric * l.unit_price)")]
+    [InlineData("((id)::bigint * 2)")]
+    [InlineData("((id + 1) * 3)")]
+    [InlineData("(lower((name)::text) || '!'::text)")]
+    [InlineData("length((name)::text)")]
+    [InlineData("date_trunc('day'::text, created_at)")]
+    [InlineData("(created_at)::date")]
+    [InlineData("((name)::text = 'x'::text)")]
+    [InlineData("(products.xmax = 0)")]
+    [InlineData("(((l.quantity)::numeric * l.unit_price))")]
+    public void NullableOf_TotalOperatorOverProvedValues_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: true)).ShouldBe(false);
+
+    [Theory]
+    [InlineData("(l.quantity * l.unit_price)")]
+    [InlineData("(u.note * 2)")]
+    [InlineData("upper(r.during)")]
+    [InlineData("(r.during * tstzrange($1, $2))")]
+    [InlineData("(l.quantity OPERATOR(public.*) l.unit_price)")]
+    [InlineData("public.lower((name)::text)")]
+    [InlineData("(- id)")]
+    [InlineData("((id)::bigint * 2) * NULL::bigint")]
+    [InlineData("(id)::bigint * 2")]
+    [InlineData("((id)::bigint * NULL::bigint)")]
+    [InlineData("((u.id) * 2)")]
+    [InlineData("(u.id)")]
+    [InlineData("((u.id))::bigint")]
+    [InlineData("(id * 2 + 1)")]
+    [InlineData("lower((name)::text, 'x'::text)")]
+    [InlineData("lower()")]
+    [InlineData("Lower((name)::text)")]
+    [InlineData("\"lower\"((name)::text)")]
+    [InlineData("((name)::text = 'x'::text COLLATE \"C\")")]
+    [InlineData("max((name)::text)")]
+    [InlineData("(count(id) + 1)")]
+    public void NullableOf_OperatorOrFunctionNotInTheTable_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: true)).ShouldBeNull();
+
+    [Theory]
+    [InlineData("((l.quantity)::numeric * l.unit_price)")]
+    [InlineData("((id)::bigint * 2)")]
+    [InlineData("((id + 1) * 3)")]
+    [InlineData("(lower((name)::text) || '!'::text)")]
+    [InlineData("length((name)::text)")]
+    [InlineData("date_trunc('day'::text, created_at)")]
+    [InlineData("(created_at)::date")]
+    [InlineData("((name)::text = 'x'::text)")]
+    [InlineData("(products.xmax = 0)")]
+    [InlineData("(((l.quantity)::numeric * l.unit_price))")]
+    public void NullableOf_TotalFormWhenTheCatalogIsNotFirst_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: false)).ShouldBeNull();
+
+    [Theory]
+    [InlineData("(status)::text")]
+    [InlineData("(id)::text")]
+    [InlineData("(created_at)::text")]
+    [InlineData("(name)::date")]
+    [InlineData("(id)::public.bigint")]
+    public void NullableOf_CastOutsideAFamily_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: true)).ShouldBeNull();
+
+    // A form of the table takes the new forms as its arguments, and COALESCE and CASE take them too.
+    [Theory]
+    [InlineData("COALESCE(u.note, ((id)::bigint * 2))")]
+    [InlineData("CASE WHEN (id > 1) THEN (id * 2) ELSE length((name)::text) END")]
+    [InlineData("upper(lower((name)::text))")]
+    [InlineData("((count(*) * 2) > 1)")]
+    [InlineData("((u.id > 1) = true)")]
+    public void NullableOf_TotalFormAsAnArgument_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Context(catalogFunctions: true)).ShouldBe(false);
+
+    // A group the walk says may not be read is unknown in an operator as anywhere else.
+    [Theory]
+    [InlineData("((id * 2) + 1)")]
+    [InlineData("(((id * 2))::bigint + 1)")]
+    public void NullableOf_OperatorOverAGroupTheWalkVetoes_IsUnknown(string entry) =>
+        PlanExpression
+            .NullableOf(
+                entry,
+                Context(catalogFunctions: true) with
+                {
+                    GroupPreserved = static group => group != "id * 2",
+                }
+            )
+            .ShouldBeNull();
+
+    [Theory]
+    [InlineData("((id)::bigint * 2)", BuiltInTypes.Int8)]
+    [InlineData("((name)::text = 'x'::text)", BuiltInTypes.Bool)]
+    [InlineData("(created_at)::date", BuiltInTypes.Date)]
+    [InlineData("length((name)::text)", BuiltInTypes.Int4)]
+    [InlineData("(id)::numeric(10,2)", BuiltInTypes.Numeric)]
+    [InlineData("(name)::character varying(3)", BuiltInTypes.Varchar)]
+    [InlineData("'x'::text", BuiltInTypes.Text)]
+    [InlineData("count(*)", BuiltInTypes.Int8)]
+    public void ProvedTypeOf_TotalOperator_IsItsResult(string entry, long expected) =>
+        PlanExpression.ProvedTypeOf(entry, Context(catalogFunctions: true)).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("COALESCE(id, 0)")]
+    [InlineData("id")]
+    [InlineData("count(id)")]
+    [InlineData("(l.quantity * l.unit_price)")]
+    public void ProvedTypeOf_FormOfNoKnownType_IsNull(string entry) =>
+        PlanExpression.ProvedTypeOf(entry, Context(catalogFunctions: true)).ShouldBeNull();
+
+    // A reference the walk proves of no known type feeds no operator, function or cast.
+    [Theory]
+    [InlineData("(u.id * 2)")]
+    [InlineData("(u.id)::bigint")]
+    [InlineData("lower(u.name)")]
+    public void NullableOf_ReferenceProvedWithoutAType_FeedsNoOperator(string entry) =>
+        PlanExpression.NullableOf(entry, Untyped(catalogFunctions: true, AllProved)).ShouldBeNull();
+
+    // The context of a node whose groups each have a row, or of one whose may have none.
+    private static ExpressionContext Grouped(bool groupsHaveRows) =>
+        Context(catalogFunctions: true) with
+        {
+            GroupsHaveRows = groupsHaveRows,
+        };
+
+    [Theory]
+    [InlineData("sum(((l.quantity)::numeric * l.unit_price))")]
+    [InlineData("max(created_at)")]
+    [InlineData("string_agg(DISTINCT p.name, ', '::text ORDER BY p.name)")]
+    [InlineData("sum(l.quantity)")]
+    [InlineData("avg(id)")]
+    [InlineData("bool_and((id > 0))")]
+    [InlineData("COALESCE(max(created_at), now())")]
+    public void NullableOf_AggregateOverAGroupWithARow_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Grouped(groupsHaveRows: true)).ShouldBe(false);
+
+    [Theory]
+    [InlineData("sum(((l.quantity)::numeric * l.unit_price))")]
+    [InlineData("max(created_at)")]
+    [InlineData("string_agg(DISTINCT p.name, ', '::text ORDER BY p.name)")]
+    [InlineData("sum(l.quantity)")]
+    [InlineData("avg(id)")]
+    [InlineData("bool_and((id > 0))")]
+    [InlineData("COALESCE(max(created_at), now())")]
+    public void NullableOf_AggregateOfANodeWhoseGroupsMayHaveNoRow_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Grouped(groupsHaveRows: false)).ShouldBeNull();
+
+    // A FILTER may leave a group no row, a window's frame may be empty, an argument may be NULL, and array_agg and an
+    // ordered-set aggregate are in no row of the table.
+    [Theory]
+    [InlineData("max(created_at) FILTER (WHERE (id > 1))")]
+    [InlineData("sum(id) OVER w1")]
+    [InlineData("sum(id) OVER (?)")]
+    [InlineData("max(o.note)")]
+    [InlineData("array_agg(DISTINCT p.id ORDER BY p.id)")]
+    [InlineData("percentile_cont('0.5'::double precision) WITHIN GROUP (ORDER BY id)")]
+    [InlineData("max((name)::text) ORDER BY id")]
+    [InlineData("max(DISTINCT)")]
+    [InlineData("max(ORDER BY id)")]
+    [InlineData("max()")]
+    [InlineData("max(id, id)")]
+    [InlineData("string_agg(p.name, ', '::text, p.name)")]
+    [InlineData("string_agg(p.name, ORDER BY p.name)")]
+    [InlineData("public.max(id)")]
+    [InlineData("\"max\"(id)")]
+    [InlineData("MAX(id)")]
+    [InlineData("max((u.id))")]
+    public void NullableOf_AggregateThatMayBeNull_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Grouped(groupsHaveRows: true)).ShouldBeNull();
+
+    // An aggregate is the catalog's only when the session finds pg_catalog first.
+    [Fact]
+    public void NullableOf_AggregateWhenTheCatalogIsNotFirst_IsUnknown() =>
+        PlanExpression
+            .NullableOf("max(created_at)", Context(catalogFunctions: false) with { GroupsHaveRows = true })
+            .ShouldBeNull();
+
+    // The context of a node whose groups each have a row, where a child printed sum(id) or no span at all.
+    private static ExpressionContext GroupedWithSumFromChild(bool fromChild) =>
+        Grouped(groupsHaveRows: true) with
+        {
+            GroupFromChild = group => fromChild && group == "sum(id)",
+        };
+
+    // A value a child printed was computed under the child's grouping, which may be a plain one.
+    [Theory]
+    [InlineData("((sum(id)) * 2)")]
+    [InlineData("((sum(id))::numeric * 2.5)")]
+    [InlineData("COALESCE((sum(id)), NULL::bigint)")]
+    [InlineData("CASE WHEN (id > 1) THEN (sum(id) * 2) ELSE (sum(id)) END")]
+    public void NullableOf_AggregateInASpanAChildPrinted_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, GroupedWithSumFromChild(fromChild: true)).ShouldBeNull();
+
+    // The same spans when no child printed them: the node computed the aggregate over its own groups.
+    [Theory]
+    [InlineData("((sum(id)) * 2)")]
+    [InlineData("((sum(id))::numeric * 2.5)")]
+    [InlineData("COALESCE((sum(id)), NULL::bigint)")]
+    [InlineData("CASE WHEN (id > 1) THEN (sum(id) * 2) ELSE (sum(id)) END")]
+    public void NullableOf_AggregateInASpanTheNodeComputes_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, GroupedWithSumFromChild(fromChild: false)).ShouldBe(false);
+
+    // Every span inside a group a child printed is read without the node's groups, however deep.
+    [Fact]
+    public void NullableOf_AggregateDeepInASpanAChildPrinted_IsUnknown() =>
+        PlanExpression
+            .NullableOf(
+                "(((sum(id) + 1)) * 2)",
+                Grouped(groupsHaveRows: true) with
+                {
+                    GroupFromChild = static group => group == "(sum(id) + 1)",
+                }
+            )
+            .ShouldBeNull();
+
+    [Theory]
+    [InlineData("sum(l.quantity)", BuiltInTypes.Int8)]
+    [InlineData("avg(id)", BuiltInTypes.Numeric)]
+    [InlineData("string_agg(DISTINCT p.name, ', '::text ORDER BY p.name)", BuiltInTypes.Text)]
+    [InlineData("(sum(l.quantity) * 2)", BuiltInTypes.Int8)]
+    public void ProvedTypeOf_AggregateOverAGroupWithARow_IsItsResult(string entry, long expected) =>
+        PlanExpression.ProvedTypeOf(entry, Grouped(groupsHaveRows: true)).ShouldBe(expected);
+
+    // The walk's answers for the subplans of the tests below: the value of SubPlan 3 as a scalar, and the first column
+    // of SubPlan 2, with "a.id" and "a.x" proved integers.
+    private static ExpressionContext SubPlans(long? scalar, long? column, bool catalogFunctions = true) =>
+        new(
+            catalogFunctions,
+            static reference => reference.Alias == "a" && reference.Column is "id" or "x" ? BuiltInTypes.Int4 : null,
+            ScalarSubPlanTypeOf: name => name == "SubPlan 3" ? scalar : null,
+            SubPlanColumnTypeOf: (name, number) => name == "SubPlan 2" && number == 1 ? column : null
+        );
+
+    [Theory]
+    [InlineData("(SubPlan 3)", BuiltInTypes.Int8, null, false)]
+    [InlineData("((SubPlan 3))", BuiltInTypes.Int8, null, false)]
+    [InlineData("(SubPlan 3)", null, null, null)]
+    [InlineData("(hashed SubPlan 3)", BuiltInTypes.Int8, null, null)]
+    [InlineData("(SubPlan 4)", BuiltInTypes.Int8, null, null)]
+    [InlineData("EXISTS(SubPlan 1)", null, null, false)]
+    [InlineData("(EXISTS(SubPlan 1))", null, null, false)]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", null, BuiltInTypes.Int4, false)]
+    [InlineData("(ANY (a.id = (SubPlan 2).col1))", null, BuiltInTypes.Int4, false)]
+    [InlineData("(ANY (a.id < (SubPlan 2).col1))", null, BuiltInTypes.Int4, false)]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", null, null, null)]
+    [InlineData("(ANY (a.id = (SubPlan 2).col1))", null, null, null)]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", null, BuiltInTypes.Text, null)]
+    [InlineData("(ANY (a.id = (SubPlan 2).col1))", null, BuiltInTypes.Text, null)]
+    [InlineData("(ANY (a.email = (hashed SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.email = (SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id + (SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id = ((SubPlan 2).col1)::integer))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id = (SubPlan 2).col01))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id = (SubPlan 2).column1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY (a.id = (rescan SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ANY ((a.id = (SubPlan 2).col1) AND (a.x = (SubPlan 2).col2)))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(ALL (a.id = (SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("((a.id = (SubPlan 2).col1))", null, BuiltInTypes.Int4, null)]
+    [InlineData("(a.id = (SubPlan 2).col1)", null, BuiltInTypes.Int4, null)]
+    [InlineData("MERGE_ACTION()", null, null, false)]
+    [InlineData("merge_action()", null, null, null)]
+    [InlineData("\"MERGE_ACTION\"()", null, null, null)]
+    [InlineData("MERGE_ACTION(1)", null, null, null)]
+    [InlineData("EXISTS(SubPlan 1) AND true", null, null, null)]
+    [InlineData("EXISTS(hashed SubPlan 1)", null, null, null)]
+    [InlineData("ARRAY(SubPlan 1)", null, null, null)]
+    [InlineData("(rescan SubPlan 1)", BuiltInTypes.Int8, null, null)]
+    public void NullableOf_SubPlanForms_AreReadThroughTheirCallbacks(
+        string entry,
+        long? scalar,
+        long? column,
+        bool? expected
+    ) => PlanExpression.NullableOf(entry, SubPlans(scalar, column)).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("(SubPlan 3)", BuiltInTypes.Int8)]
+    [InlineData("EXISTS(SubPlan 1)", BuiltInTypes.Bool)]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", BuiltInTypes.Bool)]
+    [InlineData("MERGE_ACTION()", BuiltInTypes.Text)]
+    public void ProvedTypeOf_SubPlanForm_IsItsType(string entry, long expected) =>
+        PlanExpression.ProvedTypeOf(entry, SubPlans(BuiltInTypes.Int8, BuiltInTypes.Int4)).ShouldBe(expected);
+
+    // An ANY reads an operator, which is the catalog's only when the session finds pg_catalog first; the rest are
+    // syntax.
+    [Theory]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", null)]
+    [InlineData("(SubPlan 3)", false)]
+    [InlineData("EXISTS(SubPlan 1)", false)]
+    [InlineData("MERGE_ACTION()", false)]
+    public void NullableOf_SubPlanFormWhenTheCatalogIsNotFirst_IsReadOnlyWithoutAnOperator(
+        string entry,
+        bool? expected
+    ) =>
+        PlanExpression
+            .NullableOf(entry, SubPlans(BuiltInTypes.Int8, BuiltInTypes.Int4, catalogFunctions: false))
             .ShouldBe(expected);
 
     [Fact]

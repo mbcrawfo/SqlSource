@@ -31,11 +31,15 @@ internal static class PlanPartitions
     /// </summary>
     public static IReadOnlyList<PostgresRelationName> MembersOf(PlanNode root) =>
         PlanRelations.InOrder(
-            root.SelfAndDescendants()
-                .Where(static node => ShapeOf(node) is not null)
-                .SelectMany(static node => node.Plans)
-                .Select(static member => new PostgresRelationName(member.Schema!, member.RelationName!))
+            root.SelfAndDescendants().Where(static node => ShapeOf(node) is not null).SelectMany(RelationsOf)
         );
+
+    /// <summary>
+    /// The relation each member of the <c>Append</c> scans, by schema and name, in the order of the plan.
+    /// </summary>
+    /// <param name="node">An <c>Append</c> that <see cref="ShapeOf" /> gave a prefix.</param>
+    public static IReadOnlyList<PostgresRelationName> RelationsOf(PlanNode node) =>
+        [.. node.Plans.Select(static member => new PostgresRelationName(member.Schema!, member.RelationName!))];
 
     /// <summary>
     /// The alias the nodes above an <c>Append</c> print for its members, when the node is an <c>Append</c> or a

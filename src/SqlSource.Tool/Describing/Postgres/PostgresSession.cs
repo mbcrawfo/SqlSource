@@ -178,7 +178,8 @@ internal sealed partial class PostgresSession : IDescribeSession
     // type that the parameters, the columns and their origins have, once; the server's spelling of each type with
     // each modifier the built types need, once; Npgsql's own reading of the SQL; and, for a query with rows that is
     // gated or has a column of no origin, its generic plan, then the ancestors of the relations an Append of the plan
-    // may scan as partitions, and for a set operation the relations its branches scan that "tables" did not answer.
+    // may scan as partitions, and, for a column of no origin, the relations the plan scans that "tables" did not
+    // answer.
     // The table match is made last and asks nothing: it reads the nullability the walk set.
     private async Task<Outcome<QueryDescription, DescribeFailure>> DescribePreparedAsync(
         DescribeRequest request,
@@ -342,7 +343,7 @@ internal sealed partial class PostgresSession : IDescribeSession
         {
             var partitions = await PartitionsOfAsync(request, root, cancellationToken);
             var cache = new PlanInstancesCache(root, partitions);
-            var relations = await RelationsOfAsync(request, cache, origins, scope.Tables, cancellationToken);
+            var relations = await RelationsOfAsync(request, root, origins, scope.Tables, cancellationToken);
             outcome = NullabilityWalk.Run(cache, columns, origins, scope with { Tables = relations });
         }
         else
@@ -377,27 +378,24 @@ internal sealed partial class PostgresSession : IDescribeSession
     }
 
     // The tables of "tables" with a row of "relations" for each relation the plan scans that "tables" did not
-    // answer, for the walk to read a set operation's branches.  It is asked only when a column has no origin and the
-    // walk may answer it from the branches (NullabilityWalk.MayAnswerFromBranches), and a relation is left to ask for.
-    // An error is logged and never reported: the walk goes on with the rows of "tables" alone.
+    // answer, for the walk to prove a reference inside an expression and to read a set operation's branches.  It is
+    // asked whenever a column has no origin and a relation is left to ask for.  An error is logged and never reported:
+    // the walk goes on with the rows of "tables" alone.
     private async Task<IReadOnlyDictionary<long, PostgresTableRow>> RelationsOfAsync(
         DescribeRequest request,
-        PlanInstancesCache cache,
+        PlanNode root,
         ColumnOrigin?[] origins,
         IReadOnlyDictionary<long, PostgresTableRow> tables,
         CancellationToken cancellationToken
     )
     {
-        if (!origins.Any(static origin => origin is null) || !NullabilityWalk.MayAnswerFromBranches(cache))
+        if (!origins.Any(static origin => origin is null))
         {
             return tables;
         }
 
         var answered = tables.Values.Select(static row => new PostgresRelationName(row.Schema, row.Name)).ToHashSet();
-        PostgresRelationName[] missing =
-        [
-            .. PlanRelations.Of(cache.Tree).Where(relation => !answered.Contains(relation)),
-        ];
+        PostgresRelationName[] missing = [.. PlanRelations.Of(root).Where(relation => !answered.Contains(relation))];
         if (missing.Length == 0)
         {
             return tables;

@@ -13,6 +13,7 @@ internal static class PlanNodeTypes
     public const string SubqueryScan = "Subquery Scan";
     public const string CteScan = "CTE Scan";
     public const string ModifyTable = "ModifyTable";
+    public const string Aggregate = "Aggregate";
 
     public const string SeqScan = "Seq Scan";
     public const string IndexScan = "Index Scan";
@@ -48,6 +49,12 @@ internal static class PlanRelationships
     public const string Subquery = "Subquery";
     public const string InitPlan = "InitPlan";
     public const string SubPlan = "SubPlan";
+}
+
+/// <summary>The values of <c>Strategy</c> of an <c>Aggregate</c>.</summary>
+internal static class AggregateStrategies
+{
+    public const string Plain = "Plain";
 }
 
 /// <summary>The values of <c>Join Type</c>.</summary>

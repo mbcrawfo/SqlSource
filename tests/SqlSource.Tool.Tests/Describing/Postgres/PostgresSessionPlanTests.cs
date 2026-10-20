@@ -18,8 +18,20 @@ namespace SqlSource.Tool.Tests.Describing.Postgres;
 // wrote fails.
 public sealed class PostgresSessionPlanTests
 {
-    // One script for a query of users.id and an aggregate, whatever its SQL says of a join.
-    private static async Task<QueryDescription> DescribeUsersIdAsync(string sql, PostgresExplainAnswer? explain = null)
+    // The relations of a join of "u" and "o", which "tables" did not answer and a plan that scans them asks for.
+    private static readonly PostgresRelationName[] JoinedRelations =
+    [
+        new PostgresRelationName("public", "o"),
+        new PostgresRelationName("public", "u"),
+    ];
+
+    // One script for a query of users.id and an aggregate, whatever its SQL says of a join, with the relations the
+    // plan scans that "tables" did not answer.
+    private static async Task<QueryDescription> DescribeUsersIdAsync(
+        string sql,
+        PostgresExplainAnswer? explain = null,
+        PostgresRelationName[]? relations = null
+    )
     {
         var users = PostgresTables.Users;
         var script = new PostgresScript().Open();
@@ -36,6 +48,11 @@ public sealed class PostgresSessionPlanTests
         if (explain is not null)
         {
             _ = script.Explains(1, 0, explain);
+        }
+
+        if (relations is not null)
+        {
+            _ = script.Relations(relations);
         }
 
         var exchange = script.Frees(1).Play();
@@ -127,7 +144,7 @@ public sealed class PostgresSessionPlanTests
     {
         var plan = Join("Left", Scan("u"), Scan("o")) with { Output = ["u.id", "count(*) OVER (?)"] };
 
-        var description = await DescribeUsersIdAsync(GatedUsersId, PostgresScript.PlanOf(plan));
+        var description = await DescribeUsersIdAsync(GatedUsersId, PostgresScript.PlanOf(plan), JoinedRelations);
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         AnswersOf(description).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
@@ -155,6 +172,7 @@ public sealed class PostgresSessionPlanTests
             new PostgresExplainRequest("sqlsource_1", 0, ["enable_hashjoin=off", "enable_mergejoin=off"]),
             PostgresScript.PlanOf(plan)
         );
+        _ = script.Relations(JoinedRelations);
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(
             exchange,
@@ -173,7 +191,7 @@ public sealed class PostgresSessionPlanTests
     {
         var plan = Join("Right", Scan("u"), Scan("o")) with { Output = ["u.id", "count(*) OVER (?)"] };
 
-        var description = await DescribeUsersIdAsync(GatedUsersId, PostgresScript.PlanOf(plan));
+        var description = await DescribeUsersIdAsync(GatedUsersId, PostgresScript.PlanOf(plan), JoinedRelations);
 
         description.Plan.ShouldBe(SidecarValues.Plan.Walked);
         AnswersOf(description).ShouldBe([NullableOuterJoin, UnknownNoOrigin]);
@@ -211,7 +229,12 @@ public sealed class PostgresSessionPlanTests
             error is null ? null : new PostgresServerError("57014", error, null, null, null)
         );
 
-        var description = await DescribeUsersIdAsync(GatedUsersId, answer);
+        // The one plan that is read asks for its relations before the walk finds it unusable.
+        var description = await DescribeUsersIdAsync(
+            GatedUsersId,
+            answer,
+            name == "plan-the-walk-cannot-use" ? JoinedRelations : null
+        );
 
         description.Plan.ShouldBe(SidecarValues.Plan.Unavailable);
         description.TableMatch.ShouldBe(SidecarValues.TableMatch.NoOrigin);

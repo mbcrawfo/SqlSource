@@ -12,11 +12,12 @@ internal static partial class NullabilityWalk
     // through nodes that pass a child's column on, is answered from the set operation's inputs: false with
     // set-operation when the inputs the operation returns rows of prove it, and as it was built otherwise.  A UNION's
     // Append returns every member's rows, and so does any Append, a partitioned table's or one nested in another: every
-    // member must prove it.  An INTERSECT returns rows that both inputs hold, as NULL equals NULL there: one input
-    // proves it.  An EXCEPT returns rows of its left input: that one proves it.  PostgreSQL 14 plans the last two as a
-    // SetOp over an Append whose members print a flag last, 0 for the left input and 1 for the right; 18 as a SetOp
-    // with the left input as its Outer child and the right as its Inner.  A recursive CTE's union, and any other shape,
-    // proves nothing.
+    // member must prove it, and an Append that partition pruning removed a member of proves nothing, since the rows of
+    // another execution may come from that one.  An INTERSECT returns rows that both inputs hold, as NULL equals NULL
+    // there: one input proves it.  An EXCEPT returns rows of its left input: that one proves it.  PostgreSQL 14 plans
+    // the last two as a SetOp over an Append whose members print a flag last, 0 for the left input and 1 for the right;
+    // 18 as a SetOp with the left input as its Outer child and the right as its Inner.  A recursive CTE's union, and
+    // any other shape, proves nothing.
     //
     // A branch's value counts only when its type carries to the result's (SetOperationTypes): the planner casts a
     // branch to the result's type, and the plan does not print the cast.  The result's type is the row description's,
@@ -75,14 +76,6 @@ internal static partial class NullabilityWalk
 
         return false;
     }
-
-    /// <summary>
-    /// Whether the walk may answer a column of no origin of the plan from a set operation's branches: the root reaches
-    /// one, and prints no Output or its plan holds one that is no partitioned table's <c>Append</c>.
-    /// </summary>
-    /// <param name="cache">The instances of the plan's plans, whose tree is the plan.</param>
-    public static bool MayAnswerFromBranches(PlanInstancesCache cache) =>
-        ReachesSetOperation(cache.Tree) && (cache.Tree.Output is null || cache.Of(cache.Tree).HasSetOperation);
 
     // The types to answer a set operation's columns with, when the walk takes that path: a column has no origin, there
     // is a type for each column, the root prints no Output or its plan holds a set operation, and the root reaches
@@ -234,7 +227,8 @@ internal static partial class NullabilityWalk
 
             if (PlanNodeTypes.Appends.Contains(node.NodeType))
             {
-                return MemberNodesOf(node) is [_, ..] members
+                return node.SubplansRemoved == 0
+                    && MemberNodesOf(node) is [_, ..] members
                     && members.All(member => ColumnAt(member, ordinal, type, Reach.Branch, depth + 1));
             }
 
@@ -408,7 +402,7 @@ internal static partial class NullabilityWalk
                 return false;
             }
 
-            var expressions = new Expressions(plans.Scope, node, instances, plans.OnlyAliasOf(node));
+            var expressions = new Expressions(plans, node, instances, plans.OnlyAliasOf(node));
             var entry = output[ordinal];
             if (OutputReference.Parse(entry) is { } reference)
             {
@@ -416,7 +410,7 @@ internal static partial class NullabilityWalk
                     && SetOperationTypes.Carries(attribute, type);
             }
 
-            return expressions.NullableOf(entry) == false
+            return expressions.NullableOf(entry, TotalFunctions.UnknownType) == false
                 && PlanExpression.TypeOf(entry, plans.Scope.CatalogFunctionsFirst) is { } constant
                 && SetOperationTypes.Carries(constant, type);
         }

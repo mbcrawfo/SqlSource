@@ -73,7 +73,7 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         await using (var reader = await command.ExecuteReaderAsync(token))
         {
             reader.GetName(0).ShouldBe("id?");
-            reader.GetName(1).ShouldBe("upper_name!");
+            reader.GetName(1).ShouldBe("initcap_name!");
             while (await reader.ReadAsync(token))
             {
                 names.Add(
@@ -86,9 +86,9 @@ public sealed class NoteQueryTests(PostgresContainer postgres)
         }
 
         names.ShouldBe([
-            new ListMarkedNamesDto(1, "ALICE"),
-            new ListMarkedNamesDto(2, "BOB"),
-            new ListMarkedNamesDto(3, "CAROL"),
+            new ListMarkedNamesDto(1, "Alice"),
+            new ListMarkedNamesDto(2, "Bob"),
+            new ListMarkedNamesDto(3, "Carol"),
         ]);
     }
 }

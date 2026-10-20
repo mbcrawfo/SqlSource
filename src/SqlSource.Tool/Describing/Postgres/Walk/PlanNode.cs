@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
@@ -28,6 +29,18 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// <c>Except All</c>.
 /// </param>
 /// <param name="HasGroupingSets">Whether the node has a <c>Grouping Sets</c> key, whatever it holds.</param>
+/// <param name="Strategy">
+/// <c>Strategy</c>, which an <c>Aggregate</c> has, <c>Plain</c>, <c>Sorted</c>, <c>Hashed</c> or <c>Mixed</c>, and a
+/// <c>SetOp</c> too.
+/// </param>
+/// <param name="HasGroupKey">Whether the node has a <c>Group Key</c> that names a key at least.</param>
+/// <param name="HasFilter">
+/// Whether the node has a <c>Filter</c>, whatever it holds: an aggregate's <c>HAVING</c>.
+/// </param>
+/// <param name="SubplansRemoved">
+/// <c>Subplans Removed</c>, which an <c>Append</c> or a <c>Merge Append</c> prints when partition pruning removed
+/// members from the plan: their number, and 0 when the key is absent.  Such a node does not show every partition.
+/// </param>
 /// <param name="Plans"><c>Plans</c>: the children, empty when the node has none.</param>
 internal sealed record PlanNode(
     string NodeType,
@@ -41,6 +54,10 @@ internal sealed record PlanNode(
     string? CteName,
     string? Command,
     bool HasGroupingSets,
+    string? Strategy,
+    bool HasGroupKey,
+    bool HasFilter,
+    int SubplansRemoved,
     IReadOnlyList<PlanNode> Plans
 )
 {
@@ -96,6 +113,24 @@ internal sealed record PlanNode(
         Plans.SelectMany(static child => child.SelfAndDescendants()).Prepend(this);
 
     /// <summary>
+    /// The one node of those at and under this one, through every <c>Parent Relationship</c>, that hangs here by the
+    /// relationship under the <c>Subplan Name</c>; null when none does, or when several do, which says nothing.
+    /// </summary>
+    /// <param name="relationship"><c>InitPlan</c> or <c>SubPlan</c>.</param>
+    /// <param name="subplanName">The name: <c>SubPlan 1</c>, or <c>CTE</c> and a CTE's name.</param>
+    public PlanNode? OnlyPlanNamed(string relationship, string subplanName) =>
+        SelfAndDescendants()
+            .Where(node =>
+                node.ParentRelationship == relationship
+                && string.Equals(node.SubplanName, subplanName, StringComparison.Ordinal)
+            )
+            .Take(2)
+            .ToArray()
+            is [var only]
+            ? only
+            : null;
+
+    /// <summary>
     /// The root of a plan's text, or null: the text is an array of one object whose <c>Plan</c> is the root, and
     /// anything else is a plan that cannot be used.  A key the walk does not read is ignored.
     /// </summary>
@@ -134,6 +169,8 @@ internal sealed record PlanNode(
             || !TryText(element, "Subplan Name", out var subplan)
             || !TryText(element, "CTE Name", out var cte)
             || !TryText(element, nameof(Command), out var command)
+            || !TryText(element, nameof(Strategy), out var strategy)
+            || !TryCount(element, "Subplans Removed", out var removed)
             || !TryNodes(element, out var plans)
         )
         {
@@ -152,6 +189,12 @@ internal sealed record PlanNode(
             cte,
             command,
             element.TryGetProperty("Grouping Sets", out _),
+            strategy,
+            element.TryGetProperty("Group Key", out var key)
+                && key.ValueKind == JsonValueKind.Array
+                && key.GetArrayLength() > 0,
+            element.TryGetProperty("Filter", out _),
+            removed,
             plans
         );
     }
@@ -167,6 +210,18 @@ internal sealed record PlanNode(
 
         text = value.ValueKind == JsonValueKind.String ? value.GetString() : null;
         return text is not null;
+    }
+
+    // False when the key holds what is no integer of zero or more.  A key that is absent is 0.
+    private static bool TryCount(JsonElement element, string key, out int count)
+    {
+        count = 0;
+        if (!element.TryGetProperty(key, out var value))
+        {
+            return true;
+        }
+
+        return value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out count) && count >= 0;
     }
 
     // False when the key holds what is no array of strings.  A key that is absent is null.

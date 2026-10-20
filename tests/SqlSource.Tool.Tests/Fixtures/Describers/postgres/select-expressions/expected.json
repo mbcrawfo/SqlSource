@@ -75,8 +75,8 @@
             "precision": 20,
             "scale": 4
           },
-          "nullable": null,
-          "nullableSource": "no-origin",
+          "nullable": false,
+          "nullableSource": "expression",
           "origin": null,
           "identity": null,
           "computed": null

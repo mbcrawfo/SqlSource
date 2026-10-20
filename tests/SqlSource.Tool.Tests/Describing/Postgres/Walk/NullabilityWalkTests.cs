@@ -450,6 +450,430 @@ public sealed class NullabilityWalkTests
         AnswersOf(outcome).ShouldBe([NullableCatalog]);
     }
 
+    // A table whose NOT NULL columns the catalog answers, as "tables" gives it: no attribute is a system column.
+    private static readonly PostgresTableRow Products = Table with { Oid = 16708, Name = "products" };
+
+    // An INSERT into the table, with its RETURNING list as the root's Output.
+    private static PlanNode InsertInto(PostgresTableRow table, params string[] output) =>
+        Over("ModifyTable", Scan("x") with { NodeType = "Result", Alias = null }) with
+        {
+            Alias = table.Name,
+            RelationName = table.Name,
+            Schema = "public",
+            Output = output,
+        };
+
+    private static WalkOutcome RunOver(PostgresTableRow table, PlanNode root)
+    {
+        var (columns, origins) = Built(false, Expression);
+        return NullabilityWalk.Run(
+            new PlanInstancesCache(root, null),
+            columns,
+            origins,
+            new WalkScope(false, false, true, PostgresTables.Of(table), [])
+        );
+    }
+
+    // A system column is never NULL in a row of a table, and "tables" reads no attribute of it.
+    [Fact]
+    public void Run_SystemColumnOfATable_IsAnsweredInAnExpression() =>
+        AnswersOf(RunOver(Products, InsertInto(Products, "(products.xmax = 0)"))).ShouldBe([NotNullExpression]);
+
+    // A partitioned table with no foreign partition keeps its NOT NULL in every partition, and every row has its system
+    // columns.
+    [Fact]
+    public void Run_SystemColumnOfAPartitionedTable_IsAnsweredInAnExpression()
+    {
+        var parted = Products with { Relkind = "p", Relhassubclass = true };
+
+        AnswersOf(RunOver(parted, InsertInto(parted, "(products.xmax = 0)"))).ShouldBe([NotNullExpression]);
+    }
+
+    // A system column of the side a join null-extends is NULL for a row the join did not match.
+    [Theory]
+    [InlineData("(a.xmax = 0)", false)]
+    [InlineData("(b.xmax = 0)", null)]
+    public void Run_SystemColumnThroughAnInstance_IsProvedOnlyWhereNoJoinExtendsIt(string entry, bool? nullable) =>
+        AnswersOf(
+                RunUngated(
+                    Join("Left", Scan("a", "a.id", "a.xmax"), Scan("b", "b.id", "b.xmax")) with
+                    {
+                        Output = [entry],
+                    },
+                    Expression
+                )
+            )
+            .ShouldBe([(nullable, nullable is null ? "no-origin" : "expression")]);
+
+    // Nothing holds a foreign table's rows to anything.
+    [Fact]
+    public void Run_SystemColumnOfAForeignTable_KeepsNoOrigin() =>
+        AnswersOf(RunOver(Foreign, Scan("ft", "(ft.xmax = 0)") with { NodeType = "Foreign Scan" }))
+            .ShouldBe([UnknownNoOrigin]);
+
+    // A table whose NOT NULL column the catalog would not answer false proves no system column either: an inheritance
+    // child, a foreign partition or an INSTEAD rule brings rows from elsewhere.
+    [Theory]
+    [InlineData("children")]
+    [InlineData("foreign-partition")]
+    [InlineData("instead-rule")]
+    public void Run_SystemColumnOfATableThatMayReadRowsFromElsewhere_KeepsNoOrigin(string reason)
+    {
+        var table = reason switch
+        {
+            "children" => Products with { Relhassubclass = true },
+            "foreign-partition" => Products with { Relkind = "p", HasForeignPartition = true },
+            _ => Products with { HasInsteadRule = true },
+        };
+
+        AnswersOf(RunOver(table, InsertInto(table, "(products.xmax = 0)"))).ShouldBe([UnknownNoOrigin]);
+    }
+
+    // Only the six names of the server's system columns are one, each of its own type.
+    [Theory]
+    [InlineData("(products.xmin = 0)", false)]
+    [InlineData("((products.ctid)::text = 'x'::text)", null)]
+    [InlineData("(products.oid = 0)", null)]
+    [InlineData("(products.xmax = products.id)", false)]
+    [InlineData("(products.xmax = products.opt)", null)]
+    public void Run_SystemColumnInAnOperator_IsOfItsType(string entry, bool? nullable) =>
+        AnswersOf(RunOver(Products, InsertInto(Products, entry)))
+            .ShouldBe([(nullable, nullable is null ? "no-origin" : "expression")]);
+
+    // Orders of the accounts "a", with columns that are never NULL and one that may be.
+    private static readonly PostgresTableRow OrdersO = PostgresTables.TableOf(
+        16709,
+        "o",
+        PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid, notNull: true),
+        PostgresTables.Attribute(2, "placed_at", PostgresRows.Timestamptz.Oid, notNull: true),
+        PostgresTables.Attribute(3, "quantity", PostgresRows.Int4.Oid, notNull: true),
+        PostgresTables.Attribute(4, "note", PostgresRows.Text.Oid),
+        PostgresTables.Attribute(5, "user_id", PostgresRows.Int4.Oid, notNull: true),
+        PostgresTables.Attribute(6, "parent_id", PostgresRows.Int4.Oid)
+    );
+
+    private static WalkOutcome RunOverOrders(PlanNode root)
+    {
+        var (columns, origins) = Built(false, Expression);
+        return NullabilityWalk.Run(
+            new PlanInstancesCache(root, null),
+            columns,
+            origins,
+            new WalkScope(false, false, true, PostgresTables.Of(TableA, OrdersO), [])
+        );
+    }
+
+    // A join of "a" and "o" that prints what the aggregate above it reads.
+    private static PlanNode JoinOfAAndO(string joinType) =>
+        Join(joinType, Scan("a", "a.id"), Scan("o", "o.placed_at", "o.quantity", "o.note")) with
+        {
+            Output = ["a.id", "o.placed_at", "o.quantity", "o.note"],
+        };
+
+    // An Aggregate with a Group Key over the join of "a" and "o", which prints its aggregate bare, under a Sort that
+    // prints it in parentheses or as the root.
+    private static PlanNode GroupedOverAAndO(bool sorted, string aggregate)
+    {
+        var grouped = Aggregate("Hashed", true, JoinOfAAndO("Inner"), "a.id", aggregate);
+        return sorted
+            ? Over("Sort", grouped) with
+            {
+                Output = ["(" + aggregate + ")", "a.id"],
+            }
+            : grouped with
+            {
+                Output = [aggregate, "a.id"],
+            };
+    }
+
+    // Each group of an Aggregate with a Group Key is made of the rows that share its key, so it has one at least, and
+    // the node prints its aggregate bare where a node above prints it in parentheses.
+    [Theory]
+    [InlineData(true, "max(o.placed_at)")]
+    [InlineData(false, "max(o.placed_at)")]
+    [InlineData(true, "sum(o.quantity)")]
+    public void Run_AggregateOfAGroupedNode_IsNotNull(bool sorted, string aggregate) =>
+        AnswersOf(RunOverOrders(GroupedOverAAndO(sorted, aggregate))).ShouldBe([NotNullExpression]);
+
+    // A group's every value may be NULL, array_agg is in no row of the table, and a FILTER may leave a group no row.
+    [Theory]
+    [InlineData("max(o.note)")]
+    [InlineData("array_agg(o.quantity)")]
+    [InlineData("max(o.placed_at) FILTER (WHERE (o.quantity > 1))")]
+    public void Run_AggregateOfAGroupedNodeThatMayBeNull_KeepsNoOrigin(string aggregate) =>
+        AnswersOf(RunOverOrders(GroupedOverAAndO(sorted: true, aggregate))).ShouldBe([UnknownNoOrigin]);
+
+    // An Aggregate with no Group Key returns a row for an input of none, and a node that is no Aggregate computes no
+    // aggregate.
+    [Theory]
+    [InlineData("Aggregate", "Plain", false)]
+    [InlineData("Aggregate", "Sorted", false)]
+    [InlineData("Group", "Sorted", true)]
+    [InlineData("WindowAgg", null, true)]
+    public void Run_AggregateOfAPlainNode_KeepsNoOrigin(string nodeType, string? strategy, bool groupKey)
+    {
+        var plain = Aggregate(strategy ?? "Plain", groupKey, JoinOfAAndO("Inner"), "max(o.placed_at)") with
+        {
+            NodeType = nodeType,
+            Strategy = strategy,
+        };
+
+        AnswersOf(RunOverOrders(Over("Sort", plain) with { Output = ["(max(o.placed_at))"] }))
+            .ShouldBe([UnknownNoOrigin]);
+    }
+
+    // A node with Grouping Sets may have a group of no row, the one of the empty set: the walk does not use its plan.
+    [Fact]
+    public void Run_AggregateOfANodeWithGroupingSets_KeepsNoOrigin() =>
+        AnswersOf(
+                RunOverOrders(
+                    Aggregate("Mixed", true, JoinOfAAndO("Inner"), "max(o.placed_at)") with
+                    {
+                        HasGroupingSets = true,
+                    }
+                )
+            )
+            .ShouldBe([UnknownNoOrigin]);
+
+    // A grouped Aggregate over a join of "a" and "o" that null-extends "o", under a Sort.
+    private static PlanNode GroupedOverALeftJoin(string aggregate) =>
+        Over("Sort", Aggregate("Sorted", true, JoinOfAAndO("Left"), "a.id", aggregate)) with
+        {
+            Output = ["(" + aggregate + ")", "a.id"],
+        };
+
+    // A value of the side a join null-extends may be NULL in every row of a group.
+    [Fact]
+    public void Run_AggregateOfAnExtendedSide_KeepsNoOrigin() =>
+        AnswersOf(RunOverOrders(GroupedOverALeftJoin("max(o.placed_at)"))).ShouldBe([UnknownNoOrigin]);
+
+    // A value of the side the join keeps is in every row of a group.
+    [Fact]
+    public void Run_AggregateOfThePreservedSideOfAnOuterJoin_IsNotNull() =>
+        AnswersOf(RunOverOrders(GroupedOverALeftJoin("max(a.id)"))).ShouldBe([NotNullExpression]);
+
+    // A value the node takes from a child was computed under the child's grouping, here a plain one that returns a row
+    // of NULL for an input of none.
+    [Fact]
+    public void Run_AggregateTakenFromAChild_KeepsNoOrigin() =>
+        AnswersOf(
+                RunOverOrders(
+                    Aggregate(
+                        "Sorted",
+                        true,
+                        Aggregate("Plain", false, Scan("o", "o.quantity"), "sum(o.quantity)"),
+                        "((sum(o.quantity)) * 2)"
+                    )
+                )
+            )
+            .ShouldBe([UnknownNoOrigin]);
+
+    // The same entry the node computes itself, over the rows its child scans.
+    [Fact]
+    public void Run_AggregateTheNodeComputesOverAChild_IsAnswered() =>
+        AnswersOf(RunOverOrders(Aggregate("Sorted", true, Scan("o", "o.quantity"), "(sum(o.quantity) * 2)")))
+            .ShouldBe([NotNullExpression]);
+
+    // A column of no origin for each type of the row description, over "a" and "o".
+    private static WalkOutcome RunTyped(PlanNode root, params long[] types)
+    {
+        var (columns, origins) = Built(false, [.. types.Select(static _ => Expression)]);
+        return NullabilityWalk.Run(
+            new PlanInstancesCache(root, null),
+            columns,
+            origins,
+            new WalkScope(false, false, true, PostgresTables.Of(TableA, OrdersO), types)
+        );
+    }
+
+    // SELECT a.id, (SELECT count(*) FROM o WHERE ...) FROM a: a Plain Aggregate returns one row for any input.
+    private static PlanNode CountOfO() => Aggregate("Plain", false, Scan("o", "o.user_id"), "count(*)");
+
+    // A scan of "a" that evaluates the subplan in its Output.
+    private static PlanNode ScanOfA(string entry, params PlanNode[] subPlans) =>
+        Scan("a", "a.id", entry) with
+        {
+            Plans = subPlans,
+        };
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_ScalarSubPlanOfAPlainCount_IsAnswered(bool sorted)
+    {
+        var scan = ScanOfA("(SubPlan 1)", SubPlan("SubPlan 1", CountOfO()));
+        var root = sorted ? Over("Sort", scan) with { Output = ["a.id", "((SubPlan 1))"] } : scan;
+
+        AnswersOf(RunTyped(root, BuiltInTypes.Int4, BuiltInTypes.Int8)).ShouldBe([UnknownNoOrigin, NotNullExpression]);
+    }
+
+    // On 14 a.id IN (SELECT count(*) ...) prints (SubPlan 1) too: its column is a boolean, which is no subquery's
+    // value of a family.
+    [Fact]
+    public void Run_ScalarSubPlanOfABooleanColumn_KeepsNoOrigin() =>
+        AnswersOf(
+                RunTyped(ScanOfA("(SubPlan 1)", SubPlan("SubPlan 1", CountOfO())), BuiltInTypes.Int4, BuiltInTypes.Bool)
+            )
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    // A subquery's value counts only as the whole column, where its type is the column's.
+    [Fact]
+    public void Run_ScalarSubPlanInsideAnExpression_KeepsNoOrigin() =>
+        AnswersOf(
+                RunTyped(
+                    ScanOfA("((SubPlan 1) + 1)", SubPlan("SubPlan 1", CountOfO())),
+                    BuiltInTypes.Int4,
+                    BuiltInTypes.Int8
+                )
+            )
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    // A subplan that may return no row, or a row whose value may be NULL, or one whose name is no single subplan.
+    [Theory]
+    [InlineData("group-key")]
+    [InlineData("sorted-without-a-key")]
+    [InlineData("grouping-sets")]
+    [InlineData("filter")]
+    [InlineData("limit")]
+    [InlineData("max")]
+    [InlineData("two-outputs")]
+    [InlineData("found-twice")]
+    [InlineData("other-name")]
+    [InlineData("init-plan")]
+    public void Run_ScalarSubPlanThatMayReturnNoRow_KeepsNoOrigin(string shape)
+    {
+        var count = CountOfO();
+        PlanNode[] subPlans = shape switch
+        {
+            "group-key" => [SubPlan("SubPlan 1", count with { Strategy = "Sorted", HasGroupKey = true })],
+            "sorted-without-a-key" => [SubPlan("SubPlan 1", count with { Strategy = "Sorted" })],
+            "grouping-sets" => [SubPlan("SubPlan 1", count with { HasGroupingSets = true })],
+            "filter" => [SubPlan("SubPlan 1", count with { HasFilter = true })],
+            "limit" => [SubPlan("SubPlan 1", Over("Limit", count) with { Output = ["(count(*))"] })],
+            "max" => [SubPlan("SubPlan 1", count with { Output = ["max(o.placed_at)"] })],
+            "two-outputs" => [SubPlan("SubPlan 1", count with { Output = ["count(*)", "count(*)"] })],
+            "found-twice" => [SubPlan("SubPlan 1", count), SubPlan("SubPlan 1", count)],
+            "other-name" => [SubPlan("SubPlan 2", count)],
+            _ => [count with { ParentRelationship = "InitPlan", SubplanName = "SubPlan 1" }],
+        };
+        var type = shape == "max" ? BuiltInTypes.Timestamptz : BuiltInTypes.Int8;
+
+        AnswersOf(RunTyped(ScanOfA("(SubPlan 1)", subPlans), BuiltInTypes.Int4, type))
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+    }
+
+    // A subquery evaluated on the side a join null-extends is NULL for a row the join did not match, and one evaluated
+    // on the side it keeps is answered.
+    [Theory]
+    [InlineData(true, null)]
+    [InlineData(false, false)]
+    public void Run_ScalarSubPlanOnAJoinSide_IsAnsweredOnlyWhereKept(bool extended, bool? nullable)
+    {
+        var evaluates = Scan("b", "b.id", "(SubPlan 1)") with { Plans = [SubPlan("SubPlan 1", CountOfO())] };
+        var join = extended ? Join("Left", Scan("a", "a.id"), evaluates) : Join("Left", evaluates, Scan("a", "a.id"));
+
+        AnswersOf(RunTyped(join with { Output = ["a.id", "((SubPlan 1))"] }, BuiltInTypes.Int4, BuiltInTypes.Int8))
+            .ShouldBe([UnknownNoOrigin, (nullable, nullable is null ? "no-origin" : "expression")]);
+    }
+
+    // a.id IN (SELECT o.user_id FROM o), as 18 prints it, over a subplan that scans "o" for the column and o.user_id.
+    private static WalkOutcome RunAny(string entry, string column) =>
+        RunTyped(
+            ScanOfA(entry, SubPlan("SubPlan 2", Scan("o", column, "o.user_id"))),
+            BuiltInTypes.Int4,
+            BuiltInTypes.Bool
+        );
+
+    // An ANY is NULL only for a NULL on either side.
+    [Theory]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", "o.user_id")]
+    [InlineData("(ANY (a.id = (SubPlan 2).col1))", "o.user_id")]
+    [InlineData("(ANY (a.id = (SubPlan 2).col2))", "o.note")]
+    public void Run_AnyOverAProvedSubPlanColumn_IsNotNull(string entry, string column) =>
+        AnswersOf(RunAny(entry, column)).ShouldBe([UnknownNoOrigin, NotNullExpression]);
+
+    // A column of the subplan that may be NULL, a left side that is not proved, and a subplan or a column that is not
+    // there.
+    [Theory]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", "o.note")]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", "o.parent_id")]
+    [InlineData("(ANY (a.opt = (hashed SubPlan 2).col1))", "o.user_id")]
+    [InlineData("(ANY (a.id = (hashed SubPlan 3).col1))", "o.user_id")]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col3))", "o.user_id")]
+    public void Run_AnyOverASubPlanColumnNotProved_KeepsNoOrigin(string entry, string column) =>
+        AnswersOf(RunAny(entry, column)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    // A column of the subplan is proved as its own plan proves it: here the subplan's join null-extends "o".
+    [Fact]
+    public void Run_AnyOverASubPlanColumnThatAJoinExtends_KeepsNoOrigin()
+    {
+        var join = Join("Left", Scan("b", "b.id"), Scan("o", "o.user_id")) with { Output = ["o.user_id"] };
+
+        AnswersOf(
+                RunTyped(
+                    ScanOfA("(ANY (a.id = (hashed SubPlan 2).col1))", SubPlan("SubPlan 2", join)),
+                    BuiltInTypes.Int4,
+                    BuiltInTypes.Bool
+                )
+            )
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+    }
+
+    // A subplan that names itself is followed no deeper than the walk follows plans.
+    [Fact]
+    public void Run_SubPlanThatNamesItself_KeepsNoOrigin()
+    {
+        var entry = "(ANY (a.id = (SubPlan 2).col1))";
+        var subPlan = SubPlan("SubPlan 2", Scan("o", "(ANY (o.user_id = (SubPlan 2).col1))"));
+
+        AnswersOf(RunTyped(ScanOfA(entry, subPlan), BuiltInTypes.Int4, BuiltInTypes.Bool))
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+    }
+
+    // In a statement that names OLD or NEW, the old or the new row may print under an alias a relation of the subplan
+    // has, and no subplan is read.
+    [Fact]
+    public void Run_SubPlanWhenOldOrNewMayBeNamed_KeepsNoOrigin()
+    {
+        var (columns, origins) = Built(false, Expression, Expression);
+        var outcome = NullabilityWalk.Run(
+            new PlanInstancesCache(ScanOfA("(SubPlan 1)", SubPlan("SubPlan 1", CountOfO())), null),
+            columns,
+            origins,
+            new WalkScope(false, true, true, PostgresTables.Of(TableA, OrdersO), [BuiltInTypes.Int4, BuiltInTypes.Int8])
+        );
+
+        AnswersOf(outcome).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+    }
+
+    // EXISTS on 18 starts false and turns true at the subplan's first row.
+    [Fact]
+    public void Run_ExistsOfASubPlan_IsAnswered() =>
+        AnswersOf(
+                RunTyped(
+                    ScanOfA("EXISTS(SubPlan 1)", SubPlan("SubPlan 1", Scan("o", "o.note"))),
+                    BuiltInTypes.Int4,
+                    BuiltInTypes.Bool
+                )
+            )
+            .ShouldBe([UnknownNoOrigin, NotNullExpression]);
+
+    // MERGE ... RETURNING merge_action() on 18, over the join of the source and the target that null-extends.
+    [Fact]
+    public void Run_MergeActionAtARootModifyTable_IsAnswered()
+    {
+        var join = Join("Right", Scan("o", "o.id"), Scan("a", "a.id")) with { Output = ["o.id", "a.id"] };
+        var plan = Over("ModifyTable", join) with
+        {
+            Alias = "o",
+            RelationName = "o",
+            Schema = "public",
+            Output = ["MERGE_ACTION()"],
+        };
+
+        AnswersOf(RunOverOrders(plan)).ShouldBe([NotNullExpression]);
+    }
+
     [Theory]
     [InlineData("Subquery Scan")]
     [InlineData("CTE Scan")]
@@ -849,6 +1273,92 @@ public sealed class NullabilityWalkTests
         var plan = Over("Aggregate", PartitionsOfT()) with { Output = ["count(*)", "GREATEST(p.opt, p.id)"] };
 
         AnswersOf(RunWithPartitions(plan, Expression, Expression)).ShouldBe([NotNullExpression, NotNullExpression]);
+    }
+
+    // The partitions of t as "relations" answers them, by schema and name: like t, with a NOT NULL id.
+    private static readonly PostgresTableRow PartitionOne = Table with { Oid = 16720, Name = "t_1" };
+
+    private static readonly PostgresTableRow PartitionTwo = Table with { Oid = 16721, Name = "t_2" };
+
+    // An expression of each kind over the partitioned table: a column's and a system column's.
+    private static readonly string[] OverPartitions = ["(p.id = 0)", "(p.xmax = 0)"];
+
+    // A walk of the expressions over t's partitions, with the rows the test gives in place of "tables" and "relations".
+    private static WalkOutcome RunOverPartitions(params PostgresTableRow[] rows) =>
+        RunOverPartitions(PartitionsOfT(), rows);
+
+    private static WalkOutcome RunOverPartitions(PlanNode partitions, params PostgresTableRow[] rows)
+    {
+        var plan = Over("Aggregate", partitions) with { Output = OverPartitions };
+        var (columns, origins) = Built(false, Expression, Expression);
+        return NullabilityWalk.Run(
+            new PlanInstancesCache(plan, Partitions),
+            columns,
+            origins,
+            new WalkScope(false, false, true, PostgresTables.Of(rows), [])
+        );
+    }
+
+    // "relations" asks for the relations the plan scans, which are the partitions and never their parent: with no row
+    // of the parent, a reference is proved by every member's row.
+    [Fact]
+    public void Run_ExpressionOverAPartitionedTableWithoutItsRow_IsProvedByItsPartitions() =>
+        AnswersOf(RunOverPartitions(PartitionOne, PartitionTwo)).ShouldBe([NotNullExpression, NotNullExpression]);
+
+    // Every member must prove it: a member without a row, a foreign partition, whose remote rows nothing holds to its
+    // NOT NULL, a partition whose column is nullable, or two partitions whose column is of two types each leave it.
+    [Theory]
+    [InlineData("missing")]
+    [InlineData("foreign")]
+    [InlineData("nullable")]
+    [InlineData("another-type")]
+    public void Run_ExpressionOverPartitionsThatDoNotAllProveIt_KeepsNoOrigin(string reason)
+    {
+        var (second, answers) = reason switch
+        {
+            "missing" => ((PostgresTableRow?)null, new[] { UnknownNoOrigin, UnknownNoOrigin }),
+            "foreign" => (PartitionTwo with { Relkind = "f" }, [UnknownNoOrigin, UnknownNoOrigin]),
+            "nullable" => (
+                PartitionTwo with
+                {
+                    Columns = [PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid), Table.Columns[1]],
+                },
+                [UnknownNoOrigin, NotNullExpression]
+            ),
+            _ => (
+                PartitionTwo with
+                {
+                    Columns =
+                    [
+                        PostgresTables.Attribute(1, "id", PostgresRows.Int8.Oid, notNull: true),
+                        Table.Columns[1],
+                    ],
+                },
+                [UnknownNoOrigin, NotNullExpression]
+            ),
+        };
+
+        AnswersOf(RunOverPartitions(second is null ? [PartitionOne] : [PartitionOne, second])).ShouldBe(answers);
+    }
+
+    // An Append that partition pruning removed a member of shows not every partition: its members' rows prove nothing.
+    [Fact]
+    public void Run_ExpressionOverPartitionsWithSubplansRemoved_KeepsNoOrigin() =>
+        AnswersOf(RunOverPartitions(PartitionsOfT() with { SubplansRemoved = 1 }, PartitionOne, PartitionTwo))
+            .ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
+
+    // The parent's own row, when a column names it, decides as it did: here it holds id nullable, which a partition
+    // may make NOT NULL of its own, and the reference is not proved.
+    [Fact]
+    public void Run_ExpressionOverAPartitionedTableWithItsRow_IsDecidedByThatRow()
+    {
+        var parent = Table with
+        {
+            Relkind = "p",
+            Columns = [PostgresTables.Attribute(1, "id", PostgresRows.Int4.Oid), Table.Columns[1]],
+        };
+
+        AnswersOf(RunOverPartitions(parent, PartitionOne, PartitionTwo)).ShouldBe([UnknownNoOrigin, NotNullExpression]);
     }
 
     // A foreign table's scan is an instance: unknown when nothing extends it, and the join's when one does.

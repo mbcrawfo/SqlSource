@@ -77,7 +77,7 @@ FROM orders o
 LEFT JOIN customers c ON c.id = o.customer_id;
 ```
 
-For each column the tool records whether it can be null.  The usual reasons a column is recorded as possibly null are an outer join, a view, or an expression such as `sum()` or a function call; the lists below give every rule.  If `orders.id`, `orders.placed_at` and `customers.name` are all `NOT NULL`, `id` and `placed_at` above are never null, and `name` can be: the `LEFT JOIN` gives a null name to an order with no customer.
+For each column the tool records whether it can be null.  The usual reasons a column is recorded as possibly null are an outer join, a view, or an expression such as `count(note)` or a call of a function that the lists below do not name; the lists give every rule.  If `orders.id`, `orders.placed_at` and `customers.name` are all `NOT NULL`, `id` and `placed_at` above are never null, and `name` can be: the `LEFT JOIN` gives a null name to an order with no customer.
 
 SqlSource treats a column as possibly null unless it can show that it never is.  A column it treats as possibly null that never is costs a null check in your code.  When the tool connects directly to the server, it never gives you a wrong value; see [known issues](#known-issues) for a pooler.
 
@@ -87,10 +87,18 @@ SqlSource can tell that a column is never null when it is:
 - **`count(*)`**, or a ranking over a window: `row_number()`, `rank()`, `dense_rank()`, `percent_rank()` or `cume_dist()`.
 - **A constant** other than `NULL`, such as `1` or `'active'`.
 - **A test**: `IS NULL`, `IS NOT NULL`, `IS DISTINCT FROM` or `IS NOT DISTINCT FROM`.
-- **`COALESCE`, `GREATEST` or `LEAST`** with an argument that is never null, or **a `CASE` with an `ELSE`** whose every result is never null.
+- **Arithmetic or a comparison of values that are never null**: `+`, `-`, `*` or `/` of two numbers; `=`, `<>`, `<`, `<=`, `>` or `>=` of two numbers, two texts, two booleans, or two values of one of `date`, `timestamp` and `timestamp with time zone`; and `||` of two texts.
+- **`lower` or `upper` of a text, `length` of a `text` or a `varchar` (not of a `character(n)`), or `date_trunc` of a `date`, a `timestamp` or a `timestamp with time zone` without a time zone argument**, over values that are never null, and **a cast** of a value that is never null from one number type to another, from one text type to another, or between `date`, `timestamp` and `timestamp with time zone`.
+- **One of the expressions above over a system column of a table**, such as `xmax = 0` in `RETURNING (xmax = 0) AS inserted`.  A system column on its own, `RETURNING xmax`, is possibly null, except as a column of a `UNION`, an `INTERSECT` or an `EXCEPT` below, where a system column of a table counts as never null: `SELECT xmin FROM a UNION ALL SELECT xmin FROM b` is never null.
+- **`COALESCE`, `GREATEST` or `LEAST`** with an argument that is never null, or **a `CASE` with an `ELSE`** whose every result is never null.  Each counts only on its own: arithmetic, a comparison, a function, a cast, an aggregate or a subquery's value computed from one, such as `sum(coalesce(x, 0))`, is possibly null.
+- **`max`, `min`, `sum` or `avg` of numbers, `max` or `min` of texts or of `date`, `timestamp` or `timestamp with time zone`, `string_agg` of two texts, or `bool_and`, `bool_or` or `every`** of values that are never null, in a query with a `GROUP BY` of one column or more, when it has no `FILTER` and no `OVER`.  Each group of such a query has a row; without `GROUP BY`, a query over no rows returns one row whose `sum` is null.
+- **A subquery that is the whole column, uses a column of the outer query and returns one row**, such as `(SELECT count(*) FROM orders o WHERE o.account_id = a.id)`: one with an aggregate and no `GROUP BY`, `HAVING`, `LIMIT` or `OFFSET`, whose value is `count(*)`, or arithmetic, a function or a cast of the list above over values that are never null, of a number type, a text type, or `date`, `timestamp` or `timestamp with time zone`.  The same subquery inside an expression, `(SELECT count(*) ...) + 1`, is possibly null.
+- **`EXISTS (...)` whose subquery uses a column of the outer query, on PostgreSQL 18.**  PostgreSQL may run an `EXISTS` whose subquery compares one of its columns with one of the outer query's as an `IN`, and such an `EXISTS` is never null only as that `IN` would be.
+- **`x IN (SELECT y ...)` or `x = ANY (SELECT y ...)`, on PostgreSQL 18,** when `x` and the subquery's `y` are never null by the rules above, and the comparison is one of those above.
+- **`merge_action()`** in the `RETURNING` list of a `MERGE`, on PostgreSQL 18.
 - **A column of a `UNION`, an `INTERSECT` or an `EXCEPT`** at the top of the query, when every value it can return there is never null by the rules above: every branch of a `UNION`, either side of an `INTERSECT`, the left side of an `EXCEPT`.
 
-`count(*)` and the rankings, constants, tests, and `COALESCE`, `GREATEST`, `LEAST` and `CASE` each count only where an outer join cannot leave them null.
+`count(*)` and the rankings, constants, tests, the arithmetic, comparisons, functions, casts, aggregates and subqueries above, `merge_action()`, and `COALESCE`, `GREATEST`, `LEAST` and `CASE` each count only where an outer join cannot leave them null.
 
 SqlSource treats a column as possibly null when:
 
@@ -99,27 +107,30 @@ SqlSource treats a column as possibly null when:
 - **An outer join can fill the column with null**: a column of the optional side of a `LEFT`, `RIGHT` or `FULL` join.
 - **The column comes from a view or a materialized view.**  PostgreSQL does not record whether a view's column can be null.
 - **The column comes from a foreign table.**  PostgreSQL does not enforce `NOT NULL` on its remote rows.
-- **It is `NULL`**, or an expression that is not in the list above, such as `price * quantity`, `sum(total)`, `count(note)`, `EXISTS (...)` or a function call.
+- **It is `NULL`**, or an expression that is not in the list above, such as `count(note)`, `array_agg(...)`, `upper(during)` of a range, `price * quantity` where either column can hold null, `sum(total)` without `GROUP BY`, `sum(coalesce(x, 0))`, `EXISTS (...)` before PostgreSQL 18, or a call of another function.
 - **It is a column of a `UNION`, an `INTERSECT` or an `EXCEPT`** where a branch can give null, or where SqlSource cannot follow a branch.
+- **It is an expression that a subquery in `FROM` or a `WITH` query computes**, such as a `count(*)` that a `WITH` query returns, **or one computed over a `UNION`, an `INTERSECT` or an `EXCEPT`**, such as `count(*)` of a subquery that holds one.  Such a column can be treated as possibly null even when the list above says it is never null.
 - **The query has `ROLLUP`, `CUBE` or `GROUPING SETS`.**  Every column of such a query is possibly null.
+- **The query names `OLD` or `NEW`, and the column is a subquery, an `IN (SELECT ...)` or an `= ANY (SELECT ...)`**, even one the list above says is never null.
+- **The connection's search path puts another schema before `pg_catalog`, and the column is `count(*)`, a ranking, arithmetic, a comparison, a function, a cast, an aggregate, a subquery, or an `EXISTS (...)` that PostgreSQL runs as an `IN`**, even one the list above says is never null.  PostgreSQL may run so an `EXISTS` whose subquery compares one of its columns with one of the outer query's, as the list above says.  Constants, tests, `COALESCE` over columns that are never null, any other `EXISTS (...)` and `merge_action()` are not affected.  Keep `pg_catalog` first on the search path of the connection the tool uses, or leave it off the path, where PostgreSQL searches it first.
 - **The query has an outer join, `MERGE`, `OLD` or `NEW`, and the column comes through a subquery or a `WITH` query, or from a table that an extension such as Citus or TimescaleDB manages.**  Such a column can be treated as possibly null even when its table column is `NOT NULL`.
 
 A column that can be null gets a nullable property in the query's [output model](#models), `int?` or `string?`, and a column that is never null a property that cannot be null, `int` or `string`.  Where you know better than these rules, you decide instead: an alias that ends in `!` gives a property that cannot be null, and one that ends in `?` a property that can, or a `-- column:` marker says the same and leaves the column's name alone.
 
 ```sql postgres
--- name: GetCustomerTotals
-SELECT c.id, c.name, sum(o.total) AS "total!"
+-- name: GetCustomerNotes
+SELECT c.id, c.name, count(o.note) AS "note_count!"
 FROM customers c
 JOIN orders o ON o.customer_id = c.id
 GROUP BY c.id, c.name;
 ```
 
-The sum of a group of `NOT NULL` totals is never null, though SqlSource treats it as possibly null: `"total!"` gives the property `Total` the type `decimal` and not `decimal?`.  Write the alias in quotes, since `!` and `?` are not part of a plain name, and the mark is left out of the property's name.  A `!` is your word, and nothing checks it.  The mark stays in the column's name, which Dapper matches to the property's by name, so with Dapper write a `-- column:` marker and no mark:
+A count is never null, though SqlSource treats `count(o.note)` as possibly null: `"note_count!"` gives the property `NoteCount` the type `long` and not `long?`.  Write the alias in quotes, since `!` and `?` are not part of a plain name, and the mark is left out of the property's name.  A `!` is your word, and nothing checks it.  The mark stays in the column's name, which Dapper matches to the property's by name, so with Dapper write a `-- column:` marker and no mark:
 
 ```sql postgres
--- name: GetCustomerTotals
--- column: total not null
-SELECT c.id, c.name, sum(o.total) AS total
+-- name: GetCustomerNotes
+-- column: note_count not null
+SELECT c.id, c.name, count(o.note) AS note_count
 FROM customers c
 JOIN orders o ON o.customer_id = c.id
 GROUP BY c.id, c.name;
@@ -264,7 +275,7 @@ A described PostgreSQL query gets the [models](generator.md#models) that every d
 
 ## Known issues
 
-- **Many columns that are never null are treated as possibly null.**  The rules [above](#nullability) leave out much that a person can see: `sum` or `max` of a `NOT NULL` column in a `GROUP BY` query, `count(x)`, `EXISTS (...)` as a column, the rows of `VALUES`, arithmetic on columns that are never null, a recursive `WITH` query, the columns of a view.  Nothing is wrong when that happens, but the column's property in the query's model is nullable, and costs a null check in your code.  Where you know the column is never null, end its alias with `!`, or, when you read the rows with Dapper, write a `-- column:` marker that says `not null`, as [above](#nullability).
+- **Many columns that are never null are treated as possibly null.**  The rules [above](#nullability) leave out much that a person can see: `count(x)`, `array_agg(...)`, `sum(coalesce(x, 0))`, `EXISTS (...)` as a column before PostgreSQL 18, the rows of `VALUES`, a function not listed there, an expression when the search path puts another schema before `pg_catalog`, a `count(*)` or a `sum` that a `WITH` query computes, a recursive `WITH` query, the columns of a view.  Nothing is wrong when that happens, but the column's property in the query's model is nullable, and costs a null check in your code.  Where you know the column is never null, end its alias with `!`, or, when you read the rows with Dapper, write a `-- column:` marker that says `not null`, as [above](#nullability).
 - **Describing through a pooler can give the wrong error, or a wrong answer.**  Behind a pooler in transaction mode, most queries fail with [SQLSRC236](diagnostics.md#sqlsrc236), but some are reported as [SQLSRC231](diagnostics.md#sqlsrc231) with a message about the number of columns, and in rare cases a column can be recorded with the nullability of another statement that an earlier run left on the server.  Connect directly to the server, as [connecting](#connecting) says, and describe again with `--force`.
 - **A type of your own named like a built-in one changes the names of built-in types.**  When the connection's search path puts a schema that has a type named like a built-in, such as a domain `public.text`, before `pg_catalog`, the tool records the built-in type as `pg_catalog.text` and not `text`.  Two databases that differ only in this describe the same query differently, and `--check` against one reports the sidecars written against the other as out of date.  Rename the type, or keep `pg_catalog` first on the search path of the connection the tool uses, the same on every machine.
 - **A query over a table with many partitions is slow to describe.**  The tool looks at every partition of a partitioned table, whatever the query's conditions, when it works out which columns can be null.  On a table of thousands of partitions each such query takes longer to describe, and the [log](tool.md#logs) of the run grows.  Only describing is slower; nothing else is affected.

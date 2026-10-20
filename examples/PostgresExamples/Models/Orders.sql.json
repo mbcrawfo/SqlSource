@@ -170,6 +170,53 @@
             "schema": "pg_catalog",
             "internalName": "numeric"
           },
+          "nullable": false,
+          "nullableSource": "expression",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
+    },
+    "CountShippedOrders": {
+      "hash": "ff5451aeaac7558e15de4116fb44c0a298e27c16e3b5d0c4b4eac03e85e2eace",
+      "engine": "postgres",
+      "database": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "users",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "shipped",
+          "type": {
+            "name": "bigint",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int8"
+          },
           "nullable": null,
           "nullableSource": "no-origin",
           "origin": null,

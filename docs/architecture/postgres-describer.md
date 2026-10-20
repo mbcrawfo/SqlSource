@@ -116,7 +116,7 @@ A statement without rows is `SidecarResultKind.None`, with its parameters and no
 
 ### Calls that are not made
 
-A call is not made when it has nothing to ask: `tables` when no column names a table, `types` when there is no OID, `spellings` when there is no pair, `partitions` when the plan holds no `Append` that may scan partitions, and `relations` when `tables` answered every relation the plan scans.  Each of these five requests is sorted and holds each item once, so that it is the same however a query orders what it names, and a capture of the same query is the same.
+A call is not made when it has nothing to ask: `tables` when no column names a table, `types` when there is no OID, `spellings` when there is no pair, `partitions` when the plan holds no `Append` that may scan partitions, and `relations` when every column has an origin or `tables` answered every relation the plan scans.  Each of these five requests is sorted and holds each item once, so that it is the same however a query orders what it names, and a capture of the same query is the same.
 
 ### Why `PREPARE`
 

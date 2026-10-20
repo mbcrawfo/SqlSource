@@ -184,6 +184,87 @@
       }
     },
     {
+      "method": "relations",
+      "request": {
+        "relations": [
+          {
+            "schema": "public",
+            "name": "modifiers"
+          }
+        ]
+      },
+      "answer": {
+        "tables": [
+          {
+            "oid": 16465,
+            "relkind": "r",
+            "schema": "public",
+            "name": "modifiers",
+            "columns": [
+              {
+                "attnum": 1,
+                "name": "ym",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1186,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 2,
+                "name": "ds",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1186,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 3,
+                "name": "names",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 1015,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 4,
+                "name": "tag",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16397,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 5,
+                "name": "tags",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16400,
+                "notNullValidated": null
+              },
+              {
+                "attnum": 6,
+                "name": "amount",
+                "notNull": false,
+                "identity": "",
+                "generated": "",
+                "typeOid": 16390,
+                "notNullValidated": null
+              }
+            ],
+            "relhassubclass": false,
+            "hasForeignPartition": false,
+            "hasInsteadRule": false
+          }
+        ],
+        "error": null
+      }
+    },
+    {
       "method": "deallocate",
       "request": {
         "statement": "sqlsource_1"
