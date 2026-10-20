@@ -96,7 +96,7 @@ The queries are in `EndToEnd/Queries/`, each file claimed by a type under `EndTo
 | File | Claimed by | Covers |
 |----|----|----|
 | `Accounts.sql` | `AccountQueries`, and `Reporting.AccountReports` in a second namespace | The project's settings by property, `Nested`, table models by `SELECT *` and by the table's full list, `no-table-models`, two queries that share a model by `-- output-model:`, and a parameter declared `null` |
-| `AllTypes.sql` | `AllTypesQueries` | Every type of the type map, read by `SELECT *` and written by an insert, class models by the file header, and `timestamptz` given back to the map by a query's marker |
+| `AllTypes.sql` | `AllTypesQueries` | Every type of the type map, read by `SELECT *` into the default record, array columns included, written by an insert, and `timestamptz` given back to the map by a query's marker |
 | `Constants.sql` | `ConstantQueries` | The output `sql` by the file header, with no models and no sidecar |
 | `Billing/Invoices.sql` | `InvoiceQueries` | The database `billing` by `-- database:`, the model namespace by the file header, and the folder's metadata in the project: `sealed class` output models, the suffix `Row` and `timestamptz` as a `DateTime` |
 | `Notes.sql` | `NoteQueries` | The output `codegen` by the attribute, the type override of the enum to a C# enum and of the domain to a record struct, a `LEFT JOIN`, `-- column:`, and the marks `!` and `?` |
