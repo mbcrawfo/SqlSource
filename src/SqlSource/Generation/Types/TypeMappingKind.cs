@@ -51,4 +51,10 @@ internal enum TypeMappingKind
 
     /// <summary>The type an override names cannot be a property's type.</summary>
     MappedTypeNotAPropertyType,
+
+    /// <summary>
+    /// An array outside <c>pg_catalog</c> whose own key, its name in the catalog, has an entry, which maps nothing:
+    /// the type override names such an array as its element's key with <c>[]</c>.
+    /// </summary>
+    ArrayNamedByItsOwnKey,
 }

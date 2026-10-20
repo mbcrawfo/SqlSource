@@ -162,7 +162,8 @@ internal static class TypeKeys
     /// </para>
     /// <para>
     /// Any other qualified key is given as written, unchecked: <c>public._tag</c> is not <c>public.tag[]</c>, since a
-    /// type of another schema may be named with a <c>_</c> (TD-0059).
+    /// type of another schema may be named with a <c>_</c>, and the lookup finds an array outside <c>pg_catalog</c>
+    /// by its element's key alone.
     /// </para>
     /// </summary>
     public static bool TryNormalize(ReadOnlySpan<char> key, out string normalized)

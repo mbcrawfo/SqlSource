@@ -685,6 +685,21 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    // {0} is the column or parameter, as "column 'id'", {1} the entry's key as written, {2} the place that wrote it,
+    // as "the property SqlSourceTypeOverrides", and {3} the key to write, the element's with [].
+    public static readonly DiagnosticDescriptor ArrayEntryMapsNothing = new(
+        id: "SQLSRC261",
+        title: "Entry names an array as the catalog does",
+        messageFormat: "The type override's entry for '{1}', in {2}, maps nothing: '{1}' is the database's own name of "
+            + "the array type of {0}, and an entry names that array as its element's key with [].  Write the entry "
+            + "for '{3}' instead.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc261",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -745,7 +760,8 @@ internal static class SqlDiagnostics
             ModelsDiffer,
             ModelNameUnusable,
             OutputModelWithoutRows,
-            ColumnMarkerUnusable
+            ColumnMarkerUnusable,
+            ArrayEntryMapsNothing
         );
 
     /// <summary>
