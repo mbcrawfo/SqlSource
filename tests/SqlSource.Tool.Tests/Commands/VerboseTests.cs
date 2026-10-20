@@ -122,6 +122,61 @@ public sealed class VerboseTests : IDisposable
     }
 
     [Fact]
+    public async Task Run_VerboseWithFilesThatAreNotReady_SaysWhatIsWrongWithEach()
+    {
+        var broken = _scene.Project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
+        var ansi = _scene.Project.AddSql("Ansi.sql", "-- name: Two\nSELECT 2;\n", ("SqlSourceDialect", "ansi"));
+        var queries = _scene.Project.PathOf("Queries.cs");
+
+        var result = await _scene.DescribeAsync("App.csproj", "--verbose");
+
+        result.Out.ShouldContain(Line($"file '{broken}': postgres, has parse errors, claimed by {queries}(1)"));
+        result.Out.ShouldContain(Line($"file '{ansi}': ansi, cannot be described, claimed by {queries}(1)"));
+    }
+
+    [Fact]
+    public async Task Run_VerboseWithAProjectThatWasNotRestored_SaysItCouldNotBeRead()
+    {
+        _scene.Run.Processes.Projects[_tools] = new FakeProject
+        {
+            Imported = "",
+            ProjectAssetsFile = _scene.Run.Folder.PathOf("Tools/obj/missing.assets.json"),
+        };
+
+        var result = await _scene.DescribeAsync("All.slnx", "--verbose");
+
+        result.ExitCode.ShouldBe(1);
+        result.Out.ShouldContain(Line($"project '{_tools}' could not be read"));
+    }
+
+    [Fact]
+    public async Task Run_VerboseWithASidecarToDeleteAndOneThatCannotBeWritten_SaysDeletedAndCouldNotBeChanged()
+    {
+        var plain = _scene.Project.AddSql("Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
+        await File.WriteAllTextAsync(
+            SidecarFormat.PathFor(plain),
+            SidecarFiles.Empty(),
+            TestContext.Current.CancellationToken
+        );
+        _ = Directory.CreateDirectory(SidecarFormat.PathFor(_users));
+
+        var result = await _scene.DescribeAsync("App.csproj", "--verbose");
+
+        result.Out.ShouldContain(Line($"sidecar '{SidecarFormat.PathFor(plain)}': deleted"));
+        result.Out.ShouldContain(Line($"sidecar '{_users}.json': could not be changed"));
+    }
+
+    [Fact]
+    public async Task Run_VerboseWithASessionThatDoesNotOpen_SaysThereIsNoSession()
+    {
+        _scene.Describer.OpenFailure = FakeDescriber.Failure("GetUser", "password authentication failed");
+
+        var result = await _scene.DescribeAsync("App.csproj", "--verbose");
+
+        result.Out.ShouldContain(Line("database 'postgres': no session"));
+    }
+
+    [Fact]
     public async Task Run_VerboseCheck_SaysOfEachSidecarWhetherItIsTheSame()
     {
         _ = await _scene.DescribeAsync("All.slnx");

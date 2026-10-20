@@ -240,6 +240,39 @@ public sealed class CheckTests : IDisposable
         await ShouldBeUntouchedAsync(before);
     }
 
+    // The differences of a file are in the order of its queries, whatever the order of the entries in the sidecar.
+    [Fact]
+    public async Task Check_TwoQueriesOfOneFileThatBothDiffer_AreReportedInTheOrderOfTheFile()
+    {
+        _ = await DescribeFirstAsync();
+        _ = await RewriteAsync(sidecar => WithEntries(sidecar, [.. sidecar.Queries.Reverse()]));
+        _scene.Describer.Descriptions["GetUser"] = FakeDescriber.Rows;
+        _scene.Describer.Descriptions["ListUsers"] = FakeDescriber.Rows;
+
+        var result = await _scene.DescribeAsync("--check");
+
+        result.ExitCode.ShouldBe(2);
+        const string What = "resultKind is \"none\", and the database says \"rows\"";
+        result.Error.ShouldBe(
+            Difference($"{_users}(1,10)", "GetUser", What, ForceHelp)
+                + Difference($"{_users}(4,10)", "ListUsers", What, ForceHelp)
+        );
+    }
+
+    // A file that is not ready is described in no part, so it is compared with nothing.
+    [Fact]
+    public async Task Check_FileWithAParseError_HasNoDifferenceThoughItHasNoSidecar()
+    {
+        _ = await DescribeFirstAsync();
+        _ = _scene.Project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
+
+        var result = await _scene.DescribeAsync("--check");
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain("error SQLSRC101: ");
+        result.Error.ShouldNotContain("SQLSRC219");
+    }
+
     // The database of a query comes from the project, not from the server.
     [Fact]
     public async Task Check_EntryOfAnotherDatabase_SaysWhatTheProjectSays()
@@ -334,6 +367,35 @@ public sealed class CheckTests : IDisposable
         result.Error.ShouldStartWith($"{sidecar} : error SQLSRC218: '{sidecar}' could not be read: ");
         result.Error.Split("error SQLSRC").Length.ShouldBe(2);
         Directory.Exists(sidecar).ShouldBeTrue();
+    }
+
+    // The same, for a file that a user the system keeps out cannot open, which a directory is not.
+    [Fact]
+    public async Task Check_SidecarOfAFileThatNeedsNoneAndTheSystemWillNotOpen_IsSqlsrc218AndNoDifference()
+    {
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        {
+            Assert.Skip("Needs a file mode that keeps the owner of a file out of it.");
+            return;
+        }
+
+        _ = await DescribeFirstAsync();
+        var plain = AddPlainWithASidecar();
+        var sidecar = SidecarFormat.PathFor(plain);
+        File.SetUnixFileMode(sidecar, UnixFileMode.None);
+        try
+        {
+            var result = await _scene.DescribeAsync("--check");
+
+            result.ExitCode.ShouldBe(1);
+            result.Error.ShouldStartWith($"{sidecar} : error SQLSRC218: '{sidecar}' could not be read: ");
+            result.Error.Split("error SQLSRC").Length.ShouldBe(2);
+        }
+        finally
+        {
+            // So that the folder of the test can be deleted.
+            File.SetUnixFileMode(sidecar, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
     }
 
     // "describe" deletes nothing after an error, and leaves a newer tool's file alone: so the check says nothing.

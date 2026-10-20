@@ -166,8 +166,10 @@ internal static class SidecarCheck
     }
 
     // The hash, the engine and the database are the project's: the database says nothing of them, and describe
-    // mends them.  Two hashes of 64 characters tell nobody anything.  What the database says is skipped by describe
-    // while the query's SQL is as it was, so it needs --force.
+    // mends them.  Two hashes of 64 characters tell nobody anything.  The hash covers the engine, so a changed
+    // engine is reported as a changed query, and the engine's text is reached only by a sidecar edited by hand: the
+    // arm is the database's.  What the database says is skipped by describe while the query's SQL is as it was, so
+    // it needs --force.
     private static Found FoundOf(SidecarDifference difference) =>
         difference.Path switch
         {

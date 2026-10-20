@@ -399,6 +399,101 @@ public sealed class RunLogTests : IDisposable
         projects[1].GetProperty("inRun").GetBoolean().ShouldBeTrue();
     }
 
+    // Nothing says whether a project that was not restored, or that MSBuild failed on, uses SqlSource.
+    [Fact]
+    public async Task Run_ProjectsThatDoNotUseSqlSourceOrMayNot_HaveUsesSqlSourceFalseOrNull()
+    {
+        var tools = _scene.Run.Folder.WriteFile("Tools/Tools.csproj", "<Project />");
+        var fresh = _scene.Run.Folder.WriteFile("Fresh/Fresh.csproj", "<Project />");
+        var broken = _scene.Run.Folder.WriteFile("Broken/Broken.csproj", "<Project />");
+        var restored = _scene.Run.Folder.WriteFile("Tools/obj/project.assets.json", "{}");
+        _scene.Run.Processes.Projects[tools] = new FakeProject { Imported = "", ProjectAssetsFile = restored };
+        _scene.Run.Processes.Projects[fresh] = new FakeProject
+        {
+            Imported = "",
+            ProjectAssetsFile = _scene.Run.Folder.PathOf("Fresh/obj/project.assets.json"),
+        };
+        _scene.Run.Processes.Projects[broken] = new FakeProject { EvaluationExitCode = 1 };
+        _ = _scene.Run.Folder.WriteFile(
+            "All.slnx",
+            "<Solution><Project Path=\"App.csproj\" /><Project Path=\"Tools/Tools.csproj\" />"
+                + "<Project Path=\"Fresh/Fresh.csproj\" /><Project Path=\"Broken/Broken.csproj\" /></Solution>"
+        );
+
+        _ = await _scene.DescribeAsync("All.slnx", "--log", "run.log");
+
+        var projects = LogReader.Read(Log).Where(line => Text(line, "event") == "project").ToArray();
+        UsesSqlSource(projects, tools).ShouldBe(JsonValueKind.False);
+        UsesSqlSource(projects, fresh).ShouldBe(JsonValueKind.Null);
+        UsesSqlSource(projects, broken).ShouldBe(JsonValueKind.Null);
+        UsesSqlSource(projects, _scene.Project.ProjectPath).ShouldBe(JsonValueKind.True);
+    }
+
+    private static JsonValueKind UsesSqlSource(JsonElement[] projects, string path) =>
+        projects.Single(line => Text(line, "path") == path).GetProperty("usesSqlSource").ValueKind;
+
+    [Fact]
+    public async Task Run_FilesThatAreNotReady_HaveTheStateOfWhatIsWrongWithThem()
+    {
+        var broken = _scene.Project.AddSql("Broken.sql", "-- name: One\nSELECT 'open\n");
+        var ansi = _scene.Project.AddSql("Ansi.sql", "-- name: Two\nSELECT 2;\n", ("SqlSourceDialect", "ansi"));
+
+        _ = await _scene.DescribeAsync("--log", "run.log");
+
+        var files = LogReader.Read(Log).Where(line => Text(line, "event") == "file").ToArray();
+        Text(files.Single(line => Text(line, "path") == broken), "state").ShouldBe("has-parse-errors");
+        Text(files.Single(line => Text(line, "path") == ansi), "state").ShouldBe("not-describable");
+        Text(files.Single(line => Text(line, "path") == _users), "state").ShouldBe("ready");
+    }
+
+    // Under --database a query of another database that has no entry is left out, and the file is held back.
+    [Fact]
+    public async Task Run_QueryOfADatabaseThatIsNotSelected_IsNotSelectedAndLeftOut()
+    {
+        _ = _scene.Project.AddSql("Invoices.sql", "-- name: ListInvoices\n-- database: billing\nSELECT 3;\n");
+
+        _ = await _scene.DescribeAsync("--database", "postgres", "--log", "run.log");
+
+        var queries = LogReader.Read(Log).Where(line => Text(line, "event") == "query").ToArray();
+        var left = queries.Single(line => Text(line, "name") == "ListInvoices");
+        left.GetProperty("selected").GetBoolean().ShouldBeFalse();
+        Text(left, "decision").ShouldBe("left-out");
+        Text(left, "database").ShouldBe("billing");
+        queries
+            .Where(line => Text(line, "name") != "ListInvoices")
+            .ShouldAllBe(line => line.GetProperty("selected").GetBoolean());
+    }
+
+    // The sidecar of a file that needs none is read, and then deleted from a folder that its owner cannot change.
+    [Fact]
+    public async Task Run_SidecarThatCannotBeDeleted_HasTheActionFailed()
+    {
+        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        {
+            Assert.Skip("Needs a file mode that keeps the owner of a directory from changing it.");
+            return;
+        }
+
+        _ = _scene.Project.AddSource("Plain/Queries.cs", Plans.Type);
+        var plain = _scene.Project.AddSql("Plain/Plain.sql", "-- name: Plain\n-- output: sql\nSELECT 4;\n");
+        var sidecar = SidecarFormat.PathFor(plain);
+        await File.WriteAllTextAsync(sidecar, SidecarFiles.Empty(), TestContext.Current.CancellationToken);
+        var folder = Path.GetDirectoryName(plain)!;
+        File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserExecute);
+        try
+        {
+            var result = await _scene.DescribeAsync("--log", "run.log");
+
+            result.Error.ShouldStartWith($"{sidecar} : error SQLSRC218: '{sidecar}' could not be deleted: ");
+            ActionOf(sidecar).ShouldBe("failed");
+        }
+        finally
+        {
+            // So that the folder of the test can be deleted.
+            File.SetUnixFileMode(folder, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+    }
+
     [Fact]
     public async Task Run_ExitCodeTwo_IsTheExitCodeOfRunEnd()
     {
