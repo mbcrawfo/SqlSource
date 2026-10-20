@@ -19,9 +19,9 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// entry as a whole is never asked.
 /// </param>
 /// <param name="GroupFromChild">
-/// Whether a span in parentheses inside the entry, given as the text inside them, is a value a child of the node that
-/// computes the entry printed, or null when none is.  An aggregate inside such a span was computed under the child's
-/// own grouping.
+/// Whether a span in parentheses of the entry, given as the text inside them, is a value a child of the node that
+/// computes the entry printed, or null when none is.  No aggregate inside such a span is read, since the child
+/// computed it under its own grouping.
 /// </param>
 /// <param name="GroupsHaveRows">
 /// Whether the node that computes the entry is an <c>Aggregate</c> each of whose groups has a row: one with a

@@ -166,8 +166,9 @@ public sealed class PlanExpressionTests
         (reference.Alias is null ? reference.Column : reference.Alias + "." + reference.Column) switch
         {
             "u.balance" or "l.unit_price" => BuiltInTypes.Numeric,
-            "l.quantity" or "u.id" or "id" => BuiltInTypes.Int4,
+            "l.quantity" or "u.id" or "id" or "p.id" => BuiltInTypes.Int4,
             "u.name" or "name" => BuiltInTypes.Varchar,
+            "p.name" => BuiltInTypes.Text,
             "created_at" => BuiltInTypes.Timestamptz,
             "products.xmax" => BuiltInTypes.Xid,
             "status" => UserStatus,
@@ -293,6 +294,107 @@ public sealed class PlanExpressionTests
     [InlineData("lower(u.name)")]
     public void NullableOf_ReferenceProvedWithoutAType_FeedsNoOperator(string entry) =>
         PlanExpression.NullableOf(entry, catalogFunctions: true, AllProved).ShouldBeNull();
+
+    // The context of a node whose groups each have a row, or of one whose may have none.
+    private static ExpressionContext Grouped(bool groupsHaveRows) =>
+        Context(catalogFunctions: true) with
+        {
+            GroupsHaveRows = groupsHaveRows,
+        };
+
+    [Theory]
+    [InlineData("sum(((l.quantity)::numeric * l.unit_price))")]
+    [InlineData("max(created_at)")]
+    [InlineData("string_agg(DISTINCT p.name, ', '::text ORDER BY p.name)")]
+    [InlineData("sum(l.quantity)")]
+    [InlineData("avg(id)")]
+    [InlineData("bool_and((id > 0))")]
+    [InlineData("COALESCE(max(created_at), now())")]
+    public void NullableOf_AggregateOverAGroupWithARow_IsNotNull(string entry) =>
+        PlanExpression.NullableOf(entry, Grouped(groupsHaveRows: true)).ShouldBe(false);
+
+    [Theory]
+    [InlineData("sum(((l.quantity)::numeric * l.unit_price))")]
+    [InlineData("max(created_at)")]
+    [InlineData("string_agg(DISTINCT p.name, ', '::text ORDER BY p.name)")]
+    [InlineData("sum(l.quantity)")]
+    [InlineData("avg(id)")]
+    [InlineData("bool_and((id > 0))")]
+    [InlineData("COALESCE(max(created_at), now())")]
+    public void NullableOf_AggregateOfANodeWhoseGroupsMayHaveNoRow_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Grouped(groupsHaveRows: false)).ShouldBeNull();
+
+    // A FILTER may leave a group no row, a window's frame may be empty, an argument may be NULL, and array_agg and an
+    // ordered-set aggregate are in no row of the table.
+    [Theory]
+    [InlineData("max(created_at) FILTER (WHERE (id > 1))")]
+    [InlineData("sum(id) OVER w1")]
+    [InlineData("sum(id) OVER (?)")]
+    [InlineData("max(o.note)")]
+    [InlineData("array_agg(DISTINCT p.id ORDER BY p.id)")]
+    [InlineData("percentile_cont('0.5'::double precision) WITHIN GROUP (ORDER BY id)")]
+    [InlineData("max((name)::text) ORDER BY id")]
+    [InlineData("max(DISTINCT)")]
+    [InlineData("max(ORDER BY id)")]
+    [InlineData("max()")]
+    [InlineData("max(id, id)")]
+    [InlineData("string_agg(p.name, ', '::text, p.name)")]
+    [InlineData("string_agg(p.name, ORDER BY p.name)")]
+    [InlineData("public.max(id)")]
+    [InlineData("\"max\"(id)")]
+    [InlineData("MAX(id)")]
+    [InlineData("max((u.id))")]
+    public void NullableOf_AggregateThatMayBeNull_IsUnknown(string entry) =>
+        PlanExpression.NullableOf(entry, Grouped(groupsHaveRows: true)).ShouldBeNull();
+
+    // An aggregate is the catalog's only when the session finds pg_catalog first.
+    [Fact]
+    public void NullableOf_AggregateWhenTheCatalogIsNotFirst_IsUnknown() =>
+        PlanExpression
+            .NullableOf("max(created_at)", Context(catalogFunctions: false) with { GroupsHaveRows = true })
+            .ShouldBeNull();
+
+    // A value a child printed was computed under the child's grouping, which may be a plain one.
+    [Theory]
+    [InlineData("((sum(id)) * 2)", true, null)]
+    [InlineData("((sum(id)) * 2)", false, false)]
+    [InlineData("((sum(id))::numeric * 2.5)", true, null)]
+    [InlineData("((sum(id))::numeric * 2.5)", false, false)]
+    [InlineData("COALESCE((sum(id)), NULL::bigint)", true, null)]
+    [InlineData("COALESCE((sum(id)), NULL::bigint)", false, false)]
+    [InlineData("CASE WHEN (id > 1) THEN (sum(id) * 2) ELSE (sum(id)) END", true, null)]
+    [InlineData("CASE WHEN (id > 1) THEN (sum(id) * 2) ELSE (sum(id)) END", false, false)]
+    public void NullableOf_AggregateInASpanAChildPrinted_IsUnknown(string entry, bool fromChild, bool? expected) =>
+        PlanExpression
+            .NullableOf(
+                entry,
+                Grouped(groupsHaveRows: true) with
+                {
+                    GroupFromChild = group => fromChild && group == "sum(id)",
+                }
+            )
+            .ShouldBe(expected);
+
+    // Every span inside a group a child printed is read without the node's groups, however deep.
+    [Fact]
+    public void NullableOf_AggregateDeepInASpanAChildPrinted_IsUnknown() =>
+        PlanExpression
+            .NullableOf(
+                "(((sum(id) + 1)) * 2)",
+                Grouped(groupsHaveRows: true) with
+                {
+                    GroupFromChild = static group => group == "(sum(id) + 1)",
+                }
+            )
+            .ShouldBeNull();
+
+    [Theory]
+    [InlineData("sum(l.quantity)", BuiltInTypes.Int8)]
+    [InlineData("avg(id)", BuiltInTypes.Numeric)]
+    [InlineData("string_agg(DISTINCT p.name, ', '::text ORDER BY p.name)", BuiltInTypes.Text)]
+    [InlineData("(sum(l.quantity) * 2)", BuiltInTypes.Int8)]
+    public void ProvedTypeOf_AggregateOverAGroupWithARow_IsItsResult(string entry, long expected) =>
+        PlanExpression.ProvedTypeOf(entry, Grouped(groupsHaveRows: true)).ShouldBe(expected);
 
     [Fact]
     public void Groups_Entry_IsTheTextInsideEachPairOfParenthesesOutermostFirst() =>

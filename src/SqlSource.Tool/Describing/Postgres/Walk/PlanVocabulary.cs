@@ -13,6 +13,7 @@ internal static class PlanNodeTypes
     public const string SubqueryScan = "Subquery Scan";
     public const string CteScan = "CTE Scan";
     public const string ModifyTable = "ModifyTable";
+    public const string Aggregate = "Aggregate";
 
     public const string SeqScan = "Seq Scan";
     public const string IndexScan = "Index Scan";

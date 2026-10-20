@@ -312,7 +312,7 @@ internal static partial class NullabilityWalk
     // at a ModifyTable that may return the old or the new row only the target's alias is a relation.  An entry is read
     // in a plan where no join null-extends a side, or where the walk follows it to the node that computes it and no
     // join null-extends that node: a node prints a value computed under it in one pair of parentheses, at every node
-    // up to the root.
+    // up to the root.  An aggregate is read only where the walk follows the entry to the node that computes it.
     private sealed class Expressions(WalkScope scope, PlanNode root, PlanInstances instances, string? onlyAlias)
     {
         private const int MaxDepth = 256;
@@ -321,9 +321,12 @@ internal static partial class NullabilityWalk
             visited.NullExtends == NullExtension.None
         );
 
+        // Where nothing extends, the entry is read at the root as it is, and followed to the node that computes it
+        // only when that gives nothing: the root's reading knows no node's groups, and answers no aggregate.
         public bool? NullableOf(string entry) =>
             _nothingExtends
                 ? PlanExpression.NullableOf(entry, new ExpressionContext(scope.CatalogFunctionsFirst, ProvedTypeOf))
+                    ?? NullableAt(root, entry, 0)
                 : NullableAt(root, entry, 0);
 
         // What the entry of the node's Output says, read where it is computed: a child that prints the entry, or the
@@ -333,6 +336,9 @@ internal static partial class NullabilityWalk
         // preserved.  Where the entry is computed, a value it takes from a child that computed it is in parentheses:
         // one that is not preserved is read as unknown, so that a pulled-up constant of the side a join extends,
         // ('x'::text) inside a CASE the root computes, proves nothing, while a COALESCE with a constant still does.
+        // There an aggregate is the node's own, over a group that has a row when the node is an Aggregate with a Group
+        // Key and no Grouping Sets, unless it is inside a value a child printed, which the child computed under its own
+        // grouping.
         private bool? NullableAt(PlanNode node, string entry, int depth)
         {
             if (FollowedChildrenOf(node, depth) is not { } children)
@@ -365,10 +371,18 @@ internal static partial class NullabilityWalk
                         scope.CatalogFunctionsFirst,
                         ProvedTypeOf,
                         group =>
-                            Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1))
+                            Printing(children, group).All(found => Preserved(found.Child, found.Printed, depth + 1)),
+                        group => Printing(children, group).Any(),
+                        GroupsHaveRows(node)
                     )
                 );
         }
+
+        // Whether each group of the node has a row: an Aggregate with a Group Key makes its groups of the rows that
+        // share a key, while one with no key returns a row for an input of none, and Grouping Sets may hold the empty
+        // set.
+        private static bool GroupsHaveRows(PlanNode node) =>
+            node.NodeType == PlanNodeTypes.Aggregate && node.HasGroupKey && !node.HasGroupingSets;
 
         // Whether the entry of the node's Output is computed where no join null-extends, and so is every value it is
         // computed from, followed as NullableAt follows it.

@@ -484,6 +484,78 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
             new() { Value = oids.Select(static oid => (uint)oid).ToArray(), DataTypeName = "oid[]" };
     }
 
+    // Each aggregate TotalFunctions reads is pg_catalog's own, of exactly that name and those argument types, returning
+    // that type, a plain aggregate of one value and no ordered set, whose transition function and final one are the
+    // internal functions of pg_catalog the row names, or no final one for "-".  Every row that is not so is listed.
+    [Fact]
+    public async Task Catalog_TotalAggregates_ArePgCatalogsOwn()
+    {
+        var aggregates = TotalFunctions.Aggregates.ToArray();
+        await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
+        await using var command = source.CreateCommand(
+            """
+            SELECT r.ordinal
+            FROM unnest($1::text[], $2::text[], $3::oid[], $4::text[], $5::text[]) WITH ORDINALITY
+                AS r (name, arguments, result, transition, final, ordinal)
+            WHERE NOT EXISTS (
+                SELECT 1
+                FROM pg_catalog.pg_proc AS p
+                JOIN pg_catalog.pg_aggregate AS a ON a.aggfnoid = p.oid
+                JOIN pg_catalog.pg_proc AS t ON t.oid = a.aggtransfn
+                LEFT JOIN pg_catalog.pg_proc AS f ON f.oid = a.aggfinalfn
+                WHERE p.pronamespace = 'pg_catalog'::regnamespace
+                    AND p.proname = r.name
+                    AND p.proargtypes = r.arguments::oidvector
+                    AND p.prorettype = r.result
+                    AND p.prokind = 'a'
+                    AND NOT p.proretset
+                    AND a.aggkind = 'n'
+                    AND t.pronamespace = 'pg_catalog'::regnamespace
+                    AND t.prolang = (SELECT l.oid FROM pg_catalog.pg_language AS l WHERE l.lanname = 'internal')
+                    AND t.proname = r.transition
+                    AND (
+                        (r.final = '-' AND a.aggfinalfn = 0)
+                        OR (
+                            f.pronamespace = 'pg_catalog'::regnamespace
+                            AND f.prolang = (SELECT l.oid FROM pg_catalog.pg_language AS l WHERE l.lanname = 'internal')
+                            AND f.proname = r.final
+                        )
+                    )
+            )
+            ORDER BY r.ordinal
+            """
+        );
+        _ = command.Parameters.Add(new NpgsqlParameter { Value = aggregates.Select(static row => row.Name).ToArray() });
+        _ = command.Parameters.Add(
+            new NpgsqlParameter { Value = aggregates.Select(static row => string.Join(' ', row.Arguments)).ToArray() }
+        );
+        _ = command.Parameters.Add(
+            new NpgsqlParameter
+            {
+                Value = aggregates.Select(static row => (uint)row.Result).ToArray(),
+                DataTypeName = "oid[]",
+            }
+        );
+        _ = command.Parameters.Add(
+            new NpgsqlParameter { Value = aggregates.Select(static row => row.Transition).ToArray() }
+        );
+        _ = command.Parameters.Add(
+            new NpgsqlParameter { Value = aggregates.Select(static row => row.Final).ToArray() }
+        );
+
+        var token = TestContext.Current.CancellationToken;
+        var mismatches = new List<string>();
+        await using var reader = await command.ExecuteReaderAsync(token);
+        while (await reader.ReadAsync(token))
+        {
+            var (name, arguments, result, transition, final) = aggregates[reader.GetInt64(0) - 1];
+            mismatches.Add($"aggregate {name}({string.Join(", ", arguments)}) -> {result} by {transition} and {final}");
+        }
+
+        mismatches.ShouldBeEmpty();
+        aggregates.Length.ShouldBe(38);
+    }
+
     // The types that carry a modifier are every type of the catalog with a typmod input, but the arrays, whose
     // element carries it.
     [Fact]

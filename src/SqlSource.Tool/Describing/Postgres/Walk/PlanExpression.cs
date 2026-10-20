@@ -37,6 +37,15 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// feed no operator, and a reference in parentheses of its own, <c>(u.id)</c>, is unknown.
 /// </para>
 /// <para>
+/// An aggregate, <c>name([DISTINCT] a, ... [ORDER BY ...])</c> with nothing after its parenthesis, is not <c>NULL</c>
+/// when the node that computes the entry is one each of whose groups has a row
+/// (<see cref="ExpressionContext.GroupsHaveRows" />), every argument before the <c>ORDER BY</c> is proved, and
+/// <see cref="TotalFunctions" /> holds its name with exactly their types.  A <c>FILTER</c>, an <c>OVER</c> or a
+/// <c>WITHIN GROUP</c> makes it no such form: a filter may leave a group no row, and a window's frame may be empty.
+/// Inside a group that a child of the node printed (<see cref="ExpressionContext.GroupFromChild" />) no aggregate is
+/// read, since the child computed it under its own grouping.
+/// </para>
+/// <para>
 /// A function name is the catalog's only when the plan prints it unqualified and the session finds
 /// <c>pg_catalog</c>'s functions first (<see cref="PostgresSearchPath" />): the plan prints a function bare whenever
 /// the search path finds it, so <c>count(*)</c> may be another schema's aggregate.  An operator, a cast and a
@@ -416,11 +425,16 @@ internal static class PlanExpression
         // The index of the token that closes each opening parenthesis or bracket, and -1 for any other.
         private readonly int[] _closes;
 
+        // Whether an aggregate of the span being read is one of the node's own, over a group that has a row: false
+        // inside a group a child printed.
+        private bool _groupsHaveRows;
+
         public Reader(string entry, List<Token> tokens, ExpressionContext context)
         {
             _entry = entry;
             _tokens = tokens;
             _context = context;
+            _groupsHaveRows = context.GroupsHaveRows;
             _closes = new int[tokens.Count];
             var open = new Stack<int>();
             for (var index = 0; index < tokens.Count; index++)
@@ -460,7 +474,10 @@ internal static class PlanExpression
                     return false;
                 }
 
-                return Form(from + 1, to - 1) ?? (Proved(from, to) is null ? null : false);
+                var outside = EnterGroup(from, to);
+                var form = Form(from + 1, to - 1) ?? (Proved(from, to) is null ? null : false);
+                _groupsHaveRows = outside;
+                return form;
             }
 
             if (Constant(from, to) is { } constant)
@@ -520,7 +537,10 @@ internal static class PlanExpression
                     return null;
                 }
 
-                return OperatorAt(from + 1, to - 1) is null ? Proved(from + 1, to - 1) : CatalogForm(from, to);
+                var outside = EnterGroup(from, to);
+                var proved = OperatorAt(from + 1, to - 1) is null ? Proved(from + 1, to - 1) : CatalogForm(from, to);
+                _groupsHaveRows = outside;
+                return proved;
             }
 
             if (Constant(from, to) == false || IsCountOrRanking(from, to))
@@ -550,13 +570,28 @@ internal static class PlanExpression
                 return OperatorAt(from + 1, to - 1) is { } at ? Operator(from + 1, at, to - 1) : null;
             }
 
-            return Is(from, Kind.Open) ? Cast(from, to) : Function(from, to);
+            return Is(from, Kind.Open) ? Cast(from, to) : Function(from, to) ?? Aggregate(from, to);
         }
 
         // Whether the walk says the group may not be read.  The entry as a whole is never asked.
         private bool Vetoed(int from, int to) =>
-            (from > 0 || to < _tokens.Count)
-            && _context.GroupPreserved?.Invoke(_entry[_tokens[from].End.._tokens[to - 1].Start]) == false;
+            (from > 0 || to < _tokens.Count) && _context.GroupPreserved?.Invoke(Inside(from, to)) == false;
+
+        // Marks the aggregates inside the group unread when a child of the node printed it, and returns what to
+        // restore once the group is read.
+        private bool EnterGroup(int from, int to)
+        {
+            var outside = _groupsHaveRows;
+            if (outside && _context.GroupFromChild?.Invoke(Inside(from, to)) == true)
+            {
+                _groupsHaveRows = false;
+            }
+
+            return outside;
+        }
+
+        // The text inside the group's parentheses.
+        private string Inside(int from, int to) => _entry[_tokens[from].End.._tokens[to - 1].Start];
 
         private bool IsReference(int from, int to) => to > from && OutputReference.Parse(Text(from, to)) is not null;
 
@@ -608,29 +643,94 @@ internal static class PlanExpression
                 || !IsTypeName(close + 2, to)
                 || Vetoed(from, close + 1)
                 || BuiltInType(close + 2, to) is not { } target
-                || Proved(from + 1, close) is not { } source
             )
             {
                 return null;
             }
 
-            return SetOperationTypes.Carries(source, target) ? target : null;
+            var outside = EnterGroup(from, close + 1);
+            var source = Proved(from + 1, close);
+            _groupsHaveRows = outside;
+            return source is { } proved && SetOperationTypes.Carries(proved, target) ? target : null;
         }
 
         // name(a, ...) with a lower-case bare name, to the end, a function of the table over proved arguments.  A name
         // with a schema or in quotes is not the one the session resolves from the bare name.
         private long? Function(int from, int to)
         {
-            if (!IsLowerWord(from) || from + 1 >= to || !Is(from + 1, Kind.Open) || _closes[from + 1] != to - 1)
+            if (
+                !IsCall(from, to)
+                || !TotalFunctions.HasFunction(Text(from), ArgumentCount(from + 2, to - 1))
+                || Arguments(from + 2, to - 1) is not { } arguments
+            )
             {
                 return null;
             }
 
-            // The arguments are between the commas of depth zero; a call of none has none.
+            return TotalFunctions.FunctionResult(Text(from), arguments);
+        }
+
+        // name([DISTINCT] a, ... [ORDER BY ...]) as a function is, an aggregate of the table over proved arguments,
+        // read only where the node's groups each have a row.  Nothing follows its parenthesis: a FILTER, an OVER or a
+        // WITHIN GROUP makes it no such form.  The ORDER BY and the DISTINCT change neither whether it can be NULL.
+        private long? Aggregate(int from, int to)
+        {
+            if (!_groupsHaveRows || !IsCall(from, to))
+            {
+                return null;
+            }
+
             var close = to - 1;
-            var arguments = new List<long>();
-            var start = from + 2;
+            var start = IsWord(from + 2, "DISTINCT") ? from + 3 : from + 2;
+            var end = close;
             for (var at = start; at < close; at = Next(at))
+            {
+                if (IsWord(at, "ORDER") && IsWord(at + 1, "BY"))
+                {
+                    end = at;
+                    break;
+                }
+            }
+
+            return
+                end > start
+                && TotalFunctions.HasAggregate(Text(from), ArgumentCount(start, end))
+                && Arguments(start, end) is { } arguments
+                ? TotalFunctions.AggregateResult(Text(from), arguments)
+                : null;
+        }
+
+        // The number of arguments of [from, to), between the commas of depth zero: none for an empty span.
+        private int ArgumentCount(int from, int to)
+        {
+            if (to <= from)
+            {
+                return 0;
+            }
+
+            var count = 1;
+            for (var at = from; at < to; at = Next(at))
+            {
+                if (Is(at, Kind.Comma))
+                {
+                    count++;
+                }
+            }
+
+            return count;
+        }
+
+        // Whether the span is a lower-case bare name and the parentheses of its call, to the end.
+        private bool IsCall(int from, int to) =>
+            IsLowerWord(from) && from + 1 < to && Is(from + 1, Kind.Open) && _closes[from + 1] == to - 1;
+
+        // The type of each argument of [from, to), between the commas of depth zero, when every one is proved; none
+        // for an empty span; or null.
+        private List<long>? Arguments(int from, int to)
+        {
+            var arguments = new List<long>();
+            var start = from;
+            for (var at = start; at < to; at = Next(at))
             {
                 if (Is(at, Kind.Comma))
                 {
@@ -644,9 +744,9 @@ internal static class PlanExpression
                 }
             }
 
-            if (start < close || arguments.Count > 0)
+            if (start < to || arguments.Count > 0)
             {
-                if (Proved(start, close) is not { } last)
+                if (Proved(start, to) is not { } last)
                 {
                     return null;
                 }
@@ -654,7 +754,7 @@ internal static class PlanExpression
                 arguments.Add(last);
             }
 
-            return TotalFunctions.FunctionResult(Text(from), arguments);
+            return arguments;
         }
 
         /// <summary>The OID, or null, as <see cref="TypeOf" /> answers, for the span as a whole.</summary>

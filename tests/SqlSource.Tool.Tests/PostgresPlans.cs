@@ -5,8 +5,9 @@ using SqlSource.Tool.Describing.Postgres.Walk;
 
 namespace SqlSource.Tool.Tests;
 
-// Plans as a server would answer "explain", written by a test: a scan of a table, a join of two nodes, and a node
-// over one child.  Text gives the plan as EXPLAIN (VERBOSE, FORMAT JSON) writes it, for a test of the session.
+// Plans as a server would answer "explain", written by a test: a scan of a table, a join of two nodes, a node over
+// one child, and an aggregate.  Text gives the plan as EXPLAIN (VERBOSE, FORMAT JSON) writes it, for a test of the
+// session.
 internal static class PostgresPlans
 {
     public const string Outer = "Outer";
@@ -72,6 +73,15 @@ internal static class PostgresPlans
             false,
             [child with { ParentRelationship = relationship }]
         );
+
+    // An Aggregate over one child, of a strategy, with a Group Key or without.
+    public static PlanNode Aggregate(string strategy, bool groupKey, PlanNode child, params string[] output) =>
+        Over("Aggregate", child) with
+        {
+            Strategy = strategy,
+            HasGroupKey = groupKey,
+            Output = output.Length == 0 ? null : output,
+        };
 
     // An Append over the members the test gives, which keep the relationship they have: see Member.
     public static PlanNode Append(params PlanNode[] members) => Over("Append", Scan("x")) with { Plans = members };

@@ -6,8 +6,9 @@ using System.Linq;
 namespace SqlSource.Tool.Describing.Postgres.Walk;
 
 /// <summary>
-/// The operators and functions of <c>pg_catalog</c> that never return <c>NULL</c> for arguments that are not, by
-/// their exact argument types, with the type of what each returns.
+/// The operators and functions of <c>pg_catalog</c> that never return <c>NULL</c> for arguments that are not, and the
+/// aggregates that never return <c>NULL</c> over a group of a row whose arguments are not, by their exact argument
+/// types, with the type of what each returns.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -34,11 +35,28 @@ namespace SqlSource.Tool.Describing.Postgres.Walk;
 /// <c>Catalog_TotalFunctions_ArePgCatalogsOwn</c> in <c>PlanOutputTests</c> holds every row to the catalog, its
 /// implementation included.
 /// </para>
+/// <para>
+/// An aggregate is found by the same rule, and the table holds the names of its transition function and its final
+/// one, <c>aggtransfn</c> and <c>aggfinalfn</c>, <c>-</c> for none.  Of these the final value is <c>NULL</c> only
+/// when no input was not <c>NULL</c>: <c>max</c>, <c>min</c>, <c>bool_and</c>, <c>bool_or</c>, <c>every</c> and
+/// <c>sum</c> of a <c>real</c> or a <c>double precision</c> have a strict transition with no initial value,
+/// <c>int4larger</c>, <c>text_smaller</c>, <c>booland_statefunc</c>, <c>float8pl</c> and the rest, whose state is the
+/// first input that is not <c>NULL</c>; <c>sum</c> of a <c>smallint</c> or an <c>integer</c> has <c>int2_sum</c> and
+/// <c>int4_sum</c>, which keep a state of <c>NULL</c> until such an input; and the rest have a final function that
+/// is <c>NULL</c> only for a count of no input, <c>numeric_poly_sum</c>, <c>numeric_sum</c>,
+/// <c>numeric_poly_avg</c>, <c>numeric_avg</c>, <c>int8_avg</c> and <c>float8_avg</c>, or for a state that saw none,
+/// <c>string_agg_finalfn</c>.  A <c>DISTINCT</c> and an <c>ORDER BY</c> inside the call change neither.  So over a
+/// group that has a row, whose every input is not <c>NULL</c>, none is <c>NULL</c>.
+/// <c>Catalog_TotalAggregates_ArePgCatalogsOwn</c> holds every row to the catalog, its two functions included.
+/// </para>
 /// </remarks>
 internal static class TotalFunctions
 {
     /// <summary>The type of a value that is proved not <c>NULL</c> but of no known type: no row takes it.</summary>
     public const long UnknownType = 0;
+
+    // The final function of an aggregate that has none, as aggfinalfn prints it.
+    private const string NoFinal = "-";
 
     // The number types an arithmetic operator takes two of the same.
     private static readonly long[] NumberTypes =
@@ -80,7 +98,65 @@ internal static class TotalFunctions
         ("date_trunc", [BuiltInTypes.Text, BuiltInTypes.Timestamptz], BuiltInTypes.Timestamptz, "timestamptz_trunc"),
     ];
 
-    private static readonly (string Name, long[] Arguments, long Result)[] AggregateRows = [];
+    // The types max and min take, with the transition function of each.
+    private static readonly (long Type, string Larger, string Smaller)[] Extremes =
+    [
+        (BuiltInTypes.Int2, "int2larger", "int2smaller"),
+        (BuiltInTypes.Int4, "int4larger", "int4smaller"),
+        (BuiltInTypes.Int8, "int8larger", "int8smaller"),
+        (BuiltInTypes.Numeric, "numeric_larger", "numeric_smaller"),
+        (BuiltInTypes.Float4, "float4larger", "float4smaller"),
+        (BuiltInTypes.Float8, "float8larger", "float8smaller"),
+        (BuiltInTypes.Text, "text_larger", "text_smaller"),
+        (BuiltInTypes.Bpchar, "bpchar_larger", "bpchar_smaller"),
+        (BuiltInTypes.Date, "date_larger", "date_smaller"),
+        (BuiltInTypes.Timestamp, "timestamp_larger", "timestamp_smaller"),
+        (BuiltInTypes.Timestamptz, "timestamptz_larger", "timestamptz_smaller"),
+    ];
+
+    private static readonly (
+        string Name,
+        long[] Arguments,
+        long Result,
+        string Transition,
+        string Final
+    )[] AggregateRows =
+    [
+        .. Extremes.Select(static row => ("max", new[] { row.Type }, row.Type, row.Larger, NoFinal)),
+        .. Extremes.Select(static row => ("min", new[] { row.Type }, row.Type, row.Smaller, NoFinal)),
+        ("sum", [BuiltInTypes.Int2], BuiltInTypes.Int8, "int2_sum", NoFinal),
+        ("sum", [BuiltInTypes.Int4], BuiltInTypes.Int8, "int4_sum", NoFinal),
+        ("sum", [BuiltInTypes.Int8], BuiltInTypes.Numeric, "int8_avg_accum", "numeric_poly_sum"),
+        ("sum", [BuiltInTypes.Numeric], BuiltInTypes.Numeric, "numeric_avg_accum", "numeric_sum"),
+        ("sum", [BuiltInTypes.Float4], BuiltInTypes.Float4, "float4pl", NoFinal),
+        ("sum", [BuiltInTypes.Float8], BuiltInTypes.Float8, "float8pl", NoFinal),
+        ("avg", [BuiltInTypes.Int2], BuiltInTypes.Numeric, "int2_avg_accum", "int8_avg"),
+        ("avg", [BuiltInTypes.Int4], BuiltInTypes.Numeric, "int4_avg_accum", "int8_avg"),
+        ("avg", [BuiltInTypes.Int8], BuiltInTypes.Numeric, "int8_avg_accum", "numeric_poly_avg"),
+        ("avg", [BuiltInTypes.Numeric], BuiltInTypes.Numeric, "numeric_avg_accum", "numeric_avg"),
+        ("avg", [BuiltInTypes.Float4], BuiltInTypes.Float8, "float4_accum", "float8_avg"),
+        ("avg", [BuiltInTypes.Float8], BuiltInTypes.Float8, "float8_accum", "float8_avg"),
+        (
+            "string_agg",
+            [BuiltInTypes.Text, BuiltInTypes.Text],
+            BuiltInTypes.Text,
+            "string_agg_transfn",
+            "string_agg_finalfn"
+        ),
+        ("bool_and", [BuiltInTypes.Bool], BuiltInTypes.Bool, "booland_statefunc", NoFinal),
+        ("bool_or", [BuiltInTypes.Bool], BuiltInTypes.Bool, "boolor_statefunc", NoFinal),
+        ("every", [BuiltInTypes.Bool], BuiltInTypes.Bool, "booland_statefunc", NoFinal),
+    ];
+
+    // The name and the number of arguments of each function and each aggregate, which a call is checked against before
+    // its arguments are proved.
+    private static readonly FrozenSet<(string Name, int Arguments)> FunctionShapes = FunctionRows
+        .Select(static row => (row.Name, row.Arguments.Length))
+        .ToFrozenSet();
+
+    private static readonly FrozenSet<(string Name, int Arguments)> AggregateShapes = AggregateRows
+        .Select(static row => (row.Name, row.Arguments.Length))
+        .ToFrozenSet();
 
     private static readonly FrozenDictionary<(string Name, long Left, long Right), long> OperatorsBySignature =
         OperatorRows.ToFrozenDictionary(static row => (row.Name, row.Left, row.Right), static row => row.Result);
@@ -100,12 +176,28 @@ internal static class TotalFunctions
     internal static IEnumerable<(string Name, long[] Arguments, long Result, string Implementation)> Functions =>
         FunctionRows;
 
-    /// <summary>Every aggregate of the table: its name, its argument types, and its result.</summary>
-    internal static IEnumerable<(string Name, long[] Arguments, long Result)> Aggregates => AggregateRows;
+    /// <summary>
+    /// Every aggregate of the table: its name, its argument types, its result, and the names of its transition
+    /// function and its final one, <c>-</c> for none.  <c>Catalog_TotalAggregates_ArePgCatalogsOwn</c> reads them from
+    /// here.
+    /// </summary>
+    internal static IEnumerable<(
+        string Name,
+        long[] Arguments,
+        long Result,
+        string Transition,
+        string Final
+    )> Aggregates => AggregateRows;
 
     /// <summary>The result of the operator of the table of that name and argument types, or null.</summary>
     public static long? OperatorResult(string name, long left, long right) =>
         OperatorsBySignature.TryGetValue((name, left, right), out var result) ? result : null;
+
+    /// <summary>Whether the table holds a function of that name that takes that many arguments.</summary>
+    public static bool HasFunction(string name, int arguments) => FunctionShapes.Contains((name, arguments));
+
+    /// <summary>Whether the table holds an aggregate of that name that takes that many arguments.</summary>
+    public static bool HasAggregate(string name, int arguments) => AggregateShapes.Contains((name, arguments));
 
     /// <summary>The result of the function of the table of that name and argument types, or null.</summary>
     public static long? FunctionResult(string name, IReadOnlyList<long> arguments) =>
@@ -113,7 +205,7 @@ internal static class TotalFunctions
 
     /// <summary>The result of the aggregate of the table of that name and argument types, or null.</summary>
     public static long? AggregateResult(string name, IReadOnlyList<long> arguments) =>
-        ResultOf(AggregateRows, name, arguments);
+        ResultOf(AggregateRows.Select(static row => (row.Name, row.Arguments, row.Result)), name, arguments);
 
     private static long? ResultOf(
         IEnumerable<(string Name, long[] Arguments, long Result)> rows,
