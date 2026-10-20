@@ -26,8 +26,7 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<IEnumerable<CountShippedOrdersDto>> CountShippedOrdersAsync() =>
         connection.QueryAsync<CountShippedOrdersDto>(Sql.CountShippedOrders);
 
-    // A class and not a record, by the query's -- output-model-type: marker: Dapper cannot construct a record from a
-    // row with an array.
+    // GetOrderTagsDto is a record with an array column, which Dapper reads as any other.
     public Task<GetOrderTagsDto?> GetOrderTagsAsync(int orderId) =>
         connection.QuerySingleOrDefaultAsync<GetOrderTagsDto>(Sql.GetOrderTags, new GetOrderTagsParams(orderId));
 

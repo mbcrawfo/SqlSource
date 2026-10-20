@@ -1,10 +1,14 @@
 using System;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
+using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -25,12 +29,15 @@ public sealed class RedactionTests : IDisposable
 
     public void Dispose() => _scene.Dispose();
 
-    // Whichever way the option was written, the token keeps the option and the name and loses the value.
+    // Whichever way the option was written, the token keeps the option and loses the value, and with it the name.
     [Theory]
-    [InlineData("--connection|postgres=***", "--connection", "postgres=" + Secrets.ConnectionWithMarker)]
-    [InlineData("--connection=postgres=***", "--connection=postgres=" + Secrets.ConnectionWithMarker)]
-    [InlineData("--connection:postgres=***", "--connection:postgres=" + Secrets.ConnectionWithMarker)]
-    public async Task Run_ConnectionOnTheCommandLine_IsLoggedWithItsNameAndNoValue(string logged, params string[] args)
+    [InlineData("--connection|***", "--connection", "postgres=" + Secrets.ConnectionWithMarker)]
+    [InlineData("--connection=***", "--connection=postgres=" + Secrets.ConnectionWithMarker)]
+    [InlineData("--connection:***", "--connection:postgres=" + Secrets.ConnectionWithMarker)]
+    public async Task Run_ConnectionOnTheCommandLine_IsLoggedWithNeitherItsNameNorItsValue(
+        string logged,
+        params string[] args
+    )
     {
         var result = await _scene.DescribeAsync(["--log", "run.log", .. args]);
 
@@ -108,6 +115,194 @@ public sealed class RedactionTests : IDisposable
             .GetProperty("with")
             .GetString()
             .ShouldBe("<***>");
+    }
+
+    // A password that the describer said is secret is removed where it stands as a token.
+    [Fact]
+    public async Task Run_DescriberThatLogsAPasswordItSaidIsSecret_HasTheMarkThereAndTheWordInsideANameLeft()
+    {
+        _scene.Describer.Secrets = ["test"];
+        _scene.Describer.OnOpen = (log, _) =>
+            log.Write("connect", new LogMember("message", "password test refused, table latest_orders"));
+
+        _ = await LoggedWithAsync("Host=db;Password=test");
+
+        LogReader
+            .Read(Log)
+            .Single(e => e.GetProperty("event").GetString() == "postgres.connect")
+            .GetProperty("message")
+            .GetString()
+            .ShouldBe("password *** refused, table latest_orders");
+    }
+
+    [Fact]
+    public async Task Run_VerboseWithAServerVersionThatHoldsAPassword_SaysTheMark()
+    {
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_POSTGRES"] = "Host=db;Password=" + Secrets.Marker;
+        _scene.Describer.Secrets = [Secrets.Marker];
+        _scene.Describer.Server = _scene.Describer.Server with { Version = "16.4 " + Secrets.Marker };
+
+        var result = await _scene.DescribeAsync("--verbose");
+
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Out.ShouldContain("sqlsource: database 'postgres': server 16.4 ***\n");
+    }
+
+    [Fact]
+    public void Of_TextThatHoldsTheSecretTwice_HasTheMarkInBothPlaces() =>
+        Redaction.Of("a s3cret and a s3cret", new ConnectionSecret("s3cret")).ShouldBe("a *** and a ***");
+
+    // The edges of the rule, which holds for a part of any length: the text's own ends count as no letter, and an
+    // edge of the part that is no letter, digit or "_" is not checked.
+    [Theory]
+    [InlineData("pw", "pw", true)]
+    [InlineData("pw x", "pw", true)]
+    [InlineData("x pw", "pw", true)]
+    [InlineData("x!pw", "!pw", true)]
+    [InlineData("aaa", "aa", false)]
+    public void HoldsToken_PartAtAnEdge_IsWhetherItStandsAsAToken(string text, string part, bool expected) =>
+        Redaction.HoldsToken(text, part).ShouldBe(expected);
+
+    // A part that holds another as a token is replaced first.
+    [Fact]
+    public void Of_PartThatHoldsAShorterOneAsAToken_IsReplacedWhole() =>
+        Redaction.Of("pass-word", new ConnectionSecret("Host=db", ["pass", "pass-word"])).ShouldBe("***");
+
+    [Fact]
+    public void Of_TwoPartsOneInsideTheOther_AreEachTheMark() =>
+        Redaction.Of("hunter2 hunter", new ConnectionSecret("Host=db", ["hunter", "hunter2"])).ShouldBe("*** ***");
+
+    [Fact]
+    public void Of_FailureWhoseServerLinesHoldAPart_HasTheMarkThereAndTheWordInsideANameLeft()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=test", ["test"]);
+        var failure = FakeDescriber.Failure("GetUser", "28P01: password test refused", "at latest_orders");
+
+        Redaction.Of(failure, secret).ServerLines.ShouldBe(["28P01: password *** refused", "at latest_orders"]);
+    }
+
+    // A describer cuts what a server said into lines, so a part with a line break is in two of them.
+    [Fact]
+    public void Of_FailureWithAPartOfTwoLinesCutOverTwo_HasTheMarkOnce()
+    {
+        var secret = new ConnectionSecret("Host=db;Password=a\r\nb", ["a\r\nb"]);
+        var failure = FakeDescriber.Failure("GetUser", "x a", "b y");
+
+        Redaction.Of(failure, secret).ServerLines.ShouldBe(["x *** y"]);
+    }
+
+    // A descriptor of the fake's id with the format a describer built.  The id is no constant, so release tracking
+    // has no row for it.
+    private static DiagnosticDescriptor WithFormat(string format) =>
+        new(
+            FakeDescriber.Rejected.Id,
+            "Query was rejected",
+            format,
+            "SqlSource",
+            DiagnosticSeverity.Error,
+            isEnabledByDefault: true,
+            helpLinkUri: "https://example.test/sqlsrc999"
+        );
+
+    private static string Printed(ToolDiagnostic diagnostic)
+    {
+        using var error = new StringWriter(CultureInfo.InvariantCulture) { NewLine = "\n" };
+        new Reporter(error).Report(diagnostic);
+        return error.ToString();
+    }
+
+    // Neither the format nor the argument holds the value: together they do.
+    [Fact]
+    public void Of_ValueThatTheFormatAndAnArgumentMakeTogether_IsRemovedFromTheMessage()
+    {
+        var diagnostic = ToolDiagnostic.Create(WithFormat("half: Pass{0}"), "word=x");
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Password=x")));
+
+        printed.ShouldContain("half: ***\n");
+        printed.ShouldNotContain("Password=x");
+    }
+
+    [Fact]
+    public void Of_ValueThatTwoArgumentsMakeTogether_IsRemovedFromTheMessage()
+    {
+        var diagnostic = ToolDiagnostic.Create(WithFormat("rejected {0}{1} today"), "Pass", "word=x");
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Password=x")));
+
+        printed.ShouldContain("rejected *** today\n");
+        printed.ShouldNotContain("Password=x");
+    }
+
+    // Reporter writes a line break as a space, which can make a password that holds a space.
+    [Fact]
+    public void Of_PasswordWithASpaceSplitByALineBreak_IsTheMarkInTheArgumentAndTheLine()
+    {
+        var diagnostic = ToolDiagnostic
+            .Create(WithFormat("rejected {0}"), "my\npass")
+            .WithLines(new ContinuationLine("server", "said my\r\npass"));
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Host=db;Password=my pass", ["my pass"])));
+
+        printed.ShouldContain("rejected ***\n");
+        printed.ShouldContain("    server: said ***\n");
+        printed.ShouldNotContain("my pass");
+    }
+
+    // A message that holds the value is printed as the one argument of its error, on one line, so a line break of
+    // the format can make a password that holds a space there too.
+    [Fact]
+    public void Of_MessageThatHoldsTheValueAndAPasswordSplitByALineBreakOfTheFormat_IsTheMarkInBoth()
+    {
+        var diagnostic = ToolDiagnostic.Create(
+            WithFormat("rejected {0}{1}, said my\npass"),
+            "Host=db;Password=my",
+            " pass"
+        );
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Host=db;Password=my pass", ["my pass"])));
+
+        printed.ShouldContain("rejected ***, said ***\n");
+        printed.ShouldNotContain("my pass");
+    }
+
+    // A format that a describer built holds a password with a space, cut by a line break, and nothing of the whole
+    // value: the message is searched on one line too, and printed as its one argument.
+    [Fact]
+    public void Of_FormatThatHoldsAPasswordSplitByALineBreak_IsTheMarkInTheMessage()
+    {
+        var diagnostic = ToolDiagnostic.Create(WithFormat("rejected {0}, said my\npass"), "x");
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Host=db;Password=my pass", ["my pass"])));
+
+        printed.ShouldStartWith("sqlsource : error SQLSRC999: rejected x, said ***\n");
+        printed.ShouldNotContain("pass");
+    }
+
+    // The descriptor of a failure is searched the same way, before an error is made of it.
+    [Fact]
+    public void Of_FailureWhoseFormatHoldsAPasswordSplitByALineBreak_HasTheMarkInTheFormat()
+    {
+        var failure = FakeDescriber.Failure("GetUser") with { Descriptor = WithFormat("rejected {0}, said my\npass") };
+
+        Redaction
+            .Of(failure, new ConnectionSecret("Host=db;Password=my pass", ["my pass"]))
+            .Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture)
+            .ShouldBe("rejected {0}, said ***");
+    }
+
+    // The label of a line is printed on one line too.
+    [Fact]
+    public void Of_LineWhoseLabelHoldsAPasswordSplitByALineBreak_IsTheMarkInTheLabel()
+    {
+        var diagnostic = ToolDiagnostic
+            .Create(WithFormat("rejected {0}"), "x")
+            .WithLines(new ContinuationLine("said my\npass", "x"));
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Host=db;Password=my pass", ["my pass"])));
+
+        printed.ShouldContain("    said ***: x\n");
+        printed.ShouldNotContain("my pass");
     }
 
     // What the run itself writes of a database is a describer's text too.

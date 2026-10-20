@@ -218,37 +218,36 @@ public sealed class DescribeCommandTests : IDisposable
         result.Error.ShouldNotContain(Secrets.Marker);
     }
 
-    // The port 1 of the container's host refuses at once.  The diagnostic says what the driver said, host and all,
-    // which docs/tech-debt/TD-0034 records; the driver's own events say nothing of it.
+    // The port 1 of the container's host refuses at once.  The diagnostic holds the describer's own text, which says
+    // what failed and names neither the host nor the user, and so does the rest of the log: the driver's own events
+    // say nothing of it.
     [Fact]
-    public async Task Describe_ConnectionRefusedWithLog_IsSqlsrc224AndNoDriverEventHoldsTheHost()
+    public async Task Describe_ConnectionRefusedWithLog_IsSqlsrc224AndNothingPrintedOrLoggedHoldsTheHostOrTheUser()
     {
         _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
         var host = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString).Host.ShouldNotBeNull();
-        var connection = new NpgsqlConnectionStringBuilder { Host = host, Port = 1 };
+        var connection = new NpgsqlConnectionStringBuilder
+        {
+            Host = host,
+            Port = 1,
+            Username = LogRole,
+        };
         var log = _run.Folder.PathOf("run.log");
 
         var result = await DescribeWithAsync(connection.ConnectionString, "--log", log);
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain("error SQLSRC224: ");
-        var events = LogReader.Read(log);
-        events.ShouldContain(logged =>
-            NameOf(logged) == "diagnostic"
-            && logged.GetProperty("id").GetString() == "SQLSRC224"
-            && logged.GetProperty("lines").GetArrayLength() > 0
-        );
-        foreach (var driver in events.Where(logged => NameOf(logged) == DriverEvent))
-        {
-            driver.GetRawText().ShouldNotContain(host);
-        }
+        result.Error.ShouldContain("    server: Npgsql could not reach the server: ConnectionRefused");
+        ServerLinesOf(LogReader.Read(log), "SQLSRC224")
+            .ShouldBe(["Npgsql could not reach the server: ConnectionRefused"]);
+        await ShouldNotHoldAsync(result, log, host, LogRole);
     }
 
-    // The commonest real failure: the server rejects the role's password.  The diagnostic says what the driver said,
-    // which names the role (TD-0034).  Npgsql 10.0.3 writes no driver event for it, so the check of the driver's
-    // events holds for a later version that does.
+    // The commonest real failure: the server rejects the role's password.  The diagnostic holds the SQLSTATE and the
+    // describer's own text, and names neither the role, the host nor the database, nor does the rest of the log.
     [Fact]
-    public async Task Describe_WrongPasswordWithLog_IsSqlsrc224AndNoDriverEventHoldsTheUserOrTheHost()
+    public async Task Describe_WrongPasswordWithLog_IsSqlsrc224AndNothingPrintedOrLoggedHoldsTheUserOrTheHost()
     {
         await CreateLogRoleAndDatabaseAsync();
         _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
@@ -264,17 +263,32 @@ public sealed class DescribeCommandTests : IDisposable
 
         result.ExitCode.ShouldBe(1);
         result.Error.ShouldContain("error SQLSRC224: ");
-        var events = LogReader.Read(log);
-        events.ShouldContain(logged =>
-            NameOf(logged) == "diagnostic"
-            && logged.GetProperty("id").GetString() == "SQLSRC224"
-            && logged.GetProperty("lines").GetArrayLength() > 0
-        );
-        foreach (var driver in events.Where(logged => NameOf(logged) == DriverEvent))
+        result.Error.ShouldContain("    server: 28P01: the server refused the password");
+        ServerLinesOf(LogReader.Read(log), "SQLSRC224").ShouldBe(["28P01: the server refused the password"]);
+        await ShouldNotHoldAsync(result, log, connection.Host!, LogRole, LogDatabase);
+    }
+
+    // The texts of the "server" lines of the one diagnostic of the log with the id.
+    private static IReadOnlyList<string?> ServerLinesOf(IReadOnlyList<JsonElement> events, string id) =>
+        [
+            .. events
+                .Where(logged => NameOf(logged) == "diagnostic" && logged.GetProperty("id").GetString() == id)
+                .ShouldHaveSingleItem()
+                .GetProperty("lines")
+                .EnumerateArray()
+                .Where(static line => line.GetProperty("label").GetString() == "server")
+                .Select(static line => line.GetProperty("text").GetString()),
+        ];
+
+    // Neither what the run printed nor its log holds any of the words.
+    private static async Task ShouldNotHoldAsync(CliResult result, string log, params string[] words)
+    {
+        var text = await File.ReadAllTextAsync(log, TestContext.Current.CancellationToken);
+        foreach (var word in words)
         {
-            var text = driver.GetRawText();
-            text.ShouldNotContain(LogRole);
-            text.ShouldNotContain(connection.Host!);
+            text.ShouldNotContain(word);
+            result.Out.ShouldNotContain(word);
+            result.Error.ShouldNotContain(word);
         }
     }
 

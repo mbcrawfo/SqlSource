@@ -237,7 +237,8 @@ internal static class ModelReader
                     types[index],
                     parameter.Nullable == true,
                     ParameterDocumentation(parameter, reading.Text),
-                    Subject(ParameterOwner, parameter.Name)
+                    Subject(ParameterOwner, parameter.Name),
+                    false
                 )
             );
         }
@@ -282,13 +283,23 @@ internal static class ModelReader
                     types[index],
                     IsNullable(column, query.ColumnMarkers),
                     ColumnDocumentation(column, reading.Text),
-                    Subject(ColumnOwner, column.Name)
+                    Subject(ColumnOwner, column.Name),
+                    IsArrayType(column.Type)
                 )
             );
         }
 
         return new EquatableArray<ModelProperty>(properties.ToImmutable());
     }
+
+    // Whether Npgsql reads the type as an array, which is also how it reads a domain whose base type is one.
+    private static bool IsArrayType(SidecarType type) =>
+        type is PostgresType postgres
+        && postgres.TryGetKind(out var kind)
+        && (
+            kind == PostgresTypeKind.Array
+            || (kind == PostgresTypeKind.Domain && postgres.Base is { } baseType && IsArrayType(baseType))
+        );
 
     // Whether the property name of the parameter or column at the index is usable, after its error is added when it
     // is not.  A name that is an identifier is remembered for the model, for SQLSRC255, even when it is reserved.

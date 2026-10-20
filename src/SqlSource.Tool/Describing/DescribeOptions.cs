@@ -11,10 +11,12 @@ namespace SqlSource.Tool.Describing;
 /// <c>--project</c>, and a sidecar is deleted only in a run with none of the three.
 /// </param>
 /// <param name="Connections">The values of <c>--connection</c>.</param>
-/// <param name="Databases">The names of <c>--database</c>, each once ignoring case, in the order given.</param>
+/// <param name="Databases">
+/// The values of <c>--database</c>, each name once ignoring case, in the order given; the first of a name is kept.
+/// </param>
 internal sealed record DescribeOptions(
     RunMode Mode,
     bool HasFilter,
     ImmutableArray<ConnectionArgument> Connections,
-    ImmutableArray<string> Databases
+    ImmutableArray<UsageValue> Databases
 );

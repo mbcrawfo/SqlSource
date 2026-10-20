@@ -12,8 +12,8 @@ namespace SqlSource.Tool;
 /// <remarks>
 /// System.CommandLine's own messages repeat the token they reject, and a token may be a secret: a misspelt
 /// <c>--conection</c> is followed by a connection string.  So the tool writes these lines itself.  A line names an
-/// option the tool has, or the name of an unknown option cut at its first <c>=</c> or <c>:</c>, or a position, and
-/// never any other text of the command line.
+/// option the tool has, or the name of an unknown option that is close to one the tool has, cut at its first
+/// <c>=</c> or <c>:</c>, or a position, and never any other text of the command line.
 /// </remarks>
 internal static class UsageCheck
 {
@@ -53,8 +53,12 @@ internal static class UsageCheck
                 if (option is null)
                 {
                     // The token after a misspelt option may be its value, so nothing after it is read, and nothing
-                    // found before it is reported beside it.
-                    return new Usage(command, arguments, [], [$"sqlsource: unknown option '{OneLine.Of(name)}'"]);
+                    // found before it is reported beside it.  The token itself may be a secret typed as an option,
+                    // as -pS3cret is, so it is named only when it is a misspelling of an option of the tool.
+                    var line = IsNearAnOption(root, name)
+                        ? $"sqlsource: unknown option '{OneLine.Of(name)}'"
+                        : $"sqlsource: unknown option at position {index}";
+                    return new Usage(command, arguments, [], [line]);
                 }
 
                 var hasSeparator = token.Length > name.Length;
@@ -111,6 +115,14 @@ internal static class UsageCheck
 
         return new Usage(command, arguments, values, messages);
     }
+
+    // The names and aliases of every option of the tool, whichever command the walk is in, so that --forse is named
+    // before the command, where --force is unknown, as it is after it.
+    private static bool IsNearAnOption(Command command, string name) =>
+        command.Options.Any(option =>
+            NearName.IsNear(name, option.Name, ignoreCase: false)
+            || option.Aliases.Any(alias => NearName.IsNear(name, alias, ignoreCase: false))
+        ) || command.Subcommands.Any(sub => IsNearAnOption(sub, name));
 
     private static Option? Find(List<Option> options, string name) =>
         options.Find(option => option.Name == name || option.Aliases.Contains(name));

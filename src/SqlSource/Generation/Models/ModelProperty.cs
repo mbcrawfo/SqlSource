@@ -11,12 +11,17 @@ namespace SqlSource.Generation.Models;
 /// <param name="IsNullable">Whether the property can be null.</param>
 /// <param name="Documentation">The property's documentation, as escaped XML.</param>
 /// <param name="Subject">The parameter or the column as a message names it: <c>column 'id'</c>.</param>
+/// <param name="IsArray">
+/// Whether the column's PostgreSQL type is an array, or a domain whose base type is one.  Always false for a parameter.
+/// It changes no property's C#, so <see cref="IsSameShape" /> does not compare it.
+/// </param>
 internal sealed record ModelProperty(
     string Name,
     PropertyType Type,
     bool IsNullable,
     string Documentation,
-    string Subject
+    string Subject,
+    bool IsArray
 )
 {
     /// <summary>

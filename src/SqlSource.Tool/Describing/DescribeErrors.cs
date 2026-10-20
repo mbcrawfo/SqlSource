@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Globalization;
 using System.Linq;
 using System.Text;
@@ -26,7 +27,10 @@ internal static class DescribeErrors
             SqlDialectName.Canonical(dialect)
         );
 
-    /// <summary><c>SQLSRC213</c>, with the option, the variable, and the names given for no database.</summary>
+    /// <summary>
+    /// <c>SQLSRC213</c>, with the option, the variable, the names given for no database that are close to one, and
+    /// the positions of the values whose name is far from every database, which may be a secret.
+    /// </summary>
     public static ToolDiagnostic NoConnection(PlannedQuery query, DatabaseConnection connection, Connections all)
     {
         var help = new StringBuilder("pass --connection ")
@@ -41,9 +45,29 @@ internal static class DescribeErrors
                 .Append(" of this run");
         }
 
+        if (!all.UnusedPositions.IsEmpty)
+        {
+            _ = help.Append(".  ").Append(UnusedPositionsSentence(all.UnusedPositions));
+        }
+
         return ToolDiagnostic
             .At(ToolDiagnostics.DatabaseHasNoConnection, query.Query.NameLocation, connection.Database)
             .WithLines(new ContinuationLine(Help, help.ToString()));
+    }
+
+    // The value of --connection at position 3 names no database of this run
+    // The values of --connection at positions 3 and 5 name no databases of this run
+    // The values of --connection at positions 3, 5 and 7 name no databases of this run
+    private static string UnusedPositionsSentence(ImmutableArray<int> positions)
+    {
+        var numbers = positions.Select(static position => position.ToString(CultureInfo.InvariantCulture)).ToList();
+        if (numbers.Count == 1)
+        {
+            return $"The value of --connection at position {numbers[0]} names no database of this run";
+        }
+
+        var list = $"{string.Join(", ", numbers.Take(numbers.Count - 1))} and {numbers[^1]}";
+        return $"The values of --connection at positions {list} name no databases of this run";
     }
 
     /// <summary><c>SQLSRC214</c>: the database's variable is another selected database's too.</summary>

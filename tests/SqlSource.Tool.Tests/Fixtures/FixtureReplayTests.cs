@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
@@ -195,6 +196,8 @@ public sealed class FixtureReplayTests : IDisposable
     private sealed class Probe(IQueryDescriber inner, Action<OpenRequest> opened) : IQueryDescriber
     {
         public SqlDialect Dialect => inner.Dialect;
+
+        public IReadOnlyList<string> SecretsOf(string connection) => inner.SecretsOf(connection);
 
         public Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
             OpenRequest request,

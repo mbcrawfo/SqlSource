@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
@@ -76,13 +75,6 @@ internal sealed partial class PostgresSession : IDescribeSession
     /// The settings of the planner that every <c>explain</c> carries: none, but in a test.
     /// </param>
     /// <param name="cancellationToken">Ends the call.</param>
-    [SuppressMessage(
-        "Reliability",
-        "CA2000:Dispose objects before losing scope",
-        Justification = "The session owns the connection and is its caller's to close: the run closes what it "
-            + "opened.  The analyzer follows a disposable that is returned itself and not one that is returned in "
-            + "an Outcome.  docs/tech-debt/TD-0041."
-    )]
     public static async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,
         IRunLog log,
@@ -116,7 +108,7 @@ internal sealed partial class PostgresSession : IDescribeSession
 
             var session = new PostgresSession(request, log, connection, live, server, explainSettings);
             kept = true;
-            return Outcome<IDescribeSession, DescribeFailure>.Of(session);
+            return new Outcome<IDescribeSession, DescribeFailure>(session);
         }
         finally
         {

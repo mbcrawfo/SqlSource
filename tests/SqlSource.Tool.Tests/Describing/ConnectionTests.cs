@@ -11,7 +11,7 @@ namespace SqlSource.Tool.Tests.Describing;
 // Where the connection of a database comes from: the command line, its own variable, or the variable with no name.
 public sealed class ConnectionTests
 {
-    // Every selected database can be described.
+    // Every selected database can be described, and the plan has no other.
     private static Connections Resolve(
         string[] selected,
         string[] given,
@@ -23,13 +23,23 @@ public sealed class ConnectionTests
         string[] describable,
         string[] given,
         params (string Name, string Value)[] environment
+    ) => Resolve(selected, selected, describable, given, environment);
+
+    // The value at index i of "given" stands at position (2 * i) + 3, as if each followed "describe --connection".
+    private static Connections Resolve(
+        string[] planned,
+        string[] selected,
+        string[] describable,
+        string[] given,
+        params (string Name, string Value)[] environment
     )
     {
         var variables = environment.ToDictionary(variable => variable.Name, variable => variable.Value);
         return Connections.Resolve(
             selected,
             describable,
-            [.. given.Select(ConnectionArguments.Parse)],
+            planned,
+            [.. given.Select((text, index) => ConnectionArguments.Parse(text, (2 * index) + 3))],
             name => variables.GetValueOrDefault(name)
         );
     }
@@ -180,11 +190,43 @@ public sealed class ConnectionTests
     [Fact]
     public void UnusedNames_NameThatIsNoSelectedDatabase_IsNoErrorAndIsKept()
     {
-        var connections = Resolve(["billing"], ["biling=A", "billing=B", "reports=C"]);
+        var connections = Resolve(
+            ["billing", "reports"],
+            ["billing"],
+            ["billing"],
+            ["biling=A", "billing=B", "reportz=C", "reports=D"]
+        );
 
         connections.For("billing").Value.ShouldBe("B");
-        connections.UnusedNames.ShouldBe(["biling", "reports"]);
+        connections.UnusedNames.ShouldBe(["biling", "reportz", "reports"]);
+        connections.UnusedPositions.ShouldBeEmpty();
         connections.Databases.ShouldBe(["billing"]);
+    }
+
+    // A name near a database of the plan, selected or not, is kept; ignoring case, as the databases are.
+    [Fact]
+    public void UnusedNames_NameCloseToAnUnselectedDatabaseOfThePlanIgnoringCase_IsKept()
+    {
+        var connections = Resolve(["billing", "reports"], ["billing"], ["billing"], ["BILING=A"]);
+
+        connections.UnusedNames.ShouldBe(["BILING"]);
+        connections.UnusedPositions.ShouldBeEmpty();
+    }
+
+    // The name of a secret typed in the wrong place is kept by the position of its value, in the order given.
+    [Fact]
+    public void UnusedNames_NameFarFromEveryDatabase_IsKeptByItsPosition()
+    {
+        var connections = Resolve(
+            ["billing", "reports"],
+            ["billing"],
+            ["billing"],
+            ["Host=A", "biling=B", "Server=C", "billing=D"]
+        );
+
+        connections.UnusedNames.ShouldBe(["biling"]);
+        connections.UnusedPositions.ShouldBe([3, 7]);
+        connections.For("billing").Value.ShouldBe("D");
     }
 
     [Fact]

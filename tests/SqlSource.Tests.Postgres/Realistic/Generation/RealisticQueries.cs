@@ -27,12 +27,10 @@ internal static partial class AggregateCteLeftJoinedQuery;
 )]
 internal static partial class AnyIdsAndEnumArrayQuery;
 
-// A class, since Dapper cannot construct a record with an array column (TD-0062).
 [SqlSourceGenerate(
     Path = "../Cases/array-and-string-agg/query.sql",
     SqlLocation = SqlLocation.Direct,
-    Output = GeneratorOutput.Models,
-    OutputModelType = GeneratorModelType.Class
+    Output = GeneratorOutput.Models
 )]
 internal static partial class ArrayAndStringAggQuery;
 

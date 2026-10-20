@@ -11,6 +11,12 @@ namespace SqlSource.Tool.Describing;
 /// <param name="Value">The connection.  It may hold <c>=</c> itself, and is never printed.</param>
 internal sealed record ConnectionArgument(string Name, string Value)
 {
+    /// <summary>The position of the token that holds the value on the command line, counted from one.</summary>
+    /// <remarks>
+    /// Set by the command from the <see cref="UsageValue" /> it read; <see cref="TryParse" /> does not know it.
+    /// </remarks>
+    public int Position { get; init; }
+
     /// <summary>
     /// Reads <c>name=value</c>.  The name is the text before the first <c>=</c> and must be a database name by the
     /// rule of the <c>-- database:</c> marker; the value is the rest and must hold something other than white

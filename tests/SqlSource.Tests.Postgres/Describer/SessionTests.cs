@@ -47,35 +47,40 @@ public sealed class SessionTests(PostgresContainer postgres)
         CaptureJson.Write(capture).ShouldNotContain(postgres.ConnectionString);
     }
 
+    // The server's message names the user, and its SQLSTATE alone is kept.
     [Fact]
-    public async Task OpenAsync_WrongPassword_IsSqlsrc224WithTheServersMessage()
+    public async Task OpenAsync_WrongPassword_IsSqlsrc224WithTheSqlStateAndAFixedText()
     {
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { Password = Secrets.Marker };
 
         var failure = await ShouldNotOpenAsync(connection.ConnectionString);
 
-        failure.ServerLines[0].ShouldStartWith("28P01: password authentication failed");
+        failure.ServerLines.ShouldBe(["28P01: the server refused the password"]);
+        ShouldNotName(failure, connection.Host, connection.Username);
     }
 
+    // The server's message names the database.
     [Fact]
-    public async Task OpenAsync_MissingDatabase_IsSqlsrc224WithTheServersMessage()
+    public async Task OpenAsync_MissingDatabase_IsSqlsrc224WithTheSqlStateAndAFixedText()
     {
-        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { Database = "nope" };
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString) { Database = "sqlsrc_nope" };
 
         var failure = await ShouldNotOpenAsync(connection.ConnectionString);
 
-        failure.ServerLines.ShouldBe(["3D000: database \"nope\" does not exist"]);
+        failure.ServerLines.ShouldBe(["3D000: the server has no such database"]);
+        ShouldNotName(failure, connection.Host, connection.Username, connection.Database);
     }
 
-    // The port 1 of this machine refuses at once.
+    // The port 1 of this machine refuses at once.  The driver's message names the host and the port.
     [Fact]
-    public async Task OpenAsync_UnreachableHost_IsSqlsrc224WithTheDriversMessage()
+    public async Task OpenAsync_UnreachableHost_IsSqlsrc224WithAFixedTextAndTheSocketsError()
     {
         var failure = await ShouldNotOpenAsync(
-            "Host=127.0.0.1;Port=1;Timeout=5;Username=app;Password=" + Secrets.Marker
+            "Host=127.0.0.1;Port=1;Timeout=5;Username=sqlsrc_unreached;Password=" + Secrets.Marker
         );
 
-        failure.ServerLines.ShouldBe(["Failed to connect to 127.0.0.1:1"]);
+        failure.ServerLines.ShouldBe(["Npgsql could not reach the server: ConnectionRefused"]);
+        ShouldNotName(failure, "127.0.0.1", "sqlsrc_unreached");
     }
 
     // The server asks for a password and the string names a password file instead of a password: the driver reads
@@ -150,9 +155,9 @@ public sealed class SessionTests(PostgresContainer postgres)
     private const string Sql = "SELECT 1 FROM users WHERE id = @id";
 
     // A server ends a backend when it restarts, when an administrator says so and after an idle timeout.  The
-    // describe that finds it out has what the server said last, 57P01, or what the driver says of a socket that
-    // closed before it read that, so its lines are not compared.  Every call after it has the tool's own text: the
-    // driver would throw what is no error of a server.
+    // describe that finds it out has the SQLSTATE the server said last, 57P01, or, when the driver's socket closed
+    // before it read that, a lost connection: either with the describer's own text.  Every call after it has the
+    // tool's own text: the driver would throw what is no error of a server.
     [Fact]
     public async Task DescribeAsync_AfterTheServerEndedTheSession_IsSqlsrc225EachTimeAndNoThrow()
     {
@@ -164,7 +169,12 @@ public sealed class SessionTests(PostgresContainer postgres)
         var found = await session.DescribeAsync(Requests.Of(Sql), token);
         var later = await session.DescribeAsync(Requests.Of(Sql), token);
 
-        _ = ShouldBeRejected(found, DescribeStep.DescribeParameters);
+        var ended = ShouldBeRejected(found, DescribeStep.DescribeParameters);
+        ended
+            .ServerLines.ShouldHaveSingleItem()
+            .ShouldBeOneOf("57P01: the server ended the session", PostgresConnection.LostConnection);
+        var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
+        ShouldNotName(ended, connection.Host, connection.Username);
         ShouldBeRejected(later, DescribeStep.DescribeParameters)
             .ServerLines.ShouldBe([PostgresConnection.LostConnection]);
     }
@@ -194,6 +204,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         _ = ShouldBeRejected(described, DescribeStep.DescribeColumns);
         capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "columns", "deallocate"]);
         CaptureJson.TextOf(capture.Calls[3].Answer).ShouldContain(PostgresConnection.LostConnection);
+        CaptureJson.Write(capture).ShouldNotContain(new NpgsqlConnectionStringBuilder(postgres.ConnectionString).Host!);
     }
 
     // Another session drops the table the query reads after "columns" named it: "tables" answers nothing for it.  That
@@ -320,6 +331,16 @@ public sealed class SessionTests(PostgresContainer postgres)
             _ = await live(request, cancellationToken);
             BackendsWhileOpen = await countBackends();
             throw exception;
+        }
+    }
+
+    // No text of the failure holds any of the words: a host, a user or a database's own name.
+    private static void ShouldNotName(DescribeFailure failure, params string?[] words)
+    {
+        foreach (var word in words)
+        {
+            var named = word.ShouldNotBeNull();
+            Sessions.TextsOf(failure).ShouldAllBe(text => !text.Contains(named, StringComparison.Ordinal));
         }
     }
 

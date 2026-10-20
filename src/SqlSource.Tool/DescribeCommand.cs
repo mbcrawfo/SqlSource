@@ -26,9 +26,9 @@ internal static class DescribeCommand
 
     private const string PathArgument = "path";
 
-    private const string ProjectOption = "--project";
+    internal const string ProjectOption = "--project";
 
-    private const string DatabaseOption = "--database";
+    internal const string DatabaseOption = "--database";
 
     internal const string ConnectionOption = "--connection";
 
@@ -132,17 +132,31 @@ internal static class DescribeCommand
     /// System.CommandLine takes a command's action when it invokes, not when it parses.
     /// </summary>
     /// <param name="parsed">A command line for which <see cref="Runs" /> is true.</param>
+    /// <param name="usage">The same command line as <see cref="UsageCheck" /> read it, which gives the values.</param>
     /// <param name="host">What the run takes from outside.</param>
     /// <param name="reporter">Where the errors go, with the run's trace.</param>
     /// <param name="counted">Given the counts of each selected database, as <c>run.end</c> holds them.</param>
-    public static void Bind(ParseResult parsed, ToolHost host, Reporter reporter, Action<LogValue> counted) =>
+    public static void Bind(
+        ParseResult parsed,
+        Usage usage,
+        ToolHost host,
+        Reporter reporter,
+        Action<LogValue> counted
+    ) =>
         parsed.CommandResult.Command.SetAction(
             async (command, cancellationToken) =>
             {
                 // An error is in the reporter, where the exit code is taken.
-                if (await PlanAsync(command, host, reporter, cancellationToken) is { } plan)
+                if (await PlanAsync(usage, host, reporter, cancellationToken) is { } plan)
                 {
-                    await DescribeRun.RunAsync(plan, OptionsOf(command), host, reporter, counted, cancellationToken);
+                    await DescribeRun.RunAsync(
+                        plan,
+                        OptionsOf(command, usage),
+                        host,
+                        reporter,
+                        counted,
+                        cancellationToken
+                    );
                 }
 
                 return 0;
@@ -201,6 +215,14 @@ internal static class DescribeCommand
                     $"sqlsource: the value of option '{LogOption}' at position {value.Position} is not a path"
                 );
             }
+            else if (value.Option.Name == LogOption && value.Text.AsSpan().IndexOfAny('=', ';') >= 0)
+            {
+                // "=" and ";" are what a connection string is made of: the value may be one typed after --log.
+                messages.Add(
+                    $"sqlsource: the value of option '{LogOption}' at position {value.Position} holds '=' or ';', "
+                        + "which a log's path may not"
+                );
+            }
             else if (value.Option.Name == ConnectionOption)
             {
                 if (!ConnectionArgument.TryParse(value.Text, out var connection))
@@ -257,42 +279,65 @@ internal static class DescribeCommand
     }
 
     /// <summary>
-    /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--connection</c> the same values, in the
-    /// same order.  True for a command other than <c>describe</c>.
+    /// Whether <see cref="UsageCheck" /> and System.CommandLine gave <c>--project</c>, <c>--database</c>,
+    /// <c>--connection</c> and <c>--log</c> the same values, in the same order.  True for a command other than
+    /// <c>describe</c>.
     /// </summary>
     /// <remarks>
-    /// The log's <c>arguments</c> is redacted from what <see cref="UsageCheck" /> read, and the describer is handed
-    /// what System.CommandLine bound.  If the two disagree on which token is a connection's value, a value could
-    /// reach the log, so <c>Cli</c> runs nothing then.
+    /// The run reads these values from <see cref="Usage" />, and the log's <c>arguments</c> is redacted from it,
+    /// while System.CommandLine gives the log's path and the flags.  If the two disagree on
+    /// which token is the value of an option, a token could be printed where the other reader would not print it,
+    /// so <c>Cli</c> runs nothing then.
     /// </remarks>
-    public static bool ReadsConnectionsAs(Usage usage, ParseResult parsed) =>
+    public static bool ReadsValuesAs(Usage usage, ParseResult parsed) =>
         usage.Command.Name != Name
-        || usage
-            .Values.Where(static value => value.Option?.Name == ConnectionOption)
+        || (
+            ReadsAs(usage, parsed, ProjectOption)
+            && ReadsAs(usage, parsed, DatabaseOption)
+            && ReadsAs(usage, parsed, ConnectionOption)
+            && ValuesOf(usage, LogOption)
+                .Select(static value => value.Text)
+                .SequenceEqual(parsed.GetValue<string>(LogOption) is { } log ? [log] : [], StringComparer.Ordinal)
+        );
+
+    private static bool ReadsAs(Usage usage, ParseResult parsed, string option) =>
+        ValuesOf(usage, option)
             .Select(static value => value.Text)
-            .SequenceEqual(parsed.GetValue<string[]>(ConnectionOption) ?? [], StringComparer.Ordinal);
+            .SequenceEqual(parsed.GetValue<string[]>(option) ?? [], StringComparer.Ordinal);
+
+    // The values of an option, in order.
+    private static ImmutableArray<UsageValue> ValuesOf(Usage usage, string option) =>
+        [.. usage.Values.Where(value => value.Option?.Name == option)];
+
+    // The arguments of the command: the unit, and the .sql paths.
+    private static ImmutableArray<UsageValue> ArgumentsOf(Usage usage) =>
+        [.. usage.Values.Where(static value => value.Option is null)];
 
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
-    private static DescribeOptions OptionsOf(ParseResult parsed)
+    private static DescribeOptions OptionsOf(ParseResult parsed, Usage usage)
     {
-        var paths = parsed.GetValue<string[]>(PathArgument) ?? [];
-        var projects = parsed.GetValue<string[]>(ProjectOption) ?? [];
-        var databases = parsed.GetValue<string[]>(DatabaseOption) ?? [];
+        var projects = ValuesOf(usage, ProjectOption);
+        var databases = ValuesOf(usage, DatabaseOption);
         var connections = ImmutableArray.CreateBuilder<ConnectionArgument>();
-        foreach (var text in parsed.GetValue<string[]>(ConnectionOption) ?? [])
+        foreach (var value in ValuesOf(usage, ConnectionOption))
         {
             connections.Add(
-                ConnectionArgument.TryParse(text, out var connection)
-                    ? connection
+                ConnectionArgument.TryParse(value.Text, out var connection)
+                    ? connection with
+                    {
+                        Position = value.Position,
+                    }
                     : throw new InvalidOperationException("A --connection that is no name and value was let through.")
             );
         }
 
         return new DescribeOptions(
             ModeOf(parsed),
-            projects.Length > 0 || databases.Length > 0 || paths.Any(SqlPath.IsSqlFile),
+            projects.Length > 0
+                || databases.Length > 0
+                || ArgumentsOf(usage).Any(static argument => SqlPath.IsSqlFile(argument.Text)),
             connections.ToImmutable(),
-            [.. databases.Distinct(StringComparer.OrdinalIgnoreCase)]
+            [.. databases.DistinctBy(static value => value.Text, StringComparer.OrdinalIgnoreCase)]
         );
     }
 
@@ -314,15 +359,15 @@ internal static class DescribeCommand
     /// reads the plan from here, and the run goes on from it.
     /// </remarks>
     internal static async Task<RunPlan?> PlanAsync(
-        ParseResult parsed,
+        Usage usage,
         ToolHost host,
         Reporter reporter,
         CancellationToken cancellationToken
     )
     {
         // With file filters and no unit, the unit is found from the working directory, not from the files.
-        var paths = parsed.GetValue<string[]>(PathArgument) ?? [];
-        var unitPath = paths.FirstOrDefault(static path => !SqlPath.IsSqlFile(path));
+        var paths = ArgumentsOf(usage);
+        var unitPath = paths.FirstOrDefault(static path => !SqlPath.IsSqlFile(path.Text));
         var found = RunUnitFinder.Find(unitPath, host.WorkingDirectory);
         if (!found.Succeeded)
         {
@@ -334,7 +379,7 @@ internal static class DescribeCommand
         RunEvents.Unit(reporter.Trace, unit, wasGiven: unitPath is not null);
         var manifests = await RunProjects.FindAsync(
             unit,
-            parsed.GetValue<string[]>(ProjectOption) ?? [],
+            ValuesOf(usage, ProjectOption),
             host,
             reporter,
             cancellationToken
@@ -351,8 +396,8 @@ internal static class DescribeCommand
         }
 
         var filters = RunFilters.Create(
-            paths.Where(SqlPath.IsSqlFile),
-            parsed.GetValue<string[]>(DatabaseOption) ?? [],
+            paths.Where(static path => SqlPath.IsSqlFile(path.Text)),
+            ValuesOf(usage, DatabaseOption).Select(static value => value.Text),
             host.WorkingDirectory
         );
         var result = RunPlanner.Plan(manifests, filters, cancellationToken);

@@ -404,11 +404,11 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_OutputTypeByHeaderMarker_IsAClassOfEveryColumn() =>
+    public void Models_AllTypes_IsASealedRecordOfEveryColumn() =>
         ShouldBeModel(
             typeof(AllTypesDto),
             $"{Namespace}.AllTypesDto",
-            Shape.Class,
+            Shape.SealedRecord,
             ("Id", typeof(int), false),
             ("BoolValue", typeof(bool?), true),
             ("Int2Value", typeof(short?), true),

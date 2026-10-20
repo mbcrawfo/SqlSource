@@ -41,6 +41,10 @@ internal sealed class CliRun : IDisposable
     // The clock of the run.  The machine's, unless a test brings one it can move.
     public TimeProvider Time { get; set; } = TimeProvider.System;
 
+    // Makes or empties the files the tool writes, as the log.  The host's own unless a test brings one, for a file
+    // that fails.
+    public Func<string, Stream>? CreateFile { get; set; }
+
     // Set to stand in for standard output, for a test of a writer that fails.
     public TextWriter? Out { get; set; }
 
@@ -67,9 +71,9 @@ internal sealed class CliRun : IDisposable
         using var error = NewWriter();
         var host = CreateHost(output, error);
         var reporter = new Reporter(host.Error);
-        var parsed = Cli.BuildCommands().Parse(args, Cli.Parser);
+        var usage = UsageCheck.Check(Cli.BuildCommands(), args);
 
-        var plan = await DescribeCommand.PlanAsync(parsed, host, reporter, TestContext.Current.CancellationToken);
+        var plan = await DescribeCommand.PlanAsync(usage, host, reporter, TestContext.Current.CancellationToken);
 
         return (plan, new CliResult(reporter.Count > 0 ? 1 : 0, output.ToString(), error.ToString()));
     }
@@ -94,5 +98,6 @@ internal sealed class CliRun : IDisposable
             Describers = new DescriberRegistry(Describers),
             Exchange = _ => Exchange,
             Time = Time,
+            CreateFile = CreateFile ?? ToolHost.NewFile,
         };
 }

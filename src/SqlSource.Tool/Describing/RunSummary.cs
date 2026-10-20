@@ -6,6 +6,7 @@ using System.Linq;
 using SqlSource.Parsing;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
+using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Describing;
 
@@ -18,11 +19,16 @@ internal static class RunSummary
     /// A line for each selected database, in the plan's order, then one for each name of <c>--database</c> that
     /// is no selected database, in the order given.  The counts are of selected queries that need an entry.
     /// </summary>
+    /// <remarks>
+    /// A name that is no database of the plan may be a secret typed after <c>--database</c> by mistake, so it is
+    /// printed only when it is close to a database of the plan, which tells a user that it was misspelt.  Any other
+    /// is named by its position, as <c>--database at position 3</c>.
+    /// </remarks>
     /// <param name="planned">The databases of the plan.</param>
     /// <param name="selected">The selected ones of them.</param>
     /// <param name="files">The files, with every query described, kept, failed or left out.</param>
     /// <param name="connections">The connections of the selected databases.</param>
-    /// <param name="named">The names of <c>--database</c>.</param>
+    /// <param name="named">The values of <c>--database</c>, each name once ignoring case, the first kept.</param>
     /// <param name="mode">
     /// The run's mode: the counts of <c>--check</c> are <c>same</c>, <c>differ</c> and <c>failed</c>.
     /// </param>
@@ -31,7 +37,7 @@ internal static class RunSummary
         ImmutableArray<PlannedDatabase> selected,
         ImmutableArray<FileWork> files,
         Connections connections,
-        ImmutableArray<string> named,
+        ImmutableArray<UsageValue> named,
         RunMode mode
     )
     {
@@ -69,13 +75,13 @@ internal static class RunSummary
             );
         }
 
-        foreach (var name in named.Where(candidate => !selected.Any(database => Same(database.Name, candidate))))
+        foreach (var name in named.Where(candidate => !selected.Any(database => Same(database.Name, candidate.Text))))
         {
             // With its engine when the plan knows the database, though no query of it is selected.
             lines.Add(
-                planned.FirstOrDefault(database => Same(database.Name, name)) is { } known
+                planned.FirstOrDefault(database => Same(database.Name, name.Text)) is { } known
                     ? $"{Label(known)}: {zeros}"
-                    : $"{name}: {zeros}"
+                    : $"{Named(name, planned)}: {zeros}"
             );
         }
 
@@ -118,6 +124,13 @@ internal static class RunSummary
             new("failed", failed)
         );
     }
+
+    // What a name of --database that no database of the plan equals is called: itself when it is close to one, as a
+    // misspelt name is, and its position otherwise.
+    private static string Named(UsageValue name, ImmutableArray<PlannedDatabase> planned) =>
+        planned.Any(database => NearName.IsNear(name.Text, database.Name, ignoreCase: true))
+            ? name.Text
+            : string.Create(CultureInfo.InvariantCulture, $"--database at position {name.Position}");
 
     private static string Label(PlannedDatabase database) =>
         $"{database.Name} ({SqlDialectName.Canonical(database.Dialect)})";

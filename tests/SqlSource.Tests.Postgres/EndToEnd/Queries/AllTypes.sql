@@ -1,7 +1,6 @@
--- The queries of every type of the type map, claimed by AllTypesQueries.  Their rows are read into class models: Dapper
--- cannot construct a positional record with an array column.  InsertAllTypes writes the columns whose parameter Dapper
--- can send; AllTypesQueryTests.WriteSideLeftOut names the others, each with the reason.
--- output-model-type: class
+-- The queries of every type of the type map, claimed by AllTypesQueries.  Their rows are read into the default record
+-- model, array columns included.  InsertAllTypes writes the columns whose parameter Dapper can send;
+-- AllTypesQueryTests.WriteSideLeftOut names the others, each with the reason.
 
 -- name: ListAllTypes
 -- summary: Every row of all_types, with timestamptz given back to the type map.

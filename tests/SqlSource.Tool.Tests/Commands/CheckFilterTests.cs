@@ -80,18 +80,11 @@ public sealed class CheckFilterTests : IDisposable
         result.ShouldBe(new CliResult(0, "billing (postgres): 1 same, 0 differ, 0 failed\n", ""));
     }
 
-    // An entry of a query that is gone is reported when its own database is named, and not when another is.
-    [Theory]
-    [InlineData("billing", true)]
-    [InlineData("postgres", false)]
-    public async Task Check_EntryOfAQueryThatIsGoneUnderDatabase_IsReportedForItsOwnDatabaseAlone(
-        string named,
-        bool reported
-    )
+    // The sidecar of Users.sql with an entry for a query that is gone, of this database or of none.
+    private async Task AddAnEntryOfAQueryThatIsGoneAsync(string? database)
     {
-        (await DescribeAsync()).ExitCode.ShouldBe(0);
         var sidecar = SidecarFiles.Read(_users);
-        var gone = sidecar.Find("GetInvoice").ShouldNotBeNull() with { Name = "Gone" };
+        var gone = sidecar.Find("GetInvoice").ShouldNotBeNull() with { Name = "Gone", Database = database };
         await File.WriteAllTextAsync(
             SidecarFormat.PathFor(_users),
             SidecarWriter.Write(
@@ -102,11 +95,58 @@ public sealed class CheckFilterTests : IDisposable
             ),
             TestContext.Current.CancellationToken
         );
+    }
+
+    private static bool ReportsGone(CliResult result) =>
+        result.Error.Contains("for 'Gone': the query is not in the file", StringComparison.Ordinal);
+
+    // An entry of a query that is gone is reported when its own database is named, in whatever case, and not when
+    // another is.
+    [Theory]
+    [InlineData("billing", true)]
+    [InlineData("BILLING", true)]
+    [InlineData("postgres", false)]
+    public async Task Check_EntryOfAQueryThatIsGoneUnderDatabase_IsReportedForItsOwnDatabaseAlone(
+        string named,
+        bool reported
+    )
+    {
+        (await DescribeAsync()).ExitCode.ShouldBe(0);
+        await AddAnEntryOfAQueryThatIsGoneAsync("billing");
 
         var result = await DescribeAsync("--check", "--database", named);
 
         result.ExitCode.ShouldBe(reported ? 2 : 0);
-        result.Error.Contains("for 'Gone': the query is not in the file", StringComparison.Ordinal).ShouldBe(reported);
+        ReportsGone(result).ShouldBe(reported);
+    }
+
+    // An entry with no database is nobody's, so a run for a database says nothing of it, though describe --database
+    // drops it when it rewrites the file: docs/tech-debt/TD-0036-two-small-gaps-of-check-and-the-log.md.
+    [Fact]
+    public async Task Check_EntryOfAQueryThatIsGoneWithNoDatabase_IsNotReportedUnderDatabase()
+    {
+        (await DescribeAsync()).ExitCode.ShouldBe(0);
+        await AddAnEntryOfAQueryThatIsGoneAsync(database: null);
+
+        var result = await DescribeAsync("--check", "--database", "billing");
+
+        result.ExitCode.ShouldBe(0);
+        ReportsGone(result).ShouldBeFalse();
+    }
+
+    // Without --database a run knows no database to leave an entry to, whatever else it narrows to.
+    [Theory]
+    [InlineData("App.csproj", "Users.sql")]
+    [InlineData("App.slnx", "--project", "App.csproj")]
+    public async Task Check_EntryOfAQueryThatIsGoneUnderAFileOrProjectFilter_IsReported(params string[] args)
+    {
+        (await DescribeAsync()).ExitCode.ShouldBe(0);
+        await AddAnEntryOfAQueryThatIsGoneAsync("billing");
+
+        var result = await _scene.DescribeAsync(["--check", .. args]);
+
+        result.ExitCode.ShouldBe(2);
+        ReportsGone(result).ShouldBeTrue();
     }
 
     // "describe" deletes a sidecar only in a run with no filter, so only such a check says it would.
@@ -150,8 +190,8 @@ public sealed class CheckFilterTests : IDisposable
     {
         (await DescribeAsync()).ExitCode.ShouldBe(0);
 
-        var result = await DescribeAsync("--check", "--database", "nowhere");
+        var result = await DescribeAsync("--check", "--database", "biling");
 
-        result.ShouldBe(new CliResult(0, "nowhere: 0 same, 0 differ, 0 failed\n", ""));
+        result.ShouldBe(new CliResult(0, "biling: 0 same, 0 differ, 0 failed\n", ""));
     }
 }

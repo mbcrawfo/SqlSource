@@ -2,6 +2,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
@@ -249,7 +250,7 @@ public sealed class PostgresEventsRelationTests
     {
         var log = new RecordingLog();
 
-        await DescribeAsync(WholeScript(), new SessionRunLog(log, "users", "postgres."), Whole);
+        await DescribeAsync(WholeScript(), new SessionRunLog(log, new ConnectionSecret("users"), "postgres."), Whole);
 
         var match = log.Events.Single(written => written.Name == "postgres.table-match").Members;
         Member(match, "table").ShouldBe(LogValue.MapOf(new("schema", "public"), new("table", "***")));

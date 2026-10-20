@@ -87,9 +87,23 @@ public sealed class UsageCheckTests
     [Theory]
     [InlineData("-")]
     [InlineData("--")]
-    [InlineData("-" + Secrets.Word)]
-    public void Check_AnyTokenThatStartsWithAHyphen_IsAnOption(string token) =>
+    public void Check_TokenThatStartsWithAHyphenAndIsCloseToAnOption_IsNamed(string token) =>
         UsageCheck.Check(Root(), ["describe", token]).Messages.ShouldBe([$"sqlsource: unknown option '{token}'"]);
+
+    [Theory]
+    [InlineData("-" + Secrets.Word)]
+    public void Check_TokenThatStartsWithAHyphenAndIsFarFromEveryOption_IsAnOptionNamedByItsPosition(string token) =>
+        UsageCheck.Check(Root(), ["describe", token]).Messages.ShouldBe(["sqlsource: unknown option at position 2"]);
+
+    [Fact]
+    public void Check_UnknownOptionFarFromEveryOption_IsNamedByItsPosition() =>
+        UsageCheck
+            .Check(Root(), ["describe", "App.csproj", "-pS3cret"])
+            .Messages.ShouldBe(["sqlsource: unknown option at position 3"]);
+
+    [Fact]
+    public void Check_UnknownOptionCloseToAnOptionOfAnotherCommand_IsNamed() =>
+        UsageCheck.Check(Root(), ["--forse", "describe"]).Messages.ShouldBe(["sqlsource: unknown option '--forse'"]);
 
     [Theory]
     [InlineData("--connection=", "--connection")]
@@ -162,31 +176,25 @@ public sealed class UsageCheckTests
     }
 
     [Fact]
-    public void ReadsConnectionsAs_ParseThatBindsOtherValues_IsFalse()
+    public void ReadsValuesAs_ParseThatBindsOtherValues_IsFalse()
     {
         var root = Cli.BuildCommands();
         var usage = UsageCheck.Check(root, ["describe", "--connection", "a=" + Secrets.Word, "--connection", "b=2"]);
 
         DescribeCommand
-            .ReadsConnectionsAs(
-                usage,
-                root.Parse(["describe", "--connection", "a=" + Secrets.Word, "--connection", "b=2"])
-            )
+            .ReadsValuesAs(usage, root.Parse(["describe", "--connection", "a=" + Secrets.Word, "--connection", "b=2"]))
             .ShouldBeTrue();
         DescribeCommand
-            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=x", "--connection", "b=2"]))
+            .ReadsValuesAs(usage, root.Parse(["describe", "--connection", "a=x", "--connection", "b=2"]))
             .ShouldBeFalse();
         DescribeCommand
-            .ReadsConnectionsAs(
-                usage,
-                root.Parse(["describe", "--connection", "b=2", "--connection", "a=" + Secrets.Word])
-            )
+            .ReadsValuesAs(usage, root.Parse(["describe", "--connection", "b=2", "--connection", "a=" + Secrets.Word]))
             .ShouldBeFalse();
         DescribeCommand
-            .ReadsConnectionsAs(usage, root.Parse(["describe", "--connection", "a=" + Secrets.Word]))
+            .ReadsValuesAs(usage, root.Parse(["describe", "--connection", "a=" + Secrets.Word]))
             .ShouldBeFalse();
         DescribeCommand
-            .ReadsConnectionsAs(
+            .ReadsValuesAs(
                 usage,
                 root.Parse([
                     "describe",
@@ -199,9 +207,42 @@ public sealed class UsageCheckTests
                 ])
             )
             .ShouldBeFalse();
+        DescribeCommand.ReadsValuesAs(UsageCheck.Check(root, ["--version"]), root.Parse(["--version"])).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void ReadsValuesAs_ProjectReadInAnotherOrder_IsFalse()
+    {
+        var root = Cli.BuildCommands();
+        var usage = UsageCheck.Check(root, ["describe", "--project", "b", "--project", "a"]);
+
         DescribeCommand
-            .ReadsConnectionsAs(UsageCheck.Check(root, ["--version"]), root.Parse(["--version"]))
+            .ReadsValuesAs(usage, root.Parse(["describe", "--project", "b", "--project", "a"]))
             .ShouldBeTrue();
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--project", "a", "--project", "b"]))
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void ReadsValuesAs_DatabaseAndLogReadAsOtherValues_IsFalse()
+    {
+        var root = Cli.BuildCommands();
+        var usage = UsageCheck.Check(root, ["describe", "--database", "a", "--log", "run.log"]);
+
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--database", "a", "--log", "run.log"]))
+            .ShouldBeTrue();
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--database", "b", "--log", "run.log"]))
+            .ShouldBeFalse();
+        DescribeCommand
+            .ReadsValuesAs(usage, root.Parse(["describe", "--database", "a", "--log", "other.log"]))
+            .ShouldBeFalse();
+        DescribeCommand.ReadsValuesAs(usage, root.Parse(["describe", "--database", "a"])).ShouldBeFalse();
+        DescribeCommand
+            .ReadsValuesAs(UsageCheck.Check(root, ["describe"]), root.Parse(["describe", "--log", "run.log"]))
+            .ShouldBeFalse();
     }
 
     // The two readers of a command line must agree, or a token that this one took for a value is the path of the
@@ -272,8 +313,14 @@ public sealed class UsageCheckTests
     public void Check_UnknownOptionWithALineBreak_IsNamedOnOneLine() =>
         // A line that starts in the first column and looks like an error is read as one by a build.
         UsageCheck
+            .Check(Root(), ["describe", "--forc\ne"])
+            .Messages.ShouldBe(["sqlsource: unknown option '--forc e'"]);
+
+    [Fact]
+    public void Check_UnknownOptionWithALineBreakFarFromEveryOption_IsNamedByItsPosition() =>
+        UsageCheck
             .Check(Root(), ["describe", "--oops\nsrc/App.cs(1,1): error CS0000: forged"])
-            .Messages.ShouldBe(["sqlsource: unknown option '--oops src/App.cs(1,1)'"]);
+            .Messages.ShouldBe(["sqlsource: unknown option at position 2"]);
 
     [Fact]
     public void Check_ValuesOfOptionsAndArguments_AreGivenWithTheirPositions()
@@ -337,12 +384,9 @@ public sealed class UsageCheckTests
                 continue;
             }
 
-            // The command checks the values that UsageCheck read and runs with the ones System.CommandLine read,
-            // so the two must give each option the same values too.
-            if (
-                !usage.IsReadTheSameBy(parsed)
-                || !HasTheSameValues(usage, parsed, "--project", "--database", "--connection")
-            )
+            // The command reads the values of its options from what UsageCheck read, and System.CommandLine gives the
+            // log's path, so the two must give --project, --database, --connection and --log the same values too.
+            if (!usage.IsReadTheSameBy(parsed) || !DescribeCommand.ReadsValuesAs(usage, parsed))
             {
                 disagreements.Add(string.Join(' ', args));
             }
@@ -382,16 +426,21 @@ public sealed class UsageCheckTests
             .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
             .ShouldBe([$"sqlsource: the value of option '--database' at position {position} is not a database name"]);
 
+    [Theory]
+    [InlineData(3, "describe", "--log", "a=" + Secrets.Word + ".log")]
+    [InlineData(2, "describe", "--log=a;" + Secrets.Word + ".log")]
+    public void CheckUsage_LogPathWithAnEqualsSignOrASemicolon_IsNamedByItsPosition(
+        int position,
+        params string[] args
+    ) =>
+        DescribeCommand
+            .CheckUsage(UsageCheck.Check(Cli.BuildCommands(), args))
+            .ShouldBe([
+                $"sqlsource: the value of option '--log' at position {position} holds '=' or ';', which a log's path "
+                    + "may not",
+            ]);
+
     [Fact]
     public void CheckUsage_AnotherCommand_GivesNoLine() =>
         DescribeCommand.CheckUsage(UsageCheck.Check(Cli.BuildCommands(), ["--version"])).ShouldBeEmpty();
-
-    private static bool HasTheSameValues(Usage usage, ParseResult parsed, params string[] options) =>
-        usage.Command.Name != DescribeCommand.Name
-        || options.All(name =>
-            usage
-                .Values.Where(value => value.Option?.Name == name)
-                .Select(value => value.Text)
-                .SequenceEqual(parsed.GetValue<string[]>(name) ?? [])
-        );
 }
