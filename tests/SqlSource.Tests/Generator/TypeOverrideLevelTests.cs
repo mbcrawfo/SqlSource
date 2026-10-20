@@ -11,7 +11,7 @@ using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
+using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
@@ -51,8 +51,6 @@ public sealed class TypeOverrideLevelTests
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
 
     private static readonly PostgresType Timestamptz = Catalog("timestamptz");
-
-    private static readonly PostgresType Int4 = Catalog("int4");
 
     // The place of each level, as SQLSRC250 to SQLSRC252 name it.
     public static TheoryData<string, string> Places =>
@@ -784,29 +782,15 @@ public sealed class TypeOverrideLevelTests
         string? property,
         params (SqlFile File, SidecarEntry[] Entries)[] files
     ) =>
-        GeneratorHarness.Run(
-            OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, source)],
+        ModelRuns.Run(
+            source,
             [.. files.SelectMany(file => new[] { file.File, Sidecars.Of(file.File, file.Entries) })],
-            references: [NpgsqlReferences.Npgsql10],
-            dialect: "postgres",
-            properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = property }
+            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = property }
         );
 
     // An entry of the query for its current hash, with a column of each type, named c0, c1 and so on.
     private static SidecarEntry Entry(SqlFile file, string name, params PostgresType[] columns) =>
-        TestSidecars.Entry(
-            name,
-            Sidecars.HashOf(file, name, SqlDialect.PostgreSql),
-            "postgres",
-            "main",
-            "18.0",
-            SidecarResultKind.Rows,
-            columns: [.. columns.Select((type, ordinal) => TestSidecars.Column(ordinal, "c" + ordinal, type))]
-        );
-
-    private static PostgresType Catalog(string internalName) =>
-        TestSidecars.Postgres(name: internalName, internalName: internalName);
+        ModelRuns.Entry(file, name, [], [.. columns.Select((type, ordinal) => Column("c" + ordinal, type))]);
 
     private static PostgresType EnumType(string internalName) =>
         TestSidecars.Postgres(

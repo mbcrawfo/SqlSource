@@ -2,14 +2,12 @@
 
 using System.Linq;
 using Shouldly;
-using SqlSource.Generation;
 using SqlSource.Generation.Models;
-using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
+using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
@@ -20,22 +18,10 @@ public sealed class ModelNameTests
 {
     private const string UsersPath = "/app/Repo/Users.sql";
 
-    private const string Source = """
-        using SqlSource;
-
-        namespace App
-        {
-            [SqlSourceGenerate]
-            public partial class Sample;
-        }
-        """;
-
     // The name of GetUser in Users.
     private const string GetUserName = "/app/Repo/Users.sql(1,10)-(1,17)";
 
     private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
-    private static readonly PostgresType Int4 = TestSidecars.Postgres(name: "integer", internalName: "int4");
 
     [Fact]
     public void Run_ColumnNames_ArePascalCase()
@@ -433,50 +419,11 @@ public sealed class ModelNameTests
     // Every run compiles, with no warning in the generated code, whatever its diagnostics.
     private static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries)
     {
-        var run = GeneratorHarness.Run(
-            OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [file, Sidecars.Of(file, entries)],
-            references: [NpgsqlReferences.Npgsql10],
-            dialect: "postgres"
-        );
+        var run = ModelRuns.Run(file, entries);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         return run;
     }
-
-    // An entry of the query for its current hash: with rows when it has columns, and without when they are null.
-    private static SidecarEntry Entry(
-        SqlFile file,
-        string name,
-        SidecarParameter[] parameters,
-        SidecarColumn[]? columns
-    ) =>
-        TestSidecars.Entry(
-            name,
-            Sidecars.HashOf(file, name, SqlDialect.PostgreSql),
-            "postgres",
-            "main",
-            "18.0",
-            columns is null ? SidecarResultKind.None : SidecarResultKind.Rows,
-            parameters: [.. parameters.Select((parameter, ordinal) => parameter with { Ordinal = ordinal })],
-            columns: columns?.Select((column, ordinal) => column with { Ordinal = ordinal }).ToArray()
-        );
-
-    private static SidecarParameter Parameter(string name, bool? nullable = null) =>
-        TestSidecars.Parameter(0, name, Int4, nullable);
-
-    private static SidecarColumn Column(
-        string name,
-        PostgresType? type = null,
-        bool? nullable = false,
-        SidecarOrigin? origin = null,
-        bool? identity = null,
-        bool? computed = null
-    ) => TestSidecars.Column(0, name, type ?? Int4, nullable, origin: origin, identity: identity, computed: computed);
-
-    private static FileModels ModelsOf(GeneratorRun run) =>
-        StepOutputs.Single<FileModels>(run, TrackingNames.FileModels);
 
     private static QueryModels QueryOf(GeneratorRun run) => ModelsOf(run).Queries.ShouldHaveSingleItem();
 

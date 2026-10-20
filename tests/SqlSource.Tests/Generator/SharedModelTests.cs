@@ -4,12 +4,10 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
-using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
-using SqlSource.Testing.Snapshot;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
+using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
@@ -25,16 +23,6 @@ public sealed class SharedModelTests
 
     private const string UsersPath = "/app/Repo/Users.sql";
 
-    private const string Source = """
-        using SqlSource;
-
-        namespace App
-        {
-            [SqlSourceGenerate]
-            public partial class Sample;
-        }
-        """;
-
     // The name of GetUser in Users, of GetA in A and of GetB in B.
     private const string GetUserName = "/app/Repo/Users.sql(1,10)-(1,17)";
 
@@ -46,14 +34,7 @@ public sealed class SharedModelTests
 
     private const string Help258 = "  Give the query another model name, or set another model namespace.";
 
-    // A model's file ends in -Model.g.cs, with a hash before .g.cs when its name is made unique.
-    private const string ModelMark = "-Model.";
-
     private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n");
-
-    private static readonly PostgresType Int4 = TestSidecars.Postgres(name: "integer", internalName: "int4");
-
-    private static readonly PostgresType Text = TestSidecars.Postgres(name: "text", internalName: "text");
 
     [Fact]
     public void Run_TwoQueriesOfOneModelName_ShareOneModel()
@@ -645,20 +626,6 @@ public sealed class SharedModelTests
             new SqlFile(BPath, $"-- name: GetB\n-- output-model: {name}\n{bMarkers}SELECT 2;\n")
         );
 
-    private static GeneratorRun Run(
-        string source,
-        SqlFile[] files,
-        IReadOnlyDictionary<string, string?>? properties = null
-    ) =>
-        GeneratorHarness.Run(
-            OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, source)],
-            files,
-            references: [NpgsqlReferences.Npgsql10],
-            dialect: "postgres",
-            properties: properties
-        );
-
     private static void AssertClean(GeneratorRun run)
     {
         run.Diagnostics.ShouldBeEmpty();
@@ -675,41 +642,7 @@ public sealed class SharedModelTests
         ModelFiles(run).ShouldBeEmpty();
     }
 
-    private static string[] ModelFiles(GeneratorRun run) =>
-        [
-            .. run
-                .Sources.Keys.Where(name => name.Contains(ModelMark, StringComparison.Ordinal))
-                .OrderBy(name => name, StringComparer.Ordinal),
-        ];
-
     // The sidecar of the file with an entry of the query that has rows of the columns and no parameters.
     private static SqlFile Sidecar(SqlFile file, string name, SidecarColumn[] columns) =>
         Sidecars.Of(file, Entry(file, name, [], columns));
-
-    // An entry of the query for its current hash: with rows when it has columns, and without when they are null.
-    private static SidecarEntry Entry(
-        SqlFile file,
-        string name,
-        SidecarParameter[] parameters,
-        SidecarColumn[]? columns
-    ) =>
-        TestSidecars.Entry(
-            name,
-            Sidecars.HashOf(file, name, SqlDialect.PostgreSql),
-            "postgres",
-            "main",
-            "18.0",
-            columns is null ? SidecarResultKind.None : SidecarResultKind.Rows,
-            parameters: [.. parameters.Select((parameter, ordinal) => parameter with { Ordinal = ordinal })],
-            columns: columns?.Select((column, ordinal) => column with { Ordinal = ordinal }).ToArray()
-        );
-
-    private static SidecarParameter Parameter(string name) => TestSidecars.Parameter(0, name, Int4, null);
-
-    private static SidecarColumn Column(
-        string name,
-        PostgresType? type = null,
-        bool? nullable = false,
-        SidecarOrigin? origin = null
-    ) => TestSidecars.Column(0, name, type ?? Int4, nullable, origin: origin);
 }

@@ -2,14 +2,11 @@
 
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Shouldly;
-using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
-using SqlSource.Testing.Snapshot;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
+using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
@@ -24,26 +21,11 @@ public sealed class TableModelTests
 
     private const string UsersPath = "/app/Repo/Users.sql";
 
-    private const string Source = """
-        using SqlSource;
-
-        namespace App
-        {
-            [SqlSourceGenerate]
-            public partial class Sample;
-        }
-        """;
-
     private const string GetBName = "/app/Repo/B.sql(1,10)-(1,14)";
 
     private const string Help257 = "  Give one of the two queries another model name, or make the two the same.";
 
-    // A model's file ends in -Model.g.cs, with a hash before .g.cs when its name is made unique.
-    private const string ModelMark = "-Model.";
-
     private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT id FROM users WHERE id = @id;\n");
-
-    private static readonly PostgresType Int4 = TestSidecars.Postgres(name: "integer", internalName: "int4");
 
     private static readonly SidecarTable PublicUsers = new("public", "users");
 
@@ -53,7 +35,7 @@ public sealed class TableModelTests
     [Fact]
     public void Run_QueryThatMatchesATable_GetsAModelNamedAfterTheTable()
     {
-        var run = Run(Users, Entry(Users, "GetUser", PublicUsers, [Parameter("id")], [Column("id")]));
+        var run = Run(Users, Entry(Users, "GetUser", [Parameter("id")], [Column("id")], PublicUsers));
 
         AssertClean(run);
         ModelFiles(run).ShouldBe(["App.GetUserParams-Model.g.cs", "App.UsersDto-Model.g.cs"]);
@@ -82,7 +64,7 @@ public sealed class TableModelTests
     {
         var file = Users with { Text = "-- name: GetUser\n-- summary: Loads a user.\nSELECT id FROM users;\n" };
 
-        var run = Run(file, Entry(file, "GetUser", PublicUsers, [], [Column("id")]));
+        var run = Run(file, Entry(file, "GetUser", [], [Column("id")], PublicUsers));
 
         AssertClean(run);
         run.Sources["App.UsersDto-Model.g.cs"]
@@ -96,7 +78,7 @@ public sealed class TableModelTests
     [Fact]
     public void Run_TableOfAnotherSchema_HasTheSchemaBeforeItsName()
     {
-        var run = Run(Users, Entry(Users, "GetUser", new SidecarTable("billing", "invoices"), [], [Column("id")]));
+        var run = Run(Users, Entry(Users, "GetUser", [], [Column("id")], new SidecarTable("billing", "invoices")));
 
         AssertClean(run);
         ModelFiles(run).ShouldBe(["App.BillingInvoicesDto-Model.g.cs"]);
@@ -110,7 +92,7 @@ public sealed class TableModelTests
     {
         var run = Run(
             Users,
-            [Entry(Users, "GetUser", new SidecarTable("public", "order_lines"), [], [Column("id")])],
+            [Entry(Users, "GetUser", [], [Column("id")], new SidecarTable("public", "order_lines"))],
             new Dictionary<string, string?> { ["SqlSourceOutputModelSuffix"] = "Row" }
         );
 
@@ -151,7 +133,7 @@ public sealed class TableModelTests
 
         var run = Run(
             source,
-            [file, Sidecars.Of(file, Entry(file, "GetUser", PublicUsers, [], [Column("id")]))],
+            [file, Sidecars.Of(file, Entry(file, "GetUser", [], [Column("id")], PublicUsers))],
             properties
         );
 
@@ -167,7 +149,7 @@ public sealed class TableModelTests
     {
         var run = Run(
             Users,
-            [Entry(Users, "GetUser", PublicUsers, [], [Column("id")])],
+            [Entry(Users, "GetUser", [], [Column("id")], PublicUsers)],
             new Dictionary<string, string?> { ["SqlSourceGeneratorParameters"] = "sort-output" }
         );
 
@@ -180,7 +162,7 @@ public sealed class TableModelTests
     {
         var file = Users with { Text = "-- name: GetUser\n-- output-model: UserRow\nSELECT id FROM users;\n" };
 
-        var run = Run(file, Entry(file, "GetUser", PublicUsers, [], [Column("id")]));
+        var run = Run(file, Entry(file, "GetUser", [], [Column("id")], PublicUsers));
 
         AssertClean(run);
         ModelFiles(run).ShouldBe(["App.UserRow-Model.g.cs"]);
@@ -197,7 +179,7 @@ public sealed class TableModelTests
             Text = "-- name: GetUser\n-- input-model: UserKey\nSELECT id FROM users WHERE id = @id;\n",
         };
 
-        var run = Run(file, Entry(file, "GetUser", PublicUsers, [Parameter("id")], [Column("id")]));
+        var run = Run(file, Entry(file, "GetUser", [Parameter("id")], [Column("id")], PublicUsers));
 
         AssertClean(run);
         ModelFiles(run).ShouldBe(["App.UserKey-Model.g.cs", "App.UsersDto-Model.g.cs"]);
@@ -216,7 +198,7 @@ public sealed class TableModelTests
     [InlineData("public", null)]
     public void Run_TableThatGivesNoIdentifier_NamesTheModelAfterTheQuery(string? schema, string? table)
     {
-        var run = Run(Users, Entry(Users, "GetUser", new SidecarTable(schema, table), [], [Column("id")]));
+        var run = Run(Users, Entry(Users, "GetUser", [], [Column("id")], new SidecarTable(schema, table)));
 
         AssertClean(run);
         ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs"]);
@@ -339,7 +321,7 @@ public sealed class TableModelTests
 
         var run = Run(
             source,
-            [Users, Sidecars.Of(Users, Entry(Users, "GetUser", PublicUsers, [], [Column("id")]))],
+            [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("id")], PublicUsers))],
             withNamespace ? new Dictionary<string, string?> { ["SqlSourceModelNamespace"] = "Shared" } : null
         );
 
@@ -407,28 +389,6 @@ public sealed class TableModelTests
             new SqlFile(BPath, "-- name: Users\nSELECT 1;\n")
         );
 
-    private static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries) => Run(file, entries, null);
-
-    private static GeneratorRun Run(
-        SqlFile file,
-        SidecarEntry[] entries,
-        IReadOnlyDictionary<string, string?>? properties
-    ) => Run(Source, [file, Sidecars.Of(file, entries)], properties);
-
-    private static GeneratorRun Run(
-        string source,
-        SqlFile[] files,
-        IReadOnlyDictionary<string, string?>? properties = null
-    ) =>
-        GeneratorHarness.Run(
-            OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, source)],
-            files,
-            references: [NpgsqlReferences.Npgsql10],
-            dialect: "postgres",
-            properties: properties
-        );
-
     private static void AssertClean(GeneratorRun run)
     {
         run.Diagnostics.ShouldBeEmpty();
@@ -436,41 +396,10 @@ public sealed class TableModelTests
         run.GeneratedCodeWarnings.ShouldBeEmpty();
     }
 
-    private static string[] ModelFiles(GeneratorRun run) =>
-        [
-            .. run
-                .Sources.Keys.Where(name => name.Contains(ModelMark, StringComparison.Ordinal))
-                .OrderBy(name => name, StringComparer.Ordinal),
-        ];
-
     // The sidecar of the file with an entry of the query that has rows of the columns of public.users.
     private static SqlFile Sidecar(SqlFile file, string name, SidecarColumn[] columns) =>
         Sidecar(file, name, PublicUsers, columns);
 
     private static SqlFile Sidecar(SqlFile file, string name, SidecarTable? table, SidecarColumn[] columns) =>
-        Sidecars.Of(file, Entry(file, name, table, [], columns));
-
-    // An entry of the query for its current hash, with rows of the columns and the table they are.
-    private static SidecarEntry Entry(
-        SqlFile file,
-        string name,
-        SidecarTable? table,
-        SidecarParameter[] parameters,
-        SidecarColumn[] columns
-    ) =>
-        TestSidecars.Entry(
-            name,
-            Sidecars.HashOf(file, name, SqlDialect.PostgreSql),
-            "postgres",
-            "main",
-            "18.0",
-            SidecarResultKind.Rows,
-            matchesTable: table,
-            parameters: [.. parameters.Select((parameter, ordinal) => parameter with { Ordinal = ordinal })],
-            columns: [.. columns.Select((column, ordinal) => column with { Ordinal = ordinal })]
-        );
-
-    private static SidecarParameter Parameter(string name) => TestSidecars.Parameter(0, name, Int4, null);
-
-    private static SidecarColumn Column(string name) => TestSidecars.Column(0, name, Int4, false);
+        Sidecars.Of(file, Entry(file, name, [], columns, table));
 }

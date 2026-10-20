@@ -7,12 +7,11 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
-using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
+using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
@@ -492,38 +491,11 @@ public sealed class QueryTypesTests
         };
 
     private static GeneratorRun Run(MetadataReference[] references, SqlFile file, params SidecarEntry[] entries) =>
-        GeneratorHarness.Run(
-            OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [file, Sidecars.Of(file, entries)],
-            references: references,
-            dialect: "postgres"
-        );
-
-    // An entry of the query for its current hash: with rows when it has columns, and without when they are null.
-    private static SidecarEntry Entry(
-        SqlFile file,
-        string name,
-        SidecarParameter[] parameters,
-        SidecarColumn[]? columns
-    ) =>
-        TestSidecars.Entry(
-            name,
-            Sidecars.HashOf(file, name, SqlDialect.PostgreSql),
-            "postgres",
-            "main",
-            "18.0",
-            columns is null ? SidecarResultKind.None : SidecarResultKind.Rows,
-            parameters: [.. parameters.Select((parameter, ordinal) => parameter with { Ordinal = ordinal })],
-            columns: columns?.Select((column, ordinal) => column with { Ordinal = ordinal }).ToArray()
-        );
+        ModelRuns.Run(Source, [file, Sidecars.Of(file, entries)], references: references);
 
     private static SidecarParameter Parameter(string name, SidecarType? type) => TestSidecars.Parameter(0, name, type);
 
     private static SidecarColumn Column(string name, SidecarType type) => TestSidecars.Column(0, name, type);
-
-    private static PostgresType Catalog(string internalName) =>
-        TestSidecars.Postgres(name: internalName, internalName: internalName);
 
     private static PostgresType Extension(string internalName) =>
         TestSidecars.Postgres(name: internalName, schema: "public", internalName: internalName);
