@@ -517,43 +517,37 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                 .ToImmutableArray()
         );
 
-    // Each setting and value once, in ordinal order, so that the errors of a build do not depend on the order of its
-    // files.
+    // Each setting and value once, in the order of InvalidValues.
     private static IEnumerable<InvalidSetting> FindInvalidSettings(
         ProjectSettings project,
         EquatableArray<FileSettings> files,
         EquatableArray<string> claimedPaths
     )
     {
-        var found = new HashSet<InvalidSetting>(project.Invalid);
+        var invalid = new InvalidValues();
+        invalid.AddSettings(project.Invalid);
         foreach (var file in files.Where(file => SqlPath.Contains(claimedPaths, file.NormalizedPath)))
         {
-            found.UnionWith(file.Invalid);
+            invalid.AddSettings(file.Invalid);
         }
 
-        return found
-            .OrderBy(static setting => setting.Name, StringComparer.Ordinal)
-            .ThenBy(static setting => setting.Value, StringComparer.Ordinal);
+        return invalid.Settings;
     }
 
-    // Each value once, in ordinal order, so that the errors of a build do not depend on the order of its files.
-    private static SortedSet<string> FindInvalidDialects(EquatableArray<ParsedSqlFile> files, DialectSetting project)
+    // Each value once, in the order of InvalidValues.
+    private static IReadOnlyCollection<string> FindInvalidDialects(
+        EquatableArray<ParsedSqlFile> files,
+        DialectSetting project
+    )
     {
-        var values = new SortedSet<string>(StringComparer.Ordinal);
-        if (project.InvalidValue is { } property)
-        {
-            _ = values.Add(property);
-        }
-
+        var invalid = new InvalidValues();
+        invalid.AddDialect(project.InvalidValue);
         foreach (var file in files)
         {
-            if (file.InvalidDialect is { } metadata)
-            {
-                _ = values.Add(metadata);
-            }
+            invalid.AddDialect(file.InvalidDialect);
         }
 
-        return values;
+        return invalid.Dialects;
     }
 
     // A search for each file with needs, so that the cost does not grow with the files that have none.

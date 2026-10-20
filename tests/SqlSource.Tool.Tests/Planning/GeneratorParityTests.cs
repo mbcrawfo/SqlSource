@@ -11,6 +11,7 @@ using SqlSource.Settings;
 using SqlSource.Testing.Generator;
 using SqlSource.Tool.Planning;
 using SqlSource.Tool.Projects;
+using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -262,16 +263,7 @@ public sealed class GeneratorParityTests : IDisposable
         );
         var actual = InOrder(
             plan.Errors.Where(error => IsCompared(error.Descriptor))
-                .Select(error => new Reported(
-                    error.Descriptor.Id,
-                    error.Path,
-                    error.Position,
-                    string.Format(
-                        CultureInfo.InvariantCulture,
-                        error.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
-                        [.. error.Arguments]
-                    )
-                ))
+                .Select(error => new Reported(error.Descriptor.Id, error.Path, error.Position, MessageOf(error)))
         );
 
         actual.ShouldBe(expected);
@@ -281,6 +273,84 @@ public sealed class GeneratorParityTests : IDisposable
         run.Diagnostics.Count.ShouldBe(expected.Length);
         plan.Errors.Count.ShouldBe(actual.Length);
     }
+
+    // The values that are not valid are reported in an order, and it is the generator's: the dialects in ordinal
+    // order, then the settings by name and value.  The files list the dialects out of that order and one twice, and
+    // each side's errors are compared as they come, never sorted.  The generator never sees SqlSourceDatabase, so
+    // only SqlSourceOutput is compared among the settings.
+    [Fact]
+    public void Errors_OfInvalidValues_AreInTheGeneratorsOrder()
+    {
+        var project = new TestProject(_folder) { LangVersion = "12.0" };
+        project.Properties["SqlSourceDialect"] = "zeta";
+        project.Properties["SqlSourceOutput"] = "nothing";
+        var source = new SourceFile(project.AddSource("Queries.cs", Plans.Type), Plans.Type);
+        const string Text = "-- name: Q\nSELECT 1;\n";
+        (string Name, string Value)[][] metadata =
+        [
+            [("SqlSourceDialect", "beta")],
+            [("SqlSourceDialect", "alpha")],
+            [("SqlSourceDialect", "beta")],
+            [("SqlSourceOutput", "bad")],
+        ];
+        var listed = metadata
+            .Select(
+                (pairs, index) =>
+                {
+                    var name = "Q" + index.ToString(CultureInfo.InvariantCulture) + ".sql";
+                    return new SqlFile(
+                        project.AddSql(name, Text, pairs),
+                        Text,
+                        Metadata: pairs.ToDictionary(pair => pair.Name, pair => pair.Value)
+                    );
+                }
+            )
+            .ToArray();
+
+        var run = GeneratorHarness.Run(
+            null,
+            [source],
+            listed,
+            dialect: "zeta",
+            properties: new Dictionary<string, string?> { ["SqlSourceOutput"] = "nothing" }
+        );
+        var plan = RunPlanner.Plan([project.Manifest()], RunFilters.None, TestContext.Current.CancellationToken);
+
+        var expected = run
+            .Result.Diagnostics.Where(IsInvalidValue)
+            .Select(diagnostic => (diagnostic.Id, Message: diagnostic.GetMessage(CultureInfo.InvariantCulture)))
+            .ToArray();
+        var actual = plan
+            .Errors.Select(error => (error.Descriptor.Id, Message: MessageOf(error)))
+            .Where(error => IsInvalidValue(error.Id, error.Message))
+            .ToArray();
+
+        actual.ShouldBe(expected);
+        // A case in which the two agree on nothing would prove nothing.
+        expected
+            .Where(error => error.Id == SqlDiagnostics.InvalidDialect.Id)
+            .Select(error => error.Message.Split('\'')[1])
+            .ShouldBe(["alpha", "beta", "zeta"]);
+        expected.Count(error => error.Id == SqlDiagnostics.InvalidSettingValue.Id).ShouldBeGreaterThanOrEqualTo(2);
+    }
+
+    private static bool IsInvalidValue(Diagnostic diagnostic) =>
+        IsInvalidValue(diagnostic.Id, diagnostic.GetMessage(CultureInfo.InvariantCulture));
+
+    private static bool IsInvalidValue(string id, string message) =>
+        id == SqlDiagnostics.InvalidDialect.Id
+        || (
+            id == SqlDiagnostics.InvalidSettingValue.Id && message.EndsWith("SqlSourceOutput", StringComparison.Ordinal)
+        );
+
+    // A diagnostic of the compiler keeps its arguments to itself, so a tool error is compared by its message: the
+    // descriptor's format with the error's arguments.
+    private static string MessageOf(ToolDiagnostic error) =>
+        string.Format(
+            CultureInfo.InvariantCulture,
+            error.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
+            [.. error.Arguments]
+        );
 
     private static bool IsCompared(Diagnostic diagnostic) => IsCompared(diagnostic.Descriptor);
 
