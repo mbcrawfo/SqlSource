@@ -4,7 +4,7 @@
 
 In [`SqlSourceGenerator`](../../src/SqlSource/SqlSourceGenerator.cs), the step `Models` gives one [`ModelSet`](../../src/SqlSource/Generation/Models/ModelSet.cs) for the project, its models in the ordinal order of their full names, and `ModelOutput` takes it apart with a `SelectMany` into one node for each model, which `ModelEmitter.Emit` writes.  The compiler matches the nodes a `SelectMany` gives by their place in the list, not by the model's full name.  When a model is added, every model sorted after it moves to the next place, and its node's input is another model's record, so `ModelEmitter.Emit` runs again for it and its source is added again, though nothing about it changed.  When a model is removed, every model sorted after it moves back a place in the same way.  A model sorted before the change keeps its place and is taken from the last run.
 
-A model is added or removed when a query gains or loses its parameters or its rows, when a query, a file or a type that claims a file is added or removed, when a model's name changes by a marker, a suffix or the model namespace, and when a query starts or stops matching a table.  [`CachingTests`](../../tests/SqlSource.Tests/Generator/CachingTests.cs) holds the cost in `Run_ModelAdded_EmitsTheModelsAfterItAgain` and `Run_ModelRemoved_EmitsTheModelsAfterItAgain`.
+A model is added or removed when a query gains or loses its parameters or its rows, when a query, a file or a type that claims a file is added or removed, when a model's name changes by a marker, a suffix or the model namespace, and when a query starts or stops matching a table.  [`CachingModelTests`](../../tests/SqlSource.Tests/Generator/CachingModelTests.cs) holds the cost in `Run_ModelAdded_EmitsTheModelsAfterItAgain` and `Run_ModelRemoved_EmitsTheModelsAfterItAgain`.
 
 This is the same cost that [TD-0019](TD-0019-change-to-claimed-files-reads-every-claimed-file-again.md) records for the checks of the sidecars, for the same reason, in another step.
 
@@ -18,7 +18,7 @@ Low.  Each model sorted after the change is written again and its source added a
 
 ## Proposed fix
 
-Give each model a node that stays with its full name.  One way is to emit from a step whose nodes are keyed by name: for example, a step for each type's requests, `TypeModels` taken apart by a `SelectMany`, whose output is the model record when the type's request is the first of its group and nothing otherwise, read from the collected decision by a search on the full name.  The nodes then follow the types and their requests, which a model added elsewhere does not move.  Check it with `CachingTests`: change `Run_ModelAdded_EmitsTheModelsAfterItAgain` and `Run_ModelRemoved_EmitsTheModelsAfterItAgain` to expect only the model added or removed to be written.
+Give each model a node that stays with its full name.  One way is to emit from a step whose nodes are keyed by name: for example, a step for each type's requests, `TypeModels` taken apart by a `SelectMany`, whose output is the model record when the type's request is the first of its group and nothing otherwise, read from the collected decision by a search on the full name.  The nodes then follow the types and their requests, which a model added elsewhere does not move.  Check it with `CachingModelTests`: change `Run_ModelAdded_EmitsTheModelsAfterItAgain` and `Run_ModelRemoved_EmitsTheModelsAfterItAgain` to expect only the model added or removed to be written.
 
 ## Trigger
 
