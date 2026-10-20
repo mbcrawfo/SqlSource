@@ -21,8 +21,7 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<IEnumerable<ListOrderTotalsDto>> ListOrderTotalsAsync() =>
         connection.QueryAsync<ListOrderTotalsDto>(Sql.ListOrderTotals);
 
-    // GetOrderTagsDto has an array column, so the generator gives the record a private constructor without parameters,
-    // through which Dapper reads the row.
+    // GetOrderTagsDto is a record with an array column, which Dapper reads as any other.
     public Task<GetOrderTagsDto?> GetOrderTagsAsync(int orderId) =>
         connection.QuerySingleOrDefaultAsync<GetOrderTagsDto>(Sql.GetOrderTags, new GetOrderTagsParams(orderId));
 

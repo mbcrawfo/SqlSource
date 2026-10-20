@@ -200,12 +200,8 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
 
         var full = rows.Single(static row => row.Id == AllTypesRows.FullRowId);
         var empty = rows.Single(static row => row.Id == AllTypesRows.NullRowId);
-        full.Int4ArrayValue.ShouldBe([1, 2, 3]);
-        full.TextArrayValue.ShouldBe(["a", "b c", "Zoë"]);
-        full.DateArrayValue.ShouldBe([new DateOnly(2024, 1, 1), new DateOnly(2024, 12, 31)]);
-        empty.Int4ArrayValue.ShouldBeNull();
-        empty.TextArrayValue.ShouldBeNull();
-        empty.DateArrayValue.ShouldBeNull();
+        AllTypesRows.ShouldBeTheFullRow(full);
+        AllTypesRows.ShouldBeTheNullRow(empty);
         (full with { Id = 9 }).Int4ArrayValue.ShouldBeSameAs(full.Int4ArrayValue);
         (full with { }).ShouldBe(full);
     }

@@ -237,17 +237,6 @@ The input model is the parameter object, and the output model is the type of a r
   GROUP BY o.id;
   ```
 
-- **A model with an array column is a class.**  Dapper cannot construct a record from a row that has an array, `integer[]` or `text[]`, whether the array can be null or not: it throws `InvalidOperationException` and reads no row.  A class is filled by its properties:
-
-  ```sql postgres
-  -- name: GetOrderTags
-  -- output-model-type: class
-  SELECT o.id, o.tags
-  FROM orders o
-  WHERE o.id = @orderId;
-  ```
-
-  A record with a range, a multirange, an `hstore`, a C# enum, or a struct of your own with its type handler, is filled as any other.
 - **A type override to a type that Npgsql does not give needs a Dapper type handler.**  Dapper fills a property with the type Npgsql gives for its column, or through a handler.  `timestamptz=System.DateTimeOffset` makes a property a `DateTimeOffset` where Npgsql gives a `DateTime`.  A domain mapped to a struct of your own is the same: Npgsql gives the domain's base type, a `string` for a domain over `text`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
 
   ```csharp
@@ -308,7 +297,7 @@ The input model is the parameter object, and the output model is the type of a r
   connection.QueryAsync<FindSessionsDto>(Sql.FindSessions, new { address = new TypedParameter("inet", address) });
   ```
 
-Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker), [shape of a model](settings.md#setting-model-type), [the type override](settings.md#setting-type-overrides), and [known issues](generator.md#known-issues) for parameters in snake_case and for records with an array.
+Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker), [shape of a model](settings.md#setting-model-type), [the type override](settings.md#setting-type-overrides), and [known issues](generator.md#known-issues) for parameters in snake_case.
 
 <a id="table-name-at-run-time"></a>
 
