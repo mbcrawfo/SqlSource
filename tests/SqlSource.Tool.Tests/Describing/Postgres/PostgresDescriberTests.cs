@@ -99,4 +99,19 @@ public sealed class PostgresDescriberTests
             .Arguments.Concat(failure.ServerLines)
             .ShouldAllBe(text => !text.Contains(Secrets.Marker, StringComparison.Ordinal));
     }
+
+    // The describer refuses Multiplexing=true before it connects, so the port that nothing listens on is never tried.
+    [Fact]
+    public async Task OpenAsync_Multiplexing_IsSqlsrc236WithTheRefusalAsItsLine()
+    {
+        var opened = await PostgresScript.OpenAsync(
+            LiveExchange.Instance,
+            connection: "Host=127.0.0.1;Port=1;Multiplexing=true"
+        );
+
+        opened.Value.ShouldBeNull();
+        var failure = opened.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC236");
+        failure.ServerLines.ShouldBe(["Multiplexing=true does not keep one session"]);
+    }
 }

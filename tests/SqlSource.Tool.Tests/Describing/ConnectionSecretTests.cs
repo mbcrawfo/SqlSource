@@ -49,26 +49,6 @@ public sealed class ConnectionSecretTests
     public void IsIn_PartBesideOtherCharacters_IsWhetherItStandsAsAToken(string part, string text, bool expected) =>
         new ConnectionSecret("Host=db;Password=" + part, [part]).IsIn(text).ShouldBe(expected);
 
-    // The edges of the rule, which holds for a part of any length: the text's own ends count as no letter, and an
-    // edge of the part that is no letter, digit or "_" is not checked.
-    [Theory]
-    [InlineData("pw", "pw", true)]
-    [InlineData("pw x", "pw", true)]
-    [InlineData("x pw", "pw", true)]
-    [InlineData("x!pw", "!pw", true)]
-    [InlineData("aaa", "aa", false)]
-    public void HoldsToken_PartAtAnEdge_IsWhetherItStandsAsAToken(string text, string part, bool expected) =>
-        Redaction.HoldsToken(text, part).ShouldBe(expected);
-
-    // A part that holds another as a token is replaced first.
-    [Fact]
-    public void Of_PartThatHoldsAShorterOneAsAToken_IsReplacedWhole() =>
-        Redaction.Of("pass-word", new ConnectionSecret("Host=db", ["pass", "pass-word"])).ShouldBe("***");
-
-    [Fact]
-    public void Of_TwoPartsOneInsideTheOther_AreEachTheMark() =>
-        Redaction.Of("hunter2 hunter", new ConnectionSecret("Host=db", ["hunter", "hunter2"])).ShouldBe("*** ***");
-
     // A record prints its members, and these are secrets.
     [Fact]
     public void ToString_OfASecret_HoldsNeitherTheValueNorAPart()

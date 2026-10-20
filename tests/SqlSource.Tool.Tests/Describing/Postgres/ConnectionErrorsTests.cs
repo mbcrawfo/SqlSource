@@ -59,7 +59,10 @@ public sealed class ConnectionErrorsTests
             .AtOpen(
                 new NpgsqlException(
                     $"Failed to connect to {Host}:5432",
-                    new IOException("timed out", new TimeoutException($"{Host}:5432"))
+                    new IOException(
+                        "timed out",
+                        new TimeoutException($"{Host}:5432", new SocketException((int)SocketError.TimedOut))
+                    )
                 )
             )
             .ShouldBe(new PostgresServerError(null, "the connection to the server timed out", null, null, null));

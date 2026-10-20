@@ -120,7 +120,8 @@ public sealed class CheckFilterTests : IDisposable
         ReportsGone(result).ShouldBe(reported);
     }
 
-    // An entry with no database is nobody's, so a run for a database says nothing of it.
+    // An entry with no database is nobody's, so a run for a database says nothing of it, though describe --database
+    // drops it when it rewrites the file: docs/tech-debt/TD-0036-two-small-gaps-of-check-and-the-log.md.
     [Fact]
     public async Task Check_EntryOfAQueryThatIsGoneWithNoDatabase_IsNotReportedUnderDatabase()
     {

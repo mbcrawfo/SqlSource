@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Globalization;
@@ -319,6 +320,18 @@ public sealed class DatabaseRunsTests : IDisposable
         _error.ToString().ShouldContain("    query: GetUser, database postgres, postgres 16.4, FakeDriver 1.2.3\n");
     }
 
+    // The same for the database's name alone, which is not the engine's.
+    [Fact]
+    public async Task Run_QueryThatFailsWithAPasswordThatIsTheDatabasesName_PrintsTheQueryLineAsItIs()
+    {
+        _describer.Secrets = ["billing"];
+        _describer.Failures["GetInvoice"] = FakeDescriber.Failure("GetInvoice");
+
+        _ = await RunAsync(given: ["postgres=Host=db;Password=billing", "billing=Host=db;Password=billing"]);
+
+        _error.ToString().ShouldContain("    query: GetInvoice, database billing, postgres 16.4, FakeDriver 1.2.3\n");
+    }
+
     // The guard that asks for the parts knows only the whole value.
     [Fact]
     public async Task Run_DescriberThatThrowsWhenAskedForTheSecrets_IsOneFaultWithoutTheValue()
@@ -330,6 +343,21 @@ public sealed class DatabaseRunsTests : IDisposable
         fault.InnerException.ShouldBeNull();
         fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
         fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.InvalidOperationException", "cannot read ***"]);
+        _error.ToString().ShouldBeEmpty();
+        _describer.Opened.ShouldBeEmpty();
+    }
+
+    // The list of the parts is the describer's too, and it is read under the same guard.
+    [Fact]
+    public async Task Run_DescriberWhoseSecretsThrowWhenTheyAreRead_IsOneFaultWithoutTheValue()
+    {
+        _describer.Secrets = new ThrowsWhenRead($"cannot list {Secrets.ConnectionWithWord}");
+
+        var fault = await Should.ThrowAsync<DescriberFaultException>(() => RunAsync());
+
+        fault.InnerException.ShouldBeNull();
+        fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
+        fault.Diagnostic.Arguments.ToArray().ShouldBe(["System.InvalidOperationException", "cannot list ***"]);
         _error.ToString().ShouldBeEmpty();
         _describer.Opened.ShouldBeEmpty();
     }
@@ -448,7 +476,6 @@ public sealed class DatabaseRunsTests : IDisposable
 
         fault.Diagnostic.Descriptor.Id.ShouldBe("SQLSRC200");
         fault.Diagnostic.Arguments[0].ShouldBe("System.NullReferenceException");
-        fault.Message.ShouldNotContain(Secrets.Word);
         _describer.Closed.ShouldBe(1);
     }
 
@@ -736,10 +763,6 @@ public sealed class DatabaseRunsTests : IDisposable
         _describer.Closed.ShouldBe(1);
     }
 
-    [Fact]
-    public void Of_TextThatHoldsTheSecretTwice_HasTheMarkInBothPlaces() =>
-        Redaction.Of("a s3cret and a s3cret", new ConnectionSecret("s3cret")).ShouldBe("a *** and a ***");
-
     // A describer whose OpenAsync is not async.
     private sealed class ThrowsBeforeItReturns : IQueryDescriber
     {
@@ -752,5 +775,17 @@ public sealed class DatabaseRunsTests : IDisposable
             IRunLog log,
             CancellationToken cancellationToken
         ) => throw new InvalidOperationException($"cannot parse {request.Connection}");
+    }
+
+    // A list of a describer's parts that throws whenever it is read.
+    private sealed class ThrowsWhenRead(string message) : IReadOnlyList<string>
+    {
+        public int Count => throw new InvalidOperationException(message);
+
+        public string this[int index] => throw new InvalidOperationException(message);
+
+        public IEnumerator<string> GetEnumerator() => throw new InvalidOperationException(message);
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

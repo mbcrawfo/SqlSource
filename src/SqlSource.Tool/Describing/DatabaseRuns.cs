@@ -96,10 +96,11 @@ internal static class DatabaseRuns
         }
 
         // From here on the run holds the connection's value, and what a describer gives may hold it or a password
-        // of it.  The describer says which parts are secret, under a guard that knows only the whole value; then
-        // everything said of this database goes through a trace that removes both.
+        // of it.  The describer says which parts are secret, under a guard that knows only the whole value, and its
+        // list is copied there, since reading it is the describer's code too; then everything said of this database
+        // goes through a trace that removes both.
         var parts = new Guard(new ConnectionSecret(value), host.GetEnvironmentVariable, cancellationToken).Call(() =>
-            describer.SecretsOf(value)
+            (IReadOnlyList<string>)[.. describer.SecretsOf(value)]
         );
         var engine = SqlDialectName.Canonical(database.Dialect);
         var secret = new ConnectionSecret(value, parts, [database.Name, engine]);
@@ -245,6 +246,9 @@ internal static class DatabaseRuns
     {
         public const string Nothing = "A describer returned nothing.";
 
+        // What a call that gives nothing gives Call<T>, so that both are guarded in one place.
+        private static readonly object Done = new();
+
         public ConnectionSecret Secret => secret;
 
         public async Task<T> CallAsync<T>(Func<Task<T>> call)
@@ -298,17 +302,12 @@ internal static class DatabaseRuns
             }
         }
 
-        public void Call(Action call)
-        {
-            try
+        public void Call(Action call) =>
+            Call(() =>
             {
                 call();
-            }
-            catch (Exception exception) when (!IsCancellation(exception))
-            {
-                throw Fault(exception);
-            }
-        }
+                return Done;
+            });
 
         private bool IsCancellation(Exception exception) =>
             exception is OperationCanceledException && cancellationToken.IsCancellationRequested;

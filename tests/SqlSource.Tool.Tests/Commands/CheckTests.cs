@@ -373,7 +373,7 @@ public sealed class CheckTests : IDisposable
     [Fact]
     public async Task Check_SidecarOfAFileThatNeedsNoneAndTheSystemWillNotOpen_IsSqlsrc218AndNoDifference()
     {
-        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        if (!FileModes.KeepTheOwnerOut)
         {
             Assert.Skip("Needs a file mode that keeps the owner of a file out of it.");
             return;

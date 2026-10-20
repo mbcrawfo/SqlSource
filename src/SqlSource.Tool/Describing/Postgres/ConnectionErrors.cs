@@ -58,12 +58,12 @@ internal static class ConnectionErrors
     /// A driver's error at <c>open</c> with a <see cref="SocketException" /> in its chain, followed by <c>: </c>
     /// and the name of its <see cref="SocketError" />.
     /// </summary>
-    public const string Unreachable = "Npgsql could not reach the server";
+    public const string UnreachablePrefix = "Npgsql could not reach the server";
 
     /// <summary>
     /// Any other driver's error at <c>open</c>, followed by the type of the innermost exception in parentheses.
     /// </summary>
-    public const string NotOpened = "Npgsql could not open a connection to the server";
+    public const string NotOpenedPrefix = "Npgsql could not open a connection to the server";
 
     /// <summary>
     /// A server error at a later call that ends the session: of class <c>08</c>, or <c>57P01</c>, <c>57P02</c>,
@@ -106,8 +106,8 @@ internal static class ConnectionErrors
         }
 
         return InChain<SocketException>(exception) is { } socket
-            ? Fixed(null, Unreachable + ": " + socket.SocketErrorCode.ToString())
-            : Fixed(null, NotOpened + " (" + Innermost(exception).GetType().Name + ")");
+            ? Fixed(null, UnreachablePrefix + ": " + socket.SocketErrorCode.ToString())
+            : Fixed(null, NotOpenedPrefix + " (" + Innermost(exception).GetType().Name + ")");
     }
 
     /// <summary>What a call after <c>open</c> answers for what the driver threw.</summary>

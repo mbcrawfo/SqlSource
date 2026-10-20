@@ -215,7 +215,7 @@ public sealed class RunLogFileTests : IDisposable
     {
         var expected = _folder.WriteFile("run.log", "of an earlier run\n");
 
-        using var log = RunLogFile.Open("run.log", _folder.Path, Hosts.CreateFile, _clock).Value.ShouldNotBeNull();
+        using var log = RunLogFile.Open("run.log", _folder.Path, ToolHost.NewFile, _clock).Value.ShouldNotBeNull();
 
         log.Path.ShouldBe(expected);
         log.Write("e");
@@ -231,7 +231,7 @@ public sealed class RunLogFileTests : IDisposable
     {
         _ = _folder.CreateFolder("folder");
 
-        var opened = RunLogFile.Open(given, _folder.Path, Hosts.CreateFile, _clock);
+        var opened = RunLogFile.Open(given, _folder.Path, ToolHost.NewFile, _clock);
         opened.Value?.Dispose();
 
         opened.Succeeded.ShouldBeFalse();
@@ -256,7 +256,7 @@ public sealed class RunLogFileTests : IDisposable
     {
         var existing = _folder.WriteFile(given, "of the run\n");
 
-        var opened = RunLogFile.Open(given, _folder.Path, Hosts.CreateFile, _clock);
+        var opened = RunLogFile.Open(given, _folder.Path, ToolHost.NewFile, _clock);
         opened.Value?.Dispose();
 
         opened.Failure.ShouldBe(
@@ -273,7 +273,7 @@ public sealed class RunLogFileTests : IDisposable
     [Fact]
     public void Open_PathOfAFileOfTheRunThatIsNotThere_MakesNothing()
     {
-        var opened = RunLogFile.Open("New.sql", _folder.Path, Hosts.CreateFile, _clock);
+        var opened = RunLogFile.Open("New.sql", _folder.Path, ToolHost.NewFile, _clock);
         opened.Value?.Dispose();
 
         opened.Succeeded.ShouldBeFalse();
@@ -283,7 +283,7 @@ public sealed class RunLogFileTests : IDisposable
     [Fact]
     public void Open_PathThatOnlyEndsLikeAFileOfTheRun_IsALog()
     {
-        var opened = RunLogFile.Open("run.sql.log", _folder.Path, Hosts.CreateFile, _clock);
+        var opened = RunLogFile.Open("run.sql.log", _folder.Path, ToolHost.NewFile, _clock);
         using var log = opened.Value;
 
         opened.Succeeded.ShouldBeTrue();

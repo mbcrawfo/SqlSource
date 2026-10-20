@@ -446,7 +446,7 @@ public sealed class RunLogTests : IDisposable
         Text(files.Single(line => Text(line, "path") == _users), "state").ShouldBe("ready");
     }
 
-    // Under --database a query of another database that has no entry is left out, and the file is held back.
+    // Under --database a query of another database that has no entry is left out.
     [Fact]
     public async Task Run_QueryOfADatabaseThatIsNotSelected_IsNotSelectedAndLeftOut()
     {
@@ -468,7 +468,7 @@ public sealed class RunLogTests : IDisposable
     [Fact]
     public async Task Run_SidecarThatCannotBeDeleted_HasTheActionFailed()
     {
-        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        if (!FileModes.KeepTheOwnerOut)
         {
             Assert.Skip("Needs a file mode that keeps the owner of a directory from changing it.");
             return;

@@ -53,6 +53,13 @@ internal sealed record ToolHost(
             new DescriberRegistry([new PostgresDescriber()]),
             static _ => LiveExchange.Instance,
             TimeProvider.System,
-            static path => new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read)
+            NewFile
         );
+
+    /// <summary>
+    /// The <see cref="CreateFile"/> of a real run: makes the file on disk, or empties the one that is there, opened
+    /// for writing and shared for reading.
+    /// </summary>
+    internal static Stream NewFile(string path) =>
+        new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.Read);
 }

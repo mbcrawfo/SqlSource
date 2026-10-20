@@ -203,7 +203,7 @@ public sealed class RunUnitTests : IDisposable
     [Fact]
     public void Find_DirectoryThatCannotBeRead_IsSqlsrc222()
     {
-        if (OperatingSystem.IsWindows() || Environment.IsPrivilegedProcess)
+        if (!FileModes.KeepTheOwnerOut)
         {
             Assert.Skip("Needs a file mode that keeps the owner of a directory out of it.");
             return;

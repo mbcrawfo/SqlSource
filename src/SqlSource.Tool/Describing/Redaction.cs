@@ -46,7 +46,8 @@ internal static class Redaction
         };
 
     /// <summary>
-    /// The error with the secret taken out of its arguments, of the text of each line under it, and of its message.
+    /// The error with the secret taken out of its arguments, of the label and the text of each line under it, and of
+    /// its message.
     /// </summary>
     /// <remarks>
     /// Each text is cleaned as it is, then put on one line as <see cref="Reporter" /> prints it, and cleaned again:
@@ -62,7 +63,13 @@ internal static class Redaction
         {
             Arguments = new EquatableArray<string>([.. arguments]),
             Lines = new EquatableArray<ContinuationLine>([
-                .. diagnostic.Lines.Select(line => line with { Text = AsPrinted(line.Text, secret) }),
+                .. diagnostic.Lines.Select(line =>
+                    line with
+                    {
+                        Label = AsPrinted(line.Label, secret),
+                        Text = AsPrinted(line.Text, secret),
+                    }
+                ),
             ]),
         };
 
@@ -76,7 +83,7 @@ internal static class Redaction
             ? cleaned with
             {
                 Descriptor = WithWholeMessage(diagnostic.Descriptor),
-                Arguments = new EquatableArray<string>([Of(message, secret)]),
+                Arguments = new EquatableArray<string>([AsPrinted(message, secret)]),
             }
             : cleaned;
     }
@@ -127,8 +134,11 @@ internal static class Redaction
         );
     }
 
-    // The text as Reporter prints it, with the secret taken out before and after it is put on one line.
-    private static string AsPrinted(string text, ConnectionSecret secret) => Of(OneLine.Of(Of(text, secret)), secret);
+    /// <summary>
+    /// The text as <see cref="Reporter" /> prints it, on one line, with the secret taken out before and after it is
+    /// put there: a line break written as a space can make a part that holds a space.
+    /// </summary>
+    public static string AsPrinted(string text, ConnectionSecret secret) => Of(OneLine.Of(Of(text, secret)), secret);
 
     private static string Of(string text, string value, IEnumerable<string> parts)
     {

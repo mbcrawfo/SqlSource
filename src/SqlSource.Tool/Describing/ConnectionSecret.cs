@@ -19,7 +19,7 @@ namespace SqlSource.Tool.Describing;
 /// Some parts are dropped.  One shorter than <see cref="MinimumPartLength" /> would match too much ordinary text.
 /// One that equals a word the run writes of the database itself, its logical name or the engine's name, is printed
 /// whatever the describer does, as <see cref="EntrySecretCheck" /> says of the value, so removing it hides nothing:
-/// the password <c>postgres</c> would otherwise print <c>query: GetUser, database ***, *** 16.4</c>.
+/// the password <c>postgres</c> would otherwise print <c>query: GetUser, database app, *** 16.4</c>.
 /// </para>
 /// <para>
 /// It is a class and not a record, since a record prints its members.

@@ -98,6 +98,6 @@ internal sealed class CliRun : IDisposable
             Describers = new DescriberRegistry(Describers),
             Exchange = _ => Exchange,
             Time = Time,
-            CreateFile = CreateFile ?? Hosts.CreateFile,
+            CreateFile = CreateFile ?? ToolHost.NewFile,
         };
 }

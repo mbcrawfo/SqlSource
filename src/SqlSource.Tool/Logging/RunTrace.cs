@@ -25,9 +25,7 @@ internal sealed class RunTrace(IRunLog log, TextWriter? verbose = null, Connecti
     /// </summary>
     /// <param name="text">The line, without its prefix.</param>
     public void Say(string text) =>
-        verbose?.WriteLine(
-            Prefix + (secret is null ? OneLine.Of(text) : Redaction.Of(OneLine.Of(Redaction.Of(text, secret)), secret))
-        );
+        verbose?.WriteLine(Prefix + (secret is null ? OneLine.Of(text) : Redaction.AsPrinted(text, secret)));
 
     /// <summary>
     /// The same trace with one connection's secret removed from everything said through it.  What the run says of

@@ -146,6 +146,30 @@ public sealed class RedactionTests : IDisposable
     }
 
     [Fact]
+    public void Of_TextThatHoldsTheSecretTwice_HasTheMarkInBothPlaces() =>
+        Redaction.Of("a s3cret and a s3cret", new ConnectionSecret("s3cret")).ShouldBe("a *** and a ***");
+
+    // The edges of the rule, which holds for a part of any length: the text's own ends count as no letter, and an
+    // edge of the part that is no letter, digit or "_" is not checked.
+    [Theory]
+    [InlineData("pw", "pw", true)]
+    [InlineData("pw x", "pw", true)]
+    [InlineData("x pw", "pw", true)]
+    [InlineData("x!pw", "!pw", true)]
+    [InlineData("aaa", "aa", false)]
+    public void HoldsToken_PartAtAnEdge_IsWhetherItStandsAsAToken(string text, string part, bool expected) =>
+        Redaction.HoldsToken(text, part).ShouldBe(expected);
+
+    // A part that holds another as a token is replaced first.
+    [Fact]
+    public void Of_PartThatHoldsAShorterOneAsAToken_IsReplacedWhole() =>
+        Redaction.Of("pass-word", new ConnectionSecret("Host=db", ["pass", "pass-word"])).ShouldBe("***");
+
+    [Fact]
+    public void Of_TwoPartsOneInsideTheOther_AreEachTheMark() =>
+        Redaction.Of("hunter2 hunter", new ConnectionSecret("Host=db", ["hunter", "hunter2"])).ShouldBe("*** ***");
+
+    [Fact]
     public void Of_FailureWhoseServerLinesHoldAPart_HasTheMarkThereAndTheWordInsideANameLeft()
     {
         var secret = new ConnectionSecret("Host=db;Password=test", ["test"]);
@@ -219,6 +243,37 @@ public sealed class RedactionTests : IDisposable
 
         printed.ShouldContain("rejected ***\n");
         printed.ShouldContain("    server: said ***\n");
+        printed.ShouldNotContain("my pass");
+    }
+
+    // A message that holds the value is printed as the one argument of its error, on one line, so a line break of
+    // the format can make a password that holds a space there too.
+    [Fact]
+    public void Of_MessageThatHoldsTheValueAndAPasswordSplitByALineBreakOfTheFormat_IsTheMarkInBoth()
+    {
+        var diagnostic = ToolDiagnostic.Create(
+            WithFormat("rejected {0}{1}, said my\npass"),
+            "Host=db;Password=my",
+            " pass"
+        );
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Host=db;Password=my pass", ["my pass"])));
+
+        printed.ShouldContain("rejected ***, said ***\n");
+        printed.ShouldNotContain("my pass");
+    }
+
+    // The label of a line is printed on one line too.
+    [Fact]
+    public void Of_LineWhoseLabelHoldsAPasswordSplitByALineBreak_IsTheMarkInTheLabel()
+    {
+        var diagnostic = ToolDiagnostic
+            .Create(WithFormat("rejected {0}"), "x")
+            .WithLines(new ContinuationLine("said my\npass", "x"));
+
+        var printed = Printed(Redaction.Of(diagnostic, new ConnectionSecret("Host=db;Password=my pass", ["my pass"])));
+
+        printed.ShouldContain("    said ***: x\n");
         printed.ShouldNotContain("my pass");
     }
 

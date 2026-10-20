@@ -222,7 +222,7 @@ public sealed class DescribeCommandTests : IDisposable
     // what failed and names neither the host nor the user, and so does the rest of the log: the driver's own events
     // say nothing of it.
     [Fact]
-    public async Task Describe_ConnectionRefusedWithLog_IsSqlsrc224AndNoDriverEventHoldsTheHost()
+    public async Task Describe_ConnectionRefusedWithLog_IsSqlsrc224AndNothingPrintedOrLoggedHoldsTheHostOrTheUser()
     {
         _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
         var host = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString).Host.ShouldNotBeNull();
@@ -247,7 +247,7 @@ public sealed class DescribeCommandTests : IDisposable
     // The commonest real failure: the server rejects the role's password.  The diagnostic holds the SQLSTATE and the
     // describer's own text, and names neither the role, the host nor the database, nor does the rest of the log.
     [Fact]
-    public async Task Describe_WrongPasswordWithLog_IsSqlsrc224AndNoDriverEventHoldsTheUserOrTheHost()
+    public async Task Describe_WrongPasswordWithLog_IsSqlsrc224AndNothingPrintedOrLoggedHoldsTheUserOrTheHost()
     {
         await CreateLogRoleAndDatabaseAsync();
         _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");

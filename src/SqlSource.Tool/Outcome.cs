@@ -40,7 +40,11 @@ internal sealed record Outcome<TValue, TFailure>
     [MemberNotNullWhen(false, nameof(Failure))]
     public bool Succeeded { get; }
 
-    public static Outcome<TValue, TFailure> Of(TValue value) => new(value, default, succeeded: true);
+    /// <summary>
+    /// A success that holds <paramref name="value"/>, for a value that needs no disposing; one that does is made with
+    /// the constructor, <see cref="Outcome{TValue, TFailure}(TValue)"/>.
+    /// </summary>
+    public static Outcome<TValue, TFailure> Of(TValue value) => new(value);
 
     public static Outcome<TValue, TFailure> Failed(TFailure failure) => new(default, failure, succeeded: false);
 }
