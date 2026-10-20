@@ -86,7 +86,8 @@ internal static class ModelEmitter
         }
 
         // Dapper finds no public constructor that matches the row, falls back to the private constructor without
-        // parameters, and sets each property through its init accessor.
+        // parameters, and sets each property through its init accessor.  Each argument is a typed default(T), since
+        // this(default!) would be ambiguous with the copy constructor of a record with one property (CS0121).
         var memberIndent = indent + Indent;
         _ = builder.Append('\n').Append(indent).Append("{\n");
         _ = builder

@@ -92,9 +92,14 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
 
         var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).ToList();
 
+        // Npgsql gives the type of an array column as System.Array, and Dapper looks for a constructor of that exact
+        // type, so the positional constructor of the record never matches the row.  Dapper reads it through the
+        // constructor without parameters that the generator gives a record with an array, and sets each property.
         rows.Count.ShouldBe(2);
         AllTypesRows.ShouldBeTheFullRow(rows[0]);
         AllTypesRows.ShouldBeTheNullRow(rows[1]);
+        (rows[0] with { Id = 9 }).Int4ArrayValue.ShouldBeSameAs(rows[0].Int4ArrayValue);
+        (rows[0] with { }).ShouldBe(rows[0]);
     }
 
     [Fact]
@@ -185,25 +190,6 @@ public sealed class AllTypesQueryTests(PostgresContainer postgres)
             .Concat(WriteSideLeftOut.Keys)
             .Order(StringComparer.Ordinal)
             .ShouldBe(columns.Order(StringComparer.Ordinal));
-    }
-
-    // Npgsql gives the type of an array column as System.Array, and Dapper looks for a constructor of that exact type,
-    // so the positional constructor of the record never matches the row.  Dapper reads it through the constructor
-    // without parameters that the generator gives a record with an array, and sets each property.
-    [Fact]
-    public async Task QueryAsync_RecordWithAnArray_ReadsIt()
-    {
-        await using var source = EndToEndSources.App(postgres);
-        await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
-
-        var rows = (await connection.QueryAsync<AllTypesDto>(AllTypesQueries.ListAllTypes)).ToList();
-
-        var full = rows.Single(static row => row.Id == AllTypesRows.FullRowId);
-        var empty = rows.Single(static row => row.Id == AllTypesRows.NullRowId);
-        AllTypesRows.ShouldBeTheFullRow(full);
-        AllTypesRows.ShouldBeTheNullRow(empty);
-        (full with { Id = 9 }).Int4ArrayValue.ShouldBeSameAs(full.Int4ArrayValue);
-        (full with { }).ShouldBe(full);
     }
 
     // The input model with the values of the full row, property by property by name, and the id of the new row.  A
