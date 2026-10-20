@@ -11,8 +11,9 @@ namespace SqlSource.Settings;
 /// <see cref="ClrTypeName.TryParse" /> reads, or <c>default</c>, ignoring case, which takes the key out of the map.
 /// </summary>
 /// <remarks>
-/// An MSBuild value is a list of entries separated by white space, line breaks included, outside <c>&lt;&gt;</c>
-/// and <c>[]</c>.  A marker holds one entry, with white space allowed around its <c>=</c>.
+/// An MSBuild value is a list of entries separated by white space, line breaks included, outside <c>&lt;&gt;</c>,
+/// <c>[]</c> and double quotes.  A marker holds one entry, with white space allowed around its <c>=</c>.  The
+/// <c>=</c> of an entry is the first one outside double quotes.
 /// </remarks>
 internal static class TypeOverrideGrammar
 {
@@ -36,7 +37,7 @@ internal static class TypeOverrideGrammar
     )
     {
         entry = null;
-        var equals = text.IndexOf('=');
+        var equals = IndexOfEquals(text);
         if (equals < 0)
         {
             return false;
@@ -104,8 +105,28 @@ internal static class TypeOverrideGrammar
             : new EquatableArray<TypeOverride>(entries.ToImmutableArray());
     }
 
-    // The next run of text outside white space, where white space inside <> or [] belongs to the run.  Empty at the
-    // end.
+    // The first = outside double quotes, or -1.  A " toggles being inside quotes, so a doubled one inside a quoted part
+    // closes and opens it again.
+    private static int IndexOfEquals(ReadOnlySpan<char> text)
+    {
+        var quoted = false;
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (text[index] == '"')
+            {
+                quoted = !quoted;
+            }
+            else if (text[index] == '=' && !quoted)
+            {
+                return index;
+            }
+        }
+
+        return -1;
+    }
+
+    // The next run of text outside white space, where white space inside <>, [] or double quotes belongs to the run,
+    // and a bracket inside double quotes is not counted.  Empty at the end.
     private static ReadOnlySpan<char> NextEntry(ref ReadOnlySpan<char> rest)
     {
         var start = 0;
@@ -116,9 +137,18 @@ internal static class TypeOverrideGrammar
 
         var end = start;
         var open = 0;
-        while (end < rest.Length && (open > 0 || !char.IsWhiteSpace(rest[end])))
+        var quoted = false;
+        while (end < rest.Length && (open > 0 || quoted || !char.IsWhiteSpace(rest[end])))
         {
-            if (rest[end] is '<' or '[')
+            if (rest[end] == '"')
+            {
+                quoted = !quoted;
+            }
+            else if (quoted)
+            {
+                // Inside quotes, nothing but the closing quote means anything.
+            }
+            else if (rest[end] is '<' or '[')
             {
                 open++;
             }
