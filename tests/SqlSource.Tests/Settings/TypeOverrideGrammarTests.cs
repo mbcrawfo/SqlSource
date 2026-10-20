@@ -76,6 +76,21 @@ public sealed class TypeOverrideGrammarTests
         entry.ShouldBe(new TypeOverride("numeric", type, SettingPlace.Query));
     }
 
+    [Fact]
+    public void TryReadEntry_QuotedKeyInAMarker_AllowsSpacesAroundEquals()
+    {
+        TypeOverrideGrammar
+            .TryReadEntry(
+                "\"my schema\".\"x y\" = int".AsSpan(),
+                spacesAroundEquals: true,
+                SettingPlace.Query,
+                out var entry
+            )
+            .ShouldBeTrue();
+
+        entry.ShouldBe(new TypeOverride("\"my schema\".\"x y\"", "int", SettingPlace.Query));
+    }
+
     [Theory]
     [InlineData("numeric = System.Double")]
     [InlineData("numeric= System.Double")]
@@ -253,6 +268,89 @@ public sealed class TypeOverrideGrammarTests
             )
             .Select(static entry => entry.Key)
             .ShouldBe(["bool", "Public.alpha", "public.Zeta", "text", "timestamptz"]);
+    }
+
+    // White space inside double quotes belongs to the key, as the quoted part of a name may hold any character.
+    [Fact]
+    public void ReadList_QuotedKeyWithSpaces_IsOneEntry()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("\"my schema\".\"order status\"=MyApp.A int4=long", SettingPlace.Property, invalid)
+            .ShouldBe([
+                new TypeOverride("int4", "long", SettingPlace.Property),
+                new TypeOverride("\"my schema\".\"order status\"", "global::MyApp.A", SettingPlace.Property),
+            ]);
+        invalid.ShouldBeEmpty();
+    }
+
+    // Inside double quotes a bracket does not open an entry's bracket, and an equals is not the entry's.
+    [Fact]
+    public void ReadList_BracketOrEqualsInsideQuotes_IsPartOfTheKey()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("s.\"a[b\"=int s.\"a=b\"=long int8=long", SettingPlace.Property, invalid)
+            .ShouldBe([
+                new TypeOverride("int8", "long", SettingPlace.Property),
+                new TypeOverride("s.\"a=b\"", "long", SettingPlace.Property),
+                new TypeOverride("s.\"a[b\"", "int", SettingPlace.Property),
+            ]);
+        invalid.ShouldBeEmpty();
+    }
+
+    // A quote that does not close takes the rest of the value into its entry, as a bracket does.
+    [Fact]
+    public void ReadList_UnclosedQuote_MakesTheRestOneInvalidEntry()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("int4=long \"my schema.x=int int8=long", SettingPlace.Property, invalid)
+            .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Property)]);
+        invalid.ShouldBe(["\"my schema.x=int int8=long"]);
+    }
+
+    // Quotes belong to a key, so a stray one in a type is an entry that is not valid by itself.
+    [Fact]
+    public void ReadList_QuoteInTheType_IsInvalidAloneAndTheRestApply()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("a=string\"x int4=long int8=long", SettingPlace.Property, invalid)
+            .ShouldBe([
+                new TypeOverride("int4", "long", SettingPlace.Property),
+                new TypeOverride("int8", "long", SettingPlace.Property),
+            ]);
+        invalid.ShouldBe(["a=string\"x"]);
+    }
+
+    [Fact]
+    public void ReadList_KeysThatDifferByCase_AreTwoEntries()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("public.Status=MyApp.A public.status=MyApp.B", SettingPlace.Property, invalid)
+            .ShouldBe([
+                new TypeOverride("public.Status", "global::MyApp.A", SettingPlace.Property),
+                new TypeOverride("public.status", "global::MyApp.B", SettingPlace.Property),
+            ]);
+        invalid.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadList_QuotedAndPlainSpellingOfOneText_TheLastWins()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("public.status=MyApp.A public.\"status\"=MyApp.B", SettingPlace.Property, invalid)
+            .ShouldBe([new TypeOverride("public.\"status\"", "global::MyApp.B", SettingPlace.Property)]);
+        invalid.ShouldBeEmpty();
     }
 
     [Theory]

@@ -96,11 +96,14 @@ internal static class PostgresTypeMap
     }
 
     /// <summary>
-    /// The key of <paramref name="type" />: its <c>InternalName</c> for a type of <c>pg_catalog</c>, and
-    /// <c>Schema.InternalName</c> for any other.
+    /// The key of <paramref name="type" />, written as the type override reads it: its <c>InternalName</c> for a type
+    /// of <c>pg_catalog</c>, and <c>Schema.InternalName</c> for any other, each part in quotes when it needs them,
+    /// as <see cref="TypeKeys.WritePart" /> writes it: <c>public."Status"</c> and <c>"my schema"."order-status"</c>.
     /// </summary>
     public static string KeyOf(PostgresType type) =>
-        IsSystemType(type) ? type.InternalName : type.Schema + "." + type.InternalName;
+        IsSystemType(type)
+            ? TypeKeys.WritePart(type.InternalName)
+            : TypeKeys.WritePart(type.Schema) + "." + TypeKeys.WritePart(type.InternalName);
 
     /// <summary>A C# type as a user writes it in the type override, without <c>global::</c>.</summary>
     public static string AsWritten(string text) => text.Replace("global::", string.Empty);

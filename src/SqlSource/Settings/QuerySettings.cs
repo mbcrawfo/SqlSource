@@ -84,10 +84,11 @@ internal readonly record struct QuerySettings(
         );
 
     /// <summary>
-    /// The type override in effect for a query: the precedence of the type override, which has no attribute level
-    /// and merges per key, the markers over the metadata over the property.  Sorted by key, without entries of
-    /// <c>default</c>, and empty when no level sets one.  It is kept apart from <see cref="Resolve" />, which runs for
-    /// each query and each type that claims its file, so that a caller that needs it computes it once for each
+    /// The type override of a query: the precedence of the type override, which has no attribute level and merges
+    /// per key, the markers over the metadata over the property.  Sorted by key, and empty when no level sets one.
+    /// It keeps its entries of <c>default</c>, which <see cref="TypeOverrideMap.Find" /> weighs by their place
+    /// against the entries of other keys that match a type.  It is kept apart from <see cref="Resolve" />, which runs
+    /// for each query and each type that claims its file, so that a caller that needs it computes it once for each
     /// distinct level of markers.
     /// </summary>
     public static EquatableArray<TypeOverride> ResolveTypeOverrides(
@@ -95,10 +96,8 @@ internal readonly record struct QuerySettings(
         SettingsLevel metadata,
         SettingsLevel property
     ) =>
-        TypeOverrideMap.InEffect(
-            TypeOverrideMap.Over(
-                markers.TypeOverrides,
-                TypeOverrideMap.Over(metadata.TypeOverrides, property.TypeOverrides)
-            )
-        );
+        TypeOverrideMap.Over(
+            markers.TypeOverrides,
+            TypeOverrideMap.Over(metadata.TypeOverrides, property.TypeOverrides)
+        ) ?? EquatableArray<TypeOverride>.Empty;
 }
