@@ -189,14 +189,71 @@ public sealed class SecretTests : IDisposable
         CaptureJson.Write(_scene.Run.Capture).ShouldNotContain(Secrets.Marker);
     }
 
-    // The value was typed where "name=value" stands.  Its first keyword is taken for a name, and only that is said.
+    // The value was typed where "name=value" stands.  Its first keyword is taken for a name, which could be the start
+    // of a secret, so the help says only that the option was misread, and where.
     [Fact]
-    public async Task Run_ConnectionStringGivenWithoutAName_IsNeverPrinted()
+    public async Task Run_ConnectionStringGivenWithoutAName_SaysItWasMisreadAndPrintsNothingOfIt()
     {
         var result = await _scene.DescribeAsync("--connection", Secrets.ConnectionWithMarker);
 
         ShouldHold(result, "213");
-        result.Error.ShouldContain("--connection was given for Host, which is no database of this run");
+        result.Error.ShouldContain(
+            "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
+                + "The value of --connection at position 3 names no database of this run\n"
+        );
+        result.Error.ShouldNotContain("Host");
+        result.Error.ShouldNotContain("Password");
+    }
+
+    // Its first keyword is close to a database of the run, as a misspelt name is, and is printed: nothing after the
+    // first "=" is.
+    [Fact]
+    public async Task Run_ConnectionStringWithoutANameCloseToADatabase_PrintsOnlyItsFirstWord()
+    {
+        _ = _scene.Project.AddSql("Hosts.sql", "-- name: Hosts\n-- database: hosts\nSELECT 9;\n");
+
+        var result = await _scene.DescribeAsync("--connection", Secrets.ConnectionWithMarker);
+
+        ShouldHold(result, "213");
+        result.Error.ShouldContain(
+            "    help: pass --connection hosts=<connection string>, or set SQLSOURCE_CONNECTION_HOSTS.  "
+                + "--connection was given for Host, which is no database of this run\n"
+        );
+        result.Error.ShouldNotContain("Password");
+    }
+
+    // The positions are those of the values on the command line, and the names close to a database come first.
+    [Fact]
+    public async Task Run_ConnectionsGivenForNamesThatAreNoDatabase_AreNamedOrCountedByTheirPositions()
+    {
+        var result = await _scene.DescribeAsync(
+            "--connection",
+            "Host=a;Password=" + Secrets.Marker,
+            "--connection",
+            "postgress=b",
+            "--connection",
+            "Server=c;Password=" + Secrets.Marker
+        );
+
+        ShouldHold(result, "213");
+        result.Error.ShouldContain(
+            "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
+                + "--connection was given for postgress, which is no database of this run.  "
+                + "The values of --connection at positions 3 and 7 name no databases of this run\n"
+        );
+        result.Error.ShouldNotContain("Host");
+        result.Error.ShouldNotContain("Server");
+    }
+
+    // A token typed after --database is a database name by the rule, and is far from every database of the run.
+    [Fact]
+    public async Task Run_SecretTypedAfterDatabase_IsNeverPrinted()
+    {
+        var result = await _scene.DescribeAsync("--database", Secrets.Marker);
+
+        // SummaryTests holds the exact line.
+        result.Out.ShouldNotContain(Secrets.Marker);
+        result.Error.ShouldNotContain(Secrets.Marker);
     }
 
     [Theory]
@@ -259,6 +316,26 @@ public sealed class SecretTests : IDisposable
         _scene.Run.Processes.Requests.ShouldBeEmpty();
     }
 
+    // Where a path stands: the unit, a .sql file, and the value of --project.  The error says where, and nothing else,
+    // and neither does the log, which holds the token by its position.
+    [Theory]
+    [InlineData("203", new[] { Secrets.ConnectionWithMarker })]
+    [InlineData("212", new[] { Secrets.ConnectionWithMarker + ".sql" })]
+    [InlineData("207", new[] { "--project", Secrets.ConnectionWithMarker })]
+    public async Task Run_ConnectionStringWherePathsStand_IsNeverPrinted(string id, string[] args)
+    {
+        var result = await _scene.DescribeAsync([.. args, "--log", "run.log"]);
+
+        ShouldHold(result, id);
+        result.Error.ShouldContain("The path at position ");
+        var log = await File.ReadAllTextAsync(
+            _scene.Run.Folder.PathOf("run.log"),
+            TestContext.Current.CancellationToken
+        );
+        log.ShouldNotContain(Secrets.Marker);
+        log.ShouldContain("\"run.start\"");
+    }
+
     // The rule for an unknown option: nothing after it is read.
     [Fact]
     public async Task Run_MisspeltConnectionOptionFollowedByTheValue_NamesTheOptionAlone()
@@ -266,6 +343,15 @@ public sealed class SecretTests : IDisposable
         var result = await _scene.DescribeAsync("--conection", "postgres=" + Secrets.ConnectionWithMarker);
 
         result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option '--conection'\n"));
+    }
+
+    // A password typed the way mysql takes one is far from every option, so only its position is printed.
+    [Fact]
+    public async Task Run_SecretTypedAsAShortOption_IsNamedByItsPosition()
+    {
+        var result = await _scene.DescribeAsync("-p" + Secrets.Marker);
+
+        result.ShouldBe(new CliResult(1, "", "sqlsource: unknown option at position 2\n"));
     }
 
     [Theory]

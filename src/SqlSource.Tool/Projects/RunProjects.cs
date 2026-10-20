@@ -26,13 +26,16 @@ internal static class RunProjects
     /// left out, and the run goes on with the rest.
     /// </summary>
     /// <param name="unit">The solution or the project the run is on.</param>
-    /// <param name="named">The paths that <c>--project</c> gave, as they were typed.  Empty when it gave none.</param>
+    /// <param name="named">
+    /// The paths that <c>--project</c> gave, as they were typed.  Empty when it gave none.  A message names one by
+    /// its position when it holds <c>=</c> or <c>;</c>.
+    /// </param>
     /// <param name="host">The working directory, and what MSBuild is run with.</param>
     /// <param name="reporter">Where the errors go.</param>
     /// <param name="cancellationToken">Ends the run.</param>
     public static async Task<ImmutableArray<ProjectManifest>> FindAsync(
         RunUnit unit,
-        IReadOnlyList<string> named,
+        IReadOnlyList<UsageValue> named,
         ToolHost host,
         Reporter reporter,
         CancellationToken cancellationToken
@@ -121,7 +124,7 @@ internal static class RunProjects
     // The projects of the unit that --project names, in the unit's order.  A path that names none is reported once.
     private static ImmutableArray<string> Restrict(
         ImmutableArray<string> projects,
-        IReadOnlyList<string> named,
+        IReadOnlyList<UsageValue> named,
         RunUnit unit,
         string workingDirectory,
         Reporter reporter
@@ -132,14 +135,16 @@ internal static class RunProjects
         foreach (var name in named)
         {
             // Path.GetFullPath throws for an empty path, which is what an unset variable of a shell gives.
-            var path = name.Length == 0 ? name : Path.GetFullPath(name, workingDirectory);
+            var path = name.Text.Length == 0 ? name.Text : Path.GetFullPath(name.Text, workingDirectory);
             if (projects.Contains(path, StringComparer.OrdinalIgnoreCase))
             {
                 _ = selected.Add(path);
             }
             else if (reported.Add(path))
             {
-                reporter.Report(ToolDiagnostic.Create(ToolDiagnostics.ProjectNotInRun, path, unit.Path));
+                reporter.Report(
+                    ToolDiagnostic.Create(ToolDiagnostics.ProjectNotInRun, name.NamedAsPath(path), unit.Path)
+                );
             }
         }
 

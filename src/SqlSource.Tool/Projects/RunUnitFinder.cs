@@ -15,23 +15,24 @@ internal static class RunUnitFinder
     /// <summary>
     /// The unit, or the error that says why there is none.
     /// </summary>
-    /// <param name="argument">The path as given, or null when none was.</param>
+    /// <param name="argument">The path as given, or null when none was.  A message names it by its position when it
+    /// holds <c>=</c> or <c>;</c>.</param>
     /// <param name="workingDirectory">The full path a relative path is resolved against.</param>
-    public static Outcome<RunUnit, ToolDiagnostic> Find(string? argument, string workingDirectory)
+    public static Outcome<RunUnit, ToolDiagnostic> Find(UsageValue? argument, string workingDirectory)
     {
         // Path.GetFullPath throws for an empty path, which is what an unset variable of a shell gives.
-        if (argument is { Length: 0 })
+        if (argument is { Text.Length: 0 })
         {
-            return No(ToolDiagnostics.NotARunUnit, argument);
+            return No(ToolDiagnostics.NotARunUnit, argument.NamedAsPath(""));
         }
 
         var path = Path.TrimEndingDirectorySeparator(
-            argument is null ? workingDirectory : Path.GetFullPath(argument, workingDirectory)
+            argument is null ? workingDirectory : Path.GetFullPath(argument.Text, workingDirectory)
         );
 
         if (Directory.Exists(path))
         {
-            return FindIn(path);
+            return FindIn(path, argument);
         }
 
         if (File.Exists(path) && KindOf(path) is { } kind)
@@ -39,11 +40,17 @@ internal static class RunUnitFinder
             return Outcome<RunUnit, ToolDiagnostic>.Of(new RunUnit(kind, path));
         }
 
-        return No(ToolDiagnostics.NotARunUnit, path);
+        return No(ToolDiagnostics.NotARunUnit, NamedOf(argument, path));
     }
 
-    private static Outcome<RunUnit, ToolDiagnostic> FindIn(string directory)
+    // The working directory is no token of the command line, and a message quotes it.
+    private static string NamedOf(UsageValue? argument, string path) =>
+        argument?.NamedAsPath(path) ?? UsageValue.Quoted(path);
+
+    private static Outcome<RunUnit, ToolDiagnostic> FindIn(string directory, UsageValue? argument)
     {
+        var named = NamedOf(argument, directory);
+
         (string File, RunUnitKind? Kind)[] units;
         try
         {
@@ -60,14 +67,19 @@ internal static class RunUnitFinder
         catch (Exception exception) when (exception is UnauthorizedAccessException or IOException)
         {
             // The user named this directory, so that it cannot be read is theirs to mend, and no bug of the tool.
-            return No(ToolDiagnostics.DirectoryCannotBeRead, directory, exception.Message);
+            // The system's message quotes the path, so a path that is named by its position gets no part of it.
+            return No(
+                ToolDiagnostics.DirectoryCannotBeRead,
+                named,
+                argument is { MayBePrintedAsPath: false } ? "the system would not list its files" : exception.Message
+            );
         }
 
         return units switch
         {
             [{ Kind: { } kind } unit] => Outcome<RunUnit, ToolDiagnostic>.Of(new RunUnit(kind, unit.File)),
-            [] => No(ToolDiagnostics.NoRunUnit, directory),
-            _ => No(ToolDiagnostics.SeveralRunUnits, directory),
+            [] => No(ToolDiagnostics.NoRunUnit, named),
+            _ => No(ToolDiagnostics.SeveralRunUnits, named),
         };
     }
 

@@ -21,9 +21,12 @@ public sealed class RunUnitTests : IDisposable
     }
 
     // The finder reports nothing: its caller does, as DescribeCommand does here.
-    private RunUnit? Find(string? argument)
+    private RunUnit? Find(string? argument, int position = 2)
     {
-        var found = RunUnitFinder.Find(argument, _folder.Path);
+        var found = RunUnitFinder.Find(
+            argument is null ? null : new UsageValue(null, argument, position),
+            _folder.Path
+        );
         if (found.Succeeded)
         {
             return found.Value;
@@ -33,11 +36,14 @@ public sealed class RunUnitTests : IDisposable
         return null;
     }
 
-    private void ShouldHaveReported(string id, string path)
+    private void ShouldHaveReported(string id, string path) => ShouldHaveReportedNamed(id, $"'{path}'");
+
+    // The first line starts with how the path is named: in quotes, or by its position.
+    private void ShouldHaveReportedNamed(string id, string named)
     {
         var lines = _error.ToString().Split('\n');
         lines.Length.ShouldBe(3, _error.ToString());
-        lines[0].ShouldStartWith($"sqlsource : error {id}: '{path}' ");
+        lines[0].ShouldStartWith($"sqlsource : error {id}: {named} ");
     }
 
     [Theory]
@@ -200,6 +206,81 @@ public sealed class RunUnitTests : IDisposable
         ShouldHaveReported("SQLSRC203", "");
     }
 
+    // A connection string typed where the path stands: it is named by its position, and never repeated.
+    [Fact]
+    public void Find_PathWithAnEqualsSign_IsNamedByItsPosition()
+    {
+        Find("Host=db;Password=" + Secrets.Marker).ShouldBeNull();
+
+        _error
+            .ToString()
+            .ShouldStartWith(
+                "sqlsource : error SQLSRC203: The path at position 2 is not a .sln, .slnx or .csproj file, or a "
+                    + "directory that holds one\n"
+            );
+        _error.ToString().ShouldNotContain(Secrets.Marker);
+    }
+
+    [Fact]
+    public void Find_PathWithASemicolon_IsNamedByItsPosition()
+    {
+        Find("a;b", position: 5).ShouldBeNull();
+
+        ShouldHaveReportedNamed("SQLSRC203", "The path at position 5");
+    }
+
+    [Fact]
+    public void Find_DirectoryWithAnEqualsSignAndNoUnit_IsSqlsrc201ByItsPosition()
+    {
+        _ = _folder.CreateFolder("a=b");
+
+        Find("a=b", position: 3).ShouldBeNull();
+        ShouldHaveReportedNamed("SQLSRC201", "The path at position 3");
+    }
+
+    [Fact]
+    public void Find_DirectoryWithAnEqualsSignAndSeveralUnits_IsSqlsrc202ByItsPosition()
+    {
+        _ = _folder.WriteFile("a=b/One.csproj");
+        _ = _folder.WriteFile("a=b/Two.csproj");
+
+        Find("a=b").ShouldBeNull();
+        ShouldHaveReportedNamed("SQLSRC202", "The path at position 2");
+    }
+
+    [Fact]
+    public void Find_DirectoryWithAnEqualsSignAndAUnit_IsTheUnit()
+    {
+        var path = _folder.WriteFile("a=b/App.csproj");
+
+        Find("a=b").ShouldBe(new RunUnit(RunUnitKind.Project, path));
+    }
+
+    // The rule reads the token and not the full path, so a working directory that holds "=" is printed.
+    [Fact]
+    public void Find_RelativePathInAFolderWithAnEqualsSign_PrintsTheFullPath()
+    {
+        var folder = _folder.CreateFolder("a=b");
+
+        var found = RunUnitFinder.Find(new UsageValue(null, "App", 2), folder);
+
+        found.Succeeded.ShouldBeFalse();
+        new Reporter(_error).Report(found.Failure);
+        ShouldHaveReported("SQLSRC203", Path.Combine(folder, "App"));
+    }
+
+    [Fact]
+    public void Find_NoArgumentInAFolderWithAnEqualsSign_PrintsTheWorkingDirectoryInQuotes()
+    {
+        var folder = _folder.CreateFolder("a=b");
+
+        var found = RunUnitFinder.Find(null, folder);
+
+        found.Succeeded.ShouldBeFalse();
+        new Reporter(_error).Report(found.Failure);
+        ShouldHaveReported("SQLSRC201", folder);
+    }
+
     [Fact]
     public void Find_DirectoryThatCannotBeRead_IsSqlsrc222()
     {
@@ -216,6 +297,34 @@ public sealed class RunUnitTests : IDisposable
             Find("locked").ShouldBeNull();
             ShouldHaveReported("SQLSRC222", directory);
             _error.ToString().ShouldContain(" cannot be read: ");
+        }
+        finally
+        {
+            // So that the folder of the test can be deleted.
+            File.SetUnixFileMode(directory, UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute);
+        }
+    }
+
+    [Fact]
+    public void Find_DirectoryWithAnEqualsSignThatCannotBeRead_IsSqlsrc222WithoutTheSystemsMessage()
+    {
+        if (!FileModes.KeepTheOwnerOut)
+        {
+            Assert.Skip("Needs a file mode that keeps the owner of a directory out of it.");
+            return;
+        }
+
+        var directory = _folder.CreateFolder("locked=1");
+        File.SetUnixFileMode(directory, UnixFileMode.None);
+        try
+        {
+            Find("locked=1").ShouldBeNull();
+            _error
+                .ToString()
+                .ShouldStartWith(
+                    "sqlsource : error SQLSRC222: The path at position 2 cannot be read: the system would not list "
+                        + "its files\n"
+                );
         }
         finally
         {

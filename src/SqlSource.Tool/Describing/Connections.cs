@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Describing;
 
@@ -20,6 +21,7 @@ internal sealed class Connections
         ImmutableArray<string> databases,
         ImmutableArray<string> describable,
         ImmutableArray<string> unusedNames,
+        ImmutableArray<int> unusedPositions,
         bool unnamedIsSetAndNotUsed
     )
     {
@@ -27,6 +29,7 @@ internal sealed class Connections
         Databases = databases;
         Describable = describable;
         UnusedNames = unusedNames;
+        UnusedPositions = unusedPositions;
         UnnamedIsSetAndNotUsed = unnamedIsSetAndNotUsed;
     }
 
@@ -40,10 +43,18 @@ internal sealed class Connections
     public ImmutableArray<string> Describable { get; }
 
     /// <summary>
-    /// The names <c>--connection</c> gave that are no selected database, in the order given.  Not an error: a
-    /// script may give every connection it has.  The help of <c>SQLSRC213</c> lists them.
+    /// The names <c>--connection</c> gave that are no selected database and are close to a database of the plan,
+    /// ignoring case, in the order given.  Not an error: a script may give every connection it has.  The help of
+    /// <c>SQLSRC213</c> lists them.
     /// </summary>
     public ImmutableArray<string> UnusedNames { get; }
+
+    /// <summary>
+    /// The positions of the values of <c>--connection</c> that are no selected database and whose name is far from
+    /// every database of the plan, in the order given.  Such a name may be the start of a secret typed in the wrong
+    /// place, so the help of <c>SQLSRC213</c> counts it by its position and never prints it.
+    /// </summary>
+    public ImmutableArray<int> UnusedPositions { get; }
 
     /// <summary>
     /// Whether <c>SQLSOURCE_CONNECTION</c> is set and the run has more than one selected database that can be
@@ -64,11 +75,15 @@ internal sealed class Connections
     /// <param name="describable">
     /// Those of <paramref name="selected" /> with a query that the plan did not fail, in the plan's order.
     /// </param>
+    /// <param name="planned">
+    /// Every database of the plan, selected or not: the names that <c>--connection</c> may be close to.
+    /// </param>
     /// <param name="given">The values of <c>--connection</c>, each name once ignoring case.</param>
     /// <param name="getEnvironmentVariable">The host's.</param>
     public static Connections Resolve(
         IReadOnlyList<string> selected,
         IReadOnlyList<string> describable,
+        IReadOnlyList<string> planned,
         IReadOnlyList<ConnectionArgument> given,
         Func<string, string?> getEnvironmentVariable
     )
@@ -108,14 +123,20 @@ internal sealed class Connections
             }
         }
 
+        var unused = given.Where(argument => !byDatabase.ContainsKey(argument.Name)).ToList();
+        var byNearness = unused.ToLookup(argument => IsNearAny(argument.Name, planned));
         return new Connections(
             byDatabase,
             [.. selected],
             [.. describable],
-            [.. given.Select(static argument => argument.Name).Where(name => !byDatabase.ContainsKey(name))],
+            [.. byNearness[true].Select(static argument => argument.Name)],
+            [.. byNearness[false].Select(static argument => argument.Position)],
             unnamed is not null && describable.Count > 1
         );
     }
+
+    private static bool IsNearAny(string name, IReadOnlyList<string> databases) =>
+        databases.Any(database => NearName.IsNear(name, database, ignoreCase: true));
 
     private static bool IsTheOnly(IReadOnlyList<string> describable, string name) =>
         describable.Count == 1 && string.Equals(describable[0], name, StringComparison.OrdinalIgnoreCase);

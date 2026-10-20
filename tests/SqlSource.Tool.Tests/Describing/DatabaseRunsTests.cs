@@ -51,6 +51,7 @@ public sealed class DatabaseRunsTests : IDisposable
     }
 
     // Decides for the plan and runs its databases.  Both databases have a connection unless "given" says otherwise.
+    // The value at index i of "given" stands at position (2 * i) + 3, as if each followed "describe --connection".
     private async Task<ImmutableArray<FileWork>> RunAsync(
         RunPlan? plan = null,
         bool registered = true,
@@ -65,10 +66,11 @@ public sealed class DatabaseRunsTests : IDisposable
         var connections = Connections.Resolve(
             [.. selected.Select(database => database.Name)],
             [.. RunDecisions.DescribableDatabases(plan).Select(database => database.Name)],
+            [.. plan.Databases.Select(database => database.Name)],
             [
                 .. (
                     given ?? ["postgres=" + Secrets.ConnectionWithWord, "billing=" + Secrets.ConnectionWithWord]
-                ).Select(ConnectionArguments.Parse),
+                ).Select((text, index) => ConnectionArguments.Parse(text, (2 * index) + 3)),
             ],
             name => _environment.GetValueOrDefault(name)
         );
@@ -155,14 +157,14 @@ public sealed class DatabaseRunsTests : IDisposable
     }
 
     [Fact]
-    public async Task Run_ConnectionForANameThatIsNoDatabase_IsListedInTheHelpOfSqlsrc213()
+    public async Task Run_ConnectionForANameCloseToADatabase_IsListedInTheHelpOfSqlsrc213()
     {
         _ = await RunAsync(
             given:
             [
                 "billing=" + Secrets.ConnectionWithWord,
                 "postgress=" + Secrets.ConnectionWithWord,
-                "reports=" + Secrets.ConnectionWithWord,
+                "Billng=" + Secrets.ConnectionWithWord,
             ]
         );
 
@@ -170,7 +172,63 @@ public sealed class DatabaseRunsTests : IDisposable
             .ToString()
             .ShouldContain(
                 "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
-                    + "--connection was given for postgress, reports, which are no databases of this run\n"
+                    + "--connection was given for postgress, Billng, which are no databases of this run\n"
+            );
+    }
+
+    [Fact]
+    public async Task Run_ConnectionForANameFarFromEveryDatabase_IsCountedByItsPositionInTheHelpOfSqlsrc213()
+    {
+        _ = await RunAsync(
+            given:
+            [
+                "billing=" + Secrets.ConnectionWithWord,
+                "reports=" + Secrets.ConnectionWithWord,
+                "postgress=" + Secrets.ConnectionWithWord,
+                "Host=" + Secrets.ConnectionWithWord,
+            ]
+        );
+
+        _error
+            .ToString()
+            .ShouldContain(
+                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
+                    + "--connection was given for postgress, which is no database of this run.  "
+                    + "The values of --connection at positions 5 and 9 name no databases of this run\n"
+            );
+        _error.ToString().ShouldNotContain("reports");
+        _error.ToString().ShouldNotContain("Host");
+    }
+
+    [Theory]
+    [InlineData(new[] { "Host" }, "The value of --connection at position 5 names no database of this run")]
+    [InlineData(
+        new[] { "Host", "Server" },
+        "The values of --connection at positions 5 and 7 name no databases of this run"
+    )]
+    [InlineData(
+        new[] { "Host", "Server", "Uid" },
+        "The values of --connection at positions 5, 7 and 9 name no databases of this run"
+    )]
+    public async Task Run_ConnectionsForNamesFarFromEveryDatabase_AreCountedInTheHelpOfSqlsrc213(
+        string[] far,
+        string sentence
+    )
+    {
+        _ = await RunAsync(
+            given:
+            [
+                "billing=" + Secrets.ConnectionWithWord,
+                .. far.Select(name => name + "=" + Secrets.ConnectionWithWord),
+            ]
+        );
+
+        _error
+            .ToString()
+            .ShouldContain(
+                "    help: pass --connection postgres=<connection string>, or set SQLSOURCE_CONNECTION_POSTGRES.  "
+                    + sentence
+                    + "\n"
             );
     }
 
