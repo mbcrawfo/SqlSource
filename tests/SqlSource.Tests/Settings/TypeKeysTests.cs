@@ -76,8 +76,98 @@ public sealed class TypeKeysTests
     [InlineData("pg_catalog.")]
     [InlineData("timestamp with time zone")]
     [InlineData("int 4")]
+    [InlineData("\"\"")]
+    [InlineData("public.\"\"")]
+    [InlineData("\"unclosed")]
+    [InlineData("public.\"a\"b")]
+    [InlineData("\"a\".\"b\".\"c\"")]
+    [InlineData("public. \"x\"")]
+    [InlineData("\"Int4\"")]
+    [InlineData("\"integer\"")]
+    [InlineData("\"int4\"[][]")]
     public void TryNormalize_AnythingElse_IsNotAKey(string key) =>
         TypeKeys.TryNormalize(key.AsSpan(), out _).ShouldBeFalse();
+
+    // A part may be quoted, to hold what a plain one cannot and to keep its case.  A key with a quoted part is kept as
+    // written, and the system schema's own names are read as above, whatever way they are written.
+    [Theory]
+    [InlineData("public.\"Status\"", "public.\"Status\"")]
+    [InlineData("\"my schema\".\"order-status\"", "\"my schema\".\"order-status\"")]
+    [InlineData("\"my schema\".status[]", "\"my schema\".status[]")]
+    [InlineData("\"a.b\".c", "\"a.b\".c")]
+    [InlineData("a.\"b.c\"", "a.\"b.c\"")]
+    [InlineData("s.\"x[]\"", "s.\"x[]\"")]
+    [InlineData("s.\"a=b\"", "s.\"a=b\"")]
+    [InlineData("s.\"say \"\"hi\"\"\"", "s.\"say \"\"hi\"\"\"")]
+    [InlineData("\"PG_CATALOG\".int4", "\"PG_CATALOG\".int4")]
+    public void TryNormalize_QuotedPart_IsKeptAsWritten(string key, string expected) => ShouldNormalize(key, expected);
+
+    [Theory]
+    [InlineData("\"char\"", "char")]
+    [InlineData("\"int4\"[]", "int4[]")]
+    [InlineData("\"_int4\"", "int4[]")]
+    [InlineData("\"pg_catalog\".int4", "int4")]
+    [InlineData("pg_catalog.\"int4\"", "int4")]
+    [InlineData("pg_catalog.\"_int4\"", "int4[]")]
+    [InlineData("pg_catalog.\"New Type\"", "\"New Type\"")]
+    [InlineData("pg_catalog.\"_Odd\"", "\"Odd\"[]")]
+    public void TryNormalize_QuotedCatalogName_IsItsKey(string key, string expected) => ShouldNormalize(key, expected);
+
+    [Theory]
+    [InlineData("\"a.b\".c[]", "\"a.b\"", "c", true)]
+    [InlineData("int4", "", "int4", false)]
+    [InlineData("s.\"x[]\"", "s", "\"x[]\"", false)]
+    public void TrySplit_WrittenKey_GivesItsParts(string key, string schema, string name, bool isArray)
+    {
+        TypeKeys.TrySplit(key.AsSpan(), out var actualSchema, out var actualName, out var actualIsArray).ShouldBeTrue();
+
+        actualSchema.ToString().ShouldBe(schema);
+        actualName.ToString().ShouldBe(name);
+        actualIsArray.ShouldBe(isArray);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("a.b.c")]
+    [InlineData("\"a\"b")]
+    [InlineData("a[][]")]
+    public void TrySplit_AnythingElse_IsFalse(string key) =>
+        TypeKeys.TrySplit(key.AsSpan(), out _, out _, out _).ShouldBeFalse();
+
+    [Theory]
+    [InlineData("\"say \"\"hi\"\"\"", "say \"hi\"")]
+    [InlineData("\"my schema\"", "my schema")]
+    [InlineData("plain", "plain")]
+    public void TextOf_QuotedPart_IsItsTextUndoubled(string part, string expected) =>
+        TypeKeys.TextOf(part.AsSpan()).ToString().ShouldBe(expected);
+
+    [Theory]
+    [InlineData("\"x\"", true)]
+    [InlineData("x", false)]
+    public void IsQuoted_Part_IsWhetherItHasQuotes(string part, bool expected) =>
+        TypeKeys.IsQuoted(part.AsSpan()).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("status", "status")]
+    [InlineData("user_status$1", "user_status$1")]
+    [InlineData("Status", "\"Status\"")]
+    [InlineData("my schema", "\"my schema\"")]
+    [InlineData("a\"b", "\"a\"\"b\"")]
+    [InlineData("", "\"\"")]
+    public void WritePart_Text_IsQuotedWhenItNeedsIt(string text, string expected) =>
+        TypeKeys.WritePart(text).ShouldBe(expected);
+
+    [Theory]
+    [InlineData("\"a.b\".c[]")]
+    [InlineData("s.\"say \"\"hi\"\"\"")]
+    public void WritePart_PartOfAKey_ReadsBackAsItsText(string key)
+    {
+        TypeKeys.TrySplit(key.AsSpan(), out var schema, out var name, out _).ShouldBeTrue();
+
+        var text = TypeKeys.TextOf(schema.IsEmpty ? name : schema).ToString();
+
+        TypeKeys.TextOf(TypeKeys.WritePart(text).AsSpan()).ToString().ShouldBe(text);
+    }
 
     [Theory]
     [InlineData("citext")]
