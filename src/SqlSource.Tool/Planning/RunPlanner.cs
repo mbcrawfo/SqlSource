@@ -254,10 +254,12 @@ internal static class RunPlanner
         return new PlannedQuery(
             query,
             NeedsEntry: true,
-            query.Markers.Database
-                ?? owner.Metadata.Settings?.Level.Database
-                ?? owner.Property.Database
-                ?? SqlDialectName.Canonical(dialect),
+            QuerySettings.ResolveDatabase(
+                query.Markers,
+                owner.Metadata.Settings?.Level ?? SettingsLevel.None,
+                owner.Property,
+                SqlDialectName.Canonical(dialect)
+            ),
             SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters),
             problems
         );
