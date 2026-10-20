@@ -178,6 +178,53 @@
         }
       ]
     },
+    "CountShippedOrders": {
+      "hash": "3119a253efcccc488fbeb6cc0a4a45fa2e483a1daf3f79cd9225f986f6667e24",
+      "engine": "postgres",
+      "database": "postgres",
+      "serverVersion": "18.6",
+      "resultKind": "rows",
+      "matchesTable": null,
+      "plan": "walked",
+      "tableMatch": "no-origin",
+      "parameters": [],
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type": {
+            "name": "integer",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int4"
+          },
+          "nullable": false,
+          "nullableSource": "catalog",
+          "origin": {
+            "schema": "public",
+            "table": "users",
+            "column": "id"
+          },
+          "identity": true,
+          "computed": false
+        },
+        {
+          "ordinal": 1,
+          "name": "shipped",
+          "type": {
+            "name": "bigint",
+            "kind": "base",
+            "schema": "pg_catalog",
+            "internalName": "int8"
+          },
+          "nullable": null,
+          "nullableSource": "no-origin",
+          "origin": null,
+          "identity": null,
+          "computed": null
+        }
+      ]
+    },
     "GetOrderTags": {
       "hash": "c1cc2a44e8fe4bd2ffb95649b1f13cc6597021797822534010f785a336369258",
       "engine": "postgres",

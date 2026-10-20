@@ -16,10 +16,15 @@ public sealed partial class StoreQueries(DbConnection connection)
     public Task<GetOrderDto?> GetOrderAsync(int orderId) =>
         connection.QuerySingleOrDefaultAsync<GetOrderDto>(Sql.GetOrder, new GetOrderParams(orderId));
 
-    // Total is a decimal and not a decimal?, by the query's -- column: marker, which leaves the column's name alone for
-    // Dapper.
+    // Total is a decimal and not a decimal?: the sum of a group of lines whose columns are NOT NULL is never null, and
+    // the tool shows it.
     public Task<IEnumerable<ListOrderTotalsDto>> ListOrderTotalsAsync() =>
         connection.QueryAsync<ListOrderTotalsDto>(Sql.ListOrderTotals);
+
+    // Shipped is a long and not a long?, by the query's -- column: marker, which leaves the column's name alone for
+    // Dapper: a count is never null, though the tool cannot show it for count(o.shipped_at).
+    public Task<IEnumerable<CountShippedOrdersDto>> CountShippedOrdersAsync() =>
+        connection.QueryAsync<CountShippedOrdersDto>(Sql.CountShippedOrders);
 
     // A class and not a record, by the query's -- output-model-type: marker: Dapper cannot construct a record from a
     // row with an array.

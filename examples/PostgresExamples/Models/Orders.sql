@@ -11,12 +11,20 @@ WHERE o.id = @orderId;
 
 -- name: ListOrderTotals
 -- summary: The total of each order.
--- column: total not null
 SELECT o.id, sum(l.quantity * l.unit_price) AS total
 FROM orders AS o
 JOIN order_lines AS l ON l.order_id = o.id
 GROUP BY o.id
 ORDER BY o.id;
+
+-- name: CountShippedOrders
+-- summary: How many orders of each user have shipped.
+-- column: shipped not null
+SELECT u.id, count(o.shipped_at) AS shipped
+FROM users AS u
+JOIN orders AS o ON o.user_id = u.id
+GROUP BY u.id
+ORDER BY u.id;
 
 -- name: GetOrderTags
 -- summary: The tags of one order.
