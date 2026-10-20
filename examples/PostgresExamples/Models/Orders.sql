@@ -20,7 +20,6 @@ ORDER BY o.id;
 
 -- name: GetOrderTags
 -- summary: The tags of one order.
--- output-model-type: class
 SELECT o.id, o.tags
 FROM orders AS o
 WHERE o.id = @orderId;

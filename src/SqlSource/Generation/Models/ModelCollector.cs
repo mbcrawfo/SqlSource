@@ -170,7 +170,8 @@ internal static class ModelCollector
                     first.Kind,
                     isPublic,
                     first.Properties,
-                    SummaryXml(first.Role, joined, text)
+                    SummaryXml(first.Role, joined, text),
+                    joined.Exists(static request => request.Properties.Any(static property => property.IsArray))
                 )
             );
         }

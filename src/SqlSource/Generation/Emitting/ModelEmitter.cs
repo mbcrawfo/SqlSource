@@ -78,7 +78,43 @@ internal static class ModelEmitter
             _ = AppendType(builder, properties[index]).Append(' ').Append(properties[index].Name);
         }
 
-        _ = builder.Append(");\n");
+        _ = builder.Append(')');
+        if (!model.HasArrayColumn)
+        {
+            _ = builder.Append(";\n");
+            return;
+        }
+
+        // Dapper finds no public constructor that matches the row, falls back to the private constructor without
+        // parameters, and sets each property through its init accessor.  Its summary says what it is for.  Each
+        // argument is a typed default(T), since this(default!) would be ambiguous with the copy constructor of a
+        // record with one property (CS0121).
+        var memberIndent = indent + Indent;
+        _ = builder.Append('\n').Append(indent).Append("{\n");
+        AppendSummary(
+            builder,
+            memberIndent,
+            "Creates the record for materializers such as Dapper, which set each property after construction.  It\n"
+                + "leaves each property at its default value, null for a reference type even where it cannot be null,\n"
+                + "until it is assigned."
+        );
+        _ = builder.Append(memberIndent).Append("private ").Append(model.Name).Append("() : this(");
+        for (var index = 0; index < properties.Count; index++)
+        {
+            if (index > 0)
+            {
+                _ = builder.Append(", ");
+            }
+
+            var property = properties[index];
+            _ = AppendType(builder.Append("default("), property).Append(')');
+            if (!property.IsNullable && !property.Type.IsValueType)
+            {
+                _ = builder.Append('!');
+            }
+        }
+
+        _ = builder.Append(") { }\n").Append(indent).Append("}\n");
     }
 
     // A property of a reference type that is not nullable starts as default!, so that the class compiles under
