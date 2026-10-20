@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Testing.Fixtures;
+using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic;
 
@@ -57,6 +58,16 @@ internal sealed record RealisticCase(
 
     // Whether the server of that major runs the case: a case may need a later one, MERGE ... RETURNING for one.
     public bool RunsOn(int major) => MinimumMajor is not { } minimum || minimum <= major;
+
+    // Skips the test on a server of an earlier major than the case needs.
+    public void SkipUnlessRunsOn(int major) =>
+        Assert.SkipUnless(
+            RunsOn(major),
+            $"{this} needs PostgreSQL {MinimumMajor} or later, and the server is {major}."
+        );
+
+    // Skips the test for a case that the describer refuses, which has no columns, models or entry to check.
+    public void SkipIfRefused() => Assert.SkipWhen(Refusal is not null, $"{this} is refused as {Refusal}.");
 
     // Whether "describe --check" on the server of that major compares the case's sidecar, and RealisticDescriptionTests
     // its committed entry: the case has one, the server runs it, and the server describes it as the sidecar holds.
