@@ -117,32 +117,6 @@ internal static class PlanExpression
         Tokens.Read(entry) is { Count: > 0 } tokens ? new Reader(entry, tokens, context).Form(0, tokens.Count) : null;
 
     /// <summary>
-    /// What the entry says of its column, as <see cref="NullableOf(string, ExpressionContext)" /> answers, with a
-    /// reference the walk proves of no known type.
-    /// </summary>
-    /// <param name="entry">The entry as the plan prints it.</param>
-    /// <param name="catalogFunctions">Whether an unqualified function name is <c>pg_catalog</c>'s.</param>
-    /// <param name="provedNotNull">
-    /// Whether the walk proves a reference that is part of the entry not <c>NULL</c>.  A reference that is the whole
-    /// entry is never asked.
-    /// </param>
-    /// <param name="groupPreserved">As <see cref="ExpressionContext.GroupPreserved" /> says.</param>
-    public static bool? NullableOf(
-        string entry,
-        bool catalogFunctions,
-        Func<OutputReference, bool> provedNotNull,
-        Func<string, bool>? groupPreserved = null
-    ) =>
-        NullableOf(
-            entry,
-            new ExpressionContext(
-                catalogFunctions,
-                reference => provedNotNull(reference) ? TotalFunctions.UnknownType : null,
-                groupPreserved
-            )
-        );
-
-    /// <summary>
     /// The type of an entry that is, as a whole, a value proved not <c>NULL</c> of a known type, or null: a constant,
     /// a test, <c>count(*)</c> or a ranking as <see cref="TypeOf" /> types them, or an operator, a function or a cast
     /// of the forms the remarks give.  <c>COALESCE</c>, <c>GREATEST</c>, <c>LEAST</c> and <c>CASE</c> are not

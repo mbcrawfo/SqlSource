@@ -20,7 +20,9 @@ ORDER BY a.id;
 
 -- name: ListMarkedNames
 -- summary: The names of the accounts, with their nullability set by the marks of their aliases.
-SELECT a.id AS "id?", upper(a.name) AS "upper_name!"
+-- initcap is never NULL for a name that is not, and the tool does not prove it, so the column would be nullable
+-- without its mark.  A function that the tool proves, such as upper, would leave the mark nothing to show.
+SELECT a.id AS "id?", initcap(a.name) AS "initcap_name!"
 FROM accounts AS a
 ORDER BY a.id;
 

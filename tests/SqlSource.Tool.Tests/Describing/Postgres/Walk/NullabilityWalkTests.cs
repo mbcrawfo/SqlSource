@@ -570,19 +570,12 @@ public sealed class NullabilityWalkTests
             Output = ["a.id", "o.placed_at", "o.quantity", "o.note"],
         };
 
-    // Each group of an Aggregate with a Group Key is made of the rows that share its key, so it has one at least, and
-    // the node prints its aggregate bare where a node above prints it in parentheses.
-    [Theory]
-    [InlineData(true, "max(o.placed_at)", false)]
-    [InlineData(false, "max(o.placed_at)", false)]
-    [InlineData(true, "sum(o.quantity)", false)]
-    [InlineData(true, "max(o.note)", null)]
-    [InlineData(true, "array_agg(o.quantity)", null)]
-    [InlineData(true, "max(o.placed_at) FILTER (WHERE (o.quantity > 1))", null)]
-    public void Run_AggregateOfAGroupedNode_IsAnswered(bool sorted, string aggregate, bool? nullable)
+    // An Aggregate with a Group Key over the join of "a" and "o", which prints its aggregate bare, under a Sort that
+    // prints it in parentheses or as the root.
+    private static PlanNode GroupedOverAAndO(bool sorted, string aggregate)
     {
         var grouped = Aggregate("Hashed", true, JoinOfAAndO("Inner"), "a.id", aggregate);
-        var root = sorted
+        return sorted
             ? Over("Sort", grouped) with
             {
                 Output = ["(" + aggregate + ")", "a.id"],
@@ -591,9 +584,24 @@ public sealed class NullabilityWalkTests
             {
                 Output = [aggregate, "a.id"],
             };
-
-        AnswersOf(RunOverOrders(root)).ShouldBe([(nullable, nullable is null ? "no-origin" : "expression")]);
     }
+
+    // Each group of an Aggregate with a Group Key is made of the rows that share its key, so it has one at least, and
+    // the node prints its aggregate bare where a node above prints it in parentheses.
+    [Theory]
+    [InlineData(true, "max(o.placed_at)")]
+    [InlineData(false, "max(o.placed_at)")]
+    [InlineData(true, "sum(o.quantity)")]
+    public void Run_AggregateOfAGroupedNode_IsNotNull(bool sorted, string aggregate) =>
+        AnswersOf(RunOverOrders(GroupedOverAAndO(sorted, aggregate))).ShouldBe([NotNullExpression]);
+
+    // A group's every value may be NULL, array_agg is in no row of the table, and a FILTER may leave a group no row.
+    [Theory]
+    [InlineData("max(o.note)")]
+    [InlineData("array_agg(o.quantity)")]
+    [InlineData("max(o.placed_at) FILTER (WHERE (o.quantity > 1))")]
+    public void Run_AggregateOfAGroupedNodeThatMayBeNull_KeepsNoOrigin(string aggregate) =>
+        AnswersOf(RunOverOrders(GroupedOverAAndO(sorted: true, aggregate))).ShouldBe([UnknownNoOrigin]);
 
     // An Aggregate with no Group Key returns a row for an input of none, and a node that is no Aggregate computes no
     // aggregate.
@@ -627,20 +635,22 @@ public sealed class NullabilityWalkTests
             )
             .ShouldBe([UnknownNoOrigin]);
 
+    // A grouped Aggregate over a join of "a" and "o" that null-extends "o", under a Sort.
+    private static PlanNode GroupedOverALeftJoin(string aggregate) =>
+        Over("Sort", Aggregate("Sorted", true, JoinOfAAndO("Left"), "a.id", aggregate)) with
+        {
+            Output = ["(" + aggregate + ")", "a.id"],
+        };
+
     // A value of the side a join null-extends may be NULL in every row of a group.
-    [Theory]
-    [InlineData("max(o.placed_at)", null)]
-    [InlineData("max(a.id)", false)]
-    public void Run_AggregateOfAnExtendedSide_KeepsNoOrigin(string aggregate, bool? nullable) =>
-        AnswersOf(
-                RunOverOrders(
-                    Over("Sort", Aggregate("Sorted", true, JoinOfAAndO("Left"), "a.id", aggregate)) with
-                    {
-                        Output = ["(" + aggregate + ")", "a.id"],
-                    }
-                )
-            )
-            .ShouldBe([(nullable, nullable is null ? "no-origin" : "expression")]);
+    [Fact]
+    public void Run_AggregateOfAnExtendedSide_KeepsNoOrigin() =>
+        AnswersOf(RunOverOrders(GroupedOverALeftJoin("max(o.placed_at)"))).ShouldBe([UnknownNoOrigin]);
+
+    // A value of the side the join keeps is in every row of a group.
+    [Fact]
+    public void Run_AggregateOfThePreservedSideOfAnOuterJoin_IsNotNull() =>
+        AnswersOf(RunOverOrders(GroupedOverALeftJoin("max(a.id)"))).ShouldBe([NotNullExpression]);
 
     // A value the node takes from a child was computed under the child's grouping, here a plain one that returns a row
     // of NULL for an input of none.
@@ -766,23 +776,32 @@ public sealed class NullabilityWalkTests
             .ShouldBe([UnknownNoOrigin, (nullable, nullable is null ? "no-origin" : "expression")]);
     }
 
-    // a.id IN (SELECT o.user_id FROM o), as 18 prints it: NULL only for a NULL on either side.
-    [Theory]
-    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", "o.user_id", false)]
-    [InlineData("(ANY (a.id = (SubPlan 2).col1))", "o.user_id", false)]
-    [InlineData("(ANY (a.id = (SubPlan 2).col2))", "o.note", false)]
-    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", "o.note", null)]
-    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", "o.parent_id", null)]
-    [InlineData("(ANY (a.opt = (hashed SubPlan 2).col1))", "o.user_id", null)]
-    [InlineData("(ANY (a.id = (hashed SubPlan 3).col1))", "o.user_id", null)]
-    [InlineData("(ANY (a.id = (hashed SubPlan 2).col3))", "o.user_id", null)]
-    public void Run_AnyOverAProvedSubPlanColumn_IsAnswered(string entry, string column, bool? nullable)
-    {
-        var subPlan = SubPlan("SubPlan 2", Scan("o", column, "o.user_id"));
+    // a.id IN (SELECT o.user_id FROM o), as 18 prints it, over a subplan that scans "o" for the column and o.user_id.
+    private static WalkOutcome RunAny(string entry, string column) =>
+        RunTyped(
+            ScanOfA(entry, SubPlan("SubPlan 2", Scan("o", column, "o.user_id"))),
+            BuiltInTypes.Int4,
+            BuiltInTypes.Bool
+        );
 
-        AnswersOf(RunTyped(ScanOfA(entry, subPlan), BuiltInTypes.Int4, BuiltInTypes.Bool))
-            .ShouldBe([UnknownNoOrigin, (nullable, nullable is null ? "no-origin" : "expression")]);
-    }
+    // An ANY is NULL only for a NULL on either side.
+    [Theory]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", "o.user_id")]
+    [InlineData("(ANY (a.id = (SubPlan 2).col1))", "o.user_id")]
+    [InlineData("(ANY (a.id = (SubPlan 2).col2))", "o.note")]
+    public void Run_AnyOverAProvedSubPlanColumn_IsNotNull(string entry, string column) =>
+        AnswersOf(RunAny(entry, column)).ShouldBe([UnknownNoOrigin, NotNullExpression]);
+
+    // A column of the subplan that may be NULL, a left side that is not proved, and a subplan or a column that is not
+    // there.
+    [Theory]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", "o.note")]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col1))", "o.parent_id")]
+    [InlineData("(ANY (a.opt = (hashed SubPlan 2).col1))", "o.user_id")]
+    [InlineData("(ANY (a.id = (hashed SubPlan 3).col1))", "o.user_id")]
+    [InlineData("(ANY (a.id = (hashed SubPlan 2).col3))", "o.user_id")]
+    public void Run_AnyOverASubPlanColumnNotProved_KeepsNoOrigin(string entry, string column) =>
+        AnswersOf(RunAny(entry, column)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
 
     // A column of the subplan is proved as its own plan proves it: here the subplan's join null-extends "o".
     [Fact]

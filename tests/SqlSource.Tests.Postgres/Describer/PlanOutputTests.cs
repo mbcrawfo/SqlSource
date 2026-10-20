@@ -177,7 +177,7 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
 
         var entry = root.Output.ShouldNotBeNull()[ordinal];
         entry.ShouldBe(printed);
-        PlanExpression.NullableOf(entry, catalogFunctions: true, static _ => false).ShouldBe(expected);
+        PlanExpression.NullableOf(entry, new ExpressionContext(true, static _ => null)).ShouldBe(expected);
     }
 
     // The root of a set operation prints its first branch, whatever the operation.
@@ -749,7 +749,11 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
 
     // A subquery in an expression is a SubPlan of every kind.  14 prints each as (SubPlan <n>), or (hashed SubPlan
     // <n>) where the planner hashes it; 18 prints EXISTS, IN or ANY and ARRAY each its own way, and a scalar
-    // subquery as 14 does.
+    // subquery as 14 does.  The uncorrelated IN is hashed on both by a rule of size and not of cost: the planner
+    // hashes an IN whose subplan takes no parameter of the query above when the subplan's estimated rows times their
+    // width fit in the memory a hash may take (subplan_is_hashable, under work_mem and hash_mem_multiplier).  A scan of
+    // one integer column of the small orders table fits by far under the server's default work_mem, which the test
+    // container keeps, so the row does not move with the costs or the statistics.
     [Theory]
     [InlineData("EXISTS (SELECT 1 FROM orders o WHERE o.user_id > u.id)", "(SubPlan 1)", "EXISTS(SubPlan 1)")]
     [InlineData(

@@ -333,7 +333,7 @@ Each of these is an error at the query's name, and the query has no models until
 ### Which properties can be null
 
 ```sql postgres
--- name: GetCustomerTotals
+-- name: GetCustomerNotes
 SELECT customer_id, count(note) AS "note_count!"
 FROM orders
 GROUP BY customer_id;
@@ -351,7 +351,7 @@ A property that can be null has its C# type with `?`: `int?`, which is `System.N
 #### Setting a column's nullability with a marker
 
 ```sql postgres
--- name: GetCustomerTotals
+-- name: GetCustomerNotes
 -- column: note_count not null
 SELECT customer_id, count(note) AS note_count
 FROM orders

@@ -393,7 +393,7 @@ internal static partial class NullabilityWalk
         private long? ScalarSubPlanTypeOf(string name, long columnType)
         {
             if (
-                !SetOperationTypes.Families.Any(family => family.Contains(columnType))
+                !SetOperationTypes.InFamily(columnType)
                 || SubPlanOf(name) is not { } subPlan
                 || subPlan.Root
                     is not {

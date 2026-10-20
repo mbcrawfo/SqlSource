@@ -55,4 +55,22 @@ public sealed class SetOperationTypesTests
         SetOperationTypes.Carries(Domain, Text).ShouldBeFalse();
         SetOperationTypes.Carries(Text, Domain).ShouldBeFalse();
     }
+
+    [Theory]
+    [InlineData(BuiltInTypes.Int2)]
+    [InlineData(BuiltInTypes.Int8)]
+    [InlineData(BuiltInTypes.Float8)]
+    [InlineData(BuiltInTypes.Varchar)]
+    [InlineData(BuiltInTypes.Bpchar)]
+    [InlineData(BuiltInTypes.Timestamptz)]
+    public void InFamily_TypeOfAFamily_IsTrue(long oid) => SetOperationTypes.InFamily(oid).ShouldBeTrue();
+
+    // A boolean, the value of an EXISTS or an IN, an array, a domain and a type outside every family are in none.
+    [Theory]
+    [InlineData(BuiltInTypes.Bool)]
+    [InlineData(BuiltInTypes.Xid)]
+    [InlineData(1007)]
+    [InlineData(16500)]
+    [InlineData(TotalFunctions.UnknownType)]
+    public void InFamily_TypeOfNoFamily_IsFalse(long oid) => SetOperationTypes.InFamily(oid).ShouldBeFalse();
 }
