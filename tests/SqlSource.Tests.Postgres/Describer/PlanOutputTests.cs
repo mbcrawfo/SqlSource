@@ -494,6 +494,153 @@ public sealed class PlanOutputTests(PostgresContainer postgres)
         scan.Output.ShouldNotBeNull().ShouldContain("'x'::text");
     }
 
+    // An operator, a function and a cast print with the implicit casts of their arguments, and bare where the session
+    // would resolve the same one from its name and those argument types.  The text is the same on 14 and on 18.
+    [Theory]
+    [InlineData("u.balance * 2", "(balance * '2'::numeric)")]
+    [InlineData("u.id::bigint * 2", "((id)::bigint * 2)")]
+    [InlineData("lower(u.name) || '!'", "(lower((name)::text) || '!'::text)")]
+    [InlineData("length(u.name)", "length((name)::text)")]
+    [InlineData("date_trunc('day', u.created_at)", "date_trunc('day'::text, created_at)")]
+    [InlineData("u.created_at::date", "(created_at)::date")]
+    [InlineData("u.name = 'x'", "((name)::text = 'x'::text)")]
+    public async Task Explain_TotalForm_PrintsWhatTheReaderReads(string expression, string expected)
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var root = await ExplainAsync($"SELECT {expression} FROM users u");
+
+        root.Output.ShouldBe([expected]);
+    }
+
+    // An aggregate under GROUP BY is computed at the Aggregate that has a Group Key, which prints it bare; the node
+    // above prints it in parentheses.  The Aggregate has no Grouping Sets.
+    [Fact]
+    public async Task Explain_GroupedAggregate_IsComputedAtANodeWithAGroupKey()
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var text = await ExplainTextAsync(
+            "SELECT u.id, max(u.name), sum(u.balance) FROM users u JOIN orders o ON o.user_id = u.id "
+                + "GROUP BY u.id ORDER BY 3"
+        );
+
+        var root = PlanNode.Read(text).ShouldNotBeNull();
+        root.NodeType.ShouldBe("Sort");
+        root.Output.ShouldBe(["u.id", "(max((u.name)::text))", "(sum(u.balance))"]);
+        var aggregate = root.Plans.Single();
+        aggregate.NodeType.ShouldBe("Aggregate");
+        aggregate.HasGroupingSets.ShouldBeFalse();
+        aggregate.Output.ShouldBe(["u.id", "max((u.name)::text)", "sum(u.balance)"]);
+        var node = Nodes(text).Single(static node => node.GetProperty("Node Type").GetString() == "Aggregate");
+        node.GetProperty("Group Key").EnumerateArray().Select(static key => key.GetString()).ShouldBe(["u.id"]);
+        node.TryGetProperty("Grouping Sets", out _).ShouldBeFalse();
+    }
+
+    // A scalar subquery is a SubPlan whose plan is an Aggregate of the Plain strategy, with no Group Key, and the
+    // column prints (SubPlan <n>) at the node that evaluates it.
+    [Fact]
+    public async Task Explain_ScalarSubquery_IsASubPlanOfAPlainAggregate()
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var text = await ExplainTextAsync(
+            "SELECT u.id, (SELECT count(*) FROM orders o WHERE o.user_id = u.id) AS n FROM users u"
+        );
+
+        var root = PlanNode.Read(text).ShouldNotBeNull();
+        root.Output.ShouldBe(["u.id", "(SubPlan 1)"]);
+        var subPlan = All(root).Single(static node => node.SubplanName == "SubPlan 1");
+        subPlan.ParentRelationship.ShouldBe("SubPlan");
+        subPlan.NodeType.ShouldBe("Aggregate");
+        subPlan.Output.ShouldBe(["count(*)"]);
+        var node = Nodes(text).Single(static node => node.TryGetProperty("Subplan Name", out _));
+        node.GetProperty("Strategy").GetString().ShouldBe("Plain");
+        node.TryGetProperty("Group Key", out _).ShouldBeFalse();
+    }
+
+    // A subquery in an expression is a SubPlan of every kind.  14 prints each as (SubPlan <n>), or (hashed SubPlan
+    // <n>) where the planner hashes it; 18 prints EXISTS, IN or ANY and ARRAY each its own way, and a scalar
+    // subquery as 14 does.
+    [Theory]
+    [InlineData("EXISTS (SELECT 1 FROM orders o WHERE o.user_id > u.id)", "(SubPlan 1)", "EXISTS(SubPlan 1)")]
+    [InlineData(
+        "u.id IN (SELECT o.user_id FROM orders o WHERE o.placed_at > u.created_at)",
+        "(SubPlan 1)",
+        "(ANY (u.id = (SubPlan 1).col1))"
+    )]
+    [InlineData(
+        "u.id IN (SELECT o.user_id FROM orders o)",
+        "(hashed SubPlan 1)",
+        "(ANY (u.id = (hashed SubPlan 1).col1))"
+    )]
+    [InlineData("ARRAY(SELECT o.id FROM orders o WHERE o.user_id = u.id)", "(SubPlan 1)", "ARRAY(SubPlan 1)")]
+    public async Task Explain_Sublinks_PrintEachKindOnEighteen(
+        string expression,
+        string printedOn14,
+        string printedOn18
+    )
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+        var printed = postgres.Major == 14 ? printedOn14 : printedOn18;
+
+        var root = await ExplainAsync($"SELECT {expression} FROM users u");
+
+        root.Output.ShouldBe([printed]);
+        All(root).Count(static node => node.ParentRelationship == "SubPlan").ShouldBe(1);
+    }
+
+    // A system column of a table prints as a column, qualified by the table's name on an INSERT's RETURNING.
+    [Fact]
+    public async Task Explain_SystemColumn_PrintsAsAColumn()
+    {
+        postgres.SkipUnlessRecordedMajor("The printed forms");
+
+        var root = await ExplainAsync(
+            "INSERT INTO users (name) VALUES ('x') ON CONFLICT DO NOTHING RETURNING id, (xmax = 0) AS inserted"
+        );
+
+        root.NodeType.ShouldBe("ModifyTable");
+        root.Output.ShouldBe(["users.id", "(users.xmax = 0)"]);
+    }
+
+    // merge_action() is not a function but the grammar's own form, and prints in upper case.  A MERGE has a RETURNING
+    // from 17.
+    [Fact]
+    public async Task Explain_MergeAction_PrintsUpperCase()
+    {
+        postgres.SkipBelow(17, "MERGE ... RETURNING and merge_action() need PostgreSQL 17");
+
+        var root = await ExplainAsync(
+            "MERGE INTO users u USING (SELECT 1 AS id) s ON s.id = u.id WHEN MATCHED THEN DO NOTHING "
+                + "RETURNING merge_action(), u.id"
+        );
+
+        root.NodeType.ShouldBe("ModifyTable");
+        root.Output.ShouldBe(["MERGE_ACTION()", "u.id"]);
+    }
+
+    // Every node of the plan text, as the server wrote it, for a key that PlanNode does not read.
+    private static List<JsonElement> Nodes(string text)
+    {
+        var nodes = new List<JsonElement>();
+        using var document = JsonDocument.Parse(text);
+        Collect(document.RootElement[0].GetProperty("Plan").Clone());
+        return nodes;
+
+        void Collect(JsonElement node)
+        {
+            nodes.Add(node);
+            if (node.TryGetProperty("Plans", out var plans))
+            {
+                foreach (var child in plans.EnumerateArray())
+                {
+                    Collect(child);
+                }
+            }
+        }
+    }
+
     // The node and every node under it through the sides of a join or the one input of another node.
     private static PlanNode[] Followed(PlanNode node) =>
         [
