@@ -29,7 +29,7 @@ namespace SqlSource.Tool.Describing.SqlServer;
 internal sealed class SqlServerLive(SqlServerConnection connection)
 {
     // The server's version and edition, then the settings of the database and the session, in the order of the
-    // settings of "open".
+    // settings of "open", then the database's name.
     private const string OpenSql = """
         SELECT
             CAST(SERVERPROPERTY('ProductVersion') AS nvarchar(128)),
@@ -37,7 +37,8 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             d.compatibility_level,
             CAST(SESSIONPROPERTY('ANSI_NULLS') AS int),
             CAST(SESSIONPROPERTY('QUOTED_IDENTIFIER') AS int),
-            CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS nvarchar(128))
+            CAST(DATABASEPROPERTYEX(DB_NAME(), 'Collation') AS nvarchar(128)),
+            DB_NAME()
         FROM sys.databases AS d
         WHERE d.database_id = DB_ID()
         """;
@@ -51,6 +52,18 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
         SELECT column_ordinal, system_type_name, max_length, precision, scale, user_type_schema, user_type_name,
             assembly_qualified_type_name, error_number, error_type, error_message
         FROM sys.dm_exec_describe_first_result_set(@tsql, @params, 0)
+        ORDER BY column_ordinal
+        """;
+
+    // The columns of a first result set, or the errors of its describe as rows, for "columns" and "table".  Browse
+    // mode 2: a view is its columns' source, as on PostgreSQL, and the one hidden column it adds is ROWSTAT.  Mode 1
+    // names a view's base table and adds hidden key columns of every table read.
+    private const string ColumnsSql = """
+        SELECT is_hidden, column_ordinal, name, is_nullable, system_type_name, max_length, precision, scale,
+            user_type_schema, user_type_name, assembly_qualified_type_name, source_server, source_database,
+            source_schema, source_table, source_column, is_identity_column, is_computed_column, error_number,
+            error_type, error_message
+        FROM sys.dm_exec_describe_first_result_set(@tsql, @params, 2)
         ORDER BY column_ordinal
         """;
 
@@ -78,11 +91,12 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                         new SqlServerSetting("QUOTED_IDENTIFIER", OnOrOff(reader.GetInt32(4))),
                         new SqlServerSetting("collation", reader.GetString(5)),
                     ],
-                    null
+                    null,
+                    await reader.IsDBNullAsync(6, token) ? null : reader.GetString(6)
                 );
             },
             ConnectionErrors.AtOpen,
-            static error => new SqlServerOpenAnswer(null, null, null, null, error),
+            static error => new SqlServerOpenAnswer(null, null, null, null, error, null),
             token
         );
 
@@ -197,6 +211,23 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             token
         );
 
+    /// <summary>The columns of the query's first result set, a row each, or the error rows of the describe.</summary>
+    public Task<SqlServerColumnsAnswer> ColumnsAsync(SqlServerColumnsRequest request, CancellationToken token) =>
+        DescribeColumnsAsync(request.Sql, request.Params, token);
+
+    /// <summary>
+    /// The columns of <c>SELECT *</c> from a table or view, a row each, or the error rows of the describe.
+    /// </summary>
+    public Task<SqlServerColumnsAnswer> TableAsync(SqlServerTableRequest request, CancellationToken token) =>
+        DescribeColumnsAsync(TableSelect(request.Schema, request.Table), null, token);
+
+    /// <summary>
+    /// The text of <c>table</c> for one table or view: <c>SELECT * FROM [schema].[table]</c>, each name a catalog
+    /// name the server gave, in brackets with a <c>]</c> written twice.
+    /// </summary>
+    public static string TableSelect(string schema, string table) =>
+        "SELECT * FROM " + Bracketed(schema) + "." + Bracketed(table);
+
     /// <summary>
     /// The text of <c>declared</c> for one parameter, which the server describes under its declaration:
     /// <c>SELECT @p AS [1]</c>.
@@ -208,6 +239,72 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     /// <param name="declarations">Each parameter's name, without its <c>@</c>, and its type as it is declared.</param>
     public static string Declarations(IEnumerable<(string Name, string Type)> declarations) =>
         string.Join(", ", declarations.Select(static declaration => "@" + declaration.Name + " " + declaration.Type));
+
+    // The rows of sys.dm_exec_describe_first_result_set of a text under its declarations, or its error rows.
+    private Task<SqlServerColumnsAnswer> DescribeColumnsAsync(
+        string sql,
+        string? declarations,
+        CancellationToken token
+    ) =>
+        AnswerAsync(
+            async () =>
+            {
+                await using var command = await connection.CommandAsync(ColumnsSql, token);
+                _ = command.Parameters.Add(Text("@tsql", sql));
+                _ = command.Parameters.Add(Text("@params", declarations));
+                await using var reader = await command.ExecuteReaderAsync(token);
+                var rows = new List<SqlServerColumnRow>();
+                var errors = new List<SqlServerDescribeError>();
+                while (await reader.ReadAsync(token))
+                {
+                    if (IntOf(reader, "error_number") is { } number)
+                    {
+                        errors.Add(
+                            new SqlServerDescribeError(
+                                number,
+                                IntOf(reader, "error_type") ?? 0,
+                                StringOf(reader, "error_message") ?? string.Empty
+                            )
+                        );
+                        continue;
+                    }
+
+                    rows.Add(
+                        new SqlServerColumnRow(
+                            reader.GetBoolean(reader.GetOrdinal("is_hidden")),
+                            reader.GetInt32(reader.GetOrdinal("column_ordinal")),
+                            StringOf(reader, "name"),
+                            BoolOf(reader, "is_nullable"),
+                            StringOf(reader, "system_type_name"),
+                            IntOf(reader, "max_length"),
+                            IntOf(reader, "precision"),
+                            IntOf(reader, "scale"),
+                            StringOf(reader, "user_type_schema"),
+                            StringOf(reader, "user_type_name"),
+                            StringOf(reader, "assembly_qualified_type_name"),
+                            StringOf(reader, "source_server"),
+                            StringOf(reader, "source_database"),
+                            StringOf(reader, "source_schema"),
+                            StringOf(reader, "source_table"),
+                            StringOf(reader, "source_column"),
+                            BoolOf(reader, "is_identity_column"),
+                            BoolOf(reader, "is_computed_column")
+                        )
+                    );
+                }
+
+                await DrainAsync(reader, token);
+                return errors.Count > 0
+                    ? new SqlServerColumnsAnswer(null, errors, null)
+                    : new SqlServerColumnsAnswer(rows, null, null);
+            },
+            ConnectionErrors.Of,
+            static error => new SqlServerColumnsAnswer(null, null, error),
+            token
+        );
+
+    // A name in brackets, which hold any character but a ] that is not written twice.
+    private static string Bracketed(string name) => "[" + name.Replace("]", "]]", StringComparison.Ordinal) + "]";
 
     // A call of sp_describe_undeclared_parameters with the SQL and the declarations as the values of its parameters.
     private async Task<SqlCommand> DescribeUndeclaredAsync(string sql, string? declarations, CancellationToken token)
@@ -235,6 +332,12 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
     {
         var ordinal = reader.GetOrdinal(column);
         return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+    }
+
+    private static bool? BoolOf(SqlDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal) ? null : reader.GetBoolean(ordinal);
     }
 
     // A column of smallint, tinyint or int, as an int.

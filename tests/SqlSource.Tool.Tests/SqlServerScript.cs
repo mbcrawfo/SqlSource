@@ -23,7 +23,7 @@ internal sealed class SqlServerScript
 
     private readonly DescribeCapture _capture = new(SidecarValues.Engine.SqlServer);
 
-    // What "open" answers for SQL Server 2017 with the settings a database of its defaults has.
+    // What "open" answers for SQL Server 2017 with the settings a database of its defaults has, in the database app.
     public static SqlServerOpenAnswer Opened { get; } =
         new(
             "14.0.3560.2",
@@ -35,7 +35,8 @@ internal sealed class SqlServerScript
                 new SqlServerSetting("QUOTED_IDENTIFIER", "ON"),
                 new SqlServerSetting("collation", "SQL_Latin1_General_CP1_CI_AS"),
             ],
-            null
+            null,
+            Database
         );
 
     public SqlServerScript()

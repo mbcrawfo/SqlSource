@@ -95,7 +95,9 @@ public sealed class SqlServerSessionTests
     {
         var error = new SqlServerServerError([new SqlServerErrorRow(18456, 14, 8, "the server refused the login")]);
 
-        var opened = await OpenAsync(SqlServerScript.Answering(new SqlServerOpenAnswer(null, null, null, null, error)));
+        var opened = await OpenAsync(
+            SqlServerScript.Answering(new SqlServerOpenAnswer(null, null, null, null, error, null))
+        );
 
         opened.Value.ShouldBeNull();
         var failure = opened.Failure.ShouldNotBeNull();

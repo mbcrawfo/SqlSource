@@ -46,6 +46,19 @@ internal static class SqlServerTypes
             row.AssemblyQualifiedTypeName
         );
 
+    /// <summary>The type the server gives a column of a result set.</summary>
+    /// <exception cref="InvalidOperationException">The row has no type name or lacks a facet.</exception>
+    public static SqlServerType FromColumn(SqlServerColumnRow row) =>
+        Build(
+            row.SystemTypeName,
+            row.MaxLength,
+            row.Precision,
+            row.Scale,
+            row.UserTypeSchema,
+            row.UserTypeName,
+            row.AssemblyQualifiedTypeName
+        );
+
     /// <summary>
     /// The type as a message names it: <c>schema.name</c> of a user type that is not of <c>sys</c>, as
     /// <c>dbo.Email</c>, and the system type name otherwise.

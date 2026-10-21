@@ -49,6 +49,27 @@ public sealed class CallRecordTests
             .Order(StringComparer.Ordinal)
             .ShouldBe(["FakeDescribeAnswer", "FakeDescribeRequest", "FakeOpenAnswer", "FakeOpenRequest"]);
 
+    // The records of SQL Server's calls, each held to the rule below; a row is held as a member of its answer.
+    [Fact]
+    public void Records_OfSqlServer_AreFound() =>
+        Found
+            .Values.Where(static type => type.Namespace == "SqlSource.Tool.Describing.SqlServer")
+            .Select(static type => type.Name)
+            .Order(StringComparer.Ordinal)
+            .ShouldBe([
+                "SqlServerColumnsAnswer",
+                "SqlServerColumnsRequest",
+                "SqlServerDeclaredAnswer",
+                "SqlServerDeclaredRequest",
+                "SqlServerOpenAnswer",
+                "SqlServerOpenRequest",
+                "SqlServerParametersAnswer",
+                "SqlServerParametersRequest",
+                "SqlServerProbeAnswer",
+                "SqlServerProbeRequest",
+                "SqlServerTableRequest",
+            ]);
+
     [Theory]
     [MemberData(nameof(Records))]
     public void Record_EveryMember_IsOfAKindACaptureMayHold(string name) => ShouldBePlain(Found[name], []);
