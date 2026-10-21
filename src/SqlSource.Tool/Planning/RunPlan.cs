@@ -5,4 +5,9 @@ namespace SqlSource.Tool.Planning;
 /// </summary>
 /// <param name="Files">The files, in the order of their projects and then of their paths.</param>
 /// <param name="Databases">The databases, in the order the plan first holds a query of each.</param>
-internal sealed record RunPlan(EquatableArray<PlannedFile> Files, EquatableArray<PlannedDatabase> Databases);
+/// <param name="Filters">The filters the plan was made with.</param>
+internal sealed record RunPlan(
+    EquatableArray<PlannedFile> Files,
+    EquatableArray<PlannedDatabase> Databases,
+    RunFilters Filters
+);

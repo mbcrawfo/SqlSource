@@ -151,7 +151,7 @@ internal static class DescribeCommand
                 {
                     await DescribeRun.RunAsync(
                         plan,
-                        OptionsOf(command, usage),
+                        OptionsOf(command, usage, plan),
                         host,
                         reporter,
                         counted,
@@ -314,10 +314,9 @@ internal static class DescribeCommand
         [.. usage.Values.Where(static value => value.Option is null)];
 
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
-    private static DescribeOptions OptionsOf(ParseResult parsed, Usage usage)
+    // The plan's filters hold --database and the .sql paths, and not --project.
+    private static DescribeOptions OptionsOf(ParseResult parsed, Usage usage, RunPlan plan)
     {
-        var projects = ValuesOf(usage, ProjectOption);
-        var databases = ValuesOf(usage, DatabaseOption);
         var connections = ImmutableArray.CreateBuilder<ConnectionArgument>();
         foreach (var value in ValuesOf(usage, ConnectionOption))
         {
@@ -333,11 +332,9 @@ internal static class DescribeCommand
 
         return new DescribeOptions(
             ModeOf(parsed),
-            projects.Length > 0
-                || databases.Length > 0
-                || ArgumentsOf(usage).Any(static argument => SqlPath.IsSqlFile(argument.Text)),
+            ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.IsEmpty,
             connections.ToImmutable(),
-            [.. databases.DistinctBy(static value => value.Text, DatabaseName.Comparer)]
+            plan.Filters.Databases
         );
     }
 
@@ -397,18 +394,13 @@ internal static class DescribeCommand
 
         var filters = RunFilters.Create(
             paths.Where(static path => SqlPath.IsSqlFile(path.Text)),
-            ValuesOf(usage, DatabaseOption).Select(static value => value.Text),
+            ValuesOf(usage, DatabaseOption),
             host.WorkingDirectory
         );
         var result = RunPlanner.Plan(manifests, filters, cancellationToken);
-        foreach (var manifest in manifests)
+        for (var index = 0; index < manifests.Length; index++)
         {
-            var claimed = result.Plan.Files.Count(file =>
-                file.Claims.Any(claim =>
-                    string.Equals(claim.ProjectPath, manifest.ProjectPath, StringComparison.Ordinal)
-                )
-            );
-            RunEvents.Unclaimed(reporter.Trace, manifest.ProjectPath, ListedFiles.Read(manifest).Paths.Count - claimed);
+            RunEvents.Unclaimed(reporter.Trace, manifests[index].ProjectPath, result.Unclaimed[index]);
         }
 
         foreach (var file in result.Plan.Files)

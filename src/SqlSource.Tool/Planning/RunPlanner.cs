@@ -33,13 +33,16 @@ internal static class RunPlanner
     )
     {
         var errors = ImmutableArray.CreateBuilder<ToolDiagnostic>();
+        var unclaimed = ImmutableArray.CreateBuilder<int>(manifests.Length);
 
         // A file that two projects claim is planned once, under the first.
         var works = new List<FileWork>();
         var byPath = new Dictionary<string, FileWork>(SqlPath.Comparer);
         foreach (var manifest in manifests)
         {
-            foreach (var claimed in ReadProject(manifest, errors, cancellationToken))
+            var (claimedFiles, unclaimedCount) = ReadProject(manifest, errors, cancellationToken);
+            unclaimed.Add(unclaimedCount);
+            foreach (var claimed in claimedFiles)
             {
                 if (byPath.TryGetValue(claimed.NormalizedPath, out var work))
                 {
@@ -64,14 +67,16 @@ internal static class RunPlanner
         Select(files, filters, errors);
 
         return new RunPlanResult(
-            new RunPlan(new EquatableArray<PlannedFile>([.. files]), databases),
-            new EquatableArray<ToolDiagnostic>(errors.ToImmutable())
+            new RunPlan(new EquatableArray<PlannedFile>([.. files]), databases, filters),
+            new EquatableArray<ToolDiagnostic>(errors.ToImmutable()),
+            new EquatableArray<int>(unclaimed.MoveToImmutable())
         );
     }
 
-    // The claimed files of one project, in the order of their paths, each with the settings of this project.  The
-    // errors of the project are added: SQLSRC208, then SQLSRC011, then SQLSRC014.
-    private static List<ClaimedFile> ReadProject(
+    // The claimed files of one project, in the order of their paths, each with the settings of this project, and the
+    // number of its listed files that no type of it claims.  The errors of the project are added: SQLSRC208, then
+    // SQLSRC011, then SQLSRC014.
+    private static (List<ClaimedFile> Claimed, int Unclaimed) ReadProject(
         ProjectManifest manifest,
         ImmutableArray<ToolDiagnostic>.Builder errors,
         CancellationToken cancellationToken
@@ -114,7 +119,7 @@ internal static class RunPlanner
         }
 
         AddInvalid(errors, manifest.ProjectPath, invalid);
-        return claimed;
+        return (claimed, listed.Paths.Count - claimed.Count);
     }
 
     // The claims of each claimed file, by its path.  What a claim of a file says is its Output, and nothing else.
@@ -447,8 +452,7 @@ internal static class RunPlanner
     }
 
     private static bool IsNamed(PlannedQuery query, RunFilters filters) =>
-        filters.Databases.IsEmpty
-        || (query.Database is { } database && filters.Databases.Contains(database, DatabaseName.Comparer));
+        filters.Databases.IsEmpty || (query.Database is { } database && filters.NamesDatabase(database));
 
     // The generator's reader gives every setting that is not valid.  The tool reports the ones it reads: the build
     // reports the rest.  The database is the tool's alone: the generator does not read it.

@@ -334,6 +334,36 @@ public sealed class RunPlannerTests : IDisposable
         file.Queries.ShouldHaveSingleItem().NeedsEntry.ShouldBeTrue();
     }
 
+    // A file that two projects claim is planned once, and each counts it as claimed.
+    [Fact]
+    public void Plan_FileThatTwoProjectsClaim_CountsUnclaimedForEach()
+    {
+        var first = Postgres("A");
+        _ = first.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
+        var shared = first.AddSql("X.sql", "SELECT 1;");
+        _ = first.AddSql("Only.sql", "SELECT 2;");
+        var second = Postgres("B");
+        _ = second.AddSource("Queries.cs", Plans.TypeNamed("Queries", "Path = \"../A/X.sql\""));
+        second.ListSql(shared);
+        _ = second.AddSql("Lone.sql", "SELECT 3;");
+
+        var result = Plans.Result(first, second);
+
+        result.Plan.Files.Select(file => file.Path).ShouldContain(shared);
+        result.Unclaimed.ShouldBe([0, 1]);
+    }
+
+    [Fact]
+    public void Plan_Filters_AreKeptOnThePlan()
+    {
+        var project = Postgres();
+        _ = project.AddSource("Queries.cs", Plans.TypeNamed("Queries"));
+        _ = project.AddSql("Q.sql", "SELECT 1;");
+        var filters = new RunFilters([], [new UsageValue(null, "billing", 1)]);
+
+        Plans.Result(filters, project).Plan.Filters.ShouldBeSameAs(filters);
+    }
+
     [Fact]
     public void Plan_FileThatTheFirstProjectListsAndTheSecondClaims_IsPlannedUnderTheSecond()
     {
