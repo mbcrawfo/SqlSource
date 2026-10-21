@@ -931,7 +931,7 @@ See: [Database](settings.md#setting-database)
 
 **File is not in the run**
 
-A path given to `sqlsource describe` that ends in `.sql` restricts the run to that file.  The run holds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it is on, and this path is none of them.  The message holds the full path the tool looked at: a relative path is resolved against the current folder.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
+A path given to `sqlsource describe` that ends in `.sql` restricts the run to that file.  The run holds the `.sql` files that a type with `[SqlSourceGenerate]` claims, in the projects it is on, and this path is none of them.  The message holds the full path the tool looked at: a relative path is resolved against the current folder.  On Linux and macOS a backslash is part of a name and not a separator, so a path written with backslashes whose `..` go above the root of the file system, such as `a\..\..\..\q.sql`, names no file and is reported here; write it with `/`.  A path that holds `=` or `;` is named by its position on the command line instead, as `The path at position 2`, since it may be a connection string typed in the wrong place.
 
 ```console
 $ dotnet sqlsource describe Queries/User.sql
