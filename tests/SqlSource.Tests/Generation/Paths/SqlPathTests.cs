@@ -147,6 +147,25 @@ public sealed class SqlPathTests
         SqlPath.IndexOf(TestModels.Array<Item>(), "app/A.sql", static item => item.Path).ShouldBe(-1);
     }
 
+    [Fact]
+    public void FindRepeated_PathListedOnce_IsEmpty() =>
+        FindRepeated(["app/A.sql", "app/b.sql"], ["app/A.sql", "app/b.sql"]).ShouldBeEmpty();
+
+    [Fact]
+    public void FindRepeated_NoFiles_IsEmpty() => FindRepeated([], []).ShouldBeEmpty();
+
+    [Fact]
+    public void FindRepeated_PathListedTwiceOrUnderTwoSpellings_IsThatPathOnce() =>
+        FindRepeated(["a/A.sql", "a/a.sql", "a/A.sql", "b/B.sql"], ["a/A.sql", "b/B.sql"]).ShouldBe(["a/A.sql"]);
+
+    [Fact]
+    public void FindRepeated_SeveralRepeatedPaths_AreInTheOrderOfTheSortedPaths() =>
+        FindRepeated(["c/C.sql", "b/B.sql", "b/b.sql", "a/A.sql", "c/C.sql"], ["a/A.sql", "b/B.sql", "c/C.sql"])
+            .ShouldBe(["b/B.sql", "c/C.sql"]);
+
+    private static EquatableArray<string> FindRepeated(string[] files, string[] sortedPaths) =>
+        SqlPath.FindRepeated([.. files.Select(path => SqlFilePath.Create(path)!)], TestModels.Array(sortedPaths));
+
     [Theory]
     [InlineData("app/Repo", "app/Repo/a.sql", "app/Repo/Count.sql", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("APP/repo", "app/Repo/a.sql", "app/Repo/Count.sql", GeneratorHarness.UsersNormalizedPath)]
