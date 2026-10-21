@@ -2,14 +2,12 @@
 
 using System.Linq;
 using Shouldly;
-using SqlSource.Generation;
 using SqlSource.Generation.Models;
-using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
+using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
@@ -18,24 +16,10 @@ namespace SqlSource.Tests.Generator;
 // query's current hash.
 public sealed class ModelNameTests
 {
-    private const string UsersPath = "/app/Repo/Users.sql";
-
-    private const string Source = """
-        using SqlSource;
-
-        namespace App
-        {
-            [SqlSourceGenerate]
-            public partial class Sample;
-        }
-        """;
-
     // The name of GetUser in Users.
-    private const string GetUserName = "/app/Repo/Users.sql(1,10)-(1,17)";
+    private const string GetUserName = $"{GeneratorHarness.UsersPath}(1,10)-(1,17)";
 
-    private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT 1;\n");
-
-    private static readonly PostgresType Int4 = TestSidecars.Postgres(name: "integer", internalName: "int4");
+    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
     [Fact]
     public void Run_ColumnNames_ArePascalCase()
@@ -170,13 +154,16 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_OutputModelOnNoRows_IsSqlsrc259AtTheMarker()
     {
-        var file = new SqlFile(UsersPath, "-- name: DeleteUser\n-- output-model: UserRow\nDELETE FROM users;\n");
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: DeleteUser\n-- output-model: UserRow\nDELETE FROM users;\n"
+        );
 
         var run = Run(file, Entry(file, "DeleteUser", [], null));
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC259 /app/Repo/Users.sql(2,1)-(2,25): The query 'DeleteUser' names an output model, and its "
-                + "statement returns no rows.  Remove the -- output-model: marker.",
+            $"SQLSRC259 {GeneratorHarness.UsersPath}(2,1)-(2,25): The query 'DeleteUser' names an output model, and "
+                + "its statement returns no rows.  Remove the -- output-model: marker.",
         ]);
         run.SeverityOf("SQLSRC259").ShouldBe(Microsoft.CodeAnalysis.DiagnosticSeverity.Error);
         ModelsOf(run).Queries.ShouldBeEmpty();
@@ -205,7 +192,10 @@ public sealed class ModelNameTests
     [Fact]
     public void Run_ErrorInOneQuery_LeavesTheOthersModels()
     {
-        var file = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1;\n\n-- name: GetOther\nSELECT 2;\n");
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT 1;\n\n-- name: GetOther\nSELECT 2;\n"
+        );
 
         var run = Run(
             file,
@@ -378,7 +368,7 @@ public sealed class ModelNameTests
     public void Run_OutputModelOnNoRowsWithATypeError_IsSqlsrc259Too()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: DeleteUser\n-- output-model: UserRow\nDELETE FROM users WHERE id = @id;\n"
         );
         var regclass = TestSidecars.Postgres(name: "regclass", internalName: "regclass");
@@ -386,11 +376,11 @@ public sealed class ModelNameTests
         var run = Run(file, Entry(file, "DeleteUser", [TestSidecars.Parameter(0, "id", regclass)], null));
 
         run.Diagnostics.Count.ShouldBe(2);
-        run.Diagnostics[0].ShouldStartWith("SQLSRC246 /app/Repo/Users.sql(1,10)-(1,20): ");
+        run.Diagnostics[0].ShouldStartWith($"SQLSRC246 {GeneratorHarness.UsersPath}(1,10)-(1,20): ");
         run.Diagnostics[1]
             .ShouldBe(
-                "SQLSRC259 /app/Repo/Users.sql(2,1)-(2,25): The query 'DeleteUser' names an output model, and its "
-                    + "statement returns no rows.  Remove the -- output-model: marker."
+                $"SQLSRC259 {GeneratorHarness.UsersPath}(2,1)-(2,25): The query 'DeleteUser' names an output model, "
+                    + "and its statement returns no rows.  Remove the -- output-model: marker."
             );
         ModelsOf(run).Queries.ShouldBeEmpty();
     }
@@ -400,7 +390,7 @@ public sealed class ModelNameTests
     public void Run_Query_KeepsWhatItsModelsAreWrittenFrom()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetFirst\nSELECT 1;\n\n-- name: GetUser\n-- summary: Gets a user.\n-- input-model: UserKey\n"
                 + "-- output-model: UserRow\nSELECT * FROM users WHERE id = @id;\n"
         );
@@ -413,13 +403,13 @@ public sealed class ModelNameTests
 
         run.Diagnostics.ShouldBeEmpty();
         var models = ModelsOf(run);
-        models.NormalizedPath.ShouldBe("app/Repo/Users.sql");
+        models.NormalizedPath.ShouldBe(GeneratorHarness.UsersNormalizedPath);
         models.FileName.ShouldBe("Users.sql");
         models.Queries.Count.ShouldBe(2);
         var query = models.Queries[1];
         query.Name.ShouldBe("GetUser");
         query.Index.ShouldBe(1);
-        query.NameLocation.Path.ShouldBe(UsersPath);
+        query.NameLocation.Path.ShouldBe(GeneratorHarness.UsersPath);
         query.NameLocation.LineSpan.Start.Line.ShouldBe(3);
         query.NameLocation.LineSpan.Start.Character.ShouldBe(9);
         query.Summary.ShouldBe("Gets a user.");
@@ -433,50 +423,11 @@ public sealed class ModelNameTests
     // Every run compiles, with no warning in the generated code, whatever its diagnostics.
     private static GeneratorRun Run(SqlFile file, params SidecarEntry[] entries)
     {
-        var run = GeneratorHarness.Run(
-            OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [file, Sidecars.Of(file, entries)],
-            references: [NpgsqlReferences.Npgsql10],
-            dialect: "postgres"
-        );
+        var run = ModelRuns.Run(file, entries);
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
         return run;
     }
-
-    // An entry of the query for its current hash: with rows when it has columns, and without when they are null.
-    private static SidecarEntry Entry(
-        SqlFile file,
-        string name,
-        SidecarParameter[] parameters,
-        SidecarColumn[]? columns
-    ) =>
-        TestSidecars.Entry(
-            name,
-            Sidecars.HashOf(file, name, SqlDialect.PostgreSql),
-            "postgres",
-            "main",
-            "18.0",
-            columns is null ? SidecarResultKind.None : SidecarResultKind.Rows,
-            parameters: [.. parameters.Select((parameter, ordinal) => parameter with { Ordinal = ordinal })],
-            columns: columns?.Select((column, ordinal) => column with { Ordinal = ordinal }).ToArray()
-        );
-
-    private static SidecarParameter Parameter(string name, bool? nullable = null) =>
-        TestSidecars.Parameter(0, name, Int4, nullable);
-
-    private static SidecarColumn Column(
-        string name,
-        PostgresType? type = null,
-        bool? nullable = false,
-        SidecarOrigin? origin = null,
-        bool? identity = null,
-        bool? computed = null
-    ) => TestSidecars.Column(0, name, type ?? Int4, nullable, origin: origin, identity: identity, computed: computed);
-
-    private static FileModels ModelsOf(GeneratorRun run) =>
-        StepOutputs.Single<FileModels>(run, TrackingNames.FileModels);
 
     private static QueryModels QueryOf(GeneratorRun run) => ModelsOf(run).Queries.ShouldHaveSingleItem();
 

@@ -15,7 +15,7 @@ public sealed class TypeDiagnosticsTests
 {
     private const string AttributeOnly = "SqlSourceGenerateAttribute.g.cs";
 
-    private static readonly SqlFile Users = new("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
     [Fact]
     public void Run_TypeThatIsNotPartial_IsAnErrorAtItsName()
@@ -229,7 +229,7 @@ public sealed class TypeDiagnosticsTests
     [InlineData("Missing")]
     [InlineData("Sub")]
     [InlineData("../../../Users.sql")]
-    [InlineData("/app/Repo/Users.sql")]
+    [InlineData(GeneratorHarness.UsersPath)]
     public void Run_PathThatMatchesNothing_IsAnErrorAtTheAttribute(string path)
     {
         var run = GeneratorHarness.Run(
@@ -480,13 +480,13 @@ public sealed class TypeDiagnosticsTests
             [SqlSourceGenerate]
             public class Sample { }
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- name: 1x\nSELECT 1;\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: 1x\nSELECT 1;\n")
         );
 
         run.Diagnostics.Count.ShouldBe(2);
         run.Diagnostics.ShouldContain(diagnostic => diagnostic.StartsWith("SQLSRC001 /app/Repo/Sample.cs"));
         run.Diagnostics.ShouldContain(diagnostic =>
-            diagnostic.StartsWith("SQLSRC103 /app/Repo/Users.sql(1,10)-(1,12)")
+            diagnostic.StartsWith($"SQLSRC103 {GeneratorHarness.UsersPath}(1,10)-(1,12)")
         );
     }
 

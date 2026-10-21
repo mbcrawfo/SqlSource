@@ -723,17 +723,6 @@ public sealed class SqlFileParserTests
             ]);
 
     [Fact]
-    public void Parse_DialectMarkerWithoutAValue_IsAnErrorAtTheMarker()
-    {
-        const string Text = "-- dialect:\nSELECT 1\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(Text, "-- dialect:"), "dialect:"),
-            ]);
-    }
-
-    [Fact]
     public void Parse_TwoDialectsInOneHeader_IsAnErrorAtTheSecondAndTheSameDialectTwiceIsNot()
     {
         const string Conflict = "-- dialect: mysql\n-- dialect: oracle\n-- name: A\nSELECT 1\n";
@@ -992,17 +981,6 @@ public sealed class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_TokenMarkerWithoutAValue_IsInvalidAtTheMarker()
-    {
-        const string Text = "-- name: Q\n-- token:\nSELECT 1\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(Text, "-- token:"), "token:"),
-            ]);
-    }
-
-    [Fact]
     public void Parse_TokenMarkerWithAReservedName_IsAnError()
     {
         const string Text = "-- name: Q\n-- token: {{class:x}}\nSELECT 1\n";
@@ -1010,22 +988,6 @@ public sealed class SqlFileParserTests
         Errors(Text)
             .ShouldBe([
                 SqlParseError.Create(SqlParseErrorKind.ReservedTokenName, SpanOf(Text, "{{class:x}}"), "class"),
-            ]);
-    }
-
-    [Fact]
-    public void Parse_TokenMarkerInThePreamble_IsNotAllowedThere()
-    {
-        const string Text = "-- token: {{a:x}}\n-- name: Q\nSELECT {{a}}\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(
-                    SqlParseErrorKind.MarkerNotAllowedHere,
-                    SpanOf(Text, "-- token: {{a:x}}"),
-                    "token",
-                    "inside a query"
-                ),
             ]);
     }
 
@@ -1140,33 +1102,6 @@ public sealed class SqlFileParserTests
             ]);
     }
 
-    [Fact]
-    public void Parse_ParamMarkerWithoutAValue_IsInvalid()
-    {
-        const string Text = "-- name: Q\n-- param:\nSELECT 1\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(Text, "-- param:"), "param:"),
-            ]);
-    }
-
-    [Fact]
-    public void Parse_ParamMarkerInThePreamble_IsNotAllowedThere()
-    {
-        const string Text = "-- param: @a int\n-- name: Q\nSELECT @a\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(
-                    SqlParseErrorKind.MarkerNotAllowedHere,
-                    SpanOf(Text, "-- param: @a int"),
-                    "param",
-                    "inside a query"
-                ),
-            ]);
-    }
-
     [Theory]
     [InlineData("@page")]
     [InlineData("@page null")]
@@ -1264,37 +1199,6 @@ public sealed class SqlFileParserTests
                     SqlParseErrorKind.InvalidMarkerValue,
                     SpanOf(text, value),
                     "token-ignore: " + value
-                ),
-            ]);
-    }
-
-    [Fact]
-    public void Parse_TokenIgnoreMarkerWithoutAName_IsInvalidAtTheMarker()
-    {
-        const string Text = "-- name: Q\n-- token-ignore:\nSELECT 1\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(
-                    SqlParseErrorKind.InvalidMarkerValue,
-                    SpanOf(Text, "-- token-ignore:"),
-                    "token-ignore:"
-                ),
-            ]);
-    }
-
-    [Fact]
-    public void Parse_TokenIgnoreMarkerInThePreamble_IsNotAllowedThere()
-    {
-        const string Text = "-- token-ignore: a\n-- name: Q\nSELECT {{a}}\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(
-                    SqlParseErrorKind.MarkerNotAllowedHere,
-                    SpanOf(Text, "-- token-ignore: a"),
-                    "token-ignore",
-                    "inside a query"
                 ),
             ]);
     }
@@ -1410,13 +1314,20 @@ public sealed class SqlFileParserTests
             ]);
     }
 
+    // A marker with nothing after its colon is invalid at the whole marker: in a query, and for the dialect marker in
+    // the file's header.
     [Theory]
-    [InlineData("output")]
-    [InlineData("database")]
-    [InlineData("type-override")]
-    public void Parse_MarkerWithoutAValue_IsInvalidAtTheMarker(string word)
+    [InlineData("output", true)]
+    [InlineData("database", true)]
+    [InlineData("type-override", true)]
+    [InlineData("token", true)]
+    [InlineData("param", true)]
+    [InlineData("column", true)]
+    [InlineData("token-ignore", true)]
+    [InlineData("dialect", false)]
+    public void Parse_MarkerWithoutAValue_IsInvalidAtTheMarker(string word, bool inAQuery)
     {
-        var text = "-- name: Q\n-- " + word + ":\nSELECT 1\n";
+        var text = (inAQuery ? "-- name: Q\n" : "") + "-- " + word + ":\nSELECT 1\n";
 
         Errors(text)
             .ShouldBe([
@@ -1550,6 +1461,27 @@ public sealed class SqlFileParserTests
         Errors(text)
             .ShouldBe([
                 SqlParseError.Create(SqlParseErrorKind.MarkerNotAllowedHere, SpanOf(text, marker), word, allowed),
+            ]);
+    }
+
+    // A marker of a query, given before the file's first name marker, is not allowed there.
+    [Theory]
+    [InlineData("-- token: {{a:x}}", "token", "SELECT {{a}}")]
+    [InlineData("-- param: @a int", "param", "SELECT @a")]
+    [InlineData("-- token-ignore: a", "token-ignore", "SELECT {{a}}")]
+    [InlineData("-- column: total null", "column")]
+    public void Parse_MarkerOutsideAQuery_IsNotAllowedThere(string marker, string word, string sql = "SELECT 1")
+    {
+        var text = marker + "\n-- name: Q\n" + sql + "\n";
+
+        Errors(text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.MarkerNotAllowedHere,
+                    SpanOf(text, marker),
+                    word,
+                    "inside a query"
+                ),
             ]);
     }
 
@@ -1700,33 +1632,6 @@ public sealed class SqlFileParserTests
         Errors(text)
             .ShouldBe([
                 SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "column: " + value),
-            ]);
-    }
-
-    [Fact]
-    public void Parse_ColumnMarkerWithoutAValue_IsInvalid()
-    {
-        const string Text = "-- name: Q\n-- column:\nSELECT 1\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(Text, "-- column:"), "column:"),
-            ]);
-    }
-
-    [Fact]
-    public void Parse_ColumnMarkerInTheFileHeader_IsNotAllowedThere()
-    {
-        const string Text = "-- column: total null\n-- name: Q\nSELECT 1\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(
-                    SqlParseErrorKind.MarkerNotAllowedHere,
-                    SpanOf(Text, "-- column: total null"),
-                    "column",
-                    "inside a query"
-                ),
             ]);
     }
 

@@ -1,6 +1,7 @@
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.Paths;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
@@ -13,7 +14,7 @@ public sealed class PathResolverTests
         "app/Queries/Users.sql",
         "app/Repo/Admin/Roles.sql",
         "app/Repo/Count.sql",
-        "app/Repo/Users.sql",
+        GeneratorHarness.UsersNormalizedPath,
         "app/Root.sql"
     );
 
@@ -27,7 +28,7 @@ public sealed class PathResolverTests
             unsupportedLanguageVersion: null
         );
 
-        result.Files.ShouldBe(["app/Repo/Count.sql", "app/Repo/Users.sql"]);
+        result.Files.ShouldBe(["app/Repo/Count.sql", GeneratorHarness.UsersNormalizedPath]);
         result.Diagnostics.ShouldBeEmpty();
     }
 
@@ -50,12 +51,12 @@ public sealed class PathResolverTests
     }
 
     [Theory]
-    [InlineData("Users.sql", "app/Repo/Users.sql")]
-    [InlineData("users.SQL", "app/Repo/Users.sql")]
+    [InlineData("Users.sql", GeneratorHarness.UsersNormalizedPath)]
+    [InlineData("users.SQL", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("Admin/Roles.sql", "app/Repo/Admin/Roles.sql")]
     [InlineData("Admin\\Roles.sql", "app/Repo/Admin/Roles.sql")]
     [InlineData("../Root.sql", "app/Root.sql")]
-    [InlineData("/Users.sql", "app/Repo/Users.sql")]
+    [InlineData("/Users.sql", GeneratorHarness.UsersNormalizedPath)]
     public void Resolve_FilePath_TakesThatFile(string path, string expected)
     {
         var result = PathResolver.Resolve(
@@ -128,7 +129,7 @@ public sealed class PathResolverTests
     [InlineData("/app/Repo/UserRepository.cs", "../..")]
     public void Resolve_FolderThatIsTheRoot_TakesTheFilesWithNoFolder(string filePath, string? path)
     {
-        var paths = TestModels.Array("app/Repo/Users.sql", "app/Root.sql", "Root.sql", "zeta.sql");
+        var paths = TestModels.Array(GeneratorHarness.UsersNormalizedPath, "app/Root.sql", "Root.sql", "zeta.sql");
 
         var result = PathResolver.Resolve(
             TestModels.Type(path, filePath: filePath),
@@ -149,14 +150,14 @@ public sealed class PathResolverTests
             "app/Repo-old/Users.sql",
             "app/Repo.sql",
             "app/Repo/Sub/Users.sql",
-            "app/Repo/Users.sql",
+            GeneratorHarness.UsersNormalizedPath,
             "app/Repo0/Users.sql",
             "app/RepoArchive/Users.sql"
         );
 
         PathResolver
             .Resolve(TestModels.Type(), paths, isSupportedFramework: true, unsupportedLanguageVersion: null)
-            .Files.ShouldBe(["app/Repo/Users.sql"]);
+            .Files.ShouldBe([GeneratorHarness.UsersNormalizedPath]);
     }
 
     [Fact]
@@ -169,7 +170,7 @@ public sealed class PathResolverTests
             unsupportedLanguageVersion: null
         );
 
-        result.Files.ShouldBe(["app/Repo/Users.sql"]);
+        result.Files.ShouldBe([GeneratorHarness.UsersNormalizedPath]);
         result.Diagnostics.ShouldBe([
             DiagnosticInfo.Create(SqlDiagnostics.UnsupportedTargetFramework, TestModels.AttributeLocation),
         ]);
@@ -185,7 +186,7 @@ public sealed class PathResolverTests
             unsupportedLanguageVersion: "11.0"
         );
 
-        result.Files.ShouldBe(["app/Repo/Users.sql"]);
+        result.Files.ShouldBe([GeneratorHarness.UsersNormalizedPath]);
         result.Diagnostics.ShouldBe([
             DiagnosticInfo.Create(SqlDiagnostics.UnsupportedLanguageVersion, TestModels.AttributeLocation, "11.0"),
         ]);
@@ -248,9 +249,9 @@ public sealed class PathResolverTests
             );
 
     [Theory]
-    [InlineData(null, "app/Repo/Count.sql|app/Repo/Users.sql")]
+    [InlineData(null, $"app/Repo/Count.sql|{GeneratorHarness.UsersNormalizedPath}")]
     [InlineData("../Queries", "app/Queries/Orders.sql|app/Queries/Users.sql")]
-    [InlineData("users.SQL", "app/Repo/Users.sql")]
+    [InlineData("users.SQL", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("Missing.sql", "")]
     [InlineData("../../..", "")]
     public void FindFiles_PathOfAnAttribute_GivesTheFilesItNames(string? path, string expected) =>

@@ -18,15 +18,13 @@ namespace SqlSource.Tests.Generator;
 // it is, and which entries the checks leave usable, read from what the step of the checks gave.
 public sealed class SidecarTests
 {
-    private const string UsersPath = "/app/Repo/Users.sql";
-
-    private const string SidecarPath = UsersPath + ".json";
+    private const string SidecarPath = GeneratorHarness.UsersPath + ".json";
 
     // The name of GetUser in Users.
-    private const string GetUserName = "/app/Repo/Users.sql(1,10)-(1,17)";
+    private const string GetUserName = $"{GeneratorHarness.UsersPath}(1,10)-(1,17)";
 
     // The start of the sidecar of Users.
-    private const string SidecarStart = "/app/Repo/Users.sql.json(1,1)-(1,1)";
+    private const string SidecarStart = $"{GeneratorHarness.UsersPath}.json(1,1)-(1,1)";
 
     private const string Source = """
         using SqlSource;
@@ -37,7 +35,7 @@ public sealed class SidecarTests
         public partial class Sample;
         """;
 
-    private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT 1;\n");
+    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
     [Fact]
     public void Run_MalformedSidecar_IsSqlsrc237AtTheError()
@@ -52,8 +50,8 @@ public sealed class SidecarTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC237 /app/Repo/Users.sql.json(2,20)-(2,25): The sidecar cannot be read, because 'formatVersion' has "
-                + "a value of the wrong type.  Run 'sqlsource describe' to write it again.",
+            $"SQLSRC237 {GeneratorHarness.UsersPath}.json(2,20)-(2,25): The sidecar cannot be read, because "
+                + "'formatVersion' has a value of the wrong type.  Run 'sqlsource describe' to write it again.",
         ]);
         run.SeverityOf("SQLSRC237").ShouldBe(DiagnosticSeverity.Error);
         UsableEntries(run).ShouldBeEmpty();
@@ -150,7 +148,10 @@ public sealed class SidecarTests
     [Fact]
     public void Run_MssqlFileAtModels_IsOneSqlsrc243AndNoSqlsrc241()
     {
-        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n");
+        var users = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n"
+        );
 
         var run = Run(OutputKind.Models, [users], "mssql");
 
@@ -181,8 +182,8 @@ public sealed class SidecarTests
 
         withEntries.Diagnostics.ShouldBe([
             NoTypeMap,
-            "SQLSRC245 /app/Repo/Users.sql.json(15,5)-(15,11): The entry 'Gone' names no query of the file that needs "
-                + "one.  Run 'sqlsource describe', which removes it.",
+            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,11): The entry 'Gone' names no query of the file "
+                + "that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
         UsableEntries(withEntries).ShouldBeEmpty();
         malformed.Diagnostics.ShouldBe([
@@ -200,14 +201,14 @@ public sealed class SidecarTests
     public void Run_AnsiFileAtModels_IsOneSqlsrc209AtItsFirstQueryThatNeedsAnEntry()
     {
         var users = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- output: sql\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n\n"
                 + "-- name: ListUsers\nSELECT 3;\n"
         );
         const string NotDescribable =
-            "SQLSRC209 /app/Repo/Users.sql(5,10)-(5,20): The output 'models' needs each query described by its "
-            + "database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or "
-            + "the output to 'sql'.";
+            $"SQLSRC209 {GeneratorHarness.UsersPath}(5,10)-(5,20): The output 'models' needs each query described by "
+            + "its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or "
+            + "'mssql', or the output to 'sql'.";
 
         var run = Run(OutputKind.Models, [users], "ansi");
         var withEntries = Run(
@@ -232,8 +233,14 @@ public sealed class SidecarTests
     [Fact]
     public void Run_TokenWithoutADefault_IsSqlsrc210AtTheQueryAndItIsNotChecked()
     {
-        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1 {{where}} {{order}} {{tail:}};\n");
-        var withDefaults = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1 {{where:WHERE true}};\n");
+        var users = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT 1 {{where}} {{order}} {{tail:}};\n"
+        );
+        var withDefaults = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT 1 {{where:WHERE true}};\n"
+        );
         const string NoDefault =
             $"SQLSRC210 {GetUserName}: The token '{{0}}' has no default, which a query whose output is 'models' "
             + "needs.  Give it a default, or set the output to 'sql'.";
@@ -270,7 +277,7 @@ public sealed class SidecarTests
     [Fact]
     public void Run_TokenWithoutADefault_IsSqlsrc210WhateverTheSidecarAndTheDialect()
     {
-        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1 {{where}};\n");
+        var users = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1 {{where}};\n");
         const string NoDefault =
             $"SQLSRC210 {GetUserName}: The token 'where' has no default, which a query whose output is 'models' "
             + "needs.  Give it a default, or set the output to 'sql'.";
@@ -315,8 +322,8 @@ public sealed class SidecarTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC245 /app/Repo/Users.sql.json(15,5)-(15,11): The entry 'Gone' names no query of the file that needs "
-                + "one.  Run 'sqlsource describe', which removes it.",
+            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,11): The entry 'Gone' names no query of the file "
+                + "that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
         run.SeverityOf("SQLSRC245").ShouldBe(DiagnosticSeverity.Warning);
         UsableEntries(run).ShouldBe(["GetUser"]);
@@ -327,9 +334,13 @@ public sealed class SidecarTests
     [Fact]
     public void Run_FileWithParseErrors_GetsNoOrphanAndNoQueryError()
     {
-        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1;\n\n-- name: GetUser\nSELECT 2;\n");
+        var users = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT 1;\n\n-- name: GetUser\nSELECT 2;\n"
+        );
         const string DuplicateName =
-            "SQLSRC104 /app/Repo/Users.sql(4,10)-(4,17): The query name 'GetUser' is used more than once in this file";
+            $"SQLSRC104 {GeneratorHarness.UsersPath}(4,10)-(4,17): The query name 'GetUser' is used more than once in "
+            + "this file";
 
         var withEntry = Run(OutputKind.Models, users, Sidecars.Of(users, Sidecars.Entry("GetUser", "h")));
         var malformed = Run(OutputKind.Models, users, Sidecars.Raw(users, ""));
@@ -409,8 +420,8 @@ public sealed class SidecarTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC237 /app/Repo/Users.sql.json(2,20)-(2,25): The sidecar cannot be read, because 'formatVersion' has "
-                + "a value of the wrong type.  Run 'sqlsource describe' to write it again.",
+            $"SQLSRC237 {GeneratorHarness.UsersPath}.json(2,20)-(2,25): The sidecar cannot be read, because "
+                + "'formatVersion' has a value of the wrong type.  Run 'sqlsource describe' to write it again.",
         ]);
     }
 
@@ -437,8 +448,8 @@ public sealed class SidecarTests
         run.Diagnostics.ShouldBe([
             $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
                 + "'models' needs one.  Run 'sqlsource describe'.",
-            "SQLSRC245 /app/Repo/Users.sql.json(7,5)-(7,14): The entry 'getuser' names no query of the file that needs "
-                + "one.  Run 'sqlsource describe', which removes it.",
+            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(7,5)-(7,14): The entry 'getuser' names no query of the file "
+                + "that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
         UsableEntries(run).ShouldBeEmpty();
     }
@@ -447,7 +458,7 @@ public sealed class SidecarTests
     public void Run_QueryAtModelsAndQueryAtSql_OnlyTheFirstNeedsAnEntry()
     {
         var users = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\n-- output: sql\nSELECT 2;\n"
         );
 
@@ -463,8 +474,8 @@ public sealed class SidecarTests
                 + "'models' needs one.  Run 'sqlsource describe'.",
         ]);
         run.Diagnostics.ShouldBe([
-            "SQLSRC245 /app/Repo/Users.sql.json(15,5)-(15,17): The entry 'CountUsers' names no query of the file that "
-                + "needs one.  Run 'sqlsource describe', which removes it.",
+            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,17): The entry 'CountUsers' names no query of the "
+                + "file that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
         UsableEntries(run).ShouldBe(["GetUser"]);
     }
@@ -474,7 +485,10 @@ public sealed class SidecarTests
     [Fact]
     public void Run_TwoTypesClaimingOneFile_ReportOnceAndNeedTheUnion()
     {
-        var users = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n");
+        var users = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n"
+        );
 
         var run = RunTwoTypes(
             "Output = GeneratorOutput.Sql",
@@ -561,8 +575,8 @@ public sealed class SidecarTests
         var run = Run(OutputKind.Models, Users, Sidecars.Raw(Users, "﻿" + sidecar.Text));
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC245 /app/Repo/Users.sql.json(15,5)-(15,11): The entry 'Gone' names no query of the file that needs "
-                + "one.  Run 'sqlsource describe', which removes it.",
+            $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,11): The entry 'Gone' names no query of the file "
+                + "that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
         UsableEntries(run).ShouldBe(["GetUser"]);
     }
@@ -612,7 +626,7 @@ public sealed class SidecarTests
     public void Run_EveryCheck_GivesNoUsableEntryThatFailedOne()
     {
         var users = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: Current\nSELECT 1;\n\n-- name: Stale\nSELECT 2;\n\n-- name: Missing\nSELECT 3;\n\n"
                 + "-- name: OtherEngine\nSELECT 4;\n"
         );

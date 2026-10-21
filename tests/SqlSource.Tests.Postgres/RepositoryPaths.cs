@@ -32,8 +32,4 @@ internal static class RepositoryPaths
 
     public static string EndToEndProject { get; } =
         Path.Combine(Root, "tests", "SqlSource.Tests.Postgres", "SqlSource.Tests.Postgres.csproj");
-
-    public static string EndToEndSchema(string database) => EndToEndFiles.Schema(database);
-
-    public static string EndToEndSeed(string database) => EndToEndFiles.Seed(database);
 }

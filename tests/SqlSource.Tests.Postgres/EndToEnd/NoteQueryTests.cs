@@ -13,7 +13,7 @@ namespace SqlSource.Tests.Postgres.EndToEnd;
 public sealed class NoteQueryTests(PostgresContainer postgres)
 {
     [Fact]
-    public async Task QueryAsync_ListAccountNotes_AccountWithNoNote_HasNulls()
+    public async Task QueryAsync_ListAccountNotesOfAnAccountWithNoNote_HasNulls()
     {
         await using var source = EndToEndSources.App(postgres);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);

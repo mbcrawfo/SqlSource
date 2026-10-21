@@ -5,7 +5,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
-using static SqlSource.Tool.Tests.PostgresRequests;
+using static SqlSource.Tool.Testing.DescribeRequests;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -35,7 +35,7 @@ public sealed class PostgresSessionCheckTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT @p::int AS a, 'x' AS b;", Inferred("p")),
+            Listed("SELECT @p::int AS a, 'x' AS b;", Inferred("p")),
             TestContext.Current.CancellationToken
         );
 
@@ -75,7 +75,7 @@ public sealed class PostgresSessionCheckTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT @p::int AS a, @q AS b", Inferred("p"), Inferred("q")),
+            Listed("SELECT @p::int AS a, @q AS b", Inferred("p"), Inferred("q")),
             TestContext.Current.CancellationToken
         );
 
@@ -114,7 +114,7 @@ public sealed class PostgresSessionCheckTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("DELETE FROM samples WHERE id = @id", Inferred("id")),
+            Listed("DELETE FROM samples WHERE id = @id", Inferred("id")),
             TestContext.Current.CancellationToken
         );
 
@@ -152,7 +152,7 @@ public sealed class PostgresSessionCheckTests
         await using var session = await PostgresScript.SessionAsync(exchange, log);
 
         var described = await session.DescribeAsync(
-            Of("DELETE FROM samples WHERE id = @id", Inferred("id")),
+            Listed("DELETE FROM samples WHERE id = @id", Inferred("id")),
             TestContext.Current.CancellationToken
         );
 
@@ -190,7 +190,7 @@ public sealed class PostgresSessionCheckTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("DELETE FROM t WHERE a = @a AND b = @b", Inferred("a"), Declared("b", "check_pair")),
+            Listed("DELETE FROM t WHERE a = @a AND b = @b", Inferred("a"), Declared("b", "check_pair")),
             TestContext.Current.CancellationToken
         );
 
@@ -226,7 +226,7 @@ public sealed class PostgresSessionCheckTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(Sql, Inferred("s")), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(Sql, Inferred("s")), TestContext.Current.CancellationToken);
 
         var description = described.Value.ShouldNotBeNull();
         var type = description.Parameters[0].Type.ShouldNotBeNull();
@@ -250,7 +250,7 @@ public sealed class PostgresSessionCheckTests
         _ = script.Resolves([23, PostgresRows.WithDottedName.Oid], PostgresRows.Int4, PostgresRows.WithDottedName);
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
-        var request = Of("DELETE FROM t WHERE a = @a AND s = @s", Inferred("a"), Inferred("s"));
+        var request = Listed("DELETE FROM t WHERE a = @a AND s = @s", Inferred("a"), Inferred("s"));
 
         var described = await session.DescribeAsync(request, TestContext.Current.CancellationToken);
 

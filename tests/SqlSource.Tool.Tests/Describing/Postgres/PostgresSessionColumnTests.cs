@@ -7,8 +7,8 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
 using Xunit;
+using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Tests.PostgresPlans;
-using static SqlSource.Tool.Tests.PostgresRequests;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -53,7 +53,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT 1, 'a'::varchar(100), 2::numeric(18,2)"),
+            Listed("SELECT 1, 'a'::varchar(100), 2::numeric(18,2)"),
             TestContext.Current.CancellationToken
         );
 
@@ -85,7 +85,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("DELETE FROM samples WHERE id = @id", Inferred("id")),
+            Listed("DELETE FROM samples WHERE id = @id", Inferred("id")),
             TestContext.Current.CancellationToken
         );
 
@@ -124,7 +124,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT @p::text AS a, 1 AS b, 2 AS c", Inferred("p")),
+            Listed("SELECT @p::text AS a, 1 AS b, 2 AS c", Inferred("p")),
             TestContext.Current.CancellationToken
         );
 
@@ -154,7 +154,7 @@ public sealed class PostgresSessionColumnTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of("SELECT 1"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed("SELECT 1"), TestContext.Current.CancellationToken);
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
@@ -198,7 +198,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT o.total, u.email, u.id FROM orders o, users u"),
+            Listed("SELECT o.total, u.email, u.id FROM orders o, users u"),
             TestContext.Current.CancellationToken
         );
 
@@ -231,7 +231,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT ctid FROM users"),
+            Listed("SELECT ctid FROM users"),
             TestContext.Current.CancellationToken
         );
 
@@ -253,7 +253,10 @@ public sealed class PostgresSessionColumnTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of("SELECT id FROM users"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(
+            Listed("SELECT id FROM users"),
+            TestContext.Current.CancellationToken
+        );
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
@@ -276,7 +279,10 @@ public sealed class PostgresSessionColumnTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of("SELECT id FROM users"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(
+            Listed("SELECT id FROM users"),
+            TestContext.Current.CancellationToken
+        );
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
@@ -298,7 +304,10 @@ public sealed class PostgresSessionColumnTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of("SELECT id FROM users"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(
+            Listed("SELECT id FROM users"),
+            TestContext.Current.CancellationToken
+        );
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
@@ -322,7 +331,7 @@ public sealed class PostgresSessionColumnTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of("SELECT 1 AS n"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed("SELECT 1 AS n"), TestContext.Current.CancellationToken);
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
@@ -348,7 +357,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT 1 WHERE @id = 1", Inferred("id")),
+            Listed("SELECT 1 WHERE @id = 1", Inferred("id")),
             TestContext.Current.CancellationToken
         );
 
@@ -375,7 +384,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT email FROM users"),
+            Listed("SELECT email FROM users"),
             TestContext.Current.CancellationToken
         );
 
@@ -439,7 +448,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange, log);
 
         var described = await session.DescribeAsync(
-            Of("SELECT names, v, amount, n FROM t WHERE email = @email", Inferred("email")),
+            Listed("SELECT names, v, amount, n FROM t WHERE email = @email", Inferred("email")),
             TestContext.Current.CancellationToken
         );
 
@@ -479,7 +488,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT @p::text AS a", Inferred("p")),
+            Listed("SELECT @p::text AS a", Inferred("p")),
             TestContext.Current.CancellationToken
         );
 
@@ -507,7 +516,7 @@ public sealed class PostgresSessionColumnTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("SELECT names, d FROM t"),
+            Listed("SELECT names, d FROM t"),
             TestContext.Current.CancellationToken
         );
 
@@ -544,7 +553,7 @@ public sealed class PostgresSessionColumnTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of("SELECT v FROM t"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed("SELECT v FROM t"), TestContext.Current.CancellationToken);
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");

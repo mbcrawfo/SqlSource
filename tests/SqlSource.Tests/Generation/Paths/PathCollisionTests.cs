@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Paths;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
@@ -10,18 +11,18 @@ public sealed class PathCollisionTests
 {
     [Fact]
     public void Find_PathsThatDifferByMoreThanCase_IsEmpty() =>
-        Find("/app/Repo/Users.sql", "/app/Repo/Orders.sql", "/app/Other/Users.sql").ShouldBeEmpty();
+        Find(GeneratorHarness.UsersPath, "/app/Repo/Orders.sql", "/app/Other/Users.sql").ShouldBeEmpty();
 
     [Fact]
     public void Find_NoPaths_IsEmpty() => Find().ShouldBeEmpty();
 
     [Fact]
     public void Find_OneFileUnderSpellingsThatNormalizeAlike_IsEmpty() =>
-        Find("/app/Repo/Users.sql", "\\app\\Repo\\Users.sql", "/app/Repo/Sub/../Users.sql").ShouldBeEmpty();
+        Find(GeneratorHarness.UsersPath, "\\app\\Repo\\Users.sql", "/app/Repo/Sub/../Users.sql").ShouldBeEmpty();
 
     [Theory]
-    [InlineData("/app/Repo/Users.sql", "/app/Repo/users.sql", "app/Repo/users.sql")]
-    [InlineData("/app/Repo/Users.sql", "/app/REPO/Users.sql", "app/REPO/Users.sql")]
+    [InlineData(GeneratorHarness.UsersPath, "/app/Repo/users.sql", "app/Repo/users.sql")]
+    [InlineData(GeneratorHarness.UsersPath, "/app/REPO/Users.sql", "app/REPO/Users.sql")]
     [InlineData("C:\\app\\Repo\\Users.sql", "c:/app/Repo/Users.SQL", "c:/app/Repo/Users.SQL")]
     public void Find_PathThatDiffersOnlyByCaseFromAnEarlierOne_CollidesWithTheEarlierOne(
         string first,

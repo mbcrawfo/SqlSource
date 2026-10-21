@@ -3,6 +3,7 @@ using Shouldly;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
@@ -53,7 +54,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     private Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         string sql,
         params (string Name, string Type)[] declared
-    ) => Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql, declared));
+    ) => Sessions.DescribeAsync(postgres.ConnectionString, DescribeRequests.Of(sql, declared));
 
     private async Task ShouldPassAsync(string sql, params (string Name, string Type)[] declared)
     {
@@ -175,7 +176,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         described.Value.ShouldBeNull();
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC232");
-        failure.Arguments.ShouldBe([name, written, Requests.Query]);
+        failure.Arguments.ShouldBe([name, written, DescribeRequests.Query]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldHaveSingleItem().ShouldNotBeNullOrWhiteSpace();
         failure.Help.ShouldBe(PostgresErrors.BindHelp);
@@ -191,7 +192,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC232");
-        failure.Arguments.ShouldBe(["public.check_pair", "@unused", Requests.Query]);
+        failure.Arguments.ShouldBe(["public.check_pair", "@unused", DescribeRequests.Query]);
     }
 
     // Where it is not returned, an array of a domain is bound by its element's name and [], which Npgsql takes.
@@ -217,7 +218,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
         failure.Arguments.ShouldBe([
-            Requests.Query,
+            DescribeRequests.Query,
             "column 1 is character varying[] for Npgsql and email_t[] for SqlSource",
         ]);
         failure.ServerLines.ShouldBeEmpty();
@@ -249,7 +250,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
-        failure.Arguments.ShouldBe([Requests.Query, differs]);
+        failure.Arguments.ShouldBe([DescribeRequests.Query, differs]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.Help.ShouldBe(help);
     }

@@ -6,9 +6,9 @@ using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
+using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
 using static SqlSource.Tool.Tests.PostgresPlans;
-using static SqlSource.Tool.Tests.PostgresRequests;
 using static SqlSource.Tool.Tests.PostgresSessionCases;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
@@ -58,7 +58,7 @@ public sealed class PostgresSessionPlanTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(sql), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(sql), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
         return described.Value.ShouldNotBeNull();
@@ -110,7 +110,7 @@ public sealed class PostgresSessionPlanTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(UngatedUsersId), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(UngatedUsersId), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
         AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
@@ -130,7 +130,7 @@ public sealed class PostgresSessionPlanTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(Sql), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(Sql), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
         var description = described.Value.ShouldNotBeNull();
@@ -179,7 +179,7 @@ public sealed class PostgresSessionPlanTests
             explainSettings: ["enable_hashjoin=off", "enable_mergejoin=off"]
         );
 
-        var described = await session.DescribeAsync(Of(GatedUsersId), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(GatedUsersId), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
         described.Value.ShouldNotBeNull().Plan.ShouldBe(SidecarValues.Plan.Walked);
@@ -255,7 +255,7 @@ public sealed class PostgresSessionPlanTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(GatedUsersId), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(GatedUsersId), TestContext.Current.CancellationToken);
 
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC231");
         exchange.Unused.ShouldBeEmpty();
@@ -284,7 +284,7 @@ public sealed class PostgresSessionPlanTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(sql, Inferred("id")), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(sql, Inferred("id")), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
         AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([NotNullCatalog]);
@@ -301,7 +301,7 @@ public sealed class PostgresSessionPlanTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("DELETE FROM users WHERE left(name, 1) = 'a'"),
+            Listed("DELETE FROM users WHERE left(name, 1) = 'a'"),
             TestContext.Current.CancellationToken
         );
 

@@ -1,8 +1,7 @@
-using System.IO;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
-using SqlSource.Snapshot.Reading;
+using SqlSource.Tests.Postgres.Realistic.Generation;
 using SqlSource.Tool.Describing.Describers;
 using Xunit;
 
@@ -54,11 +53,7 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
             found.IsCheckedOn(postgres.Major),
             $"{found} is checked from PostgreSQL {found.CheckedFrom?.Major}: {found.CheckedFrom?.Why}"
         );
-        var token = TestContext.Current.CancellationToken;
-        var committed = SidecarReader
-            .Read(await File.ReadAllTextAsync(found.SidecarPath, token))
-            .Sidecar.ShouldNotBeNull($"{found.SidecarPath} cannot be read")
-            .Queries.ShouldHaveSingleItem(found.ToString());
+        var committed = RealisticModels.EntryOf(found);
 
         var described = await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
 

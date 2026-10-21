@@ -7,12 +7,11 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Generation;
 using SqlSource.Generation.Types;
-using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Generator;
 using SqlSource.Testing.Snapshot;
 using Xunit;
-using OutputKind = SqlSource.Settings.OutputKind;
+using static SqlSource.Testing.Generator.ModelRuns;
 
 namespace SqlSource.Tests.Generator;
 
@@ -20,8 +19,6 @@ namespace SqlSource.Tests.Generator;
 // is at Models under postgres, with an entry written for the query's current hash.
 public sealed class QueryTypesTests
 {
-    private const string UsersPath = "/app/Repo/Users.sql";
-
     private const string Source = """
         using SqlSource;
 
@@ -38,12 +35,12 @@ public sealed class QueryTypesTests
         """;
 
     // The name of GetUser in Users.
-    private const string GetUserName = "/app/Repo/Users.sql(1,10)-(1,17)";
+    private const string GetUserName = $"{GeneratorHarness.UsersPath}(1,10)-(1,17)";
 
     // The warning ids of a C# type whose use gives none.
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
 
-    private static readonly SqlFile Users = new(UsersPath, "-- name: GetUser\nSELECT 1;\n");
+    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
     private static readonly PropertyType Int = new("int", true, true, NoWarnings, "int4", null);
 
@@ -181,7 +178,7 @@ public sealed class QueryTypesTests
             internalName: "pg_class"
         );
         var mapped = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- type-override: pg_catalog.pg_class=MyApp.Tag\n-- name: GetUser\nSELECT 1;\n"
         );
 
@@ -348,7 +345,10 @@ public sealed class QueryTypesTests
     [Fact]
     public void Run_QueryWithTwoFailures_ReportsTheFirstAndLeavesTheOtherQueryTyped()
     {
-        var file = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n");
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n"
+        );
 
         var run = Run(
             [NpgsqlReferences.Npgsql8],
@@ -372,7 +372,7 @@ public sealed class QueryTypesTests
     public void Run_QueryAtSql_HasNoTypes()
     {
         var file = new SqlFile(
-            UsersPath,
+            GeneratorHarness.UsersPath,
             "-- name: GetUser\n-- output: sql\nSELECT 1;\n\n-- name: ListUsers\nSELECT 2;\n"
         );
 
@@ -406,7 +406,13 @@ public sealed class QueryTypesTests
         ]);
         StepOutputs
             .Single<FileTypes>(run, TrackingNames.FileTypes)
-            .ShouldBe(new FileTypes("app/Repo/Users.sql", Of<QueryTypes>(), EquatableArray<DiagnosticInfo>.Empty));
+            .ShouldBe(
+                new FileTypes(
+                    GeneratorHarness.UsersNormalizedPath,
+                    Of<QueryTypes>(),
+                    EquatableArray<DiagnosticInfo>.Empty
+                )
+            );
     }
 
     // The entries are written in the other order, and the types follow the file's.  An entry without rows has no
@@ -414,7 +420,10 @@ public sealed class QueryTypesTests
     [Fact]
     public void Run_TwoQueries_KeepTheOrderOfTheFile()
     {
-        var file = new SqlFile(UsersPath, "-- name: GetUser\nSELECT 1;\n\n-- name: DeleteUser\nDELETE FROM users;\n");
+        var file = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- name: GetUser\nSELECT 1;\n\n-- name: DeleteUser\nDELETE FROM users;\n"
+        );
 
         var run = Run(
             [NpgsqlReferences.Npgsql10],
@@ -473,7 +482,7 @@ public sealed class QueryTypesTests
                 element: tag
             )
         );
-        var file = new SqlFile(UsersPath, marker + "-- name: GetUser\nSELECT 1;\n");
+        var file = new SqlFile(GeneratorHarness.UsersPath, marker + "-- name: GetUser\nSELECT 1;\n");
 
         var run = Run([NpgsqlReferences.Npgsql10], file, Entry(file, "GetUser", [], [Column("tags", tags)]));
 
@@ -492,38 +501,11 @@ public sealed class QueryTypesTests
         };
 
     private static GeneratorRun Run(MetadataReference[] references, SqlFile file, params SidecarEntry[] entries) =>
-        GeneratorHarness.Run(
-            OutputKind.Models,
-            [new SourceFile(GeneratorHarness.SourcePath, Source)],
-            [file, Sidecars.Of(file, entries)],
-            references: references,
-            dialect: "postgres"
-        );
-
-    // An entry of the query for its current hash: with rows when it has columns, and without when they are null.
-    private static SidecarEntry Entry(
-        SqlFile file,
-        string name,
-        SidecarParameter[] parameters,
-        SidecarColumn[]? columns
-    ) =>
-        TestSidecars.Entry(
-            name,
-            Sidecars.HashOf(file, name, SqlDialect.PostgreSql),
-            "postgres",
-            "main",
-            "18.0",
-            columns is null ? SidecarResultKind.None : SidecarResultKind.Rows,
-            parameters: [.. parameters.Select((parameter, ordinal) => parameter with { Ordinal = ordinal })],
-            columns: columns?.Select((column, ordinal) => column with { Ordinal = ordinal }).ToArray()
-        );
+        ModelRuns.Run(Source, [file, Sidecars.Of(file, entries)], references: references);
 
     private static SidecarParameter Parameter(string name, SidecarType? type) => TestSidecars.Parameter(0, name, type);
 
     private static SidecarColumn Column(string name, SidecarType type) => TestSidecars.Column(0, name, type);
-
-    private static PostgresType Catalog(string internalName) =>
-        TestSidecars.Postgres(name: internalName, internalName: internalName);
 
     private static PostgresType Extension(string internalName) =>
         TestSidecars.Postgres(name: internalName, schema: "public", internalName: internalName);

@@ -53,10 +53,7 @@ public sealed class RealisticModelRefusalTests(PostgresContainer postgres)
 
         var refusal = found.Models;
 
-        if (!found.RunsOn(postgres.Major))
-        {
-            Assert.Skip($"{found} needs PostgreSQL {found.MinimumMajor} or later, and the server is {postgres.Major}.");
-        }
+        found.SkipUnlessRunsOn(postgres.Major);
 
         var query = new SqlFile(
             QueryPath,

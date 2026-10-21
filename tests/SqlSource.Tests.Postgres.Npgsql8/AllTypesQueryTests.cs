@@ -27,7 +27,7 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
     // The types that differ from Npgsql 10's: date and time are a DateTime and a TimeSpan, cidr is an NpgsqlCidr, and a
     // range of dates is a range of DateTime.
     [Fact]
-    public void Models_AllTypes_HasNpgsql8sTypes()
+    public void Build_AllTypes_HasNpgsql8sTypes()
     {
         var properties = typeof(AllTypesDto)
             .GetProperties(BindingFlags.Public | BindingFlags.Instance)

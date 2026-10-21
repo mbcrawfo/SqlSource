@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -24,13 +25,17 @@ public sealed class ErrorPathTests(PostgresContainer postgres) : IDisposable
     private string ConnectionArgument => Logical + "=" + postgres.ConnectionString;
 
     // "describe", with "--check" when asked, on the copy of the project and the connection of the logical database.
-    private Task<CliResult> DescribeAsync(string project, bool check = false) =>
-        EndToEndTool.RunAsync(
-            Path.GetDirectoryName(project)!,
+    // Runs on the real MSBuild and the PostgreSQL describer.
+    private async Task<CliResult> DescribeAsync(string project, bool check = false)
+    {
+        using var run = CliRun.Real(Path.GetDirectoryName(project)!);
+        run.Describers.Add(new PostgresDescriber());
+        return await run.RunAsync(
             check
                 ? ["describe", "--check", project, "--connection", ConnectionArgument]
                 : ["describe", project, "--connection", ConnectionArgument]
         );
+    }
 
     // Runs a test's body with the table of the query made, and drops it again however the body ends.
     private async Task WithWidgetsTableAsync(Func<Task> body)

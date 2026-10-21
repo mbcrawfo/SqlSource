@@ -959,12 +959,12 @@ public sealed class NullabilityWalkTests
     };
 
     [Fact]
-    public void Run_AliasAtAModifyTableThatIsNotTheTargets_WhenOldOrNewMayBeNamed_KeepsTheHeuristic() =>
+    public void Run_AliasAtAModifyTableThatIsNotTheTargetsWhereOldOrNewMayBeNamed_KeepsTheHeuristic() =>
         AnswersOf(Run(ModifyOverOld, true, NotNull, NotNull)).ShouldBe([NullableHeuristic, NotNullCatalog]);
 
     // The flag is what decides: without it the same plan maps the alias.
     [Fact]
-    public void Run_AliasAtAModifyTableThatIsNotTheTargets_WhenNeitherIsNamed_TakesTheCatalogsAnswer() =>
+    public void Run_AliasAtAModifyTableThatIsNotTheTargetsWhereNeitherIsNamed_TakesTheCatalogsAnswer() =>
         AnswersOf(Run(ModifyOverOld, false, NotNull, NotNull)).ShouldBe([NotNullCatalog, NotNullCatalog]);
 
     // The old and the new row are a RETURNING list's alone.

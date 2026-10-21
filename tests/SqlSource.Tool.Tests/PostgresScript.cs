@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,8 +8,8 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
-using Xunit;
 
 namespace SqlSource.Tool.Tests;
 
@@ -154,12 +153,7 @@ internal sealed class PostgresScript
         IRunLog? log = null,
         string connection = Connection,
         IReadOnlyList<string>? explainSettings = null
-    ) =>
-        new PostgresDescriber(explainSettings ?? []).OpenAsync(
-            new OpenRequest(Database, connection, exchange, TimeProvider.System),
-            log ?? NullRunLog.Instance,
-            TestContext.Current.CancellationToken
-        );
+    ) => new PostgresDescriber(explainSettings ?? []).OpenAsync(Database, connection, exchange, log);
 
     // The session of a script whose "open" answered a server.
     public static async Task<IDescribeSession> SessionAsync(

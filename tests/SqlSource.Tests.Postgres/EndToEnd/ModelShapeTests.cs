@@ -46,7 +46,7 @@ public sealed class ModelShapeTests
         _ = typeof(ModelShapeTests).Assembly.GetType("SqlSource.SqlSourceGenerateAttribute").ShouldNotBeNull();
 
     [Fact]
-    public void Models_PropertySettings_GiveARecordInputAndASealedRecordOutput()
+    public void Build_PropertySettings_GiveARecordInputAndASealedRecordOutput()
     {
         ShouldBeModel(
             typeof(GetAccountArgs),
@@ -65,7 +65,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_WholeTable_IsTheTableModel()
+    public void Build_WholeTable_IsTheTableModel()
     {
         ShouldBeModel(typeof(AccountsDto), $"{Namespace}.AccountsDto", Shape.SealedRecord, AccountsProperties);
         ModelNamed($"{Namespace}.ListAccountsDto").ShouldBeNull();
@@ -73,7 +73,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_NoTableModels_NamesTheModelAfterTheQuery() =>
+    public void Build_NoTableModels_NamesTheModelAfterTheQuery() =>
         ShouldBeModel(
             typeof(ListAccountsUntabledDto),
             $"{Namespace}.ListAccountsUntabledDto",
@@ -82,7 +82,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Models_OutputModelMarker_SharesOneModel()
+    public void Build_OutputModelMarker_SharesOneModel()
     {
         ShouldBeModel(
             typeof(AccountName),
@@ -108,7 +108,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_ParamMarker_MakesTheParameterNullable() =>
+    public void Build_ParamMarker_MakesTheParameterNullable() =>
         ShouldBeModel(
             typeof(ListClosedBeforeArgs),
             $"{Namespace}.ListClosedBeforeArgs",
@@ -117,7 +117,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Models_PropertyOverride_MakesTimestamptzADateTimeOffset() =>
+    public void Build_PropertyOverride_MakesTimestamptzADateTimeOffset() =>
         ShouldBeModel(
             typeof(ListClosedBeforeDto),
             $"{Namespace}.ListClosedBeforeDto",
@@ -128,7 +128,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Models_SecondNamespace_GetsItsOwnModels()
+    public void Build_SecondNamespace_GetsItsOwnModels()
     {
         const string ReportingNamespace = $"{Namespace}.Reporting";
         ShouldBeModel(
@@ -196,7 +196,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_LeftJoin_MakesTheOptionalSideNullable() =>
+    public void Build_LeftJoin_MakesTheOptionalSideNullable() =>
         ShouldBeModel(
             typeof(ListAccountNotesDto),
             $"{Namespace}.ListAccountNotesDto",
@@ -209,7 +209,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Models_ColumnMarker_MakesTheCountNotNull() =>
+    public void Build_ColumnMarker_MakesTheCountNotNull() =>
         ShouldBeModel(
             typeof(CountAccountNotesDto),
             $"{Namespace}.CountAccountNotesDto",
@@ -219,7 +219,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Models_SuffixMarks_SetTheNullability() =>
+    public void Build_SuffixMarks_SetTheNullability() =>
         ShouldBeModel(
             typeof(ListMarkedNamesDto),
             $"{Namespace}.ListMarkedNamesDto",
@@ -229,7 +229,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Models_HeaderOverrides_MapTheEnumAndTheDomainToTypesOfTheProject() =>
+    public void Build_HeaderOverrides_MapTheEnumAndTheDomainToTypesOfTheProject() =>
         ShouldBeModel(
             typeof(ListNoteKindsDto),
             $"{Namespace}.ListNoteKindsDto",
@@ -239,7 +239,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Models_SortInput_OrdersTheInputByName()
+    public void Build_SortInput_OrdersTheInputByName()
     {
         ShouldBeModel(
             typeof(Shapes.SearchAccountsFilter),
@@ -258,7 +258,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_SortOutput_OrdersTheOutputByName() =>
+    public void Build_SortOutput_OrdersTheOutputByName() =>
         ShouldBeModel(
             typeof(Shapes.ListAccountColumnsView),
             $"{Namespace}.Shapes.ListAccountColumnsView",
@@ -269,7 +269,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void Models_OutputModelMarkerWithoutAPeriod_IsInTheModelNamespace()
+    public void Build_OutputModelMarkerWithoutAPeriod_IsInTheModelNamespace()
     {
         ShouldBeModel(
             typeof(Shapes.AccountHeadline),
@@ -287,7 +287,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_InputModelMarkerWithAPeriod_IsAFullName()
+    public void Build_InputModelMarkerWithAPeriod_IsAFullName()
     {
         ShouldBeModel(
             typeof(Shared.AccountLookup),
@@ -307,7 +307,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void ConstantQueries_SqlOutput_HasTheConstantAndNoSidecar()
+    public void Build_ConstantQueriesAtSql_HasTheConstantAndNoSidecar()
     {
         ConstantQueries.CountAccounts.ShouldBe("SELECT count(*) FROM accounts;");
         File.Exists(Path.Combine(RepositoryPaths.EndToEnd, "Queries", "Constants.sql")).ShouldBeTrue();
@@ -316,7 +316,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_TableOfAnotherSchema_IsNamedWithItsSchema() =>
+    public void Build_TableOfAnotherSchema_IsNamedWithItsSchema() =>
         ShouldBeModel(
             typeof(Billing.BillingInvoicesRow),
             $"{Namespace}.Billing.BillingInvoicesRow",
@@ -330,7 +330,7 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
-    public void InvoiceQueries_DirectLocation_HasTheConstantsOnTheType()
+    public void Build_InvoiceQueriesWithADirectLocation_HasTheConstantsOnTheType()
     {
         InvoiceQueries.ListInvoices.ShouldBe("SELECT *\nFROM billing.invoices\nORDER BY id;");
         InvoiceQueries.GetInvoice.ShouldBe(
@@ -339,7 +339,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_OutputTypeByMetadata_IsASealedClass()
+    public void Build_OutputTypeByMetadata_IsASealedClass()
     {
         ShouldBeModel(
             typeof(Billing.GetInvoiceArgs),
@@ -359,15 +359,15 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_FolderOverride_MakesTimestamptzADateTime() =>
+    public void Build_FolderOverride_MakesTimestamptzADateTime() =>
         PropertiesOf(typeof(Billing.GetInvoiceRow)).ShouldContain(("PaidAt", typeof(DateTime?), true));
 
     [Fact]
-    public void Models_QueryOverride_ReturnsTimestamptzToDateTime() =>
+    public void Build_QueryOverride_ReturnsTimestamptzToDateTime() =>
         PropertiesOf(typeof(AllTypesDto)).ShouldContain(("TimestamptzValue", typeof(DateTime?), true));
 
     [Fact]
-    public void Models_AllTypes_HasNpgsql10sTypes()
+    public void Build_AllTypes_HasNpgsql10sTypes()
     {
         var properties = PropertiesOf(typeof(AllTypesDto));
 
@@ -379,7 +379,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_InsertReturningEveryColumn_SharesTheTableModel()
+    public void Build_InsertReturningEveryColumn_SharesTheTableModel()
     {
         ModelNamed($"{Namespace}.InsertAllTypesDto").ShouldBeNull();
         ShapeOf(typeof(InsertAllTypesArgs)).ShouldBe(Shape.Record);
@@ -404,7 +404,7 @@ public sealed class ModelShapeTests
     }
 
     [Fact]
-    public void Models_AllTypes_IsASealedRecordOfEveryColumn() =>
+    public void Build_AllTypes_IsASealedRecordOfEveryColumn() =>
         ShouldBeModel(
             typeof(AllTypesDto),
             $"{Namespace}.AllTypesDto",

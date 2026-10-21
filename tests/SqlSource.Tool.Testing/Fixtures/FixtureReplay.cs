@@ -7,7 +7,6 @@ using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Logging;
 using SqlSource.Tool.Planning;
 using Xunit;
 
@@ -54,12 +53,7 @@ internal static class FixtureReplay
         var query = planned.Query;
         var database = planned.Database ?? throw new InvalidOperationException($"The case {fixture} has no database.");
 
-        var opened = await describer(fixture)
-            .OpenAsync(
-                new OpenRequest(database, connection, exchange, TimeProvider.System),
-                NullRunLog.Instance,
-                token
-            );
+        var opened = await describer(fixture).OpenAsync(database, connection, exchange);
         if (opened.Value is not { } session)
         {
             throw new InvalidOperationException(

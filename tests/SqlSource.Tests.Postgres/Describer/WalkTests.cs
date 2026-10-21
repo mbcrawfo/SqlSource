@@ -4,6 +4,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Testing;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
 
@@ -79,7 +80,7 @@ public sealed class WalkTests(PostgresContainer postgres)
         var read = session.Server.Settings.Single(static setting => setting.Name == "plan_cache_mode").Value;
 
         var described = await session.DescribeAsync(
-            Requests.Of("SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id"),
+            DescribeRequests.Of("SELECT u.id, o.total FROM users u LEFT JOIN orders o ON o.user_id = u.id"),
             token
         );
 
@@ -166,7 +167,7 @@ public sealed class WalkTests(PostgresContainer postgres)
 
         var described = await Sessions.DescribeAsync(
             postgres.ConnectionString,
-            Requests.Of(
+            DescribeRequests.Of(
                 "UPDATE users u SET name = @name FROM orders o WHERE o.user_id = u.id "
                     + "RETURNING WITH (OLD AS o) o.id"
             )

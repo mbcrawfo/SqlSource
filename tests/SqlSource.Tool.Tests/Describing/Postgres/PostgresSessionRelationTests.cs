@@ -7,9 +7,9 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Describing.Postgres.Walk;
 using Xunit;
+using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
 using static SqlSource.Tool.Tests.PostgresPlans;
-using static SqlSource.Tool.Tests.PostgresRequests;
 using static SqlSource.Tool.Tests.PostgresSessionCases;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
@@ -62,7 +62,7 @@ public sealed class PostgresSessionRelationTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(GatedUsersId), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(GatedUsersId), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
         return described.Value.ShouldNotBeNull();
@@ -147,7 +147,10 @@ public sealed class PostgresSessionRelationTests
         var log = new RecordingLog();
         await using var session = await PostgresScript.SessionAsync(exchange, log);
 
-        var described = await session.DescribeAsync(Of(UnionOfUsersAndOrders), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(
+            Listed(UnionOfUsersAndOrders),
+            TestContext.Current.CancellationToken
+        );
 
         exchange.Unused.ShouldBeEmpty();
         return (described.Value.ShouldNotBeNull(), log);
@@ -240,7 +243,7 @@ public sealed class PostgresSessionRelationTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(Sql), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(Sql), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
         AnswersOf(described.Value.ShouldNotBeNull()).ShouldBe([NullableHeuristic]);
@@ -299,7 +302,7 @@ public sealed class PostgresSessionRelationTests
         var log = new RecordingLog();
         await using var session = await PostgresScript.SessionAsync(exchange, log);
 
-        var described = await session.DescribeAsync(Of(LastPlacedAt), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(LastPlacedAt), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
         var description = described.Value.ShouldNotBeNull();
@@ -369,7 +372,7 @@ public sealed class PostgresSessionRelationTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(sql), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(sql), TestContext.Current.CancellationToken);
 
         exchange.Unused.ShouldBeEmpty();
         return described.Value.ShouldNotBeNull();
