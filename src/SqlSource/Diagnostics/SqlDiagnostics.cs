@@ -727,6 +727,20 @@ internal static class SqlDiagnostics
         helpLinkUri: HelpLinkBase + "sqlsrc268"
     );
 
+    // {0} is the column or parameter, as "column 'id'", {1} its type as the database spells it, and {2} the help,
+    // without its period: to reference Microsoft.Data.SqlClient.
+    public static readonly DiagnosticDescriptor TypeNeedsSqlClient = new(
+        id: "SQLSRC269",
+        title: "Type needs Microsoft.Data.SqlClient",
+        messageFormat: "The {0} has the type '{1}', whose C# type depends on Microsoft.Data.SqlClient, and this "
+            + "project does not reference it.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc269",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -790,7 +804,8 @@ internal static class SqlDiagnostics
             ColumnMarkerUnusable,
             ArrayEntryMapsNothing,
             SqlClientTooOld,
-            SqlClientNewerThanKnown
+            SqlClientNewerThanKnown,
+            TypeNeedsSqlClient
         );
 
     /// <summary>

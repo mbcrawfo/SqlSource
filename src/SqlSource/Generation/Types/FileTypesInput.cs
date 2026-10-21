@@ -12,14 +12,17 @@ namespace SqlSource.Generation.Types;
 /// </summary>
 /// <param name="Check">What the checks of the file's sidecar gave, its usable entries among them.</param>
 /// <param name="File">
-/// The parsed file, or null when no entry of it is usable.  Such a file carries nothing else but the probe, since it
+/// The parsed file, or null when no entry of it is usable.  Such a file carries nothing else but the probes, since it
 /// has nothing to type.
 /// </param>
 /// <param name="Metadata">
 /// The type override of the metadata of the file's item, as a level that says nothing else.
 /// </param>
 /// <param name="Property">The type override of the project's property, as a level that says nothing else.</param>
-/// <param name="Probe">The Npgsql the project references, which chooses the column of the base map.</param>
+/// <param name="Probe">The Npgsql the project references, which chooses the column of PostgreSQL's map.</param>
+/// <param name="SqlClientProbe">
+/// The Microsoft.Data.SqlClient the project references, which chooses the column of SQL Server's map.
+/// </param>
 /// <param name="MappedTypes">The C# types that the type override names at any level, resolved.</param>
 internal sealed record FileTypesInput(
     SidecarCheckResult Check,
@@ -27,6 +30,7 @@ internal sealed record FileTypesInput(
     SettingsLevel Metadata,
     SettingsLevel Property,
     NpgsqlProbe Probe,
+    SqlClientProbe SqlClientProbe,
     EquatableArray<MappedType> MappedTypes
 )
 {
@@ -41,6 +45,7 @@ internal sealed record FileTypesInput(
         EquatableArray<FileSettings> filesSettings,
         SettingsLevel property,
         NpgsqlProbe probe,
+        SqlClientProbe sqlClientProbe,
         EquatableArray<MappedType> mappedTypes
     )
     {
@@ -56,6 +61,7 @@ internal sealed record FileTypesInput(
                 SettingsLevel.None,
                 SettingsLevel.None,
                 probe,
+                sqlClientProbe,
                 EquatableArray<MappedType>.Empty
             );
         }
@@ -67,6 +73,7 @@ internal sealed record FileTypesInput(
             settingsIndex < 0 ? SettingsLevel.None : TypeOverridesOf(filesSettings[settingsIndex].Level),
             property,
             probe,
+            sqlClientProbe,
             mappedTypes
         );
     }

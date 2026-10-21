@@ -147,6 +147,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC267](#sqlsrc267) | Microsoft.Data.SqlClient is older than 6.1 |
 | [SQLSRC268](#sqlsrc268) | Microsoft.Data.SqlClient is newer than SqlSource knows |
+| [SQLSRC269](#sqlsrc269) | Type needs Microsoft.Data.SqlClient |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
@@ -159,6 +160,8 @@ The ids `SQLSRC246` and `SQLSRC249` are reported by the build, about the C# type
 The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version of the `Npgsql` package that the project references, directly or through another package.  The C# types of a PostgreSQL query depend on it.  Each is reported once for the project, with no file and line, and only when a query needs an entry in its sidecar under the `postgres` dialect.
 
 The ids `SQLSRC267` and `SQLSRC268` are reported by the build, about the version of Microsoft.Data.SqlClient that the project references, whenever a query of the `mssql` dialect has the output `models` or `codegen`.  They have no file and line, and each is reported once for the project, however many of its queries read the driver.
+
+`SQLSRC269` is reported by the build at a query of the `mssql` dialect whose output is `models` or `codegen` and whose entry in its sidecar is current, as `SQLSRC249` is under the `postgres` dialect: at the query's name, once for the query, for its first column or parameter that has no C# type, parameters before columns.
 
 The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
@@ -1619,7 +1622,7 @@ See: [Sidecar files](tool.md#sidecar-files)
 
 **Type has no C# type**
 
-A column or a parameter of the query has a database type that Npgsql cannot read as a C# value, so SqlSource can give it no C# type.  The message names the column or parameter, its type, and what to do.
+A column or a parameter of the query has a database type that Npgsql, or Microsoft.Data.SqlClient for a query of the `mssql` dialect, cannot read as a C# value, so SqlSource can give it no C# type.  The message names the column or parameter, its type, and what to do.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC246: The column 'relation' has the type 'regclass', which SqlSource cannot give a C# type.  Cast it to oid in the query.
@@ -1632,9 +1635,11 @@ What to do depends on the type:
 - **A range of a subtype that SqlSource does not know, and a multirange of one.**  Map it with the type override to `NpgsqlTypes.NpgsqlRange<T>` of its subtype's C# type, `public.floatrange=NpgsqlTypes.NpgsqlRange<double>`, and call `EnableUnmappedTypes()` on the data source builder, without which Npgsql cannot read it.  A project that does not reference Npgsql cannot name `NpgsqlTypes.NpgsqlRange<T>`, so the message tells it to reference Npgsql first.
 - **`cube` on Npgsql 8 or 9**, which cannot read it.  Update Npgsql to 10, which reads it as `NpgsqlTypes.NpgsqlCube`, or cast the column to `text` in the query, as the message says.
 - **`pg_snapshot`, `txid_snapshot`, `pg_node_tree`, and any other base type of `pg_catalog` that SqlSource does not know, such as `aclitem`.**  No version of Npgsql reads them, so a type override would build and fail when the query runs.  Cast the column to `text` in the query, and an array of one to `text[]`, as the message says.
-- **A parameter with no type, `record`, `unknown`, `void`, or a kind of type that this version of SqlSource does not know.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand or written by a newer tool.  Run `dotnet sqlsource describe`.
+- **`hierarchyid`, `geography` and `geometry` of SQL Server.**  Microsoft.Data.SqlClient reads them only when the application references the package `Microsoft.SqlServer.Types`.  Reference it, and map the type with the type override to that package's type for it, as the message says: `geography=Microsoft.SqlServer.Types.SqlGeography`, `geometry=Microsoft.SqlServer.Types.SqlGeometry` or `hierarchyid=Microsoft.SqlServer.Types.SqlHierarchyId`.
+- **A SQL Server type that this version of SqlSource does not know, and a CLR type of your own assembly.**  Map it with the type override to the C# type that your application reads it as, as the message says: `sys.newtype=MyApp.NewType` for a type of a newer SQL Server, or `dbo."Money"=MyApp.Money` for a CLR type of the schema `dbo`.
+- **A parameter with no type, `record`, `unknown`, `void`, a kind of type that this version of SqlSource does not know, or a SQL Server type with no name.**  The `sqlsource` tool never writes these, so the sidecar was edited by hand or written by a newer tool.  Run `dotnet sqlsource describe`.
 
-When the message says to map the type, it names the key of the type with its schema: `public.address`, or `pg_catalog.pg_class` for the row type of a catalog table, since a key without a schema must be a type that SqlSource knows.  A schema or a name that needs quotes is in them, `"my schema"."Order Item"`, and one with a line break, a tab or any other white space but a single space, a control character, two spaces in a row, a `;` or a `#` is written with escapes, `"my schema".U&"Order\000AItem"`, so that the key can be written in a marker and in a project file alike, with its `&` written `&amp;` there.  A name with a capital letter is quoted too, `public."Status"`, so an entry for it maps that type alone, and not one whose name differs only by case.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  The query's constant or method is still generated.
+When the message says to map the type, it names the key of the type with its schema: `public.address`, or `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server, since a key without a schema must be a type that SqlSource knows.  A schema or a name that needs quotes is in them, `"my schema"."Order Item"`, and one with a line break, a tab or any other white space but a single space, a control character, two spaces in a row, a `;` or a `#` is written with escapes, `"my schema".U&"Order\000AItem"`, so that the key can be written in a marker and in a project file alike, with its `&` written `&amp;` there.  A name with a capital letter is quoted too, `public."Status"`, so an entry for it maps that type alone, and not one whose name differs only by case.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  The query's constant or method is still generated.
 
 See: [Types](postgresql.md#type-map)
 
@@ -2012,5 +2017,19 @@ Update the `SqlSource` package when a version that knows the driver is released.
 ```
 
 It has no file and line, and is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.  As information, it is not in the output of `dotnet build`: see [SQLSRC248](#sqlsrc248) for where to find it.
+
+See: [SQL Server](sqlserver.md)
+
+## SQLSRC269
+
+**Type needs Microsoft.Data.SqlClient**
+
+The project does not reference Microsoft.Data.SqlClient, and a column or a parameter of a query of the `mssql` dialect has a type whose C# type is one of Microsoft.Data.SqlClient's own: `vector`, which it reads as `Microsoft.Data.SqlTypes.SqlVector<float>`.  Without a reference, the project cannot name that type.  The message names the column or parameter and its type.
+
+```console
+/work/App/Queries/Documents.sql(1,10): error SQLSRC269: The column 'embedding' has the type 'vector(3)', whose C# type depends on Microsoft.Data.SqlClient, and this project does not reference it.  Reference Microsoft.Data.SqlClient.
+```
+
+Reference the `Microsoft.Data.SqlClient` package from the project, at 6.1 or later.  Every other type that Microsoft.Data.SqlClient reads without another package has a C# type of .NET itself, and needs no reference.  The error is reported at the query's name, once for the query, and the query's constant or method is still generated.
 
 See: [SQL Server](sqlserver.md)

@@ -451,7 +451,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // file keeps its input beside its types, so that the models read its entries without typing it again.
         var typedFiles = sidecarChecks.Then(each =>
             each.Combine(parsedFiles.Combine(filesSettings))
-                .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(mappedTypes)))
+                .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(sqlClientProbe.Combine(mappedTypes))))
                 .Select(
                     static (input, _) =>
                         FileTypesInput.Gather(
@@ -460,7 +460,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                             input.Left.Right.Right,
                             input.Right.Left,
                             input.Right.Right.Left,
-                            input.Right.Right.Right
+                            input.Right.Right.Right.Left,
+                            input.Right.Right.Right.Right
                         )
                 )
                 .WithTrackingName(TrackingNames.FileTypesInput)
