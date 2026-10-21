@@ -123,6 +123,37 @@ public sealed class SettingsLevelReaderTests
         source.Invalids.ShouldBe([(SettingId.TypeOverrides, "timestampz=int"), (SettingId.TypeOverrides, "int8=Guid")]);
     }
 
+    // An MSBuild value serves both engines: each entry is in the list of each engine that reads its key.
+    [Fact]
+    public void Read_TypeOverridesOfEachEngine_AreInTheListOfEach()
+    {
+        var source = new FakeSource(
+            new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = "int=long nvarchar=string" }
+        );
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4", "long", SettingPlace.Property)]);
+        level
+            .SqlServerTypeOverrides.ShouldNotBeNull()
+            .ShouldBe([
+                new TypeOverride("int", "long", SettingPlace.Property),
+                new TypeOverride("nvarchar", "string", SettingPlace.Property),
+            ]);
+        source.Invalids.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Read_TypeOverridesOfOneEngine_LeaveTheOthersListUnset()
+    {
+        var source = new FakeSource(new Dictionary<SettingId, string> { [SettingId.TypeOverrides] = "int4=long" });
+
+        var level = SettingsLevelReader.Read(ref source);
+
+        level.TypeOverrides.ShouldNotBeNull().ShouldBe([new TypeOverride("int4", "long", SettingPlace.Property)]);
+        level.SqlServerTypeOverrides.ShouldBeNull();
+    }
+
     [Fact]
     public void Read_TypeOverridesThatAreNoneValid_AreNotSet()
     {

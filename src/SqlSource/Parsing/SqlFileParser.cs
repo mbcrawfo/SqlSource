@@ -167,7 +167,8 @@ internal static class SqlFileParser
                 AddError(
                     SqlParseErrorKind.InvalidMarkerValue,
                     TextSpan.FromBounds(arrow, value.End),
-                    SqlMarkerReader.Describe(text, marker)
+                    SqlMarkerReader.Describe(text, marker),
+                    string.Empty
                 );
             }
 
@@ -408,7 +409,12 @@ internal static class SqlFileParser
             var place = marker.ValueSpan.IsEmpty ? marker.Span : marker.ValueSpan;
             if (!SqlDialectMarker.TryRead(text, marker, out var dialect))
             {
-                AddError(SqlParseErrorKind.InvalidMarkerValue, place, SqlMarkerReader.Describe(text, marker));
+                AddError(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    place,
+                    SqlMarkerReader.Describe(text, marker),
+                    string.Empty
+                );
             }
             else if (_dialect is { } existing && existing != dialect)
             {

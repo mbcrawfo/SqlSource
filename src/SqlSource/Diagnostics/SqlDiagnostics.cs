@@ -157,7 +157,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor InvalidSettingValue = new(
         id: "SQLSRC014",
         title: "MSBuild setting is not valid",
-        messageFormat: "'{0}' is not a valid value of {1}",
+        messageFormat: "'{0}' is not a valid value of {1}{2}",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -279,7 +279,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor InvalidMarkerValue = new(
         id: "SQLSRC111",
         title: "Marker value is not valid",
-        messageFormat: "'{0}' lacks a value it needs, has one it does not take, or has one that is not valid",
+        messageFormat: "'{0}' lacks a value it needs, has one it does not take, or has one that is not valid{1}",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

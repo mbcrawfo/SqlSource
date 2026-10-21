@@ -1,111 +1,331 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Linq;
+using System.Text;
 using SqlSource.Settings.ClrTypes;
 
 namespace SqlSource.Settings;
 
 /// <summary>
 /// Reads the type override, in an MSBuild value and in a <c>-- type-override:</c> marker alike.  An entry is
-/// <c>key=type</c>, where the key is one that <see cref="TypeKeys.TryNormalize" /> reads and the type one that
+/// <c>key=type</c>, where the key is one that an engine reads, by <see cref="TypeKeys.TryNormalize" /> for PostgreSQL
+/// and <see cref="TypeKeys.TryNormalizeSqlServer" /> for SQL Server, and the type one that
 /// <see cref="ClrTypeName.TryParse" /> reads, or <c>default</c>, ignoring case, which takes the key out of the map.
 /// </summary>
 /// <remarks>
 /// An MSBuild value is a list of entries separated by white space, line breaks included, outside <c>&lt;&gt;</c>,
-/// <c>[]</c> and double quotes.  A marker holds one entry, with white space allowed around its <c>=</c>.  The
-/// <c>=</c> of an entry is the first one outside double quotes.  A quoted part of a key may be written
-/// <c>U&amp;"..."</c>, with escapes such as <c>\000A</c> for a line break; it keeps <c>""</c> for a quote, so the
-/// quotes of a key still pair, and <see cref="TypeKeys" /> reads it.
+/// <c>[]</c> and double quotes, and serves both engines.  A marker holds one entry, with white space allowed around its
+/// <c>=</c>, and is read by its file's engine.  The <c>=</c> of an entry is the first one outside double quotes.  A
+/// quoted part of a key may be written <c>U&amp;"..."</c>, with escapes such as <c>\000A</c> for a line break; it keeps
+/// <c>""</c> for a quote, so the quotes of a key still pair, and <see cref="TypeKeys" /> reads it.
 /// </remarks>
 internal static class TypeOverrideGrammar
 {
     private const string Default = "default";
 
+    private const string NotInBrackets = ".  A key is not written in brackets: write ";
+
     /// <summary>
-    /// Reads one entry.  False, with a null <paramref name="entry" />, for a text that is not one, and never an
-    /// exception.
+    /// Reads one entry, its key by <paramref name="engine" />'s rules.  False, with a null <paramref name="entry" />,
+    /// for a text that is not one or a key that the engine does not read, and never an exception.
     /// </summary>
     /// <param name="text">The entry and nothing else.</param>
     /// <param name="spacesAroundEquals">
     /// Whether white space may stand on either side of the <c>=</c>, as in a marker.
     /// </param>
     /// <param name="place">Where the entry was written.</param>
+    /// <param name="engine">The engine whose rules read the key.</param>
     /// <param name="entry">The entry that was read.</param>
     public static bool TryReadEntry(
         ReadOnlySpan<char> text,
         bool spacesAroundEquals,
         SettingPlace place,
+        DatabaseEngine engine,
         out TypeOverride? entry
     )
     {
         entry = null;
+        if (
+            !TrySplitEntry(text, spacesAroundEquals, out var key, out var type)
+            || !TryNormalize(key, engine, out var normalized)
+        )
+        {
+            return false;
+        }
+
+        entry = new TypeOverride(normalized, type, place);
+        return true;
+    }
+
+    /// <summary>
+    /// Reads an MSBuild value, which serves both engines: each entry goes in the list of each engine that reads its
+    /// key, and an entry that neither reads, or that is not one, is added to <paramref name="invalid" /> as written.
+    /// The other entries apply.  Of two entries for one key of a list, the last wins, so that a project can add to a
+    /// value it was given.  Each list is in the order of <see cref="TypeOverrideMap" />, and empty when it has no
+    /// entry.
+    /// </summary>
+    public static TypeOverrideLists ReadList(string text, SettingPlace place, List<string> invalid)
+    {
+        List<TypeOverride>? postgreSql = null;
+        List<TypeOverride>? sqlServer = null;
+        var rest = text.AsSpan();
+        while (NextEntry(ref rest) is { IsEmpty: false } written)
+        {
+            if (!TrySplitEntry(written, spacesAroundEquals: false, out var key, out var type))
+            {
+                invalid.Add(written.ToString());
+                continue;
+            }
+
+            var isPostgreSql = TypeKeys.TryNormalize(key, out var postgreSqlKey);
+            var isSqlServer = TypeKeys.TryNormalizeSqlServer(key, out var sqlServerKey);
+            if (!isPostgreSql && !isSqlServer)
+            {
+                invalid.Add(written.ToString());
+                continue;
+            }
+
+            if (isPostgreSql)
+            {
+                Put(postgreSql ??= [], new TypeOverride(postgreSqlKey, type, place));
+            }
+
+            if (isSqlServer)
+            {
+                Put(sqlServer ??= [], new TypeOverride(sqlServerKey, type, place));
+            }
+        }
+
+        return new TypeOverrideLists(ToArray(postgreSql), ToArray(sqlServer));
+    }
+
+    /// <summary>
+    /// The help of an entry whose key is written in brackets, as T-SQL writes a name, to end the message that says it
+    /// is not valid: the key in the forms that are read, plain, which matches ignoring case, and quoted, which matches
+    /// it exactly, or quoted alone when a part cannot be plain.  <c>[dbo].[Email]=X</c> gives
+    /// <c>dbo.Email</c> and <c>"dbo"."Email"</c>.  Empty for a key with no part in brackets, or one whose brackets
+    /// are not well formed.
+    /// </summary>
+    /// <param name="entry">The entry as written, white space around its <c>=</c> allowed.</param>
+    public static string BracketHelp(ReadOnlySpan<char> entry)
+    {
+        if (entry.IndexOf('[') < 0 || !TryRewriteBrackets(entry, out var plain, out var quoted))
+        {
+            return string.Empty;
+        }
+
+        return plain is null
+            ? NotInBrackets + quoted
+            : NotInBrackets + plain + ", or " + quoted + " to match its case exactly";
+    }
+
+    // The key and the C# type of an entry, null for default, or false for a text with no = or a type that is not
+    // valid.  The key is not read here.
+    private static bool TrySplitEntry(
+        ReadOnlySpan<char> text,
+        bool spacesAroundEquals,
+        out ReadOnlySpan<char> key,
+        out string? type
+    )
+    {
+        key = default;
+        type = null;
         var equals = IndexOfEquals(text);
         if (equals < 0)
         {
             return false;
         }
 
-        var key = text.Slice(0, equals);
-        var type = text.Slice(equals + 1);
+        key = text.Slice(0, equals);
+        var written = text.Slice(equals + 1);
         if (spacesAroundEquals)
         {
             key = key.TrimEnd();
-            type = type.TrimStart();
+            written = written.TrimStart();
         }
 
-        if (!TypeKeys.TryNormalize(key, out var normalized))
+        if (written.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase))
         {
-            return false;
-        }
-
-        if (type.Equals(Default.AsSpan(), StringComparison.OrdinalIgnoreCase))
-        {
-            entry = new TypeOverride(normalized, null, place);
             return true;
         }
 
-        if (!ClrTypeName.TryParse(type, out var name))
+        if (!ClrTypeName.TryParse(written, out var name))
         {
             return false;
         }
 
-        entry = new TypeOverride(normalized, name!.Text, place);
+        type = name!.Text;
         return true;
     }
 
-    /// <summary>
-    /// Reads an MSBuild value.  Each entry that is not valid is added to <paramref name="invalid" /> as written, and
-    /// the other entries apply.  Of two entries for one key, the last wins, so that a project can add to a value it
-    /// was given.  The entries are in the order of <see cref="TypeOverrideMap" />; empty when none is valid.
-    /// </summary>
-    public static EquatableArray<TypeOverride> ReadList(string text, SettingPlace place, List<string> invalid)
+    private static bool TryNormalize(ReadOnlySpan<char> key, DatabaseEngine engine, out string normalized) =>
+        engine == DatabaseEngine.SqlServer
+            ? TypeKeys.TryNormalizeSqlServer(key, out normalized)
+            : TypeKeys.TryNormalize(key, out normalized);
+
+    // Puts an entry in its place in a list kept in the order of TypeOverrideMap, over an entry of its key.
+    private static void Put(List<TypeOverride> entries, TypeOverride entry)
     {
-        List<TypeOverride>? entries = null;
-        var rest = text.AsSpan();
-        while (NextEntry(ref rest) is { IsEmpty: false } written)
+        var at = TypeOverrideMap.IndexOf(entries, entry.Key);
+        if (at >= 0)
         {
-            if (!TryReadEntry(written, spacesAroundEquals: false, place, out var entry))
+            entries[at] = entry;
+        }
+        else
+        {
+            entries.Insert(~at, entry);
+        }
+    }
+
+    private static EquatableArray<TypeOverride> ToArray(List<TypeOverride>? entries) =>
+        entries is null
+            ? EquatableArray<TypeOverride>.Empty
+            : new EquatableArray<TypeOverride>(entries.ToImmutableArray());
+
+    // The key at the start of an entry, written with at least one part in brackets, in the plain form, null when a
+    // bracketed part cannot be plain, and in the quoted form.  A part in brackets, in which ]] is a ], is written as
+    // its text, and quoted; a plain or a quoted part is kept.  The key is followed by [] for an array, white space,
+    // and the = of the entry, or the end of it.  False for anything else.
+    private static bool TryRewriteBrackets(ReadOnlySpan<char> entry, out string? plain, out string quoted)
+    {
+        plain = null;
+        quoted = string.Empty;
+        var plainKey = new StringBuilder();
+        var quotedKey = new StringBuilder();
+        var canBePlain = true;
+        var hasBrackets = false;
+        var index = 0;
+        while (true)
+        {
+            if (index >= entry.Length)
             {
-                invalid.Add(written.ToString());
-                continue;
+                return false;
             }
 
-            entries ??= [];
-            var at = TypeOverrideMap.IndexOf(entries, entry!.Key);
-            if (at >= 0)
+            if (entry[index] == '[')
             {
-                entries[at] = entry;
+                if (!TryReadBracketedPart(entry, ref index, out var text))
+                {
+                    return false;
+                }
+
+                hasBrackets = true;
+                canBePlain &= IsPlain(text);
+                _ = plainKey.Append(text);
+                _ = quotedKey.Append('"').Append(text.Replace("\"", "\"\"")).Append('"');
             }
             else
             {
-                entries.Insert(~at, entry);
+                var start = index;
+                if (!TryReadPart(entry, ref index))
+                {
+                    return false;
+                }
+
+                var part = entry.Slice(start, index - start).ToString();
+                _ = plainKey.Append(part);
+                _ = quotedKey.Append(part);
+            }
+
+            if (index < entry.Length && entry[index] == '.')
+            {
+                _ = plainKey.Append('.');
+                _ = quotedKey.Append('.');
+                index++;
+                continue;
+            }
+
+            break;
+        }
+
+        var rest = entry.Slice(index);
+        if (rest.StartsWith("[]".AsSpan()))
+        {
+            _ = plainKey.Append("[]");
+            _ = quotedKey.Append("[]");
+            rest = rest.Slice(2);
+        }
+
+        rest = rest.TrimStart();
+        if (!hasBrackets || (!rest.IsEmpty && rest[0] != '='))
+        {
+            return false;
+        }
+
+        plain = canBePlain ? plainKey.ToString() : null;
+        quoted = quotedKey.ToString();
+        return true;
+    }
+
+    // Reads [text] from entry[index], with ]] for a ], and moves past it.  The text is not empty.
+    private static bool TryReadBracketedPart(ReadOnlySpan<char> entry, ref int index, out string text)
+    {
+        text = string.Empty;
+        var builder = new StringBuilder();
+        var at = index + 1;
+        while (at < entry.Length)
+        {
+            if (entry[at] != ']')
+            {
+                _ = builder.Append(entry[at]);
+                at++;
+            }
+            else if (at + 1 < entry.Length && entry[at + 1] == ']')
+            {
+                _ = builder.Append(']');
+                at += 2;
+            }
+            else
+            {
+                index = at + 1;
+                text = builder.ToString();
+                return text.Length > 0;
             }
         }
 
-        return entries is null
-            ? EquatableArray<TypeOverride>.Empty
-            : new EquatableArray<TypeOverride>(entries.ToImmutableArray());
+        return false;
     }
+
+    // Moves past a plain part, or a quoted one with "" for a quote.  False for an empty part or a quote that does
+    // not close.
+    private static bool TryReadPart(ReadOnlySpan<char> entry, ref int index)
+    {
+        var start = index;
+        if (entry[index] != '"')
+        {
+            while (index < entry.Length && IsPlainCharacter(entry[index]))
+            {
+                index++;
+            }
+
+            return index > start;
+        }
+
+        index++;
+        while (index < entry.Length)
+        {
+            if (entry[index] != '"')
+            {
+                index++;
+            }
+            else if (index + 1 < entry.Length && entry[index + 1] == '"')
+            {
+                index += 2;
+            }
+            else
+            {
+                index++;
+                return index - start > 2;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool IsPlain(string text) => text.All(IsPlainCharacter);
+
+    private static bool IsPlainCharacter(char character) => char.IsLetterOrDigit(character) || character is '_' or '$';
 
     // The first = outside double quotes, or -1.  A " toggles being inside quotes, so a doubled one inside a quoted part
     // closes and opens it again.

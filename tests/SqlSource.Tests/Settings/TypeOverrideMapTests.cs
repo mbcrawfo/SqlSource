@@ -178,7 +178,7 @@ public sealed class TypeOverrideMapTests
     [Fact]
     public void Find_EscapedPart_MatchesTheQuotedPartOfItsText()
     {
-        var map = TypeOverrideGrammar.ReadList("public.\"Status\"=int", SettingPlace.Query, []);
+        var map = TypeOverrideGrammar.ReadList("public.\"Status\"=int", SettingPlace.Query, []).PostgreSql;
 
         TypeOverrideMap.Find(map, "public.U&\"St\\0061tus\"").ShouldBe(map[0]);
         TypeOverrideMap.Find(map, "public.U&\"st\\0061tus\"").ShouldBeNull();

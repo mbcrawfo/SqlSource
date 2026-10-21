@@ -33,7 +33,8 @@ internal static class SettingsLevelReader
             InputModelType = source.Choice<ModelKind>(SettingId.InputModelType),
             OutputModelType = source.Choice<ModelKind>(SettingId.OutputModelType),
             CollectionType = source.Choice<CollectionKind>(SettingId.CollectionType),
-            TypeOverrides = ReadTypeOverrides(ref source),
+            TypeOverrides = ReadTypeOverrides(ref source, out var sqlServerTypeOverrides),
+            SqlServerTypeOverrides = sqlServerTypeOverrides,
             NestedClass = ReadText(ref source, SettingId.NestedClass, SettingValue.IsTypeName),
         };
 
@@ -60,11 +61,15 @@ internal static class SettingsLevelReader
         return parameters;
     }
 
-    // An entry that is not valid is recorded as written, and the other entries apply.  A list with no valid entry
-    // is not set.
-    private static EquatableArray<TypeOverride>? ReadTypeOverrides<TSource>(ref TSource source)
+    // An entry that is not valid is recorded as written, and the other entries apply.  The value serves both engines:
+    // PostgreSQL's entries are returned and SQL Server's given in sqlServer.  A list with no valid entry is not set.
+    private static EquatableArray<TypeOverride>? ReadTypeOverrides<TSource>(
+        ref TSource source,
+        out EquatableArray<TypeOverride>? sqlServer
+    )
         where TSource : struct, ISettingSource
     {
+        sqlServer = null;
         if (source.Text(SettingId.TypeOverrides) is not { } list || string.IsNullOrWhiteSpace(list))
         {
             return null;
@@ -77,7 +82,8 @@ internal static class SettingsLevelReader
             source.Invalid(SettingId.TypeOverrides, entry);
         }
 
-        return overrides.Count == 0 ? null : overrides;
+        sqlServer = overrides.SqlServer.Count == 0 ? null : overrides.SqlServer;
+        return overrides.PostgreSql.Count == 0 ? null : overrides.PostgreSql;
     }
 
     private static string? ReadText<TSource>(ref TSource source, SettingId setting, Validator isValid)

@@ -36,16 +36,18 @@ internal sealed class SqlGeneratorParameterScope
         var words = GeneratorParameterList.Words(text.AsSpan(marker.ValueSpan.Start, marker.ValueSpan.Length));
         while (words.MoveNext())
         {
-            if (Apply(words.Current) is { } problem)
+            if (Apply(words.Current) is not { } problem)
             {
-                errors.Add(
-                    SqlParseError.Create(
-                        problem,
-                        new TextSpan(marker.ValueSpan.Start + words.Start, words.Length),
-                        words.Current.ToString()
-                    )
-                );
+                continue;
             }
+
+            var span = new TextSpan(marker.ValueSpan.Start + words.Start, words.Length);
+            var word = words.Current.ToString();
+            errors.Add(
+                problem == SqlParseErrorKind.InvalidMarkerValue
+                    ? SqlParseError.Create(problem, span, word, string.Empty)
+                    : SqlParseError.Create(problem, span, word)
+            );
         }
     }
 

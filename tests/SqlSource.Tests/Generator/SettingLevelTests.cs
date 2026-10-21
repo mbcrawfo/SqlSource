@@ -134,6 +134,32 @@ public sealed class SettingLevelTests
         run.CompilationErrors.ShouldBeEmpty();
     }
 
+    // A key in brackets, as T-SQL writes a name, is not read, and the error shows the forms that are.
+    [Fact]
+    public void Run_TypeOverrideWithAKeyInBrackets_IsSqlsrc014ShowingTheFormsThatAreRead()
+    {
+        var run = GeneratorHarness.Run(
+            null,
+            [new SourceFile(GeneratorHarness.SourcePath, Source(null))],
+            [new SqlFile("/app/Repo/Q.sql", Sql)],
+            properties: new Dictionary<string, string?>
+            {
+                ["SqlSourceTypeOverrides"] = "[dbo].[Email]=MyApp.Email nvarchar=string",
+            }
+        );
+
+        run.Diagnostics.ShouldBe(
+            [
+                "SQLSRC014 (1,1)-(1,1): '[dbo].[Email]=MyApp.Email' is not a valid value of SqlSourceTypeOverrides.  "
+                    + "A key is not written in brackets: write dbo.Email, or \"dbo\".\"Email\" to match its case "
+                    + "exactly",
+                .. Default,
+            ],
+            ignoreOrder: true
+        );
+        run.CompilationErrors.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("Output = GeneratorOutput.Sql", null)]
     [InlineData("Output = GeneratorOutput.Models", "models")]

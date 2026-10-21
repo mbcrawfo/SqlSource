@@ -305,7 +305,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                             SqlDiagnostics.InvalidSettingValue,
                             Location.None,
                             setting.Value,
-                            setting.Name
+                            setting.Name,
+                            setting.Help
                         )
                     );
                 }

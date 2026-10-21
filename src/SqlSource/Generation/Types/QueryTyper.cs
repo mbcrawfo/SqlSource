@@ -295,7 +295,12 @@ internal static class QueryTyper
             }
         }
 
-        var map = QuerySettings.ResolveTypeOverrides(markers, input.Metadata, input.Property);
+        var map = QuerySettings.ResolveTypeOverrides(
+            markers,
+            input.Metadata,
+            input.Property,
+            DatabaseEngine.PostgreSql
+        );
         OverrideOf? made = map.Count > 0 ? new OverrideLookup(map, input.MappedTypes).Find : null;
         lookups.Add((markers, made));
         return made;

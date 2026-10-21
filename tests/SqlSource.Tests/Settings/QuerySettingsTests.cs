@@ -148,7 +148,7 @@ public sealed class QuerySettingsTests
         var markers = Overrides(new TypeOverride("timestamptz", "global::System.DateTime", SettingPlace.Query));
 
         QuerySettings
-            .ResolveTypeOverrides(markers, metadata, property)
+            .ResolveTypeOverrides(markers, metadata, property, DatabaseEngine.PostgreSql)
             .ShouldBe([
                 new TypeOverride("int4", "int", SettingPlace.Metadata),
                 new TypeOverride("text", null, SettingPlace.Metadata),
@@ -158,7 +158,9 @@ public sealed class QuerySettingsTests
 
     [Fact]
     public void ResolveTypeOverrides_NoLevelSetsOne_IsEmpty() =>
-        QuerySettings.ResolveTypeOverrides(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None).ShouldBeEmpty();
+        QuerySettings
+            .ResolveTypeOverrides(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None, DatabaseEngine.PostgreSql)
+            .ShouldBeEmpty();
 
     [Theory]
     [InlineData("a", "b", "c", "a")]
@@ -222,6 +224,67 @@ public sealed class QuerySettingsTests
                 new TypeOverride("int8", "decimal", SettingPlace.FileHeader),
             ]);
     }
+
+    // Each engine merges its own entries, by the same rule, and never the other's.
+    [Fact]
+    public void ResolveTypeOverrides_SqlServer_MergesSqlServersEntriesAcrossTheLevels()
+    {
+        var property = new SettingsLevel
+        {
+            TypeOverrides = Array(new TypeOverride("int4", "long", SettingPlace.Property)),
+            SqlServerTypeOverrides = Array(
+                new TypeOverride("int", "long", SettingPlace.Property),
+                new TypeOverride("nvarchar", "string", SettingPlace.Property)
+            ),
+        };
+        var metadata = new SettingsLevel
+        {
+            SqlServerTypeOverrides = Array(new TypeOverride("int", "short", SettingPlace.Metadata)),
+        };
+        var markers = new SettingsLevel
+        {
+            SqlServerTypeOverrides = Array(new TypeOverride("nvarchar", null, SettingPlace.Query)),
+        };
+
+        QuerySettings
+            .ResolveTypeOverrides(markers, metadata, property, DatabaseEngine.SqlServer)
+            .ShouldBe([
+                new TypeOverride("int", "short", SettingPlace.Metadata),
+                new TypeOverride("nvarchar", null, SettingPlace.Query),
+            ]);
+        QuerySettings
+            .ResolveTypeOverrides(markers, metadata, property, DatabaseEngine.PostgreSql)
+            .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Property)]);
+    }
+
+    [Fact]
+    public void Over_SqlServerTypeOverrides_MergePerKey()
+    {
+        var query = new SettingsLevel
+        {
+            SqlServerTypeOverrides = Array(new TypeOverride("int", null, SettingPlace.Query)),
+        };
+        var preamble = new SettingsLevel
+        {
+            SqlServerTypeOverrides = Array(
+                new TypeOverride("bigint", "decimal", SettingPlace.FileHeader),
+                new TypeOverride("int", "long", SettingPlace.FileHeader)
+            ),
+        };
+
+        var merged = query.Over(preamble);
+
+        merged
+            .SqlServerTypeOverrides.ShouldNotBeNull()
+            .ShouldBe([
+                new TypeOverride("bigint", "decimal", SettingPlace.FileHeader),
+                new TypeOverride("int", null, SettingPlace.Query),
+            ]);
+        merged.TypeOverrides.ShouldBeNull();
+    }
+
+    private static EquatableArray<TypeOverride> Array(params TypeOverride[] entries) =>
+        new(ImmutableArray.Create(entries));
 
     private static SettingsLevel Overrides(params TypeOverride[] entries) =>
         new() { TypeOverrides = new EquatableArray<TypeOverride>(ImmutableArray.Create(entries)) };

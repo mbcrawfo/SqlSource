@@ -83,7 +83,7 @@ public sealed class SqlGeneratorParameterScopeTests
 
         var (_, errors) = Read(line);
 
-        errors.ShouldBe([SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(line, word), word)]);
+        errors.ShouldBe([SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(line, word), word, "")]);
     }
 
     [Theory]

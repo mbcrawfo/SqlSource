@@ -7,16 +7,18 @@ using System.Text;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The keys a type override may name: the names of the types that each engine's base map knows, PostgreSQL's with
-/// their one-word aliases, which the settings read today, and SQL Server's list of names, which its map is held to,
-/// and a schema-qualified name of any type.  The settings check a key here, and the map reads the names of the
-/// extensions' types here.  Each map keeps its own rows, and
-/// <c>PostgresTypeMapTests.Keys_OfTheMap_AreTheKnownNamesOfTheSettings</c> and
+/// The keys a type override may name: the names of the types that each engine's base map knows, each engine's with
+/// its one-word aliases, and a schema-qualified name of any type.  Each engine reads a key by its own rules,
+/// PostgreSQL's by <see cref="TryNormalize" /> and SQL Server's by <see cref="TryNormalizeSqlServer" />.  The
+/// settings check a key here, and the map reads the names of the extensions' types here.  Each map keeps its own rows,
+/// and <c>PostgresTypeMapTests.Keys_OfTheMap_AreTheKnownNamesOfTheSettings</c> and
 /// <c>Keys_OfTheSqlServerMap_AreTheKnownSqlServerNamesOfTheSettings</c> hold them equal to the names here.
 /// </summary>
 internal static class TypeKeys
 {
     private const string SystemSchema = "pg_catalog";
+
+    private const string SqlServerSystemSchema = "sys";
 
     // The start of a part in the escaped form, with the U in either case.
     private const string EscapedOpening = "U&\"";
@@ -173,6 +175,15 @@ internal static class TypeKeys
         ["character"] = "bpchar",
     };
 
+    // SQL Server's one-word synonyms of its types, by the name each stands for.
+    private static readonly Dictionary<string, string> SqlServerAliases = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["integer"] = "int",
+        ["character"] = "char",
+        ["dec"] = "decimal",
+        ["rowversion"] = "timestamp",
+    };
+
     /// <summary>The names of the PostgreSQL types the base map knows, in lower case.</summary>
     public static IReadOnlyCollection<string> KnownNames => Names.Keys;
 
@@ -271,6 +282,61 @@ internal static class TypeKeys
         }
 
         return true;
+    }
+
+    /// <summary>
+    /// Reads a key by SQL Server's rules, by the grammar of <see cref="TryNormalize" />.  An array is not a key: SQL
+    /// Server has none.  An unqualified plain part must be a name SQL Server's map knows or one of its aliases,
+    /// <c>integer</c>, <c>character</c>, <c>dec</c> and <c>rowversion</c>, ignoring case, and is given as the name in
+    /// lower case: <c>rowversion</c> gives <c>timestamp</c>.  A quoted one must hold the name exactly, in lower case,
+    /// and has no alias.
+    /// <para>
+    /// <c>sys.</c>, plain in any case or quoted in lower case, is SQL Server's system schema, and is taken off as
+    /// <see cref="TryNormalize" /> takes off <c>pg_catalog.</c>: what is left is not checked, a plain name the map
+    /// knows is given in lower case and any other as written, with no alias, and a quoted name that holds a name the
+    /// map knows is that name and any other is kept as written.  <c>pg_catalog.</c> is not a key, and any other
+    /// qualified key is what <see cref="TryNormalize" /> gives.  Returns false with an empty
+    /// <paramref name="normalized" /> for anything else.
+    /// </para>
+    /// </summary>
+    public static bool TryNormalizeSqlServer(ReadOnlySpan<char> key, out string normalized)
+    {
+        normalized = string.Empty;
+        if (!TrySplit(key, out var schema, out var name, out var isArray) || isArray)
+        {
+            return false;
+        }
+
+        if (schema.IsEmpty)
+        {
+            var text = TextOf(name).ToString();
+            if (IsQuoted(name))
+            {
+                if (!TryGetExactSqlServerName(text, out var exact))
+                {
+                    return false;
+                }
+
+                normalized = exact;
+                return true;
+            }
+
+            if (!SqlServerNames.TryGetValue(text, out var known) && !SqlServerAliases.TryGetValue(text, out known))
+            {
+                return false;
+            }
+
+            normalized = known;
+            return true;
+        }
+
+        if (IsSqlServerSystemSchema(schema))
+        {
+            normalized = IsQuoted(name) ? NormalizeQuotedSqlServerName(name) : NormalizePlainSqlServerName(name);
+            return true;
+        }
+
+        return !IsSystemSchema(schema) && TryNormalize(key, out normalized);
     }
 
     /// <summary>
@@ -522,6 +588,25 @@ internal static class TypeKeys
 
         return isArray ? AsWritten(name) + "[]" : AsWritten(name);
     }
+
+    // A plain name of sys: a name SQL Server's map knows in lower case, and any other as written.
+    private static string NormalizePlainSqlServerName(ReadOnlySpan<char> name)
+    {
+        var text = name.ToString();
+        return SqlServerNames.TryGetValue(text, out var known) ? known : text;
+    }
+
+    // A quoted name of sys: the name SQL Server's map knows that it holds exactly, or the name as a key keeps it.
+    private static string NormalizeQuotedSqlServerName(ReadOnlySpan<char> name) =>
+        TryGetExactSqlServerName(TextOf(name).ToString(), out var known) ? known : AsWritten(name);
+
+    private static bool TryGetExactSqlServerName(string text, out string known) =>
+        SqlServerNames.TryGetValue(text, out known) && string.Equals(known, text, StringComparison.Ordinal);
+
+    private static bool IsSqlServerSystemSchema(ReadOnlySpan<char> schema) =>
+        IsQuoted(schema)
+            ? TextOf(schema).Equals(SqlServerSystemSchema.AsSpan(), StringComparison.Ordinal)
+            : schema.Equals(SqlServerSystemSchema.AsSpan(), StringComparison.OrdinalIgnoreCase);
 
     private static bool TryGetExactName(string text, out string known) =>
         Names.TryGetValue(text, out known) && string.Equals(known, text, StringComparison.Ordinal);

@@ -72,9 +72,15 @@ internal sealed record FileTypesInput(
     }
 
     /// <summary>
-    /// The type override of <paramref name="level" /> as a level that says nothing else, so that a change to another
-    /// setting gives an equal level.  <see cref="SettingsLevel.None" /> when it has none.
+    /// The type override of <paramref name="level" />, each engine's entries, as a level that says nothing else, so
+    /// that a change to another setting gives an equal level.  <see cref="SettingsLevel.None" /> when it has none.
     /// </summary>
     public static SettingsLevel TypeOverridesOf(SettingsLevel level) =>
-        level.TypeOverrides is null ? SettingsLevel.None : new SettingsLevel { TypeOverrides = level.TypeOverrides };
+        level.TypeOverrides is null && level.SqlServerTypeOverrides is null
+            ? SettingsLevel.None
+            : new SettingsLevel
+            {
+                TypeOverrides = level.TypeOverrides,
+                SqlServerTypeOverrides = level.SqlServerTypeOverrides,
+            };
 }
