@@ -114,85 +114,73 @@ internal sealed class SqlMarkerScope(
             return;
         }
 
-        if (marker.Kind == SqlMarkerKind.GeneratorParameters)
+        switch (marker.Kind)
         {
-            Generator.Read(text, marker, errors);
-        }
-        else if (marker.Kind == SqlMarkerKind.Token)
-        {
-            ReadToken(marker);
-        }
-        else if (marker.Kind == SqlMarkerKind.TokenIgnore)
-        {
-            ReadTokenIgnore(marker);
-        }
-        else if (marker.Kind == SqlMarkerKind.Param)
-        {
-            ReadParam(marker);
-        }
-        else if (marker.Kind == SqlMarkerKind.Column)
-        {
-            ReadColumn(marker);
-        }
-        else if (marker.Kind == SqlMarkerKind.Output)
-        {
-            SetChoice(ref _output, marker);
-        }
-        else if (marker.Kind == SqlMarkerKind.Database)
-        {
-            SetText(ref _database, marker, SettingValue.IsDatabaseName(Value(marker)));
-        }
-        else if (marker.Kind == SqlMarkerKind.TypeOverride)
-        {
-            ReadTypeOverride(marker);
-        }
-        else
-        {
-            ReadModelSetting(marker);
-        }
-    }
+            case SqlMarkerKind.GeneratorParameters:
+                Generator.Read(text, marker, errors);
+                break;
+            case SqlMarkerKind.Token:
+                ReadToken(marker);
+                break;
+            case SqlMarkerKind.TokenIgnore:
+                ReadTokenIgnore(marker);
+                break;
+            case SqlMarkerKind.Param:
+                ReadParam(marker);
+                break;
+            case SqlMarkerKind.Column:
+                ReadColumn(marker);
+                break;
+            case SqlMarkerKind.Output:
+                SetChoice(ref _output, marker);
+                break;
+            case SqlMarkerKind.Database:
+                SetText(ref _database, marker, SettingValue.IsDatabaseName(Value(marker)));
+                break;
+            case SqlMarkerKind.TypeOverride:
+                ReadTypeOverride(marker);
+                break;
+            case SqlMarkerKind.InputModelSuffix:
+                SetText(ref _inputModelSuffix, marker, SettingValue.IsSuffix(Value(marker)));
+                break;
+            case SqlMarkerKind.OutputModelSuffix:
+                SetText(ref _outputModelSuffix, marker, SettingValue.IsSuffix(Value(marker)));
+                break;
+            case SqlMarkerKind.ModelNamespace:
+                SetText(ref _modelNamespace, marker, SettingValue.IsQualifiedName(Value(marker)));
+                break;
+            case SqlMarkerKind.InputModelType:
+                SetChoice(ref _inputModelType, marker);
+                break;
+            case SqlMarkerKind.OutputModelType:
+                SetChoice(ref _outputModelType, marker);
+                break;
+            case SqlMarkerKind.CollectionType:
+                SetChoice(ref _collectionType, marker);
+                break;
+            case SqlMarkerKind.InputModel:
+                SetText(ref _inputModel, marker, SettingValue.IsQualifiedName(Value(marker)));
+                if (_inputModel is { } inputModel && InputModel is null)
+                {
+                    InputModel = (inputModel, marker);
+                }
 
-    private void ReadModelSetting(SqlMarker marker)
-    {
-        if (marker.Kind == SqlMarkerKind.InputModelSuffix)
-        {
-            SetText(ref _inputModelSuffix, marker, SettingValue.IsSuffix(Value(marker)));
-        }
-        else if (marker.Kind == SqlMarkerKind.OutputModelSuffix)
-        {
-            SetText(ref _outputModelSuffix, marker, SettingValue.IsSuffix(Value(marker)));
-        }
-        else if (marker.Kind == SqlMarkerKind.ModelNamespace)
-        {
-            SetText(ref _modelNamespace, marker, SettingValue.IsQualifiedName(Value(marker)));
-        }
-        else if (marker.Kind == SqlMarkerKind.InputModelType)
-        {
-            SetChoice(ref _inputModelType, marker);
-        }
-        else if (marker.Kind == SqlMarkerKind.OutputModelType)
-        {
-            SetChoice(ref _outputModelType, marker);
-        }
-        else if (marker.Kind == SqlMarkerKind.CollectionType)
-        {
-            SetChoice(ref _collectionType, marker);
-        }
-        else if (marker.Kind == SqlMarkerKind.InputModel)
-        {
-            SetText(ref _inputModel, marker, SettingValue.IsQualifiedName(Value(marker)));
-            if (_inputModel is { } inputModel && InputModel is null)
-            {
-                InputModel = (inputModel, marker);
-            }
-        }
-        else if (marker.Kind == SqlMarkerKind.OutputModel)
-        {
-            SetText(ref _outputModel, marker, SettingValue.IsQualifiedName(Value(marker)));
-            if (_outputModel is { } outputModel && OutputModel is null)
-            {
-                OutputModel = (outputModel, marker);
-            }
+                break;
+            case SqlMarkerKind.OutputModel:
+                SetText(ref _outputModel, marker, SettingValue.IsQualifiedName(Value(marker)));
+                if (_outputModel is { } outputModel && OutputModel is null)
+                {
+                    OutputModel = (outputModel, marker);
+                }
+
+                break;
+            case SqlMarkerKind.Name:
+            case SqlMarkerKind.Summary:
+            case SqlMarkerKind.Dialect:
+            default:
+                // The parser reads the first three itself and no scope allows them, so only an allowed kind with no
+                // case reaches this, which a test of every kind catches.
+                throw new InvalidOperationException($"No reading of the marker {marker.Kind}.");
         }
     }
 
@@ -205,7 +193,7 @@ internal sealed class SqlMarkerScope(
             _ => false,
         };
 
-    private static bool IsAllowedInQuery(SqlMarkerKind kind) =>
+    internal static bool IsAllowedInQuery(SqlMarkerKind kind) =>
         kind
             is SqlMarkerKind.GeneratorParameters
                 or SqlMarkerKind.Token
@@ -221,7 +209,7 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.OutputModel
                 or SqlMarkerKind.TypeOverride;
 
-    private static bool IsAllowedInPreamble(SqlMarkerKind kind) =>
+    internal static bool IsAllowedInPreamble(SqlMarkerKind kind) =>
         kind
             is SqlMarkerKind.GeneratorParameters
                 or SqlMarkerKind.Database
