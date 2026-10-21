@@ -1,4 +1,3 @@
-using System;
 using System.Linq;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -6,7 +5,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -56,11 +55,7 @@ public sealed class ReplayingExchangeTests
     )
     {
         var token = TestContext.Current.CancellationToken;
-        var opened = await describer.OpenAsync(
-            new OpenRequest("billing", FixtureReplay.Connection, exchange, TimeProvider.System),
-            NullRunLog.Instance,
-            token
-        );
+        var opened = await describer.OpenAsync("billing", FixtureReplay.Connection, exchange);
         await using var session = opened.Value.ShouldNotBeNull();
         return (session.Server, await session.DescribeAsync(CaptureInputs.GetUser, token));
     }

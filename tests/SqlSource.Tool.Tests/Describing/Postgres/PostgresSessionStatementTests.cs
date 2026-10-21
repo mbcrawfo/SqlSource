@@ -5,7 +5,7 @@ using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using Xunit;
-using static SqlSource.Tool.Tests.PostgresRequests;
+using static SqlSource.Tool.Testing.DescribeRequests;
 using static SqlSource.Tool.Tests.PostgresSessionCases;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
@@ -26,7 +26,7 @@ public sealed class PostgresSessionStatementTests
         await using var session = await PostgresScript.SessionAsync(exchange);
 
         var described = await session.DescribeAsync(
-            Of("DELETE FROM samples WHERE flag;"),
+            Listed("DELETE FROM samples WHERE flag;"),
             TestContext.Current.CancellationToken
         );
 
@@ -47,8 +47,8 @@ public sealed class PostgresSessionStatementTests
         var exchange = script.Frees(2).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        _ = await session.DescribeAsync(Of("DELETE FROM samples"), TestContext.Current.CancellationToken);
-        var second = await session.DescribeAsync(Of("DELETE FROM orders"), TestContext.Current.CancellationToken);
+        _ = await session.DescribeAsync(Listed("DELETE FROM samples"), TestContext.Current.CancellationToken);
+        var second = await session.DescribeAsync(Listed("DELETE FROM orders"), TestContext.Current.CancellationToken);
 
         _ = second.Value.ShouldNotBeNull();
         exchange.Unused.ShouldBeEmpty();
@@ -68,8 +68,8 @@ public sealed class PostgresSessionStatementTests
         var exchange = script.Frees(2).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var first = await session.DescribeAsync(Of("DELETE FROM nope"), TestContext.Current.CancellationToken);
-        var second = await session.DescribeAsync(Of("DELETE FROM orders"), TestContext.Current.CancellationToken);
+        var first = await session.DescribeAsync(Listed("DELETE FROM nope"), TestContext.Current.CancellationToken);
+        var second = await session.DescribeAsync(Listed("DELETE FROM orders"), TestContext.Current.CancellationToken);
 
         var failure = first.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
@@ -97,7 +97,10 @@ public sealed class PostgresSessionStatementTests
         var log = new RecordingLog();
         await using var session = await PostgresScript.SessionAsync(exchange, log);
 
-        var described = await session.DescribeAsync(Of("DELETE FROM samples"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(
+            Listed("DELETE FROM samples"),
+            TestContext.Current.CancellationToken
+        );
 
         _ = described.Value.ShouldNotBeNull();
         described.Failure.ShouldBeNull();
@@ -124,7 +127,10 @@ public sealed class PostgresSessionStatementTests
             .Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of("DELETE FROM samples"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(
+            Listed("DELETE FROM samples"),
+            TestContext.Current.CancellationToken
+        );
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC236");
@@ -144,7 +150,10 @@ public sealed class PostgresSessionStatementTests
             .Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of("DELETE FROM samples"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(
+            Listed("DELETE FROM samples"),
+            TestContext.Current.CancellationToken
+        );
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC236");
@@ -173,7 +182,10 @@ public sealed class PostgresSessionStatementTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of("DELETE FROM samples"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(
+            Listed("DELETE FROM samples"),
+            TestContext.Current.CancellationToken
+        );
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC236");
@@ -210,7 +222,7 @@ public sealed class PostgresSessionStatementTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(GatedUsersId), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(GatedUsersId), TestContext.Current.CancellationToken);
 
         described.Value.ShouldBeNull();
         var failure = described.Failure.ShouldNotBeNull();
@@ -248,7 +260,7 @@ public sealed class PostgresSessionStatementTests
         var exchange = script.Frees(1).Play();
         await using var session = await PostgresScript.SessionAsync(exchange);
 
-        var described = await session.DescribeAsync(Of(UngatedUsersId), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(UngatedUsersId), TestContext.Current.CancellationToken);
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC236");

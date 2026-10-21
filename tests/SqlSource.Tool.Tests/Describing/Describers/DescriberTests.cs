@@ -8,7 +8,6 @@ using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -68,11 +67,7 @@ public sealed class DescriberTests
         var exchange = new CapturingExchange(LiveExchange.Instance, capture);
         var token = TestContext.Current.CancellationToken;
 
-        var opened = await describer.OpenAsync(
-            new OpenRequest("billing", "Host=db", exchange, TimeProvider.System),
-            NullRunLog.Instance,
-            token
-        );
+        var opened = await describer.OpenAsync("billing", "Host=db", exchange);
         await using var session = opened.Value.ShouldNotBeNull();
         var described = await session.DescribeAsync(CaptureInputs.GetUser, token);
 
@@ -89,11 +84,7 @@ public sealed class DescriberTests
         describer.Failures["GetUser"] = FakeDescriber.Failure("GetUser", "42P01: relation \"users\" does not exist");
         var token = TestContext.Current.CancellationToken;
 
-        var opened = await describer.OpenAsync(
-            new OpenRequest("billing", "Host=db", LiveExchange.Instance, TimeProvider.System),
-            NullRunLog.Instance,
-            token
-        );
+        var opened = await describer.OpenAsync("billing", "Host=db");
         var described = await opened.Value.ShouldNotBeNull().DescribeAsync(CaptureInputs.GetUser, token);
 
         described.Value.ShouldBeNull();
@@ -102,11 +93,7 @@ public sealed class DescriberTests
 
     private static async Task<IDescribeSession> OpenAsync(FakeDescriber describer)
     {
-        var opened = await describer.OpenAsync(
-            new OpenRequest("billing", "Host=db", LiveExchange.Instance, TimeProvider.System),
-            NullRunLog.Instance,
-            TestContext.Current.CancellationToken
-        );
+        var opened = await describer.OpenAsync("billing", "Host=db");
         return opened.Value.ShouldNotBeNull();
     }
 

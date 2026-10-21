@@ -163,11 +163,11 @@ public sealed class SessionTests(PostgresContainer postgres)
     {
         var token = TestContext.Current.CancellationToken;
         await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
-        _ = (await session.DescribeAsync(Requests.Of(Sql), token)).Value.ShouldNotBeNull();
+        _ = (await session.DescribeAsync(DescribeRequests.Of(Sql), token)).Value.ShouldNotBeNull();
 
         await Sessions.EndBackendAsync(session, postgres.ConnectionString);
-        var found = await session.DescribeAsync(Requests.Of(Sql), token);
-        var later = await session.DescribeAsync(Requests.Of(Sql), token);
+        var found = await session.DescribeAsync(DescribeRequests.Of(Sql), token);
+        var later = await session.DescribeAsync(DescribeRequests.Of(Sql), token);
 
         var ended = ShouldBeRejected(found, DescribeStep.DescribeParameters);
         ended
@@ -199,7 +199,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         await using var session = opened;
         ending = session;
 
-        var described = await session.DescribeAsync(Requests.Of(Sql), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(DescribeRequests.Of(Sql), TestContext.Current.CancellationToken);
 
         _ = ShouldBeRejected(described, DescribeStep.DescribeColumns);
         capture.Calls.Select(call => call.Method).ShouldBe(["open", "prepare", "columns", "deallocate"]);
@@ -229,11 +229,11 @@ public sealed class SessionTests(PostgresContainer postgres)
         await using var session = opened;
         var token = TestContext.Current.CancellationToken;
 
-        var described = await session.DescribeAsync(Requests.Of("SELECT id FROM session_gone"), token);
-        var later = await session.DescribeAsync(Requests.Of("SELECT 1 AS one"), token);
+        var described = await session.DescribeAsync(DescribeRequests.Of("SELECT id FROM session_gone"), token);
+        var later = await session.DescribeAsync(DescribeRequests.Of("SELECT 1 AS one"), token);
 
         var failure = ShouldBeRejected(described, DescribeStep.Catalog);
-        failure.Arguments.ShouldBe([Requests.Query, "the table of the column 'id' no longer exists"]);
+        failure.Arguments.ShouldBe([DescribeRequests.Query, "the table of the column 'id' no longer exists"]);
         failure.ServerLines.ShouldBeEmpty();
         failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
         capture
@@ -278,7 +278,7 @@ public sealed class SessionTests(PostgresContainer postgres)
         await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString, exchange);
         reading = session;
 
-        var described = await session.DescribeAsync(Requests.Of(sql), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(DescribeRequests.Of(sql), TestContext.Current.CancellationToken);
 
         described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
         var prepared = sent.ShouldNotBeNull();

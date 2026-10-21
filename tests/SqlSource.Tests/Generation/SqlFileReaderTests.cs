@@ -14,8 +14,6 @@ namespace SqlSource.Tests.Generation;
 
 public sealed class SqlFileReaderTests
 {
-    private const string Path = "/app/Repo/Users.sql";
-
     [Fact]
     public void Read_FileWithNamedQueries_GivesEachQueryWithTheLocationOfItsName()
     {
@@ -24,7 +22,7 @@ public sealed class SqlFileReaderTests
 
         var file = Read(Text);
 
-        file.NormalizedPath.ShouldBe("app/Repo/Users.sql");
+        file.NormalizedPath.ShouldBe(GeneratorHarness.UsersNormalizedPath);
         file.FileName.ShouldBe("Users.sql");
         file.Errors.ShouldBeEmpty();
         file.Queries.ShouldBe([
@@ -249,14 +247,14 @@ public sealed class SqlFileReaderTests
     [Fact]
     public void Read_FileParseInput_ReadsTheFileWithItsDialectAndCarriesItsInvalidValue()
     {
-        var text = new InMemoryAdditionalText(Path, "SELECT 1 # c\n");
+        var text = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1 # c\n");
 
         var file = SqlFileReader.Read(
-            new FileParseInput(text, "app/Repo/Users.sql", SqlDialect.MySql, "nope", false),
+            new FileParseInput(text, GeneratorHarness.UsersNormalizedPath, SqlDialect.MySql, "nope", false),
             TestContext.Current.CancellationToken
         );
 
-        file.NormalizedPath.ShouldBe("app/Repo/Users.sql");
+        file.NormalizedPath.ShouldBe(GeneratorHarness.UsersNormalizedPath);
         file.Queries.ShouldHaveSingleItem().Segments.ShouldBe(TestModels.Array(Literal("SELECT 1")));
         file.InvalidDialect.ShouldBe("nope");
     }
@@ -264,10 +262,10 @@ public sealed class SqlFileReaderTests
     [Fact]
     public void Read_FileParseInputThatWantsComments_BuildsTheKeptForm()
     {
-        var text = new InMemoryAdditionalText(Path, "SELECT 1; -- c\n");
+        var text = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1; -- c\n");
 
         var file = SqlFileReader.Read(
-            new FileParseInput(text, "app/Repo/Users.sql", SqlDialect.Ansi, null, true),
+            new FileParseInput(text, GeneratorHarness.UsersNormalizedPath, SqlDialect.Ansi, null, true),
             TestContext.Current.CancellationToken
         );
 
@@ -276,7 +274,7 @@ public sealed class SqlFileReaderTests
 
     private static ParsedSqlFile Read(
         string? text,
-        string path = Path,
+        string path = GeneratorHarness.UsersPath,
         SqlDialect dialect = SqlDialect.Ansi,
         string? invalidDialect = null,
         bool commentsWanted = false
@@ -292,7 +290,7 @@ public sealed class SqlFileReaderTests
 
     private static LocationInfo Location(TextSpan span, int startLine, int startColumn, int endLine, int endColumn) =>
         new(
-            Path,
+            GeneratorHarness.UsersPath,
             span,
             new LinePositionSpan(new LinePosition(startLine, startColumn), new LinePosition(endLine, endColumn))
         );

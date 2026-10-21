@@ -7,6 +7,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Testing;
 using Xunit;
 using static SqlSource.Tool.Testing.NullabilityAnswers;
 
@@ -143,7 +144,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         {
             var description = await Sessions.ShouldDescribeAsync(
                 $"{postgres.ConnectionString};Search Path=public,pg_catalog",
-                Requests.Of("SELECT NULL::pg_catalog.numeric(10,2) AS n, @p AS p", ("p", "pg_catalog.numeric"))
+                DescribeRequests.Of("SELECT NULL::pg_catalog.numeric(10,2) AS n, @p AS p", ("p", "pg_catalog.numeric"))
             );
 
             description
@@ -228,7 +229,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     {
         var (described, capture) = await Sessions.DescribeCapturedAsync(
             postgres.ConnectionString,
-            Requests.Of("SELECT @p::int AS a, 'x' AS b")
+            DescribeRequests.Of("SELECT @p::int AS a, 'x' AS b")
         );
 
         described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
@@ -419,7 +420,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     {
         var (described, capture) = await Sessions.DescribeCapturedAsync(
             postgres.ConnectionString,
-            Requests.Of("SELECT id FROM users")
+            DescribeRequests.Of("SELECT id FROM users")
         );
 
         described.Failure.ShouldBeNull(described.Failure?.Descriptor.Id);
@@ -767,12 +768,12 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [InlineData("SELECT s FROM (SELECT 1 AS a, 2 AS b) AS s", "s")]
     public async Task DescribeAsync_ColumnOfAPseudoType_IsSqlsrc229NamingItAndItsType(string sql, string column)
     {
-        var described = await Sessions.DescribeAsync(postgres.ConnectionString, Requests.Of(sql));
+        var described = await Sessions.DescribeAsync(postgres.ConnectionString, DescribeRequests.Of(sql));
 
         described.Value.ShouldBeNull();
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC229");
-        failure.Arguments.ShouldBe([column, Requests.Query, "record"]);
+        failure.Arguments.ShouldBe([column, DescribeRequests.Query, "record"]);
         failure.Step.ShouldBe(DescribeStep.ResolveType);
         failure.ServerLines.ShouldBeEmpty();
     }

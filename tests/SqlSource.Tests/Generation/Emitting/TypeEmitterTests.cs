@@ -7,6 +7,7 @@ using SqlSource.Generation.Emitting;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Emitting;
@@ -220,7 +221,7 @@ public sealed class TypeEmitterTests
         );
         var typeFiles = new TypeFiles(
             TestModels.Type(),
-            TestModels.Array("app/Repo/Users.sql"),
+            TestModels.Array(GeneratorHarness.UsersNormalizedPath),
             TestModels.Array(problem)
         );
 

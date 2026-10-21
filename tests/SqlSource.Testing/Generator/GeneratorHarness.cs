@@ -25,6 +25,12 @@ internal static class GeneratorHarness
 {
     public const string SourcePath = "/app/Repo/Sample.cs";
 
+    // The path of the .sql file that most tests use.
+    public const string UsersPath = "/app/Repo/Users.sql";
+
+    // That path as the generator normalises it, relative to the project's folder.
+    public const string UsersNormalizedPath = "app/Repo/Users.sql";
+
     // The newest language version that Roslyn 4.8.0 parses.  Documentation comments are checked, as they are in a
     // project that builds a documentation file, so that a malformed or missing one in generated code is reported.
     public static readonly CSharpParseOptions ParseOptions = new(LanguageVersion.CSharp12, DocumentationMode.Diagnose);

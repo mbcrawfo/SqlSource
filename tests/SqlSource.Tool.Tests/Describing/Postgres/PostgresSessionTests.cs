@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
 using Xunit;
-using static SqlSource.Tool.Tests.PostgresRequests;
+using static SqlSource.Tool.Testing.DescribeRequests;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
@@ -64,7 +64,7 @@ public sealed class PostgresSessionTests
     {
         await using var session = await PostgresScript.SessionAsync(new PostgresScript().Open().Play());
 
-        var described = await session.DescribeAsync(Of(sql, Inferred("id")), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(Listed(sql, Inferred("id")), TestContext.Current.CancellationToken);
 
         described.Value.ShouldBeNull();
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC230");
@@ -77,7 +77,7 @@ public sealed class PostgresSessionTests
         await using var session = await PostgresScript.SessionAsync(new PostgresScript().Open().Play());
 
         var described = await session.DescribeAsync(
-            Of("CALL archive(@id)", Inferred("id")),
+            Listed("CALL archive(@id)", Inferred("id")),
             TestContext.Current.CancellationToken
         );
 
@@ -94,7 +94,7 @@ public sealed class PostgresSessionTests
         await using var session = await PostgresScript.SessionAsync(new PostgresScript().Open().Play());
 
         var described = await session.DescribeAsync(
-            Of("SELECT 1 FROM users WHERE id = @id AND name = $2", Inferred("id")),
+            Listed("SELECT 1 FROM users WHERE id = @id AND name = $2", Inferred("id")),
             TestContext.Current.CancellationToken
         );
 
@@ -110,7 +110,10 @@ public sealed class PostgresSessionTests
     {
         await using var session = await PostgresScript.SessionAsync(new PostgresScript().Open().Play());
 
-        var described = await session.DescribeAsync(Of("CALL a(); CALL b()"), TestContext.Current.CancellationToken);
+        var described = await session.DescribeAsync(
+            Listed("CALL a(); CALL b()"),
+            TestContext.Current.CancellationToken
+        );
 
         described.Failure.ShouldNotBeNull().Descriptor.Id.ShouldBe("SQLSRC230");
     }
@@ -121,7 +124,7 @@ public sealed class PostgresSessionTests
         await using var session = await PostgresScript.SessionAsync(new PostgresScript().Open().Play());
 
         var described = await session.DescribeAsync(
-            Of("SELECT 1 FROM users WHERE id = @id", Declared("id", "int) AS SELECT 1; DROP TABLE users; --")),
+            Listed("SELECT 1 FROM users WHERE id = @id", Declared("id", "int) AS SELECT 1; DROP TABLE users; --")),
             TestContext.Current.CancellationToken
         );
 
@@ -138,7 +141,7 @@ public sealed class PostgresSessionTests
         await using var session = await PostgresScript.SessionAsync(new PostgresScript().Open().Play());
 
         var described = await session.DescribeAsync(
-            Of("SELECT @id; SELECT 2", Declared("id", "int foo")),
+            Listed("SELECT @id; SELECT 2", Declared("id", "int foo")),
             TestContext.Current.CancellationToken
         );
 

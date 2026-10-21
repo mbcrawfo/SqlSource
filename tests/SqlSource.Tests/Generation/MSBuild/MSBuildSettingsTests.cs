@@ -10,8 +10,6 @@ namespace SqlSource.Tests.Generation.MSBuild;
 
 public sealed class MSBuildSettingsTests
 {
-    private const string Path = "/app/Repo/Users.sql";
-
     // The compiler's contract, spelled out: a change to a constant must fail here, not pass by agreeing with itself.
     [Fact]
     public void Prefixes_AreWhereTheCompilerPutsAPropertyAndTheMetadataOfTheSettingsItem()
@@ -75,15 +73,15 @@ public sealed class MSBuildSettingsTests
     public void ReadFile_DatabaseUnderTheKeysOfAManifest_IsReadAsAName()
     {
         var settings = FileSettings.Read(
-            Path,
+            GeneratorHarness.UsersPath,
             new TestOptionsProvider(
                 null,
                 null,
                 fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
                 {
-                    [Path] = new Dictionary<string, string> { ["SqlSourceDatabase"] = "files" },
+                    [GeneratorHarness.UsersPath] = new Dictionary<string, string> { ["SqlSourceDatabase"] = "files" },
                 }
-            ).GetOptions(new InMemoryAdditionalText(Path, "")),
+            ).GetOptions(new InMemoryAdditionalText(GeneratorHarness.UsersPath, "")),
             MSBuildSettings.ManifestMetadata
         );
 
@@ -136,15 +134,18 @@ public sealed class MSBuildSettingsTests
     public void ReadFile_TypeOverridesUnderTheKeysOfAManifest_AreNotRead() =>
         FileSettings
             .Read(
-                Path,
+                GeneratorHarness.UsersPath,
                 new TestOptionsProvider(
                     null,
                     null,
                     fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
                     {
-                        [Path] = new Dictionary<string, string> { ["SqlSourceTypeOverrides"] = "timestampz=int" },
+                        [GeneratorHarness.UsersPath] = new Dictionary<string, string>
+                        {
+                            ["SqlSourceTypeOverrides"] = "timestampz=int",
+                        },
                     }
-                ).GetOptions(new InMemoryAdditionalText(Path, "")),
+                ).GetOptions(new InMemoryAdditionalText(GeneratorHarness.UsersPath, "")),
                 MSBuildSettings.ManifestMetadata
             )
             .ShouldBeNull();
@@ -275,7 +276,12 @@ public sealed class MSBuildSettingsTests
     [Fact]
     public void ReadFile_NothingSet_IsNull() =>
         FileSettings
-            .Read(Path, new TestOptionsProvider(null, null).GetOptions(new InMemoryAdditionalText(Path, "")))
+            .Read(
+                GeneratorHarness.UsersPath,
+                new TestOptionsProvider(null, null).GetOptions(
+                    new InMemoryAdditionalText(GeneratorHarness.UsersPath, "")
+                )
+            )
             .ShouldBeNull();
 
     [Fact]
@@ -286,17 +292,20 @@ public sealed class MSBuildSettingsTests
             null,
             fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
             {
-                [Path] = new Dictionary<string, string> { ["SqlSourceGeneratorParameters"] = "default" },
+                [GeneratorHarness.UsersPath] = new Dictionary<string, string>
+                {
+                    ["SqlSourceGeneratorParameters"] = "default",
+                },
             }
         );
 
         var settings = FileSettings.Read(
-            "app/Repo/Users.sql",
-            options.GetOptions(new InMemoryAdditionalText(Path, ""))
+            GeneratorHarness.UsersNormalizedPath,
+            options.GetOptions(new InMemoryAdditionalText(GeneratorHarness.UsersPath, ""))
         );
 
         settings.ShouldNotBeNull().Level.Parameters.ShouldBe(GeneratorParameters.None);
-        settings.NormalizedPath.ShouldBe("app/Repo/Users.sql");
+        settings.NormalizedPath.ShouldBe(GeneratorHarness.UsersNormalizedPath);
     }
 
     public static TheoryData<string, string, string> ModelSettings =>
@@ -320,12 +329,15 @@ public sealed class MSBuildSettingsTests
 
     private static FileSettings? ReadFileMetadata(Dictionary<string, string> metadata) =>
         FileSettings.Read(
-            "app/Repo/Users.sql",
+            GeneratorHarness.UsersNormalizedPath,
             new TestOptionsProvider(
                 null,
                 null,
-                fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>> { [Path] = metadata }
-            ).GetOptions(new InMemoryAdditionalText(Path, ""))
+                fileMetadata: new Dictionary<string, IReadOnlyDictionary<string, string>>
+                {
+                    [GeneratorHarness.UsersPath] = metadata,
+                }
+            ).GetOptions(new InMemoryAdditionalText(GeneratorHarness.UsersPath, ""))
         );
 
     [Fact]

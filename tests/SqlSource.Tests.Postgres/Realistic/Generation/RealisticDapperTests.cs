@@ -64,11 +64,7 @@ public sealed class RealisticDapperTests(PostgresContainer postgres)
         }
 
         RealisticModels.SkipUnlessHasModels(found);
-        if (!found.RunsOn(major))
-        {
-            Assert.Skip($"{found} needs PostgreSQL {found.MinimumMajor} or later, and the server is {major}.");
-        }
-
+        found.SkipUnlessRunsOn(major);
         Assert.Skip($"{found} has a parameter that Dapper cannot send: {found.Dapper}.");
     }
 

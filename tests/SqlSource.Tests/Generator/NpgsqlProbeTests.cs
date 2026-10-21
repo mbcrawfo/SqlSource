@@ -49,7 +49,7 @@ public sealed class NpgsqlProbeTests
     // The warning ids of a C# type whose use gives none.
     private static readonly EquatableArray<string> NoWarnings = EquatableArray<string>.Empty;
 
-    private static readonly SqlFile Users = new("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+    private static readonly SqlFile Users = new(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
     // Each type whose C# type differs between Npgsql 8 and 9 and Npgsql 10, or comes from one that does, by name.
     private static readonly Dictionary<string, PostgresType> Differing = new()
@@ -205,8 +205,8 @@ public sealed class NpgsqlProbeTests
 
         sql.Diagnostics.ShouldBeEmpty();
         mssql.Diagnostics.ShouldBe([
-            "SQLSRC243 /app/Repo/Users.sql(1,10)-(1,17): This version of SqlSource has no type map for the dialect "
-                + "'mssql', so no query of this file can have models.  Set the output to 'sql'.",
+            $"SQLSRC243 {GeneratorHarness.UsersPath}(1,10)-(1,17): This version of SqlSource has no type map for the "
+                + "dialect 'mssql', so no query of this file can have models.  Set the output to 'sql'.",
         ]);
     }
 
@@ -263,8 +263,9 @@ public sealed class NpgsqlProbeTests
         var run = RunWithColumn(Differing[name], overrides: null);
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC249 /app/Repo/Users.sql(1,10)-(1,17): The column 'value' has the type '{Differing[name].Name}', "
-                + $"whose C# type depends on Npgsql, and this project does not reference it.  {help}",
+            $"SQLSRC249 {GeneratorHarness.UsersPath}(1,10)-(1,17): The column 'value' has the type "
+                + $"'{Differing[name].Name}', whose C# type depends on Npgsql, and this project does not reference "
+                + $"it.  {help}",
         ]);
         run.SeverityOf("SQLSRC249").ShouldBe(DiagnosticSeverity.Error);
         StepOutputs.Single<FileTypes>(run, TrackingNames.FileTypes).Queries.ShouldBeEmpty();
@@ -297,8 +298,8 @@ public sealed class NpgsqlProbeTests
         var run = RunWithColumn(Catalog("point"), overrides: null);
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC249 /app/Repo/Users.sql(1,10)-(1,17): The column 'value' has the type 'point', whose C# type "
-                + "depends on Npgsql, and this project does not reference it.  Reference Npgsql.",
+            $"SQLSRC249 {GeneratorHarness.UsersPath}(1,10)-(1,17): The column 'value' has the type 'point', whose C# "
+                + "type depends on Npgsql, and this project does not reference it.  Reference Npgsql.",
         ]);
     }
 

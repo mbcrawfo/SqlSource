@@ -28,11 +28,7 @@ internal static class RealisticModels
     // generator does.
     public static void SkipUnlessHasModels(RealisticCase found)
     {
-        if (found.Refusal is not null)
-        {
-            Assert.Skip($"{found} is refused as {found.Refusal}, so it has no models.");
-        }
-
+        found.SkipIfRefused();
         if (found.Models is { } models)
         {
             Assert.Skip($"{found} has no models: the generator gives {models.Id}.");

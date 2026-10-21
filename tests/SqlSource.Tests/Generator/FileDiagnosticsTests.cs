@@ -41,7 +41,7 @@ public sealed class FileDiagnosticsTests
             OutputKind.Sql,
             Source,
             new SqlFile(
-                "/app/Repo/Users.sql",
+                GeneratorHarness.UsersPath,
                 """
                 -- generator: keep-comments shout
                 -- name: GetUser
@@ -56,10 +56,11 @@ public sealed class FileDiagnosticsTests
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC109 /app/Repo/Users.sql(1,29)-(1,34): 'shout' is not a generator parameter",
-            "SQLSRC103 /app/Repo/Users.sql(5,10)-(5,18): 'get-user' is not a valid query name.  A name is a C# "
-                + "identifier that is not a reserved keyword.",
-            "SQLSRC104 /app/Repo/Users.sql(7,10)-(7,17): The query name 'GetUser' is used more than once in this file",
+            $"SQLSRC109 {GeneratorHarness.UsersPath}(1,29)-(1,34): 'shout' is not a generator parameter",
+            $"SQLSRC103 {GeneratorHarness.UsersPath}(5,10)-(5,18): 'get-user' is not a valid query name.  A name is a "
+                + "C# identifier that is not a reserved keyword.",
+            $"SQLSRC104 {GeneratorHarness.UsersPath}(7,10)-(7,17): The query name 'GetUser' is used more than once in "
+                + "this file",
         ]);
         run.CompilationErrors.ShouldBeEmpty();
     }
@@ -70,12 +71,12 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\n-- dialect: mysql\nSELECT 1;\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\n-- dialect: mysql\nSELECT 1;\n")
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC115 /app/Repo/Users.sql(2,1)-(2,18): The '-- dialect:' marker must come before the file's first "
-                + "query and before any SQL",
+            $"SQLSRC115 {GeneratorHarness.UsersPath}(2,1)-(2,18): The '-- dialect:' marker must come before the file's "
+                + "first query and before any SQL",
         ]);
         run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
     }
@@ -87,16 +88,16 @@ public sealed class FileDiagnosticsTests
             OutputKind.Sql,
             Source,
             new SqlFile(
-                "/app/Repo/Users.sql",
+                GeneratorHarness.UsersPath,
                 "-- dialect: pgsql\n-- dialect: mysql\n-- dialect: oracle\n-- name: GetUser\nSELECT 1;\n"
             )
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC111 /app/Repo/Users.sql(1,13)-(1,18): 'dialect: pgsql' lacks a value it needs, has one it does "
-                + "not take, or has one that is not valid",
-            "SQLSRC112 /app/Repo/Users.sql(3,13)-(3,19): 'dialect: oracle' conflicts with a setting given earlier in "
-                + "the same scope",
+            $"SQLSRC111 {GeneratorHarness.UsersPath}(1,13)-(1,18): 'dialect: pgsql' lacks a value it needs, has one it "
+                + "does not take, or has one that is not valid",
+            $"SQLSRC112 {GeneratorHarness.UsersPath}(3,13)-(3,19): 'dialect: oracle' conflicts with a setting given "
+                + "earlier in the same scope",
         ]);
     }
 
@@ -106,11 +107,11 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile("/app/Repo/Users.sql", "SELECT 'unfinished;\n")
+            new SqlFile(GeneratorHarness.UsersPath, "SELECT 'unfinished;\n")
         );
 
         run.Diagnostics.ShouldBe([
-            "SQLSRC101 /app/Repo/Users.sql(1,8)-(1,9): A quoted string or identifier is not closed",
+            $"SQLSRC101 {GeneratorHarness.UsersPath}(1,8)-(1,9): A quoted string or identifier is not closed",
         ]);
         run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
         run.CompilationErrors.ShouldBeEmpty();
@@ -123,7 +124,7 @@ public sealed class FileDiagnosticsTests
             OutputKind.Sql,
             Source,
             new SqlFile("/app/Repo/Broken.sql", "/* open\nSELECT 1;\n"),
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n")
         );
 
         run.Diagnostics.ShouldBe(["SQLSRC102 /app/Repo/Broken.sql(1,1)-(1,3): A block comment or hint is not closed"]);
@@ -151,9 +152,9 @@ public sealed class FileDiagnosticsTests
     [InlineData("-- nothing here\n")]
     public void Run_UnreadableOrEmptyFile_IsAnErrorAndNotAnException(string? text)
     {
-        var run = GeneratorHarness.Run(OutputKind.Sql, Source, new SqlFile("/app/Repo/Users.sql", text));
+        var run = GeneratorHarness.Run(OutputKind.Sql, Source, new SqlFile(GeneratorHarness.UsersPath, text));
 
-        run.Diagnostics.ShouldBe(["SQLSRC113 /app/Repo/Users.sql(1,1)-(1,1): The query has no SQL"]);
+        run.Diagnostics.ShouldBe([$"SQLSRC113 {GeneratorHarness.UsersPath}(1,1)-(1,1): The query has no SQL"]);
         run.Sources["App.Sample.g.cs"].ShouldBe(EmptySqlClass);
     }
 
@@ -170,17 +171,17 @@ public sealed class FileDiagnosticsTests
             [SqlSourceGenerate(Path = "Users.sql")]
             public partial class Second { }
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- name: 1x\nSELECT 1;\n")
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: 1x\nSELECT 1;\n")
         );
 
-        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith("SQLSRC103 /app/Repo/Users.sql(1,10)-(1,12)");
+        run.Diagnostics.ShouldHaveSingleItem().ShouldStartWith($"SQLSRC103 {GeneratorHarness.UsersPath}(1,10)-(1,12)");
     }
 
     [Fact]
     public void Run_FileListedTwice_GivesEachMemberAndEachErrorOnce()
     {
         var broken = new SqlFile("/app/Repo/Broken.sql", "-- name: 1x\nSELECT 1;\n");
-        var users = new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n");
+        var users = new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n");
 
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
@@ -207,13 +208,13 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile(second, "-- name: GetOrder\nSELECT 2;\n")
         );
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC013 {second}(1,1)-(1,1): This file's path differs only by case from '/app/Repo/Users.sql', and "
-                + "SqlSource compares paths ignoring case",
+            $"SQLSRC013 {second}(1,1)-(1,1): This file's path differs only by case from "
+                + $"'{GeneratorHarness.UsersPath}', and SqlSource compares paths ignoring case",
         ]);
     }
 
@@ -223,7 +224,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile("/app/Repo/users.sql", "-- name: GetOrder\nSELECT 2;\n"),
             new SqlFile("/app/Repo/./users.sql", "-- name: GetOrder\nSELECT 2;\n"),
             new SqlFile("/app/Repo/USERS.sql", "-- name: GetItem\nSELECT 3;\n")
@@ -240,7 +241,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile("/app/Migrations/001_init.sql", "SELECT 1;\n"),
             new SqlFile("/app/Migrations/001_INIT.sql", "SELECT 2;\n")
         );
@@ -256,7 +257,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile("../Users.sql", "-- name: 1x\nSELECT 2;\n")
         );
 
@@ -271,7 +272,7 @@ public sealed class FileDiagnosticsTests
         var run = GeneratorHarness.Run(
             OutputKind.Sql,
             Source,
-            new SqlFile("/app/Repo/Users.sql", "-- name: GetUser\nSELECT 1;\n"),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: GetUser\nSELECT 1;\n"),
             new SqlFile("/app/Migrations/001_init.sql", "SELECT 'unfinished;\n"),
             new SqlFile("/app/Repo/Sub/002-more.sql", "/* open\n")
         );
@@ -345,7 +346,7 @@ public sealed class FileDiagnosticsTests
             [SqlSourceGenerate(SqlLocation = SqlLocation.Direct)]
             public partial class @class<T> { }
             """,
-            new SqlFile("/app/Repo/Users.sql", "-- name: Sql\nSELECT 1;\n"),
+            new SqlFile(GeneratorHarness.UsersPath, "-- name: Sql\nSELECT 1;\n"),
             new SqlFile("/app/Repo/Other.sql", "-- generator: keep-comments\n-- name: class\nSELECT 2;\n")
         );
 

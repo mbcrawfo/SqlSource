@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Shouldly;
 using SqlSource.Generation.Paths;
+using SqlSource.Testing.Generator;
 using Xunit;
 
 namespace SqlSource.Tests.Generation.Paths;
@@ -10,12 +11,12 @@ namespace SqlSource.Tests.Generation.Paths;
 public sealed class SqlPathTests
 {
     [Theory]
-    [InlineData("/app/Repo/Users.sql", "app/Repo/Users.sql")]
-    [InlineData("C:\\app\\Repo\\Users.sql", "C:/app/Repo/Users.sql")]
-    [InlineData("C:\\app/Repo\\Users.sql", "C:/app/Repo/Users.sql")]
+    [InlineData(GeneratorHarness.UsersPath, GeneratorHarness.UsersNormalizedPath)]
+    [InlineData("C:\\app\\Repo\\Users.sql", $"C:/{GeneratorHarness.UsersNormalizedPath}")]
+    [InlineData("C:\\app/Repo\\Users.sql", $"C:/{GeneratorHarness.UsersNormalizedPath}")]
     [InlineData("\\\\server\\share\\Users.sql", "server/share/Users.sql")]
-    [InlineData("app//Repo///Users.sql", "app/Repo/Users.sql")]
-    [InlineData("app/./Repo/./Users.sql", "app/Repo/Users.sql")]
+    [InlineData("app//Repo///Users.sql", GeneratorHarness.UsersNormalizedPath)]
+    [InlineData("app/./Repo/./Users.sql", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("app/Repo/../Queries/Users.sql", "app/Queries/Users.sql")]
     [InlineData("app/Repo/Sub/../../Users.sql", "app/Users.sql")]
     [InlineData("app/Repo/", "app/Repo")]
@@ -36,7 +37,7 @@ public sealed class SqlPathTests
     public void Normalize_DotDotWithNothingBeforeIt_IsNull(string path) => SqlPath.Normalize(path).ShouldBeNull();
 
     [Theory]
-    [InlineData("app/Repo", "Users.sql", "app/Repo/Users.sql")]
+    [InlineData("app/Repo", "Users.sql", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("app/Repo", "Queries\\Users.sql", "app/Repo/Queries/Users.sql")]
     [InlineData("app/Repo", "../Queries", "app/Queries")]
     [InlineData("app/Repo", "/Queries", "app/Repo/Queries")]
@@ -49,14 +50,14 @@ public sealed class SqlPathTests
     public void Combine_PathThatLeavesTheRoot_IsNull() => SqlPath.Combine("app", "../../Users.sql").ShouldBeNull();
 
     [Theory]
-    [InlineData("app/Repo/Users.sql", "app/Repo")]
+    [InlineData(GeneratorHarness.UsersNormalizedPath, "app/Repo")]
     [InlineData("Users.sql", "")]
     [InlineData("", "")]
     public void GetFolder_NormalizedPath_IsEverythingBeforeTheLastSegment(string path, string expected) =>
         SqlPath.GetFolder(path).ShouldBe(expected);
 
     [Theory]
-    [InlineData("/app/Repo/Users.sql", "Users.sql")]
+    [InlineData(GeneratorHarness.UsersPath, "Users.sql")]
     [InlineData("C:\\app\\Repo\\Users.sql", "Users.sql")]
     [InlineData("Users.sql", "Users.sql")]
     [InlineData("app/Repo/", "")]
@@ -147,8 +148,8 @@ public sealed class SqlPathTests
     }
 
     [Theory]
-    [InlineData("app/Repo", "app/Repo/a.sql", "app/Repo/Count.sql", "app/Repo/Users.sql")]
-    [InlineData("APP/repo", "app/Repo/a.sql", "app/Repo/Count.sql", "app/Repo/Users.sql")]
+    [InlineData("app/Repo", "app/Repo/a.sql", "app/Repo/Count.sql", GeneratorHarness.UsersNormalizedPath)]
+    [InlineData("APP/repo", "app/Repo/a.sql", "app/Repo/Count.sql", GeneratorHarness.UsersNormalizedPath)]
     [InlineData("app", "app/Repo.sql", "app/Root.sql")]
     [InlineData("", "Root.sql")]
     [InlineData("app/Repo/Admin", "app/Repo/Admin/Roles.sql")]
@@ -226,7 +227,7 @@ public sealed class SqlPathTests
             "app/Repo/Admin/Deep/x.sql",
             "app/Repo/Admin/Roles.sql",
             "app/Repo/Count.sql",
-            "app/Repo/Users.sql",
+            GeneratorHarness.UsersNormalizedPath,
             "app/Repo/Zeta/z.sql",
             "app/Repo-old/x.sql",
             "app/Repo.sql",

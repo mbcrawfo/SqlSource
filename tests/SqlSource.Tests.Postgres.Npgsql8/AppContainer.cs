@@ -30,19 +30,8 @@ public sealed partial class AppContainer : IAsyncLifetime
         await _container.StartAsync(token);
         try
         {
-            await using (var source = NpgsqlDataSource.Create(_container.GetConnectionString()))
-            await using (var create = source.CreateCommand($"CREATE DATABASE {Database}"))
-            {
-                _ = await create.ExecuteNonQueryAsync(token);
-            }
-
-            await using var app = NpgsqlDataSource.Create(ConnectionString);
-            foreach (var path in new[] { EndToEndFiles.Schema(Database), EndToEndFiles.Seed(Database) })
-            {
-                var sql = await File.ReadAllTextAsync(path, token);
-                await using var command = app.CreateCommand(sql);
-                _ = await command.ExecuteNonQueryAsync(token);
-            }
+            await using var server = NpgsqlDataSource.Create(_container.GetConnectionString());
+            await EndToEndFiles.CreateAsync(server, Database, _ => NpgsqlDataSource.Create(ConnectionString), token);
         }
         catch
         {

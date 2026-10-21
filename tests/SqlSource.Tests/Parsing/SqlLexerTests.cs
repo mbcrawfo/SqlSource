@@ -184,7 +184,7 @@ public sealed class SqlLexerTests
     [InlineData("'a\\'b -- c', 2", "LineComment:-- c', 2")]
     [InlineData("[a'b], 'x -- y'", "LineComment:-- y'")]
     [InlineData("q'[it's -- x]', q'[y's]'", "LineComment:-- x]', q'[y's]'")]
-    public void Lex_KnownLimit_MisreadQuotesThatBalance_TurnSqlIntoAComment(string text, string comment) =>
+    public void Lex_KnownLimit_MisreadQuotesThatBalanceTurnSqlIntoAComment(string text, string comment) =>
         Lex(text)[^1].ShouldBe(comment);
 
     [Theory]

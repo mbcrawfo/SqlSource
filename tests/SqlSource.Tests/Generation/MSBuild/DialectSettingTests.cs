@@ -12,8 +12,6 @@ namespace SqlSource.Tests.Generation.MSBuild;
 
 public sealed class DialectSettingTests
 {
-    private const string Path = "/app/Repo/Users.sql";
-
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -71,13 +69,13 @@ public sealed class DialectSettingTests
     [Fact]
     public void ReadMetadata_FileWithAndWithoutTheMetadata_ReadsItFromTheOptionsOfTheFile()
     {
-        var file = new InMemoryAdditionalText(Path, "SELECT 1;");
+        var file = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1;");
         var other = new InMemoryAdditionalText("/app/Repo/Orders.sql", "SELECT 2;");
         var options = new TestOptionsProvider(
             null,
             null,
             "oracle",
-            new Dictionary<string, string> { [Path] = "sqlite" }
+            new Dictionary<string, string> { [GeneratorHarness.UsersPath] = "sqlite" }
         );
 
         DialectSetting.ReadMetadata(options.GetOptions(file)).ShouldBe(new DialectSetting(SqlDialect.Sqlite, null));
@@ -88,12 +86,12 @@ public sealed class DialectSettingTests
     [Fact]
     public void Read_PropertyAndMetadata_AreNotMistakenForEachOther()
     {
-        var file = new InMemoryAdditionalText(Path, "SELECT 1;");
+        var file = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1;");
         var options = new TestOptionsProvider(
             null,
             null,
             "oracle",
-            new Dictionary<string, string> { [Path] = "sqlite" }
+            new Dictionary<string, string> { [GeneratorHarness.UsersPath] = "sqlite" }
         );
 
         DialectSetting.ReadMetadata(options.GlobalOptions).Dialect.ShouldBeNull();
@@ -121,12 +119,12 @@ public sealed class DialectSettingTests
         string? invalid
     )
     {
-        var file = new InMemoryAdditionalText(Path, "SELECT 1;");
+        var file = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1;");
 
         var resolved = Resolve(file, metadata, property);
 
         resolved.File.ShouldBeSameAs(file);
-        resolved.NormalizedPath.ShouldBe("app/Repo/Users.sql");
+        resolved.NormalizedPath.ShouldBe(GeneratorHarness.UsersNormalizedPath);
         resolved.Dialect.ShouldBe(new SqlDialectChoice(Enum.Parse<SqlDialect>(dialect), SqlDialectOptions.None));
         resolved.InvalidDialect.ShouldBe(invalid);
         resolved.CommentsWanted.ShouldBeFalse();
@@ -136,7 +134,7 @@ public sealed class DialectSettingTests
     [Fact]
     public void Resolve_MetadataWithoutAnOption_DoesNotTakeTheOptionOfTheProperty()
     {
-        var file = new InMemoryAdditionalText(Path, "SELECT 1;");
+        var file = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1;");
 
         var resolved = Resolve(file, "mysql", "mysql,ansi-quotes");
 
@@ -146,7 +144,7 @@ public sealed class DialectSettingTests
     [Fact]
     public void Resolve_NoMetadata_TakesTheOptionOfTheProperty()
     {
-        var file = new InMemoryAdditionalText(Path, "SELECT 1;");
+        var file = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1;");
 
         var resolved = Resolve(file, null, "mysql,ansi-quotes");
 
@@ -156,7 +154,7 @@ public sealed class DialectSettingTests
     [Fact]
     public void Resolve_SameFileAndSettings_GivesEqualValues()
     {
-        var file = new InMemoryAdditionalText(Path, "SELECT 1;");
+        var file = new InMemoryAdditionalText(GeneratorHarness.UsersPath, "SELECT 1;");
 
         Resolve(file, "mysql", null).ShouldBe(Resolve(file, " MySQL ", "oracle"));
     }
@@ -178,12 +176,12 @@ public sealed class DialectSettingTests
         bool expected
     ) =>
         Resolve(
-            new InMemoryAdditionalText(Path, ""),
+            new InMemoryAdditionalText(GeneratorHarness.UsersPath, ""),
             null,
             null,
             fileParameters,
             projectKeepsComments,
-            claimedByATypeThatKeepsComments ? ["app/Repo/Users.sql"] : []
+            claimedByATypeThatKeepsComments ? [GeneratorHarness.UsersNormalizedPath] : []
         )
             .CommentsWanted.ShouldBe(expected);
 
@@ -202,7 +200,7 @@ public sealed class DialectSettingTests
                 fileParameters is null
                     ? null
                     : new FileSettings(
-                        "app/Repo/Users.sql",
+                        GeneratorHarness.UsersNormalizedPath,
                         new SettingsLevel { Parameters = GeneratorParameterList.Parse(fileParameters, []) },
                         EquatableArray<InvalidSetting>.Empty
                     )

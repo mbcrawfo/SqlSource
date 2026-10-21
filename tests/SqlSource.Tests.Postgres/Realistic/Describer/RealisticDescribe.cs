@@ -30,11 +30,7 @@ internal static class RealisticDescribe
     public static RealisticCase Start(string name, int major)
     {
         var found = RealisticCases.Read(Path.Combine(RepositoryPaths.RealisticCases, name));
-        if (!found.RunsOn(major))
-        {
-            Assert.Skip($"The case needs PostgreSQL {found.MinimumMajor} or later.");
-        }
-
+        found.SkipUnlessRunsOn(major);
         return found;
     }
 
@@ -45,11 +41,7 @@ internal static class RealisticDescribe
         IReadOnlyList<DescribedParameter> Parameters
     )> DescribedAsync(RealisticCase found, string connection)
     {
-        if (found.Refusal is not null)
-        {
-            Assert.Skip($"{found} is refused as {found.Refusal}, so it has no columns to check.");
-        }
-
+        found.SkipIfRefused();
         var described = await DescribeOnceAsync(found, connection);
         return (ColumnsOf(found, described), described.Value!.Parameters);
     }
