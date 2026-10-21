@@ -28,10 +28,10 @@ public sealed class PostgresEventsTests
 
         log.Events.Select(written => written.Name).ShouldBe(["prepare", "columns", "types", "check", "deallocate"]);
 
-        // Each call took the 7 ms that the exchange moved the clock by.
+        // Each call took the CallTime that the exchange moved the clock by.
         foreach (var (_, members) in log.Events)
         {
-            Member(members, "durationMs").ShouldBe((LogValue)7L);
+            Member(members, "durationMs").ShouldBe((LogValue)(long)CallTime.TotalMilliseconds);
         }
 
         var prepare = log.Events[0].Members;

@@ -11,8 +11,9 @@ using Xunit;
 
 namespace SqlSource.Tool.Testing;
 
-// The programs that tests start: those of the operating system, for the tests of ProcessRunner, and the tool that
-// was built beside the tests, for a test that runs it in a process of its own.
+// The programs that tests start: those of the operating system, for the tests of ProcessRunner, the tool that was
+// built beside the tests, for a test that runs it in a process of its own, and the dotnet that started the tests,
+// which RunAsync runs to its end with a limit as it runs any other.
 internal static class Programs
 {
     // How long a program that was killed has to be gone.
@@ -51,8 +52,9 @@ internal static class Programs
         return start;
     }
 
-    // Runs the program to its end and gives what it wrote.  It reads both streams while the program runs, so that
-    // neither fills and holds it, and gives the program no input.  whileRunning runs once the program has started.
+    // Runs the program to its end and gives what it wrote.  It sets the three Redirect* of the start it is given, reads
+    // both streams while the program runs, so that neither fills and holds it, and gives the program no input.
+    // whileRunning runs once the program has started.
     // A program that does not end within the patience, a test that is cancelled, and a whileRunning that fails each
     // get the program and its children killed, and the program gone, before the exception is thrown.
     public static async Task<ProgramResult> RunAsync(
@@ -89,7 +91,7 @@ internal static class Programs
         catch (Exception exception)
         {
             // The cancellation of whileRunning's own, with neither token cancelled, is rethrown as it is.
-            await KillAsync(program);
+            await KillAsync(program, start, exception);
             if (
                 exception is OperationCanceledException
                 && limit.IsCancellationRequested
@@ -113,7 +115,7 @@ internal static class Programs
         start.Environment["DOTNET_NOLOGO"] = "true";
     }
 
-    // What it wrote is left out when a program that escaped the kill still holds a stream.
+    // What it wrote is left out when a program that escaped the kill still holds a stream, or a read of one failed.
     private static async Task<TimeoutException> DidNotEndAsync(
         ProcessStartInfo start,
         TimeSpan patience,
@@ -121,21 +123,22 @@ internal static class Programs
         Task<string> error
     )
     {
-        var message = $"'{start.FileName}' did not end within {patience}.";
+        var message = $"'{start.FileName}', or a program it started, did not end within {patience}.";
         try
         {
             var written = await Task.WhenAll(output, error).WaitAsync(KillWait);
             return new TimeoutException($"{message}  It wrote: {written[0]}{written[1]}");
         }
-        catch (TimeoutException)
+        catch (Exception exception) when (exception is TimeoutException or IOException or ObjectDisposedException)
         {
             return new TimeoutException(message);
         }
     }
 
     // The whole tree, since a shell or the SDK starts programs of its own that hold the streams open.  A program that
-    // has just ended is no failure.
-    private static async Task KillAsync(Process program)
+    // has just ended is no failure.  A program that is still there after KillWait is the failure, and gives the one
+    // that brought the kill as its inner exception.
+    private static async Task KillAsync(Process program, ProcessStartInfo start, Exception failure)
     {
         try
         {
@@ -147,7 +150,14 @@ internal static class Programs
             // It ended between the failure and the kill, or the system would not end it or one that it started.
         }
 
-        await program.WaitForExitAsync(CancellationToken.None).WaitAsync(KillWait);
+        try
+        {
+            await program.WaitForExitAsync(CancellationToken.None).WaitAsync(KillWait);
+        }
+        catch (TimeoutException)
+        {
+            throw new TimeoutException($"'{start.FileName}' was still there {KillWait} after it was killed.", failure);
+        }
     }
 
     private static bool IsOnPath(string program)

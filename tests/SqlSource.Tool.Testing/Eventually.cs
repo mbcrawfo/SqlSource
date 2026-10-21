@@ -39,7 +39,8 @@ internal static class Eventually
         {
             while (true)
             {
-                // An attempt that hangs is no longer than the patience either.
+                // An attempt that hangs is no longer than the patience either: it is abandoned at the limit, and a
+                // later failure of it goes unobserved.
                 if (await attempt().WaitAsync(limit.Token) is { } value)
                 {
                     return value;
@@ -55,6 +56,20 @@ internal static class Eventually
     }
 
     // A task that the test does not make end itself: a wait for something to happen, as a message or a signal.
-    public static Task<T> WithinAsync<T>(Task<T> task) =>
-        task.WaitAsync(Patience, TestContext.Current.CancellationToken);
+    public static Task<T> WithinAsync<T>(Task<T> task, string otherwise) => WithinAsync(task, otherwise, Patience);
+
+    internal static async Task<T> WithinAsync<T>(Task<T> task, string otherwise, TimeSpan patience)
+    {
+        var test = TestContext.Current.CancellationToken;
+        using var limit = CancellationTokenSource.CreateLinkedTokenSource(test);
+        limit.CancelAfter(patience);
+        try
+        {
+            return await task.WaitAsync(limit.Token);
+        }
+        catch (OperationCanceledException) when (limit.IsCancellationRequested && !test.IsCancellationRequested)
+        {
+            throw new TimeoutException(otherwise);
+        }
+    }
 }

@@ -25,8 +25,11 @@ internal sealed class ProcessGate
     private volatile bool _open;
 
     // The next request that came and now waits, in the order they came.
-    public async Task<ProcessRequest> ArrivalAsync() =>
-        await _arrivals.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(Eventually.Patience);
+    public Task<ProcessRequest> ArrivalAsync() =>
+        Eventually.WithinAsync(
+            _arrivals.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask(),
+            "No request came to the gate."
+        );
 
     // The next requests that came and now wait, as many as asked for.
     public async Task<ProcessRequest[]> ArrivalsAsync(int count)

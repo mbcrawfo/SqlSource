@@ -85,7 +85,7 @@ public sealed class PostgresEventsPlanTests
         Member(explain, "settings").ShouldBe(LogValue.ListOfTexts([]));
         Member(explain, "sql").ShouldBe((LogValue)"EXPLAIN (VERBOSE, FORMAT JSON) EXECUTE sqlsource_1");
         Member(explain, "plan").ShouldBe((LogValue)JoinedPlan);
-        Member(explain, "durationMs").ShouldBe((LogValue)7L);
+        Member(explain, "durationMs").ShouldBe((LogValue)(long)CallTime.TotalMilliseconds);
 
         var join = log.Events[8].Members;
         NamesOf(join)

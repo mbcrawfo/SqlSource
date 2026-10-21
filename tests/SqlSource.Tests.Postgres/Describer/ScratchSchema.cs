@@ -5,11 +5,11 @@ using SqlSource.Tool.Testing;
 namespace SqlSource.Tests.Postgres.Describer;
 
 // Every object that a test of the UsesPostgres collection leaves on its one server beyond the fixture has its text
-// here alone, made by SQL that can be run again, and is never dropped: the container is thrown away, and the fixtures
-// are recorded in one of their own.  So a class that runs it first makes the same object as any other would.  An
-// object that changes what another test sees while it exists, public."numeric", the schema "user",
-// describer_canary, command_widgets, error_path_widgets and session_gone, is made by its test and dropped in a
-// finally.
+// here alone, made by SQL that can be run again, and is never dropped beyond what its own text replaces: the
+// container is thrown away, and the fixtures are recorded in one of their own.  So a class that runs it first makes
+// the same object as any other would.  An object that changes what another test sees while it exists,
+// public."numeric", the schema "user", describer_canary, command_widgets, error_path_widgets and session_gone, is made
+// by its test and dropped in a finally.
 internal static class ScratchSchema
 {
     /// <summary>
@@ -119,7 +119,7 @@ internal static class ScratchSchema
 
     /// <summary>
     /// A legacy inheritance parent <c>inh_parent</c>, whose columns are NOT NULL, and its child <c>inh_child</c>.
-    /// Before PostgreSQL 18 the child drops the NOT NULL of <c>v</c> that it inherited, which 18 refuses, so there the
+    /// Before PostgreSQL 18 the child drops the NOT NULL of <c>v</c> that it inherited, which 18 refuses: before 18 the
     /// child's <c>v</c> may hold <c>NULL</c>.  Both are empty.
     /// </summary>
     public const string Inheritance = """

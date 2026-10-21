@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tool.Tests;
 
-// Eventually is the one wait of the tests that polls, and Patience the one limit of every wait.
+// Eventually is how every wait of the tests waits, and Patience its one limit.
 public sealed class EventuallyTests
 {
     [Fact]
@@ -50,6 +50,26 @@ public sealed class EventuallyTests
         );
 
         thrown.Message.ShouldBe("no value");
+    }
+
+    [Fact]
+    public async Task WithinAsync_TaskThatDoesNotEnd_ThrowsTheTimeoutWithItsMessage()
+    {
+        var hangs = new TaskCompletionSource<int>();
+
+        var thrown = await Should.ThrowAsync<TimeoutException>(() =>
+            Eventually.WithinAsync(hangs.Task, "never ended", TimeSpan.FromMilliseconds(200))
+        );
+
+        thrown.Message.ShouldBe("never ended");
+    }
+
+    [Fact]
+    public async Task WithinAsync_TaskThatEnds_GivesItsResult()
+    {
+        var result = await Eventually.WithinAsync(Task.FromResult(7), "never ended");
+
+        result.ShouldBe(7);
     }
 
     [Fact]

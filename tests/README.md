@@ -29,7 +29,7 @@ The libraries are never run as tests, hold no tests and are never packed:
 
 - the harness of a whole command: `CliRun`, which fakes MSBuild and the environment or, as `CliRun.Real`, runs the real `dotnet msbuild` and the test process's environment, `CliResult`, `Hosts` and `Plans`;
 - the fakes of a process and a project: `FakeProcessRunner`, `FakeProject` and `TestProject`;
-- `Programs`, which starts the built tool and runs a program with a limit, its tree killed and the tool's `dotnet`, and `Eventually`, the one limit of every wait of the tests;
+- `Programs`, which starts the built tool and runs a program with a limit, its tree killed and the tool's `dotnet`, and `Eventually`, how every wait of the tests waits, with `Patience` as its one limit, which every caller of `Programs.RunAsync` uses too;
 - `TestClock`, a clock that stands still until a test moves it, which a run, a host and a session of the tests stand on unless a test brings a clock;
 - `LogReader`, `Secrets`, `SidecarFiles` and `TempFolder`;
 - `Describers`, which opens a describer's session as a run does, and `DescribeRequests`, which builds the `DescribeRequest` of a test;
@@ -85,7 +85,7 @@ What each test project takes from the libraries:
 
 - `tests/SqlSource.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, `TestSidecars` and `RepositoryRoot`, and `tests/SqlSource.Tests.RoslynFloor` references it for the harness.
 - `tests/SqlSource.Tool.Tests` references `tests/SqlSource.Testing` for the harness of the generator's driver tests, which `GeneratorParityTests` runs with the tool over the same sources, and `tests/SqlSource.Tool.Testing` for the helpers it shares with `tests/SqlSource.Tests.Postgres`.
-- `tests/SqlSource.Tests.Postgres` references `tests/SqlSource.Testing` for `RepositoryRoot`, `DefaultImages`, `EndToEndFiles`, `AllTypesRows`, `TestSidecars`, and `GeneratorHarness` and `Sidecars` of the harness, and `tests/SqlSource.Tool.Testing` for the fixture harness, the command harness of the tool's tests, `CliRun` and what it needs, `Programs`, `FixtureProjects`, and `Describers` and `DescribeRequests`, which open its sessions and build its requests.
+- `tests/SqlSource.Tests.Postgres` references `tests/SqlSource.Testing` for `RepositoryRoot`, `DefaultImages`, `EndToEndFiles`, `AllTypesRows`, `TestSidecars`, and `GeneratorHarness` and `Sidecars` of the harness, and `tests/SqlSource.Tool.Testing` for the fixture harness, the command harness of the tool's tests, `CliRun` and what it needs, `Programs`, `Eventually`, `FixtureProjects`, and `Describers` and `DescribeRequests`, which open its sessions and build its requests.
 - `tests/SqlSource.Tests.Postgres.Npgsql8` references `tests/SqlSource.Testing` for `RepositoryRoot`, `DefaultImages`, `EndToEndFiles` and `AllTypesRows`, and nothing that brings Npgsql 10.
 
 `tests/SqlSource.Tests`, `tests/SqlSource.Tests.Postgres` and `tests/SqlSource.Tests.Postgres.Npgsql8` also use the generator the way a consumer does.  Their attributed types, in the `EndToEnd/` of the first two, in `Realistic/Generation/RealisticQueries.cs` of the second and at the root of the third, are compiled with the generator loaded, and each project imports `src/SqlSource/build/SqlSource.props` and `SqlSource.targets`, the MSBuild files the package ships.  Each gets them by path and the generator through a project reference.  [`tools/check-package-install.sh`](../tools/README.md#check-package-installsh) is what installs the packed package.
