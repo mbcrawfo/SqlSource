@@ -13,8 +13,9 @@ namespace SqlSource.Generation.Models;
 /// The files that have a model, in the order of <see cref="SqlPath.Comparer" />, each with its models in slots.
 /// </param>
 /// <param name="OfRepeatedPaths">
-/// The models whose file is a path that the project lists more than once, in the order of the set.  Such a file is
-/// parsed once, from the first listing, so these are emitted apart from the files.
+/// The models whose file is a path that the project lists more than once, in the order of the set.  Such a path has
+/// a <c>ParsedFile</c> node for each listing, and each node would add the model's file again, which throws, so these
+/// are emitted apart from the files.
 /// </param>
 internal sealed record ModelsByFile(EquatableArray<FileModelSlots> Files, EquatableArray<Model> OfRepeatedPaths)
 {
