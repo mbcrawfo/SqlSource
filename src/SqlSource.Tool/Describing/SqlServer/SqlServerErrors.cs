@@ -36,9 +36,8 @@ internal static class SqlServerErrors
 
     /// <summary>The help of <c>SQLSRC231</c>: the server and SqlSource read the parameters differently.</summary>
     public const string ListsDifferHelp =
-        "a parameter of a CREATE PROCEDURE is no parameter of the query, and a DECLAREd variable is none either; "
-        + "rewrite the query so that both read it the same, or declare a parameter that SqlSource reads as a variable "
-        + "with -- param:";
+        "rewrite the query so that SqlSource and SQL Server read the same parameters, or give a parameter that "
+        + "SqlSource reads as a variable a -- param: marker with its type";
 
     /// <summary>The reason of <c>SQLSRC228</c> for a type the database lacks: <c>2715</c> or <c>2724</c>.</summary>
     public const string NoSuchType = "the database has no such type";
@@ -271,8 +270,8 @@ internal static class SqlServerErrors
             null
         );
 
-    /// <summary>A parameter as the SQL writes one: <c>@id</c>.</summary>
-    public static string Written(string parameter) => SqlDialectRules.SqlServer.ParameterPrefix + parameter;
+    // A parameter as the SQL writes one: "@id".
+    private static string Written(string parameter) => SqlDialectRules.SqlServer.ParameterPrefix + parameter;
 
     // SQLSRC228 at the step "resolve type", whose last argument is the reason the type cannot be used.
     private static DescribeFailure DeclaredType(

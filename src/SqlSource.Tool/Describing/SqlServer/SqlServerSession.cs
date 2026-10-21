@@ -230,7 +230,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
     {
         var answer = await DeclaredAsync(
             new SqlServerDeclaredRequest(
-                "SELECT " + SqlServerErrors.Written(parameter.Name) + " AS [1]",
+                SqlServerLive.DeclaredSelect(parameter.Name),
                 SqlServerLive.Declarations([(parameter.Name, type)])
             ),
             cancellationToken

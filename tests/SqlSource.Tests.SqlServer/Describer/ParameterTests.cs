@@ -280,6 +280,35 @@ public sealed class ParameterTests(SqlServerContainer sqlServer)
         failure.ServerLines.ShouldHaveSingleItem().ShouldStartWith("Msg 11527, ");
     }
 
+    // A real misreading: SqlSource ends a list of DECLAREd variables at a ";" or at a word that starts a statement, and
+    // neither the label nor RECEIVE is one, so it reads "@p" after the comma as a variable, where SQL Server reads a
+    // parameter.  The list is the one the generator's parser makes of the file; the queue is the test's own.
+    [Fact]
+    public async Task DescribeAsync_ParameterSqlSourceReadsAsADeclaredVariable_IsSqlsrc231()
+    {
+        const string Sql =
+            "DECLARE @x int = @n next_message: RECEIVE TOP (1) message_body, @p + 1 AS q FROM dbo.sqlsource_messages";
+        var parsed = SqlFileParser.Parse("-- dialect: mssql\n-- name: Q\n" + Sql, "Q.sql");
+        parsed.Errors.ShouldBeEmpty();
+        var parameters = parsed.Blocks.ShouldHaveSingleItem().Parameters;
+        parameters.Select(parameter => parameter.Name).ShouldBe(["n"]);
+        await sqlServer.ExecuteAsync("CREATE QUEUE dbo.sqlsource_messages");
+        try
+        {
+            var failure = await ShouldFailAsync(Listed(Sql, [.. parameters]), "SQLSRC231");
+
+            failure.Arguments.ShouldBe([
+                "SQL Server",
+                Query,
+                "SQL Server reads '@p' as a parameter and SqlSource does not",
+            ]);
+        }
+        finally
+        {
+            await sqlServer.ExecuteAsync("DROP QUEUE dbo.sqlsource_messages");
+        }
+    }
+
     // The lists are the test's, as a reading of SqlSource that differs from the server's makes them.
     [Fact]
     public async Task DescribeAsync_ListLacksAParameterTheServerReports_IsSqlsrc231()

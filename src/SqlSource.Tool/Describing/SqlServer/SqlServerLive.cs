@@ -202,6 +202,13 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             token
         );
 
+    /// <summary>
+    /// The text of <c>declared</c> for one parameter, which the server describes under its declaration:
+    /// <c>SELECT @p AS [1]</c>.
+    /// </summary>
+    /// <param name="parameter">The parameter's name, without its <c>@</c>.</param>
+    public static string DeclaredSelect(string parameter) => "SELECT @" + parameter + " AS [1]";
+
     /// <summary>The declarations of parameters as <c>@params</c> takes them: <c>@a int, @b nvarchar(50)</c>.</summary>
     /// <param name="declarations">Each parameter's name, without its <c>@</c>, and its type as it is declared.</param>
     public static string Declarations(IEnumerable<(string Name, string Type)> declarations) =>
@@ -244,10 +251,10 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             : Convert.ToInt32(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
     }
 
-    // An error of the batch, which the server raises when the declarations do not bind: below the class that ends the
-    // connection, and no timeout of SqlClient's.
+    // An error of the batch, which the server raises when the declarations do not bind: every error of it below the
+    // class that ends the connection, and none a timeout of SqlClient's.
     private static bool IsTheBatchs(SqlException exception) =>
-        exception.Class < FatalClass && exception.Errors.Cast<SqlError>().All(static error => error.Number != Timeout);
+        exception.Errors.Cast<SqlError>().All(static error => error.Class < FatalClass && error.Number != Timeout);
 
     private static string OnOrOff(int value) => value == 1 ? "ON" : "OFF";
 

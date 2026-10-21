@@ -22,6 +22,11 @@ public sealed class SqlServerSessionTests
 {
     private const string Database = "app";
 
+    private static readonly SqlServerParameterRow IntRow = new("@x", "int", 4, 10, 0, null, null, null);
+    private static readonly SqlServerParameterRow Name100Row = new("@x", "nvarchar(100)", 200, 0, 0, null, null, null);
+    private static readonly SqlServerType Int = new("int", 4, 10, 0, null);
+    private static readonly SqlServerType Name100 = new("nvarchar(100)", 200, 0, 0, null);
+
     // What "open" answers for SQL Server 2017 with the settings a database of its defaults has.
     private static readonly SqlServerOpenAnswer Opened2017 = new(
         "14.0.3560.2",
@@ -115,11 +120,6 @@ public sealed class SqlServerSessionTests
                 + "database"
         );
     }
-
-    private static readonly SqlServerParameterRow IntRow = new("@x", "int", 4, 10, 0, null, null, null);
-    private static readonly SqlServerParameterRow Name100Row = new("@x", "nvarchar(100)", 200, 0, 0, null, null, null);
-    private static readonly SqlServerType Int = new("int", 4, 10, 0, null);
-    private static readonly SqlServerType Name100 = new("nvarchar(100)", 200, 0, 0, null);
 
     [Fact]
     public async Task DescribeAsync_TwoInferredParameters_AsksParametersOnceWithNoDeclarations()

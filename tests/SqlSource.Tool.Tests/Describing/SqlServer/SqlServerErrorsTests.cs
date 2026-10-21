@@ -273,9 +273,8 @@ public sealed class SqlServerErrorsTests
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldBeEmpty();
         failure.Help.ShouldBe(
-            "a parameter of a CREATE PROCEDURE is no parameter of the query, and a DECLAREd variable is none either; "
-                + "rewrite the query so that both read it the same, or declare a parameter that SqlSource reads as a "
-                + "variable with -- param:"
+            "rewrite the query so that SqlSource and SQL Server read the same parameters, or give a parameter that "
+                + "SqlSource reads as a variable a -- param: marker with its type"
         );
         MessageOf(failure)
             .ShouldBe(

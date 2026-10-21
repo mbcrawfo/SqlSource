@@ -1283,7 +1283,9 @@ SQL Server gives the error for a parameter whose uses fix no type, `SELECT @p AS
     help: add a CAST around a use of the parameter, or declare its type with -- param:
 ```
 
-Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter used more than once whose uses all leave its type open is this error too, with no `server:` line.  A parameter whose only use is `@p IS NULL` is not: SQL Server gives it the type `int`.
+Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter whose only use is `@p IS NULL` is not this error: SQL Server gives it the type `int`.
+
+The same error with no `server:` line is for a parameter used more than once.  SQL Server gives it a type at each use, and when the uses get different types, those that say nothing of the type, such as `@p IS NULL`, are left out, as [SQLSRC262](#sqlsrc262) says.  When every use is left out that way, or a use that is left gets no type from SQL Server, the parameter has no type.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
 
 See: [Parameters](postgresql.md#parameters)
 
@@ -1419,13 +1421,18 @@ One difference has no `@` in it: a parameter that is an array of a domain, `-- p
 
 A pooler in transaction mode, such as PgBouncer, can also show as this error: the describe of a statement that is missing on another backend can answer no columns and no error, so the message ends "... columns for Npgsql and 0 for SqlSource", and a statement that an earlier run left on a pooled backend can give the wrong column names.  The fix is a direct connection to the server, as [SQLSRC236](#sqlsrc236) says.  An error of the check that says nothing of how Npgsql reads the SQL, such as a lost connection, is [SQLSRC225](#sqlsrc225) at the same step.  If the SQL is plain and the two still differ, report it.
 
-For SQL Server, the tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case, and the message names each one that only one of them reads.  Under `mssql`, SqlSource reads a name as a [variable declared with `DECLARE`](parameters-and-tokens.md#declared-variables) when it stands after a comma of a list of declarations, and that list ends at a `;` or at a word that starts a statement.  A statement after a `DECLARE`, with no `;` between, that holds no such word before the comma can hide a parameter from SqlSource, and SQL Server reports it:
+For SQL Server, the tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case, and the message names each one that only one of them reads.  Under `mssql`, SqlSource reads a name as a [variable declared with `DECLARE`](parameters-and-tokens.md#declared-variables) when it stands after a comma of a list of declarations, and that list ends at a `;` or at a word that starts a statement, such as `SELECT` or `SET`.  A label is no such word, and neither is a word of the statements of Service Broker, such as `RECEIVE`.  So in this query SqlSource reads `@p` as a variable, and SQL Server as a parameter:
+
+```sql mssql
+-- name: NextMessage
+DECLARE @x int = @n next_message: RECEIVE TOP (1) message_body, @p + 1 AS q FROM dbo.messages
+```
 
 ```console
-/work/App/Queries/Users.sql(1,10): error SQLSRC231: SQL Server reads the parameters of the query 'TopUsers' differently from SqlSource: SQL Server reads '@p' as a parameter and SqlSource does not
-    query: TopUsers, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+/work/App/Queries/Users.sql(1,10): error SQLSRC231: SQL Server reads the parameters of the query 'NextMessage' differently from SqlSource: SQL Server reads '@p' as a parameter and SqlSource does not
+    query: NextMessage, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
     step: check parameters
-    help: a parameter of a CREATE PROCEDURE is no parameter of the query, and a DECLAREd variable is none either; rewrite the query so that both read it the same, or declare a parameter that SqlSource reads as a variable with -- param:
+    help: rewrite the query so that SqlSource and SQL Server read the same parameters, or give a parameter that SqlSource reads as a variable a -- param: marker with its type
 ```
 
 **Fix:** end the list of declarations with a `;`, or give the parameter a `-- param:` marker with its type, `-- param: @p int`, which makes it a parameter for SqlSource too.
