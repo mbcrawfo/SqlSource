@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using Shouldly;
 using SqlSource.Diagnostics;
@@ -12,8 +13,8 @@ public sealed class ModelsByFileTests
     [Fact]
     public void Arrange_ModelsOfTwoFiles_GivesEachFileItsSlotsInPathOrder()
     {
-        var onB = Model("App.OnB");
-        var onA = Model("App.OnA");
+        var onB = Model("App.OnB", ModelRole.Output);
+        var onA = Model("App.OnA", ModelRole.Input);
         var set = Set((onB, Place("b/B.sql", 0, ModelRole.Output)), (onA, Place("a/A.sql", 1, ModelRole.Input)));
 
         var byFile = ModelsByFile.Arrange(set, TestModels.Array<string>());
@@ -35,8 +36,8 @@ public sealed class ModelsByFileTests
     [Fact]
     public void Arrange_TwoTypesClaimOneQuery_PutsBothModelsInItsSlotByClaimingType()
     {
-        var byZ = Model("App.ByZ");
-        var byA = Model("App.ByA");
+        var byZ = Model("App.ByZ", ModelRole.Output);
+        var byA = Model("App.ByA", ModelRole.Output);
         var set = Set(
             (byZ, Place("a/A.sql", 0, ModelRole.Output, "App.Z")),
             (byA, Place("a/A.sql", 0, ModelRole.Output, "App.A"))
@@ -51,8 +52,8 @@ public sealed class ModelsByFileTests
     [Fact]
     public void Arrange_ModelsOfOneQueryAndRole_KeepTheSetsOrderWhenTheirPlacesAreEqual()
     {
-        var first = Model("App.First");
-        var second = Model("App.Second");
+        var first = Model("App.First", ModelRole.Input);
+        var second = Model("App.Second", ModelRole.Input);
         var place = Place("a/A.sql", 0, ModelRole.Input);
 
         var byFile = ModelsByFile.Arrange(Set((first, place), (second, place)), TestModels.Array<string>());
@@ -63,8 +64,8 @@ public sealed class ModelsByFileTests
     [Fact]
     public void Arrange_PathsThatDifferByCase_AreOneFile()
     {
-        var lower = Model("App.Lower");
-        var upper = Model("App.Upper");
+        var lower = Model("App.Lower", ModelRole.Input);
+        var upper = Model("App.Upper", ModelRole.Input);
         var set = Set((upper, Place("a/A.sql", 1, ModelRole.Input)), (lower, Place("a/a.sql", 0, ModelRole.Input)));
 
         var byFile = ModelsByFile.Arrange(set, TestModels.Array<string>());
@@ -77,8 +78,8 @@ public sealed class ModelsByFileTests
     [Fact]
     public void Arrange_RepeatedPath_LeavesItsModelsToTheCollectedOutput()
     {
-        var onA = Model("App.OnA");
-        var onB = Model("App.OnB");
+        var onA = Model("App.OnA", ModelRole.Output);
+        var onB = Model("App.OnB", ModelRole.Output);
         var set = Set((onA, Place("a/A.sql", 0, ModelRole.Output)), (onB, Place("b/B.sql", 0, ModelRole.Output)));
 
         var byFile = ModelsByFile.Arrange(set, TestModels.Array("A/a.sql"));
@@ -99,7 +100,10 @@ public sealed class ModelsByFileTests
     [Fact]
     public void SlotsOf_PathWithoutModels_IsEmpty()
     {
-        var byFile = ModelsByFile.Arrange(Set((Model("App.OnA"), Place("a/A.sql", 0, ModelRole.Input))), default);
+        var byFile = ModelsByFile.Arrange(
+            Set((Model("App.OnA", ModelRole.Input), Place("a/A.sql", 0, ModelRole.Input))),
+            default
+        );
 
         ModelsByFile.SlotsOf("b/B.sql", byFile).ShouldBeEmpty();
     }
@@ -107,12 +111,19 @@ public sealed class ModelsByFileTests
     [Fact]
     public void SlotsOf_PathIgnoringCase_FindsItsSlots()
     {
-        var onA = Model("App.OnA");
+        var onA = Model("App.OnA", ModelRole.Input);
         var byFile = ModelsByFile.Arrange(Set((onA, Place("a/A.sql", 0, ModelRole.Input))), default);
 
         ModelsByFile.SlotsOf("A/a.SQL", byFile).ShouldBe(byFile.Files[0].Slots);
         ModelsByFile.SlotsOf("A/a.SQL", byFile)[0].ShouldBe([onA]);
     }
+
+    // The slot of a model is QueryIndex * 2 + (int)Role, so the roles must be these two, numbered so.
+    [Fact]
+    public void ModelRole_SlotsAreTwoForEachQuery_HasInputThenOutput() =>
+        Enum.GetValues<ModelRole>()
+            .Select(role => (role, (int)role))
+            .ShouldBe([(ModelRole.Input, 0), (ModelRole.Output, 1)]);
 
     [Fact]
     public void Arrange_EqualSets_AreEqual()
@@ -120,9 +131,9 @@ public sealed class ModelsByFileTests
         static ModelsByFile Arrange() =>
             ModelsByFile.Arrange(
                 Set(
-                    (Model("App.OnB"), Place("b/B.sql", 0, ModelRole.Output)),
-                    (Model("App.OnA"), Place("a/A.sql", 1, ModelRole.Input)),
-                    (Model("App.OnRepeated"), Place("c/C.sql", 0, ModelRole.Input))
+                    (Model("App.OnB", ModelRole.Output), Place("b/B.sql", 0, ModelRole.Output)),
+                    (Model("App.OnA", ModelRole.Input), Place("a/A.sql", 1, ModelRole.Input)),
+                    (Model("App.OnRepeated", ModelRole.Input), Place("c/C.sql", 0, ModelRole.Input))
                 ),
                 TestModels.Array("c/C.sql")
             );
@@ -143,12 +154,12 @@ public sealed class ModelsByFileTests
     private static ModelPlace Place(string path, int queryIndex, ModelRole role, string claimingType = "App.Repo") =>
         new(path, queryIndex, role, claimingType);
 
-    private static Model Model(string fullName) =>
+    private static Model Model(string fullName, ModelRole role) =>
         new(
             fullName + ".g.cs",
             "App",
             fullName[(fullName.LastIndexOf('.') + 1)..],
-            ModelRole.Output,
+            role,
             ModelKind.Record,
             true,
             TestModels.Array<ModelProperty>(),

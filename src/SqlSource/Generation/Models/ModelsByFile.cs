@@ -61,13 +61,13 @@ internal sealed record ModelsByFile(EquatableArray<FileModelSlots> Files, Equata
         }
 
         var ordered = new List<(ModelPlace Place, int Index)>(set.Models.Count);
-        var ofRepeatedPaths = ImmutableArray.CreateBuilder<Model>();
+        ImmutableArray<Model>.Builder? ofRepeatedPaths = null;
         for (var index = 0; index < set.Models.Count; index++)
         {
             var place = set.Places[index];
             if (SqlPath.Contains(repeatedPaths, place.NormalizedPath))
             {
-                ofRepeatedPaths.Add(set.Models[index]);
+                (ofRepeatedPaths ??= ImmutableArray.CreateBuilder<Model>()).Add(set.Models[index]);
             }
             else
             {
@@ -93,7 +93,9 @@ internal sealed record ModelsByFile(EquatableArray<FileModelSlots> Files, Equata
 
         return new ModelsByFile(
             new EquatableArray<FileModelSlots>(files.ToImmutable()),
-            new EquatableArray<Model>(ofRepeatedPaths.ToImmutable())
+            ofRepeatedPaths is null
+                ? EquatableArray<Model>.Empty
+                : new EquatableArray<Model>(ofRepeatedPaths.ToImmutable())
         );
     }
 
@@ -106,7 +108,12 @@ internal sealed record ModelsByFile(EquatableArray<FileModelSlots> Files, Equata
         return index < 0 ? EquatableArray<EquatableArray<Model>>.Empty : byFile.Files[index].Slots;
     }
 
+    // The slot of a place: two for each query, the role in the lower bit.  Input is 0 and Output is 1, which
+    // ModelsByFileTests holds.
+    private static int SlotOf(ModelPlace place) => (place.QueryIndex * 2) + (int)place.Role;
+
     // The slots of the models from start up to end, which are the models of one file, in the order of their places.
+    // That order puts the models of a slot together, so each slot takes the run of models that has its number.
     private static EquatableArray<EquatableArray<Model>> SlotsOfFile(
         ModelSet set,
         List<(ModelPlace Place, int Index)> ordered,
@@ -114,21 +121,32 @@ internal sealed record ModelsByFile(EquatableArray<FileModelSlots> Files, Equata
         int end
     )
     {
-        // The last of the file's models is of its last query, and the role in a slot's index is the lower bit.
-        var slots = new ImmutableArray<Model>.Builder?[(ordered[end - 1].Place.QueryIndex + 1) * 2];
-        for (var position = start; position < end; position++)
+        // The last of the file's models is of its last query.
+        var slots = ImmutableArray.CreateBuilder<EquatableArray<Model>>((ordered[end - 1].Place.QueryIndex + 1) * 2);
+        var position = start;
+        for (var slot = 0; slot < slots.Capacity; slot++)
         {
-            var (place, index) = ordered[position];
-            var slot = (place.QueryIndex * 2) + (int)place.Role;
-            (slots[slot] ??= ImmutableArray.CreateBuilder<Model>()).Add(set.Models[index]);
+            var runEnd = position;
+            while (runEnd < end && SlotOf(ordered[runEnd].Place) == slot)
+            {
+                runEnd++;
+            }
+
+            if (runEnd == position)
+            {
+                slots.Add(EquatableArray<Model>.Empty);
+                continue;
+            }
+
+            var models = ImmutableArray.CreateBuilder<Model>(runEnd - position);
+            for (; position < runEnd; position++)
+            {
+                models.Add(set.Models[ordered[position].Index]);
+            }
+
+            slots.Add(new EquatableArray<Model>(models.MoveToImmutable()));
         }
 
-        var result = ImmutableArray.CreateBuilder<EquatableArray<Model>>(slots.Length);
-        foreach (var slot in slots)
-        {
-            result.Add(slot is null ? EquatableArray<Model>.Empty : new EquatableArray<Model>(slot.ToImmutable()));
-        }
-
-        return new EquatableArray<EquatableArray<Model>>(result.MoveToImmutable());
+        return new EquatableArray<EquatableArray<Model>>(slots.MoveToImmutable());
     }
 }
