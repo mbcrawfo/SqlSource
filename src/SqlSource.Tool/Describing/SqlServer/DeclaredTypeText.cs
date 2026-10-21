@@ -111,7 +111,7 @@ internal static class DeclaredTypeText
         while (index < text.Length)
         {
             var value = text[index];
-            if (value is '\r' or '\n')
+            if (IsLineBreak(value))
             {
                 return OneLine;
             }
@@ -210,7 +210,7 @@ internal static class DeclaredTypeText
             ';' => Semicolon,
             '-' when next == '-' => Comment,
             '/' when next == '*' => Comment,
-            '\r' or '\n' => OneLine,
+            var value when IsLineBreak(value) => OneLine,
             _ => Shape,
         };
     }
@@ -230,6 +230,9 @@ internal static class DeclaredTypeText
     private static bool IsFirst(char value) => char.IsAsciiLetter(value) || value is '_' or '#' or '@';
 
     private static bool IsNext(char value) => char.IsAsciiLetterOrDigit(value) || value is '_' or '#' or '@' or '$';
+
+    // A line break of any kind a reader may take for one: a type name stays on its line, quoted or not.
+    private static bool IsLineBreak(char value) => value is '\r' or '\n' or '\u0085' or '\u2028' or '\u2029';
 
     private static bool IsAt(string text, int position, char value) =>
         position < text.Length && text[position] == value;

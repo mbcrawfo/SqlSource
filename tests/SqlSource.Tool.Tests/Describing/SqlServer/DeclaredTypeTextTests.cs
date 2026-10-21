@@ -27,6 +27,24 @@ public sealed class DeclaredTypeTextTests
     [InlineData("_t$1")]
     public void Read_TypeName_IsTheText(string text) => DeclaredTypeText.Read(text).Value.ShouldBe(text);
 
+    // A delimited name holds anything but its own closing delimiter alone, so what looks like a second statement
+    // inside one is part of the one name, and the server reads it as such.
+    [Theory]
+    [InlineData("[a]]; DROP]")]
+    [InlineData("\"a\"\";\"")]
+    [InlineData("[a]]--b]")]
+    [InlineData("[x, @y int]")]
+    public void Read_DelimitedNameThatHoldsSyntax_IsOneName(string text) =>
+        DeclaredTypeText.Read(text).Value.ShouldBe(text);
+
+    // Space and tab may stand between the name and its parentheses, and inside them.
+    [Theory]
+    [InlineData("nvarchar\t(50)")]
+    [InlineData("nvarchar ( 50 )")]
+    [InlineData("nvarchar(\tmax\t)")]
+    public void Read_SpaceBeforeOrInsideTheParentheses_IsAccepted(string text) =>
+        DeclaredTypeText.Read(text).Value.ShouldBe(text);
+
     [Fact]
     public void Read_SpaceAroundTheName_IsLeftOut() =>
         DeclaredTypeText.Read("  nvarchar(50) \t").Value.ShouldBe("nvarchar(50)");
@@ -48,6 +66,13 @@ public sealed class DeclaredTypeTextTests
     [InlineData("nvarchar(-1)", DeclaredTypeText.Shape)]
     [InlineData("nvarchar()", DeclaredTypeText.Shape)]
     [InlineData("decimal(18,2)(3)", DeclaredTypeText.Shape)]
+    [InlineData("int(1)(2)", DeclaredTypeText.Shape)]
+    [InlineData("int\tfoo", DeclaredTypeText.Shape)]
+    // A second declaration never passes: a comma stands outside the grammar.
+    [InlineData("int, @x int", DeclaredTypeText.Shape)]
+    [InlineData("int,@x int", DeclaredTypeText.Shape)]
+    [InlineData("nvarchar(50), @x int", DeclaredTypeText.Shape)]
+    [InlineData("[a]], @x int", DeclaredTypeText.NotClosed)]
     [InlineData("''", DeclaredTypeText.Shape)]
     [InlineData("", DeclaredTypeText.Shape)]
     [InlineData(" ", DeclaredTypeText.Shape)]
@@ -63,6 +88,12 @@ public sealed class DeclaredTypeTextTests
     [InlineData("int\r\n", DeclaredTypeText.OneLine)]
     [InlineData("[a\nb]", DeclaredTypeText.OneLine)]
     [InlineData("\"a\rb\"", DeclaredTypeText.OneLine)]
+    [InlineData("int\u0085foo", DeclaredTypeText.OneLine)]
+    [InlineData("int\u2028", DeclaredTypeText.OneLine)]
+    [InlineData("int\u2029foo", DeclaredTypeText.OneLine)]
+    [InlineData("[a\u0085b]", DeclaredTypeText.OneLine)]
+    [InlineData("[a\u2028b]", DeclaredTypeText.OneLine)]
+    [InlineData("\"a\u2029b\"", DeclaredTypeText.OneLine)]
     public void Read_AnythingElse_IsRefusedWithWhatWasFound(string text, string found) =>
         DeclaredTypeText.Read(text).Failure.ShouldBe(DeclaredTypeText.NotATypeName + ": " + found, text);
 

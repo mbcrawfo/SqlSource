@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
 using SqlSource.Snapshot;
@@ -136,6 +137,71 @@ public sealed class ParameterCopiesTests
         ]);
 
         ParameterCopies.Rename("SELECT @p, @p", parameters).Sql.ShouldBe("SELECT @p__1, @p__2");
+    }
+
+    // SQL Server's identifier holds 128 characters with the "@", so a copy of a long name has its name cut to fit.
+    [Fact]
+    public void Rename_NameOfTheLongestLength_IsCutToFit()
+    {
+        var name = new string('a', 127);
+        var sql = $"SELECT @{name}, @{name}";
+
+        var copied = Rename(sql);
+
+        var stem = new string('a', 125);
+        copied.Reused[0].Copies.ShouldBe([stem + "_1", stem + "_2"]);
+        copied.Sql.ShouldBe($"SELECT @{stem}_1, @{stem}_2");
+        copied.ParameterOfCopy[stem + "_2"].ShouldBe(name);
+    }
+
+    // Two long names that differ only past the cut get copies of their own: the later one passes over the numbers the
+    // first took.
+    [Fact]
+    public void Rename_TwoLongNamesAlikeUpToTheCut_HaveCopiesThatDiffer()
+    {
+        var first = new string('a', 126) + "x";
+        var second = new string('A', 126) + "y";
+        var sql = $"SELECT @{first}, @{second}, @{first}, @{second}";
+
+        var copied = Rename(sql);
+
+        var stem = new string('a', 125);
+        var upper = new string('A', 125);
+        copied.Reused[0].Copies.ShouldBe([stem + "_1", stem + "_2"]);
+        copied.Reused[1].Copies.ShouldBe([upper + "_3", upper + "_4"]);
+        copied.Sql.ShouldBe($"SELECT @{stem}_1, @{upper}_3, @{stem}_2, @{upper}_4");
+        copied.ParameterOfCopy[upper + "_3"].ShouldBe(second);
+    }
+
+    [Fact]
+    public void Rename_CutCopyNameTheTextHolds_IsPassedOver()
+    {
+        var name = new string('a', 127);
+        var stem = new string('a', 125);
+        var sql = $"DECLARE @{stem}_1 int = 1; SELECT @{name} + @{stem}_1, @{name}";
+
+        var copied = ParameterCopies.Rename(sql, Listed(sql, name));
+
+        copied.Reused[0].Copies.ShouldBe([stem + "_2", stem + "_3"]);
+    }
+
+    [Theory]
+    [InlineData(100)]
+    [InlineData(124)]
+    [InlineData(125)]
+    [InlineData(126)]
+    [InlineData(127)]
+    [InlineData(200)]
+    public void Rename_LongName_EveryCopyFitsAnIdentifier(int length)
+    {
+        var name = new string('p', length);
+        var sql = string.Join(", ", Enumerable.Repeat("@" + name, 12));
+
+        var copies = Rename("SELECT " + sql).Reused[0].Copies;
+
+        copies.Count.ShouldBe(12);
+        copies.ShouldAllBe(copy => copy.Length <= ParameterCopies.MaximumCopyLength);
+        copies.ShouldBeUnique();
     }
 
     // A DECLAREd variable is in no list, so it is never reused, however often it is used.

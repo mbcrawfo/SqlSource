@@ -63,7 +63,10 @@ internal sealed record ListDifference(string Name, bool ReadBySqlSource);
 /// that the list holds undeclared, and that the lexer finds more than once, is renamed to a copy: the parameter's
 /// name, a separator of <c>_</c> and the use's number, counted from one.  The separator is as many <c>_</c> as make
 /// every copy's name differ, ignoring case, from every name the text holds as a parameter or a variable, from every
-/// name of the list, and from every other copy's.  Only <see cref="SqlLexemeKind.Parameter" /> lexemes are renamed,
+/// name of the list, and from every other copy's.  A copy's name is at most <see cref="MaximumCopyLength" />
+/// characters: one that would be longer has its parameter's part cut to fit, and a number whose copy then meets a
+/// name already held is passed over, so the copies of such a parameter are numbered in order but not always from one
+/// without a gap.  Only <see cref="SqlLexemeKind.Parameter" /> lexemes are renamed,
 /// so a string, a comment and a quoted identifier are left as written.
 /// </para>
 /// <para>
@@ -73,6 +76,12 @@ internal sealed record ListDifference(string Name, bool ReadBySqlSource);
 /// </remarks>
 internal static class ParameterCopies
 {
+    /// <summary>
+    /// The longest name of a copy, without its <c>@</c>: SQL Server's identifier holds 128 characters, and a
+    /// variable's counts its <c>@</c>.
+    /// </summary>
+    public const int MaximumCopyLength = 127;
+
     private const char Prefix = '@';
 
     /// <summary>The SQL with every use of each reused parameter renamed to a copy.</summary>
@@ -109,11 +118,9 @@ internal static class ParameterCopies
         }
 
         var separator = SeparatorFor(reused, taken);
+        var made = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var copies = reused
-            .Select(parameter => new ReusedParameter(
-                parameter.Name,
-                [.. Enumerable.Range(1, parameter.Uses).Select(number => CopyName(parameter.Name, separator, number))]
-            ))
+            .Select(parameter => new ReusedParameter(parameter.Name, CopiesOf(parameter, separator, taken, made)))
             .ToList();
         return new CopiedSql(Renamed(sql, lexemes, copies), copies, ParameterOfCopy(copies));
     }
@@ -248,6 +255,45 @@ internal static class ParameterCopies
         }
 
         return parameterOfCopy;
+    }
+
+    // The copies of one parameter, numbered in order of use.  A number whose copy meets a name the text or the list
+    // holds, or another copy, is passed over: that happens only when a name was cut to fit.
+    private static List<string> CopiesOf(
+        (string Name, int Uses) parameter,
+        string separator,
+        HashSet<string> taken,
+        HashSet<string> made
+    )
+    {
+        var copies = new List<string>(parameter.Uses);
+        var number = 0;
+        while (copies.Count < parameter.Uses)
+        {
+            number++;
+            var copy = FittedCopyName(parameter.Name, separator, number);
+            if (!taken.Contains(copy) && made.Add(copy))
+            {
+                copies.Add(copy);
+            }
+        }
+
+        return copies;
+    }
+
+    // The copy's name, its parameter's part cut so that the whole is no longer than MaximumCopyLength.  A cut never
+    // splits a surrogate pair.
+    private static string FittedCopyName(string name, string separator, int number)
+    {
+        var suffix = separator + number.ToString(CultureInfo.InvariantCulture);
+        var room = Math.Max(MaximumCopyLength - suffix.Length, 0);
+        if (name.Length <= room)
+        {
+            return name + suffix;
+        }
+
+        var cut = room > 0 && char.IsHighSurrogate(name[room - 1]) ? room - 1 : room;
+        return name[..cut] + suffix;
     }
 
     private static string CopyName(string name, string separator, int number) =>
