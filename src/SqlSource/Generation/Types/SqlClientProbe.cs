@@ -71,12 +71,12 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
 
     private static string? ReadVersion(Compilation compilation)
     {
+        // The module's references are already bound, so a name is checked before anything of an assembly is read.
         IAssemblySymbol? newest = null;
-        foreach (var reference in compilation.References)
+        foreach (var assembly in compilation.SourceModule.ReferencedAssemblySymbols)
         {
             if (
-                compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly
-                && string.Equals(assembly.Identity.Name, AssemblyName, StringComparison.OrdinalIgnoreCase)
+                string.Equals(assembly.Identity.Name, AssemblyName, StringComparison.OrdinalIgnoreCase)
                 && (newest is null || assembly.Identity.Version > newest.Identity.Version)
             )
             {
