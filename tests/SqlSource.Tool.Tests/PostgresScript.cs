@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -152,13 +153,15 @@ internal sealed class PostgresScript
         IDescribeExchange exchange,
         IRunLog? log = null,
         string connection = Connection,
-        IReadOnlyList<string>? explainSettings = null
-    ) => new PostgresDescriber(explainSettings ?? []).OpenAsync(Database, connection, exchange, log);
+        IReadOnlyList<string>? explainSettings = null,
+        TimeProvider? time = null
+    ) => new PostgresDescriber(explainSettings ?? []).OpenAsync(Database, connection, exchange, log, time);
 
     // The session of a script whose "open" answered a server.
     public static async Task<IDescribeSession> SessionAsync(
         IDescribeExchange exchange,
         IRunLog? log = null,
-        IReadOnlyList<string>? explainSettings = null
-    ) => (await OpenAsync(exchange, log, explainSettings: explainSettings)).Value.ShouldNotBeNull();
+        IReadOnlyList<string>? explainSettings = null,
+        TimeProvider? time = null
+    ) => (await OpenAsync(exchange, log, explainSettings: explainSettings, time: time)).Value.ShouldNotBeNull();
 }

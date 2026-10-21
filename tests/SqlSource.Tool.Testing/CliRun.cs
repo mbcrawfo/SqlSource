@@ -52,8 +52,8 @@ internal sealed class CliRun : IDisposable
     // Every database of the run calls through this one, which asks the describer and keeps the call.
     public CapturingExchange Exchange { get; }
 
-    // The clock of the run.  The machine's, unless a test brings one it can move.
-    public TimeProvider Time { get; set; } = TimeProvider.System;
+    // The clock of the run.  A clock that stands still, unless a test brings one it can move, or the machine's.
+    public TimeProvider Time { get; set; } = new TestClock();
 
     // Makes or empties the files the tool writes, as the log.  The host's own unless a test brings one, for a file
     // that fails.
