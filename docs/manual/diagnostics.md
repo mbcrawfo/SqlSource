@@ -2110,13 +2110,13 @@ See: [SQL Server](sqlserver.md)
 
 **Query returns rows of different shapes**
 
-SQL Server works out the columns of a query from its text, without running it, so every path through the query must return the same columns.  Here the paths return different ones: an `IF` whose two `SELECT`s differ in the number, the names or the types of their columns.  A query has one set of columns, and one model for its rows, whichever path runs.
+SQL Server works out the columns of a query from its text, without running it, so every path through the query must return the same columns.  Here the paths return different ones: an `IF` whose two `SELECT`s differ in the number or the types of their columns.  A query has one set of columns, and one model for its rows, whichever path runs.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC263: The query 'FindUser' returns rows of different shapes on different paths
     query: FindUser, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
     step: describe columns
-    server: Msg 11509: The metadata could not be determined because the statement 'SELECT id FROM dbo.users WHERE id = @id' is not compatible with the statement 'SELECT id, name FROM dbo.users WHERE name = @name'.
+    server: Msg 11509: The metadata could not be determined because the statement 'SELECT id, name FROM dbo.users WHERE name = @name' is not compatible with the statement 'SELECT id FROM dbo.users WHERE id = @id'.
 ```
 
 ```sql error
@@ -2127,7 +2127,7 @@ ELSE
     SELECT id FROM dbo.users WHERE id = @id;
 ```
 
-Make every path return the same columns, of the same names and types, or split the query into one query for each set of columns and choose between them in your code:
+Make every path return the same number of columns, of the same types, or split the query into one query for each set of columns and choose between them in your code:
 
 ```sql mssql
 -- name: FindUserByName
@@ -2136,6 +2136,8 @@ SELECT id, name FROM dbo.users WHERE name = @name;
 -- name: FindUserById
 SELECT id, name FROM dbo.users WHERE id = @id;
 ```
+
+Paths whose columns differ only in their names are not this error: SQL Server gives such a column no name, which is [SQLSRC266](#sqlsrc266).  Give it one name on every path.
 
 See: [SQL Server](sqlserver.md)
 
@@ -2149,7 +2151,7 @@ The query runs SQL that it builds in a string, `EXEC(@sql)`.  SQL Server works o
 /work/App/Queries/Orders.sql(1,10): error SQLSRC264: The query 'ListOrders' runs SQL that the server cannot read until it runs
     query: ListOrders, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
     step: describe columns
-    server: Msg 11513: The metadata could not be determined because statement 'EXEC(@sql)' contains dynamic SQL. Consider using the WITH RESULT SETS clause to explicitly describe the result set.
+    server: Msg 11513: The metadata could not be determined because statement 'EXEC(@sql)' contains dynamic SQL.  Consider using the WITH RESULT SETS clause to explicitly describe the result set.
 ```
 
 ```sql error
@@ -2173,13 +2175,13 @@ See: [SQL Server](sqlserver.md)
 
 **Query uses a temporary table in a batch**
 
-The query creates a temporary table, a `#` table, and reads it in a later statement.  SQL Server works out the columns of a query from its text, without running it, and the table does not exist until the query runs, so SQL Server cannot say what the statement that reads it returns.
+The query creates a temporary table, a `#` table, and uses it in a later statement.  SQL Server works out the columns of a query from its text, without running it, and the table does not exist until the query runs, so SQL Server cannot work out the statements that use it.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC265: The query 'RecentTotals' uses a temporary table in a batch of several statements
     query: RecentTotals, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
     step: describe columns
-    server: Msg 11525: The metadata could not be determined because statement 'SELECT customer_id, SUM(total) AS total FROM #recent GROUP BY customer_id' uses a temp table.
+    server: Msg 11525: The metadata could not be determined because statement 'INSERT #recent (customer_id, total) SELECT customer_id, total FROM dbo.orders WHERE placed_at > @sin' uses a temp table.  Metadata discovery only supports temp tables when analyzing a single-statement batch.
     help: make the query one statement, or use a table variable in place of the temporary table
 ```
 

@@ -362,8 +362,8 @@ public sealed class SqlServerErrorsTests
     public void Columns_ConflictingResults_Is263()
     {
         const string Message =
-            "The metadata could not be determined because the statement 'SELECT name FROM dbo.users' is not "
-            + "compatible with the statement 'SELECT id FROM dbo.users'.";
+            "The metadata could not be determined because the statement 'SELECT id FROM dbo.users' is not "
+            + "compatible with the statement 'SELECT name FROM dbo.users'.";
 
         var failure = SqlServerErrors.Columns(
             Of(SqlDialectRules.SqlServer, "IF @a = 1 SELECT id FROM dbo.users ELSE SELECT name FROM dbo.users"),
@@ -383,7 +383,7 @@ public sealed class SqlServerErrorsTests
     public void Columns_DynamicSql_Is264()
     {
         const string Message =
-            "The metadata could not be determined because statement 'EXEC(@s)' contains dynamic SQL. Consider "
+            "The metadata could not be determined because statement 'EXEC(@s)' contains dynamic SQL.  Consider "
             + "using the WITH RESULT SETS clause to explicitly describe the result set.";
 
         var failure = SqlServerErrors.Columns(
@@ -405,12 +405,13 @@ public sealed class SqlServerErrorsTests
     public void Columns_TemporaryTable_Is265WithHelp()
     {
         const string Message =
-            "The metadata could not be determined because statement 'SELECT a FROM #y' uses a temp table.";
+            "The metadata could not be determined because statement 'SELECT a FROM #y' uses a temp table.  Metadata "
+            + "discovery only supports temp tables when analyzing a single-statement batch.";
 
         var failure = SqlServerErrors.Columns(
             Of(SqlDialectRules.SqlServer, "CREATE TABLE #y (a int NOT NULL); SELECT a FROM #y"),
             [
-                new SqlServerDescribeError(208, 1, "Invalid object name '#y'."),
+                new SqlServerDescribeError(208, 2, "Invalid object name '#y'."),
                 new SqlServerDescribeError(11525, 10, Message),
             ],
             DescribeStep.DescribeColumns
@@ -430,14 +431,14 @@ public sealed class SqlServerErrorsTests
     public void Columns_UndeclaredParameter_Is225()
     {
         const string Message =
-            "The metadata could not be determined because statement 'SELECT @p' uses an undeclared parameter in a "
-            + "context that affects its metadata.";
+            "The metadata could not be determined because statement 'SELECT @p AS p' uses an undeclared parameter "
+            + "in a context that affects its metadata.";
 
         var failure = SqlServerErrors.Columns(
             Of(SqlDialectRules.SqlServer, "SELECT @p AS p"),
             [
-                new SqlServerDescribeError(102, 1, "Incorrect syntax near 'x'."),
-                new SqlServerDescribeError(11526, 8, Message),
+                new SqlServerDescribeError(102, 2, "Incorrect syntax near 'x'."),
+                new SqlServerDescribeError(11521, 8, Message),
             ],
             DescribeStep.DescribeColumns
         );
@@ -445,44 +446,63 @@ public sealed class SqlServerErrorsTests
         failure.Descriptor.Id.ShouldBe("SQLSRC225");
         failure.Arguments.ShouldBe([Query, Message]);
         failure.Step.ShouldBe(DescribeStep.DescribeColumns);
-        failure.ServerLines.ShouldBe(["Msg 102: Incorrect syntax near 'x'.", $"Msg 11526: {Message}"]);
+        failure.ServerLines.ShouldBe(["Msg 102: Incorrect syntax near 'x'.", $"Msg 11521: {Message}"]);
         failure.Help.ShouldBeNull();
     }
 
     // An OUTPUT without INTO on a table with a trigger, an unknown column, a GO inside the query and a word read as
-    // a procedure: the cause first and the row that says the query did not compile last.
+    // a procedure: the cause first and the row that says the query did not compile last, each of the type the server
+    // gives it.
     [Theory]
     [InlineData(
         334,
+        1,
         "The target table 'dbo.trig' of the DML statement cannot have any enabled triggers if the statement contains "
             + "an OUTPUT clause without INTO clause.",
         11501,
+        2,
         "The batch could not be analyzed because of compile errors."
     )]
     [InlineData(
         207,
+        2,
         "Invalid column name 'nope'.",
         11501,
+        2,
         "The batch could not be analyzed because of compile errors."
     )]
     [InlineData(
         102,
+        2,
         "Incorrect syntax near 'GO'.",
         11501,
+        2,
         "The batch could not be analyzed because of compile errors."
     )]
     [InlineData(
         2812,
+        1,
         "Could not find stored procedure 'SELEC'.",
         11529,
+        1,
         "The metadata could not be determined because every code path results in an error; see previous errors for "
             + "some of these."
     )]
-    public void Columns_OtherType_Is225WithEveryLineInOrder(int cause, string causeText, int last, string lastText)
+    public void Columns_OtherType_Is225WithEveryLineInOrder(
+        int cause,
+        int causeType,
+        string causeText,
+        int last,
+        int lastType,
+        string lastText
+    )
     {
         var failure = SqlServerErrors.Columns(
             Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users"),
-            [new SqlServerDescribeError(cause, 1, causeText), new SqlServerDescribeError(last, 1, lastText)],
+            [
+                new SqlServerDescribeError(cause, causeType, causeText),
+                new SqlServerDescribeError(last, lastType, lastText),
+            ],
             DescribeStep.DescribeColumns
         );
 
@@ -498,7 +518,7 @@ public sealed class SqlServerErrorsTests
         SqlServerErrors
             .Columns(
                 Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users"),
-                [new SqlServerDescribeError(208, 1, "Invalid object name 'dbo.users'.")],
+                [new SqlServerDescribeError(208, 2, "Invalid object name 'dbo.users'.")],
                 DescribeStep.TableMatch
             )
             .Step.ShouldBe(DescribeStep.TableMatch);
@@ -511,7 +531,7 @@ public sealed class SqlServerErrorsTests
         var query = Of(SqlDialectRules.SqlServer, "CREATE TABLE #y (a int NOT NULL); SELECT a FROM #y WHERE a = @p");
         const string Message =
             "The metadata could not be determined because statement 'SELECT a FROM #y WHERE a = @p' uses a temp "
-            + "table.";
+            + "table.  Metadata discovery only supports temp tables when analyzing a single-statement batch.";
 
         var failure = SqlServerErrors.AfterRefusal(
             query,
@@ -540,8 +560,13 @@ public sealed class SqlServerErrorsTests
             new SqlServerColumnsAnswer(
                 null,
                 [
-                    new SqlServerDescribeError(208, 1, "Invalid object name '#y'."),
-                    new SqlServerDescribeError(11529, 1, "The metadata could not be determined."),
+                    new SqlServerDescribeError(208, 2, "Invalid object name '#y'."),
+                    new SqlServerDescribeError(
+                        11529,
+                        1,
+                        "The metadata could not be determined because every code path results in an error; see "
+                            + "previous errors for some of these."
+                    ),
                 ],
                 null
             )
