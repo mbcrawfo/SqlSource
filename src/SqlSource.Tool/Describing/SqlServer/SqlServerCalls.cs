@@ -51,3 +51,52 @@ internal sealed record SqlServerServerError(IReadOnlyList<SqlServerErrorRow> Err
 /// <param name="State">Its state.</param>
 /// <param name="Message">The message, or the describer's fixed text.</param>
 internal sealed record SqlServerErrorRow(int Number, int Class, int State, string Message);
+
+/// <summary>
+/// A row of <c>sp_describe_undeclared_parameters</c>: one parameter the server typed, and the type it suggests.  The
+/// members are named as the procedure names its columns.
+/// </summary>
+/// <param name="Name">The parameter's name with its <c>@</c>, as the procedure gives it: <c>@name_1</c>.</param>
+/// <param name="SuggestedSystemTypeName">
+/// The system type with its facets, <c>nvarchar(100)</c>, or null when the server gave none.
+/// </param>
+/// <param name="SuggestedMaxLength">The length in bytes, <c>-1</c> for <c>max</c>.</param>
+/// <param name="SuggestedPrecision">The precision, 0 for a type that has none.</param>
+/// <param name="SuggestedScale">The scale, 0 for a type that has none.</param>
+/// <param name="SuggestedUserTypeSchema">The schema of an alias or CLR type, or null.</param>
+/// <param name="SuggestedUserTypeName">The name of an alias or CLR type, or null.</param>
+/// <param name="SuggestedAssemblyQualifiedTypeName">The assembly-qualified name of a CLR type, or null.</param>
+internal sealed record SqlServerParameterRow(
+    string Name,
+    string? SuggestedSystemTypeName,
+    int? SuggestedMaxLength,
+    int? SuggestedPrecision,
+    int? SuggestedScale,
+    string? SuggestedUserTypeSchema,
+    string? SuggestedUserTypeName,
+    string? SuggestedAssemblyQualifiedTypeName
+);
+
+/// <summary>
+/// A row of <c>sys.dm_exec_describe_first_result_set</c> for <c>SELECT @a AS [1], @b AS [2], ...</c> under the
+/// declarations: the type the server gives a declared parameter.  The members are named as the function names its
+/// columns.
+/// </summary>
+/// <param name="ColumnOrdinal">The column's place, counted from one: the declaration's place.</param>
+/// <param name="SystemTypeName">The system type with its facets, <c>nvarchar(320)</c>, or null.</param>
+/// <param name="MaxLength">The length in bytes, <c>-1</c> for <c>max</c>.</param>
+/// <param name="Precision">The precision, 0 for a type that has none.</param>
+/// <param name="Scale">The scale, 0 for a type that has none.</param>
+/// <param name="UserTypeSchema">The schema of an alias or CLR type, or null.</param>
+/// <param name="UserTypeName">The name of an alias or CLR type, or null.</param>
+/// <param name="AssemblyQualifiedTypeName">The assembly-qualified name of a CLR type, or null.</param>
+internal sealed record SqlServerDeclaredRow(
+    int ColumnOrdinal,
+    string? SystemTypeName,
+    int? MaxLength,
+    int? Precision,
+    int? Scale,
+    string? UserTypeSchema,
+    string? UserTypeName,
+    string? AssemblyQualifiedTypeName
+);
