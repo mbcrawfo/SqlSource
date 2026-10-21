@@ -73,7 +73,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC222](#sqlsrc222) | Directory cannot be read |
 | [SQLSRC223](#sqlsrc223) | Solution cannot be read |
 
-**PostgreSQL**
+**Describing a query**
 
 | Id | Title |
 |----|----|
@@ -147,9 +147,9 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC262](#sqlsrc262) | Copies of a parameter have different types |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, and 262, are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
-The ids from `SQLSRC224` to `SQLSRC236` are the errors of describing a query against PostgreSQL, which this version of the tool does for the `postgres` dialect.  It reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
+The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262`, are the errors of describing a query against its database, PostgreSQL or SQL Server, and each section says which database gives it and for what.  This version of the tool describes the `postgres` dialect, and reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
 
 The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` dialect every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209), [SQLSRC210](#sqlsrc210) or [SQLSRC243](#sqlsrc243) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 119, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
 
@@ -1285,7 +1285,7 @@ SQL Server gives the error for a parameter whose uses fix no type, `SELECT @p AS
 
 Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter whose only use is `@p IS NULL` is not this error: SQL Server gives it the type `int`.
 
-The same error with no `server:` line is for a parameter used more than once.  SQL Server gives it a type at each use, and when the uses get different types, those that say nothing of the type, such as `@p IS NULL`, are left out, as [SQLSRC262](#sqlsrc262) says.  When every use is left out that way, or a use that is left gets no type from SQL Server, the parameter has no type.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
+The same error with no `server:` line is for a parameter used more than once whose uses SQL Server gives different types, or a use no type.  The uses that say nothing of the type, such as `@p IS NULL`, are then left out, as [SQLSRC262](#sqlsrc262) says, and the error is given when every use is left out that way, or when a use that is left has no type.  When every use gets the same type, the parameter has that type and this error is not given.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
 
 See: [Parameters](postgresql.md#parameters)
 

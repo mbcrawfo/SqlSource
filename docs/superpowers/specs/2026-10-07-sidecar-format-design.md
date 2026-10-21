@@ -143,7 +143,7 @@ A composite carries no fields in this epic; `fields` is the obvious additive key
 | Key | Type | Written | Meaning |
 |----|----|----|----|
 | `name` | string | always | `system_type_name` verbatim: `"nvarchar(50)"`, `"decimal(18,2)"`, `"varchar(max)"`, `"datetime2(7)"`, `"int"`.  `rowversion` is reported, and stored, as `"timestamp"`, and `json` as `"varchar(max)"` or `"nvarchar(max)"` depending on the connection's TDS version, because that is what the server says. |
-| `bindName` | string | phase 6 decides | Not yet settled.  The expected shape is `SqlParameter.TypeName` for a table type and `UdtTypeName` for a CLR type, and no `bindName` for a type that `SqlDbType` names.  Phase 6 states when it writes the key. |
+| `bindName` | string | never | Not written for SQL Server, as phase 6 decided: the generated code of phase 8 binds a type that `SqlDbType` names by its `SqlDbType` with `maxLength`, `precision` and `scale`, and a CLR type by the `userType` the type already holds, its `assemblyQualifiedName` included.  A table type is outside the epic, so no parameter has one. |
 | `maxLength` | integer | always | `max_length` verbatim: bytes, `-1` for `max`. |
 | `precision` | integer | always | `precision` verbatim. |
 | `scale` | integer | always | `scale` verbatim. |

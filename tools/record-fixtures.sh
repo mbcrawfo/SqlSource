@@ -74,6 +74,8 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 if [[ $# -eq 1 ]]; then
+    # Only checks the argument, before anything runs: an engine with no row prints the usage.  record sets the row
+    # again for itself.
     engine_row "$1"
     record "$1"
 else

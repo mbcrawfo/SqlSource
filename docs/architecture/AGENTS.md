@@ -28,6 +28,7 @@ Each page is in this folder.
 | `src/SqlSource.Tool/Describing/Capture` | `postgres-describer.md` | `## Capture and replay` |
 | `src/SqlSource.Tool/Describing/Postgres`, with `Columns/` | `postgres-describer.md`, `postgres-nullability.md` | `## One describe, step by step`, `## Building parameters and columns`, `## Matching a table`, `## Errors`, `## Why a query cannot run a statement`; `## Nullability` in `postgres-nullability.md` |
 | `src/SqlSource.Tool/Describing/Postgres/Walk` | `postgres-nullability.md` | `## The plan walk` |
+| `src/SqlSource.Tool/Describing/SqlServer` | `sqlserver-describer.md` | Every section |
 
 A new page gets its rows here and its line in the reading guide of `README.md`, in the commit that adds it.  A new folder under `src/` gets its row in the same commit.
 
