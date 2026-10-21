@@ -16,7 +16,7 @@ The source generator.  It is loaded into the C# compiler of whoever consumes it,
 
 ## The pipeline
 
-`SqlSourceGenerator` wires the steps, and its only logic is the helpers at its end; everything else is in `Generation/`.  See [the pipeline](../../docs/architecture/generator.md#the-pipeline).
+`SqlSourceGenerator` wires the steps: `Initialize` calls one method for each stage, in the order of the source outputs, and its only logic is the helpers at its end; everything else is in `Generation/`.  A new step goes in the method of its stage, and a new source output where its order among the others falls.  See [the pipeline](../../docs/architecture/generator.md#the-pipeline).
 
 - **No Roslyn object flows between steps**, except the `AdditionalText` that `FileMetadata`, `FileParseInput` and `SidecarInput` carry, compared by reference, into the step that reads the file.  Only `Generation/TargetTypeReader.cs`, the `SupportedFramework` step, `Generation/Types/NpgsqlProbe.cs`, `Generation/Types/MappedTypeResolver.cs` and `Generation/Models/ModelNameChecker.cs` touch symbols and syntax.  A value between steps never holds an `ISymbol`, a `SyntaxNode`, a `Compilation`, a `Location` or a `Diagnostic`; carry a `LocationInfo` or `DiagnosticInfo`, and make the Roslyn object in an output step.
 - **Every `Collect()` has a `Select` after it that gives an `EquatableArray<T>`**, or the step after runs on every edit.  The listed paths that `CaseCollisions` takes are the one exception.
