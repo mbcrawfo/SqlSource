@@ -5,8 +5,9 @@ using SqlSource.Tool.Describing.Describers;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 
-// The calls of the session, each asked through the exchange with the live function that answers it, and timed by the
-// run's clock.  Under a replay the time is taken all the same.
+// The calls of the session, each asked through the exchange with the live function that answers it, and written to
+// the log where it happens, with how long it took by the run's clock.  Under a replay the event is written all the
+// same.
 internal sealed partial class SqlServerSession
 {
     // "open" is asked before there is a session, so it takes the exchange and the live functions it is given.
@@ -22,7 +23,7 @@ internal sealed partial class SqlServerSession
             cancellationToken
         );
 
-    // Asks one call, and hands the request, the answer and the time it took to what logs it.
+    // Asks one call, and hands the request, the answer and the time it took to what writes its event.
     private async Task<TAnswer> AskAsync<TRequest, TAnswer>(
         string method,
         TRequest request,
@@ -38,23 +39,41 @@ internal sealed partial class SqlServerSession
     }
 
     private Task<SqlServerParametersAnswer> ParametersAsync(
+        string query,
         SqlServerParametersRequest request,
         CancellationToken cancellationToken
-    ) => AskAsync(SqlServerCallNames.Parameters, request, _live.ParametersAsync, Unlogged, cancellationToken);
+    ) =>
+        AskAsync(
+            SqlServerCallNames.Parameters,
+            request,
+            _live.ParametersAsync,
+            (asked, answer, durationMs) => SqlServerEvents.Parameters(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
 
-    private Task<SqlServerProbeAnswer> ProbeAsync(SqlServerProbeRequest request, CancellationToken cancellationToken) =>
-        AskAsync(SqlServerCallNames.Probe, request, _live.ProbeAsync, Unlogged, cancellationToken);
+    private Task<SqlServerProbeAnswer> ProbeAsync(
+        string query,
+        SqlServerProbeRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        AskAsync(
+            SqlServerCallNames.Probe,
+            request,
+            _live.ProbeAsync,
+            (asked, answer, durationMs) => SqlServerEvents.Probe(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
 
     private Task<SqlServerDeclaredAnswer> DeclaredAsync(
+        string query,
         SqlServerDeclaredRequest request,
         CancellationToken cancellationToken
-    ) => AskAsync(SqlServerCallNames.Declared, request, _live.DeclaredAsync, Unlogged, cancellationToken);
-
-    // The describer writes no event of its own until its events are added: the run logs the describe's outcome.
-    private static void Unlogged<TRequest, TAnswer>(TRequest request, TAnswer answer, long durationMs)
-    {
-        _ = request;
-        _ = answer;
-        _ = durationMs;
-    }
+    ) =>
+        AskAsync(
+            SqlServerCallNames.Declared,
+            request,
+            _live.DeclaredAsync,
+            (asked, answer, durationMs) => SqlServerEvents.Declared(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
 }

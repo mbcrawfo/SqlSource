@@ -46,13 +46,21 @@ internal sealed partial class SqlServerSession : IDescribeSession
 
     private readonly IDescribeExchange _exchange;
     private readonly SqlServerLive _live;
+    private readonly IRunLog _log;
     private readonly TimeProvider _time;
 
-    private SqlServerSession(OpenRequest request, SqlServerConnection connection, SqlServerLive live, ServerInfo server)
+    private SqlServerSession(
+        OpenRequest request,
+        IRunLog log,
+        SqlServerConnection connection,
+        SqlServerLive live,
+        ServerInfo server
+    )
     {
         _exchange = request.Exchange;
         _time = request.Time;
         _live = live;
+        _log = log;
         Connection = connection;
         Server = server;
     }
@@ -64,7 +72,9 @@ internal sealed partial class SqlServerSession : IDescribeSession
 
     /// <summary>Asks <c>open</c>, and gives the session of the server that answered.</summary>
     /// <param name="request">The database, its connection, the exchange and the clock.</param>
-    /// <param name="log">Where the session's events go.</param>
+    /// <param name="log">
+    /// Where the session's events go.  <c>open</c> has none: <c>database.open</c> holds its answer.
+    /// </param>
     /// <param name="cancellationToken">Ends the call.</param>
     public static async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
         OpenRequest request,
@@ -72,9 +82,6 @@ internal sealed partial class SqlServerSession : IDescribeSession
         CancellationToken cancellationToken
     )
     {
-        // The describer writes no event of its own until its events are added: the run's database.open holds what
-        // open answered.
-        _ = log;
         var connection = new SqlServerConnection(request.Connection);
         var live = new SqlServerLive(connection);
         var kept = false;
@@ -94,7 +101,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
                 );
             }
 
-            var session = new SqlServerSession(request, connection, live, server);
+            var session = new SqlServerSession(request, log, connection, live, server);
             kept = true;
             return new Outcome<IDescribeSession, DescribeFailure>(session);
         }
@@ -157,6 +164,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
             .Select(static declaration => (declaration.Parameter.Name, declaration.Type))
             .ToList();
         var answer = await ParametersAsync(
+            request.Name,
             new SqlServerParametersRequest(
                 copied.Sql,
                 declared.Count == 0 ? null : SqlServerLive.Declarations(declared)
@@ -229,6 +237,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
     )
     {
         var answer = await DeclaredAsync(
+            request.Name,
             new SqlServerDeclaredRequest(
                 SqlServerLive.DeclaredSelect(parameter.Name),
                 SqlServerLive.Declarations([(parameter.Name, type)])
@@ -274,7 +283,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
         for (var index = 0; index < types.Count; index++)
         {
             var copy = reused.Copies[index];
-            var asXml = await ProbeAsync(probes.Request(copy, ProbeXml), cancellationToken);
+            var asXml = await ProbeAsync(request.Name, probes.Request(copy, ProbeXml), cancellationToken);
             if (asXml.Error is { } xmlError)
             {
                 return Outcome<SqlServerType, DescribeFailure>.Failed(
@@ -285,7 +294,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
             var ignored = false;
             if (asXml.Binds == true)
             {
-                var asInt = await ProbeAsync(probes.Request(copy, ProbeInt), cancellationToken);
+                var asInt = await ProbeAsync(request.Name, probes.Request(copy, ProbeInt), cancellationToken);
                 if (asInt.Error is { } intError)
                 {
                     return Outcome<SqlServerType, DescribeFailure>.Failed(

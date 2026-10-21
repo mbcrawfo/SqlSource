@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Shouldly;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
@@ -133,6 +134,106 @@ public sealed class RedactionTests : IDisposable
             .GetProperty("message")
             .GetString()
             .ShouldBe("password *** refused, table latest_orders");
+    }
+
+    // The events of the SQL Server describer hold the SQL, the declarations and the messages of the server, so the
+    // value is searched in each: the fake describer writes them through its log as the real one does.
+    [Fact]
+    public async Task Run_DescriberThatLogsAParametersEventWithItsConnection_HasTheMarkInEachString()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            var sql = "SELECT '" + value + "'";
+            var declarations = "@p nvarchar(10) /* " + value + " */";
+            var rows = new SqlServerParametersAnswer(
+                [new SqlServerParameterRow("@" + value, value, 4, 10, 0, value, value, value)],
+                null
+            );
+            SqlServerEvents.Parameters(log, "GetUser", new(sql, declarations), rows, 1);
+            var error = new SqlServerServerError([
+                new SqlServerErrorRow(102, 15, 1, "Incorrect syntax near '" + value + "'."),
+            ]);
+            SqlServerEvents.Parameters(log, "GetUser", new(sql, declarations), new(null, error), 1);
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var events = LogReader
+            .Read(Log)
+            .Where(e => e.GetProperty("event").GetString() == "postgres.parameters")
+            .ToList();
+        events.Count.ShouldBe(2);
+        events[0].GetProperty("sql").GetString().ShouldBe("SELECT '***'");
+        events[0].GetProperty("params").GetString().ShouldBe("@p nvarchar(10) /* *** */");
+        var row = events[0].GetProperty("rows")[0];
+        row.GetProperty("name").GetString().ShouldBe("@***");
+        row.GetProperty("suggestedSystemTypeName").GetString().ShouldBe("***");
+        row.GetProperty("suggestedUserTypeSchema").GetString().ShouldBe("***");
+        row.GetProperty("suggestedUserTypeName").GetString().ShouldBe("***");
+        row.GetProperty("suggestedAssemblyQualifiedTypeName").GetString().ShouldBe("***");
+        events[1].GetProperty("sql").GetString().ShouldBe("SELECT '***'");
+        events[1].GetProperty("error")[0].GetProperty("message").GetString().ShouldBe("Incorrect syntax near '***'.");
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogsAProbeEventWithItsConnection_HasTheMarkInEachString()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            var sql = "SELECT '" + value + "'";
+            var declarations = "@p_1 nvarchar(10) /* " + value + " */";
+            SqlServerEvents.Probe(log, "GetUser", new(sql, declarations), new(true, null), 1);
+            var error = new SqlServerServerError([new SqlServerErrorRow(53, 20, 0, "Cannot reach '" + value + "'.")]);
+            SqlServerEvents.Probe(log, "GetUser", new(sql, declarations), new(null, error), 1);
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.probe").ToList();
+        events.Count.ShouldBe(2);
+        events[0].GetProperty("sql").GetString().ShouldBe("SELECT '***'");
+        events[0].GetProperty("params").GetString().ShouldBe("@p_1 nvarchar(10) /* *** */");
+        events[1].GetProperty("error")[0].GetProperty("message").GetString().ShouldBe("Cannot reach '***'.");
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogsADeclaredEventWithItsConnection_HasTheMarkInEachString()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            var sql = "SELECT @p AS [1] /* " + value + " */";
+            var declaration = "@p " + value;
+            var rows = new SqlServerDeclaredAnswer([new(1, value, 4, 10, 0, value, value, value)], null, null);
+            SqlServerEvents.Declared(log, "GetUser", new(sql, declaration), rows, 1);
+            var errors = new SqlServerDeclaredAnswer(
+                null,
+                [new(2715, 1, "Cannot find data type " + value + ".")],
+                null
+            );
+            SqlServerEvents.Declared(log, "GetUser", new(sql, declaration), errors, 1);
+            var error = new SqlServerServerError([new SqlServerErrorRow(53, 20, 0, "Cannot reach '" + value + "'.")]);
+            SqlServerEvents.Declared(log, "GetUser", new(sql, declaration), new(null, null, error), 1);
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.declared").ToList();
+        events.Count.ShouldBe(3);
+        events[0].GetProperty("sql").GetString().ShouldBe("SELECT @p AS [1] /* *** */");
+        events[0].GetProperty("params").GetString().ShouldBe("@p ***");
+        var row = events[0].GetProperty("rows")[0];
+        row.GetProperty("systemTypeName").GetString().ShouldBe("***");
+        row.GetProperty("userTypeSchema").GetString().ShouldBe("***");
+        row.GetProperty("userTypeName").GetString().ShouldBe("***");
+        row.GetProperty("assemblyQualifiedTypeName").GetString().ShouldBe("***");
+        events[1].GetProperty("errors")[0].GetProperty("message").GetString().ShouldBe("Cannot find data type ***.");
+        events[2].GetProperty("error")[0].GetProperty("message").GetString().ShouldBe("Cannot reach '***'.");
     }
 
     [Fact]
