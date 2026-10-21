@@ -37,7 +37,7 @@ An error keeps each of the exception's errors, in order, with its number, class 
 | `open`, `4060` or `4064` | `DatabaseRefused` |
 | `open`, `-2`, or a `TimeoutException` in the chain | `ConnectTimedOut` |
 | `open`, an `AuthenticationException` in the chain | `CertificateRefused` |
-| `open`, a `SocketException` in the chain | `UnreachablePrefix`, `: ` and the name of its `SocketError` |
+| `open`, a `SocketException` in the chain | `UnreachablePrefix`, then `: ` and the name of its `SocketError` unless that is `Success`, which SqlClient gives on Linux |
 | `open`, anything else | `SessionRefused` |
 | A later call, `-2` | `NoAnswerInTime` |
 | A later call, an error of class 20 or above | `LostConnection` |

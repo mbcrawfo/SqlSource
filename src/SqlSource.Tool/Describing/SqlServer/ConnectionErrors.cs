@@ -35,7 +35,8 @@ internal static class ConnectionErrors
 
     /// <summary>
     /// An error at <c>open</c> with a <see cref="SocketException" /> in its chain, followed by <c>: </c> and the name
-    /// of its <see cref="SocketError" />.
+    /// of its <see cref="SocketError" /> when that names a reason.  SqlClient 7.1.1 on Linux wraps a socket's
+    /// exception whose error is <see cref="SocketError.Success" />, which names none, so the text stands alone there.
     /// </summary>
     public const string UnreachablePrefix = "SqlClient could not reach the server";
 
@@ -152,9 +153,12 @@ internal static class ConnectionErrors
             return CertificateRefused;
         }
 
-        return InChain<SocketException>(exception) is { } socket
-            ? UnreachablePrefix + ": " + socket.SocketErrorCode.ToString()
-            : SessionRefused;
+        return InChain<SocketException>(exception) switch
+        {
+            null => SessionRefused,
+            { SocketErrorCode: SocketError.Success } => UnreachablePrefix,
+            { } socket => UnreachablePrefix + ": " + socket.SocketErrorCode.ToString(),
+        };
     }
 
     /// <summary>An error of the describer's own: the text, and 0 for each number.</summary>
