@@ -57,6 +57,13 @@ internal static class ConnectionErrors
     /// </summary>
     public const string UnreadableConnectionString = "SqlClient cannot read the connection string";
 
+    /// <summary>
+    /// A connection string whose settings SqlClient reads one by one and does not accept together.  SqlClient's own
+    /// text names the keywords, and is not passed on all the same.
+    /// </summary>
+    public const string ConflictingSettings =
+        "SqlClient does not accept these settings of the connection string together";
+
     /// <summary>A connection string that sets nothing, such as <c>;</c>.</summary>
     public const string EmptyConnectionString = "the connection string is empty";
 

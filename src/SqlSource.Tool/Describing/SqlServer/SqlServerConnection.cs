@@ -91,6 +91,15 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
     /// </item>
     /// <item>
     /// <description>
+    /// Settings that the builder reads one by one and SqlClient does not accept together, such as an
+    /// <c>Authentication</c> of <c>Active Directory Integrated</c> with a <c>Password</c>, or
+    /// <c>Integrated Security</c> with any <c>Authentication</c>: the <see cref="SqlConnection" />'s constructor
+    /// throws an <see cref="ArgumentException" /> as it reads the value, before anything is opened.  The answer is
+    /// <see cref="ConnectionErrors.ConflictingSettings" />.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
     /// A value that sets nothing, <c>;</c> or white space: the builder reads it, and <c>SqlConnection.OpenAsync</c>
     /// throws an <see cref="InvalidOperationException" />, "The ConnectionString property has not been initialized"
     /// (<c>SqlConnection.PermissionDemand</c>).  It is refused before anything is opened, as
@@ -143,7 +152,16 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
             throw new UnusableException(ConnectionErrors.EmptyConnectionString);
         }
 
-        var connection = new SqlConnection(builder.ConnectionString);
+        SqlConnection connection;
+        try
+        {
+            connection = new SqlConnection(builder.ConnectionString);
+        }
+        catch (ArgumentException)
+        {
+            throw new UnusableException(ConnectionErrors.ConflictingSettings);
+        }
+
         try
         {
             await connection.OpenAsync(cancellationToken);

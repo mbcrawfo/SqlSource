@@ -41,6 +41,14 @@ public sealed class SqlServerDescriberTests
         "Data Source=127.0.0.1,1;Connect Timeout=" + Secrets.Marker,
         "SqlClient cannot read the connection string"
     )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Authentication=Active Directory Integrated;Password=" + Secrets.Marker,
+        "SqlClient does not accept these settings of the connection string together"
+    )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Integrated Security=true;Authentication=Sql Password;Password=" + Secrets.Marker,
+        "SqlClient does not accept these settings of the connection string together"
+    )]
     public async Task OpenAsync_ConnectionStringRefusedBeforeOpening_IsSqlsrc224WithTheFixedLine(
         string connection,
         string line
