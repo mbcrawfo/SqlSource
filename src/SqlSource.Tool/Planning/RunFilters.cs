@@ -33,7 +33,7 @@ internal sealed record RunFilters(ImmutableArray<FileFilter> Files, ImmutableArr
     /// The filters of a command line.  A path is resolved against the working directory and compared as the
     /// generator compares paths, so another case, <c>./</c>, <c>..</c> and either separator name the same file.  A
     /// file that several paths name is named by the first, and a path that names no file is left out of
-    /// <see cref="Files" /> but sets <see cref="NamesFiles" />.
+    /// <see cref="Files" /> but sets <see cref="NamesFiles" />.  Such a path is reported nowhere (TD-0068).
     /// </summary>
     public static RunFilters Create(
         IEnumerable<UsageValue> sqlPaths,
