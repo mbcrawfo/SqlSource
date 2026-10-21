@@ -243,14 +243,18 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             )
             .WithTrackingName(TrackingNames.FileParseInput);
 
-        // A file that no type claims is never read.
-        var parsedFile = fileInputs
+        // Whether a type claims each file.  The claim is a value of its own, so a change to the claimed paths reads
+        // only a file whose answer changed, and not every file that is claimed.
+        var fileClaims = fileInputs
             .Combine(claimedPaths)
+            .Select(static (input, _) => FileClaim.Of(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.FileClaim);
+
+        // A file that no type claims is never read.
+        var parsedFile = fileClaims
             .Select(
-                static (input, cancellationToken) =>
-                    input.Left.NormalizedPath is { } path && SqlPath.Contains(input.Right, path)
-                        ? SqlFileReader.Read(input.Left, cancellationToken)
-                        : null
+                static (claim, cancellationToken) =>
+                    claim.IsClaimed ? SqlFileReader.Read(claim.Input, cancellationToken) : null
             )
             .WhereNotNull()
             .WithTrackingName(TrackingNames.ParsedFile);
