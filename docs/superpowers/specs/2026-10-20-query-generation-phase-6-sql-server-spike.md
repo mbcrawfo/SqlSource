@@ -205,6 +205,8 @@ Every place where `NULL` can come out was reported nullable; no column was found
 | identity and computed, nullability, `OUTPUT` | as mode 1 | as mode 1 |
 | `FOR SYSTEM_TIME ALL` | no origin | no origin |
 
+SqlClient under browse mode 2 answered every row of the two tables above as `sqlcmd` under mode 1 did, on both 2017 and 2025, but for the origins of a view's columns, which name the view; the columns of an `OUTPUT` clause have their table's column as origin, and `$action` none.  The hidden column's name, through SqlClient on both servers, is `ROWSTAT` followed by a NUL character, `ROWSTAT\0`.
+
 ## Statements and safety
 
 | Query | Answer | Effect |
