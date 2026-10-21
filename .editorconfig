@@ -232,6 +232,11 @@ dotnet_diagnostic.CA1515.severity = none
 # CA2007 (ConfigureAwait): xUnit1030 forbids the call in a test.
 dotnet_diagnostic.CA2007.severity = none
 
+[tests/SqlSource.Tests.SqlServer/{SqlServerContainer,SqlServerScripts}.cs]
+# CA2100 (review SQL for user input): the two places that make a command of the SQL Server tests, from a script of the
+# repository or a statement of a test's own, never from what a user writes.
+dotnet_diagnostic.CA2100.severity = none
+
 [src/SqlSource/Polyfills/*.cs]
 # IDE0130 (namespace matches folder): a polyfill must be in the namespace of the type it stands in for.
 dotnet_diagnostic.IDE0130.severity = none

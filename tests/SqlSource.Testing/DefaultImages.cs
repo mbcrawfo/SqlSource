@@ -11,4 +11,10 @@ internal static class DefaultImages
     // against, and a moving tag would run another.
     // See tests/SqlSource.Tests.Postgres/README.md.
     public const string Postgres = "postgres:18.6";
+
+    // The scripts read this line by its shape, with sed, as they read the line above.  It names its cumulative
+    // update, and the GDR over it when the build has one, as every SQL Server image of the tests does, and
+    // SqlServerContainer.ImageBuilds of tests/SqlSource.Tests.SqlServer records the build its server reports.
+    // See tests/SqlSource.Tests.SqlServer/README.md.
+    public const string SqlServer = "mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04";
 }

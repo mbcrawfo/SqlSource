@@ -26,6 +26,8 @@
             tests/SqlSource.Tests.RoslynFloor does not, and runs the generator tests on this version.
         -->
         <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
+        <!-- The driver of the SQL Server describer and of tests/SqlSource.Tests.SqlServer. -->
+        <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
         <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
         <!-- Reads .sln and .slnx files for the tool, as the dotnet command does with the same library. -->
         <PackageVersion Include="Microsoft.VisualStudio.SolutionPersistence" Version="1.0.52" />
@@ -41,7 +43,14 @@
         <PackageVersion Include="Shouldly" Version="4.3.0" />
         <PackageVersion Include="SonarAnalyzer.CSharp" Version="10.35.0.4138" />
         <PackageVersion Include="System.CommandLine" Version="2.0.12" />
+        <!--
+            Not referenced: central transitive pinning raises the 9.0.18 that Microsoft.Data.SqlClient brings to the
+            first build without CVE-2026-70162 and CVE-2026-84008.  Remove it when SqlClient brings that build or later.
+        -->
+        <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
         <!-- Starts the PostgreSQL that tests/SqlSource.Tests.Postgres describes against.  It needs Docker. -->
+        <!-- Starts the SQL Server that tests/SqlSource.Tests.SqlServer describes against.  It needs Docker. -->
+        <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
         <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
         <PackageVersion Include="xunit.analyzers" Version="2.1.0" />
         <PackageVersion Include="xunit.v3" Version="4.0.1" />
