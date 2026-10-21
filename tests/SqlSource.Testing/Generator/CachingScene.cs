@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Snapshot;
 using SqlSource.Testing.Snapshot;
 using Xunit;
 using OutputKind = SqlSource.Settings.OutputKind;
@@ -159,11 +160,12 @@ internal sealed class CachingScene
             properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = overrides }
         );
 
-    // A current sidecar whose entry has one column, of the type of pg_catalog.
+    // A current sidecar whose entry has one column, of the type of pg_catalog, and these parameters when given.
     public static InMemoryAdditionalText TypedSidecar(
         InMemoryAdditionalText sqlFile,
         string queryName,
-        string internalName
+        string internalName,
+        SidecarParameter[]? parameters = null
     )
     {
         var file = ToSqlFile(sqlFile);
@@ -175,6 +177,7 @@ internal sealed class CachingScene
                 "postgres",
                 "main",
                 "18.0",
+                parameters: parameters,
                 columns:
                 [
                     TestSidecars.Column(0, "value", TestSidecars.Postgres(internalName, internalName: internalName)),
