@@ -1,6 +1,6 @@
 namespace SqlSource.Generation.Types;
 
-/// <summary>Whether a PostgreSQL type has a C# type, and if not, why.</summary>
+/// <summary>Whether a database type has a C# type, and if not, why.</summary>
 internal enum TypeMappingKind
 {
     /// <summary>The type has a C# type.</summary>
@@ -37,7 +37,10 @@ internal enum TypeMappingKind
     /// <summary>A range of a subtype the map does not list, or a multirange of such a range.</summary>
     UserDefinedRange,
 
-    /// <summary>With no Npgsql referenced, the type's C# type is of the <c>NpgsqlTypes</c> namespace.</summary>
+    /// <summary>
+    /// With no driver referenced, the type's C# type is the driver's: of the <c>NpgsqlTypes</c> namespace for Npgsql,
+    /// or of <c>Microsoft.Data.SqlTypes</c> for SqlClient.
+    /// </summary>
     NeedsDriver,
 
     /// <summary>With no Npgsql referenced, the type's C# type differs between Npgsql 8 and 9 and Npgsql 10.</summary>
@@ -57,4 +60,10 @@ internal enum TypeMappingKind
     /// the type override names such an array as its element's key with <c>[]</c>.
     /// </summary>
     ArrayNamedByItsOwnKey,
+
+    /// <summary>
+    /// SqlClient reads the type only with the package Microsoft.SqlServer.Types: <c>hierarchyid</c>,
+    /// <c>geography</c> and <c>geometry</c>.  <see cref="TypeMapping.Detail" /> is that package's C# type for it.
+    /// </summary>
+    NeedsSqlServerTypes,
 }

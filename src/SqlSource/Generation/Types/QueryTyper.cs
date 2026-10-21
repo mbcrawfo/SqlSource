@@ -241,13 +241,15 @@ internal static class QueryTyper
                 failure.Detail ?? "",
                 failure.Text ?? ""
             ),
-            TypeMappingKind.Mapped or TypeMappingKind.Unreadable or _ => DiagnosticInfo.Create(
-                SqlDiagnostics.TypeHasNoCSharpType,
-                at,
-                subject,
-                typeName,
-                "Map it with the type override, as " + AsAKey(key) + "=<a C# type>"
-            ),
+            // The SQL Server map's kind, which no PostgreSQL type has; the engine split gives it a message.
+            TypeMappingKind.Mapped or TypeMappingKind.Unreadable or TypeMappingKind.NeedsSqlServerTypes or _ =>
+                DiagnosticInfo.Create(
+                    SqlDiagnostics.TypeHasNoCSharpType,
+                    at,
+                    subject,
+                    typeName,
+                    "Map it with the type override, as " + AsAKey(key) + "=<a C# type>"
+                ),
         };
     }
 

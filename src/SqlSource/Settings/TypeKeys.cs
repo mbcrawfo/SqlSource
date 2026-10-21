@@ -9,8 +9,9 @@ namespace SqlSource.Settings;
 /// <summary>
 /// The keys a type override may name: the names of the PostgreSQL types that the base map knows, their one-word
 /// aliases, and a schema-qualified name of any type.  The settings check a key here, and the map reads the names of
-/// the extensions' types here.  The map keeps its own rows, and
-/// <c>PostgresTypeMapTests.Keys_OfTheMap_AreTheKnownNamesOfTheSettings</c> holds them equal to the names here.
+/// the extensions' types here.  Each map keeps its own rows, and
+/// <c>PostgresTypeMapTests.Keys_OfTheMap_AreTheKnownNamesOfTheSettings</c> and
+/// <c>Keys_OfTheSqlServerMap_AreTheKnownSqlServerNamesOfTheSettings</c> hold them equal to the names here.
 /// </summary>
 internal static class TypeKeys
 {
@@ -116,6 +117,46 @@ internal static class TypeKeys
         "void"
     );
 
+    // Every key of the SQL Server map.  rowversion is an alias of timestamp, and sysname is nvarchar's alias type.
+    private static readonly Dictionary<string, string> SqlServerNames = NamesOf(
+        "bigint",
+        "int",
+        "smallint",
+        "tinyint",
+        "bit",
+        "decimal",
+        "numeric",
+        "money",
+        "smallmoney",
+        "float",
+        "real",
+        "date",
+        "datetime",
+        "datetime2",
+        "smalldatetime",
+        "time",
+        "datetimeoffset",
+        "char",
+        "varchar",
+        "text",
+        "nchar",
+        "nvarchar",
+        "ntext",
+        "xml",
+        "json",
+        "binary",
+        "varbinary",
+        "image",
+        "timestamp",
+        "uniqueidentifier",
+        "sql_variant",
+        "vector",
+        "hierarchyid",
+        "geography",
+        "geometry",
+        "sysname"
+    );
+
     // The one-word aliases of PostgreSQL's table of data types, by the name each stands for.  "char" is the key of
     // the one-byte type, not an alias of bpchar.
     private static readonly Dictionary<string, string> Aliases = new(StringComparer.OrdinalIgnoreCase)
@@ -131,8 +172,11 @@ internal static class TypeKeys
         ["character"] = "bpchar",
     };
 
-    /// <summary>The names of the types the base map knows, in lower case.</summary>
+    /// <summary>The names of the PostgreSQL types the base map knows, in lower case.</summary>
     public static IReadOnlyCollection<string> KnownNames => Names.Keys;
+
+    /// <summary>The names of the SQL Server types the base map knows, in lower case.</summary>
+    public static IReadOnlyCollection<string> KnownSqlServerNames => SqlServerNames.Keys;
 
     /// <summary>
     /// Whether <paramref name="internalName" /> is the name of a type of an extension that the base map knows:
