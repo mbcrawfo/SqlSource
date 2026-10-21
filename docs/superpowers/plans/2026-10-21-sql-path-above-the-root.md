@@ -46,6 +46,8 @@ All four command-line cases skip on Windows, where `Path.GetFullPath` resolves a
 - Test: `tests/SqlSource.Tool.Tests/Planning/RunFiltersTests.cs`
 - Test: `tests/SqlSource.Tool.Tests/Commands/FilterRunTests.cs`
 - Test: `tests/SqlSource.Tool.Tests/Commands/FilterTests.cs`
+- Test: `tests/SqlSource.Tool.Tests/Planning/RunPlannerTests.cs` (added after review: a `FileFilter` with no normalised path selects nothing, with and without `--database`, and is one `SQLSRC212`; runs on Windows too)
+- Create: `tests/SqlSource.Tool.Tests/AboveTheRoot.cs` (added after review: the climbing path and the Windows skip reason, shared by the three test classes)
 
 **Interfaces:**
 - Produces: `internal sealed record FileFilter(string? NormalizedPath, string Named)`, null when `SqlPath.Normalize` cannot place the path.  `RunFilters.NamesFiles` is removed; callers use `!Files.IsEmpty`.

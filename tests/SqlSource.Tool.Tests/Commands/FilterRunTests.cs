@@ -176,27 +176,30 @@ public sealed class FilterRunTests : IDisposable
         );
     }
 
-    // Outside Windows a backslash is no separator to Path.GetFullPath, so the path climbs above the root and names no
-    // file.  It is reported and selects nothing, so a run with no other filter describes nothing and deletes nothing.
+    // The path names no file.  It is reported and selects nothing, so a run with no other filter describes nothing
+    // and deletes nothing.
     [Fact]
     public async Task Run_SqlPathThatClimbsAboveTheRoot_IsSqlsrc212AndDescribesNothing()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows(), "Path.GetFullPath resolves a backslash's .. on Windows.");
+        Assert.SkipWhen(OperatingSystem.IsWindows(), AboveTheRoot.SkipReason);
         await File.WriteAllTextAsync(
             SidecarFormat.PathFor(_plain),
             "of a query that needed an entry once",
             TestContext.Current.CancellationToken
         );
-        var climbing = "a" + string.Concat(Enumerable.Repeat(@"\..", 64)) + @"\q.sql";
 
-        var result = await _scene.DescribeAsync("App.csproj", climbing);
+        var result = await _scene.DescribeAsync("App.csproj", AboveTheRoot.SqlFile);
 
-        result.ExitCode.ShouldBe(1);
-        result.Error.ShouldContain(
-            $"sqlsource : error SQLSRC212: '{_scene.Run.Folder.PathOf(climbing)}' is not a .sql file that a type of "
-                + "the run claims\n"
+        result.ShouldBe(
+            new CliResult(
+                1,
+                "",
+                $"sqlsource : error SQLSRC212: '{_scene.Run.Folder.PathOf(AboveTheRoot.SqlFile)}' is not a .sql file "
+                    + "that a type of the run claims\n"
+                    + Expected.See("SQLSRC212")
+                    + DescribeScene.RunAgain
+            )
         );
-        result.Out.ShouldNotContain(" 1 described");
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
         (await File.ReadAllTextAsync(SidecarFormat.PathFor(_plain), TestContext.Current.CancellationToken)).ShouldBe(
             "of a query that needed an entry once"

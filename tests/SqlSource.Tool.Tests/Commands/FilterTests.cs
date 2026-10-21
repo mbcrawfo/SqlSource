@@ -130,23 +130,19 @@ public sealed class FilterTests : IDisposable
             .ShouldBe(["GetUser", "GetInvoice", "Plain"]);
     }
 
-    // Outside Windows a backslash is no separator to Path.GetFullPath, so this path climbs above the root and names no
-    // file.
-    private static readonly string Climbing = "a" + string.Concat(Enumerable.Repeat(@"\..", 64)) + @"\q.sql";
-
     [Fact]
     public async Task Plan_SqlPathThatClimbsAboveTheRootBesideOneThatIsClaimed_ReportsTheOneAndSelectsTheOther()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows(), "Path.GetFullPath resolves a backslash's .. on Windows.");
+        Assert.SkipWhen(OperatingSystem.IsWindows(), AboveTheRoot.SkipReason);
 
-        var (plan, result) = await _run.PlanAsync("describe", Climbing, "Q/Users.sql");
+        var (plan, result) = await _run.PlanAsync("describe", AboveTheRoot.SqlFile, "Q/Users.sql");
 
         result.ShouldBe(
             new CliResult(
                 1,
                 "",
-                $"sqlsource : error SQLSRC212: '{_run.Folder.PathOf(Climbing)}' is not a .sql file that a type of the "
-                    + "run claims\n"
+                $"sqlsource : error SQLSRC212: '{_run.Folder.PathOf(AboveTheRoot.SqlFile)}' is not a .sql file "
+                    + "that a type of the run claims\n"
                     + Expected.See("SQLSRC212")
             )
         );
@@ -160,9 +156,9 @@ public sealed class FilterTests : IDisposable
     [Fact]
     public async Task Plan_SqlPathThatClimbsAboveTheRootWithAnEqualsSign_IsNamedByItsPosition()
     {
-        Assert.SkipWhen(OperatingSystem.IsWindows(), "Path.GetFullPath resolves a backslash's .. on Windows.");
+        Assert.SkipWhen(OperatingSystem.IsWindows(), AboveTheRoot.SkipReason);
 
-        var (_, result) = await _run.PlanAsync("describe", "a=b" + Climbing);
+        var (_, result) = await _run.PlanAsync("describe", "a=b" + AboveTheRoot.SqlFile);
 
         result.ShouldBe(
             new CliResult(

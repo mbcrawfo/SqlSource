@@ -3,8 +3,10 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Shouldly;
+using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Tool.Planning;
+using SqlSource.Tool.Reporting;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -362,6 +364,25 @@ public sealed class RunPlannerTests : IDisposable
         var filters = new RunFilters([], [new UsageValue(null, "billing", 1)]);
 
         Plans.Result(filters, project).Plan.Filters.ShouldBeSameAs(filters);
+    }
+
+    // A .sql path that climbs above the root names no file: it selects none, beside --database too, and is reported.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Plan_FileFilterWithNoNormalizedPath_SelectsNothingAndIsSqlsrc212(bool withDatabase)
+    {
+        var project = Plans.Postgres(_folder);
+        _ = project.AddSql("Q.sql", SqlTexts.Users);
+        var filters = new RunFilters(
+            [new FileFilter(null, "'x'")],
+            withDatabase ? [new UsageValue(null, "billing", 1)] : []
+        );
+
+        var result = Plans.Result(filters, project);
+
+        result.Plan.Files.SelectMany(file => file.Queries).ShouldAllBe(query => !query.IsSelected);
+        result.Errors.ShouldHaveSingleItem().ShouldBe(ToolDiagnostic.Create(ToolDiagnostics.FileNotInRun, "'x'"));
     }
 
     [Fact]
