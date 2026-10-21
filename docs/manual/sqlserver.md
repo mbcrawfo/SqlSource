@@ -96,3 +96,5 @@ A type that the table does not name gets its C# type by what it is:
       <PackageReference Include="Microsoft.Data.SqlClient" Version="6.1.7" />
   </ItemGroup>
   ```
+
+- **A `vector` column in a project that references a Microsoft.Data.SqlClient older than 6.1** gets, beside [SQLSRC267](diagnostics.md#sqlsrc267), a compiler error in the generated model, because the `SqlVector<float>` it names is not in that version.  The error goes away with the package update that clears SQLSRC267.

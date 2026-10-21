@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0070`
+Next id: `TD-0072`
 
 ## Active items
 
@@ -41,6 +41,7 @@ Next id: `TD-0070`
 | [TD-0063](TD-0063-lower-bound-of-the-type-override-map-is-a-search-of-its-own.md) | Open | 2026-10-19 | Low | The lower bound of the type override map is a search of its own: it runs over a `ref struct` key that `SortedSearch` cannot take on netstandard2.0 |
 | [TD-0067](TD-0067-nullability-inside-a-mapped-type-argument-is-not-checked.md) | Open | 2026-10-20 | Low | The nullability inside a type argument of a C# type that the type override names is not checked against the constraints of its type parameter, so a mapping such as `List<string?>` for a parameter constrained to `IEnumerable<string>` gives its model a warning |
 | [TD-0069](TD-0069-change-to-any-model-runs-every-files-model-node-again.md) | Open | 2026-10-21 | Low | A change to any model runs the model node of every claimed file again, a search and a compare each, which at 500 files allocates about 260 KB more per run, and takes half a millisecond longer, than emitting from the sorted models did, though it writes the same one model |
+| [TD-0071](TD-0071-vector-column-below-sqlclient-6-1-does-not-compile.md) | Open | 2026-10-21 | Low | A `vector` column in a project that references a Microsoft.Data.SqlClient older than 6.1 is typed by `SqlVector<float>`, which that version lacks, so the generated model does not compile beside `SQLSRC267` |
 
 ## Columns
 

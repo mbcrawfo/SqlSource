@@ -29,8 +29,6 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
 {
     private const string AssemblyName = "Microsoft.Data.SqlClient";
 
-    private const string InformationalVersionAttribute = "System.Reflection.AssemblyInformationalVersionAttribute";
-
     // The newest major whose types the map knows.
     private const int NewestKnownMajor = 7;
 
@@ -94,9 +92,9 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
         foreach (var attribute in assembly.GetAttributes())
         {
             if (
-                attribute.AttributeClass?.ToDisplayString() == InformationalVersionAttribute
+                IsInformationalVersion(attribute.AttributeClass)
                 && attribute.ConstructorArguments.Length > 0
-                && attribute.ConstructorArguments[0].Value is string text
+                && attribute.ConstructorArguments[0] is { Kind: TypedConstantKind.Primitive, Value: string text }
             )
             {
                 var end = text.IndexOf('+');
@@ -110,6 +108,19 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
 
         return assembly.Identity.Version.Major.ToString(CultureInfo.InvariantCulture);
     }
+
+    // System.Reflection.AssemblyInformationalVersionAttribute, compared by its names so that no string is made for the
+    // attribute of every assembly on every edit.
+    private static bool IsInformationalVersion(INamedTypeSymbol? type) =>
+        type
+            is {
+                MetadataName: "AssemblyInformationalVersionAttribute",
+                ContainingNamespace:
+                {
+                    Name: "Reflection",
+                    ContainingNamespace: { Name: "System", ContainingNamespace.IsGlobalNamespace: true }
+                },
+            };
 
     // The digits that start a version, or zero for a version that does not start with any or is too large.
     private static int LeadingInteger(string? version)

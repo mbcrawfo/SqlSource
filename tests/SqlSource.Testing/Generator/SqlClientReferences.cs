@@ -33,18 +33,32 @@ internal static class SqlClientReferences
     // An assembly of the AssemblyVersion, with the AssemblyInformationalVersion when one is given, with
     // Microsoft.Data.SqlClient.SqlConnection, Microsoft.Data.SqlTypes.SqlVector<T> and
     // Microsoft.Data.SqlClient.SspiContextProvider when asked for.  It is named Microsoft.Data.SqlClient, unless
-    // another name is given, as for a driver merged into an assembly of another name.
+    // another name is given, as for a driver merged into an assembly of another name.  With arrayInformationalVersion
+    // the assembly defines an AssemblyInformationalVersionAttribute of its own that takes a string array, and applies
+    // it, so that the attribute is by the name of the framework's and its argument is not text.
     public static MetadataReference Synthetic(
         string version,
         bool connection,
         bool vector,
         bool seven,
         string? informationalVersion = null,
-        string assemblyName = "Microsoft.Data.SqlClient"
+        string assemblyName = "Microsoft.Data.SqlClient",
+        bool arrayInformationalVersion = false
     )
     {
         var source =
             $"[assembly: System.Reflection.AssemblyVersion(\"{version}\")]\n"
+            + (
+                arrayInformationalVersion
+                    ? "[assembly: System.Reflection.AssemblyInformationalVersion(new[] { \"9.9.9\" })]\n"
+                        + "\nnamespace System.Reflection\n{\n"
+                        + "    [System.AttributeUsage(System.AttributeTargets.Assembly)]\n"
+                        + "    public sealed class AssemblyInformationalVersionAttribute : System.Attribute\n"
+                        + "    {\n"
+                        + "        public AssemblyInformationalVersionAttribute(string[] versions) { }\n"
+                        + "    }\n}\n"
+                    : ""
+            )
             + (
                 informationalVersion is null
                     ? ""

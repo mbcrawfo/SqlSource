@@ -188,6 +188,20 @@ public sealed class SqlClientProbeTests
         StepOutputs.Single<SqlClientProbe>(run, TrackingNames.SqlClientProbe).Version.ShouldBe(expected);
     }
 
+    // An informational version attribute of the assembly's own, whose argument is an array, is not text: the probe
+    // falls back to the major, and nothing throws.
+    [Fact]
+    public void Run_InformationalVersionAttributeTakingAnArray_GivesTheMajor()
+    {
+        var driver = SqlClientReferences.Synthetic("6.0.0.0", true, true, false, arrayInformationalVersion: true);
+
+        var run = Run(OutputKind.Models, [driver], UsersWithSidecar);
+
+        StepOutputs
+            .Single<SqlClientProbe>(run, TrackingNames.SqlClientProbe)
+            .ShouldBe(new SqlClientProbe(true, true, false, "6"));
+    }
+
     // A driver merged into an assembly of another name: its types are found, and its version is not known.  An old
     // one is still below the floor, and a new one is not known to be newer.
     [Fact]
