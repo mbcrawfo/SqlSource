@@ -1,5 +1,7 @@
+using System;
 using Shouldly;
 using SqlSource.Generation.Models;
+using SqlSource.Settings;
 using SqlSource.Snapshot;
 using Xunit;
 
@@ -68,7 +70,25 @@ public sealed class PropertyNamesTests
     [InlineData("Public", "users", "PublicUsers")]
     [InlineData("PUBLIC", "users", "PUBLICUsers")]
     public void FromTable_Table_IsTheSchemaUnlessItIsPublicThenTheTable(string schema, string table, string expected) =>
-        PropertyNames.FromTable(new SidecarTable(schema, table)).ShouldBe(expected);
+        PropertyNames.FromTable(new SidecarTable(schema, table), DatabaseEngine.PostgreSql).ShouldBe(expected);
+
+    // The schema that is dropped is the engine's: public on PostgreSQL and dbo on SQL Server, each compared ordinally.
+    [Theory]
+    [InlineData("dbo", "orders", "SqlServer", "Orders")]
+    [InlineData("dbo", "orders", "PostgreSql", "DboOrders")]
+    [InlineData("public", "orders", "SqlServer", "PublicOrders")]
+    [InlineData("public", "orders", "PostgreSql", "Orders")]
+    [InlineData("billing", "invoices", "SqlServer", "BillingInvoices")]
+    [InlineData("billing", "invoices", "PostgreSql", "BillingInvoices")]
+    [InlineData("DBO", "orders", "SqlServer", "DBOOrders")]
+    [InlineData("Dbo", "orders", "SqlServer", "DboOrders")]
+    public void FromTable_TableOfAnEngine_DropsTheSchemaOfThatEngineAlone(
+        string schema,
+        string table,
+        string engine,
+        string expected
+    ) =>
+        PropertyNames.FromTable(new SidecarTable(schema, table), Enum.Parse<DatabaseEngine>(engine)).ShouldBe(expected);
 
     [Theory]
     [InlineData(null, "users")]
@@ -86,10 +106,10 @@ public sealed class PropertyNamesTests
     [InlineData("billing?", "invoices")]
     [InlineData("billing!", "invoices")]
     public void FromTable_PartThatGivesNoIdentifier_IsNull(string? schema, string? table) =>
-        PropertyNames.FromTable(new SidecarTable(schema, table)).ShouldBeNull();
+        PropertyNames.FromTable(new SidecarTable(schema, table), DatabaseEngine.PostgreSql).ShouldBeNull();
 
     // The public schema gives no name, so it is not checked: a table whose name is an identifier needs no schema.
     [Fact]
     public void FromTable_PublicSchema_NeedsNothingOfTheSchema() =>
-        PropertyNames.FromTable(new SidecarTable("public", "t")).ShouldBe("T");
+        PropertyNames.FromTable(new SidecarTable("public", "t"), DatabaseEngine.PostgreSql).ShouldBe("T");
 }

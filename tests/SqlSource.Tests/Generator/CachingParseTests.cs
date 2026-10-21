@@ -94,6 +94,7 @@ public sealed class CachingParseTests
         // was read again too, and gave an equal value, so nothing after it ran.
         AllReasons(result, TrackingNames.SupportedFramework).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.NpgsqlProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
+        AllReasons(result, TrackingNames.SqlClientProbe).ShouldBe([IncrementalStepRunReason.Unchanged]);
         AllReasons(result, TrackingNames.MappedTypes).ShouldBe([IncrementalStepRunReason.Unchanged]);
         string[] steps =
         [
@@ -123,6 +124,7 @@ public sealed class CachingParseTests
             TrackingNames.SidecarCheckInput,
             TrackingNames.SidecarCheck,
             TrackingNames.UsesPostgresEntries,
+            TrackingNames.UsesSqlServerEntries,
             TrackingNames.MappedTypeNames,
             TrackingNames.FileTypesInput,
             TrackingNames.FileTypes,
@@ -196,6 +198,32 @@ public sealed class CachingParseTests
         reason.ShouldBe(IncrementalStepRunReason.Unchanged);
         probe.ShouldBe(before);
         AllReasons(result, TrackingNames.UsesPostgresEntries)
+            .ShouldHaveSingleItem()
+            .ShouldBeOneOf(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Unchanged);
+        OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+    }
+
+    // A project that references SqlClient and needs entries of mssql: the probe runs on the new compilation, gives an
+    // equal value, and nothing after it runs again.  No query needs an entry of postgres.
+    [Fact]
+    public void Run_CSharpEdit_RunsTheProbeOfSqlClientAndNothingAfterIt()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [SqlClientReferences.SqlClient7]);
+        var driver = _scene.FirstRunWithSqlServerSidecars(compilation);
+        var before = Outputs(driver.GetRunResult(), TrackingNames.SqlClientProbe).ShouldHaveSingleItem().Value;
+        (
+            (bool)Outputs(driver.GetRunResult(), TrackingNames.UsesSqlServerEntries).ShouldHaveSingleItem().Value
+        ).ShouldBeTrue();
+        (
+            (bool)Outputs(driver.GetRunResult(), TrackingNames.UsesPostgresEntries).ShouldHaveSingleItem().Value
+        ).ShouldBeFalse();
+
+        var result = Run(driver, WithMethodBodyEdited(compilation));
+
+        var (probe, reason) = Outputs(result, TrackingNames.SqlClientProbe).ShouldHaveSingleItem();
+        reason.ShouldBe(IncrementalStepRunReason.Unchanged);
+        probe.ShouldBe(before);
+        AllReasons(result, TrackingNames.UsesSqlServerEntries)
             .ShouldHaveSingleItem()
             .ShouldBeOneOf(IncrementalStepRunReason.Cached, IncrementalStepRunReason.Unchanged);
         OutputReasons(result).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);

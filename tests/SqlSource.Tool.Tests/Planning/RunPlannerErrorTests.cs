@@ -110,13 +110,15 @@ public sealed class RunPlannerErrorTests : IDisposable
                 SqlDiagnostics.InvalidSettingValue,
                 project.ProjectPath,
                 "not a name",
-                "SqlSourceDatabase"
+                "SqlSourceDatabase",
+                ""
             ),
             ToolDiagnostic.AtFile(
                 SqlDiagnostics.InvalidSettingValue,
                 project.ProjectPath,
                 "everything",
-                "SqlSourceOutput"
+                "SqlSourceOutput",
+                ""
             ),
         ]);
         var query = result.Plan.Files.ShouldHaveSingleItem().Queries.ShouldHaveSingleItem();

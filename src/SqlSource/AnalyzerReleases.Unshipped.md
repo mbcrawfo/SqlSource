@@ -99,3 +99,6 @@ SQLSRC258 | SqlSource | Error | Model name cannot be used
 SQLSRC259 | SqlSource | Error | Output model on a query without rows
 SQLSRC260 | SqlSource | Error | Column marker names no usable column
 SQLSRC261 | SqlSource | Error | Entry names an array as the catalog does
+SQLSRC267 | SqlSource | Error | Microsoft.Data.SqlClient is older than 6.1
+SQLSRC268 | SqlSource | Info | Microsoft.Data.SqlClient is newer than SqlSource knows
+SQLSRC269 | SqlSource | Error | Type needs Microsoft.Data.SqlClient

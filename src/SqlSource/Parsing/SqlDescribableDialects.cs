@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using SqlSource.Settings;
 
 namespace SqlSource.Parsing;
 
@@ -13,4 +14,11 @@ internal static class SqlDescribableDialects
         ImmutableArray.Create(SqlDialect.PostgreSql, SqlDialect.SqlServer);
 
     public static bool Contains(SqlDialect dialect) => All.Contains(dialect);
+
+    /// <summary>
+    /// The engine whose rules read a file's type override: SQL Server for <see cref="SqlDialect.SqlServer" />, and
+    /// PostgreSQL for every other dialect, as before SQL Server's map.
+    /// </summary>
+    public static DatabaseEngine EngineOf(SqlDialect dialect) =>
+        dialect == SqlDialect.SqlServer ? DatabaseEngine.SqlServer : DatabaseEngine.PostgreSql;
 }

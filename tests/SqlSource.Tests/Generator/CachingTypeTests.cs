@@ -69,6 +69,37 @@ public sealed class CachingTypeTests
         TypesOf(result, "app/Users/Users.sql").Queries.ShouldBeEmpty();
     }
 
+    // The same edit under mssql: Users has no entry now, and Orders is not typed again.
+    [Fact]
+    public void Run_SqlFileEditedUnderMssql_TypesOnlyThatFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources, references: [SqlClientReferences.SqlClient7]);
+        var driver = _scene.FirstRunWithSqlServerSidecars(compilation);
+
+        var edited = new InMemoryAdditionalText(_scene.Users.Path, "-- name: GetUser\nSELECT 1, 2;\n");
+        var result = Run(driver.ReplaceAdditionalText(_scene.Users, edited), compilation);
+
+        Reasons<FileTypesInput>(result, TrackingNames.FileTypesInput, input => input.Check.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<FileTypes>(result, TrackingNames.FileTypes, file => file.NormalizedPath)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Modified,
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        TypesOf(result, "app/Users/Users.sql").Queries.ShouldBeEmpty();
+    }
+
     // The new entry of Users has a column of text, and Orders is not typed again.
     [Fact]
     public void Run_SidecarEdited_TypesOnlyItsFile()

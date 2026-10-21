@@ -144,54 +144,87 @@ public sealed class SidecarTests
         UsableEntries(run).ShouldBeEmpty();
     }
 
-    // The tool cannot give such a file an entry yet, so its queries get no error of their own.
+    // The file is checked as a postgres file is: an entry that is current is usable, a stale one is SQLSRC244, and a
+    // query without one is SQLSRC241.
     [Fact]
-    public void Run_MssqlFileAtModels_IsOneSqlsrc243AndNoSqlsrc241()
+    public void Run_MssqlFile_IsCheckedAgainstItsSidecar()
     {
         var users = new SqlFile(
             GeneratorHarness.UsersPath,
-            "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n"
+            "-- name: GetUser\nSELECT 1;\n\n-- name: CountUsers\nSELECT 2;\n\n-- name: ListUsers\nSELECT 3;\n"
         );
+        var current = Sidecars.Entry("GetUser", Sidecars.HashOf(users, "GetUser", SqlDialect.SqlServer), "mssql");
+        var stale = Sidecars.Entry("CountUsers", "stale", "mssql");
 
-        var run = Run(OutputKind.Models, [users], "mssql");
+        var run = Run(OutputKind.Models, [users, Sidecars.Of(users, current, stale)], "mssql");
 
         run.Diagnostics.ShouldBe([
-            $"SQLSRC243 {GetUserName}: This version of SqlSource has no type map for the dialect 'mssql', so no query "
-                + "of this file can have models.  Set the output to 'sql'.",
+            $"SQLSRC244 {GeneratorHarness.UsersPath}(4,10)-(4,20): The query 'CountUsers' has changed since its entry "
+                + "was written.  Run 'sqlsource describe'.",
+            $"SQLSRC241 {GeneratorHarness.UsersPath}(7,10)-(7,19): The query 'ListUsers' has no entry in the sidecar "
+                + "of its file, and its output 'models' needs one.  Run 'sqlsource describe'.",
         ]);
-        run.SeverityOf("SQLSRC243").ShouldBe(DiagnosticSeverity.Error);
-        UsableEntries(run).ShouldBeEmpty();
+        run.SeverityOf("SQLSRC244").ShouldBe(DiagnosticSeverity.Error);
+        UsableEntries(run).ShouldBe(["GetUser"]);
     }
 
-    // An entry that would pass under another type map is still not usable, and the checks of the sidecar itself and
-    // of its orphans still run.
     [Fact]
-    public void Run_MssqlFileAtModelsWithASidecar_IsSqlsrc243AndTheSidecarsOwnErrors()
+    public void Run_MssqlFileWithoutASidecar_IsSqlsrc241AtEachQuery()
+    {
+        var run = Run(OutputKind.Models, [Users], "mssql");
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                + "'models' needs one.  Run 'sqlsource describe'.",
+        ]);
+    }
+
+    // An entry of postgres is not one of mssql, and the sidecar's own errors and its orphans are still found.
+    [Fact]
+    public void Run_MssqlFileWithASidecar_IsCheckedForTheEngineAndForTheSidecarsOwnErrors()
     {
         var current = Sidecars.Entry("GetUser", Sidecars.HashOf(Users, "GetUser", SqlDialect.SqlServer), "mssql");
-        const string NoTypeMap =
-            $"SQLSRC243 {GetUserName}: This version of SqlSource has no type map for the dialect 'mssql', so no query "
-            + "of this file can have models.  Set the output to 'sql'.";
+        var ofPostgres = Sidecars.Entry("GetUser", Sidecars.HashOf(Users, "GetUser", SqlDialect.PostgreSql));
 
-        var withEntries = Run(
+        var withOrphan = Run(
             OutputKind.Models,
             [Users, Sidecars.Of(Users, current, Sidecars.Entry("Gone", "h", "mssql"))],
             "mssql"
         );
         var malformed = Run(OutputKind.Models, [Users, Sidecars.Raw(Users, "")], "mssql");
+        var wrongEngine = Run(OutputKind.Models, [Users, Sidecars.Of(Users, ofPostgres)], "mssql");
 
-        withEntries.Diagnostics.ShouldBe([
-            NoTypeMap,
+        withOrphan.Diagnostics.ShouldBe([
             $"SQLSRC245 {GeneratorHarness.UsersPath}.json(15,5)-(15,11): The entry 'Gone' names no query of the file "
                 + "that needs one.  Run 'sqlsource describe', which removes it.",
         ]);
-        UsableEntries(withEntries).ShouldBeEmpty();
+        UsableEntries(withOrphan).ShouldBe(["GetUser"]);
         malformed.Diagnostics.ShouldBe([
-            NoTypeMap,
             $"SQLSRC237 {SidecarStart}: The sidecar cannot be read, because it is not one JSON object.  Run "
                 + "'sqlsource describe' to write it again.",
         ]);
         UsableEntries(malformed).ShouldBeEmpty();
+        wrongEngine.Diagnostics.ShouldBe([
+            $"SQLSRC242 {GetUserName}: The entry of the query 'GetUser' was described for 'postgres', and the "
+                + "dialect of this file is 'mssql'.  Run 'sqlsource describe'.",
+        ]);
+        UsableEntries(wrongEngine).ShouldBeEmpty();
+    }
+
+    // SQLSRC243 is kept for an engine whose describer lands before its map, and this release has none: the file of
+    // each describable dialect is checked against its sidecar, which it lacks here.
+    [Fact]
+    public void Run_EachDescribableDialect_IsNeverSqlsrc243()
+    {
+        foreach (var dialect in SqlDescribableDialects.All)
+        {
+            var run = Run(OutputKind.Models, [Users], SqlDialectName.Canonical(dialect));
+
+            run.Diagnostics.ShouldBe([
+                $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                    + "'models' needs one.  Run 'sqlsource describe'.",
+            ]);
+        }
     }
 
     // At the first query that needs an entry, as the tool reports it: one setting mends the file, so its queries get
@@ -273,7 +306,7 @@ public sealed class SidecarTests
     }
 
     // The tool reports a token without a default whatever the file's sidecar and dialect, and so does the build:
-    // beside an error of the sidecar itself, and beside an error for the whole file.
+    // beside an error of the sidecar itself, and under mssql, whose file is checked as a postgres file is.
     [Fact]
     public void Run_TokenWithoutADefault_IsSqlsrc210WhateverTheSidecarAndTheDialect()
     {
@@ -291,11 +324,7 @@ public sealed class SidecarTests
                 + "'sqlsource describe' to write it again.",
         ]);
         UsableEntries(malformed).ShouldBeEmpty();
-        mssql.Diagnostics.ShouldBe([
-            $"SQLSRC243 {GetUserName}: This version of SqlSource has no type map for the dialect 'mssql', so no query "
-                + "of this file can have models.  Set the output to 'sql'.",
-            NoDefault,
-        ]);
+        mssql.Diagnostics.ShouldBe([NoDefault]);
         UsableEntries(mssql).ShouldBeEmpty();
     }
 

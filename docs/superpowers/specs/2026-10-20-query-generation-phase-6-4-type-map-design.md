@@ -168,6 +168,33 @@ Not decided with the owner, and open to the review of this spec:
 - `hierarchyid`, `geography` and `geometry` are refused by the base map, not mapped to `object` or `byte[]`.
 - `System.Data.SqlClient` counts as no driver.
 
+## Research
+
+Every row of the base map was read from a live server: Microsoft.Data.SqlClient 6.1.7, the newest 6.1, and 7.1.1, the newest 7, each on `net8.0` (.NET 8.0.16) and `net10.0` (.NET 10.0.12), against the image `mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04`, SQL Server 2025 (17.0.5015.4, RTM-CU9-GDR) under amd64 emulation.  A plain `SqlDataReader` with `CommandBehavior.Default` read a one-row table of each type, recording `GetDataTypeName`, `GetFieldType` and the type of `GetValue`'s value.  `Microsoft.SqlServer.Types` was not referenced.  Both drivers and both frameworks gave the same answer for every type, so the map has one cell for each row, and the column of the driver decides only whether the driver is referenced.
+
+| SQL type | `GetFieldType` | `GetValue` | Value type |
+|----|----|----|----|
+| `bigint`, `int`, `smallint`, `tinyint` | `Int64`, `Int32`, `Int16`, `Byte` | the same | yes |
+| `bit` | `Boolean` | `Boolean` | yes |
+| `decimal`, `numeric`, `money`, `smallmoney` | `Decimal` | `Decimal` | yes |
+| `float`, `real` | `Double`, `Single` | the same | yes |
+| `date`, `datetime`, `datetime2`, `smalldatetime` | `DateTime` | `DateTime` | yes; never `DateOnly` |
+| `time` | `TimeSpan` | `TimeSpan` | yes; never `TimeOnly` |
+| `datetimeoffset` | `DateTimeOffset` | `DateTimeOffset` | yes |
+| `char`, `varchar`, `text`, `nchar`, `nvarchar`, `ntext`, `xml` | `String` | `String` | no |
+| `json` | `String` | `String` | no; the provider-specific type is `String`, not `SqlJson` |
+| `binary`, `varbinary`, `image`, `rowversion` (`timestamp`) | `Byte[]` | `Byte[]` | no |
+| `uniqueidentifier` | `Guid` | `Guid` | yes |
+| `sql_variant` | `Object` | the stored value's type | no |
+| `vector(3)` | `Microsoft.Data.SqlTypes.SqlVector<float>` | the same | yes, a struct |
+| `hierarchyid`, `geography`, `geometry` | null | throws `FileNotFoundException` for `Microsoft.SqlServer.Types, Version=10.0.0.0` | - |
+
+A facet changes nothing: `varchar(max)`, `nvarchar(max)` and `varbinary(max)` box as `varchar`, `nvarchar` and `varbinary`, `numeric` is reported as `decimal`, and `float(24)` is `real`.  An alias type boxes as its base, `dbo.Email` over `nvarchar(320)` as `String`, and `sysname` as `String`.  `sys.dm_exec_describe_first_result_set` gives `json` for a `json` column and `vector(3)` for a vector, with no user type, through both drivers.
+
+The probe's markers were checked in the compiled metadata of every release from 6.0.0 to 7.1.1 on every target framework the package references, with a Roslyn `GetTypesByMetadataName` check of the same names.  `Microsoft.Data.SqlClient.SqlConnection` is a type definition of `Microsoft.Data.SqlClient.dll` in every version.  `Microsoft.Data.SqlTypes.SqlVector`1` is absent from 6.0.0 to 6.0.5 and present from 6.1.0, so it marks 6.1.  7.0's marker is `Microsoft.Data.SqlClient.SspiContextProvider`, a public abstract class that every 7.x ships on every target framework and no 6.x does; it and `SspiAuthenticationParameters` are the only two types of that kind, and the probe uses the first.  The assembly version is the major alone, `6.0.0.0` for 6.0 and 6.1 and `7.0.0.0` for 7.x, and the reference assemblies carry an `AssemblyInformationalVersionAttribute` of the form `6.1.7+efca28ca...` and `7.1.1+29ce2d85...`.  `System.Data.SqlClient` 4.8.6 and 4.9.0 define nothing in the namespace `Microsoft.Data.SqlClient`.  Not verified: `GetValue` on other patches, Roslyn on `net9.0` (its metadata was read), and a vector of any base type but `float32`.
+
+No finding changes a row of the table of the base map above.
+
 ## Version
 
 The pull request checks `VersionPrefix` against the release tags, as `AGENTS.md` requires.

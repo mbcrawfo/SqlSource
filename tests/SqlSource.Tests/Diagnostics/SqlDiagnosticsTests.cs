@@ -20,6 +20,7 @@ public sealed class SqlDiagnosticsTests
         ["SQLSRC240"] = DiagnosticSeverity.Warning,
         ["SQLSRC245"] = DiagnosticSeverity.Warning,
         ["SQLSRC248"] = DiagnosticSeverity.Info,
+        ["SQLSRC268"] = DiagnosticSeverity.Info,
     };
 
     [Fact]
@@ -171,6 +172,22 @@ public sealed class SqlDiagnosticsTests
             .ShouldBe(
                 "This project references Npgsql 11.0.0, which is newer than this version of SqlSource knows.  Its "
                     + "models use the types of Npgsql 10."
+            );
+
+    [Fact]
+    public void SqlClientTooOld_Message_HoldsTheVersionAndTheFloor() =>
+        Format(SqlDiagnostics.SqlClientTooOld, "6.0.5")
+            .ShouldBe(
+                "This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs Microsoft.Data.SqlClient "
+                    + "6.1 or later.  Update the package."
+            );
+
+    [Fact]
+    public void SqlClientNewerThanKnown_Message_HoldsTheVersion() =>
+        Format(SqlDiagnostics.SqlClientNewerThanKnown, "8.0.1")
+            .ShouldBe(
+                "This project references Microsoft.Data.SqlClient 8.0.1, which is newer than this version of "
+                    + "SqlSource knows.  Its models use the types of Microsoft.Data.SqlClient 7."
             );
 
     [Fact]

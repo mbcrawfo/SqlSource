@@ -129,6 +129,24 @@ internal sealed class CachingScene
         return driver;
     }
 
+    // Both types at Models under mssql, and each file with its current sidecar.
+    public GeneratorDriver FirstRunWithSqlServerSidecars(Compilation compilation)
+    {
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [
+                    Users,
+                    Orders,
+                    CurrentSidecar(Users, "GetUser", SqlDialect.SqlServer),
+                    CurrentSidecar(Orders, "GetOrder", SqlDialect.SqlServer),
+                ],
+                new TestOptionsProvider(OutputKind.Models, null, "mssql")
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
+        return driver;
+    }
+
     // Both types at Models under postgres, and each file with a current sidecar whose entry has a column of int4,
     // Users with this one when it is given.
     public GeneratorDriver FirstRunWithTypes(
@@ -189,9 +207,13 @@ internal sealed class CachingScene
         return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
     }
 
-    public static InMemoryAdditionalText CurrentSidecar(InMemoryAdditionalText sqlFile, string queryName)
+    public static InMemoryAdditionalText CurrentSidecar(
+        InMemoryAdditionalText sqlFile,
+        string queryName,
+        SqlDialect dialect = SqlDialect.PostgreSql
+    )
     {
-        var sidecar = Sidecars.Current(ToSqlFile(sqlFile), SqlDialect.PostgreSql, queryName);
+        var sidecar = Sidecars.Current(ToSqlFile(sqlFile), dialect, queryName);
         return new InMemoryAdditionalText(sidecar.Path, sidecar.Text);
     }
 

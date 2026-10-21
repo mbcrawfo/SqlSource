@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using Microsoft.CodeAnalysis.Text;
 using SqlSource.Parsing.Tokens;
 using SqlSource.Settings;
 
@@ -56,7 +57,8 @@ internal sealed class SqlMarkerScope(
 
     private string? _outputModel;
 
-    // Sorted by key as TypeOverrideMap keeps a map, each key once.
+    // The entries of the file's engine, keyed by its rules: sorted by key as TypeOverrideMap keeps a map, each key
+    // once.
     private List<TypeOverride>? _typeOverrides;
 
     /// <summary>The scope's generator parameters.</summary>
@@ -222,31 +224,45 @@ internal sealed class SqlMarkerScope(
                 or SqlMarkerKind.CollectionType
                 or SqlMarkerKind.TypeOverride;
 
-    private SettingsLevel BuildLevel() =>
-        Generator.Parameters is null
-        && _output is null
-        && _database is null
-        && _inputModelSuffix is null
-        && _outputModelSuffix is null
-        && _modelNamespace is null
-        && _inputModelType is null
-        && _outputModelType is null
-        && _collectionType is null
-        && _typeOverrides is null
-            ? SettingsLevel.None
-            : new SettingsLevel
-            {
-                Parameters = Generator.Parameters,
-                Output = _output,
-                Database = _database,
-                InputModelSuffix = _inputModelSuffix,
-                OutputModelSuffix = _outputModelSuffix,
-                ModelNamespace = _modelNamespace,
-                InputModelType = _inputModelType,
-                OutputModelType = _outputModelType,
-                CollectionType = _collectionType,
-                TypeOverrides = BuildTypeOverrides(),
-            };
+    private SettingsLevel BuildLevel()
+    {
+        if (
+            Generator.Parameters is null
+            && _output is null
+            && _database is null
+            && _inputModelSuffix is null
+            && _outputModelSuffix is null
+            && _modelNamespace is null
+            && _inputModelType is null
+            && _outputModelType is null
+            && _collectionType is null
+            && _typeOverrides is null
+        )
+        {
+            return SettingsLevel.None;
+        }
+
+        // The entries are the file's engine's alone.
+        var typeOverrides = BuildTypeOverrides();
+        var isSqlServer = Engine == DatabaseEngine.SqlServer;
+        return new SettingsLevel
+        {
+            Parameters = Generator.Parameters,
+            Output = _output,
+            Database = _database,
+            InputModelSuffix = _inputModelSuffix,
+            OutputModelSuffix = _outputModelSuffix,
+            ModelNamespace = _modelNamespace,
+            InputModelType = _inputModelType,
+            OutputModelType = _outputModelType,
+            CollectionType = _collectionType,
+            TypeOverrides = isSqlServer ? null : typeOverrides,
+            SqlServerTypeOverrides = isSqlServer ? typeOverrides : null,
+        };
+    }
+
+    // The engine of the file, whose rules read its type override's keys and whose entries its markers give.
+    private DatabaseEngine Engine => SqlDescribableDialects.EngineOf(rules.Dialect);
 
     private EquatableArray<TypeOverride>? BuildTypeOverrides() =>
         _typeOverrides is null ? null : new EquatableArray<TypeOverride>(_typeOverrides.ToImmutableArray());
@@ -291,15 +307,16 @@ internal sealed class SqlMarkerScope(
         }
     }
 
-    // One entry, with white space allowed around its "=".  The entries of a scope add up, one for each key; the same
+    // One entry, with white space allowed around its "=", its key read by the file's engine: a key that engine does
+    // not read is not valid, though the other reads it.  The entries of a scope add up, one for each key; the same
     // type twice is fine, and another type for a key is a conflict, the first standing.  The types are compared as
     // their text, so int and System.Int32 are two.  A file's header is the place of its preamble's entries.
     private void ReadTypeOverride(SqlMarker marker)
     {
         var place = scopeKind == SqlScopeKind.Preamble ? SettingPlace.FileHeader : SettingPlace.Query;
-        if (!TypeOverrideGrammar.TryReadEntry(Value(marker), spacesAroundEquals: true, place, out var entry))
+        if (!TypeOverrideGrammar.TryReadEntry(Value(marker), spacesAroundEquals: true, place, Engine, out var entry))
         {
-            AddInvalid(marker);
+            AddInvalid(marker, TypeOverrideGrammar.BracketHelp(Value(marker)));
             return;
         }
 
@@ -535,17 +552,25 @@ internal sealed class SqlMarkerScope(
         return true;
     }
 
-    // At the value, or at the whole marker when it has none.
-    private void AddInvalid(SqlMarker marker) => Add(SqlParseErrorKind.InvalidMarkerValue, marker);
-
-    private void AddConflict(SqlMarker marker) => Add(SqlParseErrorKind.ConflictingSettings, marker);
-
-    private void Add(SqlParseErrorKind kind, SqlMarker marker) =>
+    // At the value, or at the whole marker when it has none, with the help that ends the message.
+    private void AddInvalid(SqlMarker marker, string help = "") =>
         errors.Add(
             SqlParseError.Create(
-                kind,
-                marker.ValueSpan.IsEmpty ? marker.Span : marker.ValueSpan,
+                SqlParseErrorKind.InvalidMarkerValue,
+                PlaceOf(marker),
+                SqlMarkerReader.Describe(text, marker),
+                help
+            )
+        );
+
+    private void AddConflict(SqlMarker marker) =>
+        errors.Add(
+            SqlParseError.Create(
+                SqlParseErrorKind.ConflictingSettings,
+                PlaceOf(marker),
                 SqlMarkerReader.Describe(text, marker)
             )
         );
+
+    private static TextSpan PlaceOf(SqlMarker marker) => marker.ValueSpan.IsEmpty ? marker.Span : marker.ValueSpan;
 }

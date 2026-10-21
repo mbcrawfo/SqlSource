@@ -479,7 +479,13 @@ internal static class RunPlanner
         foreach (var setting in invalid.Settings)
         {
             errors.Add(
-                ToolDiagnostic.AtFile(SqlDiagnostics.InvalidSettingValue, projectPath, setting.Value, setting.Name)
+                ToolDiagnostic.AtFile(
+                    SqlDiagnostics.InvalidSettingValue,
+                    projectPath,
+                    setting.Value,
+                    setting.Name,
+                    setting.Help
+                )
             );
         }
     }
