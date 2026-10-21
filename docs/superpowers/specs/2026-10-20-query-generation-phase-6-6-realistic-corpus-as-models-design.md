@@ -17,7 +17,7 @@ It builds on sub-phase 6.5.  Sub-phase 6.7 builds on it.  It follows [sub-phase 
 3. Each committed entry is compared whole with the one described, provenance and origins included, which `--check` ignores, on each of 14 and 17 that runs the case and that a `checkedFrom` does not leave out.  A case that 2017 describes otherwise, by a parameter's type as the spike found for `DATEADD` or by a column's type, gets `checkedFrom` with why, and is left out of the comparison on 2017 whole, as PostgreSQL's `checkedFrom` leaves a case out; the sidecar is always recorded on the default image.
 4. `--check` covers `realistic` on both majors, with the positional filters leaving out what `minimumMajor` and `checkedFrom` leave out.
 5. Each property of each generated output model is as nullable as the case's truth says or wider, read from the compiled model.
-6. Each query runs through Dapper into its model over the seed with each of its samples, in a transaction that is rolled back, and reads every row without an error; a case Dapper cannot bind is left out of this run alone by a `dapper` member with why.
+6. Each query runs through Dapper into its model over the seed with each of its samples, in a transaction that is rolled back and that every Dapper call is given as its `transaction`, since SqlClient refuses a command on a connection with a pending transaction it was not given, and reads every row without an error; a case Dapper cannot bind is left out of this run alone by a `dapper` member with why.
 
 ## Non-goals
 

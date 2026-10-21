@@ -60,7 +60,7 @@ The PostgreSQL project's classes, each in T-SQL with its combinations kept, and 
 | Invoices | `-- database: billing`; the model namespace by the file's marker; a table model named `Billing...` |
 | Notes | `Output = GeneratorOutput.CodeGen`; type overrides at the property, metadata, file and query levels with SQL Server's keys, among them `sys.`, `dbo.Email`, `date=System.DateOnly` and `time=System.TimeOnly`; an outer join; `-- column:`; `[name!]` and `"name?"` |
 | Shapes | Record and class shapes, a suffix, `ModelNamespace`, `MethodLocation.Public`, `CollectionType.List`, `sort-output` |
-| Writes | `INSERT ... OUTPUT`, `UPDATE ... OUTPUT`, `MERGE ... OUTPUT`, run in a transaction that is rolled back |
+| Writes | `INSERT ... OUTPUT`, `UPDATE ... OUTPUT`, `MERGE ... OUTPUT`, run in a transaction that is rolled back and that each Dapper call is given as its `transaction`, which SqlClient requires |
 
 The types Dapper cannot send are listed as PostgreSQL's `WriteSideLeftOut` lists them.  The row expectations of the type table live beside PostgreSQL's in `tests/SqlSource.Testing/EndToEnd/`.
 
