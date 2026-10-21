@@ -489,6 +489,53 @@ public sealed class CachingModelTests
         }
     }
 
+    // Each path listed twice, under one spelling or two, is typed and its models read once, from the collected files,
+    // so that its errors are reported once.  Without Npgsql, Users' column of date has no C# type, SQLSRC249, an error
+    // of its types.  Orders' column gives a property name that is not an identifier, SQLSRC254, an error of its
+    // models.  A second spelling is a collision, SQLSRC013, as it is for any claimed file.  When the first listings go,
+    // the second ones are typed and read from their own nodes, and each error is still reported once.
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Run_FileListedTwice_ReportsItsTypeAndNameErrorsOnce(bool byCase)
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [
+                    _scene.Users,
+                    Again(_scene.Users, byCase),
+                    _scene.Orders,
+                    Again(_scene.Orders, byCase),
+                    TypedSidecar(_scene.Users, "GetUser", "date"),
+                    TypedSidecar(_scene.Orders, "GetOrder", "int4", columnName: "api-url"),
+                ],
+                OptionsWithTypeOverrides(null)
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        var first = driver.GetRunResult();
+
+        first.Results.Single().Exception.ShouldBeNull();
+        first
+            .Diagnostics.Select(diagnostic => diagnostic.Id)
+            .ShouldBe(
+                byCase ? ["SQLSRC013", "SQLSRC013", "SQLSRC249", "SQLSRC254"] : ["SQLSRC249", "SQLSRC254"],
+                ignoreOrder: true
+            );
+
+        var result = Run(driver.RemoveAdditionalTexts([_scene.Users, _scene.Orders]), compilation);
+
+        result.Results.Single().Exception.ShouldBeNull();
+        result.Diagnostics.Select(diagnostic => diagnostic.Id).ShouldBe(["SQLSRC249", "SQLSRC254"], ignoreOrder: true);
+
+        // The file again at its own path, or at that path with its extension in capitals.
+        static InMemoryAdditionalText Again(InMemoryAdditionalText file, bool byCase) =>
+            new(
+                byCase ? file.Path.Replace(".sql", ".SQL", StringComparison.Ordinal) : file.Path,
+                file.GetText(TestContext.Current.CancellationToken)!.ToString()
+            );
+    }
+
     // The edit gives the pipeline a new compilation: the names the project has are looked up again and found the
     // same, so the models are not worked out again, and none is emitted.
     [Fact]
