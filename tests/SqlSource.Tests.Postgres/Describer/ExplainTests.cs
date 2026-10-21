@@ -104,13 +104,6 @@ public sealed class ExplainTests(PostgresContainer postgres)
         (await ShowAsync(connection, "plan_cache_mode")).ShouldBe("auto");
     }
 
-    // A table of this test alone with one row, made by SQL that can be run again, and left: the container is
-    // thrown away, and the fixtures are recorded in one of their own.
-    private const string Rows = """
-        CREATE TABLE IF NOT EXISTS walk_explain_rows (id integer PRIMARY KEY, label text);
-        INSERT INTO walk_explain_rows VALUES (1, 'kept') ON CONFLICT (id) DO UPDATE SET label = 'kept';
-        """;
-
     // An UPDATE is planned and not executed: its row is unchanged.
     [Fact]
     public async Task ExplainAsync_Update_ChangesNoRow()
@@ -118,7 +111,7 @@ public sealed class ExplainTests(PostgresContainer postgres)
         var token = TestContext.Current.CancellationToken;
         await using var connection = new PostgresConnection(postgres.ConnectionString, NullRunLog.Instance);
         var live = new PostgresLive(connection);
-        await using (var made = await connection.CommandAsync(Rows, token))
+        await using (var made = await connection.CommandAsync(ScratchSchema.ExplainRows, token))
         {
             _ = await made.ExecuteNonQueryAsync(token);
         }

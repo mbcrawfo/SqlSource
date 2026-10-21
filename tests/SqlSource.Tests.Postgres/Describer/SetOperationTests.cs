@@ -352,10 +352,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_ViewWhoseSubqueryIsNamedLikeALeafScan_StaysUnknown()
     {
-        await postgres.ExecuteAsync(
-            "CREATE OR REPLACE VIEW setop_leaf_alias AS SELECT \"*SELECT* 9\".b, \"*SELECT* 9\".a FROM "
-                + "(SELECT u.name AS a, NULLIF(u.name, 'x') AS b FROM users u OFFSET 0) AS \"*SELECT* 9\""
-        );
+        await postgres.ExecuteAsync(ScratchSchema.LeafAliasView);
         var sql = "SELECT b, a FROM setop_leaf_alias EXCEPT SELECT 'zz', 'zz'";
 
         (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);
@@ -411,11 +408,7 @@ public sealed class SetOperationTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_UnionAllOfAnInlinedFunctionWithALimitBranch_StaysUnknown()
     {
-        await postgres.ExecuteAsync(
-            "CREATE OR REPLACE FUNCTION setop_pairs() RETURNS TABLE (a varchar, b varchar) LANGUAGE sql STABLE AS "
-                + "$$ SELECT u.name, u.name FROM users u "
-                + "UNION ALL (SELECT x.name, NULLIF(x.name, 'x') FROM users x LIMIT 5) $$"
-        );
+        await postgres.ExecuteAsync(ScratchSchema.PairsFunction);
         var sql = "SELECT b, a FROM setop_pairs()";
 
         (await WalkedAsync(sql)).ShouldBe([UnknownNoOrigin, UnknownNoOrigin]);

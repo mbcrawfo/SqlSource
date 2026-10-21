@@ -239,32 +239,6 @@ public sealed class ColumnTests(PostgresContainer postgres)
             .ShouldBe(["open", "prepare", "columns", "types", "check", "explain", "deallocate"]);
     }
 
-    // Two tables of these tests alone: one with the modifiers the fixture schema lacks, and one with no column.
-    // They are made once and left: the container is thrown away, and the fixtures are recorded in one of their own.
-    private const string OwnTables = """
-        CREATE TABLE IF NOT EXISTS column_types (
-            n0 numeric(18, 0),
-            n1 numeric(5),
-            n numeric,
-            ts3 timestamp(3),
-            tstz0 timestamptz(0),
-            ttz2 timetz(2),
-            t4 time(4),
-            i3 interval(3),
-            b3 bit(3),
-            b1 bit,
-            vb5 varbit(5),
-            vb varbit,
-            c1 char,
-            bp bpchar,
-            vc varchar,
-            em email_t NOT NULL,
-            ems email_t[],
-            statuses user_status[]
-        );
-        CREATE TABLE IF NOT EXISTS column_empty ();
-        """;
-
     // The name of each column's type as the server spells it with its modifier, with the schema before a type that
     // is not of pg_catalog: format_type leaves the schema out of a type on the search path.
     private const string FormatTypes = """
@@ -277,7 +251,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         ORDER BY a.attnum
         """;
 
-    private Task MakeOwnTablesAsync() => postgres.ExecuteAsync(OwnTables);
+    private Task MakeOwnTablesAsync() => postgres.ExecuteAsync(ScratchSchema.ColumnTypes);
 
     private async Task<List<string>> FormatTypesOfAsync(string table)
     {
@@ -431,22 +405,12 @@ public sealed class ColumnTests(PostgresContainer postgres)
     }
 
     // PostgreSQL 18 holds a NOT NULL constraint that is NOT VALID: it sets attnotnull, and rows that were there
-    // before may hold NULL.  The table is made by SQL that can be run again.
-    private const string NotValidTable = """
-        CREATE TABLE IF NOT EXISTS column_not_valid (id int, name text NOT NULL);
-        DO $$
-        BEGIN
-            ALTER TABLE column_not_valid ADD CONSTRAINT column_not_valid_id NOT NULL id NOT VALID;
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END
-        $$;
-        """;
-
+    // before may hold NULL.
     [Fact]
     public async Task DescribeAsync_NotNullThatIsNotValid_IsNullable()
     {
         postgres.SkipBelow(18, "Only PostgreSQL 18 has a NOT NULL that is NOT VALID.");
-        await postgres.ExecuteAsync(NotValidTable);
+        await postgres.ExecuteAsync(ScratchSchema.NotValid);
 
         // The premise: the server sets attnotnull for a constraint that is not validated.
         (
@@ -461,62 +425,18 @@ public sealed class ColumnTests(PostgresContainer postgres)
         Of(columns).ShouldBe([NullableCatalog, NotNullCatalog]);
     }
 
-    // A legacy inheritance parent and its child, of this test alone, made by SQL that can be run again.
-    private const string InheritanceTables = """
-        CREATE TABLE IF NOT EXISTS inh_parent (id integer NOT NULL, v text NOT NULL);
-        CREATE TABLE IF NOT EXISTS inh_child () INHERITS (inh_parent);
-        """;
-
     // Before PostgreSQL 18 a child may drop a NOT NULL it inherited, and a query of the parent reads the child's
     // rows, so a NULL comes back for a column the parent says is NOT NULL.  18 refuses the drop, and the answer is
     // the same there: the rule does not depend on the version.
     [Fact]
     public async Task DescribeAsync_ColumnsOfAnInheritanceParent_AreNullableByTheCatalog()
     {
-        var token = TestContext.Current.CancellationToken;
-        await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
-        {
-            await using var made = source.CreateCommand(InheritanceTables);
-            _ = await made.ExecuteNonQueryAsync(token);
-            if (postgres.Major < 18)
-            {
-                await using var dropped = source.CreateCommand("ALTER TABLE inh_child ALTER COLUMN v DROP NOT NULL");
-                _ = await dropped.ExecuteNonQueryAsync(token);
-            }
-        }
+        await postgres.ExecuteAsync(ScratchSchema.Inheritance);
 
         var columns = await ColumnsOfAsync("SELECT p.id, p.v FROM inh_parent p");
 
         Of(columns).ShouldBe([NullableCatalog, NullableCatalog]);
     }
-
-    // A partitioned table, of this test alone, with a foreign partition through postgres_fdw over a loopback server
-    // to the container's own database, at the server's port inside the container, made by SQL that can be run
-    // again.  Its remote row holds NULL in v, which the parent says is NOT NULL.
-    private static string ForeignPartitionTables(NpgsqlConnectionStringBuilder connection) =>
-        $$"""
-            {{ForeignServer(connection)}}
-            CREATE TABLE IF NOT EXISTS fp_remote (id integer NOT NULL, kind integer NOT NULL, v text);
-            INSERT INTO fp_remote SELECT 1, 2, NULL WHERE NOT EXISTS (SELECT 1 FROM fp_remote);
-            CREATE TABLE IF NOT EXISTS fp_parted (id integer NOT NULL, kind integer NOT NULL, v text NOT NULL)
-                PARTITION BY LIST (kind);
-            CREATE TABLE IF NOT EXISTS fp_parted_1 PARTITION OF fp_parted FOR VALUES IN (1);
-            CREATE FOREIGN TABLE IF NOT EXISTS fp_parted_2 PARTITION OF fp_parted FOR VALUES IN (2)
-                SERVER fp_loop OPTIONS (table_name 'fp_remote');
-            """;
-
-    // The loopback server the foreign tables of these tests share, made by SQL that can be run again.
-    private static string ForeignServer(NpgsqlConnectionStringBuilder connection) =>
-        $$"""
-            CREATE EXTENSION IF NOT EXISTS postgres_fdw;
-            CREATE SERVER IF NOT EXISTS fp_loop FOREIGN DATA WRAPPER postgres_fdw
-                OPTIONS (dbname {{Literal(connection.Database)}}, host 'localhost', port '5432');
-            CREATE USER MAPPING IF NOT EXISTS FOR CURRENT_USER SERVER fp_loop
-                OPTIONS (user {{Literal(connection.Username)}}, password {{Literal(connection.Password)}});
-            """;
-
-    private static string Literal(string? value) =>
-        $"'{(value ?? string.Empty).Replace("'", "''", StringComparison.Ordinal)}'";
 
     // A foreign partition inherits its parent's NOT NULL, which nothing enforces on the remote rows, and a query of
     // the parent reads them: both columns' origin is the parent, so both are nullable, on every version.
@@ -524,7 +444,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     public async Task DescribeAsync_ColumnsOfAPartitionedTableWithAForeignPartition_AreNullableByTheCatalog()
     {
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
-        await postgres.ExecuteAsync(ForeignPartitionTables(connection));
+        await postgres.ExecuteAsync(ScratchSchema.ForeignPartitions(connection));
 
         // The premise: a query of the parent returns the remote row's NULL.
         (await postgres.ScalarAsync("SELECT p.v IS NULL FROM fp_parted p WHERE p.id = 1")).ShouldBe(true);
@@ -540,7 +460,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     public async Task DescribeAsync_ExpressionOverAPartitionedTableWithAForeignPartition_StaysUnknown()
     {
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
-        await postgres.ExecuteAsync(ForeignPartitionTables(connection));
+        await postgres.ExecuteAsync(ScratchSchema.ForeignPartitions(connection));
 
         // The premise: a query of the parent returns the remote row's NULL.
         (await postgres.ScalarAsync("SELECT p.v IS NULL FROM fp_parted p WHERE p.id = 1")).ShouldBe(true);
@@ -552,24 +472,13 @@ public sealed class ColumnTests(PostgresContainer postgres)
         Of(columns).ShouldBe([NotNullCatalog, UnknownNoOrigin]);
     }
 
-    // A foreign table of this test alone, through the same loopback server, whose remote row holds NULL in v, which
-    // the foreign table says is NOT NULL and PostgreSQL does not enforce.  Made by SQL that can be run again.
-    private static string ForeignTable(NpgsqlConnectionStringBuilder connection) =>
-        $$"""
-            {{ForeignServer(connection)}}
-            CREATE TABLE IF NOT EXISTS ft_remote (id integer NOT NULL, v text);
-            INSERT INTO ft_remote SELECT 1, NULL WHERE NOT EXISTS (SELECT 1 FROM ft_remote);
-            CREATE FOREIGN TABLE IF NOT EXISTS ft_foreign (id integer NOT NULL, v text NOT NULL)
-                SERVER fp_loop OPTIONS (table_name 'ft_remote');
-            """;
-
     // PostgreSQL does not enforce a foreign table's NOT NULL on the remote rows, and a query reads them: the column
     // is unknown, and the source says why, in a gated query too, where only a join that extends it makes it nullable.
     [Fact]
     public async Task DescribeAsync_ColumnOfAForeignTable_IsUnknownFromTheForeignTable()
     {
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
-        await postgres.ExecuteAsync(ForeignTable(connection));
+        await postgres.ExecuteAsync(ScratchSchema.ForeignTable(connection));
 
         // The premise: a query of the foreign table returns the remote row's NULL.
         (await postgres.ScalarAsync("SELECT f.v IS NULL FROM ft_foreign f WHERE f.id = 1")).ShouldBe(true);
@@ -580,15 +489,6 @@ public sealed class ColumnTests(PostgresContainer postgres)
         Of(plain).ShouldBe([UnknownForeignTable, UnknownForeignTable]);
         Of(gated).ShouldBe([UnknownForeignTable, NullableOuterJoin]);
     }
-
-    // A table with a DO INSTEAD rule on INSERT, and the table the rule writes to instead, of this test alone, made by
-    // SQL that can be run again.  The rule writes NULL into the other table's id and returns the other table's row.
-    private const string InsteadRuleTables = """
-        CREATE TABLE IF NOT EXISTS ir_target (id integer NOT NULL, x integer);
-        CREATE TABLE IF NOT EXISTS ir_other (id integer, x integer);
-        CREATE OR REPLACE RULE ir_target_insert AS ON INSERT TO ir_target
-            DO INSTEAD INSERT INTO ir_other VALUES (NULL, NEW.x) RETURNING ir_other.*;
-        """;
 
     // The rule replaces the INSERT by its action, and the rows of its RETURNING list are the action's, while the row
     // description keeps the target as the column's origin: the column is nullable whatever the target's NOT NULL
@@ -601,7 +501,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
         var token = TestContext.Current.CancellationToken;
         await using (var source = NpgsqlDataSource.Create(postgres.ConnectionString))
         {
-            await using var made = source.CreateCommand(InsteadRuleTables);
+            await using var made = source.CreateCommand(ScratchSchema.InsteadRule);
             _ = await made.ExecuteNonQueryAsync(token);
 
             // The premise: the INSERT returns the rule's row, whose id is NULL.  The row is rolled back.
@@ -735,9 +635,7 @@ public sealed class ColumnTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_ColumnsOfAViewAndOfAMaterializedView_SayView()
     {
-        await postgres.ExecuteAsync(
-            "CREATE MATERIALIZED VIEW IF NOT EXISTS column_users AS SELECT id, name FROM users"
-        );
+        await postgres.ExecuteAsync(ScratchSchema.MaterializedUsers);
 
         var view = await ColumnsOfAsync("SELECT id, name, email, status FROM active_users");
         var materialized = await ColumnsOfAsync("SELECT id FROM column_users");

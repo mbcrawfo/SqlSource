@@ -210,35 +210,43 @@ public sealed class SessionTests(PostgresContainer postgres)
     public async Task DescribeAsync_TableDroppedBetweenColumnsAndTables_IsSqlsrc225AtCatalogAndNoThrow()
     {
         await postgres.ExecuteAsync("CREATE TABLE IF NOT EXISTS session_gone (id int)");
-        var dropped = false;
-        var exchange = new AfterLiveExchange(
-            async (method, _, _) =>
-            {
-                if (method == "columns" && !dropped)
+        try
+        {
+            var dropped = false;
+            var exchange = new AfterLiveExchange(
+                async (method, _, _) =>
                 {
-                    dropped = true;
-                    await postgres.ExecuteAsync("DROP TABLE session_gone");
+                    if (method == "columns" && !dropped)
+                    {
+                        dropped = true;
+                        await postgres.ExecuteAsync("DROP TABLE session_gone");
+                    }
                 }
-            }
-        );
-        var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString, exchange);
-        await using var session = opened;
-        var token = TestContext.Current.CancellationToken;
+            );
+            var (opened, capture) = await Sessions.OpenCapturedAsync(postgres.ConnectionString, exchange);
+            await using var session = opened;
+            var token = TestContext.Current.CancellationToken;
 
-        var described = await session.DescribeAsync(DescribeRequests.Of("SELECT id FROM session_gone"), token);
-        var later = await session.DescribeAsync(DescribeRequests.Of("SELECT 1 AS one"), token);
+            var described = await session.DescribeAsync(DescribeRequests.Of("SELECT id FROM session_gone"), token);
+            var later = await session.DescribeAsync(DescribeRequests.Of("SELECT 1 AS one"), token);
 
-        var failure = ShouldBeRejected(described, DescribeStep.Catalog);
-        failure.Arguments.ShouldBe([DescribeRequests.Query, "the table of the column 'id' no longer exists"]);
-        failure.ServerLines.ShouldBeEmpty();
-        failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
-        capture
-            .Calls.Take(5)
-            .Select(call => call.Method)
-            .ShouldBe(["open", "prepare", "columns", "tables", "deallocate"]);
-        later.Failure.ShouldBeNull();
-        _ = later.Value.ShouldNotBeNull();
-        (await Sessions.PreparedStatementsAsync(session)).ShouldBe(0);
+            var failure = ShouldBeRejected(described, DescribeStep.Catalog);
+            failure.Arguments.ShouldBe([DescribeRequests.Query, "the table of the column 'id' no longer exists"]);
+            failure.ServerLines.ShouldBeEmpty();
+            failure.Help.ShouldBe(PostgresErrors.SchemaChangedHelp);
+            capture
+                .Calls.Take(5)
+                .Select(call => call.Method)
+                .ShouldBe(["open", "prepare", "columns", "tables", "deallocate"]);
+            later.Failure.ShouldBeNull();
+            _ = later.Value.ShouldNotBeNull();
+            (await Sessions.PreparedStatementsAsync(session)).ShouldBe(0);
+        }
+        finally
+        {
+            // A run that fails before the hook drops the table leaves none for the next test.
+            await postgres.ExecuteAsync("DROP TABLE IF EXISTS session_gone");
+        }
     }
 
     // The read of "prepare" matches the statement's name and its text, so that a statement of the same name that an
