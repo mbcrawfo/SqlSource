@@ -281,7 +281,7 @@ public sealed partial class TypeKeysTests
     {
         var part = TypeKeys.WritePart(text);
 
-        MyRegex().Replace(part, " ").ShouldBe(part);
+        WhitespaceRunPattern().Replace(part, " ").ShouldBe(part);
         part.Split(';')[0].Split('#')[0].ShouldBe(part);
         part.Where(char.IsWhiteSpace).ShouldAllBe(character => character == ' ');
         part.ShouldNotContain("  ");
@@ -323,5 +323,5 @@ public sealed partial class TypeKeysTests
     }
 
     [GeneratedRegex(@"\s+")]
-    private static partial Regex MyRegex();
+    private static partial Regex WhitespaceRunPattern();
 }
