@@ -342,7 +342,8 @@ internal static class TypeKeys
     /// written in MSBuild is trimmed, and the compiler cuts it at <c>;</c> and <c>#</c>, and a marker is one line, so
     /// a text with a control character, a white space other than a lone space, a <c>;</c> or a <c>#</c> is written
     /// <c>U&amp;"a\000Ab"</c>, with <c>\XXXX</c> for each such character, <c>\\</c> for a <c>\</c> and
-    /// <c>""</c> for a <c>"</c>.
+    /// <c>""</c> for a <c>"</c>.  A NUL stays as it is: a PostgreSQL name cannot hold it, and <c>\0000</c> is no
+    /// escape.
     /// </summary>
     public static string WritePart(string text)
     {
@@ -397,7 +398,7 @@ internal static class TypeKeys
     private static bool MustEscape(string text, int index)
     {
         var character = text[index];
-        return char.IsControl(character)
+        return (character != '\0' && char.IsControl(character))
             || (char.IsWhiteSpace(character) && character != ' ')
             || (character == ' ' && index > 0 && text[index - 1] == ' ')
             || character is ';' or '#';

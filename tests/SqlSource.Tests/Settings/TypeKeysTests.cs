@@ -246,6 +246,7 @@ public sealed class TypeKeysTests
     [InlineData("a\u00A0b", "U&\"a\\00A0b\"")]
     [InlineData("a;b#c", "U&\"a\\003Bb\\0023c\"")]
     [InlineData("a\u0001b", "U&\"a\\0001b\"")]
+    [InlineData("a\0\nb", "U&\"a\0\\000Ab\"")]
     [InlineData("say \"hi\"\n\\", "U&\"say \"\"hi\"\"\\000A\\\\\"")]
     [InlineData("a\\b", "\"a\\b\"")]
     [InlineData("a b", "\"a b\"")]
@@ -273,6 +274,7 @@ public sealed class TypeKeysTests
     [InlineData("a  b")]
     [InlineData("a;b")]
     [InlineData("x\u2028y")]
+    [InlineData("\uD800\n")]
     public void WritePart_TextThatNeedsTheEscape_SurvivesTheTrimAndALine(string text)
     {
         var part = TypeKeys.WritePart(text);
