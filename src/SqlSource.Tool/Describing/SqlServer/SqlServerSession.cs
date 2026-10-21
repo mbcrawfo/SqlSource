@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Logging;
@@ -13,6 +15,18 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// A session with one SQL Server database.  Every call it makes to the server goes through the exchange, and the
 /// connection is made inside a <c>live</c> function and nowhere else.
 /// </summary>
+/// <remarks>
+/// <para>
+/// A query's parameters are described by <c>sp_describe_undeclared_parameters</c>, which refuses a parameter used
+/// twice.  So each use of a reused parameter is renamed to a copy of its own (<see cref="ParameterCopies" />), and
+/// the copies' types are unified: when they differ, a <c>probe</c> asks whether each copy binds declared <c>xml</c>
+/// and declared <c>int</c>, and a copy that binds both ways types nothing and is left out.  A declared parameter's
+/// type is the server's reading of its declaration, asked first, one <c>declared</c> for each.
+/// </para>
+/// <para>
+/// A parameter is declared when its marker gives a type: a <c>-- param: @p null</c> with no type is inferred.
+/// </para>
+/// </remarks>
 internal sealed partial class SqlServerSession : IDescribeSession
 {
     public const string DriverName = "Microsoft.Data.SqlClient";
@@ -25,8 +39,20 @@ internal sealed partial class SqlServerSession : IDescribeSession
     private const int AzureSqlDatabase = 5;
     private const int AzureSqlManagedInstance = 8;
 
-    private SqlServerSession(SqlServerConnection connection, ServerInfo server)
+    // The types a probe declares a copy with: xml converts to almost nothing, so a copy in a typed context other than
+    // one of xml fails as xml, and one in a context of xml fails as int.
+    private const string ProbeXml = "xml";
+    private const string ProbeInt = "int";
+
+    private readonly IDescribeExchange _exchange;
+    private readonly SqlServerLive _live;
+    private readonly TimeProvider _time;
+
+    private SqlServerSession(OpenRequest request, SqlServerConnection connection, SqlServerLive live, ServerInfo server)
     {
+        _exchange = request.Exchange;
+        _time = request.Time;
+        _live = live;
         Connection = connection;
         Server = server;
     }
@@ -68,7 +94,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
                 );
             }
 
-            var session = new SqlServerSession(connection, server);
+            var session = new SqlServerSession(request, connection, live, server);
             kept = true;
             return new Outcome<IDescribeSession, DescribeFailure>(session);
         }
@@ -82,27 +108,243 @@ internal sealed partial class SqlServerSession : IDescribeSession
     }
 
     /// <summary>
-    /// The description of a query.  Until the parameters are described it is that of a statement without rows and
-    /// without parameters, and nothing is asked.
+    /// The description of a query: its parameters, each typed by the server.  A statement's rows are not described
+    /// yet, so the result is that of a statement without rows.
     /// </summary>
-    public Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
+    /// <remarks>
+    /// The order: each declared type is read against T-SQL's grammar of a type name before anything is sent; then
+    /// <c>declared</c> for each declared parameter, in the list's order; then <c>parameters</c>, with the SQL whose
+    /// reused parameters are renamed to copies and the declarations; then the comparison of the server's parameters
+    /// with the list, before any <c>probe</c>, so that a text whose parameters the two read differently is not probed;
+    /// then, for each reused parameter whose copies' types differ, the probes of its copies.
+    /// </remarks>
+    public async Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         DescribeRequest request,
         CancellationToken cancellationToken
-    ) =>
-        Task.FromResult(
-            Outcome<QueryDescription, DescribeFailure>.Of(
-                new QueryDescription(
-                    SidecarResultKind.None,
-                    EquatableArray<DescribedParameter>.Empty,
-                    null,
-                    null,
-                    null,
-                    null
-                )
+    )
+    {
+        var declarations = new List<(SqlQueryParameter Parameter, string Type)>();
+        foreach (var parameter in request.Parameters)
+        {
+            if (parameter.Type is not { } text)
+            {
+                continue;
+            }
+
+            var read = DeclaredTypeText.Read(text);
+            if (read.Failure is { } reason)
+            {
+                return Failed(SqlServerErrors.TypeRefused(request, parameter, reason));
+            }
+
+            declarations.Add((parameter, read.Value!));
+        }
+
+        var declaredTypes = new Dictionary<string, SqlServerType>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (parameter, type) in declarations)
+        {
+            var resolved = await ResolveAsync(request, parameter, type, cancellationToken);
+            if (resolved.Failure is { } failure)
+            {
+                return Failed(failure);
+            }
+
+            declaredTypes[parameter.Name] = resolved.Value!;
+        }
+
+        var copied = ParameterCopies.Rename(request.Sql, request.Parameters);
+        var declared = declarations
+            .Select(static declaration => (declaration.Parameter.Name, declaration.Type))
+            .ToList();
+        var answer = await ParametersAsync(
+            new SqlServerParametersRequest(
+                copied.Sql,
+                declared.Count == 0 ? null : SqlServerLive.Declarations(declared)
+            ),
+            cancellationToken
+        );
+        if (answer.Error is { } error)
+        {
+            return Failed(SqlServerErrors.Parameters(request, error, copied));
+        }
+
+        var rows =
+            answer.Rows
+            ?? throw new InvalidOperationException("The answer to 'parameters' holds no rows and no error.");
+        var differences = ParameterCopies.CompareLists(
+            request
+                .Parameters.Where(static parameter => parameter.Type is null)
+                .Select(static parameter => parameter.Name),
+            rows.Select(static row => row.Name),
+            copied.ParameterOfCopy
+        );
+        if (differences.Count > 0)
+        {
+            return Failed(SqlServerErrors.ListsDiffer(request, differences));
+        }
+
+        var rowOf = new Dictionary<string, SqlServerParameterRow>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            _ = rowOf.TryAdd(Bare(row.Name), row);
+        }
+
+        var probes = new Probes(request, copied, declarations, rowOf);
+        var reusedTypes = new Dictionary<string, SqlServerType>(StringComparer.OrdinalIgnoreCase);
+        foreach (var reused in copied.Reused)
+        {
+            var unified = await UnifyAsync(request, reused, probes, rowOf, cancellationToken);
+            if (unified.Failure is { } failure)
+            {
+                return Failed(failure);
+            }
+
+            reusedTypes[reused.Name] = unified.Value!;
+        }
+
+        return Outcome<QueryDescription, DescribeFailure>.Of(
+            new QueryDescription(
+                SidecarResultKind.None,
+                new EquatableArray<DescribedParameter>([
+                    .. request.Parameters.Select(parameter =>
+                        DescribedOf(parameter, declaredTypes, reusedTypes, rowOf)
+                    ),
+                ]),
+                null,
+                null,
+                null,
+                null
             )
         );
+    }
 
     public ValueTask DisposeAsync() => Connection.DisposeAsync();
+
+    // The type the server reads a declared parameter's declaration as, through "declared".
+    private async Task<Outcome<SqlServerType, DescribeFailure>> ResolveAsync(
+        DescribeRequest request,
+        SqlQueryParameter parameter,
+        string type,
+        CancellationToken cancellationToken
+    )
+    {
+        var answer = await DeclaredAsync(
+            new SqlServerDeclaredRequest(
+                "SELECT " + SqlServerErrors.Written(parameter.Name) + " AS [1]",
+                SqlServerLive.Declarations([(parameter.Name, type)])
+            ),
+            cancellationToken
+        );
+        if (answer.Error is { } error)
+        {
+            return Outcome<SqlServerType, DescribeFailure>.Failed(
+                SqlServerErrors.Failed(request, error, DescribeStep.ResolveType)
+            );
+        }
+
+        if (answer.Errors is { Count: > 0 })
+        {
+            return Outcome<SqlServerType, DescribeFailure>.Failed(SqlServerErrors.Declared(request, parameter, answer));
+        }
+
+        return answer.Rows is [var row]
+            ? Outcome<SqlServerType, DescribeFailure>.Of(SqlServerTypes.FromDeclared(row))
+            : throw new InvalidOperationException("The answer to 'declared' holds no error and not one row.");
+    }
+
+    // The type of a reused parameter from its copies: their one type when every copy is typed and the types agree, and
+    // otherwise the type of the copies the probes do not leave out.
+    private async Task<Outcome<SqlServerType, DescribeFailure>> UnifyAsync(
+        DescribeRequest request,
+        ReusedParameter reused,
+        Probes probes,
+        Dictionary<string, SqlServerParameterRow> rowOf,
+        CancellationToken cancellationToken
+    )
+    {
+        var types = reused
+            .Copies.Select(copy => rowOf.TryGetValue(copy, out var row) ? SqlServerTypes.FromParameter(row) : null)
+            .ToList();
+        if (ParameterCopies.Agreed(types) is { } agreed)
+        {
+            return Outcome<SqlServerType, DescribeFailure>.Of(agreed);
+        }
+
+        var findings = new List<CopyFinding>(types.Count);
+        for (var index = 0; index < types.Count; index++)
+        {
+            var copy = reused.Copies[index];
+            var asXml = await ProbeAsync(probes.Request(copy, ProbeXml), cancellationToken);
+            if (asXml.Error is { } xmlError)
+            {
+                return Outcome<SqlServerType, DescribeFailure>.Failed(
+                    SqlServerErrors.Failed(request, xmlError, DescribeStep.DescribeParameters)
+                );
+            }
+
+            var ignored = false;
+            if (asXml.Binds == true)
+            {
+                var asInt = await ProbeAsync(probes.Request(copy, ProbeInt), cancellationToken);
+                if (asInt.Error is { } intError)
+                {
+                    return Outcome<SqlServerType, DescribeFailure>.Failed(
+                        SqlServerErrors.Failed(request, intError, DescribeStep.DescribeParameters)
+                    );
+                }
+
+                ignored = asInt.Binds == true;
+            }
+
+            findings.Add(new CopyFinding(types[index], ignored));
+        }
+
+        var unified = ParameterCopies.Unify(findings);
+        return unified.Failure switch
+        {
+            null => Outcome<SqlServerType, DescribeFailure>.Of(unified.Value!),
+            { First: { } first, Second: { } second } => Outcome<SqlServerType, DescribeFailure>.Failed(
+                SqlServerErrors.CopiesDisagree(request, reused.Name, first, second)
+            ),
+            _ => Outcome<SqlServerType, DescribeFailure>.Failed(SqlServerErrors.NoType(request, reused.Name)),
+        };
+    }
+
+    // A parameter of the list with its type: declared, from "declared"; reused, from its copies; otherwise from its
+    // row, which the comparison of the lists has found.
+    private static DescribedParameter DescribedOf(
+        SqlQueryParameter parameter,
+        Dictionary<string, SqlServerType> declaredTypes,
+        Dictionary<string, SqlServerType> reusedTypes,
+        Dictionary<string, SqlServerParameterRow> rowOf
+    )
+    {
+        if (declaredTypes.TryGetValue(parameter.Name, out var declared))
+        {
+            return new DescribedParameter(parameter.Name, declared, SidecarValues.TypeSource.Declared);
+        }
+
+        if (reusedTypes.TryGetValue(parameter.Name, out var reused))
+        {
+            return new DescribedParameter(parameter.Name, reused, SidecarValues.TypeSource.InferredFromCopies);
+        }
+
+        return rowOf.TryGetValue(parameter.Name, out var row)
+            ? new DescribedParameter(
+                parameter.Name,
+                SqlServerTypes.FromParameter(row),
+                SidecarValues.TypeSource.Inferred
+            )
+            : throw new InvalidOperationException(
+                $"The server reported no type for the parameter '{parameter.Name}', and the lists agreed."
+            );
+    }
+
+    // A name without its "@", as the server reports one.
+    private static string Bare(string name) => name.StartsWith('@') ? name[1..] : name;
+
+    private static Outcome<QueryDescription, DescribeFailure> Failed(DescribeFailure failure) =>
+        Outcome<QueryDescription, DescribeFailure>.Failed(failure);
 
     // Below the floor, unless the edition is Azure's: a version whose first part is no number is not refused, since
     // the tool cannot tell what it is.
@@ -129,4 +371,51 @@ internal sealed partial class SqlServerSession : IDescribeSession
                 .. (answer.Settings ?? []).Select(static setting => new ServerSetting(setting.Name, setting.Value)),
             ])
         );
+
+    /// <summary>
+    /// The requests of <c>probe</c> for one describe: the SQL that <c>parameters</c> was asked, and the declarations
+    /// of every parameter of the list in its order, each copy of a reused parameter in its place.
+    /// </summary>
+    /// <remarks>
+    /// The copy that is probed is declared at the type it is probed with; every other copy and undeclared parameter
+    /// at the system type that <c>parameters</c> gave it, and one it gave none is left out; a declared parameter as it
+    /// is declared.
+    /// </remarks>
+    private sealed class Probes(
+        DescribeRequest request,
+        CopiedSql copied,
+        List<(SqlQueryParameter Parameter, string Type)> declarations,
+        Dictionary<string, SqlServerParameterRow> rowOf
+    )
+    {
+        public SqlServerProbeRequest Request(string probed, string type)
+        {
+            var declared = new List<(string Name, string Type)>();
+            foreach (var parameter in request.Parameters)
+            {
+                if (parameter.Type is not null)
+                {
+                    declared.Add((parameter.Name, declarations.Find(found => found.Parameter == parameter).Type));
+                    continue;
+                }
+
+                var copies = copied.Reused.FirstOrDefault(reused =>
+                    string.Equals(reused.Name, parameter.Name, StringComparison.OrdinalIgnoreCase)
+                );
+                foreach (var name in copies?.Copies ?? [parameter.Name])
+                {
+                    if (string.Equals(name, probed, StringComparison.OrdinalIgnoreCase))
+                    {
+                        declared.Add((name, type));
+                    }
+                    else if (rowOf.TryGetValue(name, out var row) && row.SuggestedSystemTypeName is { } suggested)
+                    {
+                        declared.Add((name, suggested));
+                    }
+                }
+            }
+
+            return new SqlServerProbeRequest(copied.Sql, SqlServerLive.Declarations(declared));
+        }
+    }
 }

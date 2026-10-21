@@ -84,7 +84,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC228](#sqlsrc228) | Declared type is not valid |
 | [SQLSRC229](#sqlsrc229) | Column type is not supported |
 | [SQLSRC230](#sqlsrc230) | Query holds more than one statement |
-| [SQLSRC231](#sqlsrc231) | Parameters as Npgsql reads them differ |
+| [SQLSRC231](#sqlsrc231) | Parameters are read differently |
 | [SQLSRC232](#sqlsrc232) | Type cannot be bound by Npgsql |
 | [SQLSRC233](#sqlsrc233) | Statement cannot be described |
 | [SQLSRC234](#sqlsrc234) | Query writes a positional parameter |
@@ -140,6 +140,12 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | Id | Title |
 |----|----|
 | [SQLSRC261](#sqlsrc261) | Entry names an array as the catalog does |
+
+**The parameters of a SQL Server query**
+
+| Id | Title |
+|----|----|
+| [SQLSRC262](#sqlsrc262) | Copies of a parameter have different types |
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
@@ -1138,7 +1144,7 @@ Mend the file.  `dotnet sln list` reads it the same way.
 
 **Database could not be opened**
 
-The tool could not open a session with the database of a query that must be described: nothing answers at the address, the server refused the user or the password, the database does not exist, the driver cannot read the connection string, or a file that the connection string names cannot be used.  The `server:` line says what went wrong in the tool's own words, after the server's SQLSTATE when the server gave one.  It names neither the host nor the user: what the server or the driver said would name them, or quote the connection string or a path in it.
+The tool could not open a session with the database of a query that must be described: nothing answers at the address, the server refused the user or the password, the database does not exist, the driver cannot read the connection string, or a file that the connection string names cannot be used.  The `server:` line says what went wrong in the tool's own words, after the server's SQLSTATE or SQL Server's error number when the server gave one.  It names neither the host nor the user: what the server or the driver said would name them, or quote the connection string or a path in it.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC224: The database 'app' could not be opened
@@ -1170,6 +1176,21 @@ The `server:` line is one of these.  A SQLSTATE is PostgreSQL's code of the erro
 | `a file that the connection string or the environment names is not what Npgsql expects: it is not in the right form, or its password is wrong` | Such a file was read and could not be used, as when a line of a password file is no entry |
 | `Npgsql does not support these settings of the connection string together` | A `Target Session Attributes` other than `Any` for one host, or a `Replication Mode` for several |
 | `GSS authentication is not available on this machine` | The server asks for GSS, and the operating system's GSS library cannot be loaded |
+
+For SQL Server, the line starts with `Msg <number>, Level <level>, State <state>:` when the server or SqlClient numbered the error, as in `Msg 18456, Level 14, State 1: the server refused the login`.  The number is SQL Server's, listed in [Database Engine errors](https://learn.microsoft.com/sql/relational-databases/errors-events/database-engine-events-and-errors).  The text is one of these:
+
+| The text of the `server:` line | What it means |
+|----|----|
+| `the server refused the login` | The login or its password is wrong, or the login may not connect (`Msg 18456`) |
+| `the server cannot open the database for the login` | The database that the connection string names is not on the server, or the login may not open it (`Msg 4060`), or the login's default database cannot be opened (`Msg 4064`) |
+| `the connection to the server timed out` | Nothing answered at the address in time: the address drops what is sent to it, a firewall between drops the connection, or the server is too slow to answer |
+| `SqlClient could not reach the server: ConnectionRefused` | The connection could not be made.  The word after the colon is the system's reason, such as `ConnectionRefused` when nothing listens at the port, or `HostNotFound` for a host name that is not found |
+| `the server's certificate is not trusted, or the TLS handshake failed` | The server's certificate is not one this machine trusts.  Install the certificate's authority, or, for a server of your own such as a container, add `TrustServerCertificate=True` to the connection string |
+| `the server refused to open a session` | Any other error while the session was opened: its number says which |
+| `SqlClient cannot read the connection string` | The string is not written as SqlClient wants one: `Server=localhost;Database=app;User ID=app;Password=...` |
+| `SqlClient does not accept these settings of the connection string together` | Two settings that SqlClient reads one by one and refuses together, such as `Integrated Security` with an `Authentication` |
+| `the connection string is empty` | The value sets nothing, such as `;` |
+| `SqlClient has no provider for the Authentication of the connection string` | An `Authentication` of Microsoft Entra ID, `Active Directory ...`, which the tool cannot sign in with.  Use a login and a password |
 
 See: [Connecting](postgresql.md#connecting)
 
@@ -1222,6 +1243,20 @@ The step `check parameters` gives it too, for an error of the tool's comparison 
     server: 57014: canceling statement due to statement timeout
 ```
 
+For SQL Server, each error the server gave is a `server:` line, `Msg <number>, Level <level>, State <state>:` and its text, the cause first.  The last is often `Msg 11501`, which says only that the query did not compile, and the message ends with the cause's text:
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC225: The server rejected the query 'GetUser': Invalid column name 'nope'.
+    query: GetUser, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: describe parameters
+    server: Msg 207, Level 16, State 1: Invalid column name 'nope'.
+    server: Msg 11501, Level 16, State 2: The batch could not be analyzed because of compile errors.
+```
+
+- **A type that a `-- param:` marker declares** is checked against every use of the parameter, so `-- param: @p xml` with `WHERE id = @p` is this error, `Msg 206`, `Operand type clash: xml is incompatible with int`.  A type that the query's own text names and the database lacks, `CAST(@p AS dbo.Nope)`, is this error too.
+- **A statement whose result SQL Server cannot work out**, such as `CREATE PROCEDURE`, is `Msg 11527`, `... does not support metadata discovery`.  Give the query `-- output: sql`.
+- **A connection that was lost** has the line `the connection to the server was lost`, or `the server did not answer in time` when SqlClient stopped waiting for its answer, after the error's number.  Every query of that database after it has the line `the connection to the server was lost`: start the run again.  At the step `resolve type`, the server could not be asked about a declared type for the same reasons.
+
 ## SQLSRC226
 
 **Parameter type could not be determined**
@@ -1237,6 +1272,18 @@ The server gives each parameter a type from the way the query uses it, and nothi
 ```
 
 Cast the parameter where it is used, or declare its type with a `-- param:` marker.  The same error, at the step `resolve type` and with no `server:` line, says that the server did give the parameter a type and that the type is a pseudo-type, which no value has: `row_to_json(@p)` makes `@p` a `record`.  Its `help:` line names the pseudo-type, and the fix is the same.
+
+SQL Server gives the error for a parameter whose uses fix no type, `SELECT @p AS x` or `COALESCE(@p, name)`, for two parameters in one expression with nothing else, `@a + @b`, and for a parameter that no type would make the query valid.  The `server:` line is SQL Server's error, which names the parameter:
+
+```console
+/work/App/Queries/Checks.sql(1,10): error SQLSRC226: The type of the parameter '@p' of the query 'Echo' could not be determined
+    query: Echo, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: describe parameters
+    server: Msg 11506, Level 16, State 1: The parameter type for '@p' cannot be uniquely deduced; two possibilities are 'sql_variant' and 'xml'.
+    help: add a CAST around a use of the parameter, or declare its type with -- param:
+```
+
+Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter used more than once whose uses all leave its type open is this error too, with no `server:` line.  A parameter whose only use is `@p IS NULL` is not: SQL Server gives it the type `int`.
 
 See: [Parameters](postgresql.md#parameters)
 
@@ -1279,6 +1326,24 @@ A `-- param:` marker gives a parameter a type, and the tool asks the server to r
 
 Write the type as the database has it: `int`, `varchar(50)`, `numeric(18,2)`, `timestamp(3) without time zone`, `public.user_status`, `"My Schema"."Status"[]`.  A type in a schema that is not on the search path of the connection needs its schema.  A marker's type runs to the end of its line, but for a `null` or `not null` that ends it, so nothing else may follow it there.
 
+For SQL Server the error is at the step `resolve type`, and its reasons are these:
+
+- `it is not written as a type name`, followed by what was found: the text is not a type name as T-SQL writes one, a name of one or two parts, each plain, `[bracketed]` or `"quoted"`, then `(max)` or one or two numbers in parentheses.  A `;`, a comment, a second `(` and a line break are refused.  Nothing of the query is sent.
+- `the database has no such type`: the database has no type of that name, `Msg 2715`.
+- `it is not a type`: SQL Server did not accept the text as a type, such as `nvarchar(9000)`, longer than the most it allows, `Msg 131`.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC228: The type 'dbo.Nope' declared for the parameter '@email' of the query 'FindUser' is not valid: the database has no such type
+    query: FindUser, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: resolve type
+    server: Msg 2715: Column, parameter, or variable #1: Cannot find data type dbo.Nope.
+    server: Msg 2724: Parameter or variable '@email' has an invalid data type.
+    server: Msg 11501: The batch could not be analyzed because of compile errors.
+    help: write a type the database has, with its schema when it is not a built-in type: dbo.Email
+```
+
+Write the type as a column definition would: `int`, `nvarchar(50)`, `varchar(max)`, `decimal(18,2)`, `dbo.Email`, `[billing].[Amount]`.  An alias type needs its schema unless it is in `dbo` or in the default schema of the login.
+
 See: [Parameters](postgresql.md#parameters)
 
 ## SQLSRC229
@@ -1319,9 +1384,11 @@ See: [What can be described](postgresql.md#what-can-be-described)
 
 ## SQLSRC231
 
-**Parameters as Npgsql reads them differ**
+**Parameters are read differently**
 
-SqlSource finds the parameters of a query with its own reading of the SQL, and describes the query that way.  The generated query methods of a later release will send the SQL as you wrote it and let Npgsql find the `@name` parameters, so the tool also asks Npgsql to describe the SQL that way, and compares the two results: the columns, and where each parameter stands.  They are not the same, so what was described is not what would run.  The message ends with what differs: where the two texts part, the number of columns, the name or the type of one, or what the server said of the SQL as Npgsql sent it.
+SqlSource finds the parameters of a query with its own reading of the SQL, and describes the query that way.  The tool checks that reading against the database's own, and the two differ, so what was described is not what would run.  The message starts with what reads the parameters differently: Npgsql for PostgreSQL, SQL Server for SQL Server.
+
+For PostgreSQL, the generated query methods of a later release will send the SQL as you wrote it and let Npgsql find the `@name` parameters, so the tool also asks Npgsql to describe the SQL that way, and compares the two results: the columns, and where each parameter stands.  The message ends with what differs: where the two texts part, the number of columns, the name or the type of one, or what the server said of the SQL as Npgsql sent it.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC231: Npgsql reads the parameters of the query 'ListUsers' differently from SqlSource: syntax error at or near "@"
@@ -1351,6 +1418,17 @@ The error also follows a schema that changed while the tool ran: a table, a colu
 One difference has no `@` in it: a parameter that is an array of a domain, `-- param: @p email_t[]`, and is returned as a column.  Npgsql sends it as an array of the domain's base type, so the column is `character varying[]` for Npgsql and `email_t[]` for SqlSource, and the help is `Npgsql sends a parameter that is an array of a domain as an array of the domain's base type, so the column it is returned as has another type; cast the column, @p::varchar[] for an array of a domain over varchar` in place of the first example's help.  Cast the column to the type you want, `@p::varchar[]`.
 
 A pooler in transaction mode, such as PgBouncer, can also show as this error: the describe of a statement that is missing on another backend can answer no columns and no error, so the message ends "... columns for Npgsql and 0 for SqlSource", and a statement that an earlier run left on a pooled backend can give the wrong column names.  The fix is a direct connection to the server, as [SQLSRC236](#sqlsrc236) says.  An error of the check that says nothing of how Npgsql reads the SQL, such as a lost connection, is [SQLSRC225](#sqlsrc225) at the same step.  If the SQL is plain and the two still differ, report it.
+
+For SQL Server, the tool compares the parameters that SqlSource reads in the query with those that SQL Server reports, ignoring case, and the message names each one that only one of them reads.  Under `mssql`, SqlSource reads a name as a [variable declared with `DECLARE`](parameters-and-tokens.md#declared-variables) when it stands after a comma of a list of declarations, and that list ends at a `;` or at a word that starts a statement.  A statement after a `DECLARE`, with no `;` between, that holds no such word before the comma can hide a parameter from SqlSource, and SQL Server reports it:
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC231: SQL Server reads the parameters of the query 'TopUsers' differently from SqlSource: SQL Server reads '@p' as a parameter and SqlSource does not
+    query: TopUsers, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: check parameters
+    help: a parameter of a CREATE PROCEDURE is no parameter of the query, and a DECLAREd variable is none either; rewrite the query so that both read it the same, or declare a parameter that SqlSource reads as a variable with -- param:
+```
+
+**Fix:** end the list of declarations with a `;`, or give the parameter a `-- param:` marker with its type, `-- param: @p int`, which makes it a parameter for SqlSource too.
 
 See: [What can be described](postgresql.md#what-can-be-described)
 
@@ -1966,3 +2044,20 @@ The type override has an entry for the name the database gives an array type, an
 Rename the entry to the key the message gives: `public.user_status[]=System.Collections.Generic.List<string>`.  When the type override already has an entry for that key, remove the one the message names.  The query's constant or method is still generated.
 
 See: [Type overrides](settings.md#setting-type-overrides)
+
+## SQLSRC262
+
+**Copies of a parameter have different types**
+
+SQL Server gives a parameter a type at each place the query uses it, and SqlSource takes each use as a copy of the parameter, typed on its own.  A use that says nothing of the type, such as `@p IS NULL`, is left out; the uses that fix a type must agree.  Here two of them give the parameter two types: `WHERE id = @p OR name = @p` compares it with an `int` column and with an `nvarchar(100)` one.  The message names the first two types in the order of the uses.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC262: The copies of the parameter '@p' of the query 'FindUser' have the types 'int' and 'nvarchar(100)'
+    query: FindUser, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: describe parameters
+    help: declare the parameter's type with -- param:
+```
+
+Declare the parameter's type with a `-- param:` marker, `-- param: @p nvarchar(100)`: SQL Server then checks every use against the type you chose.  Or use two parameters, one for each type.  The optional filter, `(@name IS NULL OR name = @name)`, is not this error: its first use fixes no type, and the parameter takes the type of the column.
+
+See: [SQL Server](sqlserver.md)

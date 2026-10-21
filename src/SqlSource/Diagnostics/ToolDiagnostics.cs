@@ -361,8 +361,8 @@ internal static class ToolDiagnostics
 
     public static readonly DiagnosticDescriptor ParametersReadDifferently = new(
         id: "SQLSRC231",
-        title: "Parameters as Npgsql reads them differ",
-        messageFormat: "Npgsql reads the parameters of the query '{0}' differently from SqlSource: {1}",
+        title: "Parameters are read differently",
+        messageFormat: "{0} reads the parameters of the query '{1}' differently from SqlSource: {2}",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -425,6 +425,17 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor CopiesHaveDifferentTypes = new(
+        id: "SQLSRC262",
+        title: "Copies of a parameter have different types",
+        messageFormat: "The copies of the parameter '{0}' of the query '{1}' have the types '{2}' and '{3}'",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc262",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -466,6 +477,7 @@ internal static class ToolDiagnostics
             StatementCannotBeDescribed,
             PositionalParameterWritten,
             ServerVersionNotSupported,
-            SessionNotKept
+            SessionNotKept,
+            CopiesHaveDifferentTypes
         );
 }

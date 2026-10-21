@@ -42,7 +42,7 @@ public sealed class PostgresSessionCheckTests
         described.Value.ShouldBeNull();
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
-        failure.Arguments.ShouldBe(["Q", "the result has 1 columns for Npgsql and 2 for SqlSource"]);
+        failure.Arguments.ShouldBe(["Npgsql", "Q", "the result has 1 columns for Npgsql and 2 for SqlSource"]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         exchange.Unused.ShouldBeEmpty();
     }
@@ -82,6 +82,7 @@ public sealed class PostgresSessionCheckTests
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
         failure.Arguments.ShouldBe([
+            "Npgsql",
             "Q",
             "the SQL with $n parts at character 22: '$2 AS b' for Npgsql and '$1 AS b' for SqlSource",
         ]);
@@ -120,7 +121,7 @@ public sealed class PostgresSessionCheckTests
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
-        failure.Arguments.ShouldBe(["Q", refused.Message]);
+        failure.Arguments.ShouldBe(["Npgsql", "Q", refused.Message]);
         failure.ServerLines.ShouldBe([refused.Message]);
         exchange.Unused.ShouldBeEmpty();
     }

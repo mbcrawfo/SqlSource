@@ -59,6 +59,22 @@ internal static class Sessions
         return await session.DescribeAsync(request, TestContext.Current.CancellationToken);
     }
 
+    // Describes one query in a session of its own, through a capture of every call over the exchange, the live one
+    // unless the test brings one.
+    public static async Task<(
+        Outcome<QueryDescription, DescribeFailure> Described,
+        DescribeCapture Capture
+    )> DescribeCapturedAsync(string connection, DescribeRequest request, IDescribeExchange? exchange = null)
+    {
+        var capture = new DescribeCapture(SidecarValues.Engine.SqlServer);
+        var described = await DescribeAsync(
+            connection,
+            request,
+            new CapturingExchange(exchange ?? LiveExchange.Instance, capture)
+        );
+        return (described, capture);
+    }
+
     // A query that must be described, with no failure.
     public static async Task<QueryDescription> ShouldDescribeAsync(
         string connection,

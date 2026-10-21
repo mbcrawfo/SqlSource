@@ -53,6 +53,22 @@ internal sealed record SqlServerServerError(IReadOnlyList<SqlServerErrorRow> Err
 internal sealed record SqlServerErrorRow(int Number, int Class, int State, string Message);
 
 /// <summary>
+/// The request of <c>parameters</c>: <c>sp_describe_undeclared_parameters</c> of the query's SQL under the
+/// declarations of its declared parameters.
+/// </summary>
+/// <param name="Sql">The SQL with each use of a reused parameter renamed to a copy of its own.</param>
+/// <param name="Params">The declarations of the declared parameters, <c>@a int, @b nvarchar(50)</c>, or null.</param>
+internal sealed record SqlServerParametersRequest(string Sql, string? Params);
+
+/// <summary>The parameters the server typed, or why it typed none.</summary>
+/// <param name="Rows">One for each parameter that the declarations leave out, in the server's order.</param>
+/// <param name="Error">Why the server typed none, or null.</param>
+internal sealed record SqlServerParametersAnswer(
+    IReadOnlyList<SqlServerParameterRow>? Rows,
+    SqlServerServerError? Error
+);
+
+/// <summary>
 /// A row of <c>sp_describe_undeclared_parameters</c>: one parameter the server typed, and the type it suggests.  The
 /// members are named as the procedure names its columns.
 /// </summary>
@@ -78,11 +94,47 @@ internal sealed record SqlServerParameterRow(
 );
 
 /// <summary>
-/// A row of <c>sys.dm_exec_describe_first_result_set</c> for <c>SELECT @a AS [1], @b AS [2], ...</c> under the
-/// declarations: the type the server gives a declared parameter.  The members are named as the function names its
+/// The request of <c>probe</c>: whether the SQL binds with every copy and parameter declared, one copy at
+/// <c>xml</c> or <c>int</c> and the others at the types the server gave them.
+/// </summary>
+/// <param name="Sql">The SQL as <c>parameters</c> was asked it.</param>
+/// <param name="Params">The declarations.</param>
+internal sealed record SqlServerProbeRequest(string Sql, string Params);
+
+/// <summary>Whether the SQL binds under the declarations, or why the server could not say.</summary>
+/// <param name="Binds">
+/// True when <c>sp_describe_undeclared_parameters</c> raised nothing, false when it refused the batch, and null
+/// with an error.
+/// </param>
+/// <param name="Error">
+/// A failure that is not the batch's, such as a connection that was lost or a timeout, or null.
+/// </param>
+internal sealed record SqlServerProbeAnswer(bool? Binds, SqlServerServerError? Error);
+
+/// <summary>
+/// The request of <c>declared</c>: <c>sys.dm_exec_describe_first_result_set</c> of <c>SELECT @p AS [1]</c> under
+/// one declared parameter's declaration, which gives the type the server reads it as.
+/// </summary>
+/// <param name="Sql">The <c>SELECT</c> of the parameter.</param>
+/// <param name="Params">The parameter's declaration, <c>@p dbo.Email</c>.</param>
+internal sealed record SqlServerDeclaredRequest(string Sql, string Params);
+
+/// <summary>The type of a declared parameter, or what the server found wrong with its declaration.</summary>
+/// <param name="Rows">The described column, one, when the server found no error; or null.</param>
+/// <param name="Errors">The error rows of the describe, in their order, or null when it has none.</param>
+/// <param name="Error">Why the server could not be asked, or null.</param>
+internal sealed record SqlServerDeclaredAnswer(
+    IReadOnlyList<SqlServerDeclaredRow>? Rows,
+    IReadOnlyList<SqlServerDescribeError>? Errors,
+    SqlServerServerError? Error
+);
+
+/// <summary>
+/// The row of <c>sys.dm_exec_describe_first_result_set</c> for <c>SELECT @p AS [1]</c> under the parameter's
+/// declaration: the type the server gives a declared parameter.  The members are named as the function names its
 /// columns.
 /// </summary>
-/// <param name="ColumnOrdinal">The column's place, counted from one: the declaration's place.</param>
+/// <param name="ColumnOrdinal">The column's place, counted from one: 1.</param>
 /// <param name="SystemTypeName">The system type with its facets, <c>nvarchar(320)</c>, or null.</param>
 /// <param name="MaxLength">The length in bytes, <c>-1</c> for <c>max</c>.</param>
 /// <param name="Precision">The precision, 0 for a type that has none.</param>
@@ -100,3 +152,12 @@ internal sealed record SqlServerDeclaredRow(
     string? UserTypeName,
     string? AssemblyQualifiedTypeName
 );
+
+/// <summary>
+/// An error row of <c>sys.dm_exec_describe_first_result_set</c>: the function answers what it could not describe
+/// as rows, the cause first and <c>11501</c> or <c>11529</c> last.
+/// </summary>
+/// <param name="Number">The row's <c>error_number</c>: <c>2715</c> for a type the database lacks.</param>
+/// <param name="Type">The row's <c>error_type</c>.</param>
+/// <param name="Message">The row's <c>error_message</c>.</param>
+internal sealed record SqlServerDescribeError(int Number, int Type, string Message);

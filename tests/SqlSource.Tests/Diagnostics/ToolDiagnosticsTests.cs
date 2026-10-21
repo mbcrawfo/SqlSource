@@ -79,10 +79,12 @@ public sealed class ToolDiagnosticsTests
             ToolDiagnostics.FileNotInRun,
             ToolDiagnostics.DirectoryCannotBeRead,
         };
+        // SQLSRC231 starts with the name of the reader, and its own test formats it.
         foreach (
             var descriptor in ToolDiagnostics
                 .All.Remove(ToolDiagnostics.UnexpectedFailure)
                 .Remove(ToolDiagnostics.UnnamedConnectionNotUsed)
+                .Remove(ToolDiagnostics.ParametersReadDifferently)
         )
         {
             // The later arguments are for the ones that have more than one place: a format ignores an argument it
@@ -327,16 +329,31 @@ public sealed class ToolDiagnosticsTests
             .ShouldBe("The query 'Cleanup' holds more than one statement");
 
     [Fact]
-    public void ParametersReadDifferently_Message_HoldsTheQueryAndWhatDiffers() =>
+    public void ParametersReadDifferently_Message_HoldsTheReaderTheQueryAndWhatDiffers() =>
         string.Format(
                 CultureInfo.InvariantCulture,
                 ToolDiagnostics.ParametersReadDifferently.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "Npgsql",
                 "ListUsers",
                 "column 1 is text for Npgsql and integer for SqlSource"
             )
             .ShouldBe(
                 "Npgsql reads the parameters of the query 'ListUsers' differently from SqlSource: "
                     + "column 1 is text for Npgsql and integer for SqlSource"
+            );
+
+    [Fact]
+    public void CopiesHaveDifferentTypes_Message_HoldsTheParameterTheQueryAndBothTypes() =>
+        string.Format(
+                CultureInfo.InvariantCulture,
+                ToolDiagnostics.CopiesHaveDifferentTypes.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                "@p",
+                "FindUsers",
+                "int",
+                "nvarchar(100)"
+            )
+            .ShouldBe(
+                "The copies of the parameter '@p' of the query 'FindUsers' have the types 'int' and 'nvarchar(100)'"
             );
 
     [Fact]

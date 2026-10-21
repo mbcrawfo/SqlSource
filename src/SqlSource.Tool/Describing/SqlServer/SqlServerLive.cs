@@ -1,5 +1,8 @@
 using System;
+using System.Collections.Generic;
+using System.Data;
 using System.Globalization;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
@@ -11,9 +14,17 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// the describer.  A function of this class is the <c>live</c> one of its call, and under a replay none runs.
 /// </summary>
 /// <remarks>
+/// <para>
 /// In each function, what the server or SqlClient can cause is the answer's error, through
 /// <see cref="ConnectionErrors" />.  SqlClient reports a cancelled command as a <see cref="SqlException" />, so one
 /// thrown once the token is cancelled is the cancellation, and passes through as one.  Anything else is a bug.
+/// </para>
+/// <para>
+/// The user's SQL and the declarations reach the server only as the values of the parameters <c>@tsql</c> and
+/// <c>@params</c> of <c>sys.sp_describe_undeclared_parameters</c>, which is called as a procedure, and of
+/// <c>sys.dm_exec_describe_first_result_set</c>, whose text is the tool's own.  Neither runs the text it is given: it
+/// is analysed, so nothing a <c>.sql</c> file holds can make the describer run a statement.
+/// </para>
 /// </remarks>
 internal sealed class SqlServerLive(SqlServerConnection connection)
 {
@@ -30,6 +41,23 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
         FROM sys.databases AS d
         WHERE d.database_id = DB_ID()
         """;
+
+    /// <summary>The procedure that <c>parameters</c> and <c>probe</c> call.</summary>
+    public const string DescribeUndeclaredParameters = "sys.sp_describe_undeclared_parameters";
+
+    // The type of a declared parameter, or the errors of its declaration as rows, for "declared".  Browse mode 0: the
+    // columns alone, with no key columns of tables added.
+    private const string DeclaredSql = """
+        SELECT column_ordinal, system_type_name, max_length, precision, scale, user_type_schema, user_type_name,
+            assembly_qualified_type_name, error_number, error_type, error_message
+        FROM sys.dm_exec_describe_first_result_set(@tsql, @params, 0)
+        ORDER BY column_ordinal
+        """;
+
+    // The class from which an error ends the connection, and SqlClient's number of a command that timed out: a probe
+    // that fails so says nothing of the batch.
+    private const int FatalClass = 20;
+    private const int Timeout = -2;
 
     public Task<SqlServerOpenAnswer> OpenAsync(CancellationToken token) =>
         AnswerAsync(
@@ -62,6 +90,164 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             static error => new SqlServerOpenAnswer(null, null, null, null, error),
             token
         );
+
+    /// <summary>The parameters the server types in the SQL under the declarations, a row each, or its error.</summary>
+    public Task<SqlServerParametersAnswer> ParametersAsync(
+        SqlServerParametersRequest request,
+        CancellationToken token
+    ) =>
+        AnswerAsync(
+            async () =>
+            {
+                await using var command = await DescribeUndeclaredAsync(request.Sql, request.Params, token);
+                await using var reader = await command.ExecuteReaderAsync(token);
+                var rows = new List<SqlServerParameterRow>();
+                while (await reader.ReadAsync(token))
+                {
+                    rows.Add(
+                        new SqlServerParameterRow(
+                            reader.GetString(reader.GetOrdinal("name")),
+                            StringOf(reader, "suggested_system_type_name"),
+                            IntOf(reader, "suggested_max_length"),
+                            IntOf(reader, "suggested_precision"),
+                            IntOf(reader, "suggested_scale"),
+                            StringOf(reader, "suggested_user_type_schema"),
+                            StringOf(reader, "suggested_user_type_name"),
+                            StringOf(reader, "suggested_assembly_qualified_type_name")
+                        )
+                    );
+                }
+
+                await DrainAsync(reader, token);
+                return new SqlServerParametersAnswer(rows, null);
+            },
+            ConnectionErrors.Of,
+            static error => new SqlServerParametersAnswer(null, error),
+            token
+        );
+
+    /// <summary>
+    /// Whether the SQL binds under the declarations: true when the procedure raises nothing, false when it refuses
+    /// the batch, with any error below class 20 that is no timeout; and the error of anything else.
+    /// </summary>
+    public Task<SqlServerProbeAnswer> ProbeAsync(SqlServerProbeRequest request, CancellationToken token) =>
+        AnswerAsync(
+            async () =>
+            {
+                await using var command = await DescribeUndeclaredAsync(request.Sql, request.Params, token);
+                try
+                {
+                    _ = await command.ExecuteNonQueryAsync(token);
+                }
+                catch (SqlException exception) when (!token.IsCancellationRequested && IsTheBatchs(exception))
+                {
+                    return new SqlServerProbeAnswer(false, null);
+                }
+
+                return new SqlServerProbeAnswer(true, null);
+            },
+            ConnectionErrors.Of,
+            static error => new SqlServerProbeAnswer(null, error),
+            token
+        );
+
+    /// <summary>
+    /// The type the server reads a declared parameter as: the row of its column, or the error rows of the describe.
+    /// </summary>
+    public Task<SqlServerDeclaredAnswer> DeclaredAsync(SqlServerDeclaredRequest request, CancellationToken token) =>
+        AnswerAsync(
+            async () =>
+            {
+                await using var command = await connection.CommandAsync(DeclaredSql, token);
+                _ = command.Parameters.Add(Text("@tsql", request.Sql));
+                _ = command.Parameters.Add(Text("@params", request.Params));
+                await using var reader = await command.ExecuteReaderAsync(token);
+                var rows = new List<SqlServerDeclaredRow>();
+                var errors = new List<SqlServerDescribeError>();
+                while (await reader.ReadAsync(token))
+                {
+                    if (IntOf(reader, "error_number") is { } number)
+                    {
+                        errors.Add(
+                            new SqlServerDescribeError(
+                                number,
+                                IntOf(reader, "error_type") ?? 0,
+                                StringOf(reader, "error_message") ?? string.Empty
+                            )
+                        );
+                        continue;
+                    }
+
+                    rows.Add(
+                        new SqlServerDeclaredRow(
+                            reader.GetInt32(reader.GetOrdinal("column_ordinal")),
+                            StringOf(reader, "system_type_name"),
+                            IntOf(reader, "max_length"),
+                            IntOf(reader, "precision"),
+                            IntOf(reader, "scale"),
+                            StringOf(reader, "user_type_schema"),
+                            StringOf(reader, "user_type_name"),
+                            StringOf(reader, "assembly_qualified_type_name")
+                        )
+                    );
+                }
+
+                await DrainAsync(reader, token);
+                return errors.Count > 0
+                    ? new SqlServerDeclaredAnswer(null, errors, null)
+                    : new SqlServerDeclaredAnswer(rows, null, null);
+            },
+            ConnectionErrors.Of,
+            static error => new SqlServerDeclaredAnswer(null, null, error),
+            token
+        );
+
+    /// <summary>The declarations of parameters as <c>@params</c> takes them: <c>@a int, @b nvarchar(50)</c>.</summary>
+    /// <param name="declarations">Each parameter's name, without its <c>@</c>, and its type as it is declared.</param>
+    public static string Declarations(IEnumerable<(string Name, string Type)> declarations) =>
+        string.Join(", ", declarations.Select(static declaration => "@" + declaration.Name + " " + declaration.Type));
+
+    // A call of sp_describe_undeclared_parameters with the SQL and the declarations as the values of its parameters.
+    private async Task<SqlCommand> DescribeUndeclaredAsync(string sql, string? declarations, CancellationToken token)
+    {
+        var command = await connection.ProcedureAsync(DescribeUndeclaredParameters, token);
+        _ = command.Parameters.Add(Text("@tsql", sql));
+        _ = command.Parameters.Add(Text("@params", declarations));
+        return command;
+    }
+
+    // A parameter of nvarchar(max), DBNull for null.
+    private static SqlParameter Text(string name, string? value) =>
+        new(name, SqlDbType.NVarChar, -1) { Value = (object?)value ?? DBNull.Value };
+
+    // Reads to the end of what the server answered, so that an error it raised after the rows is the call's.
+    private static async Task DrainAsync(SqlDataReader reader, CancellationToken token)
+    {
+        while (await reader.NextResultAsync(token))
+        {
+            // A result set after the first is read for its errors alone.
+        }
+    }
+
+    private static string? StringOf(SqlDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal) ? null : reader.GetString(ordinal);
+    }
+
+    // A column of smallint, tinyint or int, as an int.
+    private static int? IntOf(SqlDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal)
+            ? null
+            : Convert.ToInt32(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
+    }
+
+    // An error of the batch, which the server raises when the declarations do not bind: below the class that ends the
+    // connection, and no timeout of SqlClient's.
+    private static bool IsTheBatchs(SqlException exception) =>
+        exception.Class < FatalClass && exception.Errors.Cast<SqlError>().All(static error => error.Number != Timeout);
 
     private static string OnOrOff(int value) => value == 1 ? "ON" : "OFF";
 
