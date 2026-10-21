@@ -1,0 +1,112 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "declared",
+      "request": {
+        "sql": "SELECT @email AS [1]",
+        "params": "@email dbo.Email"
+      },
+      "answer": {
+        "rows": [
+          {
+            "columnOrdinal": 1,
+            "systemTypeName": "nvarchar(320)",
+            "maxLength": 640,
+            "precision": 0,
+            "scale": 0,
+            "userTypeSchema": "dbo",
+            "userTypeName": "Email",
+            "assemblyQualifiedTypeName": null
+          }
+        ],
+        "errors": null,
+        "error": null
+      }
+    },
+    {
+      "method": "declared",
+      "request": {
+        "sql": "SELECT @nickname AS [1]",
+        "params": "@nickname nvarchar(50)"
+      },
+      "answer": {
+        "rows": [
+          {
+            "columnOrdinal": 1,
+            "systemTypeName": "nvarchar(50)",
+            "maxLength": 100,
+            "precision": 0,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null
+          }
+        ],
+        "errors": null,
+        "error": null
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "INSERT INTO dbo.users (name, email, nickname, credit) VALUES (@name, @email, @nickname, @credit);",
+        "params": "@email dbo.Email, @nickname nvarchar(50)"
+      },
+      "answer": {
+        "rows": [
+          {
+            "name": "@name",
+            "suggestedSystemTypeName": "nvarchar(100)",
+            "suggestedMaxLength": 200,
+            "suggestedPrecision": 0,
+            "suggestedScale": 0,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          },
+          {
+            "name": "@credit",
+            "suggestedSystemTypeName": "decimal(10,2)",
+            "suggestedMaxLength": 9,
+            "suggestedPrecision": 10,
+            "suggestedScale": 2,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          }
+        ],
+        "error": null
+      }
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "declared",
+      "request": {
+        "sql": "SELECT @tenant AS [1]",
+        "params": "@tenant int"
+      },
+      "answer": {
+        "rows": [
+          {
+            "columnOrdinal": 1,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null
+          }
+        ],
+        "errors": null,
+        "error": null
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "DELETE FROM dbo.orders WHERE user_id = @userId AND note IS NOT NULL;",
+        "params": "@tenant int"
+      },
+      "answer": {
+        "rows": [
+          {
+            "name": "@userId",
+            "suggestedSystemTypeName": "int",
+            "suggestedMaxLength": 4,
+            "suggestedPrecision": 10,
+            "suggestedScale": 0,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          }
+        ],
+        "error": null
+      }
+    }
+  ]
+}

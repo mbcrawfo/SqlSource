@@ -31,7 +31,7 @@ Moving to a new minor is a change of its own: bump the tag, here and in `example
 The describer's fixtures are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/`: a folder for each case with its `query.sql`, the `capture.json` of describing it and the `expected.json` of its sidecar, whose `toolVersion` is `fixture` so that a new version of the tool touches no case.  A case may also hold an `issue.md`, which says where the case came from, and an `explain-settings.txt`, the settings of the planner it is described with.  `tests/SqlSource.Tool.Tests` replays each from its capture with no database, and this project describes each against the container and compares the entry, so a describer that asks something else fails the first and one that answers something else fails the second.  After a change to what the describer asks or answers, or to `schema.sql`, record them again and read the diff before it is committed:
 
 ```bash
-tools/record-fixtures.sh
+tools/record-fixtures.sh postgres
 ```
 
 To add a case, add its folder with a `query.sql` and run the script.  A recorded file is never edited by hand.

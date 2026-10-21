@@ -1,0 +1,99 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "UPDATE dbo.users SET nickname = N'x' WHERE (@name_1 IS NULL OR name = @name_2);",
+        "params": null
+      },
+      "answer": {
+        "rows": [
+          {
+            "name": "@name_1",
+            "suggestedSystemTypeName": "int",
+            "suggestedMaxLength": 4,
+            "suggestedPrecision": 10,
+            "suggestedScale": 0,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          },
+          {
+            "name": "@name_2",
+            "suggestedSystemTypeName": "nvarchar(100)",
+            "suggestedMaxLength": 200,
+            "suggestedPrecision": 0,
+            "suggestedScale": 0,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "probe",
+      "request": {
+        "sql": "UPDATE dbo.users SET nickname = N'x' WHERE (@name_1 IS NULL OR name = @name_2);",
+        "params": "@name_1 xml, @name_2 nvarchar(100)"
+      },
+      "answer": {
+        "binds": true,
+        "error": null
+      }
+    },
+    {
+      "method": "probe",
+      "request": {
+        "sql": "UPDATE dbo.users SET nickname = N'x' WHERE (@name_1 IS NULL OR name = @name_2);",
+        "params": "@name_1 int, @name_2 nvarchar(100)"
+      },
+      "answer": {
+        "binds": true,
+        "error": null
+      }
+    },
+    {
+      "method": "probe",
+      "request": {
+        "sql": "UPDATE dbo.users SET nickname = N'x' WHERE (@name_1 IS NULL OR name = @name_2);",
+        "params": "@name_1 int, @name_2 xml"
+      },
+      "answer": {
+        "binds": false,
+        "error": null
+      }
+    }
+  ]
+}

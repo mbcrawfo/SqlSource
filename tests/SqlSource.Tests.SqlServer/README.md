@@ -1,6 +1,6 @@
 # SqlSource.Tests.SqlServer
 
-This project runs the tests of SQL Server against a real server, which Testcontainers starts in Docker.  Today it proves the container itself: that the image the run names is pinned to its update and runs the build that is recorded for it, and that the fixture schema applies.  The tests of the SQL Server describer and its fixture cases are added here as the describer is built.
+This project runs the tests of SQL Server against a real server, which Testcontainers starts in Docker.  Today it proves the container itself: that the image the run names is pinned to its update and runs the build that is recorded for it, and that the fixture schema applies.  The tests of the SQL Server describer are added here as the describer is built, and its fixture cases are described against the server here.
 
 ## Running
 
@@ -30,4 +30,14 @@ Moving a tag is a change of its own: change the tag and its row of `ImageBuilds`
 
 ## The fixtures
 
-The fixture schema is `tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/schema.sql`: tables of `dbo` and of a schema `billing`, an identity, a default, a `rowversion`, a computed and a persisted computed column, an alias type and a table type, a view over an outer join, a table with an `AFTER` trigger, a system-versioned table, the table `dbo.victim`, which a test that proves a text runs nothing looks for afterwards, and `dbo.all_types`, with one `NOT NULL` column of every type that SQL Server 2017 and 2025 share.  The describer's fixture cases come in the folder beside it with the describer.
+The fixture schema is `tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/schema.sql`: tables of `dbo` and of a schema `billing`, an identity, a default, a `rowversion`, a computed and a persisted computed column, an alias type and a table type, a view over an outer join, a table with an `AFTER` trigger, a system-versioned table, the table `dbo.victim`, which a test that proves a text runs nothing looks for afterwards, and `dbo.all_types`, with one `NOT NULL` column of every type that SQL Server 2017 and 2025 share.  The describer's fixture cases are in the folders beside it.
+
+### The describer's fixtures
+
+The describer's fixtures are in `tests/SqlSource.Tool.Tests/Fixtures/Describers/mssql/`: a folder for each case with its `query.sql`, the `capture.json` of describing it and the `expected.json` of its sidecar, whose `toolVersion` is `fixture` so that a new version of the tool touches no case.  `tests/SqlSource.Tool.Tests` replays each from its capture with no database, and this project describes each against the container and compares the entry, so a describer that asks something else fails the first and one that answers something else fails the second.  Both the capture and the sidecar carry the build of the server they were recorded on, which `FixtureVersionTests` holds to the build of the default image in `ImageBuilds`; `FixtureCasesTests` compares an entry whatever the build, so CI describes the cases on the floor image as well, where the answers are the same.  After a change to what the describer asks or answers, or to `schema.sql`, record them again and read the diff before it is committed:
+
+```bash
+tools/record-fixtures.sh mssql
+```
+
+To add a case, add its folder with a `query.sql` and run the script.  A recorded file is never edited by hand.  Nothing is recorded on the floor image.
