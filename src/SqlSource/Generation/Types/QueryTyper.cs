@@ -291,7 +291,8 @@ internal static class QueryTyper
 
     // The key as an entry names it: the key of a type of the engine's system schema, pg_catalog or sys, is its bare
     // name, which a key may be only for a name the engine's map knows, so a catalog table's row type, pg_class, is
-    // written pg_catalog.pg_class, and a type of a newer server, sys.newtype.  The key of any other type has its
+    // written pg_catalog.pg_class, and a type of a newer server, sys.newtype, as is one of SQL Server whose bare name
+    // is an alias of another, sys.rowversion.  The key of any other type has its
     // schema already, which is found by splitting the key, as a dot inside quotes is no schema's.
     private static string AsAKey(string key, DatabaseEngine engine)
     {
@@ -302,7 +303,13 @@ internal static class QueryTyper
 
         if (engine == DatabaseEngine.SqlServer)
         {
-            return TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out _) ? key : "sys." + key;
+            // A bare key that SQL Server reads as another name, as rowversion is read as timestamp, names that type
+            // and not this one, which sys. names as it is.
+            return
+                TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized)
+                && string.Equals(normalized, key, StringComparison.Ordinal)
+                ? key
+                : "sys." + key;
         }
 
         return TypeKeys.TryNormalize(key.AsSpan(), out _) ? key : "pg_catalog." + key;

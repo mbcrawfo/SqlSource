@@ -108,19 +108,27 @@ public sealed class QueryTyperTests
     }
 
     // The help of each SQL Server type that has no C# type: a sidecar edited by hand, or written by a newer tool, gets
-    // an entry to write, with sys. before a name that is no key without it, or the help to describe again.
+    // an entry to write, with sys. before a name that is no key without it or that is the alias of another type, or
+    // the help to describe again.  Each type is a column's, but the null type, which only a parameter can have.
     [Theory]
     [InlineData(
         "geography",
+        "column 'c0'",
         "geography",
         "Reference the package Microsoft.SqlServer.Types and map it with the type override, as "
             + "geography=Microsoft.SqlServer.Types.SqlGeography"
     )]
-    [InlineData("newtype", "newtype", "Map it with the type override, as sys.newtype=<a C# type>")]
-    [InlineData("null", "null", "Run 'sqlsource describe'")]
-    [InlineData("empty", "", "Run 'sqlsource describe'")]
-    [InlineData("dbo.Money", "Money", "Map it with the type override, as dbo.\"Money\"=<a C# type>")]
-    public void Type_SqlServerHelps(string type, string typeName, string help)
+    [InlineData("newtype", "column 'c0'", "newtype", "Map it with the type override, as sys.newtype=<a C# type>")]
+    [InlineData(
+        "rowversion",
+        "column 'c0'",
+        "rowversion",
+        "Map it with the type override, as sys.rowversion=<a C# type>"
+    )]
+    [InlineData("null", "parameter 'p0'", "null", "Run 'sqlsource describe'")]
+    [InlineData("empty", "column 'c0'", "", "Run 'sqlsource describe'")]
+    [InlineData("dbo.Money", "column 'c0'", "Money", "Map it with the type override, as dbo.\"Money\"=<a C# type>")]
+    public void Type_SqlServerHelps(string type, string subject, string typeName, string help)
     {
         SidecarType? sidecarType = type switch
         {
@@ -131,6 +139,7 @@ public sealed class QueryTyperTests
                 userType: new SqlServerUserType("sys", "geography", Assembly)
             ),
             "newtype" => TestSidecars.SqlServer("newtype"),
+            "rowversion" => TestSidecars.SqlServer("rowversion", maxLength: 8, precision: 0),
             "null" => null,
             "empty" => TestSidecars.SqlServer(""),
             "dbo.Money" => TestSidecars.SqlServer(
@@ -141,27 +150,29 @@ public sealed class QueryTyperTests
             ),
             _ => throw new ArgumentOutOfRangeException(nameof(type), type, null),
         };
-        var entry = new SidecarEntry(
-            "GetUser",
-            default,
-            "h",
-            SidecarValues.Engine.SqlServer,
-            "app",
-            "17.0",
-            SidecarResultKind.Rows,
-            null,
-            SidecarValues.Plan.NotNeeded,
-            SidecarValues.TableMatch.NoOrigin,
-            TestSidecars.Of(TestSidecars.Parameter(0, "p0", sidecarType)),
-            TestSidecars.Of(TestSidecars.Column(0, "c0", TestSidecars.SqlServer()))
-        );
+        var entry = sidecarType is null
+            ? new SidecarEntry(
+                "GetUser",
+                default,
+                "h",
+                SidecarValues.Engine.SqlServer,
+                "app",
+                "17.0",
+                SidecarResultKind.Rows,
+                null,
+                SidecarValues.Plan.NotNeeded,
+                SidecarValues.TableMatch.NoOrigin,
+                TestSidecars.Of(TestSidecars.Parameter(0, "p0", null)),
+                TestSidecars.Of(TestSidecars.Column(0, "c0", TestSidecars.SqlServer()))
+            )
+            : Entry(SidecarValues.Engine.SqlServer, columns: [sidecarType]);
 
         var types = QueryTyper.Type(InputOf(SqlDialect.SqlServer, entry, SettingsLevel.None));
 
         types.Queries.ShouldBeEmpty();
         var diagnostic = types.Diagnostics.ShouldHaveSingleItem();
         diagnostic.Descriptor.ShouldBe(SqlDiagnostics.TypeHasNoCSharpType);
-        diagnostic.Arguments.ShouldBe(["parameter 'p0'", typeName, help]);
+        diagnostic.Arguments.ShouldBe([subject, typeName, help]);
     }
 
     // The property serves both engines: a name both have reaches each engine's own type of that name, and a name one
