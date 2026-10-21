@@ -529,6 +529,10 @@ public sealed class TypeOverrideGrammarTests
         "\"dbo\".[Email]=X",
         ".  A key is not written in brackets: write \"dbo\".Email, or \"dbo\".\"Email\" to match its case exactly"
     )]
+    [InlineData(
+        "U&\"dbo\".[Email]=X",
+        ".  A key is not written in brackets: write U&\"dbo\".Email, or U&\"dbo\".\"Email\" to match its case exactly"
+    )]
     [InlineData("[my schema].[Email]=X", ".  A key is not written in brackets: write \"my schema\".\"Email\"")]
     [InlineData("[a]]b].c=X", ".  A key is not written in brackets: write \"a]b\".c")]
     [InlineData("[a\"b]=X", ".  A key is not written in brackets: write \"a\"\"b\"")]
@@ -537,6 +541,15 @@ public sealed class TypeOverrideGrammarTests
         ".  A key is not written in brackets: write dbo.Email, or \"dbo\".\"Email\" to match its case exactly"
     )]
     public void BracketHelp_KeyInBrackets_ShowsTheFormsThatAreRead(string entry, string help) =>
+        TypeOverrideGrammar.BracketHelp(entry.AsSpan()).ShouldBe(help);
+
+    // An unqualified quoted key must be a name in lower case, so an unqualified key has the plain form alone, which
+    // matches in any case.
+    [Theory]
+    [InlineData("[INT]=long", ".  A key is not written in brackets: write INT")]
+    [InlineData("[Email]=X", ".  A key is not written in brackets: write Email")]
+    [InlineData("[int][]=long", ".  A key is not written in brackets: write int[]")]
+    public void BracketHelp_UnqualifiedKeyInBrackets_ShowsThePlainFormAlone(string entry, string help) =>
         TypeOverrideGrammar.BracketHelp(entry.AsSpan()).ShouldBe(help);
 
     [Theory]

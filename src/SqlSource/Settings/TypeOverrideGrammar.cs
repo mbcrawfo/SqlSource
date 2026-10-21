@@ -78,20 +78,18 @@ internal static class TypeOverrideGrammar
                 continue;
             }
 
-            var isPostgreSql = TypeKeys.TryNormalize(key, out var postgreSqlKey);
-            var isSqlServer = TypeKeys.TryNormalizeSqlServer(key, out var sqlServerKey);
-            if (!isPostgreSql && !isSqlServer)
+            if (!TypeKeys.TryNormalizeEach(key, out var postgreSqlKey, out var sqlServerKey))
             {
                 invalid.Add(written.ToString());
                 continue;
             }
 
-            if (isPostgreSql)
+            if (postgreSqlKey is not null)
             {
                 Put(postgreSql ??= [], new TypeOverride(postgreSqlKey, type, place));
             }
 
-            if (isSqlServer)
+            if (sqlServerKey is not null)
             {
                 Put(sqlServer ??= [], new TypeOverride(sqlServerKey, type, place));
             }
@@ -102,22 +100,28 @@ internal static class TypeOverrideGrammar
 
     /// <summary>
     /// The help of an entry whose key is written in brackets, as T-SQL writes a name, to end the message that says it
-    /// is not valid: the key in the forms that are read, plain, which matches ignoring case, and quoted, which matches
-    /// it exactly, or quoted alone when a part cannot be plain.  <c>[dbo].[Email]=X</c> gives
-    /// <c>dbo.Email</c> and <c>"dbo"."Email"</c>.  Empty for a key with no part in brackets, or one whose brackets
-    /// are not well formed.
+    /// is not valid: the key in the forms that are read.  A qualified key has two, plain, which matches ignoring case,
+    /// and quoted, which matches it exactly: <c>[dbo].[Email]=X</c> gives <c>dbo.Email</c> and
+    /// <c>"dbo"."Email"</c>.  An unqualified key has the plain form alone, <c>[INT]=long</c> gives <c>INT</c>, since an
+    /// unqualified quoted key must be a name in lower case.  A key with a part that cannot be plain has the quoted form
+    /// alone.  Empty for a key with no part in brackets, or one whose brackets are not well formed.
     /// </summary>
     /// <param name="entry">The entry as written, white space around its <c>=</c> allowed.</param>
     public static string BracketHelp(ReadOnlySpan<char> entry)
     {
-        if (entry.IndexOf('[') < 0 || !TryRewriteBrackets(entry, out var plain, out var quoted))
+        if (entry.IndexOf('[') < 0 || !TryRewriteBrackets(entry, out var plain, out var quoted, out var isQualified))
         {
             return string.Empty;
         }
 
-        return plain is null
-            ? NotInBrackets + quoted
-            : NotInBrackets + plain + ", or " + quoted + " to match its case exactly";
+        if (plain is null)
+        {
+            return NotInBrackets + quoted;
+        }
+
+        return isQualified
+            ? NotInBrackets + plain + ", or " + quoted + " to match its case exactly"
+            : NotInBrackets + plain;
     }
 
     // The key and the C# type of an entry, null for default, or false for a text with no = or a type that is not
@@ -185,12 +189,18 @@ internal static class TypeOverrideGrammar
 
     // The key at the start of an entry, written with at least one part in brackets, in the plain form, null when a
     // bracketed part cannot be plain, and in the quoted form.  A part in brackets, in which ]] is a ], is written as
-    // its text, and quoted; a plain or a quoted part is kept.  The key is followed by [] for an array, white space,
-    // and the = of the entry, or the end of it.  False for anything else.
-    private static bool TryRewriteBrackets(ReadOnlySpan<char> entry, out string? plain, out string quoted)
+    // its text, and quoted; a plain, quoted or escaped part is kept as written.  The key is followed by [] for an
+    // array, white space, and the = of the entry, or the end of it.  False for anything else.
+    private static bool TryRewriteBrackets(
+        ReadOnlySpan<char> entry,
+        out string? plain,
+        out string quoted,
+        out bool isQualified
+    )
     {
         plain = null;
         quoted = string.Empty;
+        isQualified = false;
         var plainKey = new StringBuilder();
         var quotedKey = new StringBuilder();
         var canBePlain = true;
@@ -218,7 +228,7 @@ internal static class TypeOverrideGrammar
             else
             {
                 var start = index;
-                if (!TryReadPart(entry, ref index))
+                if (!TypeKeys.TryReadPart(entry, start, out index))
                 {
                     return false;
                 }
@@ -232,6 +242,7 @@ internal static class TypeOverrideGrammar
             {
                 _ = plainKey.Append('.');
                 _ = quotedKey.Append('.');
+                isQualified = true;
                 index++;
                 continue;
             }
@@ -287,45 +298,7 @@ internal static class TypeOverrideGrammar
         return false;
     }
 
-    // Moves past a plain part, or a quoted one with "" for a quote.  False for an empty part or a quote that does
-    // not close.
-    private static bool TryReadPart(ReadOnlySpan<char> entry, ref int index)
-    {
-        var start = index;
-        if (entry[index] != '"')
-        {
-            while (index < entry.Length && IsPlainCharacter(entry[index]))
-            {
-                index++;
-            }
-
-            return index > start;
-        }
-
-        index++;
-        while (index < entry.Length)
-        {
-            if (entry[index] != '"')
-            {
-                index++;
-            }
-            else if (index + 1 < entry.Length && entry[index + 1] == '"')
-            {
-                index += 2;
-            }
-            else
-            {
-                index++;
-                return index - start > 2;
-            }
-        }
-
-        return false;
-    }
-
-    private static bool IsPlain(string text) => text.All(IsPlainCharacter);
-
-    private static bool IsPlainCharacter(char character) => char.IsLetterOrDigit(character) || character is '_' or '$';
+    private static bool IsPlain(string text) => text.All(TypeKeys.IsPlainCharacter);
 
     // The first = outside double quotes, or -1.  A " toggles being inside quotes, so a doubled one inside a quoted part
     // closes and opens it again.

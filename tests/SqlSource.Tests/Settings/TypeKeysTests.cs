@@ -388,6 +388,42 @@ public sealed partial class TypeKeysTests
     [Fact]
     public void TryNormalize_SysSchema_IsAUsersSchema() => ShouldNormalize("sys.int", "sys.int");
 
+    // TryNormalizeEach gives what each engine's own reading gives, null for an engine that does not read the key.
+    [Theory]
+    [InlineData("int", "int4", "int")]
+    [InlineData("int4", "int4", null)]
+    [InlineData("nvarchar", null, "nvarchar")]
+    [InlineData("sys.int", "sys.int", "int")]
+    [InlineData("pg_catalog.text", "text", null)]
+    [InlineData("\"sys\".\"int\"", "\"sys\".\"int\"", "int")]
+    [InlineData("dbo.Email", "dbo.Email", "dbo.Email")]
+    [InlineData("dbo.U&\"Em\\0061il\"", "dbo.\"Email\"", "dbo.\"Email\"")]
+    [InlineData("dbo.Email[]", "dbo.Email[]", null)]
+    [InlineData("_int4", "int4[]", null)]
+    public void TryNormalizeEach_Key_IsWhatEachEnginesReadingGives(string key, string? postgreSql, string? sqlServer)
+    {
+        TypeKeys.TryNormalizeEach(key.AsSpan(), out var first, out var second).ShouldBeTrue();
+
+        first.ShouldBe(postgreSql);
+        second.ShouldBe(sqlServer);
+        (TypeKeys.TryNormalize(key.AsSpan(), out var alone) ? alone : null).ShouldBe(postgreSql);
+        (TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var sqlServerAlone) ? sqlServerAlone : null).ShouldBe(
+            sqlServer
+        );
+    }
+
+    [Theory]
+    [InlineData("nosuch")]
+    [InlineData("[dbo].[Email]")]
+    [InlineData("")]
+    public void TryNormalizeEach_KeyThatNeitherEngineReads_IsFalse(string key)
+    {
+        TypeKeys.TryNormalizeEach(key.AsSpan(), out var postgreSql, out var sqlServer).ShouldBeFalse();
+
+        postgreSql.ShouldBeNull();
+        sqlServer.ShouldBeNull();
+    }
+
     private static void ShouldNormalizeSqlServer(string key, string expected)
     {
         TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized).ShouldBeTrue();

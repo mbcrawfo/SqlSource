@@ -239,11 +239,76 @@ internal static class TypeKeys
     public static bool TryNormalize(ReadOnlySpan<char> key, out string normalized)
     {
         normalized = string.Empty;
+        return TrySplit(key, out var schema, out var name, out var isArray)
+            && TryNormalizeParts(key, schema, name, isArray, out normalized);
+    }
+
+    /// <summary>
+    /// Reads a key by SQL Server's rules, by the grammar of <see cref="TryNormalize" />.  An array is not a key: SQL
+    /// Server has none.  An unqualified plain part must be a name SQL Server's map knows or one of its aliases,
+    /// <c>integer</c>, <c>character</c>, <c>dec</c> and <c>rowversion</c>, ignoring case, and is given as the name in
+    /// lower case: <c>rowversion</c> gives <c>timestamp</c>.  A quoted one must hold the name exactly, in lower case,
+    /// and has no alias.
+    /// <para>
+    /// <c>sys.</c>, plain in any case or quoted in lower case, is SQL Server's system schema, and is taken off as
+    /// <see cref="TryNormalize" /> takes off <c>pg_catalog.</c>: what is left is not checked, a plain name the map
+    /// knows is given in lower case and any other as written, with no alias, and a quoted name that holds a name the
+    /// map knows is that name and any other is kept as written.  <c>pg_catalog.</c> is not a key, and any other
+    /// qualified key is what <see cref="TryNormalize" /> gives.  Returns false with an empty
+    /// <paramref name="normalized" /> for anything else.
+    /// </para>
+    /// </summary>
+    public static bool TryNormalizeSqlServer(ReadOnlySpan<char> key, out string normalized)
+    {
+        normalized = string.Empty;
+        return TrySplit(key, out var schema, out var name, out var isArray)
+            && TryNormalizeSqlServerParts(key, schema, name, isArray, out normalized);
+    }
+
+    /// <summary>
+    /// Reads a key by each engine's rules, as <see cref="TryNormalize" /> and <see cref="TryNormalizeSqlServer" />
+    /// do, with null for an engine that does not read it.  The key is split once, and a key of a user's schema, which
+    /// both engines read alike, is read once.  Returns whether either engine reads it.
+    /// </summary>
+    public static bool TryNormalizeEach(ReadOnlySpan<char> key, out string? postgreSql, out string? sqlServer)
+    {
+        postgreSql = null;
+        sqlServer = null;
         if (!TrySplit(key, out var schema, out var name, out var isArray))
         {
             return false;
         }
 
+        if (!schema.IsEmpty && !IsSchema(schema, SystemSchema) && !IsSchema(schema, SqlServerSystemSchema))
+        {
+            postgreSql = UsersKey(key, schema, name, isArray);
+            sqlServer = isArray ? null : postgreSql;
+            return true;
+        }
+
+        if (TryNormalizeParts(key, schema, name, isArray, out var postgreSqlKey))
+        {
+            postgreSql = postgreSqlKey;
+        }
+
+        if (TryNormalizeSqlServerParts(key, schema, name, isArray, out var sqlServerKey))
+        {
+            sqlServer = sqlServerKey;
+        }
+
+        return postgreSql is not null || sqlServer is not null;
+    }
+
+    // PostgreSQL's reading of a key that TrySplit split.
+    private static bool TryNormalizeParts(
+        ReadOnlySpan<char> key,
+        ReadOnlySpan<char> schema,
+        ReadOnlySpan<char> name,
+        bool isArray,
+        out string normalized
+    )
+    {
+        normalized = string.Empty;
         if (schema.IsEmpty)
         {
             return IsQuoted(name)
@@ -251,9 +316,9 @@ internal static class TypeKeys
                 : TryNormalizePlain(name.ToString(), isArray, out normalized);
         }
 
-        if (!IsSystemSchema(schema))
+        if (!IsSchema(schema, SystemSchema))
         {
-            normalized = IsEscaped(schema) || IsEscaped(name) ? Rewrite(schema, name, isArray) : key.ToString();
+            normalized = UsersKey(key, schema, name, isArray);
         }
         else if (IsQuoted(name))
         {
@@ -284,25 +349,17 @@ internal static class TypeKeys
         return true;
     }
 
-    /// <summary>
-    /// Reads a key by SQL Server's rules, by the grammar of <see cref="TryNormalize" />.  An array is not a key: SQL
-    /// Server has none.  An unqualified plain part must be a name SQL Server's map knows or one of its aliases,
-    /// <c>integer</c>, <c>character</c>, <c>dec</c> and <c>rowversion</c>, ignoring case, and is given as the name in
-    /// lower case: <c>rowversion</c> gives <c>timestamp</c>.  A quoted one must hold the name exactly, in lower case,
-    /// and has no alias.
-    /// <para>
-    /// <c>sys.</c>, plain in any case or quoted in lower case, is SQL Server's system schema, and is taken off as
-    /// <see cref="TryNormalize" /> takes off <c>pg_catalog.</c>: what is left is not checked, a plain name the map
-    /// knows is given in lower case and any other as written, with no alias, and a quoted name that holds a name the
-    /// map knows is that name and any other is kept as written.  <c>pg_catalog.</c> is not a key, and any other
-    /// qualified key is what <see cref="TryNormalize" /> gives.  Returns false with an empty
-    /// <paramref name="normalized" /> for anything else.
-    /// </para>
-    /// </summary>
-    public static bool TryNormalizeSqlServer(ReadOnlySpan<char> key, out string normalized)
+    // SQL Server's reading of a key that TrySplit split.
+    private static bool TryNormalizeSqlServerParts(
+        ReadOnlySpan<char> key,
+        ReadOnlySpan<char> schema,
+        ReadOnlySpan<char> name,
+        bool isArray,
+        out string normalized
+    )
     {
         normalized = string.Empty;
-        if (!TrySplit(key, out var schema, out var name, out var isArray) || isArray)
+        if (isArray)
         {
             return false;
         }
@@ -312,7 +369,7 @@ internal static class TypeKeys
             var text = TextOf(name).ToString();
             if (IsQuoted(name))
             {
-                if (!TryGetExactSqlServerName(text, out var exact))
+                if (!TryGetExactName(SqlServerNames, text, out var exact))
                 {
                     return false;
                 }
@@ -330,13 +387,19 @@ internal static class TypeKeys
             return true;
         }
 
-        if (IsSqlServerSystemSchema(schema))
+        if (IsSchema(schema, SqlServerSystemSchema))
         {
             normalized = IsQuoted(name) ? NormalizeQuotedSqlServerName(name) : NormalizePlainSqlServerName(name);
             return true;
         }
 
-        return !IsSystemSchema(schema) && TryNormalize(key, out normalized);
+        if (IsSchema(schema, SystemSchema))
+        {
+            return false;
+        }
+
+        normalized = UsersKey(key, schema, name, isArray: false);
+        return true;
     }
 
     /// <summary>
@@ -516,6 +579,15 @@ internal static class TypeKeys
             || character is ';' or '#';
     }
 
+    // The key of a type of a user's schema, which both engines read alike: as written, or rewritten when a part is
+    // escaped.
+    private static string UsersKey(
+        ReadOnlySpan<char> key,
+        ReadOnlySpan<char> schema,
+        ReadOnlySpan<char> name,
+        bool isArray
+    ) => IsEscaped(schema) || IsEscaped(name) ? Rewrite(schema, name, isArray) : key.ToString();
+
     // A qualified key as written, except that an escaped part is in the quoted form of its text.
     private static string Rewrite(ReadOnlySpan<char> schema, ReadOnlySpan<char> name, bool isArray)
     {
@@ -549,13 +621,13 @@ internal static class TypeKeys
     private static bool TryNormalizeQuoted(string text, bool isArray, out string normalized)
     {
         normalized = string.Empty;
-        if (TryGetExactName(text, out var known))
+        if (TryGetExactName(Names, text, out var known))
         {
             normalized = isArray ? known + "[]" : known;
             return true;
         }
 
-        if (text.Length > 1 && text[0] == '_' && TryGetExactName(text.Substring(1), out var element))
+        if (text.Length > 1 && text[0] == '_' && TryGetExactName(Names, text.Substring(1), out var element))
         {
             normalized = isArray ? "_" + element + "[]" : element + "[]";
             return true;
@@ -567,7 +639,7 @@ internal static class TypeKeys
     private static string NormalizeQuotedCatalogName(ReadOnlySpan<char> name, bool isArray)
     {
         var text = TextOf(name).ToString();
-        if (TryGetExactName(text, out var known))
+        if (TryGetExactName(Names, text, out var known))
         {
             return isArray ? known + "[]" : known;
         }
@@ -575,7 +647,7 @@ internal static class TypeKeys
         if (text.Length > 1 && text[0] == '_')
         {
             var ofElement = text.Substring(1);
-            var isKnownElement = TryGetExactName(ofElement, out var knownElement);
+            var isKnownElement = TryGetExactName(Names, ofElement, out var knownElement);
 
             // With [], the catalog's name is kept with its _, as a plain one is.
             if (isArray)
@@ -598,23 +670,17 @@ internal static class TypeKeys
 
     // A quoted name of sys: the name SQL Server's map knows that it holds exactly, or the name as a key keeps it.
     private static string NormalizeQuotedSqlServerName(ReadOnlySpan<char> name) =>
-        TryGetExactSqlServerName(TextOf(name).ToString(), out var known) ? known : AsWritten(name);
+        TryGetExactName(SqlServerNames, TextOf(name).ToString(), out var known) ? known : AsWritten(name);
 
-    private static bool TryGetExactSqlServerName(string text, out string known) =>
-        SqlServerNames.TryGetValue(text, out known) && string.Equals(known, text, StringComparison.Ordinal);
+    // Whether text is a name of names exactly, in its case: a quoted name has no other spelling.
+    private static bool TryGetExactName(Dictionary<string, string> names, string text, out string known) =>
+        names.TryGetValue(text, out known) && string.Equals(known, text, StringComparison.Ordinal);
 
-    private static bool IsSqlServerSystemSchema(ReadOnlySpan<char> schema) =>
+    // Whether schema is the engine's system schema, pg_catalog or sys: plain in any case, or quoted in lower case.
+    private static bool IsSchema(ReadOnlySpan<char> schema, string systemSchema) =>
         IsQuoted(schema)
-            ? TextOf(schema).Equals(SqlServerSystemSchema.AsSpan(), StringComparison.Ordinal)
-            : schema.Equals(SqlServerSystemSchema.AsSpan(), StringComparison.OrdinalIgnoreCase);
-
-    private static bool TryGetExactName(string text, out string known) =>
-        Names.TryGetValue(text, out known) && string.Equals(known, text, StringComparison.Ordinal);
-
-    private static bool IsSystemSchema(ReadOnlySpan<char> schema) =>
-        IsQuoted(schema)
-            ? TextOf(schema).Equals(SystemSchema.AsSpan(), StringComparison.Ordinal)
-            : schema.Equals(SystemSchema.AsSpan(), StringComparison.OrdinalIgnoreCase);
+            ? TextOf(schema).Equals(systemSchema.AsSpan(), StringComparison.Ordinal)
+            : schema.Equals(systemSchema.AsSpan(), StringComparison.OrdinalIgnoreCase);
 
     // The catalog's name of an array of a type the map knows, _int4, gives that type's name.
     private static bool TryReadArrayName(string part, out string element)
@@ -623,10 +689,12 @@ internal static class TypeKeys
         return part.Length > 1 && part[0] == '_' && Names.TryGetValue(part.Substring(1), out element);
     }
 
-    // Reads the part that starts at start, plain, quoted or escaped, and gives the index after it.  A quoted part holds
-    // at least one character, and ends at the first quote that is not doubled; an escaped one holds only escapes that
-    // TryReadEscape reads.
-    private static bool TryReadPart(ReadOnlySpan<char> key, int start, out int end)
+    /// <summary>
+    /// Reads the part of a key that starts at <paramref name="start" />, plain, quoted or escaped, and gives the index
+    /// after it.  A quoted part holds at least one character, and ends at the first quote that is not doubled; an
+    /// escaped one holds only valid escapes.  False for an empty part, or a quoted one that does not close.
+    /// </summary>
+    public static bool TryReadPart(ReadOnlySpan<char> key, int start, out int end)
     {
         end = start;
         if (start >= key.Length)
@@ -769,7 +837,8 @@ internal static class TypeKeys
             _ => -1,
         };
 
-    private static bool IsPlainCharacter(char character) => char.IsLetterOrDigit(character) || character is '_' or '$';
+    /// <summary>Whether a character may stand in a plain part: a letter, a digit, <c>_</c> or <c>$</c>.</summary>
+    public static bool IsPlainCharacter(char character) => char.IsLetterOrDigit(character) || character is '_' or '$';
 
     private static Dictionary<string, string> NamesOf(params string[] names)
     {
