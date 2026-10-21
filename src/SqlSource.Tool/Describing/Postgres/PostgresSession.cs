@@ -456,14 +456,13 @@ internal sealed partial class PostgresSession : IDescribeSession
         }
 
         var answer = await TypesAsync(query, new PostgresTypesRequest([.. oids.Distinct().Order()]), cancellationToken);
-        return answer.Error is { } error
-            ? Outcome<IReadOnlyDictionary<long, PostgresTypeRow>, PostgresServerError>.Failed(error)
-            : Outcome<IReadOnlyDictionary<long, PostgresTypeRow>, PostgresServerError>.Of(
-                (
-                    answer.Rows
-                    ?? throw new InvalidOperationException("The answer to 'types' holds no rows and no error.")
-                ).ToDictionary(static row => row.Oid)
-            );
+        return Answered(
+            answer.Error,
+            answer.Rows,
+            "types",
+            "rows",
+            static rows => (IReadOnlyDictionary<long, PostgresTypeRow>)rows.ToDictionary(static row => row.Oid)
+        );
     }
 
     // The tables the columns name, by OID.  The request is sorted and holds each table once.  Nothing is asked when
@@ -486,14 +485,13 @@ internal sealed partial class PostgresSession : IDescribeSession
         }
 
         var answer = await TablesAsync(query, new PostgresTablesRequest(oids), cancellationToken);
-        return answer.Error is { } error
-            ? Outcome<IReadOnlyDictionary<long, PostgresTableRow>, PostgresServerError>.Failed(error)
-            : Outcome<IReadOnlyDictionary<long, PostgresTableRow>, PostgresServerError>.Of(
-                (
-                    answer.Tables
-                    ?? throw new InvalidOperationException("The answer to 'tables' holds no tables and no error.")
-                ).ToDictionary(static table => table.Oid)
-            );
+        return Answered(
+            answer.Error,
+            answer.Tables,
+            "tables",
+            "tables",
+            static tables => (IReadOnlyDictionary<long, PostgresTableRow>)tables.ToDictionary(static table => table.Oid)
+        );
     }
 
     // The server's spelling of every pair of a type and a modifier that the parameters and the columns will be built
@@ -532,15 +530,28 @@ internal sealed partial class PostgresSession : IDescribeSession
         }
 
         var answer = await SpellingsAsync(query, new PostgresSpellingsRequest(pairs), cancellationToken);
-        return answer.Error is { } error
-            ? Outcome<TypeSpellings, PostgresServerError>.Failed(error)
-            : Outcome<TypeSpellings, PostgresServerError>.Of(
-                TypeSpellings.From(
-                    answer.Rows
-                        ?? throw new InvalidOperationException("The answer to 'spellings' holds no rows and no error.")
+        return Answered(answer.Error, answer.Rows, "spellings", "rows", TypeSpellings.From);
+    }
+
+    // The outcome of an answer: the server's error when it gave one, otherwise what the answer holds, read.  An
+    // answer that holds neither is a fault of the call.
+    private static Outcome<TValue, PostgresServerError> Answered<TRow, TValue>(
+        PostgresServerError? error,
+        IReadOnlyList<TRow>? rows,
+        string call,
+        string member,
+        Func<IReadOnlyList<TRow>, TValue> read
+    ) =>
+        error is not null
+            ? Outcome<TValue, PostgresServerError>.Failed(error)
+            : Outcome<TValue, PostgresServerError>.Of(
+                read(
+                    rows
+                        ?? throw new InvalidOperationException(
+                            $"The answer to '{call}' holds no {member} and no error."
+                        )
                 )
             );
-    }
 
     // The columns in order.  The first of a pseudo-type ends the describe: no value has such a type.  A domain is
     // never over one, so the type the protocol reported is the one to ask.
