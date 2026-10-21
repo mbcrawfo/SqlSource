@@ -6,11 +6,8 @@ using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Parsing;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
-using SqlSource.Tool.Describing.Describers;
-using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;
@@ -332,60 +329,6 @@ public sealed class RunLogTests : IDisposable
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
     }
 
-    // The events of one call of a describe each say which query asked: a run describes several queries.  The nodes and
-    // the columns of the walk are of the plan and not of a call.
-    [Fact]
-    public async Task Log_DescribeOfAQuery_NamesTheQueryInEveryPostgresEventOfIt()
-    {
-        const string Name = "ListVarchars";
-        const string Sql = "SELECT id, v FROM users";
-        var varchar = PostgresTables.ExpressionOf(1, "v", PostgresRows.Varchar.Oid, length: 10) with
-        {
-            TypeModifier = Typmods.Varchar10,
-        };
-        var script = new PostgresScript()
-            .Open()
-            .Prepares(1, Sql, [], new PostgresPrepareAnswer([], null))
-            .Columns(1, 0, PostgresTables.UsersId, varchar)
-            .Tables([PostgresTables.Users.Oid], PostgresTables.Users)
-            .Resolves([PostgresRows.Int4.Oid, PostgresRows.Varchar.Oid], PostgresRows.Int4, PostgresRows.Varchar)
-            .Spells((PostgresRows.Varchar.Oid, Typmods.Varchar10, "character varying(10)"))
-            .Checks(Sql, [], PostgresTables.UsersId, varchar)
-            .PlansNothing(1, 0)
-            .Frees(1);
-        var log = new RecordingLog();
-
-        await PostgresEventCases.DescribeAsync(
-            script,
-            new SessionRunLog(log, new ConnectionSecret("secret"), "postgres."),
-            new DescribeRequest(Name, Sql, EquatableArray<SqlQueryParameter>.Empty)
-        );
-
-        var asked = log
-            .Events.Where(written => written.Name is not ("postgres.walk.node" or "postgres.walk.column"))
-            .ToArray();
-        asked
-            .Select(written => written.Name)
-            .ShouldBe([
-                "postgres.prepare",
-                "postgres.columns",
-                "postgres.tables",
-                "postgres.types",
-                "postgres.spellings",
-                "postgres.column",
-                "postgres.column",
-                "postgres.check",
-                "postgres.explain",
-                "postgres.walk",
-                "postgres.table-match",
-                "postgres.deallocate",
-            ]);
-        foreach (var (eventName, members) in asked)
-        {
-            PostgresEventCases.Member(members, "query").ShouldBe((LogValue)Name, eventName);
-        }
-    }
-
     // The log's "action" and the "--verbose" line of each action.  A sidecar that was to be written or deleted and
     // could not be is "failed", never "written" or "deleted".
     [Theory]
@@ -397,7 +340,7 @@ public sealed class RunLogTests : IDisposable
     [InlineData("Unreadable", true, "failed", "could not be changed")]
     [InlineData("HeldBack", false, "held-back", "left as it was")]
     [InlineData("Unchanged", false, "unchanged", "unchanged")]
-    public void RunEvents_Sidecar_EachActionIsItsWord(string action, bool failed, string logged, string said)
+    public void Sidecar_EachAction_IsItsWord(string action, bool failed, string logged, string said)
     {
         var log = new RecordingLog();
         using var output = new StringWriter { NewLine = "\n" };
@@ -414,7 +357,7 @@ public sealed class RunLogTests : IDisposable
     [Theory]
     [InlineData(0)]
     [InlineData(99)]
-    public void RunEvents_Sidecar_ActionThatHasNoEvent_Throws(int action)
+    public void Sidecar_ActionThatHasNoEvent_Throws(int action)
     {
         _ = Should.Throw<InvalidOperationException>(() =>
             RunEvents.Sidecar(new RunTrace(NullRunLog.Instance, TextWriter.Null), "p", (FileAction)action, false)
@@ -424,7 +367,7 @@ public sealed class RunLogTests : IDisposable
     [Theory]
     [InlineData(true, "differs", "different")]
     [InlineData(false, "same", "the same")]
-    public void RunEvents_SidecarChecked_IsDiffersOrSame(bool differs, string logged, string said)
+    public void SidecarChecked_EachResult_IsItsWord(bool differs, string logged, string said)
     {
         var log = new RecordingLog();
         using var output = new StringWriter { NewLine = "\n" };

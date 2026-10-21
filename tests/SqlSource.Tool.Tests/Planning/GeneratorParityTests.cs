@@ -21,7 +21,8 @@ namespace SqlSource.Tool.Tests.Planning;
 // The plan must agree with the generator on which type claims which file with which output: a query the tool does
 // not describe is a build error, SQLSRC241, and one it describes for nothing costs a description.  The generator
 // reads symbols and the tool reads syntax, so each case runs both over the same sources and file list and compares
-// what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text.
+// what they find.  Both report SQLSRC209 and SQLSRC210, which must be at the same places with the same text, and
+// SQLSRC011 and SQLSRC014, which must come in the same order.
 public sealed class GeneratorParityTests : IDisposable
 {
     private const string Using = "using SqlSource;\n";

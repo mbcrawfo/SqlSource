@@ -314,7 +314,8 @@ internal static class DescribeCommand
         [.. usage.Values.Where(static value => value.Option is null)];
 
     // What the command line says of the run, beside its plan.  CheckUsage has held each --connection to its form.
-    // The plan's filters hold --database and the .sql paths, and not --project.
+    // The plan's filters hold --database and the .sql paths, and not --project.  A .sql path that names no file still
+    // counts as a filter, so that such a run deletes no sidecar.
     private static DescribeOptions OptionsOf(ParseResult parsed, Usage usage, RunPlan plan)
     {
         var connections = ImmutableArray.CreateBuilder<ConnectionArgument>();
@@ -332,7 +333,7 @@ internal static class DescribeCommand
 
         return new DescribeOptions(
             ModeOf(parsed),
-            ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.IsEmpty,
+            ValuesOf(usage, ProjectOption).Length > 0 || plan.Filters.NamesFiles || !plan.Filters.Databases.IsEmpty,
             connections.ToImmutable(),
             plan.Filters.Databases
         );

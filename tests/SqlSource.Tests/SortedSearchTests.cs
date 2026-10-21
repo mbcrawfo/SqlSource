@@ -6,17 +6,22 @@ namespace SqlSource.Tests;
 
 public sealed class SortedSearchTests
 {
-    [Fact]
-    public void IndexOf_KeyInTheList_IsItsIndex()
-    {
-        var sorted = new EquatableArray<string>(["a", "B", "c"]);
+    private static readonly EquatableArray<string> Sorted = new(["a", "B", "c"]);
 
-        SortedSearch.IndexOf(sorted, "b", static key => key, StringComparer.OrdinalIgnoreCase).ShouldBe(1);
-        SortedSearch.IndexOf(sorted, "a", static key => key, StringComparer.OrdinalIgnoreCase).ShouldBe(0);
-        SortedSearch.IndexOf(sorted, "C", static key => key, StringComparer.OrdinalIgnoreCase).ShouldBe(2);
-        SortedSearch.IndexOf(sorted, "d", static key => key, StringComparer.OrdinalIgnoreCase).ShouldBe(-1);
+    [Theory]
+    [InlineData("a", 0)]
+    [InlineData("b", 1)]
+    [InlineData("C", 2)]
+    public void IndexOf_KeyInTheList_IsItsIndex(string key, int index) =>
+        SortedSearch.IndexOf(Sorted, key, static item => item, StringComparer.OrdinalIgnoreCase).ShouldBe(index);
+
+    [Fact]
+    public void IndexOf_KeyNotInTheList_IsMinusOne() =>
+        SortedSearch.IndexOf(Sorted, "d", static item => item, StringComparer.OrdinalIgnoreCase).ShouldBe(-1);
+
+    [Fact]
+    public void IndexOf_EmptyList_IsMinusOne() =>
         SortedSearch
-            .IndexOf(EquatableArray<string>.Empty, "a", static key => key, StringComparer.OrdinalIgnoreCase)
+            .IndexOf(EquatableArray<string>.Empty, "a", static item => item, StringComparer.OrdinalIgnoreCase)
             .ShouldBe(-1);
-    }
 }

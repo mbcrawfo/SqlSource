@@ -271,6 +271,7 @@ internal static class RunEvents
             FileAction.Delete => ("deleted", "deleted"),
             FileAction.HeldBack => ("held-back", "left as it was"),
             FileAction.Unchanged => ("unchanged", "unchanged"),
+            // The action is itself the failure: a sidecar that could not be read was neither written nor deleted.
             FileAction.Unreadable => SidecarFailed,
             FileAction.None => throw new InvalidOperationException("A file with no action has no event."),
             _ => throw new InvalidOperationException($"Unknown action {action}."),

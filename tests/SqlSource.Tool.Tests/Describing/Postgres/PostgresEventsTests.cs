@@ -1,15 +1,19 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Parsing;
 using SqlSource.Tool.Describing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using Xunit;
 using static SqlSource.Tool.Tests.PostgresEventCases;
 
 namespace SqlSource.Tool.Tests.Describing.Postgres;
 
-// What the describer says in the run's log of prepare, of the types and their spellings, and of deallocate.
+// What the describer says in the run's log of prepare, of the types and their spellings, and of deallocate, and that
+// each event of a call names its query.
 public sealed class PostgresEventsTests
 {
     [Fact]
@@ -274,5 +278,59 @@ public sealed class PostgresEventsTests
         error
             .Values.Single(value => value.Name == "message")
             .Value.ShouldBe((LogValue)"relation \"***\" does not exist");
+    }
+
+    // The events of one call of a describe each say which query asked: a run describes several queries.  The nodes and
+    // the columns of the walk are of the plan and not of a call.
+    [Fact]
+    public async Task DescribeAsync_QueryThroughEveryCall_NamesTheQueryInEachOfItsEvents()
+    {
+        const string Name = "ListVarchars";
+        const string Sql = "SELECT id, v FROM users";
+        var varchar = PostgresTables.ExpressionOf(1, "v", PostgresRows.Varchar.Oid, length: 10) with
+        {
+            TypeModifier = Typmods.Varchar10,
+        };
+        var script = new PostgresScript()
+            .Open()
+            .Prepares(1, Sql, [], new PostgresPrepareAnswer([], null))
+            .Columns(1, 0, PostgresTables.UsersId, varchar)
+            .Tables([PostgresTables.Users.Oid], PostgresTables.Users)
+            .Resolves([PostgresRows.Int4.Oid, PostgresRows.Varchar.Oid], PostgresRows.Int4, PostgresRows.Varchar)
+            .Spells((PostgresRows.Varchar.Oid, Typmods.Varchar10, "character varying(10)"))
+            .Checks(Sql, [], PostgresTables.UsersId, varchar)
+            .PlansNothing(1, 0)
+            .Frees(1);
+        var log = new RecordingLog();
+
+        await DescribeAsync(
+            script,
+            new SessionRunLog(log, new ConnectionSecret("secret"), "postgres."),
+            new DescribeRequest(Name, Sql, EquatableArray<SqlQueryParameter>.Empty)
+        );
+
+        var asked = log
+            .Events.Where(written => written.Name is not ("postgres.walk.node" or "postgres.walk.column"))
+            .ToArray();
+        asked
+            .Select(written => written.Name)
+            .ShouldBe([
+                "postgres.prepare",
+                "postgres.columns",
+                "postgres.tables",
+                "postgres.types",
+                "postgres.spellings",
+                "postgres.column",
+                "postgres.column",
+                "postgres.check",
+                "postgres.explain",
+                "postgres.walk",
+                "postgres.table-match",
+                "postgres.deallocate",
+            ]);
+        foreach (var (eventName, members) in asked)
+        {
+            Member(members, "query").ShouldBe((LogValue)Name, eventName);
+        }
     }
 }

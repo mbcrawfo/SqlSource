@@ -45,7 +45,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             claims.ClaimedPaths
         );
         ReportInvalidSettings(context, settings.ProjectSettings, settings.FilesSettings, claims.ClaimedPaths);
-        var typeQueries = SelectTypeQueries(claims.Types, parsedFiles, settings.FilesSettings);
+        var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles, settings.FilesSettings);
         var sidecars = CheckSidecars(context, claims.ClaimedPaths, typeQueries, settings.ProjectLevel, parsedFiles);
         var typing = TypeFiles(
             context,
@@ -57,11 +57,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
         var models = CollectModels(context, typing.Files, typeQueries, settings.ProjectLevel);
         ReportDriver(context, typing.NpgsqlProbe, sidecars.Needs, parsedFiles);
-        ReportProblems(context, sidecars.Checks, typing.Types, models.FileModels, models.Models);
+        ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
         RegisterModelSources(context, models.Models);
         RegisterTypeSources(context, typeQueries, settings.ProjectLevel);
     }
 
+    // The attribute's file, which every compilation gets before the pipeline runs.
     private static void RegisterAttribute(IncrementalGeneratorInitializationContext context) =>
         context.RegisterPostInitializationOutput(static output =>
             output.AddSource(AttributeSource.HintName, SourceText.From(AttributeSource.Text, Encoding.UTF8))
@@ -168,7 +169,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .AnalyzerConfigOptionsProvider.Select(static (options, _) => ProjectSettings.Read(options.GlobalOptions))
             .WithTrackingName(TrackingNames.ProjectSettings);
 
-        // The properties join after a type's queries are selected, so that they never reach the parse of a file.
+        // The properties' level alone, which never reaches the parse of a file.
         var projectLevel = projectSettings.Select(static (settings, _) => settings.Level);
 
         // What the metadata of each file's item says: its dialect and its settings.
@@ -189,6 +190,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return new ProjectAndFileSettings(projectDialect, projectSettings, projectLevel, fileMetadata, filesSettings);
     }
 
+    // Each claimed file parsed, sorted by path, with its parse errors and the dialects that are not valid reported.
     private static IncrementalValueProvider<EquatableArray<ParsedSqlFile>> ParseFiles(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<FileMetadata> fileMetadata,
@@ -250,8 +252,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return parsedFiles;
     }
 
-    // Not located, and once for each setting and value.  The metadata of a file that no type claims is not
-    // reported, as nothing else about such a file is.
+    // Each setting and value that is not valid, once and with no position, of the project and the claimed files alone.
     private static void ReportInvalidSettings(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<ProjectSettings> projectSettings,
@@ -276,6 +277,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
+    // Each type with the parsed files it claims, the settings of their metadata, and the name of its file.
     private static IncrementalValuesProvider<TypeQueries> SelectTypeQueries(
         IncrementalValuesProvider<TypeFiles> typeFiles,
         IncrementalValueProvider<EquatableArray<ParsedSqlFile>> parsedFiles,
@@ -299,6 +301,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.TypeQueries);
     }
 
+    // What every type needs of each file, and the check of each claimed file's sidecar against it.
     private static CheckedSidecars CheckSidecars(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<EquatableArray<string>> claimedPaths,
@@ -345,6 +348,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return new CheckedSidecars(fileNeeds, sidecarChecks);
     }
 
+    // The C# types of each claimed file's usable entries, with the Npgsql and the mapped types they depend on.
     private static TypedFiles TypeFiles(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<SidecarCheckResult> sidecarChecks,
@@ -408,6 +412,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return new TypedFiles(npgsqlProbe, typedFiles, fileTypes);
     }
 
+    // Each file's models, and the models every type's requests come to, checked against each other and the project.
     private static CollectedModels CollectModels(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<TypedFile> typedFiles,
@@ -469,6 +474,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return new CollectedModels(fileModels, models);
     }
 
+    // Whether the Npgsql the project references is too old or newer than known, if a query needs an entry of postgres.
     private static void ReportDriver(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
@@ -512,6 +518,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
+    // The problems of each file's sidecar, types and models, and of the models, each from a node of its own.
     private static void ReportProblems(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<SidecarCheckResult> sidecarChecks,
@@ -532,6 +539,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(models.Select(static (set, _) => set.Diagnostics), ReportAll);
     }
 
+    // The file of each model.
     private static void RegisterModelSources(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<ModelSet> models
@@ -550,6 +558,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         );
     }
 
+    // The file of each type, and its diagnostics.
     private static void RegisterTypeSources(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<TypeQueries> typeQueries,
@@ -694,7 +703,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     // The project's .sql files, each type with the files it claims, every claimed path, and those that keep comments.
     private readonly record struct ClaimedFiles(
         IncrementalValuesProvider<AdditionalText> SqlFiles,
-        IncrementalValuesProvider<TypeFiles> Types,
+        IncrementalValuesProvider<TypeFiles> ClaimingTypes,
         IncrementalValueProvider<EquatableArray<string>> ClaimedPaths,
         IncrementalValueProvider<EquatableArray<string>> CommentPaths
     );
@@ -718,7 +727,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     private readonly record struct TypedFiles(
         IncrementalValueProvider<NpgsqlProbe> NpgsqlProbe,
         IncrementalValuesProvider<TypedFile> Files,
-        IncrementalValuesProvider<FileTypes> Types
+        IncrementalValuesProvider<FileTypes> FileTypes
     );
 
     // Each file's models, and the models to emit with the problems of the requests.

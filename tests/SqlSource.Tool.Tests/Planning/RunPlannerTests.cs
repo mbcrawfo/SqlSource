@@ -349,7 +349,7 @@ public sealed class RunPlannerTests : IDisposable
 
         var result = Plans.Result(first, second);
 
-        result.Plan.Files.Select(file => file.Path).ShouldContain(shared);
+        result.Plan.Files.Count(file => file.Path == shared).ShouldBe(1);
         result.Unclaimed.ShouldBe([0, 1]);
     }
 

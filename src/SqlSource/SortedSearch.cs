@@ -3,7 +3,7 @@ using System;
 namespace SqlSource;
 
 /// <summary>
-/// The one binary search of a sorted list, by a key that each item gives.
+/// The one exact binary search of a sorted list, by a key that each item gives.
 /// </summary>
 internal static class SortedSearch
 {
