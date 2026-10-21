@@ -34,6 +34,8 @@ internal static class StepReasons
 
     // The files of the models that went.  A model is emitted from the node of its file, in the slot of its query and
     // role, so what goes is the model that went, and a model that moves to another file's node goes from the old one.
+    // A slot of several models loses its last place, so what goes there is the last model it held, which may be
+    // another.
     public static string[] ModelsRemoved(GeneratorDriverRunResult result) =>
         [
             .. Outputs(result, TrackingNames.ModelOutput)

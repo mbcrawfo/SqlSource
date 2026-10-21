@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
 using Shouldly;
 using SqlSource.Generation;
 using SqlSource.Generation.Models;
@@ -198,6 +199,110 @@ public sealed class CachingModelTests
                 ignoreOrder: true
             );
         ModelsRemoved(result).ShouldBe(["App.Orders.GetPaymentDto-Model.g.cs"]);
+    }
+
+    // Orders is listed between Users and Payments.  Its node goes with its model, and the nodes of the files listed
+    // after it keep theirs.
+    [Fact]
+    public void Run_MiddleFileRemoved_EmitsNoOtherModel()
+    {
+        var compilation = ModelsCompilation();
+        var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, ordersSidecar);
+
+        var result = Run(driver.RemoveAdditionalTexts([_scene.Orders, ordersSidecar]), compilation);
+
+        ModelReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Users.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        ModelsRemoved(result).ShouldBe(["App.Orders.GetOrderDto-Model.g.cs"]);
+    }
+
+    // Orders becomes Receipts.sql, in the same folder and in its place in the list, and its sidecar becomes that of
+    // Receipts.sql in its own place.  The file's node keeps its place, so its model alone is written, now naming
+    // Receipts.sql.  Receipts.sql sorts after Payments.sql, so a node matched by its place among the sorted files
+    // would move the model of Payments too.
+    [Fact]
+    public void Run_MiddleFileRenamed_EmitsOnlyItsModel()
+    {
+        var compilation = ModelsCompilation();
+        var ordersSidecar = TypedSidecar(_scene.Orders, "GetOrder", "int4");
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders, ordersSidecar);
+        var receipts = new InMemoryAdditionalText(
+            "/app/Orders/Receipts.sql",
+            _scene.Orders.GetText(TestContext.Current.CancellationToken)!.ToString()
+        );
+
+        var result = Run(
+            driver
+                .ReplaceAdditionalText(_scene.Orders, receipts)
+                .ReplaceAdditionalText(ordersSidecar, TypedSidecar(receipts, "GetOrder", "int4")),
+            compilation
+        );
+
+        result.Diagnostics.ShouldBeEmpty();
+        ModelReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Orders.GetOrderDto-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Users.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        ModelsRemoved(result).ShouldBeEmpty();
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("GetOrderDto-Model.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("A row of the query <c>GetOrder</c> from <c>Receipts.sql</c>.");
+    }
+
+    // A type that comes to claim Users.sql asks for a model of its own for GetUser, App.Admin.GetUserDto, in the slot
+    // of the query's rows.  A slot holds its models in the order of the types that asked for them, and
+    // App.Admin.AdminQueries sorts before App.Users.UserQueries, so the new model takes the first place of the slot
+    // and moves the model of UserQueries to a second place.  The node of the first place now emits a model of
+    // another name, that of the second place is new, and both are written.  The other files' models are not.
+    [Fact]
+    public void Run_TypeAddedThatSortsFirstInASlot_EmitsTheModelsOfTheTypesSortedAfterItAgain()
+    {
+        var compilation = ModelsCompilation();
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
+        var admin = CSharpSyntaxTree.ParseText(
+            """
+            using SqlSource;
+
+            namespace App.Admin;
+
+            [SqlSourceGenerate(Path = "Users.sql")]
+            public partial class AdminQueries;
+            """,
+            GeneratorHarness.ParseOptions,
+            "/app/Users/AdminQueries.cs",
+            cancellationToken: TestContext.Current.CancellationToken
+        );
+
+        var result = Run(driver, compilation.AddSyntaxTrees(admin));
+
+        result.Diagnostics.ShouldBeEmpty();
+        ModelReasons(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["App.Admin.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Orders.GetOrderDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Users.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.New,
+                },
+                ignoreOrder: true
+            );
+        ModelsRemoved(result).ShouldBeEmpty();
     }
 
     // A marker is a comment, so the sidecar stays current.  The query's row model keeps its slot, which now holds a

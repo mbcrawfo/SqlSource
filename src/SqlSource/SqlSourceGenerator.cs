@@ -569,10 +569,11 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.ModelsByFile);
 
         // The compiler matches the nodes after a SelectMany by their place, so each model is emitted from a node that
-        // does not move when another model is added or removed.  A file's node stays with its additional text: the
-        // compiler appends a text added, drops one removed and keeps the place of one replaced.  Inside it, a slot
-        // stays with its query and role.  So an edit writes the models whose record changed, and a model added or
-        // removed writes itself alone.
+        // does not move when a model of another file or slot is added or removed.  A file's node stays with its
+        // additional text: the compiler appends a text added, drops one removed and keeps the place of one replaced.
+        // Inside it, a slot stays with its query and role.  So an edit writes the models whose record changed, and a
+        // model added or removed writes itself and the models after it in its slot, those of the types sorted after
+        // its own.
         var fileModelOutputs = parsedFile
             .Select(static (file, _) => file.NormalizedPath)
             .Combine(modelsByFile)
