@@ -496,6 +496,7 @@
         "type": "Project",
         "dependencies": {
           "Microsoft.CodeAnalysis.CSharp": "[5.9.0, )",
+          "Microsoft.Data.SqlClient": "[7.1.1, )",
           "Microsoft.VisualStudio.SolutionPersistence": "[1.0.52, )",
           "Npgsql": "[10.0.3, )",
           "SqlSource": "[0.1.0-dev, )",

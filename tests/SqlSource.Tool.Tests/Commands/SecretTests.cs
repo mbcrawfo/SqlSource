@@ -7,6 +7,7 @@ using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -113,6 +114,33 @@ public sealed class SecretTests : IDisposable
 
         ShouldHold(result, "224");
         result.Error.ShouldContain("    server: Npgsql could not reach the server: ConnectionRefused");
+        result.Error.ShouldNotContain("127.0.0.1");
+        var log = await File.ReadAllTextAsync(
+            _scene.Run.Folder.PathOf("run.log"),
+            TestContext.Current.CancellationToken
+        );
+        log.ShouldNotContain(Secrets.Marker);
+        log.ShouldNotContain("127.0.0.1");
+        log.ShouldContain("\"id\":\"SQLSRC224\"");
+        CaptureJson.Write(_scene.Run.Capture).ShouldNotContain(Secrets.Marker);
+        CaptureJson.Write(_scene.Run.Capture).ShouldNotContain("127.0.0.1");
+    }
+
+    // The describer of SQL Server itself, as PostgreSQL's above: an mssql query, and a value whose port 1 refuses at
+    // once.  The describer's own text is printed, and neither the value nor the host is anywhere.
+    [Fact]
+    public async Task Run_SqlServerDescriberThatCannotOpen_PrintsSqlsrc224AndNothingOfTheValue()
+    {
+        _ = _scene.Project.AddSql("Other.sql", "-- dialect: mssql\n-- name: Other\nSELECT 6;\n");
+        _scene.Run.Describers.Clear();
+        _scene.Run.Describers.Add(new SqlServerDescriber());
+        _scene.Run.Environment["SQLSOURCE_CONNECTION_MSSQL"] =
+            "Data Source=127.0.0.1,1;Connect Timeout=5;Encrypt=False;Password=" + Secrets.Marker;
+
+        var result = await _scene.DescribeAsync("--database", "mssql", "--log", "run.log");
+
+        ShouldHold(result, "224");
+        result.Error.ShouldContain("    server: ");
         result.Error.ShouldNotContain("127.0.0.1");
         var log = await File.ReadAllTextAsync(
             _scene.Run.Folder.PathOf("run.log"),

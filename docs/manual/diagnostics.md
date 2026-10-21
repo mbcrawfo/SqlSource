@@ -1421,7 +1421,7 @@ See: [What can be described](postgresql.md#what-can-be-described)
 
 **Server version is not supported**
 
-The tool supports PostgreSQL 14 and later, and the server that the database's connection string reaches is older.  The version is read when the session is opened, before any query is sent, and it is the one the server reports.
+The server that the database's connection string reaches is older than the oldest version the tool supports: PostgreSQL 14, or SQL Server 2017, which reports version 14.  An Azure SQL Database or Azure SQL Managed Instance is accepted whatever version it reports.  The version is read when the session is opened, before any query is sent, and it is the one the server reports.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC235: The database 'app' runs PostgreSQL 13.12, and the tool supports 14 and later
@@ -1429,7 +1429,7 @@ The tool supports PostgreSQL 14 and later, and the server that the database's co
     help: upgrade the server, or describe against a database of PostgreSQL 14 or later
 ```
 
-Upgrade the server, or point the tool at a database of PostgreSQL 14 or later, a copy of the schema on a newer server for one.  The error is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed.  A version that does not start with a number is not refused, since the tool cannot tell what it is.
+Upgrade the server, or point the tool at a database of a supported version, a copy of the schema on a newer server for one.  The error is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed.  A version that does not start with a number is not refused, since the tool cannot tell what it is.
 
 See: [Connecting](postgresql.md#connecting)
 

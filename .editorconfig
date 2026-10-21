@@ -258,3 +258,9 @@ dotnet_diagnostic.CA1031.severity = none
 # describer puts into them is a counter, a type that DeclaredTypeText read, and the user's own SQL, which is what is
 # to be described; the check describes the user's own SQL and runs nothing.
 dotnet_diagnostic.CA2100.severity = none
+
+[src/SqlSource.Tool/Describing/SqlServer/SqlServerConnection.cs]
+# CA2100 (review SQL for user input): the one place that makes every command of the SQL Server describer, as
+# PostgresConnection.cs is PostgreSQL's.  Its texts are the describer's own and the names of the procedures it calls;
+# what a user wrote reaches the server as the value of a parameter, never in a command's text.
+dotnet_diagnostic.CA2100.severity = none

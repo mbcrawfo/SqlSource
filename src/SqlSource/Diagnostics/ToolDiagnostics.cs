@@ -406,7 +406,7 @@ internal static class ToolDiagnostics
     public static readonly DiagnosticDescriptor ServerVersionNotSupported = new(
         id: "SQLSRC235",
         title: "Server version is not supported",
-        messageFormat: "The database '{0}' runs PostgreSQL {1}, and the tool supports {2} and later",
+        messageFormat: "The database '{0}' runs {1} {2}, and the tool supports {3} and later",
         category: SqlDiagnostics.Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

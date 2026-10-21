@@ -82,6 +82,9 @@ internal static class PostgresErrors
     public const string SchemaChangedHelp =
         "the database's schema changed while the query was described; run the tool again";
 
+    // How SQLSRC235 names the engine.
+    private const string Engine = "PostgreSQL";
+
     private const string UndefinedObject = "42704";
     private const string UtilityStatement = "42P14";
     private const string DuplicatePreparedStatement = "42P05";
@@ -140,6 +143,7 @@ internal static class PostgresErrors
             ToolDiagnostics.ServerVersionNotSupported,
             new EquatableArray<string>([
                 database,
+                Engine,
                 version,
                 PostgresSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture),
             ]),
