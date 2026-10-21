@@ -201,36 +201,37 @@ public sealed class CachingModelTests
     }
 
     // A marker is a comment, so the sidecar stays current.  The query's row model keeps its slot, which now holds a
-    // model of another name, so that model alone is emitted, and the file of the old name goes in its place.
+    // model of another name, so that model alone is emitted, and the file of the old name goes in its place.  The new
+    // name sorts after App.Orders.GetPaymentDto, so a node matched by its place in the sorted list would move it too.
     [Fact]
     public void Run_ModelRenamedInPlace_EmitsOnlyThatModel()
     {
         var compilation = ModelsCompilation();
         var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
         var renamed = new InMemoryAdditionalText(
-            _scene.Users.Path,
-            "-- name: GetUser\n-- output-model: App.Users.UserRow\nSELECT 1;\n"
+            _scene.Orders.Path,
+            "-- name: GetOrder\n-- output-model: App.Orders.OrderRow\nSELECT 2;\n"
         );
 
-        var result = Run(driver.ReplaceAdditionalText(_scene.Users, renamed), compilation);
+        var result = Run(driver.ReplaceAdditionalText(_scene.Orders, renamed), compilation);
 
         result.Diagnostics.ShouldBeEmpty();
         ModelReasons(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
-                    ["App.Orders.GetOrderDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
+                    ["App.Orders.OrderRow-Model.g.cs"] = IncrementalStepRunReason.Modified,
                     ["App.Orders.GetPaymentDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
-                    ["App.Users.UserRow-Model.g.cs"] = IncrementalStepRunReason.Modified,
+                    ["App.Users.GetUserDto-Model.g.cs"] = IncrementalStepRunReason.Cached,
                 },
                 ignoreOrder: true
             );
         ModelsRemoved(result).ShouldBeEmpty();
         result.GeneratedTrees.ShouldContain(tree =>
-            tree.FilePath.EndsWith("UserRow-Model.g.cs", StringComparison.Ordinal)
+            tree.FilePath.EndsWith("OrderRow-Model.g.cs", StringComparison.Ordinal)
         );
         result.GeneratedTrees.ShouldNotContain(tree =>
-            tree.FilePath.EndsWith("GetUserDto-Model.g.cs", StringComparison.Ordinal)
+            tree.FilePath.EndsWith("GetOrderDto-Model.g.cs", StringComparison.Ordinal)
         );
     }
 
@@ -350,6 +351,37 @@ public sealed class CachingModelTests
         result.GeneratedTrees.Count(IsOrderModel).ShouldBe(1);
         static bool IsOrderModel(SyntaxTree tree) =>
             tree.FilePath.EndsWith("GetOrderDto-Model.g.cs", StringComparison.Ordinal);
+    }
+
+    // A path that the project comes to list a second time, under the same spelling or one that differs by case alone,
+    // moves its model from its file's node to the collected output in one run, and the model's file is added once.
+    // The second spelling is a collision, SQLSRC013, as it is for any claimed file.
+    [Theory]
+    [InlineData("/app/Orders/Orders.sql")]
+    [InlineData("/app/Orders/orders.sql")]
+    public void Run_FileListedAgain_EmitsItsModelOnce(string spelling)
+    {
+        var compilation = ModelsCompilation();
+        var driver = _scene.FirstRunOfModels(compilation, _scene.Users, _scene.Orders);
+        var ordersAgain = new InMemoryAdditionalText(
+            spelling,
+            _scene.Orders.GetText(TestContext.Current.CancellationToken)!.ToString()
+        );
+
+        var result = Run(driver.AddAdditionalTexts([ordersAgain]), compilation);
+
+        result.Results.Single().Exception.ShouldBeNull();
+        result
+            .GeneratedTrees.Count(tree => tree.FilePath.EndsWith("GetOrderDto-Model.g.cs", StringComparison.Ordinal))
+            .ShouldBe(1);
+        if (spelling == _scene.Orders.Path)
+        {
+            result.Diagnostics.ShouldBeEmpty();
+        }
+        else
+        {
+            result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC013");
+        }
     }
 
     // The edit gives the pipeline a new compilation: the names the project has are looked up again and found the
