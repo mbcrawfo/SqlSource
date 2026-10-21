@@ -29,7 +29,7 @@ The libraries are never run as tests, hold no tests and are never packed:
 
 - the harness of a whole command: `CliRun`, which fakes MSBuild and the environment or, as `CliRun.Real`, runs the real `dotnet msbuild` and the test process's environment, `CliResult`, `Hosts` and `Plans`;
 - the fakes of a process and a project: `FakeProcessRunner`, `FakeProject` and `TestProject`;
-- the start of the built tool, `Programs`;
+- `Programs`, the start of the built tool and the run of a program with a limit and its tree killed, and `Eventually`, the one limit of every wait of the tests;
 - `LogReader`, `Secrets`, `SidecarFiles` and `TempFolder`;
 - `Describers`, which opens a describer's session as a run does, and `DescribeRequests`, which builds the `DescribeRequest` of a test;
 - `PasswordFiles`, which skips a test of a password file;
