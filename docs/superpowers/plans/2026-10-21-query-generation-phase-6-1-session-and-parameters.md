@@ -255,7 +255,7 @@
   - the optional filter typed `nvarchar(100)`, `inferred-from-copies`, in a `SELECT`, an `UPDATE` with no `OUTPUT`, and an `IF @a = 1 SELECT id … WHERE (@n IS NULL OR name = @n) ELSE SELECT name FROM dbo.users`;
   - `UPDATE dbo.all_types SET xml_value = @d WHERE (@d IS NULL OR id = 1)` → `xml`;
   - `WHERE @p IS NULL OR @p IS NOT NULL` → whatever the server gives (expected `int`, `inferred`: see "calls" above);
-  - `CREATE PROCEDURE p @id int AS SELECT 1` → `SQLSRC231`;
+  - `CREATE PROCEDURE p @id int AS SELECT 1` → `SQLSRC231` (`SQLSRC225` in the code, by `11527`: see "Where the code differs from the spec" above);
   - `WHERE id = @p AND name = @p` → `SQLSRC262` with `int` and `nvarchar(100)`;
   - `DECLARE @x int = 1; SELECT id FROM dbo.users WHERE id = @x` → no parameter;
   - canaries: a text of two statements with `DROP TABLE dbo.victim` described through `parameters` (a session's describe) and asked through `probe` (`SqlServerLive.ProbeAsync` on the session's connection), and `-- param: @p int; DROP TABLE dbo.victim` (`SQLSRC228`): after each, `OBJECT_ID('dbo.victim')` is not null.

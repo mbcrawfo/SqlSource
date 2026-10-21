@@ -7,9 +7,9 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
 
 // What the connection makes of an exception of SqlClient's open for a value it read, and which values it refuses
-// before it opens.  The refusal of a missing
-// provider of authentication comes only from a server that asks for a federated token, which only Azure does, so the
-// exception is built here as SqlClient builds it: an ArgumentException with no parameter's name.
+// before it opens.  The refusal of a missing provider of authentication comes only from a server that asks for a
+// federated token, which only Azure does, so the exception is built here as SqlClient builds it: an ArgumentException
+// with no parameter's name.
 public sealed class SqlServerConnectionTests
 {
     private const string ProviderMissing = "Cannot find an authentication provider for 'ActiveDirectoryDefault'.";
