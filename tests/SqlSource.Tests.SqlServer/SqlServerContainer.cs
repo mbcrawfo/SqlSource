@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using SqlSource.Testing;
@@ -95,7 +96,7 @@ public sealed class SqlServerContainer : IAsyncLifetime
                 "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)",
                 fixtures
             );
-            Major = (int)await major.ExecuteScalarAsync(token);
+            Major = Convert.ToInt32(await major.ExecuteScalarAsync(token), CultureInfo.InvariantCulture);
         }
         catch
         {

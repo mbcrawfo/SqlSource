@@ -1,6 +1,6 @@
 # Tools
 
-This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, a script that pulls the test images, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
 ## Linters
 
@@ -52,6 +52,10 @@ tools/check-tool-install.sh artifacts/packages
 This installs the tool the way a user does: `dotnet tool install` into a temporary folder outside the repository, from a feed that holds nothing else.  It then runs `sqlsource --version` and compares it with the package's version, runs `sqlsource --help`, and runs `sqlsource describe` in an empty folder, which must exit with 1 and report `SQLSRC201`.  A tool's package carries everything the tool loads, so this is what shows that all of it is there.
 
 The last run sets `DOTNET_ROLL_FORWARD` to `LatestMajor`, which starts the tool on the newest runtime the machine has.  The tool targets .NET 8 and rolls forward on a machine that has only a later one, and this proves it wherever the script runs.  Without an argument the script packs first.
+
+## Pulling the test images
+
+`tools/pull-test-images.sh [image ...]` is a step of `build.yml` and no check, and `pre-commit-validation.sh` does not run it.  It runs `docker pull` once for the default image of each engine, which it reads from the lines of `tests/SqlSource.Testing/DefaultImages.cs` that declare `Postgres` and `SqlServer`, and once for each image given as an argument, and prints `<image>: <n> s` for each.  The workflow gives it the two floor images.  A person can run it to have every image before a first run of the tests, which on Apple silicon saves minutes of the first test.
 
 ## Recording scripts
 

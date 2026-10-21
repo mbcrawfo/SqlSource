@@ -48,9 +48,9 @@
             first build without CVE-2026-70162 and CVE-2026-84008.  Remove it when SqlClient brings that build or later.
         -->
         <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
-        <!-- Starts the PostgreSQL that tests/SqlSource.Tests.Postgres describes against.  It needs Docker. -->
         <!-- Starts the SQL Server that tests/SqlSource.Tests.SqlServer describes against.  It needs Docker. -->
         <PackageVersion Include="Testcontainers.MsSql" Version="4.16.0" />
+        <!-- Starts the PostgreSQL that tests/SqlSource.Tests.Postgres describes against.  It needs Docker. -->
         <PackageVersion Include="Testcontainers.PostgreSql" Version="4.16.0" />
         <PackageVersion Include="xunit.analyzers" Version="2.1.0" />
         <PackageVersion Include="xunit.v3" Version="4.0.1" />

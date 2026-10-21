@@ -18,7 +18,7 @@ SQLSOURCE_TESTS_SQLSERVER_IMAGE=mcr.microsoft.com/mssql/server:2017-CU31-GDR19-u
 
 A change to these tests, or to the SQL Server describer, is run on both images before it is pushed.
 
-SQL Server's images are built for x64 alone.  On Apple silicon Docker runs them under emulation: the first run takes minutes while the image is pulled, and a start with the image already pulled takes from ten to thirty seconds.
+SQL Server's images are built for x64 alone.  On Apple silicon Docker runs them under emulation: the first run takes minutes while the image is pulled, and a start with the image already pulled takes seconds.
 
 ## The images
 

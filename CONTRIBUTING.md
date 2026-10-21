@@ -103,7 +103,7 @@ dotnet restore SqlSource.slnx
 
 ## Continuous integration
 
-CI runs the same checks as `pre-commit-validation.sh` on Linux, and `tests/SqlSource.Tests.Postgres` again on PostgreSQL 14.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and by hand on a branch:
+CI runs the same checks as `pre-commit-validation.sh` on Linux.  It pulls the test images in a step of its own, with `tools/pull-test-images.sh`, and runs `tests/SqlSource.Tests.Postgres` again on PostgreSQL 14 and `tests/SqlSource.Tests.SqlServer` again on SQL Server 2017.  The `ci` job is the one required check on `main`.  `nightly.yml` runs the tests that need no container on Windows and macOS every night, and by hand on a branch:
 
 ```bash
 gh workflow run nightly.yml --ref <branch>
