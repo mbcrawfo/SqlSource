@@ -32,6 +32,12 @@ public sealed class PostgresEventsTests
 
         log.Events.Select(written => written.Name).ShouldBe(["prepare", "columns", "types", "check", "deallocate"]);
 
+        // Each call took the CallTime that the exchange moved the clock by.
+        foreach (var (_, members) in log.Events)
+        {
+            Member(members, "durationMs").ShouldBe((LogValue)(long)CallTime.TotalMilliseconds);
+        }
+
         var prepare = log.Events[0].Members;
         NamesOf(prepare).ShouldBe(["query", "statement", "sql", "types", "parameterTypes", "durationMs"]);
         Member(prepare, "query").ShouldBe((LogValue)"GetUser");
@@ -39,7 +45,6 @@ public sealed class PostgresEventsTests
         Member(prepare, "sql").ShouldBe((LogValue)"SELECT 1 FROM users WHERE id = $1");
         Member(prepare, "types").ShouldBe(LogValue.ListOfTexts(["unknown"]));
         Member(prepare, "parameterTypes").ShouldBe(LogValue.ListOf([23L]));
-        _ = Member(prepare, "durationMs").ShouldBeOfType<LogValue.Number>();
 
         var types = log.Events[2].Members;
         NamesOf(types).ShouldBe(["query", "oids", "rows", "durationMs"]);

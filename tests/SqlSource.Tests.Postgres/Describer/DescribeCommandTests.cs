@@ -30,9 +30,8 @@ public sealed class DescribeCommandTests : IDisposable
     // The event of the driver's own log, as the describer's log names it.
     private const string DriverEvent = "postgres.driver";
 
-    // The role, the database and the application of the log test: words that nothing else of a run writes.
-    private const string LogRole = "sqlsrc_wombat";
-    private const string LogDatabase = "sqlsrc_numbat";
+    // The application of the log test, a word that nothing else of a run writes, as the role and the database of
+    // ScratchSchema are.
     private const string LogApplication = "sqlsrc_quokka";
 
     // Not the password that CreateLogRoleAndDatabaseAsync gives the role.
@@ -193,9 +192,9 @@ public sealed class DescribeCommandTests : IDisposable
         _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
         var connection = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString)
         {
-            Username = LogRole,
+            Username = ScratchSchema.LogRoleName,
             Password = Secrets.Marker,
-            Database = LogDatabase,
+            Database = ScratchSchema.LogDatabaseName,
             ApplicationName = LogApplication,
         };
         var log = _run.Folder.PathOf("run.log");
@@ -209,7 +208,16 @@ public sealed class DescribeCommandTests : IDisposable
                 NameOf(logged) == DriverEvent && logged.GetProperty("category").GetString() == "Npgsql.Command"
             );
         var text = await File.ReadAllTextAsync(log, TestContext.Current.CancellationToken);
-        foreach (var word in new[] { LogRole, LogDatabase, LogApplication, connection.Host!, Secrets.Marker })
+        foreach (
+            var word in new[]
+            {
+                ScratchSchema.LogRoleName,
+                ScratchSchema.LogDatabaseName,
+                LogApplication,
+                connection.Host!,
+                Secrets.Marker,
+            }
+        )
         {
             text.ShouldNotContain(word);
         }
@@ -230,7 +238,7 @@ public sealed class DescribeCommandTests : IDisposable
         {
             Host = host,
             Port = 1,
-            Username = LogRole,
+            Username = ScratchSchema.LogRoleName,
         };
         var log = _run.Folder.PathOf("run.log");
 
@@ -241,7 +249,7 @@ public sealed class DescribeCommandTests : IDisposable
         result.Error.ShouldContain("    server: Npgsql could not reach the server: ConnectionRefused");
         ServerLinesOf(LogReader.Read(log), "SQLSRC224")
             .ShouldBe(["Npgsql could not reach the server: ConnectionRefused"]);
-        await ShouldNotHoldAsync(result, log, host, LogRole);
+        await ShouldNotHoldAsync(result, log, host, ScratchSchema.LogRoleName);
     }
 
     // The commonest real failure: the server rejects the role's password.  The diagnostic holds the SQLSTATE and the
@@ -253,9 +261,9 @@ public sealed class DescribeCommandTests : IDisposable
         _ = AddSql("one.sql", "-- name: One\nSELECT 1 AS one;\n");
         var connection = new NpgsqlConnectionStringBuilder(_postgres.ConnectionString)
         {
-            Username = LogRole,
+            Username = ScratchSchema.LogRoleName,
             Password = WrongPassword,
-            Database = LogDatabase,
+            Database = ScratchSchema.LogDatabaseName,
         };
         var log = _run.Folder.PathOf("run.log");
 
@@ -265,7 +273,13 @@ public sealed class DescribeCommandTests : IDisposable
         result.Error.ShouldContain("error SQLSRC224: ");
         result.Error.ShouldContain("    server: 28P01: the server refused the password");
         ServerLinesOf(LogReader.Read(log), "SQLSRC224").ShouldBe(["28P01: the server refused the password"]);
-        await ShouldNotHoldAsync(result, log, connection.Host!, LogRole, LogDatabase);
+        await ShouldNotHoldAsync(
+            result,
+            log,
+            connection.Host!,
+            ScratchSchema.LogRoleName,
+            ScratchSchema.LogDatabaseName
+        );
     }
 
     // The texts of the "server" lines of the one diagnostic of the log with the id.
@@ -292,20 +306,18 @@ public sealed class DescribeCommandTests : IDisposable
         }
     }
 
-    // CREATE ROLE and CREATE DATABASE have no IF NOT EXISTS, and the container outlives the test.
+    // The role's text asks the catalog itself; CREATE DATABASE cannot run in a DO block, so the catalog is asked here.
     private async Task CreateLogRoleAndDatabaseAsync()
     {
-        if (await _postgres.ScalarAsync($"SELECT count(*) FROM pg_catalog.pg_roles WHERE rolname = '{LogRole}'") is 0L)
-        {
-            await _postgres.ExecuteAsync($"CREATE ROLE {LogRole} LOGIN PASSWORD '{Secrets.Marker}'");
-        }
-
+        await _postgres.ExecuteAsync(ScratchSchema.LogRole);
         if (
-            await _postgres.ScalarAsync($"SELECT count(*) FROM pg_catalog.pg_database WHERE datname = '{LogDatabase}'")
+            await _postgres.ScalarAsync(
+                $"SELECT count(*) FROM pg_catalog.pg_database WHERE datname = '{ScratchSchema.LogDatabaseName}'"
+            )
             is 0L
         )
         {
-            await _postgres.ExecuteAsync($"CREATE DATABASE {LogDatabase} OWNER {LogRole}");
+            await _postgres.ExecuteAsync(ScratchSchema.LogDatabase);
         }
     }
 }

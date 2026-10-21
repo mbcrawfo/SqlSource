@@ -270,8 +270,7 @@ internal static class ProjectEvaluator
         CancellationToken cancellationToken
     )
     {
-        // The dotnet that started the tool, when it said which; else the one on the path.
-        var dotnet = host.GetEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } path ? path : "dotnet";
+        var dotnet = DotnetOf(host.GetEnvironmentVariable);
 
         // The project's folder, so that the project's own global.json picks the SDK.
         var workingDirectory = Path.GetDirectoryName(project) ?? host.WorkingDirectory;
@@ -280,6 +279,10 @@ internal static class ProjectEvaluator
             cancellationToken
         );
     }
+
+    // The dotnet that started the tool, when it said which; else the one on the path.
+    internal static string DotnetOf(Func<string, string?> getEnvironmentVariable) =>
+        getEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } path ? path : "dotnet";
 
     // What "dotnet build" of the solution gives each project.  A project that imports a file through
     // $(SolutionDir) evaluates with these as it does in a build.

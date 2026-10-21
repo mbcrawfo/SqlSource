@@ -8,6 +8,7 @@
 set -euo pipefail
 
 PROJECT='tests/SqlSource.Tests.Postgres'
+IMAGES='tests/SqlSource.Testing/DefaultImages.cs'
 CASES='tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres'
 TESTS='SqlSource.Tests.Postgres.Describer.FixtureCasesTests'
 
@@ -20,7 +21,11 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 # The default image is named in one place, which is read here and not repeated.
-default_image="$(sed -n 's/.*DefaultImage = "\(.*\)";.*/\1/p' "$PROJECT/PostgresContainer.cs")"
+default_image="$(sed -n 's/.*const string Postgres = "\(.*\)";.*/\1/p' "$IMAGES")"
+if [[ -z "$default_image" ]]; then
+    echo "$IMAGES has no line that declares Postgres as a string." >&2
+    exit 1
+fi
 image="${SQLSOURCE_TESTS_POSTGRES_IMAGE:-$default_image}"
 # A case is every folder of the engine's, as the test finds them: one with no query.sql fails its test, and the
 # recording.

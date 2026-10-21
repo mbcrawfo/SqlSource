@@ -1,7 +1,7 @@
 using System;
 using System.Globalization;
 
-namespace SqlSource.Tool.Tests;
+namespace SqlSource.Tool.Testing;
 
 // A clock that stands still until a test moves it, so that a time and a duration in a log are exact.
 internal sealed class TestClock : TimeProvider

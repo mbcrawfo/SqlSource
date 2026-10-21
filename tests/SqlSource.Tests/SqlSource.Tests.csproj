@@ -57,12 +57,6 @@
         <PackageReference Include="xunit.v3" />
     </ItemGroup>
     <ItemGroup>
-        <!-- Diagnostics/DiagnosticsDocumentTests.cs reads the document from the output folder. -->
-        <None
-            Include="../../docs/manual/diagnostics.md"
-            Link="docs/manual/diagnostics.md"
-            CopyToOutputDirectory="PreserveNewest"
-        />
         <!-- Snapshot/SidecarExamples.cs reads the examples of the sidecar format design from the output folder. -->
         <None Update="Snapshot/Examples/*.json" CopyToOutputDirectory="PreserveNewest" />
         <!-- Snapshot/SidecarSchemaTests.cs reads the schema from the output folder. -->
