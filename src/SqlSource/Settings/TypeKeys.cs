@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 
 namespace SqlSource.Settings;
 
@@ -13,6 +15,9 @@ namespace SqlSource.Settings;
 internal static class TypeKeys
 {
     private const string SystemSchema = "pg_catalog";
+
+    // The start of a part in the escaped form, with the U in either case.
+    private const string EscapedOpening = "U&\"";
 
     private static readonly Dictionary<string, string> Extensions = NamesOf(
         "citext",
@@ -138,8 +143,12 @@ internal static class TypeKeys
 
     /// <summary>
     /// Reads a key, <c>[part "."] part ["[]"]</c>, where a part is plain, letters, digits, <c>_</c> and <c>$</c>, or
-    /// quoted, in double quotes with <c>""</c> for a quote, which can hold any character and keeps its case.  Returns
-    /// false for anything else, with an empty <paramref name="normalized" />.
+    /// quoted, in double quotes with <c>""</c> for a quote, which can hold any character and keeps its case.  A
+    /// quoted part may be written in PostgreSQL's Unicode-escape form, <c>U&amp;"a\000Ab"</c>, where <c>\\</c> is a
+    /// backslash, <c>\XXXX</c> and <c>\+XXXXXX</c> are the character with that hex code, and a character outside the
+    /// BMP is either one escape or the two of its surrogates; it has no <c>UESCAPE</c> clause.  It holds the same text
+    /// as the part in plain quotes, so it is a key by the same rules, and an escape that is not valid makes the key not
+    /// valid.  Returns false for anything else, with an empty <paramref name="normalized" />.
     /// <para>
     /// An unqualified part must be a name the base map knows, an alias of one, or <c>_</c> and a name it knows, and
     /// is given as the name in lower case: <c>integer[]</c> gives <c>int4[]</c>.  A quoted one must hold the name
@@ -165,6 +174,11 @@ internal static class TypeKeys
     /// type of another schema may be named with a <c>_</c>, and the lookup finds an array outside <c>pg_catalog</c>
     /// by its element's key alone.
     /// </para>
+    /// <para>
+    /// An escaped part is read as the quoted part of its text, and where a quoted part is kept as written it is given
+    /// in the quoted form <see cref="WritePart" /> writes for its text, so <c>public.U&amp;"st\0061tus"</c> gives
+    /// <c>public."status"</c> and <c>public.U&amp;"a\000ab"</c> gives <c>public.U&amp;"a\000Ab"</c>.
+    /// </para>
     /// </summary>
     public static bool TryNormalize(ReadOnlySpan<char> key, out string normalized)
     {
@@ -183,7 +197,7 @@ internal static class TypeKeys
 
         if (!IsSystemSchema(schema))
         {
-            normalized = key.ToString();
+            normalized = IsEscaped(schema) || IsEscaped(name) ? Rewrite(schema, name, isArray) : key.ToString();
         }
         else if (IsQuoted(name))
         {
@@ -216,9 +230,10 @@ internal static class TypeKeys
 
     /// <summary>
     /// Splits a key as it is written, which is what <see cref="TryNormalize" /> gives and <see cref="WritePart" />
-    /// builds, into its parts, quotes included: <c>"a.b".c[]</c> gives <c>"a.b"</c>, <c>c</c> and true.
-    /// <paramref name="schema" /> is empty for an unqualified key.  Returns false for text that is not
-    /// <c>[part "."] part ["[]"]</c>, the grammar of <see cref="TryNormalize" />.
+    /// builds, into its parts, quotes included: <c>"a.b".c[]</c> gives <c>"a.b"</c>, <c>c</c> and true, and
+    /// <c>U&amp;"a.b".c</c> gives <c>U&amp;"a.b"</c>, whose escapes are checked here.  <paramref name="schema" /> is
+    /// empty for an unqualified key.  Returns false for text that is not <c>[part "."] part ["[]"]</c>, the grammar of
+    /// <see cref="TryNormalize" />.
     /// </summary>
     public static bool TrySplit(
         ReadOnlySpan<char> key,
@@ -255,12 +270,17 @@ internal static class TypeKeys
         return isArray || rest.IsEmpty;
     }
 
-    /// <summary>Whether <paramref name="part" />, as <see cref="TrySplit" /> gives it, is in quotes.</summary>
-    public static bool IsQuoted(ReadOnlySpan<char> part) => !part.IsEmpty && part[0] == '"';
+    /// <summary>
+    /// Whether <paramref name="part" />, as <see cref="TrySplit" /> gives it, is in quotes: <c>"x"</c>, or
+    /// <c>U&amp;"x"</c> in the escaped form, with <c>u</c> allowed.
+    /// </summary>
+    public static bool IsQuoted(ReadOnlySpan<char> part) => (!part.IsEmpty && part[0] == '"') || IsEscaped(part);
 
     /// <summary>
     /// The text of <paramref name="part" />, as <see cref="TrySplit" /> gives it, without the quotes of a quoted one
-    /// and with each <c>""</c> in it a single <c>"</c>.  Allocates only for a part that holds <c>""</c>.
+    /// and with each <c>""</c> in it a single <c>"</c>, and each escape of an escaped one the character it names.
+    /// Allocates only for a part that holds <c>""</c>, or <c>\</c> in an escaped one.  A <c>\</c> that is not a valid
+    /// escape, which <see cref="TrySplit" /> does not give, is kept as a character.
     /// </summary>
     public static ReadOnlySpan<char> TextOf(ReadOnlySpan<char> part)
     {
@@ -269,22 +289,47 @@ internal static class TypeKeys
             return part;
         }
 
-        var inside = part.Slice(1, part.Length - 2);
-        if (inside.IndexOf('"') < 0)
+        var isEscaped = IsEscaped(part);
+        var opening = isEscaped ? EscapedOpening.Length : 1;
+        if (part.Length <= opening)
+        {
+            return default;
+        }
+
+        var inside = part.Slice(opening, part.Length - opening - 1);
+        if (inside.IndexOf('"') < 0 && (!isEscaped || inside.IndexOf('\\') < 0))
         {
             return inside;
         }
 
-        // The span is over the one array that is made, so the text costs a single allocation.
+        // The span is over the one array that is made, so the text costs a single allocation.  No step writes more
+        // characters than it reads, so the text is never longer than the inside.
         var text = new char[inside.Length];
         var length = 0;
         var index = 0;
         while (index < inside.Length)
         {
-            text[length++] = inside[index];
+            var character = inside[index];
+            if (
+                isEscaped
+                && character == '\\'
+                && TryReadEscape(inside, index, out var first, out var second, out var next)
+            )
+            {
+                text[length++] = first;
+                if (second != '\0')
+                {
+                    text[length++] = second;
+                }
+
+                index = next;
+                continue;
+            }
+
+            text[length++] = character;
 
             // A quote is doubled in a part that is well formed, and the second of the two is skipped.
-            index += inside[index] == '"' ? 2 : 1;
+            index += character == '"' ? 2 : 1;
         }
 
         return new ReadOnlySpan<char>(text, 0, length);
@@ -293,13 +338,83 @@ internal static class TypeKeys
     /// <summary>
     /// Writes <paramref name="text" /> as a part of a key: as it is when it is not empty and holds only letters,
     /// digits, <c>_</c> and <c>$</c>, none of them upper case, since a plain part is read in lower case; otherwise in
-    /// double quotes with each <c>"</c> doubled.
+    /// double quotes with each <c>"</c> doubled, or in the escaped form when the quotes would not keep it.  A value
+    /// written in MSBuild is trimmed, and the compiler cuts it at <c>;</c> and <c>#</c>, and a marker is one line, so
+    /// a text with a control character other than NUL, a white space other than a lone space, a <c>;</c> or a
+    /// <c>#</c> is written <c>U&amp;"a\000Ab"</c>, with <c>\XXXX</c> for each such character, <c>\\</c> for a
+    /// <c>\</c> and <c>""</c> for a <c>"</c>.  A NUL stays as it is: a PostgreSQL name cannot hold it, and
+    /// <c>\0000</c> is no escape.
     /// </summary>
     public static string WritePart(string text)
     {
         var isPlain = text.Length > 0 && text.All(character => IsPlainCharacter(character) && !char.IsUpper(character));
-        return isPlain ? text : "\"" + text.Replace("\"", "\"\"") + "\"";
+        return isPlain ? text : Quote(text);
     }
+
+    // A part in double quotes, with each quote doubled, or in the escaped form when the quotes would not keep it.
+    private static string Quote(string text)
+    {
+        if (!NeedsEscape(text))
+        {
+            return "\"" + text.Replace("\"", "\"\"") + "\"";
+        }
+
+        var written = new StringBuilder(EscapedOpening, text.Length + EscapedOpening.Length + 8);
+        for (var index = 0; index < text.Length; index++)
+        {
+            var character = text[index];
+            if (MustEscape(text, index))
+            {
+                _ = written.Append('\\').Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
+            }
+            else if (character is '\\' or '"')
+            {
+                _ = written.Append(character).Append(character);
+            }
+            else
+            {
+                _ = written.Append(character);
+            }
+        }
+
+        return written.Append('"').ToString();
+    }
+
+    private static bool NeedsEscape(string text)
+    {
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (MustEscape(text, index))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // A character that a quoted part would not keep: the trim reads any white space but U+0020 as a space and a run
+    // of them as one, the compiler cuts at ; and #, and a control character may end the line, but a NUL, which no
+    // PostgreSQL name holds and \0000 cannot write.
+    private static bool MustEscape(string text, int index)
+    {
+        var character = text[index];
+        return (character != '\0' && char.IsControl(character))
+            || (char.IsWhiteSpace(character) && character != ' ')
+            || (character == ' ' && index > 0 && text[index - 1] == ' ')
+            || character is ';' or '#';
+    }
+
+    // A qualified key as written, except that an escaped part is in the quoted form of its text.
+    private static string Rewrite(ReadOnlySpan<char> schema, ReadOnlySpan<char> name, bool isArray)
+    {
+        var key = AsWritten(schema) + "." + AsWritten(name);
+        return isArray ? key + "[]" : key;
+    }
+
+    // A part as a key keeps it: as written, except that an escaped one is in the quoted form of its text.
+    private static string AsWritten(ReadOnlySpan<char> part) =>
+        IsEscaped(part) ? Quote(TextOf(part).ToString()) : part.ToString();
 
     private static bool TryNormalizePlain(string text, bool isArray, out string normalized)
     {
@@ -354,13 +469,13 @@ internal static class TypeKeys
             // With [], the catalog's name is kept with its _, as a plain one is.
             if (isArray)
             {
-                return isKnownElement ? "_" + knownElement + "[]" : name.ToString() + "[]";
+                return isKnownElement ? "_" + knownElement + "[]" : AsWritten(name) + "[]";
             }
 
             return (isKnownElement ? knownElement : WritePart(ofElement)) + "[]";
         }
 
-        return isArray ? name.ToString() + "[]" : name.ToString();
+        return isArray ? AsWritten(name) + "[]" : AsWritten(name);
     }
 
     private static bool TryGetExactName(string text, out string known) =>
@@ -378,8 +493,9 @@ internal static class TypeKeys
         return part.Length > 1 && part[0] == '_' && Names.TryGetValue(part.Substring(1), out element);
     }
 
-    // Reads the part that starts at start, plain or quoted, and gives the index after it.  A quoted part holds at least
-    // one character, and ends at the first quote that is not doubled.
+    // Reads the part that starts at start, plain, quoted or escaped, and gives the index after it.  A quoted part holds
+    // at least one character, and ends at the first quote that is not doubled; an escaped one holds only escapes that
+    // TryReadEscape reads.
     private static bool TryReadPart(ReadOnlySpan<char> key, int start, out int end)
     {
         end = start;
@@ -388,7 +504,8 @@ internal static class TypeKeys
             return false;
         }
 
-        if (key[start] != '"')
+        var isEscaped = IsEscaped(key.Slice(start));
+        if (key[start] != '"' && !isEscaped)
         {
             while (end < key.Length && IsPlainCharacter(key[end]))
             {
@@ -398,10 +515,18 @@ internal static class TypeKeys
             return end > start;
         }
 
-        end = start + 1;
+        var opening = isEscaped ? start + EscapedOpening.Length - 1 : start;
+        end = opening + 1;
         while (end < key.Length)
         {
-            if (key[end] != '"')
+            if (isEscaped && key[end] == '\\')
+            {
+                if (!TryReadEscape(key, end, out _, out _, out end))
+                {
+                    return false;
+                }
+            }
+            else if (key[end] != '"')
             {
                 end++;
             }
@@ -412,12 +537,107 @@ internal static class TypeKeys
             else
             {
                 end++;
-                return end - start > 2;
+                return end - opening > 2;
             }
         }
 
         return false;
     }
+
+    // Whether the part starts as the escaped form does, U&" in either case of the U.
+    private static bool IsEscaped(ReadOnlySpan<char> part) =>
+        part.Length >= EscapedOpening.Length && part[0] is 'U' or 'u' && part[1] == '&' && part[2] == '"';
+
+    // Reads the escape at text[at], a backslash that is followed by a second one, by 4 hex digits, or by + and 6.  A
+    // character outside the BMP is given as its surrogates, in first and second, and a high surrogate must be followed
+    // at once by an escape of a low one.  The second is '\0' for a single character, which no escape can name.  next is
+    // the index after what was read.
+    private static bool TryReadEscape(ReadOnlySpan<char> text, int at, out char first, out char second, out int next)
+    {
+        first = '\0';
+        second = '\0';
+        if (!TryReadCodePoint(text, at, out var codePoint, out next))
+        {
+            return false;
+        }
+
+        if (codePoint is >= 0xDC00 and <= 0xDFFF)
+        {
+            return false;
+        }
+
+        if (codePoint is >= 0xD800 and <= 0xDBFF)
+        {
+            // The high surrogate waits for its low one.
+            if (!TryReadCodePoint(text, next, out var low, out next) || low is < 0xDC00 or > 0xDFFF)
+            {
+                return false;
+            }
+
+            first = (char)codePoint;
+            second = (char)low;
+            return true;
+        }
+
+        if (codePoint > 0xFFFF)
+        {
+            first = (char)(0xD800 + ((codePoint - 0x10000) >> 10));
+            second = (char)(0xDC00 + ((codePoint - 0x10000) & 0x3FF));
+            return true;
+        }
+
+        first = (char)codePoint;
+        return true;
+    }
+
+    // Reads one escape to its code point, from U+0001 to U+10FFFF, a surrogate included.
+    private static bool TryReadCodePoint(ReadOnlySpan<char> text, int at, out int codePoint, out int next)
+    {
+        codePoint = 0;
+        next = at;
+        if (at >= text.Length || text[at] != '\\' || at + 1 >= text.Length)
+        {
+            return false;
+        }
+
+        if (text[at + 1] == '\\')
+        {
+            codePoint = '\\';
+            next = at + 2;
+            return true;
+        }
+
+        var isLong = text[at + 1] == '+';
+        var start = at + (isLong ? 2 : 1);
+        var digits = isLong ? 6 : 4;
+        if (start + digits > text.Length)
+        {
+            return false;
+        }
+
+        for (var index = start; index < start + digits; index++)
+        {
+            var value = HexValue(text[index]);
+            if (value < 0)
+            {
+                return false;
+            }
+
+            codePoint = (codePoint << 4) | value;
+        }
+
+        next = start + digits;
+        return codePoint is >= 1 and <= 0x10FFFF;
+    }
+
+    private static int HexValue(char character) =>
+        character switch
+        {
+            >= '0' and <= '9' => character - '0',
+            >= 'a' and <= 'f' => character - 'a' + 10,
+            >= 'A' and <= 'F' => character - 'A' + 10,
+            _ => -1,
+        };
 
     private static bool IsPlainCharacter(char character) => char.IsLetterOrDigit(character) || character is '_' or '$';
 

@@ -13,7 +13,9 @@ namespace SqlSource.Settings;
 /// <remarks>
 /// An MSBuild value is a list of entries separated by white space, line breaks included, outside <c>&lt;&gt;</c>,
 /// <c>[]</c> and double quotes.  A marker holds one entry, with white space allowed around its <c>=</c>.  The
-/// <c>=</c> of an entry is the first one outside double quotes.
+/// <c>=</c> of an entry is the first one outside double quotes.  A quoted part of a key may be written
+/// <c>U&amp;"..."</c>, with escapes such as <c>\000A</c> for a line break; it keeps <c>""</c> for a quote, so the
+/// quotes of a key still pair, and <see cref="TypeKeys" /> reads it.
 /// </remarks>
 internal static class TypeOverrideGrammar
 {

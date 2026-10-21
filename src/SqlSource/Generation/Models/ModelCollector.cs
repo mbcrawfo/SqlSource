@@ -83,7 +83,11 @@ internal static class ModelCollector
     {
         if (groups.Count == 0)
         {
-            return new ModelSet(EquatableArray<Model>.Empty, EquatableArray<DiagnosticInfo>.Empty);
+            return new ModelSet(
+                EquatableArray<Model>.Empty,
+                EquatableArray<ModelPlace>.Empty,
+                EquatableArray<DiagnosticInfo>.Empty
+            );
         }
 
         var names = new Names(groups, taken);
@@ -146,16 +150,18 @@ internal static class ModelCollector
             }
         }
 
-        return new ModelSet(Models(emitted), new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()));
+        var (models, places) = Models(emitted);
+        return new ModelSet(models, places, new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable()));
     }
 
-    private static EquatableArray<Model> Models(
+    private static (EquatableArray<Model> Models, EquatableArray<ModelPlace> Places) Models(
         List<(ModelRequest First, List<ModelRequest> Joined, bool IsPublic)> emitted
     )
     {
         var hintNames = emitted.Select(static model => HintName.ForModel(model.First.FullName)).ToImmutableArray();
         var ambiguous = HintName.FindAmbiguous(hintNames);
         var models = ImmutableArray.CreateBuilder<Model>(emitted.Count);
+        var places = ImmutableArray.CreateBuilder<ModelPlace>(emitted.Count);
         var text = new StringBuilder();
         for (var index = 0; index < emitted.Count; index++)
         {
@@ -173,9 +179,20 @@ internal static class ModelCollector
                     joined.Exists(static request => request.Properties.Any(static property => property.IsArray))
                 )
             );
+            places.Add(
+                new ModelPlace(
+                    first.Source.NormalizedPath,
+                    first.Source.QueryIndex,
+                    first.Role,
+                    first.Source.ClaimingType
+                )
+            );
         }
 
-        return new EquatableArray<Model>(models.MoveToImmutable());
+        return (
+            new EquatableArray<Model>(models.MoveToImmutable()),
+            new EquatableArray<ModelPlace>(places.MoveToImmutable())
+        );
     }
 
     // The first difference of the later request from the first, as SQLSRC257 words it, or null when they give one

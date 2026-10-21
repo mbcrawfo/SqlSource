@@ -1,4 +1,5 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -22,6 +23,10 @@ internal static class SqlPath
     public const string SidecarExtension = SqlExtension + SidecarFormat.Extension;
 
     private const char Separator = '/';
+
+    private const byte Once = 1;
+
+    private const byte Twice = 2;
 
     private static readonly char[] Separators = [Separator, '\\'];
 
@@ -148,6 +153,60 @@ internal static class SqlPath
     /// </summary>
     public static int IndexOf<T>(EquatableArray<T> sortedItems, string normalizedPath, Func<T, string> getPath)
         where T : IEquatable<T> => SortedSearch.IndexOf(sortedItems, normalizedPath, getPath, Comparer);
+
+    /// <summary>
+    /// The paths of <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, that more than one
+    /// of <paramref name="files" /> has, ignoring case, in the same order and spelled as there.  A file the project
+    /// lists twice under one spelling counts twice.
+    /// </summary>
+    /// <remarks>
+    /// This runs whenever the project's list of files changes and almost never finds anything, so it is a search for
+    /// each file and allocates nothing until it finds a path.
+    /// </remarks>
+    public static EquatableArray<string> FindRepeated(
+        ImmutableArray<SqlFilePath> files,
+        EquatableArray<string> sortedPaths
+    )
+    {
+        // Whether each path has been seen, then whether it has been seen twice, by its index.
+        var seen = ArrayPool<byte>.Shared.Rent(sortedPaths.Count);
+        try
+        {
+            Array.Clear(seen, 0, sortedPaths.Count);
+            ImmutableArray<string>.Builder? repeated = null;
+            foreach (var file in files)
+            {
+                var index = IndexOf(sortedPaths, file.NormalizedPath, static path => path);
+                if (index < 0 || seen[index] == Twice)
+                {
+                    continue;
+                }
+
+                if (seen[index] == Once)
+                {
+                    seen[index] = Twice;
+                    (repeated ??= ImmutableArray.CreateBuilder<string>()).Add(sortedPaths[index]);
+                }
+                else
+                {
+                    seen[index] = Once;
+                }
+            }
+
+            if (repeated is null)
+            {
+                return EquatableArray<string>.Empty;
+            }
+
+            // The files are in the project's order, and the paths are wanted in theirs.
+            repeated.Sort(Comparer);
+            return new EquatableArray<string>(repeated.ToImmutable());
+        }
+        finally
+        {
+            ArrayPool<byte>.Shared.Return(seen);
+        }
+    }
 
     /// <summary>
     /// The paths of <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, that are files of
