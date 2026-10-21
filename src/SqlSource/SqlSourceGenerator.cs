@@ -64,7 +64,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             settings.ProjectLevel
         );
         var models = CollectModels(context, typing.Files, typeQueries, settings.ProjectLevel);
-        ReportDriver(context, typing.NpgsqlProbe, sidecars.Needs, parsedFiles.Sorted);
+        ReportDrivers(context, typing.NpgsqlProbe, typing.SqlClientProbe, sidecars.Needs, parsedFiles.Sorted);
         ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
         RegisterModelSources(context, models.Models, parsedFiles.EachFile, claims.RepeatedPaths);
         RegisterTypeSources(context, typeQueries, settings.ProjectLevel);
@@ -401,7 +401,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return new CheckedSidecars(fileNeeds, sidecarChecks);
     }
 
-    // The C# types of each claimed file's usable entries, with the Npgsql and the mapped types they depend on.
+    // The C# types of each claimed file's usable entries, with the drivers and the mapped types they depend on.
     private static TypedFiles TypeFiles(
         IncrementalGeneratorInitializationContext context,
         FileNodes<SidecarCheckResult> sidecarChecks,
@@ -416,6 +416,12 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         var npgsqlProbe = context
             .CompilationProvider.Select(static (compilation, _) => NpgsqlProbe.Read(compilation))
             .WithTrackingName(TrackingNames.NpgsqlProbe);
+
+        // The Microsoft.Data.SqlClient the project references, the same way, which chooses the column of the SQL
+        // Server map.
+        var sqlClientProbe = context
+            .CompilationProvider.Select(static (compilation, _) => SqlClientProbe.Read(compilation))
+            .WithTrackingName(TrackingNames.SqlClientProbe);
 
         // The C# types that the type override names at any level, as a sorted list of their names, which an edit that
         // leaves the names alone gives again, equal.
@@ -465,7 +471,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             each.Select(static (file, _) => file.Types).WithTrackingName(TrackingNames.FileTypes)
         );
 
-        return new TypedFiles(npgsqlProbe, typedFiles, fileTypes);
+        return new TypedFiles(npgsqlProbe, sqlClientProbe, typedFiles, fileTypes);
     }
 
     // Each file's models, and the models every type's requests come to, checked against each other and the project.
@@ -531,48 +537,80 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return new CollectedModels(fileModels, models);
     }
 
-    // Whether the Npgsql the project references is too old or newer than known, if a query needs an entry of postgres.
-    private static void ReportDriver(
+    // Whether the Npgsql and the Microsoft.Data.SqlClient the project references are too old or newer than known, each
+    // reported if a query needs an entry of the driver's own engine, and independently of the other.
+    private static void ReportDrivers(
         IncrementalGeneratorInitializationContext context,
         IncrementalValueProvider<NpgsqlProbe> npgsqlProbe,
+        IncrementalValueProvider<SqlClientProbe> sqlClientProbe,
         IncrementalValueProvider<EquatableArray<FileNeeds>> fileNeeds,
         IncrementalValueProvider<EquatableArray<ParsedSqlFile>> parsedFiles
     )
     {
-        // Whether a query of the project needs an entry of postgres, whose types the driver decides.  Without one, the
+        // Whether a query of the project needs an entry of an engine, whose types the driver decides.  Without one, the
         // driver is not reported on.
-        var usesPostgresEntries = fileNeeds
-            .Combine(parsedFiles)
-            .Select(static (input, _) => UsesPostgresEntries(input.Left, input.Right))
+        var filesWithNeeds = fileNeeds.Combine(parsedFiles);
+        var usesPostgresEntries = filesWithNeeds
+            .Select(static (input, _) => UsesEntriesOf(input.Left, input.Right, SqlDialect.PostgreSql))
             .WithTrackingName(TrackingNames.UsesPostgresEntries);
+        var usesSqlServerEntries = filesWithNeeds
+            .Select(static (input, _) => UsesEntriesOf(input.Left, input.Right, SqlDialect.SqlServer))
+            .WithTrackingName(TrackingNames.UsesSqlServerEntries);
 
         // Not located, and once for the project, however many of its queries need the driver.
         context.RegisterSourceOutput(
             npgsqlProbe.Combine(usesPostgresEntries),
             static (output, input) =>
-            {
-                if (!input.Right)
-                {
-                    return;
-                }
-
-                var probe = input.Left;
-
-                if (probe.IsBelowTheFloor)
-                {
-                    output.ReportDiagnostic(
-                        Diagnostic.Create(SqlDiagnostics.NpgsqlTooOld, Location.None, probe.VersionText)
-                    );
-                }
-
-                if (probe.IsNewerThanKnown)
-                {
-                    output.ReportDiagnostic(
-                        Diagnostic.Create(SqlDiagnostics.NpgsqlNewerThanKnown, Location.None, probe.VersionText)
-                    );
-                }
-            }
+                ReportDriver(
+                    output,
+                    input.Right,
+                    input.Left.IsBelowTheFloor,
+                    input.Left.IsNewerThanKnown,
+                    input.Left.VersionText,
+                    SqlDiagnostics.NpgsqlTooOld,
+                    SqlDiagnostics.NpgsqlNewerThanKnown
+                )
         );
+        context.RegisterSourceOutput(
+            sqlClientProbe.Combine(usesSqlServerEntries),
+            static (output, input) =>
+                ReportDriver(
+                    output,
+                    input.Right,
+                    input.Left.IsBelowTheFloor,
+                    input.Left.IsNewerThanKnown,
+                    input.Left.VersionText,
+                    SqlDiagnostics.SqlClientTooOld,
+                    SqlDiagnostics.SqlClientNewerThanKnown
+                )
+        );
+    }
+
+    // The diagnostics of one driver, if a query needs an entry of its engine.
+    private static void ReportDriver(
+        SourceProductionContext output,
+        bool usesEntries,
+        bool isBelowTheFloor,
+        bool isNewerThanKnown,
+        string versionText,
+        DiagnosticDescriptor tooOld,
+        DiagnosticDescriptor newerThanKnown
+    )
+    {
+        if (!usesEntries)
+        {
+            return;
+        }
+
+        if (isBelowTheFloor)
+        {
+            output.ReportDiagnostic(Diagnostic.Create(tooOld, Location.None, versionText));
+        }
+
+        if (isNewerThanKnown)
+        {
+            output.ReportDiagnostic(Diagnostic.Create(newerThanKnown, Location.None, versionText));
+        }
     }
 
     // The problems of each file's sidecar, types and models, and of the models, each from a node of its own.
@@ -747,13 +785,18 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return invalid.Dialects;
     }
 
-    // A search for each file with needs, so that the cost does not grow with the files that have none.
-    private static bool UsesPostgresEntries(EquatableArray<FileNeeds> fileNeeds, EquatableArray<ParsedSqlFile> files)
+    // Whether a file with needs is read as this dialect.  A search for each file with needs, so that the cost does not
+    // grow with the files that have none.
+    private static bool UsesEntriesOf(
+        EquatableArray<FileNeeds> fileNeeds,
+        EquatableArray<ParsedSqlFile> files,
+        SqlDialect dialect
+    )
     {
         foreach (var needs in fileNeeds)
         {
             var index = SqlPath.IndexOf(files, needs.NormalizedPath, static file => file.NormalizedPath);
-            if (index >= 0 && files[index].Dialect == SqlDialect.PostgreSql)
+            if (index >= 0 && files[index].Dialect == dialect)
             {
                 return true;
             }
@@ -849,9 +892,10 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         FileNodes<SidecarCheckResult> Checks
     );
 
-    // The Npgsql the project references, each claimed file typed, and its types alone.
+    // The drivers the project references, each claimed file typed, and its types alone.
     private readonly record struct TypedFiles(
         IncrementalValueProvider<NpgsqlProbe> NpgsqlProbe,
+        IncrementalValueProvider<SqlClientProbe> SqlClientProbe,
         FileNodes<TypedFile> Files,
         FileNodes<FileTypes> FileTypes
     );

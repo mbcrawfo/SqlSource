@@ -1,6 +1,6 @@
 # Diagnostics
 
-Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and one message of information about the version of Npgsql, [SQLSRC248](#sqlsrc248).  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) says.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 119, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: the query's constant or method is still generated.  An error in a sidecar is reported at its line and column in the sidecar.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
+Every problem SqlSource finds is an error, and none can be turned off or made a warning, except two warnings about a sidecar that a project can configure, [SQLSRC240](#sqlsrc240) and [SQLSRC245](#sqlsrc245), and two messages of information about the version of a database driver, [SQLSRC248](#sqlsrc248) for Npgsql and [SQLSRC268](#sqlsrc268) for Microsoft.Data.SqlClient.  The generator reports its errors and warnings in the build's output.  Its information is not in the output of `dotnet build`: an IDE that lists information shows it, and the build log has it at the detailed verbosity, as [SQLSRC248](#sqlsrc248) and [SQLSRC268](#sqlsrc268) say.  An error in a `.sql` file is reported at its line and column in that file.  An error in how a `.sql` file is written, an id from 101 to 119, costs the file its members until it is fixed.  An error about describing a query or about its sidecar, such as [SQLSRC209](#sqlsrc209) or [SQLSRC241](#sqlsrc241), leaves them in place: the query's constant or method is still generated.  An error in a sidecar is reported at its line and column in the sidecar.  The `sqlsource` command-line tool prints its errors itself, in the format of a build error, and ends each with a `see:` line that links to its section here; the samples on this page leave that line out.
 
 **Project and attribute**
 
@@ -141,6 +141,13 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC261](#sqlsrc261) | Entry names an array as the catalog does |
 
+**The C# types of a SQL Server query**
+
+| Id | Title |
+|----|----|
+| [SQLSRC267](#sqlsrc267) | Microsoft.Data.SqlClient is older than 6.1 |
+| [SQLSRC268](#sqlsrc268) | Microsoft.Data.SqlClient is newer than SqlSource knows |
+
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236 are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
 The ids from `SQLSRC224` to `SQLSRC236` are the errors of describing a query against PostgreSQL, which this version of the tool does for the `postgres` dialect.  It reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
@@ -148,6 +155,8 @@ The ids from `SQLSRC224` to `SQLSRC236` are the errors of describing a query aga
 The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` dialect every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209), [SQLSRC210](#sqlsrc210) or [SQLSRC243](#sqlsrc243) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 119, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
 
 The ids `SQLSRC246` and `SQLSRC249` are reported by the build, about the C# types of a query whose output is `models` or `codegen` under the `postgres` dialect and whose entry in its sidecar is current.  Each column and parameter of the entry gets the C# type that Npgsql reads it as, which can depend on the version of Npgsql that the project references, or the type the type override maps its database type to.  Each is reported at the query's name, once for a query: for its first column or parameter that has no C# type, parameters before columns.
+
+The ids `SQLSRC267` and `SQLSRC268` are reported by the build, about the version of Microsoft.Data.SqlClient that the project references, whenever a query of the `mssql` dialect has the output `models` or `codegen`.  They have no file and line, and each is reported once for the project, however many of its queries read the driver.
 
 The ids `SQLSRC247` and `SQLSRC248` are reported by the build, about the version of the `Npgsql` package that the project references, directly or through another package.  The C# types of a PostgreSQL query depend on it.  Each is reported once for the project, with no file and line, and only when a query needs an entry in its sidecar under the `postgres` dialect.
 
@@ -1966,3 +1975,39 @@ The type override has an entry for the name the database gives an array type, an
 Rename the entry to the key the message gives: `public.user_status[]=System.Collections.Generic.List<string>`.  When the type override already has an entry for that key, remove the one the message names.  The query's constant or method is still generated.
 
 See: [Type overrides](settings.md#setting-type-overrides)
+
+## SQLSRC267
+
+**Microsoft.Data.SqlClient is older than 6.1**
+
+The project references a version of Microsoft.Data.SqlClient older than 6.1, and SqlSource gives the queries of the `mssql` dialect the C# types of Microsoft.Data.SqlClient 6.1 and later.  The message names the version the project references.
+
+```console
+CSC : error SQLSRC267: This project references Microsoft.Data.SqlClient 6.0.5, and SqlSource needs Microsoft.Data.SqlClient 6.1 or later.  Update the package.
+```
+
+Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  When another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1, so a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.
+
+See: [SQL Server](sqlserver.md)
+
+## SQLSRC268
+
+**Microsoft.Data.SqlClient is newer than SqlSource knows**
+
+The project references Microsoft.Data.SqlClient 8 or later, and this version of SqlSource knows the C# types of Microsoft.Data.SqlClient up to version 7.  It gives the queries of the `mssql` dialect the types that Microsoft.Data.SqlClient 7 reads, which are right unless the newer driver reads one of them as another type.  The message names the version the project references.
+
+```console
+info SQLSRC268: This project references Microsoft.Data.SqlClient 8.0.1, which is newer than this version of SqlSource knows.  Its models use the types of Microsoft.Data.SqlClient 7.
+```
+
+Update the `SqlSource` package when a version that knows the driver is released.  This is information, not a warning, so that a project that sets `TreatWarningsAsErrors` still builds on the day it updates Microsoft.Data.SqlClient.  A project can list it in `NoWarn` to hide it:
+
+```xml
+<PropertyGroup>
+    <NoWarn>$(NoWarn);SQLSRC268</NoWarn>
+</PropertyGroup>
+```
+
+It has no file and line, and is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.  As information, it is not in the output of `dotnet build`: see [SQLSRC248](#sqlsrc248) for where to find it.
+
+See: [SQL Server](sqlserver.md)

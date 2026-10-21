@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
         The helpers that the test projects share and that need nothing of the tool: the harness of the generator's
-        driver tests, the builder of a sidecar's records, the references to the drivers of Npgsql, and RepositoryRoot,
-        which finds the repository's folder.  A library of the tests, never a test project of its own.
+        driver tests, the builder of a sidecar's records, the references to the drivers of Npgsql and of
+        Microsoft.Data.SqlClient, and RepositoryRoot, which finds the repository's folder.  A library of the tests,
+        never a test project of its own.
     -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
@@ -26,6 +27,11 @@
             never load it.
         -->
         <PackageDownload Include="Npgsql" Version="[8.0.3];[9.0.3];[10.0.3]" />
+        <!--
+            The same for the probe of Microsoft.Data.SqlClient: the newest 6.0, which has no SqlVector, the newest 6.1
+            and the newest 7.
+        -->
+        <PackageDownload Include="Microsoft.Data.SqlClient" Version="[6.0.5];[6.1.7];[7.1.1]" />
         <AssemblyMetadata Include="NuGetPackageRoot" Value="$(NuGetPackageRoot)" />
     </ItemGroup>
     <ItemGroup>

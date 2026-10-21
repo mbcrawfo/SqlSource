@@ -700,6 +700,33 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor SqlClientTooOld = new(
+        id: "SQLSRC267",
+        title: "Microsoft.Data.SqlClient is older than 6.1",
+        messageFormat: "This project references Microsoft.Data.SqlClient {0}, and SqlSource needs "
+            + "Microsoft.Data.SqlClient 6.1 or later.  Update the package.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc267",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // Information a project may configure, not a warning, for the reason of SQLSRC248: the models of a newer
+    // Microsoft.Data.SqlClient use the types of Microsoft.Data.SqlClient 7, which are right unless the newer driver
+    // changed one, and a warning would break the build of every project that treats warnings as errors on the day it
+    // updates the driver.
+    public static readonly DiagnosticDescriptor SqlClientNewerThanKnown = new(
+        id: "SQLSRC268",
+        title: "Microsoft.Data.SqlClient is newer than SqlSource knows",
+        messageFormat: "This project references Microsoft.Data.SqlClient {0}, which is newer than this version of "
+            + "SqlSource knows.  Its models use the types of Microsoft.Data.SqlClient 7.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc268"
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -761,7 +788,9 @@ internal static class SqlDiagnostics
             ModelNameUnusable,
             OutputModelWithoutRows,
             ColumnMarkerUnusable,
-            ArrayEntryMapsNothing
+            ArrayEntryMapsNothing,
+            SqlClientTooOld,
+            SqlClientNewerThanKnown
         );
 
     /// <summary>
