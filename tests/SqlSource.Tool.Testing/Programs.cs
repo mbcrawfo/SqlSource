@@ -51,18 +51,6 @@ internal static class Programs
         return start;
     }
 
-    // Starts the tool in the working directory given, with the temporary directory given.
-    public static Process StartTool(string workingDirectory, string temp, params string[] arguments)
-    {
-        var start = ToolStart(workingDirectory, temp, arguments);
-        start.RedirectStandardOutput = true;
-        start.RedirectStandardError = true;
-        start.RedirectStandardInput = true;
-        var tool = Process.Start(start)!;
-        tool.StandardInput.Close();
-        return tool;
-    }
-
     // Runs the program to its end and gives what it wrote.  It reads both streams while the program runs, so that
     // neither fills and holds it, and gives the program no input.  whileRunning runs once the program has started.
     // A program that does not end within the patience, a test that is cancelled, and a whileRunning that fails each

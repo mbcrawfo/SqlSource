@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using SqlSource.Tool.Processes;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -14,9 +15,6 @@ namespace SqlSource.Tool.Tests;
 // counts as running.
 internal sealed class ProcessGate
 {
-    // How long a test waits for a request that does not come, before it fails.  No test passes by this time.
-    private static readonly TimeSpan Patience = TimeSpan.FromSeconds(30);
-
     private readonly Channel<ProcessRequest> _arrivals = Channel.CreateUnbounded<ProcessRequest>();
 
     // By the request itself and not by its value: two runs may ask the same.
@@ -28,7 +26,7 @@ internal sealed class ProcessGate
 
     // The next request that came and now waits, in the order they came.
     public async Task<ProcessRequest> ArrivalAsync() =>
-        await _arrivals.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(Patience);
+        await _arrivals.Reader.ReadAsync(TestContext.Current.CancellationToken).AsTask().WaitAsync(Eventually.Patience);
 
     // The next requests that came and now wait, as many as asked for.
     public async Task<ProcessRequest[]> ArrivalsAsync(int count)

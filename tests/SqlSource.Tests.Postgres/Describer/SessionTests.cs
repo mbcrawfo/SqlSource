@@ -106,7 +106,7 @@ public sealed class SessionTests(PostgresContainer postgres)
 
     // The exchange asks the server, so that the session's connection is open, and then fails.  The caller of the
     // session sees that exception, and the connection is not left behind: the server ends the backend when the
-    // driver closes it, which takes a moment, so it is asked until none is left or a few seconds have passed.
+    // driver closes it, which takes a moment, so it is asked until none is left.
     [Fact]
     public async Task OpenAsync_ExchangeThatThrowsAfterTheServerAnswered_RethrowsItAndLeavesNoConnection()
     {
@@ -129,14 +129,10 @@ public sealed class SessionTests(PostgresContainer postgres)
             1,
             "the session did not connect, so the count of none below proves nothing"
         );
-        var backends = await BackendsOfAsync(own, application, token);
-        for (var attempt = 0; backends > 0 && attempt < 100; attempt++)
-        {
-            await Task.Delay(TimeSpan.FromMilliseconds(50), token);
-            backends = await BackendsOfAsync(own, application, token);
-        }
-
-        backends.ShouldBe(0, "the failed session left its connection open");
+        await Eventually.TrueAsync(
+            async () => await BackendsOfAsync(own, application, token) == 0,
+            "the failed session left its connection open"
+        );
     }
 
     private static async Task<long> BackendsOfAsync(
