@@ -417,8 +417,8 @@ internal static class RunPlanner
         public string? File { get; set; }
     }
 
-    // Says which queries the filters take.  A file filter that names no planned file is SQLSRC212, and the run goes
-    // on.  Under --database a query that needs no entry is not selected: it belongs to no database.
+    // Says which queries the filters take.  A file filter that names no planned file, or no file at all, is SQLSRC212,
+    // and the run goes on.  Under --database a query that needs no entry is not selected: it belongs to no database.
     private static void Select(
         List<PlannedFile> files,
         RunFilters filters,
@@ -430,7 +430,10 @@ internal static class RunPlanner
             return;
         }
 
-        var named = new HashSet<string>(filters.Files.Select(static filter => filter.NormalizedPath), SqlPath.Comparer);
+        var named = new HashSet<string>(
+            filters.Files.Select(static filter => filter.NormalizedPath).OfType<string>(),
+            SqlPath.Comparer
+        );
         var planned = new HashSet<string>(files.Select(static file => file.NormalizedPath), SqlPath.Comparer);
         for (var index = 0; index < files.Count; index++)
         {
@@ -446,7 +449,7 @@ internal static class RunPlanner
 
         errors.AddRange(
             filters
-                .Files.Where(filter => !planned.Contains(filter.NormalizedPath))
+                .Files.Where(filter => filter.NormalizedPath is not { } path || !planned.Contains(path))
                 .Select(static filter => ToolDiagnostic.Create(ToolDiagnostics.FileNotInRun, filter.Named))
         );
     }

@@ -333,7 +333,7 @@ internal static class DescribeCommand
 
         return new DescribeOptions(
             ModeOf(parsed),
-            ValuesOf(usage, ProjectOption).Length > 0 || plan.Filters.NamesFiles || !plan.Filters.Databases.IsEmpty,
+            ValuesOf(usage, ProjectOption).Length > 0 || !plan.Filters.Files.IsEmpty || !plan.Filters.Databases.IsEmpty,
             connections.ToImmutable(),
             plan.Filters.Databases
         );

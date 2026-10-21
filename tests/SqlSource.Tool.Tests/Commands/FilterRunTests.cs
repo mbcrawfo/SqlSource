@@ -177,9 +177,9 @@ public sealed class FilterRunTests : IDisposable
     }
 
     // Outside Windows a backslash is no separator to Path.GetFullPath, so the path climbs above the root and names no
-    // file.  It selects nothing, as if it were not there, but the run is still one on a part.
+    // file.  It is reported and selects nothing, so a run with no other filter describes nothing and deletes nothing.
     [Fact]
-    public async Task Run_SqlPathThatNamesNoFile_KeepsTheSidecarOfAFileThatNeedsNoEntry()
+    public async Task Run_SqlPathThatClimbsAboveTheRoot_IsSqlsrc212AndDescribesNothing()
     {
         Assert.SkipWhen(OperatingSystem.IsWindows(), "Path.GetFullPath resolves a backslash's .. on Windows.");
         await File.WriteAllTextAsync(
@@ -187,13 +187,17 @@ public sealed class FilterRunTests : IDisposable
             "of a query that needed an entry once",
             TestContext.Current.CancellationToken
         );
+        var climbing = "a" + string.Concat(Enumerable.Repeat(@"\..", 64)) + @"\q.sql";
 
-        var result = await _scene.DescribeAsync(
-            "App.csproj",
-            "a" + string.Concat(Enumerable.Repeat(@"\..", 64)) + @"\q.sql"
+        var result = await _scene.DescribeAsync("App.csproj", climbing);
+
+        result.ExitCode.ShouldBe(1);
+        result.Error.ShouldContain(
+            $"sqlsource : error SQLSRC212: '{_scene.Run.Folder.PathOf(climbing)}' is not a .sql file that a type of "
+                + "the run claims\n"
         );
-
-        result.Out.ShouldContain("postgres (postgres): 1 described, 0 skipped, 0 failed\n");
+        result.Out.ShouldNotContain(" 1 described");
+        File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
         (await File.ReadAllTextAsync(SidecarFormat.PathFor(_plain), TestContext.Current.CancellationToken)).ShouldBe(
             "of a query that needed an entry once"
         );
