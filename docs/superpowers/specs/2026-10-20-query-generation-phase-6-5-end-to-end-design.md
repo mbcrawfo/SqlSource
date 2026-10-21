@@ -66,7 +66,7 @@ The types Dapper cannot send are listed as PostgreSQL's `WriteSideLeftOut` lists
 
 ### The script
 
-`tools/describe-end-to-end.sh` gains SQL Server's part: it reads `SqlServerContainer.DefaultImage` by its line shape, starts the container with the platform it needs on an arm64 host, waits for a query to answer, creates the databases and applies each file with the image's `sqlcmd` given `-I` and `-b`, deletes the project's SQL Server sidecars, and runs the tool as a project with `--connection app=...` and `--connection billing=...`, `TrustServerCertificate=True` in the value.  Each engine's part is a function, and the script runs both.  `tools/AGENTS.md`'s rule that the script applies the same files in the same order as the container class covers SQL Server's.
+`tools/describe-end-to-end.sh` gains SQL Server's part: it reads `DefaultImages.SqlServer` by its line shape, starts the container with the platform it needs on an arm64 host, waits for a query to answer, creates the databases and applies each file with the image's `sqlcmd` given `-I` and `-b`, deletes the project's SQL Server sidecars, and runs the tool as a project with `--connection app=...` and `--connection billing=...`, `TrustServerCertificate=True` in the value.  Each engine's part is a function, and the script runs both.  `tools/AGENTS.md`'s rule that the script applies the same files in the same order as the container class covers SQL Server's.
 
 ### The three kinds of test
 
@@ -76,7 +76,7 @@ The types Dapper cannot send are listed as PostgreSQL's `WriteSideLeftOut` lists
 
 ### The floor of SqlClient
 
-`tests/SqlSource.Tests.SqlServer.SqlClient61` references Microsoft.Data.SqlClient with `VersionOverride` at 6.1's last patch, Dapper, and the generator as an analyzer, and nothing that brings SqlClient 7: not the tool, not `SqlSource.Tool.Testing`.  It links the type table's `.sql` files and sidecars from the main project, the 2025-only `json` and `vector` one included, starts its own container on the default image, read from `SqlServerContainer.cs` by its line shape, builds only `app` with its 2025-only file, and reads both tables through Dapper into the models the generator gave it under the 6.1 column, so that every cell of 6.1's column is proven against the server.  It runs in the solution, on the default image.  `tests/README.md` documents it beside the Npgsql 8 project.
+`tests/SqlSource.Tests.SqlServer.SqlClient61` references Microsoft.Data.SqlClient with `VersionOverride` at 6.1's last patch, Dapper, and the generator as an analyzer, and nothing that brings SqlClient 7: not the tool, not `SqlSource.Tool.Testing`.  It links the type table's `.sql` files and sidecars from the main project, the 2025-only `json` and `vector` one included, starts its own container on the default image, `DefaultImages.SqlServer`, read by its line shape, builds only `app` with its 2025-only file, and reads both tables through Dapper into the models the generator gave it under the 6.1 column, so that every cell of 6.1's column is proven against the server.  It runs in the solution, on the default image.  `tests/README.md` documents it beside the Npgsql 8 project.
 
 ## Testing
 
