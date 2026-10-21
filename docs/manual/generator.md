@@ -53,6 +53,7 @@ Every property of the attribute is a [setting](settings.md), documented there wi
 |----|----|
 | `Path` | Which `.sql` files belong to the type: [Path](settings.md#setting-path) |
 | `SqlLocation` | Where the generated members go: [Where the SQL goes](settings.md#setting-sql-location) |
+| `NestedClass` | The name of the class that holds the members under `SqlLocation.Nested`: [Name of the nested class](settings.md#setting-nested-class) |
 | `Parameters` | Generator parameters for the type's queries: [Generator parameters](settings.md#setting-generator-parameters) |
 | `Output` | What is generated for the type's queries: [Output](settings.md#setting-output) |
 | `InputModelSuffix`, `OutputModelSuffix` | What ends the name of a model: [Suffix of a model's name](settings.md#setting-model-suffix) |
@@ -61,7 +62,7 @@ Every property of the attribute is a [setting](settings.md), documented there wi
 | `CollectionType` | The type that holds many rows: [Collection type](settings.md#setting-collection-type) |
 | `MethodLocation` | Where the methods that run the queries go: [Where the methods go](settings.md#setting-method-location) |
 
-`Path`, `SqlLocation`, `Parameters` and the properties of the models change what the generator writes today.  `Output` decides which queries the tool describes and the build checks against their sidecar, and which get models.  `CollectionType` and `MethodLocation`, for the methods that run the queries, are read and checked and change no generated code yet: see [what works today](README.md#what-works-today).
+`Path`, `SqlLocation`, `NestedClass`, `Parameters` and the properties of the models change what the generator writes today.  `Output` decides which queries the tool describes and the build checks against their sidecar, and which get models.  `CollectionType` and `MethodLocation`, for the methods that run the queries, are read and checked and change no generated code yet: see [what works today](README.md#what-works-today).
 
 <a id="files-of-a-type"></a>
 
