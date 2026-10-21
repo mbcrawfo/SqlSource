@@ -1,5 +1,6 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Microsoft.CodeAnalysis;
@@ -86,29 +87,96 @@ public sealed class CachingCheckTests
         result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC244");
     }
 
-    // TD-0019: the check of each file is a node of its own, but the nodes are matched by their place in the sorted
-    // list of parsed files, not by path.  So a claimed file added to the list checks again every file sorted after
-    // it, and none before it: Payments takes the place Users had, and Users is checked as a new node after it.
+    // The added file has a node of its own, from its file's node, which moves no other file's: Payments sorts between
+    // Orders and Users, and Users keeps its node.
     [Fact]
-    public void Run_ClaimedSqlFileAdded_ChecksTheFilesSortedAfterIt()
+    public void Run_ClaimedSqlFileAdded_ChecksOnlyThatFile()
     {
         var compilation = GeneratorHarness.CreateCompilation(Sources);
         var driver = _scene.FirstRunWithSidecars(compilation);
-        var payments = new InMemoryAdditionalText("/app/Orders/Payments.sql", "-- name: GetPayment\nSELECT 3;\n");
 
-        var result = Run(driver.AddAdditionalTexts([payments, CurrentSidecar(payments, "GetPayment")]), compilation);
+        var result = Run(
+            driver.AddAdditionalTexts([_scene.Payments, CurrentSidecar(_scene.Payments, "GetPayment")]),
+            compilation
+        );
 
         Checks(result)
             .ShouldBe(
                 new Dictionary<string, IncrementalStepRunReason>
                 {
                     ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Cached,
-                    ["app/Orders/Payments.sql"] = IncrementalStepRunReason.Modified,
-                    ["app/Users/Users.sql"] = IncrementalStepRunReason.New,
+                    ["app/Orders/Payments.sql"] = IncrementalStepRunReason.New,
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Cached,
                 },
                 ignoreOrder: true
             );
         result.Diagnostics.ShouldBeEmpty();
+    }
+
+    // Orders sorts first, and its node goes with it.  The others keep theirs, so neither is checked or typed again.
+    [Fact]
+    public void Run_ClaimedSqlFileRemoved_MovesNoOtherFilesCheck()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRunWithSidecars(compilation);
+        driver = driver
+            .AddAdditionalTexts([_scene.Payments, CurrentSidecar(_scene.Payments, "GetPayment")])
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+
+        var result = Run(driver.RemoveAdditionalTexts([_scene.Orders, _scene.OrdersSidecar]), compilation);
+
+        Checks(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["app/Orders/Orders.sql"] = IncrementalStepRunReason.Removed,
+                    ["app/Orders/Payments.sql"] = IncrementalStepRunReason.Cached,
+                    ["app/Users/Users.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        AllReasons(result, TrackingNames.FileTypesInput)
+            .ShouldAllBe(reason =>
+                reason != IncrementalStepRunReason.Modified && reason != IncrementalStepRunReason.New
+            );
+        result.Diagnostics.ShouldBeEmpty();
+    }
+
+    // A path listed twice, under one spelling or two, has a node for each listing, and is checked once, from the
+    // collected files: its stale entry is reported once.  The second spelling is a collision, SQLSRC013, as it is for
+    // any claimed file.  When the first listing goes, the second is checked from its own node, once.
+    [Theory]
+    [InlineData("/app/Users/Users.sql")]
+    [InlineData("/app/Users/users.sql")]
+    public void Run_FileListedTwice_ChecksItOnce(string spelling)
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var usersAgain = new InMemoryAdditionalText(
+            spelling,
+            _scene.Users.GetText(TestContext.Current.CancellationToken)!.ToString()
+        );
+        var stale = Sidecars.Of(ToSqlFile(_scene.Users), Sidecars.Entry("GetUser", "stale"));
+        var staleSidecar = new InMemoryAdditionalText(stale.Path, stale.Text);
+        var driver = GeneratorHarness
+            .CreateDriver(
+                [_scene.Users, usersAgain, _scene.Orders, _scene.OrdersSidecar, staleSidecar],
+                new TestOptionsProvider(OutputKind.Models, null, "postgres")
+            )
+            .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        var collides = spelling != _scene.Users.Path;
+
+        var first = driver.GetRunResult();
+
+        first.Results.Single().Exception.ShouldBeNull();
+        first
+            .Diagnostics.Select(diagnostic => diagnostic.Id)
+            .ShouldBe(collides ? ["SQLSRC013", "SQLSRC244"] : ["SQLSRC244"], ignoreOrder: true);
+        Checks(first).Keys.Count(path => path.StartsWith("app/Users/", StringComparison.Ordinal)).ShouldBe(1);
+
+        var result = Run(driver.RemoveAdditionalTexts([_scene.Users]), compilation);
+
+        result.Results.Single().Exception.ShouldBeNull();
+        result.Diagnostics.ShouldHaveSingleItem().Id.ShouldBe("SQLSRC244");
     }
 
     // The attribute changes the type, so its needs are found again, and they are the same.

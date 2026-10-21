@@ -52,7 +52,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             claims.ClaimedPaths,
             typeQueries,
             settings.ProjectLevel,
-            parsedFiles.Sorted
+            parsedFiles,
+            claims.RepeatedPaths
         );
         var typing = TypeFiles(
             context,
@@ -341,7 +342,8 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<EquatableArray<string>> claimedPaths,
         IncrementalValuesProvider<TypeQueries> typeQueries,
         IncrementalValueProvider<SettingsLevel> projectLevel,
-        IncrementalValueProvider<EquatableArray<ParsedSqlFile>> parsedFiles
+        ParsedFiles parsedFiles,
+        IncrementalValueProvider<EquatableArray<string>> repeatedPaths
     )
     {
         // The sidecars are an input of their own, so that an edit to one reads nothing that a .sql file feeds.  A
@@ -369,15 +371,32 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (files, _) => SidecarNeeds.Merge(files))
             .WithTrackingName(TrackingNames.FileNeeds);
 
+        // Each claimed file from its own ParsedFile node.  The compiler matches the nodes after a SelectMany by their
+        // place, and these nodes follow the additional texts, so a file added, removed or renamed moves no other
+        // file's check.  A path listed twice has a node for each listing, and the two would report its problems twice.
+        // So it is checked from the collected files instead, whose nodes are matched by their place, a cost that a
+        // project with no path listed twice never pays.
+        var files = new FileNodes<ParsedSqlFile>(
+            parsedFiles
+                .EachFile.Combine(repeatedPaths)
+                .Select(
+                    static (input, _) => SqlPath.Contains(input.Right, input.Left.NormalizedPath) ? null : input.Left
+                )
+                .WhereNotNull(),
+            parsedFiles
+                .Sorted.Combine(repeatedPaths)
+                .SelectMany(static (input, _) => FilesOfRepeatedPaths(input.Left, input.Right))
+        );
+
         // One check for each claimed file, whatever the number of its types, so that each problem is reported once.
         // Each file gathers its own sidecar and needs, so an edit to one file or one sidecar checks that file alone.
-        var sidecarChecks = parsedFiles
-            .SelectMany(static (files, _) => files)
-            .Combine(fileNeeds.Combine(sidecars))
-            .Select(static (input, _) => SidecarCheckInput.Gather(input.Left, input.Right.Left, input.Right.Right))
-            .WithTrackingName(TrackingNames.SidecarCheckInput)
-            .Select(static (input, _) => SidecarChecker.Check(input))
-            .WithTrackingName(TrackingNames.SidecarCheck);
+        var sidecarChecks = files.Then(each =>
+            each.Combine(fileNeeds.Combine(sidecars))
+                .Select(static (input, _) => SidecarCheckInput.Gather(input.Left, input.Right.Left, input.Right.Right))
+                .WithTrackingName(TrackingNames.SidecarCheckInput)
+                .Select(static (input, _) => SidecarChecker.Check(input))
+                .WithTrackingName(TrackingNames.SidecarCheck)
+        );
 
         return new CheckedSidecars(fileNeeds, sidecarChecks);
     }
@@ -385,7 +404,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     // The C# types of each claimed file's usable entries, with the Npgsql and the mapped types they depend on.
     private static TypedFiles TypeFiles(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<SidecarCheckResult> sidecarChecks,
+        FileNodes<SidecarCheckResult> sidecarChecks,
         IncrementalValueProvider<EquatableArray<ParsedSqlFile>> parsedFiles,
         IncrementalValueProvider<EquatableArray<FileSettings>> filesSettings,
         IncrementalValueProvider<ProjectSettings> projectSettings,
@@ -423,25 +442,28 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         // The C# types of each claimed file's usable entries, a node for each file after its check, so that an edit to
         // one file or one sidecar types that file alone.  A file with no usable entry carries nothing to type.  Each
         // file keeps its input beside its types, so that the models read its entries without typing it again.
-        var typedFiles = sidecarChecks
-            .Combine(parsedFiles.Combine(filesSettings))
-            .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(mappedTypes)))
-            .Select(
-                static (input, _) =>
-                    FileTypesInput.Gather(
-                        input.Left.Left,
-                        input.Left.Right.Left,
-                        input.Left.Right.Right,
-                        input.Right.Left,
-                        input.Right.Right.Left,
-                        input.Right.Right.Right
-                    )
-            )
-            .WithTrackingName(TrackingNames.FileTypesInput)
-            .Select(static (input, _) => new TypedFile(input, QueryTyper.Type(input)))
-            .WithTrackingName(TrackingNames.TypedFile);
+        var typedFiles = sidecarChecks.Then(each =>
+            each.Combine(parsedFiles.Combine(filesSettings))
+                .Combine(projectTypeOverrides.Combine(npgsqlProbe.Combine(mappedTypes)))
+                .Select(
+                    static (input, _) =>
+                        FileTypesInput.Gather(
+                            input.Left.Left,
+                            input.Left.Right.Left,
+                            input.Left.Right.Right,
+                            input.Right.Left,
+                            input.Right.Right.Left,
+                            input.Right.Right.Right
+                        )
+                )
+                .WithTrackingName(TrackingNames.FileTypesInput)
+                .Select(static (input, _) => new TypedFile(input, QueryTyper.Type(input)))
+                .WithTrackingName(TrackingNames.TypedFile)
+        );
 
-        var fileTypes = typedFiles.Select(static (file, _) => file.Types).WithTrackingName(TrackingNames.FileTypes);
+        var fileTypes = typedFiles.Then(each =>
+            each.Select(static (file, _) => file.Types).WithTrackingName(TrackingNames.FileTypes)
+        );
 
         return new TypedFiles(npgsqlProbe, typedFiles, fileTypes);
     }
@@ -449,21 +471,22 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     // Each file's models, and the models every type's requests come to, checked against each other and the project.
     private static CollectedModels CollectModels(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<TypedFile> typedFiles,
+        FileNodes<TypedFile> typedFiles,
         IncrementalValuesProvider<TypeQueries> typeQueries,
         IncrementalValueProvider<SettingsLevel> projectLevel
     )
     {
         // The properties of each file's models and the errors of their names, once for each file, whatever the number
         // of types that claim it, since no setting of a type changes them.
-        var fileModels = typedFiles
-            .Select(static (file, _) => ModelReader.Read(file))
-            .WithTrackingName(TrackingNames.FileModels);
+        var fileModels = typedFiles.Then(each =>
+            each.Select(static (file, _) => ModelReader.Read(file)).WithTrackingName(TrackingNames.FileModels)
+        );
 
         // Every file's models, sorted by path, so that a type finds the models of each of its files with a search.
         var allFileModels = fileModels
-            .Collect()
-            .Select(static (files, _) => ToSorted(files, static file => file.NormalizedPath))
+            .EachFile.Collect()
+            .Combine(fileModels.OfRepeatedPaths.Collect())
+            .Select(static (input, _) => ToSorted(input.Left.AddRange(input.Right), static file => file.NormalizedPath))
             .WithTrackingName(TrackingNames.AllFileModels);
 
         // What each type asks for of its queries' models, which only its own settings decide.  A change to a type or
@@ -555,19 +578,22 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     // The problems of each file's sidecar, types and models, and of the models, each from a node of its own.
     private static void ReportProblems(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValuesProvider<SidecarCheckResult> sidecarChecks,
-        IncrementalValuesProvider<FileTypes> fileTypes,
-        IncrementalValuesProvider<FileModels> fileModels,
+        FileNodes<SidecarCheckResult> sidecarChecks,
+        FileNodes<FileTypes> fileTypes,
+        FileNodes<FileModels> fileModels,
         IncrementalValueProvider<ModelSet> models
     )
     {
-        context.RegisterSourceOutput(sidecarChecks, static (output, check) => ReportAll(output, check.Diagnostics));
+        context.RegisterSourceOutput(sidecarChecks.EachFile, ReportChecks);
+        context.RegisterSourceOutput(sidecarChecks.OfRepeatedPaths, ReportChecks);
 
         // Beside the checks' output, so that a change to the types alone reports the checks of no file again.
-        context.RegisterSourceOutput(fileTypes, static (output, types) => ReportAll(output, types.Diagnostics));
+        context.RegisterSourceOutput(fileTypes.EachFile, ReportTypes);
+        context.RegisterSourceOutput(fileTypes.OfRepeatedPaths, ReportTypes);
 
         // Beside the types' output, so that a change to the models alone reports the types of no file again.
-        context.RegisterSourceOutput(fileModels, static (output, models) => ReportAll(output, models.Diagnostics));
+        context.RegisterSourceOutput(fileModels.EachFile, ReportModels);
+        context.RegisterSourceOutput(fileModels.OfRepeatedPaths, ReportModels);
 
         // Apart from the models' sources, so that a change to one model reports nothing again.
         context.RegisterSourceOutput(models.Select(static (set, _) => set.Diagnostics), ReportAll);
@@ -639,6 +665,15 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
     }
+
+    private static void ReportChecks(SourceProductionContext output, SidecarCheckResult check) =>
+        ReportAll(output, check.Diagnostics);
+
+    private static void ReportTypes(SourceProductionContext output, FileTypes types) =>
+        ReportAll(output, types.Diagnostics);
+
+    private static void ReportModels(SourceProductionContext output, FileModels models) =>
+        ReportAll(output, models.Diagnostics);
 
     private static void AddModel(SourceProductionContext output, (string HintName, string Source) model) =>
         output.AddSource(model.HintName, SourceText.From(model.Source, Encoding.UTF8));
@@ -727,6 +762,23 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return false;
     }
 
+    // For each path the project lists more than once, the file of it, if a type claims it.  A search for each path, so
+    // that the cost does not grow with the files.
+    private static IEnumerable<ParsedSqlFile> FilesOfRepeatedPaths(
+        EquatableArray<ParsedSqlFile> files,
+        EquatableArray<string> repeatedPaths
+    )
+    {
+        foreach (var path in repeatedPaths)
+        {
+            var index = SqlPath.IndexOf(files, path, static file => file.NormalizedPath);
+            if (index >= 0)
+            {
+                yield return files[index];
+            }
+        }
+    }
+
     private static TypeQueries SelectFiles(
         TypeFiles type,
         EquatableArray<ParsedSqlFile> parsedFiles,
@@ -794,19 +846,32 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
     // What every type needs of each file, and the check of each claimed file's sidecar.
     private readonly record struct CheckedSidecars(
         IncrementalValueProvider<EquatableArray<FileNeeds>> Needs,
-        IncrementalValuesProvider<SidecarCheckResult> Checks
+        FileNodes<SidecarCheckResult> Checks
     );
 
     // The Npgsql the project references, each claimed file typed, and its types alone.
     private readonly record struct TypedFiles(
         IncrementalValueProvider<NpgsqlProbe> NpgsqlProbe,
-        IncrementalValuesProvider<TypedFile> Files,
-        IncrementalValuesProvider<FileTypes> FileTypes
+        FileNodes<TypedFile> Files,
+        FileNodes<FileTypes> FileTypes
     );
 
     // Each file's models, and the models to emit with the problems of the requests.
     private readonly record struct CollectedModels(
-        IncrementalValuesProvider<FileModels> FileModels,
+        FileNodes<FileModels> FileModels,
         IncrementalValueProvider<ModelSet> Models
     );
+
+    // A step for each claimed file, in two chains: from each file's own ParsedFile node, for a path the project lists
+    // once, and from the collected files, for a path it lists more than once.  A step is added to both by Then, under
+    // its one tracking name.
+    private readonly record struct FileNodes<T>(
+        IncrementalValuesProvider<T> EachFile,
+        IncrementalValuesProvider<T> OfRepeatedPaths
+    )
+    {
+        public FileNodes<TResult> Then<TResult>(
+            Func<IncrementalValuesProvider<T>, IncrementalValuesProvider<TResult>> step
+        ) => new(step(EachFile), step(OfRepeatedPaths));
+    }
 }

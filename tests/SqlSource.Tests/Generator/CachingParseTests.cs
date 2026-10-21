@@ -311,4 +311,37 @@ public sealed class CachingParseTests
                 ignoreOrder: true
             );
     }
+
+    // UserQueries comes to claim Orders.sql in place of its folder, so Users.sql leaves the claimed paths.  Its claim
+    // alone changes, and it is no longer read.  Orders.sql stays claimed, so its claim is equal and it is not read
+    // again.
+    [Fact]
+    public void Run_SqlFileLeavesTheClaimedPaths_ReadsNoOtherFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+
+        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "Path = \"../Orders/Orders.sql\""));
+
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Modified]);
+        Claims(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_scene.Users.Path] = IncrementalStepRunReason.Modified,
+                    [_scene.Orders.Path] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["Users.sql"] = IncrementalStepRunReason.Removed,
+                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
+    }
 }
