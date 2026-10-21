@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
+using System.Text;
 
 namespace SqlSource.Settings;
 
@@ -173,8 +175,9 @@ internal static class TypeKeys
     /// by its element's key alone.
     /// </para>
     /// <para>
-    /// A part in the escaped form is never given as written: it is given in plain quotes, with <c>""</c> for each
-    /// quote, whatever the key.  <c>U&amp;"st\0061tus"</c> gives <c>"status"</c>.
+    /// An escaped part is read as the quoted part of its text, and where a quoted part is kept as written it is given
+    /// in the quoted form <see cref="WritePart" /> writes for its text, so <c>public.U&amp;"st\0061tus"</c> gives
+    /// <c>public."status"</c> and <c>public.U&amp;"a\000ab"</c> gives <c>public.U&amp;"a\000Ab"</c>.
     /// </para>
     /// </summary>
     public static bool TryNormalize(ReadOnlySpan<char> key, out string normalized)
@@ -335,7 +338,11 @@ internal static class TypeKeys
     /// <summary>
     /// Writes <paramref name="text" /> as a part of a key: as it is when it is not empty and holds only letters,
     /// digits, <c>_</c> and <c>$</c>, none of them upper case, since a plain part is read in lower case; otherwise in
-    /// double quotes with each <c>"</c> doubled.
+    /// double quotes with each <c>"</c> doubled, or in the escaped form when the quotes would not keep it.  A value
+    /// written in MSBuild is trimmed, and the compiler cuts it at <c>;</c> and <c>#</c>, and a marker is one line, so
+    /// a text with a control character, a white space other than a lone space, a <c>;</c> or a <c>#</c> is written
+    /// <c>U&amp;"a\000Ab"</c>, with <c>\XXXX</c> for each such character, <c>\\</c> for a <c>\</c> and
+    /// <c>""</c> for a <c>"</c>.
     /// </summary>
     public static string WritePart(string text)
     {
@@ -343,8 +350,58 @@ internal static class TypeKeys
         return isPlain ? text : Quote(text);
     }
 
-    // A part in double quotes, with each quote doubled.
-    private static string Quote(string text) => "\"" + text.Replace("\"", "\"\"") + "\"";
+    // A part in double quotes, with each quote doubled, or in the escaped form when the quotes would not keep it.
+    private static string Quote(string text)
+    {
+        if (!NeedsEscape(text))
+        {
+            return "\"" + text.Replace("\"", "\"\"") + "\"";
+        }
+
+        var written = new StringBuilder(EscapedOpening, text.Length + EscapedOpening.Length + 8);
+        for (var index = 0; index < text.Length; index++)
+        {
+            var character = text[index];
+            if (MustEscape(text, index))
+            {
+                _ = written.Append('\\').Append(((int)character).ToString("X4", CultureInfo.InvariantCulture));
+            }
+            else if (character is '\\' or '"')
+            {
+                _ = written.Append(character).Append(character);
+            }
+            else
+            {
+                _ = written.Append(character);
+            }
+        }
+
+        return written.Append('"').ToString();
+    }
+
+    private static bool NeedsEscape(string text)
+    {
+        for (var index = 0; index < text.Length; index++)
+        {
+            if (MustEscape(text, index))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    // A character that a quoted part would not keep: the trim reads any white space but U+0020 as a space and a run
+    // of them as one, the compiler cuts at ; and #, and a control character may end the line.
+    private static bool MustEscape(string text, int index)
+    {
+        var character = text[index];
+        return char.IsControl(character)
+            || (char.IsWhiteSpace(character) && character != ' ')
+            || (character == ' ' && index > 0 && text[index - 1] == ' ')
+            || character is ';' or '#';
+    }
 
     // A qualified key as written, except that an escaped part is in the quoted form of its text.
     private static string Rewrite(ReadOnlySpan<char> schema, ReadOnlySpan<char> name, bool isArray)

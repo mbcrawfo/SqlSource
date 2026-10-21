@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using Shouldly;
 using SqlSource.Settings;
 using Xunit;
@@ -144,6 +145,8 @@ public sealed class TypeKeysTests
     [InlineData("pg_catalog.U&\"_int4\"", "int4[]")]
     [InlineData("pg_catalog.U&\"New Type\"", "\"New Type\"")]
     [InlineData("U&\"pg_catalog\".int4", "int4")]
+    [InlineData("pg_catalog.U&\"_x\"[]", "\"_x\"[]")]
+    [InlineData("pg_catalog.U&\"newtype\"[]", "\"newtype\"[]")]
     public void TryNormalize_EscapedPart_IsItsQuotedForm(string key, string expected) => ShouldNormalize(key, expected);
 
     [Theory]
@@ -160,6 +163,7 @@ public sealed class TypeKeysTests
     [InlineData("s.U&\"\\D800\"")]
     [InlineData("s.U&\"\\DE00\\D83D\"")]
     [InlineData("s.U&\"\\D83Dx\"")]
+    [InlineData("s.U&\"\\D83D\\D83D\"")]
     [InlineData("s.U&x")]
     [InlineData("s.U& \"x\"")]
     [InlineData("s.U&\"x\" UESCAPE '!'")]
@@ -175,16 +179,19 @@ public sealed class TypeKeysTests
     [InlineData("U&\"\\D83D\\+00DE00\"", "\U0001F600")]
     [InlineData("U&\"a\"\"b\"", "a\"b")]
     [InlineData("U&\"plain\"", "plain")]
+    [InlineData("U&\"\\00e9\"", "\u00E9")]
+    [InlineData("U&\"\\+00D83D\\DE00\"", "\U0001F600")]
     public void TextOf_EscapedPart_IsItsTextDecoded(string part, string expected) =>
         TypeKeys.TextOf(part.AsSpan()).ToString().ShouldBe(expected);
 
-    // TextOf is given only parts TrySplit read, but nothing a user writes may make the generator throw.
+    // TextOf is given only parts TrySplit read, but nothing a user writes may make the generator throw, so a \ that
+    // is not an escape is a character.
     [Theory]
-    [InlineData("U&\"\\\"")]
-    [InlineData("U&\"\\+12\"")]
-    [InlineData("U&\"\\D800\"")]
-    public void TextOf_EscapedPartThatIsNotWellFormed_DoesNotThrow(string part) =>
-        Should.NotThrow(() => TypeKeys.TextOf(part.AsSpan()).ToString());
+    [InlineData("U&\"\\\"", "\\")]
+    [InlineData("U&\"\\+12\"", "\\+12")]
+    [InlineData("U&\"\\D800\"", "\\D800")]
+    public void TextOf_EscapedPartThatIsNotWellFormed_KeepsTheBackslashAsACharacter(string part, string expected) =>
+        TypeKeys.TextOf(part.AsSpan()).ToString().ShouldBe(expected);
 
     [Theory]
     [InlineData("\"a.b\".c[]", "\"a.b\"", "c", true)]
@@ -232,12 +239,24 @@ public sealed class TypeKeysTests
     [InlineData("my schema", "\"my schema\"")]
     [InlineData("a\"b", "\"a\"\"b\"")]
     [InlineData("", "\"\"")]
+    [InlineData("a\nb", "U&\"a\\000Ab\"")]
+    [InlineData("a\r\nb", "U&\"a\\000D\\000Ab\"")]
+    [InlineData("a\tb", "U&\"a\\0009b\"")]
+    [InlineData("a  b", "U&\"a \\0020b\"")]
+    [InlineData("a\u00A0b", "U&\"a\\00A0b\"")]
+    [InlineData("a;b#c", "U&\"a\\003Bb\\0023c\"")]
+    [InlineData("a\u0001b", "U&\"a\\0001b\"")]
+    [InlineData("say \"hi\"\n\\", "U&\"say \"\"hi\"\"\\000A\\\\\"")]
+    [InlineData("a\\b", "\"a\\b\"")]
+    [InlineData("a b", "\"a b\"")]
     public void WritePart_Text_IsQuotedWhenItNeedsIt(string text, string expected) =>
         TypeKeys.WritePart(text).ShouldBe(expected);
 
     [Theory]
     [InlineData("\"a.b\".c[]")]
     [InlineData("s.\"say \"\"hi\"\"\"")]
+    [InlineData("s.U&\"a\\000Ab\"")]
+    [InlineData("s.U&\"x \\0020y;\"")]
     public void WritePart_PartOfAKey_ReadsBackAsItsText(string key)
     {
         TypeKeys.TrySplit(key.AsSpan(), out var schema, out var name, out _).ShouldBeTrue();
@@ -245,6 +264,25 @@ public sealed class TypeKeysTests
         var text = TypeKeys.TextOf(schema.IsEmpty ? name : schema).ToString();
 
         TypeKeys.TextOf(TypeKeys.WritePart(text).AsSpan()).ToString().ShouldBe(text);
+    }
+
+    // What the trim of an MSBuild value and the compiler's cut would change is not in the written part.
+    [Theory]
+    [InlineData("a\nb")]
+    [InlineData("a\tb")]
+    [InlineData("a  b")]
+    [InlineData("a;b")]
+    [InlineData("x\u2028y")]
+    public void WritePart_TextThatNeedsTheEscape_SurvivesTheTrimAndALine(string text)
+    {
+        var part = TypeKeys.WritePart(text);
+
+        part.Where(char.IsWhiteSpace).ShouldAllBe(character => character == ' ');
+        part.ShouldNotContain("  ");
+        part.ShouldNotContain(";");
+        part.ShouldNotContain("#");
+        part.Any(char.IsControl).ShouldBeFalse();
+        TypeKeys.TextOf(part.AsSpan()).ToString().ShouldBe(text);
     }
 
     [Theory]

@@ -106,6 +106,21 @@ public sealed class TypeOverrideGrammarTests
         entry.ShouldBe(new TypeOverride("public.\"status\"", "int", SettingPlace.Query));
     }
 
+    [Fact]
+    public void TryReadEntry_EscapedKeyInAMarker_IsItsWrittenForm()
+    {
+        TypeOverrideGrammar
+            .TryReadEntry(
+                "public.U&\"a\\000ab\" = MyApp.Tag".AsSpan(),
+                spacesAroundEquals: true,
+                SettingPlace.Query,
+                out var entry
+            )
+            .ShouldBeTrue();
+
+        entry.ShouldBe(new TypeOverride("public.U&\"a\\000Ab\"", "global::MyApp.Tag", SettingPlace.Query));
+    }
+
     [Theory]
     [InlineData("numeric = System.Double")]
     [InlineData("numeric= System.Double")]
