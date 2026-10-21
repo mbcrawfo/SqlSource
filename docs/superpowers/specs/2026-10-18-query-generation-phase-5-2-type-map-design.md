@@ -225,7 +225,7 @@ The keys are engine-neutral: SQL Server's will be its type names, `datetime2`, a
 
 ### Resolving the C# types
 
-A named step takes the distinct C# types that any level names, from the project's settings, the files' settings and the parsed files' markers, as a sorted, value-equal list, combines it with the compilation, and gives for each a value-equal record: found or the reason it is not, whether it is a value type, and its accessibility.  It holds no symbol.  A keyword is its special type.  A named type is looked up by its metadata name, `A.B+C`1`, tried from the longest namespace prefix down so that a nested type is found, with `GetTypesByMetadataName`, the compilation's own assembly first; its type arguments and ranks are resolved the same way.
+A named step takes the distinct C# types that any level names, from the project's settings, the files' settings and the parsed files' markers, as a sorted, value-equal list, combines it with the compilation, and gives for each a value-equal record: found or the reason it is not, whether it is a value type, and its accessibility.  It holds no symbol.  A keyword is its special type.  A named type is looked up by its metadata name, ``A.B+C`1``, tried from the longest namespace prefix down so that a nested type is found, with `GetTypesByMetadataName`, the compilation's own assembly first; its type arguments and ranks are resolved the same way.
 
 An empty list gives an empty result at once, so a project without overrides pays nothing.  The step runs on every edit of C#, as the probe does, at the cost of a few lookups per named type, and its value is equal from one edit to the next, so nothing after it runs again unless a type appeared or went.
 

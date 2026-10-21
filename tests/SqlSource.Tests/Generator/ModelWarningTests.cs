@@ -9,8 +9,8 @@ using static SqlSource.Testing.Generator.ModelRuns;
 namespace SqlSource.Tests.Generator;
 
 // The warnings a model gives for the obsolete and experimental types it names: the pragma that disables their ids, in
-// the order the generator writes it, and the type that no pragma can make usable.  Each run is at Models under
-// postgres on Npgsql 10, as the runs of ModelTests are.
+// the order the generator writes it, and the types that no pragma can make usable, as a broken constraint is too.  Each
+// run is at Models under postgres on Npgsql 10, as the runs of ModelTests are.
 public sealed class ModelWarningTests
 {
     private static readonly SqlFile Users = new(
@@ -224,6 +224,38 @@ public sealed class ModelWarningTests
                 $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'text' to "
                     + "'MyApp.GoneName' for column 'name', in the property SqlSourceTypeOverrides, and no property "
                     + "can have that type."
+            );
+        run.CompilationErrors.ShouldBeEmpty();
+        run.GeneratedCodeWarnings.ShouldBeEmpty();
+        ModelFiles(run).ShouldBeEmpty();
+    }
+
+    // A type argument that breaks a constraint of its type parameter is CS0453 in a model, so the type is refused.
+    [Fact]
+    public void Run_GenericTypeWithABrokenConstraint_IsSqlsrc252AndHasNoModel()
+    {
+        var source =
+            Source
+            + """
+
+                namespace MyApp
+                {
+                    public sealed class ValueBox<T>
+                        where T : struct;
+                }
+                """;
+
+        var run = Run(
+            source,
+            [Users, Sidecars.Of(Users, Entry(Users, "GetUser", [], [Column("name", Text)]))],
+            new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = "text=MyApp.ValueBox<string>" }
+        );
+
+        run.Diagnostics.ShouldHaveSingleItem()
+            .ShouldStartWith(
+                $"SQLSRC252 {GeneratorHarness.UsersPath}(1,10)-(1,17): The type override maps 'text' to "
+                    + "'MyApp.ValueBox<string>' for column 'name', in the property SqlSourceTypeOverrides, and no "
+                    + "property can have that type."
             );
         run.CompilationErrors.ShouldBeEmpty();
         run.GeneratedCodeWarnings.ShouldBeEmpty();
