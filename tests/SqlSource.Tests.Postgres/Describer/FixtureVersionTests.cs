@@ -3,6 +3,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 
@@ -26,7 +27,7 @@ public sealed partial class FixtureVersionTests
     public void Recorded_Case_IsOfTheVersionOfTheDefaultImage(string name)
     {
         var fixture = Found.Single(found => found.Name == name);
-        var version = PostgresContainer.TagOf(PostgresContainer.DefaultImage);
+        var version = PostgresContainer.TagOf(DefaultImages.Postgres);
 
         VersionsIn(fixture.Capture).ShouldBe([version], "the capture.json");
         VersionsIn(fixture.Expected).ShouldBe([version], "the expected.json");

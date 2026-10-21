@@ -2,6 +2,7 @@ using System;
 using System.Threading.Tasks;
 using Npgsql;
 using Shouldly;
+using SqlSource.Testing;
 using Xunit;
 using Xunit.Sdk;
 
@@ -90,7 +91,7 @@ public sealed class PostgresContainerTests(PostgresContainer postgres)
     {
         var named = Environment.GetEnvironmentVariable(PostgresContainer.ImageVariable);
 
-        PostgresContainer.Image.ShouldBe(string.IsNullOrEmpty(named) ? PostgresContainer.DefaultImage : named);
+        PostgresContainer.Image.ShouldBe(string.IsNullOrEmpty(named) ? DefaultImages.Postgres : named);
     }
 
     [Fact]

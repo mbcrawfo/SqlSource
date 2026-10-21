@@ -125,17 +125,7 @@ public sealed class ScanTests(PostgresContainer postgres)
     public async Task DescribeAsync_ForeignTableOnEachSideOfALeftJoin_IsAnsweredByItsSide()
     {
         var connection = new NpgsqlConnectionStringBuilder(postgres.ConnectionString);
-        await postgres.ExecuteAsync(
-            "CREATE EXTENSION IF NOT EXISTS postgres_fdw; "
-                + "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_foreign_server WHERE srvname = 'scan_loop') THEN "
-                + "CREATE SERVER scan_loop FOREIGN DATA WRAPPER postgres_fdw "
-                + $"OPTIONS (host 'localhost', dbname '{connection.Database}'); "
-                + "CREATE USER MAPPING FOR CURRENT_USER SERVER scan_loop "
-                + $"OPTIONS (user '{connection.Username}', password '{connection.Password}'); "
-                + "END IF; END $$; "
-                + "CREATE FOREIGN TABLE IF NOT EXISTS scan_foreign (id bigint NOT NULL, note text) "
-                + "SERVER scan_loop OPTIONS (table_name 'orders')"
-        );
+        await postgres.ExecuteAsync(ScratchSchema.ScanForeign(connection));
 
         (await WalkedAsync("SELECT f.id, u.name FROM scan_foreign f LEFT JOIN users u ON u.id = f.id")).ShouldBe([
             UnknownForeignTable,

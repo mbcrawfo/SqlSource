@@ -1,9 +1,11 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using SqlSource.Parsing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Logging;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests;
@@ -33,9 +35,18 @@ internal static class PostgresEventCases
 
     public static string[] NamesOf(LogMember[] members) => [.. members.Select(member => member.Name)];
 
+    // What each call of a describe through DescribeAsync takes: the clock moves this far before it is answered.
+    public static readonly TimeSpan CallTime = TimeSpan.FromMilliseconds(7);
+
+    // A describe whose every call takes CallTime, so that the durations in the log are exact.
     public static async Task DescribeAsync(PostgresScript script, IRunLog log, DescribeRequest? query = null)
     {
-        await using var session = await PostgresScript.SessionAsync(script.Play(), log);
+        var clock = new TestClock();
+        await using var session = await PostgresScript.SessionAsync(
+            new ClockedExchange(script.Play(), clock, CallTime),
+            log,
+            time: clock
+        );
         _ = await session.DescribeAsync(query ?? Query, TestContext.Current.CancellationToken);
     }
 

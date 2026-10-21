@@ -2,6 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Threading.Tasks;
+using Xunit;
 
 namespace SqlSource.Tool.Testing.Fixtures;
 
@@ -42,10 +44,10 @@ internal sealed class FixtureProjects : IDisposable
 
     // Runs the manifest target of a project with the real "dotnet msbuild", as the tool does, and gives the lines of
     // the file it wrote.  A property is given as "Name=value".
-    public string[] WriteManifest(string project, params string[] properties)
+    public async Task<string[]> WriteManifestAsync(string project, params string[] properties)
     {
         var file = _folder.PathOf(Guid.NewGuid().ToString("N") + ".manifest");
-        var (exitCode, output) = RunMSBuild(
+        var (exitCode, output) = await RunMSBuildAsync(
             project,
             ["-t:SqlSourceWriteManifest", $"-p:SqlSourceManifestFile={file}", .. PropertySwitches(properties)]
         );
@@ -54,18 +56,15 @@ internal sealed class FixtureProjects : IDisposable
             throw new InvalidOperationException($"msbuild exited with {exitCode}:\n{output}");
         }
 
-        return File.ReadAllLines(file);
+        return await File.ReadAllLinesAsync(file, TestContext.Current.CancellationToken);
     }
 
-    public static (int ExitCode, string Output) RunMSBuild(string project, IEnumerable<string> arguments)
+    public static async Task<(int ExitCode, string Output)> RunMSBuildAsync(
+        string project,
+        IEnumerable<string> arguments
+    )
     {
-        var start = new ProcessStartInfo("dotnet")
-        {
-            WorkingDirectory = Path.GetDirectoryName(project)!,
-            RedirectStandardOutput = true,
-            RedirectStandardError = true,
-            RedirectStandardInput = true,
-        };
+        var start = new ProcessStartInfo(Programs.Dotnet) { WorkingDirectory = Path.GetDirectoryName(project) };
         start.ArgumentList.Add("msbuild");
         start.ArgumentList.Add(project);
         start.ArgumentList.Add("-nologo");
@@ -80,12 +79,8 @@ internal sealed class FixtureProjects : IDisposable
         _ = start.Environment.Remove("MSBuildExtensionsPath");
         start.Environment["DOTNET_NOLOGO"] = "true";
 
-        using var process = Process.Start(start)!;
-        process.StandardInput.Close();
-        var error = process.StandardError.ReadToEndAsync();
-        var output = process.StandardOutput.ReadToEnd();
-        process.WaitForExit();
-        return (process.ExitCode, output + error.GetAwaiter().GetResult());
+        var result = await Programs.RunAsync(start, Eventually.Patience);
+        return (result.ExitCode, result.Output + result.Error);
     }
 
     public void Dispose() => _folder.Dispose();

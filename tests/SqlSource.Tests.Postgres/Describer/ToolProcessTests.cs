@@ -29,38 +29,28 @@ public sealed class ToolProcessTests(PostgresContainer postgres) : IDisposable
         _ = _fixtures.WriteFile("Single/Queries/Queries.cs", Plans.Type);
         var temp = Directory.CreateDirectory(_fixtures.PathOf("tmp")).FullName;
 
-        using var tool = Programs.StartTool(
-            _fixtures.Root,
-            temp,
-            "describe",
-            project,
-            "--connection",
-            "billing=" + postgres.ConnectionString
+        var result = await Programs.RunAsync(
+            Programs.ToolStart(
+                _fixtures.Root,
+                temp,
+                "describe",
+                project,
+                "--connection",
+                "billing=" + postgres.ConnectionString
+            ),
+            Eventually.Patience
         );
-        try
-        {
-            var error = tool.StandardError.ReadToEndAsync(token);
-            var output = tool.StandardOutput.ReadToEndAsync(token);
-            await tool.WaitForExitAsync(token);
 
-            tool.ExitCode.ShouldBe(0, await error);
-            (await error).ShouldBeEmpty();
-            (await output).ShouldBe("billing (postgres): 1 described, 0 skipped, 0 failed" + Environment.NewLine);
-            var sidecar = SidecarFormat.PathFor(_fixtures.PathOf("Single/Queries/Users.sql"));
-            File.Exists(sidecar).ShouldBeTrue();
-            var entry = SidecarReader
-                .Read(await File.ReadAllTextAsync(sidecar, token))
-                .Sidecar.ShouldNotBeNull()
-                .Queries.ShouldHaveSingleItem();
-            entry.Name.ShouldBe("GetUser");
-            entry.Engine.ShouldBe("postgres");
-        }
-        finally
-        {
-            if (!tool.HasExited)
-            {
-                tool.Kill(entireProcessTree: true);
-            }
-        }
+        result.ExitCode.ShouldBe(0, result.Error);
+        result.Error.ShouldBeEmpty();
+        result.Output.ShouldBe("billing (postgres): 1 described, 0 skipped, 0 failed" + Environment.NewLine);
+        var sidecar = SidecarFormat.PathFor(_fixtures.PathOf("Single/Queries/Users.sql"));
+        File.Exists(sidecar).ShouldBeTrue();
+        var entry = SidecarReader
+            .Read(await File.ReadAllTextAsync(sidecar, token))
+            .Sidecar.ShouldNotBeNull()
+            .Queries.ShouldHaveSingleItem();
+        entry.Name.ShouldBe("GetUser");
+        entry.Engine.ShouldBe("postgres");
     }
 }

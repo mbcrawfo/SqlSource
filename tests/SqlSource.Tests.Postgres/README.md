@@ -4,7 +4,7 @@ This project runs the PostgreSQL describer and the `describe` command against a 
 
 ## Running
 
-The project needs Docker running, and its first run pulls the image.  It starts one container for the run, with the database `fixtures` and the schema `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql`, and a second database, `realistic`, for the realistic corpus below.  It also has the databases `app` and `billing` for the end-to-end tests, each built from the `schema.sql` and `seed.sql` in its folder of `tests/SqlSource.Tests.Postgres/EndToEnd/`.
+The project needs Docker running, and its first run pulls the image.  It starts one container for the run, with the database `fixtures` and the schema `tests/SqlSource.Tool.Tests/Fixtures/Describers/postgres/schema.sql`, and a second database, `realistic`, for the realistic corpus below.  It also has the databases `app` and `billing` for the end-to-end tests, each built from the `schema.sql` and `seed.sql` in its folder of `tests/SqlSource.Tests.Postgres/EndToEnd/`.  An object that a test leaves on that one server has its text in `Describer/ScratchSchema.cs`, made by SQL that can run again, so it is the same whichever class runs first; one that changes what other tests see is dropped by its test in a `finally`.
 
 ```bash
 dotnet test --project tests/SqlSource.Tests.Postgres
@@ -16,7 +16,7 @@ The project copies two fixture projects to its output, with the package's MSBuil
 
 ## The image
 
-The image is `postgres:18.6`, named for the tests and the scripts in one place, `PostgresContainer.DefaultImage`, and repeated in `examples/PostgresExamples/docker-compose.yml`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported, which CI runs as `postgres:14.24`:
+The image is `postgres:18.6`, named for the tests and the scripts in one place, `DefaultImages.Postgres` in `tests/SqlSource.Testing/DefaultImages.cs`, and repeated in `examples/PostgresExamples/docker-compose.yml`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported, which CI runs as `postgres:14.24`:
 
 ```bash
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres

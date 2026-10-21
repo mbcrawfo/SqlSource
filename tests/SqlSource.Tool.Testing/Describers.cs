@@ -6,7 +6,7 @@ using Xunit;
 
 namespace SqlSource.Tool.Testing;
 
-// A session opened as a run opens one, for a test: the live exchange, the machine's clock and no log, unless the
+// A session opened as a run opens one, for a test: the live exchange, a clock that stands still and no log, unless the
 // test brings its own.
 internal static class Describers
 {
@@ -19,7 +19,7 @@ internal static class Describers
         TimeProvider? time = null
     ) =>
         describer.OpenAsync(
-            new OpenRequest(database, connection, exchange ?? LiveExchange.Instance, time ?? TimeProvider.System),
+            new OpenRequest(database, connection, exchange ?? LiveExchange.Instance, time ?? new TestClock()),
             log ?? NullRunLog.Instance,
             TestContext.Current.CancellationToken
         );
