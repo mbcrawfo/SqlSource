@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Checks the contents of the two packages.  SqlSource: the generator, the two MSBuild files that hand .sql files and
 # the settings to the compiler, the readme, and nothing under lib/.  SqlSource.Tool: the tool with the generator's
-# assembly, Roslyn, the library that reads a solution and Npgsql beside it, the settings that name its command, the
+# assembly, Roslyn, the library that reads a solution, Npgsql and Microsoft.Data.SqlClient beside it, SqlClient's
+# copies for Unix and Windows and its native SNI for Windows under runtimes/, the settings that name its command, the
 # readme, and no documentation files.  Both have one version.
 # Usage: check-package.sh [directory]   The directory holds one SqlSource.<version>.nupkg and one
 # SqlSource.Tool.<version>.nupkg.  Without it, both are packed into a temporary directory first.
@@ -17,6 +18,12 @@ TOOL_REQUIRED=(
     'tools/net8.0/any/Microsoft.CodeAnalysis.CSharp.dll'
     'tools/net8.0/any/Microsoft.VisualStudio.SolutionPersistence.dll'
     'tools/net8.0/any/Npgsql.dll'
+    'tools/net8.0/any/Microsoft.Data.SqlClient.dll'
+    'tools/net8.0/any/runtimes/unix/lib/net8.0/Microsoft.Data.SqlClient.dll'
+    'tools/net8.0/any/runtimes/win/lib/net8.0/Microsoft.Data.SqlClient.dll'
+    'tools/net8.0/any/runtimes/win-arm64/native/Microsoft.Data.SqlClient.SNI.dll'
+    'tools/net8.0/any/runtimes/win-x64/native/Microsoft.Data.SqlClient.SNI.dll'
+    'tools/net8.0/any/runtimes/win-x86/native/Microsoft.Data.SqlClient.SNI.dll'
     'tools/net8.0/any/DotnetToolSettings.xml'
     'README.md'
 )

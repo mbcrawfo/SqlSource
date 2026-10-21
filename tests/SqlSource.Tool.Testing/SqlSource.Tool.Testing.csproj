@@ -20,6 +20,7 @@
     </ItemGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="SqlSource.Tests.Postgres" />
+        <InternalsVisibleTo Include="SqlSource.Tests.SqlServer" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>
     <ItemGroup>

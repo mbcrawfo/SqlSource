@@ -68,7 +68,7 @@ SQLSRC227 | SqlSource | Error | Parameter's first use does not fix its type
 SQLSRC228 | SqlSource | Error | Declared type is not valid
 SQLSRC229 | SqlSource | Error | Column type is not supported
 SQLSRC230 | SqlSource | Error | Query holds more than one statement
-SQLSRC231 | SqlSource | Error | Parameters as Npgsql reads them differ
+SQLSRC231 | SqlSource | Error | Parameters are read differently
 SQLSRC232 | SqlSource | Error | Type cannot be bound by Npgsql
 SQLSRC233 | SqlSource | Error | Statement cannot be described
 SQLSRC234 | SqlSource | Error | Query writes a positional parameter
@@ -99,6 +99,7 @@ SQLSRC258 | SqlSource | Error | Model name cannot be used
 SQLSRC259 | SqlSource | Error | Output model on a query without rows
 SQLSRC260 | SqlSource | Error | Column marker names no usable column
 SQLSRC261 | SqlSource | Error | Entry names an array as the catalog does
+SQLSRC262 | SqlSource | Error | Copies of a parameter have different types
 SQLSRC267 | SqlSource | Error | Microsoft.Data.SqlClient is older than 6.1
 SQLSRC268 | SqlSource | Info | Microsoft.Data.SqlClient is newer than SqlSource knows
 SQLSRC269 | SqlSource | Error | Type needs Microsoft.Data.SqlClient

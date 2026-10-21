@@ -1,0 +1,66 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "UPDATE TOP (@n) dbo.users SET nickname = NULL WHERE name LIKE @pattern;",
+        "params": null
+      },
+      "answer": {
+        "rows": [
+          {
+            "name": "@n",
+            "suggestedSystemTypeName": "bigint",
+            "suggestedMaxLength": 8,
+            "suggestedPrecision": 19,
+            "suggestedScale": 0,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          },
+          {
+            "name": "@pattern",
+            "suggestedSystemTypeName": "nvarchar(4000)",
+            "suggestedMaxLength": 8000,
+            "suggestedPrecision": 0,
+            "suggestedScale": 0,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          }
+        ],
+        "error": null
+      }
+    }
+  ]
+}

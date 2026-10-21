@@ -232,6 +232,11 @@ dotnet_diagnostic.CA1515.severity = none
 # CA2007 (ConfigureAwait): xUnit1030 forbids the call in a test.
 dotnet_diagnostic.CA2007.severity = none
 
+[tests/SqlSource.Tests.SqlServer/{SqlServerContainer,SqlServerScripts}.cs]
+# CA2100 (review SQL for user input): the two places that make a command of the SQL Server tests, from a script of the
+# repository or a statement of a test's own, never from what a user writes.
+dotnet_diagnostic.CA2100.severity = none
+
 [src/SqlSource/Polyfills/*.cs]
 # IDE0130 (namespace matches folder): a polyfill must be in the namespace of the type it stands in for.
 dotnet_diagnostic.IDE0130.severity = none
@@ -252,4 +257,10 @@ dotnet_diagnostic.CA1031.severity = none
 # batches, which carry the PREPARE and the SQL of the check.  PREPARE and DEALLOCATE take no parameters, and what the
 # describer puts into them is a counter, a type that DeclaredTypeText read, and the user's own SQL, which is what is
 # to be described; the check describes the user's own SQL and runs nothing.
+dotnet_diagnostic.CA2100.severity = none
+
+[src/SqlSource.Tool/Describing/SqlServer/SqlServerConnection.cs]
+# CA2100 (review SQL for user input): the one place that makes every command of the SQL Server describer, as
+# PostgresConnection.cs is PostgreSQL's.  Its texts are the describer's own and the names of the procedures it calls;
+# what a user wrote reaches the server as the value of a parameter, never in a command's text.
 dotnet_diagnostic.CA2100.severity = none

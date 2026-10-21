@@ -4,10 +4,10 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Testing;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -15,8 +15,9 @@ using Xunit;
 namespace SqlSource.Tool.Tests.Fixtures;
 
 // Every case of every engine's fixtures, replayed with the engine's describer and no database: the text of the
-// sidecar is the case's expected.json, byte for byte.  tests/SqlSource.Tests.Postgres describes the same cases
-// against a server, and tools/record-fixtures.sh records them.
+// sidecar is the case's expected.json, byte for byte.  tests/SqlSource.Tests.Postgres and
+// tests/SqlSource.Tests.SqlServer describe the same cases against a server, and tools/record-fixtures.sh records
+// them.
 public sealed class DescriberFixtureTests : IDisposable
 {
     private static readonly IReadOnlyList<FixtureCase> Found = FindAll();
@@ -50,6 +51,7 @@ public sealed class DescriberFixtureTests : IDisposable
         fixture.Engine switch
         {
             "postgres" => new PostgresDescriber(fixture.ExplainSettings),
+            "mssql" => new SqlServerDescriber(),
             _ => throw new InvalidOperationException($"No describer is known for the engine of the case {fixture}."),
         };
 
@@ -143,6 +145,28 @@ public sealed class DescriberFixtureTests : IDisposable
         }
     }
 
+    // The cases of the SQL Server describer.
+    [Fact]
+    public void Cases_OfSqlServer_HoldEveryCase()
+    {
+        var names = Found.Select(static found => found.ToString()).ToList();
+
+        foreach (
+            var name in new[]
+            {
+                "mssql/delete-declared-only",
+                "mssql/insert-declared",
+                "mssql/update-copies-agree",
+                "mssql/update-inferred",
+                "mssql/update-optional-filter",
+                "mssql/update-wide-types",
+            }
+        )
+        {
+            names.ShouldContain(name);
+        }
+    }
+
     // A describer whose calls changed fails its fixtures, and never passes silently.
     [Theory]
     [InlineData("prepare")]
@@ -152,9 +176,23 @@ public sealed class DescriberFixtureTests : IDisposable
     [InlineData("check")]
     [InlineData("explain", "select-left-join")]
     [InlineData("deallocate")]
-    public async Task Replay_CaptureWithACallRemoved_ThrowsACaptureMiss(string method, string from = "update-inferred")
+    public Task Replay_CaptureWithACallRemoved_ThrowsACaptureMiss(string method, string from = "update-inferred") =>
+        ReplayWithoutAsync("postgres/" + from, method);
+
+    // The same of the SQL Server describer, whose cases hold each of its calls.
+    [Theory]
+    [InlineData("open")]
+    [InlineData("parameters")]
+    [InlineData("probe", "update-optional-filter")]
+    [InlineData("declared", "insert-declared")]
+    public Task Replay_SqlServerCaptureWithACallRemoved_ThrowsACaptureMiss(
+        string method,
+        string from = "update-inferred"
+    ) => ReplayWithoutAsync("mssql/" + from, method);
+
+    private async Task ReplayWithoutAsync(string name, string method)
     {
-        var source = Found.Single(found => found.ToString() == "postgres/" + from);
+        var source = Found.Single(found => found.ToString() == name);
         var capture = CaptureJson.Read(source.Capture).Value.ShouldNotBeNull();
         var cut = new DescribeCapture(capture.Engine);
         foreach (var call in capture.Calls.Where(call => call.Method != method))
@@ -162,7 +200,7 @@ public sealed class DescriberFixtureTests : IDisposable
             cut.Add(call);
         }
 
-        var fixture = FixtureCaseFiles.Create(_folder.Path, SidecarValues.Engine.Postgres, "cut", source.Query);
+        var fixture = FixtureCaseFiles.Create(_folder.Path, source.Engine, "cut", source.Query);
         await FixtureCaseFiles.WriteCaptureAsync(fixture, cut, TestContext.Current.CancellationToken);
 
         _ = await Should.ThrowAsync<CaptureMissException>(() => FixtureReplay.DescribeAsync(fixture, DescriberOf));

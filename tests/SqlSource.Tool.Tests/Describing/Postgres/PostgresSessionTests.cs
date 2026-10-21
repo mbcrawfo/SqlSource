@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Describing.Postgres;
@@ -35,9 +36,15 @@ public sealed class PostgresSessionTests
         opened.Value.ShouldBeNull();
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC235");
-        failure.Arguments.ShouldBe([PostgresScript.Database, version, "14"]);
+        failure.Arguments.ShouldBe([PostgresScript.Database, "PostgreSQL", version, "14"]);
         failure.Step.ShouldBeNull();
         failure.ServerLines.ShouldBeEmpty();
+        string.Format(
+                CultureInfo.InvariantCulture,
+                failure.Descriptor.MessageFormat.ToString(CultureInfo.InvariantCulture),
+                [.. failure.Arguments]
+            )
+            .ShouldBe($"The database 'app' runs PostgreSQL {version}, and the tool supports 14 and later");
     }
 
     // A version with no leading digits is not refused: the tool cannot tell what it is.

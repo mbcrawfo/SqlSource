@@ -18,7 +18,11 @@ namespace SqlSource.Tool.Tests.Describing.Capture;
 public sealed class CallRecordTests
 {
     // A namespace of an engine's describer, with every namespace under it.
-    private static readonly string[] Under = ["SqlSource.Tool.Describing.Postgres"];
+    private static readonly string[] Under =
+    [
+        "SqlSource.Tool.Describing.Postgres",
+        "SqlSource.Tool.Describing.SqlServer",
+    ];
 
     // The namespace of the describer of the tests, and no namespace under it: the tests have their own types there.
     private static readonly string[] Exactly = ["SqlSource.Tool.Tests"];

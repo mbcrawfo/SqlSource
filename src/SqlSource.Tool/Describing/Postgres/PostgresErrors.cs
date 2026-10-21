@@ -82,6 +82,12 @@ internal static class PostgresErrors
     public const string SchemaChangedHelp =
         "the database's schema changed while the query was described; run the tool again";
 
+    // How SQLSRC235 names the engine.
+    private const string Engine = "PostgreSQL";
+
+    // How SQLSRC231 names what reads the parameters differently from SqlSource.
+    private const string Reader = "Npgsql";
+
     private const string UndefinedObject = "42704";
     private const string UtilityStatement = "42P14";
     private const string DuplicatePreparedStatement = "42P05";
@@ -140,6 +146,7 @@ internal static class PostgresErrors
             ToolDiagnostics.ServerVersionNotSupported,
             new EquatableArray<string>([
                 database,
+                Engine,
                 version,
                 PostgresSession.MinimumMajorVersion.ToString(CultureInfo.InvariantCulture),
             ]),
@@ -460,7 +467,7 @@ internal static class PostgresErrors
 
         return new DescribeFailure(
             ToolDiagnostics.ParametersReadDifferently,
-            new EquatableArray<string>([query.Name, verdict.Differs ?? string.Empty]),
+            new EquatableArray<string>([Reader, query.Name, verdict.Differs ?? string.Empty]),
             DescribeStep.CheckParameters,
             lines,
             HelpOf(verdict, parameters)

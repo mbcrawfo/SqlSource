@@ -1,6 +1,6 @@
 # Tools
 
-This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
+This folder holds the scripts that `pre-commit-validation.sh` and `.github/workflows/build.yml` run, the consumer project that one of them installs the package into, a script that pulls the test images, and two recording scripts, which are not checks.  [`CONTRIBUTING.md`](../CONTRIBUTING.md) says when to run them; [`AGENTS.md`](AGENTS.md) holds the traps of changing them.
 
 ## Linters
 
@@ -23,7 +23,7 @@ The three package checks look at what `dotnet pack SqlSource.slnx --output artif
 tools/check-package.sh artifacts/packages
 ```
 
-This checks what the two packages hold.  `SqlSource`: the generator under `analyzers/`, `build/SqlSource.props` and `build/SqlSource.targets`, the readme, and nothing under `lib/`.  `SqlSource.Tool`: the tool under `tools/net8.0/any/` with the generator's assembly, Roslyn, the library that reads a solution and Npgsql beside it, `DotnetToolSettings.xml`, the readme, which is `src/SqlSource.Tool/README.md`, and no documentation file of an assembly.  It fails when the two have different versions.  Without an argument it packs both into a temporary folder first.
+This checks what the two packages hold.  `SqlSource`: the generator under `analyzers/`, `build/SqlSource.props` and `build/SqlSource.targets`, the readme, and nothing under `lib/`.  `SqlSource.Tool`: the tool under `tools/net8.0/any/` with the generator's assembly, Roslyn, the library that reads a solution, Npgsql and Microsoft.Data.SqlClient beside it, SqlClient's copies for Unix and Windows and its native SNI for Windows under `runtimes/`, `DotnetToolSettings.xml`, the readme, which is `src/SqlSource.Tool/README.md`, and no documentation file of an assembly.  It fails when the two have different versions.  Without an argument it packs both into a temporary folder first.
 
 ### `check-package-install.sh`
 
@@ -53,9 +53,13 @@ This installs the tool the way a user does: `dotnet tool install` into a tempora
 
 The last run sets `DOTNET_ROLL_FORWARD` to `LatestMajor`, which starts the tool on the newest runtime the machine has.  The tool targets .NET 8 and rolls forward on a machine that has only a later one, and this proves it wherever the script runs.  Without an argument the script packs first.
 
+## Pulling the test images
+
+`tools/pull-test-images.sh [image ...]` is a step of `build.yml` and no check, and `pre-commit-validation.sh` does not run it.  It runs `docker pull` once for the default image of each engine, which it reads from the lines of `tests/SqlSource.Testing/DefaultImages.cs` that declare `Postgres` and `SqlServer`, and once for each image given as an argument, and prints `<image>: <n> s` for each.  The workflow gives it the two floor images.  A person can run it to have every image before a first run of the tests, which on Apple silicon saves minutes of the first test.
+
 ## Recording scripts
 
-None of these is a check, and a person runs them.  `pre-commit-validation.sh` and `build.yml` run none of them.  Each reads the default image from the line of `tests/SqlSource.Testing/DefaultImages.cs` that declares `Postgres`, and fails when it finds none.
+None of these is a check, and a person runs them.  `pre-commit-validation.sh` and `build.yml` run none of them.  Each reads the default image of the engine it records from the line of `tests/SqlSource.Testing/DefaultImages.cs` that declares it, and fails when it finds none: `record-fixtures.sh` reads `Postgres` and `SqlServer`, and `describe-end-to-end.sh` reads `Postgres` alone.
 
-- `tools/record-fixtures.sh` records the cases of the PostgreSQL describer's fixtures; [the describer's fixtures](../tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) has the procedure.
+- `tools/record-fixtures.sh [postgres|mssql]` records the cases of one describer's fixtures, or of both when it is given no engine; any other argument is a usage error.  It records on the default image of the engine, or on the image of `SQLSOURCE_TESTS_POSTGRES_IMAGE` or `SQLSOURCE_TESTS_SQLSERVER_IMAGE` when the variable is set.  The procedures are [the PostgreSQL describer's fixtures](../tests/SqlSource.Tests.Postgres/README.md#the-describers-fixtures) and [the SQL Server describer's](../tests/SqlSource.Tests.SqlServer/README.md#the-describers-fixtures).
 - `tools/describe-end-to-end.sh` writes every sidecar of the end-to-end queries, of the realistic cases and of `examples/PostgresExamples`, from nothing, on the default image alone; [the end-to-end project](../tests/SqlSource.Tests.Postgres/README.md#writing-the-sidecars) has the procedure.  It runs no test, since the project does not build until its sidecars are current: it starts a container itself with `docker run`, applies `Realistic/schema.sql` and `Realistic/seed.sql` of `tests/SqlSource.Tests.Postgres` to a database `realistic`, the schemas and seeds of `app` and `billing`, and the examples' schema to a database `examples`, with `psql`, and runs the tool from its source with `describe --force`.

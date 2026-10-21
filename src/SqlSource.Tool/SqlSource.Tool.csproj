@@ -31,6 +31,7 @@
     </PropertyGroup>
     <ItemGroup>
         <InternalsVisibleTo Include="SqlSource.Tests.Postgres" />
+        <InternalsVisibleTo Include="SqlSource.Tests.SqlServer" />
         <InternalsVisibleTo Include="SqlSource.Tool.Testing" />
         <InternalsVisibleTo Include="SqlSource.Tool.Tests" />
     </ItemGroup>
@@ -40,6 +41,8 @@
             takes a current compiler and not the generator's pin, as tests/SqlSource.Tests does.
         -->
         <PackageReference Include="Microsoft.CodeAnalysis.CSharp" VersionOverride="5.9.0" />
+        <!-- The driver of the SQL Server describer, Describing/SqlServer/. -->
+        <PackageReference Include="Microsoft.Data.SqlClient" />
         <PackageReference Include="Microsoft.VisualStudio.SolutionPersistence" />
         <!-- The driver of the PostgreSQL describer, Describing/Postgres/. -->
         <PackageReference Include="Npgsql" />

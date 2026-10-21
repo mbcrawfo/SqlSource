@@ -183,6 +183,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
         failure.Arguments.ShouldBe([
+            "Npgsql",
             DescribeRequests.Query,
             "column 1 is character varying[] for Npgsql and email_t[] for SqlSource",
         ]);
@@ -215,7 +216,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
 
         var failure = described.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
-        failure.Arguments.ShouldBe([DescribeRequests.Query, differs]);
+        failure.Arguments.ShouldBe(["Npgsql", DescribeRequests.Query, differs]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.Help.ShouldBe(help);
     }

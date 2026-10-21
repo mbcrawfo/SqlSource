@@ -605,7 +605,7 @@ public sealed class PostgresErrorsTests
             .ShouldNotBeNull();
 
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
-        failure.Arguments.ShouldBe(["ListUsers", "the result has 0 columns for Npgsql and 1 for SqlSource"]);
+        failure.Arguments.ShouldBe(["Npgsql", "ListUsers", "the result has 0 columns for Npgsql and 1 for SqlSource"]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldBeEmpty();
         failure.Help.ShouldBe(PostgresErrors.CheckHelp);
@@ -628,7 +628,7 @@ public sealed class PostgresErrorsTests
             .ShouldNotBeNull();
 
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
-        failure.Arguments.ShouldBe(["ListUsers", "syntax error at or near \"@\""]);
+        failure.Arguments.ShouldBe(["Npgsql", "ListUsers", "syntax error at or near \"@\""]);
         failure.ServerLines.ShouldBe(["42601: syntax error at or near \"@\"", "hint: a hint"]);
     }
 
@@ -759,7 +759,7 @@ public sealed class PostgresErrorsTests
             .ShouldNotBeNull();
 
         failure.Descriptor.Id.ShouldBe("SQLSRC231");
-        failure.Arguments.ShouldBe(["ListUsers", Differs]);
+        failure.Arguments.ShouldBe(["Npgsql", "ListUsers", Differs]);
         failure.Step.ShouldBe(DescribeStep.CheckParameters);
         failure.ServerLines.ShouldBeEmpty();
         failure.Help.ShouldBe(PostgresErrors.PlacementHelp);

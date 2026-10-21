@@ -57,6 +57,10 @@ jobs:
       # MSBuild reads environment variables as properties, so every dotnet command in this job sees the same version.
       BuildNumber: ${{ github.run_number }}
       VersionSuffix: ${{ inputs.version-suffix }}
+      # The oldest image of each engine that is supported, pinned as every image of the tests is: see rule 5 of
+      # AGENTS.md.  Each is pulled once, in its own step, and run by the step that tests on it.
+      POSTGRES_FLOOR_IMAGE: postgres:14.24
+      SQLSERVER_FLOOR_IMAGE: mcr.microsoft.com/mssql/server:2017-CU31-GDR19-ubuntu-18.04
     steps:
       - name: Check out
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -86,6 +90,12 @@ jobs:
         if: ${{ !cancelled() }}
         run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION" --no-restore
 
+      # A pull is a step of its own, so that the time it takes shows apart from the time the tests take.  It pulls the
+      # default image of each engine and the two floor images.
+      - name: Pull test images
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: tools/pull-test-images.sh "$POSTGRES_FLOOR_IMAGE" "$SQLSERVER_FLOOR_IMAGE"
+
       - name: Test
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: >-
@@ -95,14 +105,24 @@ jobs:
           --report-github
 
       # The Test step ran every test of tests/SqlSource.Tests.Postgres, the describer's and the end-to-end
-      # project's, on the default image.  This runs them again on the oldest PostgreSQL that is supported, pinned to
-      # its minor as every image of the tests is: see tests/SqlSource.Tests.Postgres/README.md.
+      # project's, on the default image.  This runs them again on the oldest PostgreSQL that is supported: see
+      # tests/SqlSource.Tests.Postgres/README.md.
       - name: Test on PostgreSQL 14
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         env:
-          SQLSOURCE_TESTS_POSTGRES_IMAGE: postgres:14.24
+          SQLSOURCE_TESTS_POSTGRES_IMAGE: ${{ env.POSTGRES_FLOOR_IMAGE }}
         run: >-
           dotnet test --project tests/SqlSource.Tests.Postgres --configuration "$CONFIGURATION" --no-build
+          --report-github
+
+      # The same for tests/SqlSource.Tests.SqlServer, which the Test step ran on the default image, on the oldest
+      # SQL Server that is supported: see tests/SqlSource.Tests.SqlServer/README.md.
+      - name: Test on SQL Server 2017
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        env:
+          SQLSOURCE_TESTS_SQLSERVER_IMAGE: ${{ env.SQLSERVER_FLOOR_IMAGE }}
+        run: >-
+          dotnet test --project tests/SqlSource.Tests.SqlServer --configuration "$CONFIGURATION" --no-build
           --report-github
 
       - name: Report coverage

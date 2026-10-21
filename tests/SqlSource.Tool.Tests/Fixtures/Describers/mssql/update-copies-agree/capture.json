@@ -1,0 +1,66 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "UPDATE dbo.users SET deleted_at = SYSUTCDATETIME() WHERE created_at < @before_1 OR deleted_at < @before_2;",
+        "params": null
+      },
+      "answer": {
+        "rows": [
+          {
+            "name": "@before_1",
+            "suggestedSystemTypeName": "datetime2(7)",
+            "suggestedMaxLength": 8,
+            "suggestedPrecision": 27,
+            "suggestedScale": 7,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          },
+          {
+            "name": "@before_2",
+            "suggestedSystemTypeName": "datetime2(7)",
+            "suggestedMaxLength": 8,
+            "suggestedPrecision": 27,
+            "suggestedScale": 7,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          }
+        ],
+        "error": null
+      }
+    }
+  ]
+}

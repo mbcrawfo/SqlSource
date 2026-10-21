@@ -2,6 +2,9 @@
 # Installs the packed sqlsource tool the way a user does, into an empty folder outside the repository, and runs it.
 # A tool carries everything it loads, so only a run of the packed tool shows that all of it is there and loads, and
 # that a tool built for .NET 8 starts on a machine whose only runtime is a later one.
+# No run here opens a database, so what a driver loads only when it connects, Microsoft.Data.SqlClient's copy for the
+# platform under runtimes/ and its native SNI on Windows, is shown to be in the package by tools/check-package.sh and
+# not shown to load.
 # It restores from the folder that holds the package and from nowhere else.
 # Usage: check-tool-install.sh [directory]   The directory holds one SqlSource.Tool.<version>.nupkg.  Without it, the
 # package is packed into a temporary directory first.

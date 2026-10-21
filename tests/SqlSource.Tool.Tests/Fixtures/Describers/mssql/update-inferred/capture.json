@@ -1,0 +1,76 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "UPDATE dbo.users SET name = @name, email = @email WHERE id = @id;",
+        "params": null
+      },
+      "answer": {
+        "rows": [
+          {
+            "name": "@name",
+            "suggestedSystemTypeName": "nvarchar(100)",
+            "suggestedMaxLength": 200,
+            "suggestedPrecision": 0,
+            "suggestedScale": 0,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          },
+          {
+            "name": "@email",
+            "suggestedSystemTypeName": "nvarchar(320)",
+            "suggestedMaxLength": 640,
+            "suggestedPrecision": 0,
+            "suggestedScale": 0,
+            "suggestedUserTypeSchema": "dbo",
+            "suggestedUserTypeName": "Email",
+            "suggestedAssemblyQualifiedTypeName": null
+          },
+          {
+            "name": "@id",
+            "suggestedSystemTypeName": "int",
+            "suggestedMaxLength": 4,
+            "suggestedPrecision": 10,
+            "suggestedScale": 0,
+            "suggestedUserTypeSchema": null,
+            "suggestedUserTypeName": null,
+            "suggestedAssemblyQualifiedTypeName": null
+          }
+        ],
+        "error": null
+      }
+    }
+  ]
+}

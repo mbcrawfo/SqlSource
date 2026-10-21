@@ -195,6 +195,7 @@ Each folder is a namespace of its own.  "From the generator" is what the folder 
 | `Describing/Describers/` | The contract a describer implements, `DescriberRegistry`, `LiveExchange` and `DescriberFaultException`: [the describer contract](postgres-describer.md#the-describer-contract) | `Logging/` for a describer's log, `Reporting/` | `SqlDialect`, `SqlQueryParameter`, the sidecar's model for what a describer gives, and the descriptors |
 | `Describing/Capture/` | Recording and replaying a describer's calls, as a [capture](README.md#capture): [capture and replay](postgres-describer.md#capture-and-replay) | `Describing/Describers/` | Nothing |
 | `Describing/Postgres/` | The PostgreSQL describer, with `Columns/`, which builds a column and matches a table, and `Walk/`, the plan walk: [its page](postgres-describer.md) and [nullability](postgres-nullability.md) | `Describing/Describers/`, `Logging/` | `SqlLexer` and its `SqlLexeme`s, `SqlDialectRules` and `QuoteReader.IsNameCharacterOfPostgreSql`, `SqlQueryParameter`, the sidecar's model, and `ToolDiagnostics` |
+| `Describing/SqlServer/` | The SQL Server describer: [its page](sqlserver-describer.md) | `Describing/Describers/`, `Logging/` | `SqlLexer` and its `SqlLexeme`s, `SqlDialectRules`, `SqlQueryParameter`, the sidecar's model, and `ToolDiagnostics` |
 | `Logging/` | What a run says of itself: the trace, the events and the log file | `Describing/` for `Redaction`, `ConnectionSecret` and the run's records, `ServerInfo` of `Describing/Describers/`, `Planning/`, `Projects/`, `Reporting/` | `ToolDiagnostics`, `SqlDialectName`, `SqlPath.SqlExtension` and `SqlPath.SidecarExtension` |
 | `Reporting/` | Errors as data, `ToolDiagnostic`, and the `Reporter` that writes and counts them | `Logging/` for the trace | The descriptors, `DiagnosticInfo` for a parse error |
 
@@ -232,7 +233,7 @@ A write that the system refuses keeps its exception as `RunLogFile.Failure`, and
 
 ### The SQL Server describer
 
-> **Not built yet.**  How the describer of `mssql` queries asks SQL Server about a query, and how the host registers it.  Delivered by phase 6 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
+> **Not built yet.**  How the host registers the describer of `mssql` queries, which [the SQL Server describer](sqlserver-describer.md) explains.  Delivered by phase 6 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 
 ### Build integration options
 
