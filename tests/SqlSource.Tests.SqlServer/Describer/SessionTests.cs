@@ -61,7 +61,8 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
     }
 
     // The port 1 of this machine refuses at once.  SqlClient's message names the host and the port.  On Linux SqlClient
-    // gives the socket's error as Success, which names no reason, so the line ends with the fixed text alone there.
+    // gives the socket's error as Success, which names no reason, and the error the number 0, so the line is the fixed
+    // text alone there.
     [Fact]
     public async Task OpenAsync_UnreachableHost_IsSqlsrc224WithNoPartOfTheValue()
     {
@@ -73,7 +74,7 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
 
         failure
             .ServerLines.ShouldHaveSingleItem()
-            .ShouldMatch(@": SqlClient could not reach the server(: ConnectionRefused)?$");
+            .ShouldMatch(@"(^|: )SqlClient could not reach the server(: ConnectionRefused)?$");
     }
 
     // The container's certificate is its own and signed by no authority this machine trusts, so a string that asks for
