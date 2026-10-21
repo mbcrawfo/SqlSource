@@ -1209,7 +1209,7 @@ For SQL Server, the line starts with `Msg <number>, Level <level>, State <state>
 | `SqlClient does not support this server on this platform` | The connection string names a server that cannot be used from this operating system: a LocalDB instance, such as `(localdb)\MSSQLLocalDB`, can be used on Windows alone.  Describe against a SQL Server that listens on a port, such as one in a container |
 | `SqlClient has no provider for the Authentication of the connection string` | An `Authentication` of Microsoft Entra ID, `Active Directory ...`, which the tool cannot sign in with.  Use a login and a password |
 
-See: [Connecting](postgresql.md#connecting)
+See: [Connecting](postgresql.md#connecting), [SQL Server](sqlserver.md)
 
 ## SQLSRC225
 
@@ -1303,9 +1303,9 @@ SQL Server gives the error for a parameter whose uses fix no type, `SELECT @p AS
 
 Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter whose only use is `@p IS NULL` is not this error: SQL Server gives it the type `int`.
 
-The same error with no `server:` line is for a parameter used more than once whose uses SQL Server gives different types, or gives one of its uses no type.  The uses that say nothing of the type, such as `@p IS NULL`, are then left out, as [SQLSRC262](#sqlsrc262) says, and the error is given when every use is left out that way, or when a use that is left has no type.  When every use gets the same type, the parameter has that type and this error is not given.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
+The same error with no `server:` line is for a parameter used more than once whose uses SQL Server gives different types, or gives one of its uses no type.  The uses that say nothing of the type, such as `@p IS NULL`, are then left out, as [SQLSRC262](#sqlsrc262) says, and this error is given when every use is left out that way, or when a use that is left has no type.  When the uses that are left have two types, the error is [SQLSRC262](#sqlsrc262) instead, and when every use gets the same type, the parameter has that type and no error is given.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
 
-See: [Parameters](postgresql.md#parameters)
+See: [Parameters](postgresql.md#parameters), [SQL Server](sqlserver.md)
 
 ## SQLSRC227
 
@@ -1364,7 +1364,7 @@ For SQL Server the error is at the step `resolve type`, and its reasons are thes
 
 Write the type as a column definition would: `int`, `nvarchar(50)`, `varchar(max)`, `decimal(18,2)`, `dbo.Email`, `[billing].[Amount]`.  An alias type needs its schema unless it is in `dbo` or in the default schema of the login.
 
-See: [Parameters](postgresql.md#parameters)
+See: [Parameters](postgresql.md#parameters), [SQL Server](sqlserver.md)
 
 ## SQLSRC229
 
@@ -1455,7 +1455,7 @@ DECLARE @x int = @n next_message: RECEIVE TOP (1) message_body, @p + 1 AS q FROM
 
 **Fix:** end the list of declarations with a `;`, or give the parameter a `-- param:` marker with its type, `-- param: @p int`, which makes it a parameter for SqlSource too.
 
-See: [What can be described](postgresql.md#what-can-be-described)
+See: [What can be described](postgresql.md#what-can-be-described), [SQL Server](sqlserver.md)
 
 ## SQLSRC232
 
@@ -1534,7 +1534,7 @@ The server that the database's connection string reaches is older than the oldes
 
 Upgrade the server, or point the tool at a database of a supported version, a copy of the schema on a newer server for one.  The error is reported once, at the first query of the database that the run would have described, as [SQLSRC224](#sqlsrc224) is, and each of the database's queries counts as failed.  A version that does not start with a number is not refused, since the tool cannot tell what it is.
 
-See: [Connecting](postgresql.md#connecting)
+See: [Connecting](postgresql.md#connecting), [SQL Server](sqlserver.md)
 
 ## SQLSRC236
 

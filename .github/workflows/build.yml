@@ -52,7 +52,7 @@ jobs:
   build:
     name: Format check, build, test and pack
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     env:
       # MSBuild reads environment variables as properties, so every dotnet command in this job sees the same version.
       BuildNumber: ${{ github.run_number }}
