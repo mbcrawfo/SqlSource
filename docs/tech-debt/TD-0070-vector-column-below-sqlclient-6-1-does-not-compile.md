@@ -1,4 +1,4 @@
-# TD-0071 - A `vector` column below Microsoft.Data.SqlClient 6.1 is typed by a type that version lacks
+# TD-0070 - A `vector` column below Microsoft.Data.SqlClient 6.1 is typed by a type that version lacks
 
 ## Problem
 
