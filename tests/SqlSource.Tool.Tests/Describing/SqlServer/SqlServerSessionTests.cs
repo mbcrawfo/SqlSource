@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Globalization;
-using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
@@ -20,31 +18,15 @@ namespace SqlSource.Tool.Tests.Describing.SqlServer;
 // answers.  No driver runs: the connection is a word that SqlClient could not open.
 public sealed class SqlServerSessionTests
 {
-    private const string Database = "app";
-
     private static readonly SqlServerParameterRow IntRow = new("@x", "int", 4, 10, 0, null, null, null);
     private static readonly SqlServerParameterRow Name100Row = new("@x", "nvarchar(100)", 200, 0, 0, null, null, null);
     private static readonly SqlServerType Int = new("int", 4, 10, 0, null);
     private static readonly SqlServerType Name100 = new("nvarchar(100)", 200, 0, 0, null);
 
-    // What "open" answers for SQL Server 2017 with the settings a database of its defaults has.
-    private static readonly SqlServerOpenAnswer Opened2017 = new(
-        "14.0.3560.2",
-        3,
-        "7.1.1",
-        [
-            new SqlServerSetting("compatibility_level", "140"),
-            new SqlServerSetting("ANSI_NULLS", "ON"),
-            new SqlServerSetting("QUOTED_IDENTIFIER", "ON"),
-            new SqlServerSetting("collation", "SQL_Latin1_General_CP1_CI_AS"),
-        ],
-        null
-    );
-
     [Fact]
     public async Task OpenAsync_Server2017_OpensWithTheVersionTheDriverAndTheFourSettings()
     {
-        var exchange = Answering(Opened2017);
+        var exchange = SqlServerScript.Answering(SqlServerScript.Opened);
 
         var opened = await OpenAsync(exchange);
 
@@ -65,12 +47,14 @@ public sealed class SqlServerSessionTests
     [Fact]
     public async Task OpenAsync_Server2016_IsSqlsrc235()
     {
-        var opened = await OpenAsync(Answering(Opened2017 with { ProductVersion = "13.0.6300.2" }));
+        var opened = await OpenAsync(
+            SqlServerScript.Answering(SqlServerScript.Opened with { ProductVersion = "13.0.6300.2" })
+        );
 
         opened.Value.ShouldBeNull();
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC235");
-        failure.Arguments.ShouldBe([Database, "SQL Server", "13.0.6300.2", "14 (SQL Server 2017)"]);
+        failure.Arguments.ShouldBe([SqlServerScript.Database, "SQL Server", "13.0.6300.2", "14 (SQL Server 2017)"]);
         failure.Step.ShouldBeNull();
         failure.ServerLines.ShouldBeEmpty();
         string.Format(
@@ -87,7 +71,9 @@ public sealed class SqlServerSessionTests
     [Fact]
     public async Task OpenAsync_AzureSqlDatabaseOfAnOlderVersion_Opens()
     {
-        var opened = await OpenAsync(Answering(Opened2017 with { ProductVersion = "12.0.2000.8", EngineEdition = 5 }));
+        var opened = await OpenAsync(
+            SqlServerScript.Answering(SqlServerScript.Opened with { ProductVersion = "12.0.2000.8", EngineEdition = 5 })
+        );
 
         await using var session = opened.Value.ShouldNotBeNull();
         session.Server.Version.ShouldBe("12.0.2000.8");
@@ -96,7 +82,9 @@ public sealed class SqlServerSessionTests
     [Fact]
     public async Task OpenAsync_AzureManagedInstance_Opens()
     {
-        var opened = await OpenAsync(Answering(Opened2017 with { ProductVersion = "12.0.2000.8", EngineEdition = 8 }));
+        var opened = await OpenAsync(
+            SqlServerScript.Answering(SqlServerScript.Opened with { ProductVersion = "12.0.2000.8", EngineEdition = 8 })
+        );
 
         await using var session = opened.Value.ShouldNotBeNull();
         session.Server.Version.ShouldBe("12.0.2000.8");
@@ -107,12 +95,12 @@ public sealed class SqlServerSessionTests
     {
         var error = new SqlServerServerError([new SqlServerErrorRow(18456, 14, 8, "the server refused the login")]);
 
-        var opened = await OpenAsync(Answering(new SqlServerOpenAnswer(null, null, null, null, error)));
+        var opened = await OpenAsync(SqlServerScript.Answering(new SqlServerOpenAnswer(null, null, null, null, error)));
 
         opened.Value.ShouldBeNull();
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
-        failure.Arguments.ShouldBe([Database]);
+        failure.Arguments.ShouldBe([SqlServerScript.Database]);
         failure.Step.ShouldBeNull();
         failure.ServerLines.ShouldBe(["Msg 18456, Level 14, State 8: the server refused the login"]);
         failure.Help.ShouldBe(
@@ -126,7 +114,7 @@ public sealed class SqlServerSessionTests
     {
         const string Sql = "SELECT id FROM dbo.users WHERE id = @id AND name = @name";
         var parameters = new SqlServerParametersRequest(Sql, null);
-        var script = new Script().Add(
+        var script = new SqlServerScript().Add(
             "parameters",
             parameters,
             new SqlServerParametersAnswer([IntRow with { Name = "@id" }, Name100Row with { Name = "@name" }], null)
@@ -154,7 +142,7 @@ public sealed class SqlServerSessionTests
         var xmlFirst = new SqlServerProbeRequest(Renamed, "@name_1 xml, @name_2 nvarchar(100)");
         var intFirst = new SqlServerProbeRequest(Renamed, "@name_1 int, @name_2 nvarchar(100)");
         var xmlSecond = new SqlServerProbeRequest(Renamed, "@name_1 int, @name_2 xml");
-        var script = new Script()
+        var script = new SqlServerScript()
             .Add(
                 "parameters",
                 parameters,
@@ -189,7 +177,7 @@ public sealed class SqlServerSessionTests
     {
         const string Renamed = "SELECT id FROM dbo.orders WHERE id = @p_1 OR user_id = @p_2";
         var parameters = new SqlServerParametersRequest(Renamed, null);
-        var script = new Script().Add(
+        var script = new SqlServerScript().Add(
             "parameters",
             parameters,
             new SqlServerParametersAnswer([IntRow with { Name = "@p_1" }, IntRow with { Name = "@p_2" }], null)
@@ -213,7 +201,7 @@ public sealed class SqlServerSessionTests
         const string Sql = "SELECT id FROM dbo.orders WHERE user_id = @tenant AND id = @id";
         var declared = new SqlServerDeclaredRequest("SELECT @tenant AS [1]", "@tenant int");
         var parameters = new SqlServerParametersRequest(Sql, "@tenant int");
-        var script = new Script()
+        var script = new SqlServerScript()
             .Add(
                 "declared",
                 declared,
@@ -239,7 +227,7 @@ public sealed class SqlServerSessionTests
     [Fact]
     public async Task DescribeAsync_DeclaredTypeTheGrammarRefuses_IsSqlsrc228AndAsksNothing()
     {
-        var (described, asked) = await new Script().DescribeAsync(
+        var (described, asked) = await new SqlServerScript().DescribeAsync(
             Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users WHERE id = @p", ("p", "int; DROP TABLE dbo.victim"))
         );
 
@@ -257,7 +245,7 @@ public sealed class SqlServerSessionTests
     {
         const string Sql = "SELECT TOP (@n) id, @p + 1 AS q FROM dbo.users";
         var parameters = new SqlServerParametersRequest(Sql, null);
-        var script = new Script().Add(
+        var script = new SqlServerScript().Add(
             "parameters",
             parameters,
             new SqlServerParametersAnswer(
@@ -284,7 +272,7 @@ public sealed class SqlServerSessionTests
     {
         const string Renamed = "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2 AND id = @q";
         var parameters = new SqlServerParametersRequest(Renamed, null);
-        var script = new Script().Add(
+        var script = new SqlServerScript().Add(
             "parameters",
             parameters,
             new SqlServerParametersAnswer(
@@ -306,7 +294,7 @@ public sealed class SqlServerSessionTests
     {
         const string Renamed = "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2";
         var parameters = new SqlServerParametersRequest(Renamed, null);
-        var script = new Script()
+        var script = new SqlServerScript()
             .Add(
                 "parameters",
                 parameters,
@@ -338,7 +326,7 @@ public sealed class SqlServerSessionTests
     {
         const string Renamed = "SELECT id FROM dbo.users WHERE id = @p_1 AND name = @p_2";
         var lost = new SqlServerServerError([new SqlServerErrorRow(0, 0, 0, ConnectionErrors.LostConnection)]);
-        var script = new Script()
+        var script = new SqlServerScript()
             .Add(
                 "parameters",
                 new SqlServerParametersRequest(Renamed, null),
@@ -364,7 +352,7 @@ public sealed class SqlServerSessionTests
     public async Task DescribeAsync_DeclaredAnswersErrorRows_IsSqlsrc228AndAsksNoParameters()
     {
         var declared = new SqlServerDeclaredRequest("SELECT @p AS [1]", "@p dbo.Nope");
-        var script = new Script().Add(
+        var script = new SqlServerScript().Add(
             "declared",
             declared,
             new SqlServerDeclaredAnswer(
@@ -393,51 +381,6 @@ public sealed class SqlServerSessionTests
     private static (string Method, string Request) Call<TRequest>(string method, TRequest request) =>
         (method, CaptureJson.KeyOf(CaptureJson.ToElement(request)));
 
-    // A capture of "open", answered as Opened2017, and of the calls the test adds; a describe over it gives the
-    // calls the session asked after "open", in order.
-    private sealed class Script
-    {
-        private readonly DescribeCapture _capture = new(SidecarValues.Engine.SqlServer);
-
-        public Script()
-        {
-            _ = Add("open", SqlServerOpenRequest.Instance, Opened2017);
-        }
-
-        public Script Add<TRequest, TAnswer>(string method, TRequest request, TAnswer answer)
-        {
-            _capture.Add(new CaptureCall(method, CaptureJson.ToElement(request), CaptureJson.ToElement(answer)));
-            return this;
-        }
-
-        public async Task<(
-            Outcome<QueryDescription, DescribeFailure> Described,
-            IReadOnlyList<(string Method, string Request)> Asked
-        )> DescribeAsync(DescribeRequest request)
-        {
-            var replay = new ReplayingExchange(_capture);
-            var asked = new DescribeCapture(SidecarValues.Engine.SqlServer);
-            var opened = await OpenAsync(new CapturingExchange(replay, asked));
-            await using var session = opened.Value.ShouldNotBeNull();
-            var described = await session.DescribeAsync(request, TestContext.Current.CancellationToken);
-            replay.Unused.ShouldBeEmpty();
-            return (
-                described,
-                [.. asked.Calls.Skip(1).Select(static call => (call.Method, CaptureJson.KeyOf(call.Request)))]
-            );
-        }
-    }
-
-    // A capture of the one call "open", answered as the test gives.
-    private static ReplayingExchange Answering(SqlServerOpenAnswer answer)
-    {
-        var capture = new DescribeCapture(SidecarValues.Engine.SqlServer);
-        capture.Add(
-            new CaptureCall("open", CaptureJson.ToElement(SqlServerOpenRequest.Instance), CaptureJson.ToElement(answer))
-        );
-        return new ReplayingExchange(capture);
-    }
-
     private static Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(IDescribeExchange exchange) =>
-        new SqlServerDescriber().OpenAsync(Database, FixtureReplay.Connection, exchange);
+        new SqlServerDescriber().OpenAsync(SqlServerScript.Database, FixtureReplay.Connection, exchange);
 }

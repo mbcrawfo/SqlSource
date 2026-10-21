@@ -3,14 +3,10 @@ using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
-using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
-using SqlSource.Tool.Describing.Capture;
-using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
-using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 
@@ -49,6 +45,28 @@ public sealed class SqlServerEventsTests
             )
         );
 
+    // A row of "parameters" as the event writes it: every member, named as the capture names it.
+    private static LogValue ParameterMap(
+        string name,
+        string? type,
+        long? length,
+        long? precision,
+        long? scale,
+        string? userSchema = null,
+        string? userName = null,
+        string? assembly = null
+    ) =>
+        LogValue.MapOf(
+            new("name", name),
+            new("suggestedSystemTypeName", type),
+            new("suggestedMaxLength", LogValue.Of(length)),
+            new("suggestedPrecision", LogValue.Of(precision)),
+            new("suggestedScale", LogValue.Of(scale)),
+            new("suggestedUserTypeSchema", userSchema),
+            new("suggestedUserTypeName", userName),
+            new("suggestedAssemblyQualifiedTypeName", assembly)
+        );
+
     [Fact]
     public void Parameters_RowsOfTheServer_WritesTheSqlTheDeclarationsAndEveryMemberOfEachRow()
     {
@@ -73,26 +91,8 @@ public sealed class SqlServerEventsTests
         Member(members, "rows")
             .ShouldBe(
                 LogValue.ListOf([
-                    LogValue.MapOf(
-                        new("name", "@id"),
-                        new("suggestedSystemTypeName", "int"),
-                        new("suggestedMaxLength", 4L),
-                        new("suggestedPrecision", 10L),
-                        new("suggestedScale", 0L),
-                        new("suggestedUserTypeSchema", LogValue.Null),
-                        new("suggestedUserTypeName", LogValue.Null),
-                        new("suggestedAssemblyQualifiedTypeName", LogValue.Null)
-                    ),
-                    LogValue.MapOf(
-                        new("name", "@e"),
-                        new("suggestedSystemTypeName", "nvarchar(320)"),
-                        new("suggestedMaxLength", 640L),
-                        new("suggestedPrecision", 0L),
-                        new("suggestedScale", 0L),
-                        new("suggestedUserTypeSchema", "dbo"),
-                        new("suggestedUserTypeName", "Email"),
-                        new("suggestedAssemblyQualifiedTypeName", "Types, Version=1.0")
-                    ),
+                    ParameterMap("@id", "int", 4, 10, 0),
+                    ParameterMap("@e", "nvarchar(320)", 640, 0, 0, "dbo", "Email", "Types, Version=1.0"),
                 ])
             );
         Member(members, "durationMs").ShouldBe((LogValue)3L);
@@ -117,21 +117,7 @@ public sealed class SqlServerEventsTests
 
         var members = log.Events.ShouldHaveSingleItem().Members;
         Member(members, "params").ShouldBe(LogValue.Null);
-        Member(members, "rows")
-            .ShouldBe(
-                LogValue.ListOf([
-                    LogValue.MapOf(
-                        new("name", "@x"),
-                        new("suggestedSystemTypeName", LogValue.Null),
-                        new("suggestedMaxLength", LogValue.Null),
-                        new("suggestedPrecision", LogValue.Null),
-                        new("suggestedScale", LogValue.Null),
-                        new("suggestedUserTypeSchema", LogValue.Null),
-                        new("suggestedUserTypeName", LogValue.Null),
-                        new("suggestedAssemblyQualifiedTypeName", LogValue.Null)
-                    ),
-                ])
-            );
+        Member(members, "rows").ShouldBe(LogValue.ListOf([ParameterMap("@x", null, null, null, null)]));
     }
 
     // Every error of the exception is written, in its order, in the place of the rows.
@@ -361,7 +347,7 @@ public sealed class SqlServerEventsTests
         var parameters = new SqlServerParametersRequest(Renamed, "@tenant int");
         var intRow = new SqlServerParameterRow("@name_1", "int", 4, 10, 0, null, null, null);
         var textRow = new SqlServerParameterRow("@name_2", "nvarchar(100)", 200, 0, 0, null, null, null);
-        var script = new EventScript()
+        var script = new SqlServerScript()
             .Add(
                 "declared",
                 new SqlServerDeclaredRequest("SELECT @tenant AS [1]", "@tenant int"),
@@ -389,13 +375,15 @@ public sealed class SqlServerEventsTests
             );
         var log = new RecordingLog();
 
-        await script.DescribeAsync(
+        _ = await script.DescribeAsync(
             Of(
                 SqlDialectRules.SqlServer,
                 "SELECT id FROM dbo.users WHERE tenant = @tenant AND (@name IS NULL OR name = @name)",
                 ("tenant", "int")
             ),
-            log
+            log,
+            new TestClock(),
+            CallTime
         );
 
         log.Events.Select(written => written.Name).ShouldBe(["declared", "parameters", "probe", "probe", "probe"]);
@@ -417,14 +405,14 @@ public sealed class SqlServerEventsTests
     public async Task DescribeAsync_ParametersThatFail_WritesTheErrorAndNoProbe()
     {
         const string Sql = "SELECT id FROM dbo.users WHERE id = @id";
-        var script = new EventScript().Add(
+        var script = new SqlServerScript().Add(
             "parameters",
             new SqlServerParametersRequest(Sql, null),
             new SqlServerParametersAnswer(null, Refused)
         );
         var log = new RecordingLog();
 
-        await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql), log);
+        _ = await script.DescribeAsync(Of(SqlDialectRules.SqlServer, Sql), log, new TestClock(), CallTime);
 
         var (name, members) = log.Events.ShouldHaveSingleItem();
         name.ShouldBe("parameters");
@@ -432,12 +420,52 @@ public sealed class SqlServerEventsTests
     }
 
     // As a run gives the describer its log: the engine before each name, and the connection's value written as ***
-    // wherever it stands, in the SQL, the declarations and the message of an error one level down.
+    // wherever it stands: in the SQL, in the declarations and in a string of a row.
     [Fact]
     public async Task DescribeAsync_ThroughTheLogOfASession_HasTheEngineBeforeEachNameAndNothingOfTheSecret()
     {
+        const string Sql = "SELECT id FROM dbo.users WHERE email = @p AND other = @e";
+        var script = new SqlServerScript()
+            .Add(
+                "declared",
+                new SqlServerDeclaredRequest("SELECT @p AS [1]", "@p dbo.Email"),
+                new SqlServerDeclaredAnswer(
+                    [new SqlServerDeclaredRow(1, "nvarchar(320)", 640, 0, 0, "dbo", "Email", null)],
+                    null,
+                    null
+                )
+            )
+            .Add(
+                "parameters",
+                new SqlServerParametersRequest(Sql, "@p dbo.Email"),
+                new SqlServerParametersAnswer(
+                    [new SqlServerParameterRow("@e", "nvarchar(320)", 640, 0, 0, "dbo", "Email", null)],
+                    null
+                )
+            );
+        var inner = new RecordingLog();
+
+        var (described, _) = await script.DescribeAsync(
+            Of(SqlDialectRules.SqlServer, Sql, ("p", "dbo.Email")),
+            new SessionRunLog(inner, new ConnectionSecret("Email"), "mssql.")
+        );
+
+        _ = described.Value.ShouldNotBeNull();
+        inner.Events.Select(written => written.Name).ShouldBe(["mssql.declared", "mssql.parameters"]);
+        var declared = inner.Events[0].Members;
+        Member(declared, "params").ShouldBe((LogValue)"@p dbo.***");
+        var parameters = inner.Events[1].Members;
+        Member(parameters, "params").ShouldBe((LogValue)"@p dbo.***");
+        Member(parameters, "rows")
+            .ShouldBe(LogValue.ListOf([ParameterMap("@e", "nvarchar(320)", 640, 0, 0, "dbo", "***")]));
+    }
+
+    // The same inside a list of maps: the message of an error is a string two levels down, and the SQL holds it too.
+    [Fact]
+    public async Task DescribeAsync_ThroughTheLogOfASession_RemovesTheSecretFromTheSqlAndTheMessageOfAnError()
+    {
         const string Sql = "SELECT id FROM dbo.secret WHERE id = @id";
-        var script = new EventScript().Add(
+        var script = new SqlServerScript().Add(
             "parameters",
             new SqlServerParametersRequest(Sql, null),
             new SqlServerParametersAnswer(
@@ -447,7 +475,7 @@ public sealed class SqlServerEventsTests
         );
         var inner = new RecordingLog();
 
-        await script.DescribeAsync(
+        _ = await script.DescribeAsync(
             Of(SqlDialectRules.SqlServer, Sql),
             new SessionRunLog(inner, new ConnectionSecret("secret"), "mssql.")
         );
@@ -456,48 +484,5 @@ public sealed class SqlServerEventsTests
         name.ShouldBe("mssql.parameters");
         Member(members, "sql").ShouldBe((LogValue)"SELECT id FROM dbo.*** WHERE id = @id");
         Member(members, "error").ShouldBe(ErrorsOf((208, 16, 1, "Invalid object name 'dbo.***'.")));
-    }
-
-    // A capture of "open" and of the calls a test adds, replayed with a clock that every call moves by CallTime.
-    private sealed class EventScript
-    {
-        private readonly DescribeCapture _capture = new(SidecarValues.Engine.SqlServer);
-
-        public EventScript()
-        {
-            _ = Add(
-                "open",
-                SqlServerOpenRequest.Instance,
-                new SqlServerOpenAnswer(
-                    "14.0.3560.2",
-                    3,
-                    "7.1.1",
-                    [new SqlServerSetting("compatibility_level", "140")],
-                    null
-                )
-            );
-        }
-
-        public EventScript Add<TRequest, TAnswer>(string method, TRequest request, TAnswer answer)
-        {
-            _capture.Add(new CaptureCall(method, CaptureJson.ToElement(request), CaptureJson.ToElement(answer)));
-            return this;
-        }
-
-        public async Task DescribeAsync(DescribeRequest request, IRunLog log)
-        {
-            var clock = new TestClock();
-            var replay = new ReplayingExchange(_capture);
-            var opened = await new SqlServerDescriber().OpenAsync(
-                "app",
-                FixtureReplay.Connection,
-                new ClockedExchange(replay, clock, CallTime),
-                log,
-                clock
-            );
-            await using var session = opened.Value.ShouldNotBeNull();
-            _ = await session.DescribeAsync(request, TestContext.Current.CancellationToken);
-            replay.Unused.ShouldBeEmpty();
-        }
     }
 }
