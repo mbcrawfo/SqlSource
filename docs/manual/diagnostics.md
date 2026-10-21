@@ -147,6 +147,15 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 |----|----|
 | [SQLSRC262](#sqlsrc262) | Copies of a parameter have different types |
 
+**The columns of a SQL Server query**
+
+| Id | Title |
+|----|----|
+| [SQLSRC263](#sqlsrc263) | Query returns rows of different shapes |
+| [SQLSRC264](#sqlsrc264) | Query runs SQL the server cannot read |
+| [SQLSRC265](#sqlsrc265) | Query uses a temporary table in a batch |
+| [SQLSRC266](#sqlsrc266) | Column has no name |
+
 **The C# types of a SQL Server query**
 
 | Id | Title |
@@ -155,9 +164,9 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC268](#sqlsrc268) | Microsoft.Data.SqlClient is newer than SqlSource knows |
 | [SQLSRC269](#sqlsrc269) | Type needs Microsoft.Data.SqlClient |
 
-Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, and 262, are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
+Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, and 262 to 266, are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
-The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` dialect, and reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
+The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262` to `SQLSRC266`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` dialect, and reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
 
 The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` and `mssql` dialects every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209) or [SQLSRC210](#sqlsrc210) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 119, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
 
@@ -1270,6 +1279,20 @@ For SQL Server, each error the server gave is a `server:` line, `Msg <number>, L
     server: Msg 11501, Level 16, State 2: The batch could not be analyzed because of compile errors.
 ```
 
+At the step `describe columns`, each line is `Msg <number>:` and its text, with no level or state, and the last is `Msg 11501` or `Msg 11529`, which says only that SQL Server could not work out the query's columns:
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC225: The server rejected the query 'AddOrder': The target table 'dbo.orders' of the DML statement cannot have any enabled triggers if the statement contains an OUTPUT clause without INTO clause.
+    query: AddOrder, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: describe columns
+    server: Msg 334: The target table 'dbo.orders' of the DML statement cannot have any enabled triggers if the statement contains an OUTPUT clause without INTO clause.
+    server: Msg 11501: The batch could not be analyzed because of compile errors.
+```
+
+- **An `OUTPUT` clause without `INTO`, on a table that has an enabled trigger,** is `Msg 334`, as above.  SQL Server refuses the statement when it runs, too.  Output the rows `INTO` a table variable and select them from it.
+- **A table or a column that the database does not have** is `Msg 208`, `Invalid object name`, or `Msg 207`, `Invalid column name`, as in the first SQL Server example.  A temporary table that the query reads and does not create is `Msg 208` too, since it does not exist when the query is described; one that the query creates is [SQLSRC265](#sqlsrc265).
+- **A `GO` inside the query** is `Msg 102`, `Incorrect syntax near 'GO'`.  `GO` ends a batch in SQL Server Management Studio and `sqlcmd`, and is not T-SQL: give each batch a `-- name:` of its own.
+- **A misspelt keyword at the start of the query**, such as `SELEC 1`, is `Msg 2812`, `Could not find stored procedure 'SELEC'`, then `Msg 11529`: SQL Server reads a query that starts with a name as a call of the procedure of that name.  Correct the spelling.
 - **A type that a `-- param:` marker declares** is checked against every use of the parameter, so `-- param: @p xml` with `WHERE id = @p` is this error, `Msg 206`, `Operand type clash: xml is incompatible with int`.  A type that the query's own text names and the database lacks, `CAST(@p AS dbo.Nope)`, is this error too.
 - **A parameter whose name, with its `@`, is longer than 128 characters** is this error, `Msg 103`, `The identifier that starts with '...' is too long`, whether it is used once, used more than once or declared with `-- param:`; a declared one gives it at the step `resolve type`.  Give the parameter a shorter name.
 - **A statement whose result SQL Server cannot work out**, such as `CREATE PROCEDURE`, is `Msg 11527`, `... does not support metadata discovery`.  Give the query `-- output: sql`.
@@ -2080,6 +2103,131 @@ SQL Server gives a parameter a type at each place the query uses it, and SqlSour
 ```
 
 Declare the parameter's type with a `-- param:` marker, `-- param: @p nvarchar(100)`: SQL Server then checks every use against the type you chose.  Or use two parameters, one for each type.  The optional filter, `(@name IS NULL OR name = @name)`, is not this error: its use in `@name IS NULL` fixes no type, and the parameter takes the type of the column.
+
+See: [SQL Server](sqlserver.md)
+
+## SQLSRC263
+
+**Query returns rows of different shapes**
+
+SQL Server works out the columns of a query from its text, without running it, so every path through the query must return the same columns.  Here the paths return different ones: an `IF` whose two `SELECT`s differ in the number, the names or the types of their columns.  A query has one set of columns, and one model for its rows, whichever path runs.
+
+```console
+/work/App/Queries/Users.sql(1,10): error SQLSRC263: The query 'FindUser' returns rows of different shapes on different paths
+    query: FindUser, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: describe columns
+    server: Msg 11509: The metadata could not be determined because the statement 'SELECT id FROM dbo.users WHERE id = @id' is not compatible with the statement 'SELECT id, name FROM dbo.users WHERE name = @name'.
+```
+
+```sql error
+-- name: FindUser
+IF @by_name = 1
+    SELECT id, name FROM dbo.users WHERE name = @name
+ELSE
+    SELECT id FROM dbo.users WHERE id = @id;
+```
+
+Make every path return the same columns, of the same names and types, or split the query into one query for each set of columns and choose between them in your code:
+
+```sql mssql
+-- name: FindUserByName
+SELECT id, name FROM dbo.users WHERE name = @name;
+
+-- name: FindUserById
+SELECT id, name FROM dbo.users WHERE id = @id;
+```
+
+See: [SQL Server](sqlserver.md)
+
+## SQLSRC264
+
+**Query runs SQL the server cannot read**
+
+The query runs SQL that it builds in a string, `EXEC(@sql)`.  SQL Server works out the columns of a query from its text, without running it, and the string holds its SQL only when the query runs, so SQL Server cannot say what it returns.
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC264: The query 'ListOrders' runs SQL that the server cannot read until it runs
+    query: ListOrders, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: describe columns
+    server: Msg 11513: The metadata could not be determined because statement 'EXEC(@sql)' contains dynamic SQL. Consider using the WITH RESULT SETS clause to explicitly describe the result set.
+```
+
+```sql error
+-- name: ListOrders
+DECLARE @sql nvarchar(max) = N'SELECT id, total FROM dbo.orders WHERE customer_id = ' + CAST(@customer_id AS nvarchar(20));
+EXEC(@sql);
+```
+
+Write the SQL in the query, with a query parameter where the string took a value:
+
+```sql mssql
+-- name: ListOrders
+SELECT id, total FROM dbo.orders WHERE customer_id = @customer_id;
+```
+
+Or `EXEC` a literal string, `EXEC(N'SELECT id, total FROM dbo.orders')`, which SQL Server can read.  A part of the SQL that changes between calls, such as the name of a table, can be a [token](parameters-and-tokens.md#tokens), which the generated method takes as an argument.
+
+See: [SQL Server](sqlserver.md)
+
+## SQLSRC265
+
+**Query uses a temporary table in a batch**
+
+The query creates a temporary table, a `#` table, and reads it in a later statement.  SQL Server works out the columns of a query from its text, without running it, and the table does not exist until the query runs, so SQL Server cannot say what the statement that reads it returns.
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC265: The query 'RecentTotals' uses a temporary table in a batch of several statements
+    query: RecentTotals, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: describe columns
+    server: Msg 11525: The metadata could not be determined because statement 'SELECT customer_id, SUM(total) AS total FROM #recent GROUP BY customer_id' uses a temp table.
+    help: make the query one statement, or use a table variable in place of the temporary table
+```
+
+```sql error
+-- name: RecentTotals
+CREATE TABLE #recent (customer_id int NOT NULL, total decimal(12,2) NOT NULL);
+INSERT #recent (customer_id, total) SELECT customer_id, total FROM dbo.orders WHERE placed_at > @since;
+SELECT customer_id, SUM(total) AS total FROM #recent GROUP BY customer_id;
+```
+
+Make the query one statement:
+
+```sql mssql
+-- name: RecentTotals
+SELECT customer_id, SUM(total) AS total
+FROM dbo.orders
+WHERE placed_at > @since
+GROUP BY customer_id;
+```
+
+Or declare a table variable in the place of the temporary table, `DECLARE @recent TABLE (customer_id int NOT NULL, total decimal(12,2) NOT NULL)`, whose columns SQL Server reads from its declaration.  A query that reads a temporary table it does not create is [SQLSRC225](#sqlsrc225) instead, with `Msg 208`, `Invalid object name`.
+
+See: [SQL Server](sqlserver.md)
+
+## SQLSRC266
+
+**Column has no name**
+
+A column of the query has no name, so its property in the output model would have none.  SQL Server gives no name to a column that is an expression or a literal without an alias, such as `COUNT(*)`, `price * quantity` or `1`.  The message gives the column's position, from 1, and the query.  It is what [SQLSRC253](#sqlsrc253) is for PostgreSQL, and the tool reports it when it describes the query.
+
+```console
+/work/App/Queries/Orders.sql(1,10): error SQLSRC266: Column 2 of the query 'CountOrders' has no name
+    query: CountOrders, database app, mssql 17.0.5015.4, Microsoft.Data.SqlClient 7.1.1
+    step: describe columns
+    help: give the column a name with AS
+```
+
+```sql error
+-- name: CountOrders
+SELECT customer_id, COUNT(*) FROM dbo.orders GROUP BY customer_id;
+```
+
+Give the column an alias, which names its property, then run `dotnet sqlsource describe` again:
+
+```sql mssql
+-- name: CountOrders
+SELECT customer_id, COUNT(*) AS order_count FROM dbo.orders GROUP BY customer_id;
+```
 
 See: [SQL Server](sqlserver.md)
 

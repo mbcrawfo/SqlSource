@@ -436,6 +436,50 @@ internal static class ToolDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor ConflictingResults = new(
+        id: "SQLSRC263",
+        title: "Query returns rows of different shapes",
+        messageFormat: "The query '{0}' returns rows of different shapes on different paths",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc263",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor DynamicSql = new(
+        id: "SQLSRC264",
+        title: "Query runs SQL the server cannot read",
+        messageFormat: "The query '{0}' runs SQL that the server cannot read until it runs",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc264",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor TemporaryTableInBatch = new(
+        id: "SQLSRC265",
+        title: "Query uses a temporary table in a batch",
+        messageFormat: "The query '{0}' uses a temporary table in a batch of several statements",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc265",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    public static readonly DiagnosticDescriptor ColumnHasNoName = new(
+        id: "SQLSRC266",
+        title: "Column has no name",
+        messageFormat: "Column {0} of the query '{1}' has no name",
+        category: SqlDiagnostics.Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: SqlDiagnostics.HelpLinkBase + "sqlsrc266",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -478,6 +522,10 @@ internal static class ToolDiagnostics
             PositionalParameterWritten,
             ServerVersionNotSupported,
             SessionNotKept,
-            CopiesHaveDifferentTypes
+            CopiesHaveDifferentTypes,
+            ConflictingResults,
+            DynamicSql,
+            TemporaryTableInBatch,
+            ColumnHasNoName
         );
 }
