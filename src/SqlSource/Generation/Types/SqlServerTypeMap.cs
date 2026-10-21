@@ -46,7 +46,8 @@ internal static class SqlServerTypeMap
                 return Map(type with { UserType = null }, column, overrideOf);
             }
 
-            return IsSystemSchema(userType) && Rows.TryGetValue(userType.Name!, out var clrRow)
+            // Only the CLR types are rows by their name: an assembly-qualified sys.int is not int.
+            return IsSystemSchema(userType) && Rows.TryGetValue(userType.Name!, out var clrRow) && clrRow.IsClr
                 ? clrRow.Under(column)
                 : TypeMapping.Failed(TypeMappingKind.Unreadable, userKey);
         }
@@ -76,7 +77,10 @@ internal static class SqlServerTypeMap
     {
         if (UserTypeOf(type) is not { } userType)
         {
-            return TypeKeys.WritePart(BaseName(type.Name));
+            // A system type's name is case-insensitive: a row is keyed by its own name, so the key asked of the
+            // override and the key of the mapping agree.
+            var baseName = BaseName(type.Name);
+            return Rows.TryGetValue(baseName, out var row) ? row.Key : TypeKeys.WritePart(baseName);
         }
 
         return IsSystemSchema(userType)
@@ -105,27 +109,27 @@ internal static class SqlServerTypeMap
     {
         var rows = new Dictionary<string, Row>(StringComparer.OrdinalIgnoreCase);
 
-        void Add(Func<string, Row> row, params string[] keys)
+        void Add(Row row, params string[] keys)
         {
             foreach (var key in keys)
             {
-                rows.Add(key, row(key));
+                rows.Add(key, row with { Key = key });
             }
         }
 
-        Add(key => Row.Of(key, "long", true), "bigint");
-        Add(key => Row.Of(key, "int", true), "int");
-        Add(key => Row.Of(key, "short", true), "smallint");
-        Add(key => Row.Of(key, "byte", true), "tinyint");
-        Add(key => Row.Of(key, "bool", true), "bit");
-        Add(key => Row.Of(key, "decimal", true), "decimal", "numeric", "money", "smallmoney");
-        Add(key => Row.Of(key, "double", true), "float");
-        Add(key => Row.Of(key, "float", true), "real");
-        Add(key => Row.Of(key, DateTime, true), "date", "datetime", "datetime2", "smalldatetime");
-        Add(key => Row.Of(key, "global::System.TimeSpan", true), "time");
-        Add(key => Row.Of(key, "global::System.DateTimeOffset", true), "datetimeoffset");
+        Add(Row.Same("long", true), "bigint");
+        Add(Row.Same("int", true), "int");
+        Add(Row.Same("short", true), "smallint");
+        Add(Row.Same("byte", true), "tinyint");
+        Add(Row.Same("bool", true), "bit");
+        Add(Row.Same("decimal", true), "decimal", "numeric", "money", "smallmoney");
+        Add(Row.Same("double", true), "float");
+        Add(Row.Same("float", true), "real");
+        Add(Row.Same(DateTime, true), "date", "datetime", "datetime2", "smalldatetime");
+        Add(Row.Same("global::System.TimeSpan", true), "time");
+        Add(Row.Same("global::System.DateTimeOffset", true), "datetimeoffset");
         Add(
-            key => Row.Of(key, StringKeyword, false),
+            Row.Same(StringKeyword, false),
             "char",
             "varchar",
             "text",
@@ -136,31 +140,34 @@ internal static class SqlServerTypeMap
             "json",
             "sysname"
         );
-        Add(key => Row.Of(key, "byte[]", false), "binary", "varbinary", "image", "timestamp");
-        Add(key => Row.Of(key, "global::System.Guid", true), "uniqueidentifier");
-        Add(key => Row.Of(key, "object", false), "sql_variant");
-        Add(key => Row.OfSqlClient(key, "global::Microsoft.Data.SqlTypes.SqlVector<float>", true), "vector");
-        Add(key => Row.NeedsTypes(key, "SqlHierarchyId"), "hierarchyid");
-        Add(key => Row.NeedsTypes(key, "SqlGeography"), "geography");
-        Add(key => Row.NeedsTypes(key, "SqlGeometry"), "geometry");
+        Add(Row.Same("byte[]", false), "binary", "varbinary", "image", "timestamp");
+        Add(Row.Same("global::System.Guid", true), "uniqueidentifier");
+        Add(Row.Same("object", false), "sql_variant");
+        Add(Row.OfSqlClient("global::Microsoft.Data.SqlTypes.SqlVector<float>", true), "vector");
+        Add(Row.NeedsTypes("SqlHierarchyId"), "hierarchyid");
+        Add(Row.NeedsTypes("SqlGeography"), "geography");
+        Add(Row.NeedsTypes("SqlGeometry"), "geometry");
         return rows;
     }
 
     /// <summary>A row of the map.</summary>
-    /// <param name="Key">The row's name.</param>
+    /// <param name="Key">The row's name, set when it is added.</param>
     /// <param name="Text">The C# type, or null when SqlClient cannot read the type without a package.</param>
     /// <param name="IsValueType">Whether the C# type is a value type.</param>
     /// <param name="IsOfSqlClient">Whether the C# type is SqlClient's own, so a project without it has none.</param>
     /// <param name="Package">The package's C# type for a type that SqlClient reads only with it, or null.</param>
     private sealed record Row(string Key, string? Text, bool IsValueType, bool IsOfSqlClient, string? Package)
     {
-        public static Row Of(string key, string text, bool isValueType) => new(key, text, isValueType, false, null);
+        // Whether SqlClient reads the type only with the package, which makes it a CLR type.
+        public bool IsClr => Package is not null;
 
-        public static Row OfSqlClient(string key, string text, bool isValueType) =>
-            new(key, text, isValueType, true, null);
+        public static Row Same(string text, bool isValueType) => new(string.Empty, text, isValueType, false, null);
 
-        public static Row NeedsTypes(string key, string package) =>
-            new(key, null, false, false, SqlServerTypesNamespace + package);
+        public static Row OfSqlClient(string text, bool isValueType) =>
+            new(string.Empty, text, isValueType, true, null);
+
+        public static Row NeedsTypes(string package) =>
+            new(string.Empty, null, false, false, SqlServerTypesNamespace + package);
 
         public TypeMapping Under(SqlClientColumn column)
         {

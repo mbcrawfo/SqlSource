@@ -7,9 +7,10 @@ using System.Text;
 namespace SqlSource.Settings;
 
 /// <summary>
-/// The keys a type override may name: the names of the PostgreSQL types that the base map knows, their one-word
-/// aliases, and a schema-qualified name of any type.  The settings check a key here, and the map reads the names of
-/// the extensions' types here.  Each map keeps its own rows, and
+/// The keys a type override may name: the names of the types that each engine's base map knows, PostgreSQL's with
+/// their one-word aliases, which the settings read today, and SQL Server's list of names, which its map is held to,
+/// and a schema-qualified name of any type.  The settings check a key here, and the map reads the names of the
+/// extensions' types here.  Each map keeps its own rows, and
 /// <c>PostgresTypeMapTests.Keys_OfTheMap_AreTheKnownNamesOfTheSettings</c> and
 /// <c>Keys_OfTheSqlServerMap_AreTheKnownSqlServerNamesOfTheSettings</c> hold them equal to the names here.
 /// </summary>

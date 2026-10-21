@@ -191,10 +191,28 @@ public sealed class SqlServerTypeMapTests
     }
 
     [Fact]
-    public void Map_Name_IsMatchedIgnoringCase() =>
-        SqlServerTypeMap
-            .Map(TestSidecars.SqlServer(name: "NVarChar(10)"), SqlClientColumn.None)
-            .Text.ShouldBe("string");
+    public void Map_Name_IsMatchedIgnoringCase()
+    {
+        var type = TestSidecars.SqlServer(name: "NVarChar(10)");
+        var asked = new List<string>();
+
+        var mapping = SqlServerTypeMap.Map(type, SqlClientColumn.None, Recording(asked));
+
+        mapping.Text.ShouldBe("string");
+        mapping.Key.ShouldBe("nvarchar");
+        asked.ShouldBe(["nvarchar"]);
+    }
+
+    [Fact]
+    public void Map_ClrTypeNamedAsAPlainRow_IsUnreadable()
+    {
+        var type = TestSidecars.SqlServer(name: "int", userType: new SqlServerUserType("sys", "int", Assembly));
+
+        var mapping = SqlServerTypeMap.Map(type, SqlClientColumn.SqlClient7);
+
+        mapping.Kind.ShouldBe(TypeMappingKind.Unreadable);
+        mapping.Key.ShouldBe("int");
+    }
 
     [Fact]
     public void Map_UserTypeWithoutAName_IsTreatedAsNoUserType()
