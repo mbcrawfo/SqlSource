@@ -15,14 +15,9 @@ namespace SqlSource.Generation.Emitting;
 /// </summary>
 internal static class TypeEmitter
 {
-    /// <summary>
-    /// The name of the class that holds the members in <see cref="MemberPlacement.Nested" /> placement.
-    /// </summary>
-    public const string NestedClassName = "Sql";
-
     private const string Indent = "    ";
 
-    // A query can be named like a member the type inherits: "GetType" hides object.GetType in the Sql class, and
+    // A query can be named like a member the type inherits: "GetType" hides object.GetType in the nested class, and
     // under SqlLocation.Direct a query can hide a member of a base class.  That is what was asked for, and the
     // compiler's request to add "new" (CS0108) is one that nobody can act on in generated code.  Neither is its
     // request to add "new" or "override" (CS0114) to a method that has the name and the parameters of an inherited
@@ -70,7 +65,7 @@ internal static class TypeEmitter
         ImmutableArray<DiagnosticInfo>.Builder? diagnostics
     )
     {
-        var containingTypeName = type.Placement == MemberPlacement.Nested ? NestedClassName : type.Name;
+        var containingTypeName = type.Placement == MemberPlacement.Nested ? type.NestedClass : type.Name;
         var usable = new bool[files.Count];
         var fileOfName = new Dictionary<string, string>(StringComparer.Ordinal);
         for (var index = 0; index < files.Count; index++)
@@ -172,7 +167,7 @@ internal static class TypeEmitter
 
         if (type.Placement == MemberPlacement.Nested)
         {
-            Open(builder, depth++, "private static class " + NestedClassName);
+            Open(builder, depth++, "private static class " + type.NestedClass);
         }
 
         var indent = GetIndent(depth);

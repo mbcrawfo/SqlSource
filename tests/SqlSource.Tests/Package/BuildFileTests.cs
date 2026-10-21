@@ -50,6 +50,9 @@ public sealed partial class BuildFileTests
     // What the targets trim and the generator does not read.
     private static readonly string[] TrimmedOnly = ["SqlSourceDatabase"];
 
+    // What the generator reads as a property of the project and never as metadata of a file.
+    private static readonly string[] PropertyOnly = ["SqlSourceNestedClass"];
+
     private static readonly XDocument Props = Load("SqlSource.props");
 
     private static readonly XDocument Targets = Load("SqlSource.targets");
@@ -71,7 +74,9 @@ public sealed partial class BuildFileTests
     {
         var items = Props.Descendants("CompilerVisibleProperty").ToList();
 
-        items.Select(item => item.Attribute("Include").ShouldNotBeNull().Value).ShouldBe(Settings, ignoreOrder: true);
+        items
+            .Select(item => item.Attribute("Include").ShouldNotBeNull().Value)
+            .ShouldBe(Settings.Concat(PropertyOnly), ignoreOrder: true);
 
         // A project that sets SqlSourceIncludeFiles to false lists its own .sql files, and still needs the
         // properties.  So nothing may put a condition on the items.
@@ -190,6 +195,7 @@ public sealed partial class BuildFileTests
     public void Targets_ManifestTarget_WritesEverySettingOfTheProjectAndOfEachFile()
     {
         var names = Settings.Concat(TrimmedOnly).ToList();
+        var properties = names.Concat(PropertyOnly);
         var lines = Manifest()
             .Descendants("SqlSourceManifestLine")
             .Select(line => line.Attribute("Include").ShouldNotBeNull().Value)
@@ -198,7 +204,7 @@ public sealed partial class BuildFileTests
         lines[0].ShouldBe("SqlSourceManifest=1");
         lines
             .Where(line => line.StartsWith("Property.", StringComparison.Ordinal))
-            .ShouldBe(names.Select(name => $"Property.{name}=$([MSBuild]::Escape($({name})))"), ignoreOrder: true);
+            .ShouldBe(properties.Select(name => $"Property.{name}=$([MSBuild]::Escape($({name})))"), ignoreOrder: true);
 
         const string Start = "@(SqlSourceManifestSqlFile->'";
         const string End = "')";
@@ -293,7 +299,9 @@ public sealed partial class BuildFileTests
             .Elements()
             .ToList();
 
-        trimmed.Select(element => element.Name.LocalName).ShouldBe(Settings.Concat(TrimmedOnly), ignoreOrder: true);
+        trimmed
+            .Select(element => element.Name.LocalName)
+            .ShouldBe(Settings.Concat(TrimmedOnly).Concat(PropertyOnly), ignoreOrder: true);
         trimmed.ShouldAllBe(element => element.Value == Trimmed(element.Name.LocalName));
         trimmed.SelectMany(ConditionsAround).ShouldBeEmpty();
     }

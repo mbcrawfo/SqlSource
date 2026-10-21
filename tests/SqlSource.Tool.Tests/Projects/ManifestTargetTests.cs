@@ -27,6 +27,9 @@ public sealed class ManifestTargetTests : IDisposable
         "SqlSourceTypeOverrides",
     ];
 
+    // The settings that are properties of the project and never metadata of a file.
+    private static readonly string[] PropertyOnlyNames = ["SqlSourceNestedClass"];
+
     private readonly FixtureProjects _fixtures = new();
 
     public void Dispose() => _fixtures.Dispose();
@@ -39,7 +42,11 @@ public sealed class ManifestTargetTests : IDisposable
         ];
 
     private static string[] PropertyLines(params (string Name, string Value)[] properties) =>
-        [.. Names.Select(name => $"Property.{name}=" + properties.FirstOrDefault(pair => pair.Name == name).Value)];
+        [
+            .. Names
+                .Concat(PropertyOnlyNames)
+                .Select(name => $"Property.{name}=" + properties.FirstOrDefault(pair => pair.Name == name).Value),
+        ];
 
     private static string[] Constants(string[] lines) =>
         lines

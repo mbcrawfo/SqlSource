@@ -47,6 +47,7 @@ Each name links to its section, which gives its values and its rules.  **Written
 | [One query's model name](#setting-model-name) | A type's name, or its full name | `-- input-model:`, `-- output-model:` inside a query | Works today |
 | [Type overrides](#setting-type-overrides) | Entries `key=type`, each a database type and the C# type it gets, or `key=default`.  Default: none | `SqlSourceTypeOverrides` property and metadata; `-- type-override:` in the file header and inside a query | Works today |
 | [`SqlLocation`](#setting-sql-location) | `Nested`, `Direct`.  Default `Nested` | `SqlLocation` on the attribute | Works today |
+| [Nested class](#setting-nested-class) | A C# identifier that is not a keyword.  Default `Sql` | `SqlSourceNestedClass` property; `NestedClass` on the attribute | Works today |
 | [`Path`](#setting-path) | A folder, or one `.sql` file, relative to the folder of the C# file.  Default: that folder | `Path` on the attribute | Works today |
 
 ### Settings for query methods
@@ -90,7 +91,7 @@ Four exceptions, stated plainly:
 
 - **A list of generator parameters replaces the one below it whole.**  It never adds to it.  See [generator parameters](#setting-generator-parameters).
 - **A dialect value replaces the one below it whole**, options included.  The dialect has no attribute and no in-query level: a file has one dialect, which is the marker in its file header, else its item metadata, else the property, else `ansi`.  See [dialect](#setting-dialect).
-- **`SqlLocation`, `MethodLocation` and `Path` exist only on the attribute.**  They have nothing to choose between.
+- **`SqlLocation`, `MethodLocation` and `Path` exist only on the attribute.**  They have nothing to choose between.  The nested class has two places, the attribute over the property.
 - **A type override replaces only the types it names.**  Each place adds its entries to those of the places below it, an entry for a type replaces the entry below it for that type, and `default` takes the type out.  The type override has no attribute level.  See [type overrides](#setting-type-overrides).
 
 <a id="a-value-that-is-wrong"></a>
@@ -416,10 +417,32 @@ public static partial class UserQueries;
 
 | `SqlLocation` | Generated members | Used as |
 |----|----|----|
-| `SqlLocation.Nested` (the default) | Public members in a `private static class Sql` nested in the type | `Sql.GetUser`, inside the type only |
+| `SqlLocation.Nested` (the default) | Public members in a `private static class` nested in the type, named `Sql` unless [the nested class](#setting-nested-class) names it | `Sql.GetUser`, inside the type only |
 | `SqlLocation.Direct` | Public members on the type itself | `UserQueries.GetUser`, wherever the type is visible |
 
-With `Nested`, a type that already has a member named `Sql` is [SQLSRC007](diagnostics.md#sqlsrc007): rename it, or use `Direct`.  The members are described on [the generator page](generator.md).
+With `Nested`, a type that already has a member with the nested class's name is [SQLSRC007](diagnostics.md#sqlsrc007): rename it, give the nested class another name, or use `Direct`.  The members are described on [the generator page](generator.md).
+
+<a id="setting-nested-class"></a>
+
+## Name of the nested class
+
+```xml
+<PropertyGroup>
+    <SqlSourceNestedClass>Queries</SqlSourceNestedClass>
+</PropertyGroup>
+```
+
+```csharp
+[SqlSourceGenerate(NestedClass = "Statements")]
+public partial class UserRepository
+{
+    public string Get() => Statements.GetUser;
+}
+```
+
+Under `SqlLocation.Nested`, this names the private class that holds the type's members.  `NestedClass` on the attribute names it for one type, and the `SqlSourceNestedClass` property for every type of the project that does not set it.  Without either, the class is `Sql`.  The setting has no item metadata and no marker, since a type's queries can come from several files.
+
+The value is one C# identifier that is not a keyword: `Queries` is fine, and `class`, `My-Sql` or `App.Sql` is not.  A value that is not valid is [SQLSRC006](diagnostics.md#sqlsrc006) on the attribute, and [SQLSRC014](diagnostics.md#sqlsrc014) as the property.  Under `SqlLocation.Direct` there is no nested class, and the setting has no effect, even on the same attribute.
 
 <a id="setting-method-location"></a>
 

@@ -12,7 +12,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC004](#sqlsrc004) | Path matches no SQL file |
 | [SQLSRC005](#sqlsrc005) | Folder has no SQL file |
 | [SQLSRC006](#sqlsrc006) | Attribute value is not valid |
-| [SQLSRC007](#sqlsrc007) | Type has a member named Sql |
+| [SQLSRC007](#sqlsrc007) | Type has a member named like its nested class |
 | [SQLSRC008](#sqlsrc008) | Query name is used in two files |
 | [SQLSRC009](#sqlsrc009) | Query is named like its containing type |
 | [SQLSRC011](#sqlsrc011) | SqlSourceDialect is not valid |
@@ -233,15 +233,15 @@ A property of `[SqlSourceGenerate]` has a value it does not take.  The message n
 public partial class UserRepository { }
 ```
 
-Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  `Output` takes `GeneratorOutput.Sql`, `GeneratorOutput.Models` or `GeneratorOutput.CodeGen`.  `InputModelType` and `OutputModelType` take `GeneratorModelType.Record`, `SealedRecord`, `Class` or `SealedClass`; `CollectionType` takes a member of `GeneratorCollectionType`; `MethodLocation` takes a member of `MethodLocation`.  `InputModelSuffix` and `OutputModelSuffix` take characters that can be part of an identifier, and `ModelNamespace` takes a namespace such as `App.Models`; a value that is empty or only white space is not set.  The type gets no members until the value is fixed.
+Use a member of the enum, and for `Parameters` the words that [SQLSRC109](#sqlsrc109) lists.  `Output` takes `GeneratorOutput.Sql`, `GeneratorOutput.Models` or `GeneratorOutput.CodeGen`.  `InputModelType` and `OutputModelType` take `GeneratorModelType.Record`, `SealedRecord`, `Class` or `SealedClass`; `CollectionType` takes a member of `GeneratorCollectionType`; `MethodLocation` takes a member of `MethodLocation`.  `InputModelSuffix` and `OutputModelSuffix` take characters that can be part of an identifier, `ModelNamespace` takes a namespace such as `App.Models`, and `NestedClass` takes one identifier that is not a keyword; a value that is empty or only white space is not set.  The type gets no members until the value is fixed.
 
 See: [All settings](settings.md#all-settings)
 
 ## SQLSRC007
 
-**Type has a member named Sql**
+**Type has a member named like its nested class**
 
-With `SqlLocation.Nested` the queries go in a nested class named `Sql`, and the type already has a member with that name.  The same error is reported when the type itself, or one of its type parameters, is named `Sql`: a nested class cannot share either name.
+With `SqlLocation.Nested` the queries go in a nested class, named `Sql` unless [the nested class](settings.md#setting-nested-class) names it otherwise, and the type already has a member with that name.  The message names it.  The same error is reported when the type itself, or one of its type parameters, has the name: a nested class cannot share either name.
 
 ```csharp
 [SqlSourceGenerate]
@@ -251,7 +251,7 @@ public partial class UserRepository
 }
 ```
 
-Rename the member, the type or the type parameter, or set `SqlLocation = SqlLocation.Direct` so that the queries become members of the type itself.
+Rename the member, the type or the type parameter, give the nested class another name with `NestedClass` on the attribute or the `SqlSourceNestedClass` property, or set `SqlLocation = SqlLocation.Direct` so that the queries become members of the type itself.
 
 See: [Where the members go](generator.md#locations)
 
@@ -269,7 +269,7 @@ See: [Which files belong to a type](generator.md#files-of-a-type)
 
 **Query is named like its containing type**
 
-A member cannot have the name of the type that contains it.  With `SqlLocation.Nested` that type is the generated class, so no query can be named `Sql`.  With `SqlLocation.Direct` it is the attributed type, so no query can have that type's name.
+A member cannot have the name of the type that contains it.  With `SqlLocation.Nested` that type is the generated class, so no query can have its name, `Sql` unless [the nested class](settings.md#setting-nested-class) is named otherwise.  With `SqlLocation.Direct` it is the attributed type, so no query can have that type's name.
 
 ```sql
 -- name: Sql
@@ -360,7 +360,7 @@ An MSBuild property of SqlSource, or the metadata of that name on an `Additional
 
 Correct the value, or remove it to keep the default.  While it is wrong the setting is not set.  In a list of generator parameters the other words still apply, with one exception: `default` beside another parameter makes the whole list wrong, so `default no-token-validation` is reported whole and sets no list.  The same value in several places is reported once, and the metadata of a file that no type claims is not reported.
 
-`SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceInputModelType` and `SqlSourceOutputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `SqlSourceCollectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `SqlSourceInputModelSuffix` and `SqlSourceOutputModelSuffix` take characters that can be part of an identifier, and `SqlSourceModelNamespace` takes a namespace such as `App.Models`.  `SqlSourceDatabase` takes one word of letters, digits, `-`, `_` and `.`.  The generator does not read it, so a build does not report it; the `sqlsource` tool does.  Where a type's methods go is set by the attribute alone, so there is no property for it.
+`SqlSourceOutput` takes `sql`, `models` or `codegen`, in any case and with or without hyphens and spaces.  `SqlSourceInputModelType` and `SqlSourceOutputModelType` take `record`, `sealed record`, `class` or `sealed class`, and `SqlSourceCollectionType` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`, all matched in the same way.  `SqlSourceInputModelSuffix` and `SqlSourceOutputModelSuffix` take characters that can be part of an identifier, `SqlSourceModelNamespace` takes a namespace such as `App.Models`, and `SqlSourceNestedClass` takes one identifier that is not a keyword.  `SqlSourceDatabase` takes one word of letters, digits, `-`, `_` and `.`.  The generator does not read it, so a build does not report it; the `sqlsource` tool does.  Where a type's methods go is set by the attribute alone, so there is no property for it.
 
 `SqlSourceTypeOverrides` takes entries `key=type`, separated by spaces or line breaks, and each entry that is not valid is reported on its own, while the others still apply.  A space or a line break inside `<>`, `[]` or the double quotes of a key is part of the entry, so a `<`, a `[` or a quote that is never closed makes the rest of the value one entry, which is reported whole, and the entries after it do not apply:
 

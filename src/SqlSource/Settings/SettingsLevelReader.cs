@@ -34,6 +34,7 @@ internal static class SettingsLevelReader
             OutputModelType = source.Choice<ModelKind>(SettingId.OutputModelType),
             CollectionType = source.Choice<CollectionKind>(SettingId.CollectionType),
             TypeOverrides = ReadTypeOverrides(ref source),
+            NestedClass = ReadText(ref source, SettingId.NestedClass, SettingValue.IsTypeName),
         };
 
         // A source that sets nothing shares the empty level.

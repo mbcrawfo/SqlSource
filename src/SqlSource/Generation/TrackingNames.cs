@@ -7,6 +7,8 @@ internal static class TrackingNames
 {
     public const string TargetTypes = nameof(TargetTypes);
 
+    public const string NestedClassCheck = nameof(NestedClassCheck);
+
     public const string SqlPaths = nameof(SqlPaths);
 
     public const string CaseCollisions = nameof(CaseCollisions);

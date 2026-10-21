@@ -86,10 +86,10 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
-    public static readonly DiagnosticDescriptor SqlMemberExists = new(
+    public static readonly DiagnosticDescriptor NestedClassNameTaken = new(
         id: "SQLSRC007",
-        title: "Type has a member named Sql",
-        messageFormat: "'{0}' already has a member named 'Sql'.  Rename it, or use SqlLocation.Direct.",
+        title: "Type has a member named like its nested class",
+        messageFormat: "'{0}' already has a member named '{1}'.  Rename it, or use SqlLocation.Direct.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -711,7 +711,7 @@ internal static class SqlDiagnostics
             PathMatchesNothing,
             FolderHasNoSqlFile,
             InvalidAttributeValue,
-            SqlMemberExists,
+            NestedClassNameTaken,
             DuplicateQueryName,
             QueryNamedLikeContainingType,
             InvalidDialect,

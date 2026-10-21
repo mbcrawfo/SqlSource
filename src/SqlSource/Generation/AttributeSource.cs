@@ -43,6 +43,8 @@ internal static class AttributeSource
 
     public const string CollectionTypeProperty = "CollectionType";
 
+    public const string NestedClassProperty = "NestedClass";
+
     /// <summary>
     /// The metadata name of every type that <see cref="Text" /> declares.  A project that sees the internals of
     /// another one that uses SqlSource sees each of them twice, and <c>AttributeConflictSuppressor</c> turns the
@@ -81,7 +83,8 @@ internal static class AttributeSource
             internal enum SqlLocation
             {
                 /// <summary>
-                /// In a private static class named <c>Sql</c>, nested in the type.
+                /// In a private static class nested in the type, named by
+                /// <see cref="SqlSourceGenerateAttribute.NestedClass" />.
                 /// </summary>
                 Nested = 0,
 
@@ -242,6 +245,13 @@ internal static class AttributeSource
                 /// <see cref="global::SqlSource.SqlLocation.Nested" />.
                 /// </summary>
                 public SqlLocation SqlLocation { get; set; }
+
+                /// <summary>
+                /// The name of the class that holds the generated members under
+                /// <see cref="global::SqlSource.SqlLocation.Nested" />.  The default is the project's
+                /// <c>SqlSourceNestedClass</c>, else <c>Sql</c>.
+                /// </summary>
+                public string NestedClass { get; set; }
 
                 /// <summary>
                 /// What is generated for the queries of the type's files.  The default is

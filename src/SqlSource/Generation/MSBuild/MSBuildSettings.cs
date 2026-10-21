@@ -53,6 +53,12 @@ internal static class MSBuildSettings
     /// </summary>
     public const string TypeOverridesName = "SqlSourceTypeOverrides";
 
+    /// <summary>
+    /// The setting that is a property of the project and never metadata of a file, since it belongs to a type, whose
+    /// queries can come from several files.  The tool does not read it either: it changes nothing that is described.
+    /// </summary>
+    public const string NestedClassName = "SqlSourceNestedClass";
+
     // The names, in the order of SettingId.  Above Property and Metadata, which read it when they are made.
     private static readonly string[] Names =
     [
@@ -66,6 +72,7 @@ internal static class MSBuildSettings
         OutputModelTypeName,
         CollectionTypeName,
         TypeOverridesName,
+        NestedClassName,
     ];
 
     /// <summary>
@@ -74,17 +81,21 @@ internal static class MSBuildSettings
     /// </summary>
     public static SettingKeys Property { get; } = new(PropertyPrefix, SettingPlace.Property, isManifest: false);
 
-    /// <summary>The keys of the metadata of a file's item that the compiler is shown, without the database.</summary>
+    /// <summary>
+    /// The keys of the metadata of a file's item that the compiler is shown, without the database and the nested
+    /// class.
+    /// </summary>
     public static SettingKeys Metadata { get; } = new(MetadataPrefix, SettingPlace.Metadata, isManifest: false);
 
     /// <summary>
     /// The keys of the properties in a project manifest, which the tool reads: with the database, and without the
-    /// type override.
+    /// type override and the nested class.
     /// </summary>
     public static SettingKeys ManifestProperty { get; } = new(PropertyPrefix, SettingPlace.Property, isManifest: true);
 
     /// <summary>
-    /// The keys of a file's metadata in a project manifest: with the database, and without the type override.
+    /// The keys of a file's metadata in a project manifest: with the database, and without the type override and the
+    /// nested class.
     /// </summary>
     public static SettingKeys ManifestMetadata { get; } = new(MetadataPrefix, SettingPlace.Metadata, isManifest: true);
 
@@ -137,7 +148,8 @@ internal static class MSBuildSettings
 
     /// <summary>
     /// The keys of the settings under one prefix, built once.  The keys of a manifest are the tool's, and have the
-    /// database and not the type override; the compiler's have the type override and not the database.
+    /// database and not the type override; the compiler's have the type override and not the database.  Only the
+    /// compiler's keys of the properties have the nested class.
     /// </summary>
     internal sealed class SettingKeys(string prefix, SettingPlace place, bool isManifest)
     {
@@ -148,7 +160,9 @@ internal static class MSBuildSettings
 
         /// <summary>The key of a setting, or null for one these keys have none for.</summary>
         public string? this[SettingId setting] =>
-            (setting == SettingId.Database && !isManifest) || (setting == SettingId.TypeOverrides && isManifest)
+            (setting == SettingId.Database && !isManifest)
+            || (setting == SettingId.TypeOverrides && isManifest)
+            || (setting == SettingId.NestedClass && (isManifest || place != SettingPlace.Property))
                 ? null
                 : _keys[(int)setting];
     }

@@ -15,6 +15,7 @@ public sealed class SettingsLevelReaderTests
         [SettingId.InputModelSuffix] = static level => level.InputModelSuffix,
         [SettingId.OutputModelSuffix] = static level => level.OutputModelSuffix,
         [SettingId.ModelNamespace] = static level => level.ModelNamespace,
+        [SettingId.NestedClass] = static level => level.NestedClass,
     };
 
     [Fact]
@@ -32,6 +33,7 @@ public sealed class SettingsLevelReaderTests
     [InlineData("InputModelSuffix", " Args ", "Args")]
     [InlineData("OutputModelSuffix", "Row", "Row")]
     [InlineData("ModelNamespace", " App.Models ", "App.Models")]
+    [InlineData("NestedClass", " Queries ", "Queries")]
     public void Read_TextThatIsValid_IsSetWithoutTheWhiteSpaceAroundIt(string setting, string written, string expected)
     {
         var id = Enum.Parse<SettingId>(setting);
@@ -48,6 +50,8 @@ public sealed class SettingsLevelReaderTests
     [InlineData("InputModelSuffix", "a-b", "a-b")]
     [InlineData("OutputModelSuffix", " a b ", "a b")]
     [InlineData("ModelNamespace", "App..Models", "App..Models")]
+    [InlineData("NestedClass", " App.Sql ", "App.Sql")]
+    [InlineData("NestedClass", "class", "class")]
     public void Read_TextThatIsNotValid_IsRecordedTrimmedAndNotSet(string setting, string written, string recorded)
     {
         var id = Enum.Parse<SettingId>(setting);
@@ -64,6 +68,7 @@ public sealed class SettingsLevelReaderTests
     [InlineData("ModelNamespace")]
     [InlineData("Parameters")]
     [InlineData("TypeOverrides")]
+    [InlineData("NestedClass")]
     public void Read_TextThatIsWhiteSpace_IsNotSetAndNotRecorded(string setting)
     {
         var source = new FakeSource(new Dictionary<SettingId, string> { [Enum.Parse<SettingId>(setting)] = " \t " });

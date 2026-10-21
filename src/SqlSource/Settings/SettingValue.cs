@@ -78,6 +78,11 @@ internal static class SettingValue
     }
 
     /// <summary>
+    /// Whether <paramref name="value" /> can name a generated type: one identifier that is not a reserved keyword.
+    /// </summary>
+    public static bool IsTypeName(ReadOnlySpan<char> value) => SqlIdentifier.IsUsableName(value.ToString());
+
+    /// <summary>
     /// Whether <paramref name="value" /> is identifiers that are not reserved keywords, joined by periods.  It is
     /// the rule of a namespace and of the name of a type, which is one identifier or a full name: nothing in the
     /// text tells the two apart.

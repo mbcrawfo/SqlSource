@@ -30,6 +30,12 @@ internal readonly record struct QuerySettings(
     /// <summary>What ends the name of the type of a row, unless a level says otherwise.</summary>
     public const string DefaultOutputModelSuffix = "Dto";
 
+    /// <summary>
+    /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement, unless a
+    /// level says otherwise.
+    /// </summary>
+    public const string DefaultNestedClass = "Sql";
+
     /// <summary>Whether comments and blank lines stay in the query's SQL.</summary>
     public bool KeepComments => (Parameters & GeneratorParameters.KeepComments) != 0;
 
@@ -112,4 +118,11 @@ internal readonly record struct QuerySettings(
         SettingsLevel property,
         string dialectName
     ) => markers.Database ?? metadata.Database ?? property.Database ?? dialectName;
+
+    /// <summary>
+    /// The name of a type's nested class: the attribute's, then the property's, else the default.  It belongs to the
+    /// type and not to a query, so it has no marker or metadata level and is kept apart from <see cref="Resolve" />.
+    /// </summary>
+    public static string ResolveNestedClass(SettingsLevel attribute, SettingsLevel property) =>
+        attribute.NestedClass ?? property.NestedClass ?? DefaultNestedClass;
 }

@@ -35,6 +35,7 @@
             <SqlSourceCollectionType>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceCollectionType), '\s+', ' ').Trim())</SqlSourceCollectionType>
             <SqlSourceTypeOverrides>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceTypeOverrides), '\s+', ' ').Trim())</SqlSourceTypeOverrides>
             <SqlSourceDatabase>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceDatabase), '\s+', ' ').Trim())</SqlSourceDatabase>
+            <SqlSourceNestedClass>$([System.Text.RegularExpressions.Regex]::Replace($(SqlSourceNestedClass), '\s+', ' ').Trim())</SqlSourceNestedClass>
         </PropertyGroup>
     </Target>
     <!-- editorconfig-checker-enable -->
@@ -227,6 +228,7 @@
             <SqlSourceManifestLine Include="Property.SqlSourceOutputModelType=$([MSBuild]::Escape($(SqlSourceOutputModelType)))" />
             <SqlSourceManifestLine Include="Property.SqlSourceCollectionType=$([MSBuild]::Escape($(SqlSourceCollectionType)))" />
             <SqlSourceManifestLine Include="Property.SqlSourceTypeOverrides=$([MSBuild]::Escape($(SqlSourceTypeOverrides)))" />
+            <SqlSourceManifestLine Include="Property.SqlSourceNestedClass=$([MSBuild]::Escape($(SqlSourceNestedClass)))" />
             <SqlSourceManifestSqlFile Include="@(AdditionalFiles)" Condition="'%(Extension)' == '.sql'" />
             <SqlSourceManifestLine Include="@(SqlSourceManifestSqlFile->'File=%(FullPath)%0aFile.SqlSourceDialect=%(SqlSourceDialect)%0aFile.SqlSourceDatabase=%(SqlSourceDatabase)%0aFile.SqlSourceOutput=%(SqlSourceOutput)%0aFile.SqlSourceGeneratorParameters=%(SqlSourceGeneratorParameters)%0aFile.SqlSourceInputModelSuffix=%(SqlSourceInputModelSuffix)%0aFile.SqlSourceOutputModelSuffix=%(SqlSourceOutputModelSuffix)%0aFile.SqlSourceModelNamespace=%(SqlSourceModelNamespace)%0aFile.SqlSourceInputModelType=%(SqlSourceInputModelType)%0aFile.SqlSourceOutputModelType=%(SqlSourceOutputModelType)%0aFile.SqlSourceCollectionType=%(SqlSourceCollectionType)%0aFile.SqlSourceTypeOverrides=%(SqlSourceTypeOverrides)')" />
             <SqlSourceManifestLine Include="@(Compile->'Compile=%(FullPath)')" />

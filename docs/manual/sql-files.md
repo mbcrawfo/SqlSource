@@ -61,7 +61,7 @@ A `-- name:` line begins a query.  The query runs to the next `-- name:` line or
 - The name is a C# identifier, and not a reserved keyword such as `class`.  Anything else is [SQLSRC103](diagnostics.md#sqlsrc103).  `get-user` is not a name.
 - Names are case-sensitive: `GetUser` and `getUser` are two queries.
 - A name is used once in a file ([SQLSRC104](diagnostics.md#sqlsrc104)), and once among all the files of one type ([SQLSRC008](diagnostics.md#sqlsrc008)).
-- A name is not the name of the type the members go in: `Sql`, or the type itself when the members go on it ([SQLSRC009](diagnostics.md#sqlsrc009)).  See [the generator](generator.md).
+- A name is not the name of the type the members go in: the nested class, `Sql` unless [it is named otherwise](settings.md#setting-nested-class), or the type itself when the members go on it ([SQLSRC009](diagnostics.md#sqlsrc009)).  See [the generator](generator.md).
 - The query has SQL in it.  A query that holds only comments and markers is [SQLSRC113](diagnostics.md#sqlsrc113).
 
 The marker may be followed by `->` and a result shape: see [result shapes](#result-shapes).  The name ends at the `->`.

@@ -53,6 +53,7 @@ Every property of the attribute is a [setting](settings.md), documented there wi
 |----|----|
 | `Path` | Which `.sql` files belong to the type: [Path](settings.md#setting-path) |
 | `SqlLocation` | Where the generated members go: [Where the SQL goes](settings.md#setting-sql-location) |
+| `NestedClass` | The name of the class that holds the members under `SqlLocation.Nested`: [Name of the nested class](settings.md#setting-nested-class) |
 | `Parameters` | Generator parameters for the type's queries: [Generator parameters](settings.md#setting-generator-parameters) |
 | `Output` | What is generated for the type's queries: [Output](settings.md#setting-output) |
 | `InputModelSuffix`, `OutputModelSuffix` | What ends the name of a model: [Suffix of a model's name](settings.md#setting-model-suffix) |
@@ -61,7 +62,7 @@ Every property of the attribute is a [setting](settings.md), documented there wi
 | `CollectionType` | The type that holds many rows: [Collection type](settings.md#setting-collection-type) |
 | `MethodLocation` | Where the methods that run the queries go: [Where the methods go](settings.md#setting-method-location) |
 
-`Path`, `SqlLocation`, `Parameters` and the properties of the models change what the generator writes today.  `Output` decides which queries the tool describes and the build checks against their sidecar, and which get models.  `CollectionType` and `MethodLocation`, for the methods that run the queries, are read and checked and change no generated code yet: see [what works today](README.md#what-works-today).
+`Path`, `SqlLocation`, `NestedClass`, `Parameters` and the properties of the models change what the generator writes today.  `Output` decides which queries the tool describes and the build checks against their sidecar, and which get models.  `CollectionType` and `MethodLocation`, for the methods that run the queries, are read and checked and change no generated code yet: see [what works today](README.md#what-works-today).
 
 <a id="files-of-a-type"></a>
 
@@ -101,11 +102,11 @@ public static partial class UserQueries;
 var sql = UserQueries.GetUser;
 ```
 
-[`SqlLocation`](settings.md#setting-sql-location) chooses between a private class `Sql` nested in the type (`Nested`, the default) and the type itself (`Direct`).  Its section says what each means.  What to know when you choose:
+[`SqlLocation`](settings.md#setting-sql-location) chooses between a private class `Sql` nested in the type (`Nested`, the default) and the type itself (`Direct`).  Its section says what each means.  [The nested class](settings.md#setting-nested-class) can have another name, for the project or for one type.  What to know when you choose:
 
 - Use `Nested` for queries that one class runs, and `Direct` for a type whose job is to hold queries that other code uses.
-- With `Nested`, the type cannot have a member or a type parameter named `Sql`, and cannot be called `Sql` itself ([SQLSRC007](diagnostics.md#sqlsrc007)).  Rename it, or use `Direct`.
-- A query is not named like the class that holds the members: `Sql` under `Nested`, the type's own name under `Direct` ([SQLSRC009](diagnostics.md#sqlsrc009)).
+- With `Nested`, the type cannot have a member or a type parameter named like the nested class, and cannot have that name itself ([SQLSRC007](diagnostics.md#sqlsrc007)).  Rename it, give the nested class another name, or use `Direct`.
+- A query is not named like the class that holds the members: the nested class under `Nested`, `Sql` unless it is named otherwise, and the type's own name under `Direct` ([SQLSRC009](diagnostics.md#sqlsrc009)).
 - A query may share its name with a member that the type inherits, such as `ToString`.  The constant hides it, with no warning in the generated code.
 
 <a id="constants"></a>
