@@ -95,9 +95,9 @@ internal static class DescribeRun
                     reporter.Report(difference);
                 }
 
-                if (CheckedAs(files[index], check) is { } action)
+                if (CheckedAs(files[index], check) is { } differs)
                 {
-                    RunEvents.Sidecar(trace, check.Outcome.SidecarPath, action);
+                    RunEvents.SidecarChecked(trace, check.Outcome.SidecarPath, differs);
                 }
             }
         }
@@ -127,10 +127,10 @@ internal static class DescribeRun
     private static ImmutableArray<string> DatabaseNames(DescribeOptions options) =>
         [.. options.Databases.Select(static value => value.Text)];
 
-    // What the log says of a sidecar that was checked: "differs" when a difference was reported for the file; "same"
-    // only when every selected query of the file that needs an entry was described, so that each was compared; and
-    // nothing otherwise, since a query that could not be checked is neither.
-    private static string? CheckedAs(FileWork file, FileCheck check)
+    // What the log says of a sidecar that was checked: that it differs, when a difference was reported for the file;
+    // that it is the same, only when every selected query of the file that needs an entry was described, so that each
+    // was compared; and nothing otherwise, since a query that could not be checked is neither.
+    private static bool? CheckedAs(FileWork file, FileCheck check)
     {
         if (!check.WasCompared)
         {
@@ -139,13 +139,13 @@ internal static class DescribeRun
 
         if (check.Differences.Count > 0)
         {
-            return "differs";
+            return true;
         }
 
         return file
             .Queries.Where(static query => query.Planned is { NeedsEntry: true, IsSelected: true })
             .All(static query => query.State == QueryState.Described)
-            ? "same"
+            ? false
             : null;
     }
 }

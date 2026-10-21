@@ -38,7 +38,8 @@ public sealed class PostgresEventsTests
         _ = Member(prepare, "durationMs").ShouldBeOfType<LogValue.Number>();
 
         var types = log.Events[2].Members;
-        NamesOf(types).ShouldBe(["oids", "rows", "durationMs"]);
+        NamesOf(types).ShouldBe(["query", "oids", "rows", "durationMs"]);
+        Member(types, "query").ShouldBe((LogValue)"GetUser");
         Member(types, "oids").ShouldBe(LogValue.ListOf([23L]));
         Member(types, "rows")
             .ShouldBe(
@@ -61,7 +62,8 @@ public sealed class PostgresEventsTests
             );
 
         var deallocate = log.Events[4].Members;
-        NamesOf(deallocate).ShouldBe(["statement", "error", "durationMs"]);
+        NamesOf(deallocate).ShouldBe(["query", "statement", "error", "durationMs"]);
+        Member(deallocate, "query").ShouldBe((LogValue)"GetUser");
         Member(deallocate, "statement").ShouldBe((LogValue)"sqlsource_1");
         Member(deallocate, "error").ShouldBe(LogValue.Null);
     }
@@ -107,11 +109,12 @@ public sealed class PostgresEventsTests
             null
         );
 
-        PostgresEvents.Spellings(log, request, answer, 3);
+        PostgresEvents.Spellings(log, "GetUser", request, answer, 3);
 
         var (name, members) = log.Events.ShouldHaveSingleItem();
         name.ShouldBe("spellings");
-        NamesOf(members).ShouldBe(["pairs", "rows", "durationMs"]);
+        NamesOf(members).ShouldBe(["query", "pairs", "rows", "durationMs"]);
+        Member(members, "query").ShouldBe((LogValue)"GetUser");
         Member(members, "pairs")
             .ShouldBe(
                 LogValue.ListOf([
@@ -144,13 +147,14 @@ public sealed class PostgresEventsTests
 
         PostgresEvents.Spellings(
             log,
+            "GetUser",
             new PostgresSpellingsRequest([new PostgresTypmodPair(1043, 36)]),
             new PostgresSpellingsAnswer(null, refused),
             0
         );
 
         var members = log.Events.ShouldHaveSingleItem().Members;
-        NamesOf(members).ShouldBe(["pairs", "error", "durationMs"]);
+        NamesOf(members).ShouldBe(["query", "pairs", "error", "durationMs"]);
         Member(members, "error")
             .ShouldBe(
                 LogValue.MapOf(
@@ -186,7 +190,7 @@ public sealed class PostgresEventsTests
 
         log.Events.Select(written => written.Name).ShouldBe(["prepare", "columns", "types", "deallocate"]);
         var types = log.Events[2].Members;
-        NamesOf(types).ShouldBe(["oids", "error", "durationMs"]);
+        NamesOf(types).ShouldBe(["query", "oids", "error", "durationMs"]);
         Member(types, "error")
             .ShouldBe(
                 LogValue.MapOf(

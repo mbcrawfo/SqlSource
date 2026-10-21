@@ -12,8 +12,9 @@ namespace SqlSource.Tool.Describing.Postgres;
 /// </summary>
 /// <remarks>
 /// The names are written without the engine: the log a describer is given puts <c>postgres.</c> before each, and
-/// removes the connection's value from every string.  A member is added and never renamed.  <c>open</c> has no
-/// event of its own: the run's <c>database.open</c> records what the session knows of its server.  A describe
+/// removes the connection's value from every string.  A member is added and never renamed.  Every event but
+/// <c>walk.node</c> and <c>walk.column</c> has the name of the query as its first member, <c>query</c>.  <c>open</c>
+/// has no event of its own: the run's <c>database.open</c> records what the session knows of its server.  A describe
 /// writes <c>prepare</c>, <c>columns</c>, <c>tables</c>, <c>types</c>, <c>spellings</c>, one <c>column</c> for each
 /// column, <c>check</c>, <c>table-match</c> and <c>deallocate</c>, in that order, each only when its call was made,
 /// and <c>table-match</c> only for a statement with rows whose check agreed.  A query with rows that is gated or has
@@ -52,9 +53,16 @@ internal static class PostgresEvents
         );
 
     /// <summary><c>postgres.types</c>: each row as the answer holds it, or the error.</summary>
-    public static void Types(IRunLog log, PostgresTypesRequest request, PostgresTypesAnswer answer, long durationMs) =>
+    public static void Types(
+        IRunLog log,
+        string query,
+        PostgresTypesRequest request,
+        PostgresTypesAnswer answer,
+        long durationMs
+    ) =>
         log.Write(
             PostgresCallNames.Types,
+            new("query", query),
             new("oids", LogValue.ListOf(request.Oids.Select(static oid => (LogValue)oid))),
             answer.Error is { } error
                 ? new LogMember(Error, ErrorOf(error))
@@ -67,12 +75,14 @@ internal static class PostgresEvents
     /// </summary>
     public static void Spellings(
         IRunLog log,
+        string query,
         PostgresSpellingsRequest request,
         PostgresSpellingsAnswer answer,
         long durationMs
     ) =>
         log.Write(
             PostgresCallNames.Spellings,
+            new("query", query),
             new(
                 "pairs",
                 LogValue.ListOf(
@@ -119,12 +129,14 @@ internal static class PostgresEvents
     /// <summary><c>postgres.tables</c>: each table with its columns as the answer holds them, or the error.</summary>
     public static void Tables(
         IRunLog log,
+        string query,
         PostgresTablesRequest request,
         PostgresTablesAnswer answer,
         long durationMs
     ) =>
         log.Write(
             PostgresCallNames.Tables,
+            new("query", query),
             new("oids", LogValue.ListOf(request.Oids.Select(static oid => (LogValue)oid))),
             answer.Error is { } error
                 ? new LogMember(Error, ErrorOf(error))
@@ -321,12 +333,14 @@ internal static class PostgresEvents
     /// <summary><c>postgres.deallocate</c>: the one place that says a statement could not be freed.</summary>
     public static void Deallocate(
         IRunLog log,
+        string query,
         PostgresDeallocateRequest request,
         PostgresDeallocateAnswer answer,
         long durationMs
     ) =>
         log.Write(
             PostgresCallNames.Deallocate,
+            new("query", query),
             new("statement", request.Statement),
             new(Error, answer.Error is { } error ? ErrorOf(error) : LogValue.Null),
             new(Duration, durationMs)
