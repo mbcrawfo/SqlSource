@@ -59,7 +59,8 @@ internal static class RealisticModels
     // no-table-models unset, so the table's or the query's name is the model's.
     public static Type OutputModelOf(SidecarEntry entry) =>
         ModelNamed(
-            (entry.MatchesTable is { } table ? PropertyNames.FromTable(table) : null) ?? entry.Name,
+            (entry.MatchesTable is { } table ? PropertyNames.FromTable(table, DatabaseEngine.PostgreSql) : null)
+                ?? entry.Name,
             OutputSuffix
         );
 

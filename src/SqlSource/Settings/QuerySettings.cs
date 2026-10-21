@@ -90,22 +90,22 @@ internal readonly record struct QuerySettings(
         );
 
     /// <summary>
-    /// The type override of a query: the precedence of the type override, which has no attribute level and merges
-    /// per key, the markers over the metadata over the property.  Sorted by key, and empty when no level sets one.
-    /// It keeps its entries of <c>default</c>, which <see cref="TypeOverrideMap.Find" /> weighs by their place
-    /// against the entries of other keys that match a type.  It is kept apart from <see cref="Resolve" />, which runs
-    /// for each query and each type that claims its file, so that a caller that needs it computes it once for each
-    /// distinct level of markers.
+    /// The type override of a query on <paramref name="engine" />: the precedence of the type override, which has no
+    /// attribute level and merges per key, the markers over the metadata over the property, each level's entries of
+    /// that engine.  Sorted by key, and empty when no level sets one.  It keeps its entries of <c>default</c>, which
+    /// <see cref="TypeOverrideMap.Find" /> weighs by their place against the entries of other keys that match a type.
+    /// It is kept apart from <see cref="Resolve" />, which runs for each query and each type that claims its file, so
+    /// that a caller that needs it computes it once for each distinct level of markers.
     /// </summary>
     public static EquatableArray<TypeOverride> ResolveTypeOverrides(
         SettingsLevel markers,
         SettingsLevel metadata,
-        SettingsLevel property
+        SettingsLevel property,
+        DatabaseEngine engine
     ) =>
-        TypeOverrideMap.Over(
-            markers.TypeOverrides,
-            TypeOverrideMap.Over(metadata.TypeOverrides, property.TypeOverrides)
-        ) ?? EquatableArray<TypeOverride>.Empty;
+        engine == DatabaseEngine.SqlServer
+            ? Merge(markers.SqlServerTypeOverrides, metadata.SqlServerTypeOverrides, property.SqlServerTypeOverrides)
+            : Merge(markers.TypeOverrides, metadata.TypeOverrides, property.TypeOverrides);
 
     /// <summary>
     /// The database of a query: the markers', then the metadata's, then the property's, else the name of the dialect,
@@ -125,4 +125,10 @@ internal readonly record struct QuerySettings(
     /// </summary>
     public static string ResolveNestedClass(SettingsLevel attribute, SettingsLevel property) =>
         attribute.NestedClass ?? property.NestedClass ?? DefaultNestedClass;
+
+    private static EquatableArray<TypeOverride> Merge(
+        EquatableArray<TypeOverride>? markers,
+        EquatableArray<TypeOverride>? metadata,
+        EquatableArray<TypeOverride>? property
+    ) => TypeOverrideMap.Over(markers, TypeOverrideMap.Over(metadata, property)) ?? EquatableArray<TypeOverride>.Empty;
 }

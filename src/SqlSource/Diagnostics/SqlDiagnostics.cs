@@ -157,7 +157,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor InvalidSettingValue = new(
         id: "SQLSRC014",
         title: "MSBuild setting is not valid",
-        messageFormat: "'{0}' is not a valid value of {1}",
+        messageFormat: "'{0}' is not a valid value of {1}{2}",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -279,7 +279,7 @@ internal static class SqlDiagnostics
     public static readonly DiagnosticDescriptor InvalidMarkerValue = new(
         id: "SQLSRC111",
         title: "Marker value is not valid",
-        messageFormat: "'{0}' lacks a value it needs, has one it does not take, or has one that is not valid",
+        messageFormat: "'{0}' lacks a value it needs, has one it does not take, or has one that is not valid{1}",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
@@ -700,6 +700,47 @@ internal static class SqlDiagnostics
         customTags: WellKnownDiagnosticTags.NotConfigurable
     );
 
+    public static readonly DiagnosticDescriptor SqlClientTooOld = new(
+        id: "SQLSRC267",
+        title: "Microsoft.Data.SqlClient is older than 6.1",
+        messageFormat: "This project references Microsoft.Data.SqlClient {0}, and SqlSource needs "
+            + "Microsoft.Data.SqlClient 6.1 or later.  Update the package.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc267",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
+    // Information a project may configure, not a warning, for the reason of SQLSRC248: the models of a newer
+    // Microsoft.Data.SqlClient use the types of Microsoft.Data.SqlClient 7, which are right unless the newer driver
+    // changed one, and a warning would break the build of every project that treats warnings as errors on the day it
+    // updates the driver.
+    public static readonly DiagnosticDescriptor SqlClientNewerThanKnown = new(
+        id: "SQLSRC268",
+        title: "Microsoft.Data.SqlClient is newer than SqlSource knows",
+        messageFormat: "This project references Microsoft.Data.SqlClient {0}, which is newer than this version of "
+            + "SqlSource knows.  Its models use the types of Microsoft.Data.SqlClient 7.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Info,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc268"
+    );
+
+    // {0} is the column or parameter, as "column 'id'", {1} its type as the database spells it, and {2} the help,
+    // without its period: to reference Microsoft.Data.SqlClient.
+    public static readonly DiagnosticDescriptor TypeNeedsSqlClient = new(
+        id: "SQLSRC269",
+        title: "Type needs Microsoft.Data.SqlClient",
+        messageFormat: "The {0} has the type '{1}', whose C# type depends on Microsoft.Data.SqlClient, and this "
+            + "project does not reference it.  {2}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLinkBase + "sqlsrc269",
+        customTags: WellKnownDiagnosticTags.NotConfigurable
+    );
+
     /// <summary>
     /// Every descriptor, in the order of its id.
     /// </summary>
@@ -761,7 +802,10 @@ internal static class SqlDiagnostics
             ModelNameUnusable,
             OutputModelWithoutRows,
             ColumnMarkerUnusable,
-            ArrayEntryMapsNothing
+            ArrayEntryMapsNothing,
+            SqlClientTooOld,
+            SqlClientNewerThanKnown,
+            TypeNeedsSqlClient
         );
 
     /// <summary>

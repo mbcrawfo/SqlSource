@@ -65,6 +65,10 @@ internal static class TrackingNames
 
     public const string UsesPostgresEntries = nameof(UsesPostgresEntries);
 
+    public const string SqlClientProbe = nameof(SqlClientProbe);
+
+    public const string UsesSqlServerEntries = nameof(UsesSqlServerEntries);
+
     public const string MappedTypeNames = nameof(MappedTypeNames);
 
     public const string MappedTypes = nameof(MappedTypes);

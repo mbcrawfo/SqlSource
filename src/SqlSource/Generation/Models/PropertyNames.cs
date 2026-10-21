@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using SqlSource.Settings;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Models;
@@ -62,12 +63,14 @@ internal static class PropertyNames
 
     /// <summary>
     /// The name a table gives its model, before the suffix: the PascalCase of the table's name, with the PascalCase of
-    /// its schema before it unless the schema is <c>public</c>, compared ordinally.  <c>users</c> is <c>Users</c> and
-    /// <c>billing.invoices</c> is <c>BillingInvoices</c>.  Null when the schema or the table is unknown, when the
-    /// PascalCase of a part is no identifier, as for the quoted <c>"order-lines"</c>, or when a part ends in <c>!</c>
-    /// or <c>?</c>, which <see cref="PascalCase" /> would drop as a column's nullability: the table then gives no name.
+    /// its schema before it unless the schema is the engine's default, <c>public</c> on PostgreSQL and <c>dbo</c> on
+    /// SQL Server, compared ordinally.  <c>users</c> is <c>Users</c> and <c>billing.invoices</c> is
+    /// <c>BillingInvoices</c> on both, while <c>dbo.orders</c> is <c>Orders</c> on SQL Server and <c>DboOrders</c> on
+    /// PostgreSQL.  Null when the schema or the table is unknown, when the PascalCase of a part is no identifier, as
+    /// for the quoted <c>"order-lines"</c>, or when a part ends in <c>!</c> or <c>?</c>, which
+    /// <see cref="PascalCase" /> would drop as a column's nullability: the table then gives no name.
     /// </summary>
-    public static string? FromTable(SidecarTable table)
+    public static string? FromTable(SidecarTable table, DatabaseEngine engine)
     {
         if (table.Schema is not { } schema || table.Table is not { } name)
         {
@@ -80,7 +83,8 @@ internal static class PropertyNames
             return null;
         }
 
-        if (string.Equals(schema, "public", StringComparison.Ordinal))
+        var defaultSchema = engine == DatabaseEngine.SqlServer ? "dbo" : "public";
+        if (string.Equals(schema, defaultSchema, StringComparison.Ordinal))
         {
             return tableName;
         }

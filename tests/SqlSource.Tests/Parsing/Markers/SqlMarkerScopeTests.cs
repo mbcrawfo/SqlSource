@@ -200,6 +200,75 @@ public sealed class SqlMarkerScopeTests
         scope.Level.ShouldBeSameAs(SettingsLevel.None);
     }
 
+    // A file's markers are read by its engine: an mssql file's by SQL Server's rules, into SQL Server's entries alone.
+    [Fact]
+    public void Read_TypeOverrideOfAnMssqlFile_IsSqlServersEntryAlone()
+    {
+        var (scope, errors) = Scope(
+            SqlDialectRules.SqlServer,
+            SqlScopeKind.Query,
+            "-- type-override: nvarchar = string"
+        );
+
+        errors.ShouldBeEmpty();
+        scope.Level.TypeOverrides.ShouldBeNull();
+        scope
+            .Level.SqlServerTypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("nvarchar", "string", SettingPlace.Query)]);
+    }
+
+    // int and integer are one key in SQL Server, as int4 and integer are in PostgreSQL.
+    [Fact]
+    public void Read_TwoValuesForOneSqlServerKeyInAnMssqlFile_ConflictAtTheSecond()
+    {
+        var (scope, errors) = Scope(
+            SqlDialectRules.SqlServer,
+            SqlScopeKind.Query,
+            "-- type-override: int = long",
+            "-- type-override: integer = short"
+        );
+
+        errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.ConflictingSettings]);
+        scope
+            .Level.SqlServerTypeOverrides.ShouldNotBeNull()
+            .ShouldBe([new TypeOverride("int", "long", SettingPlace.Query)]);
+    }
+
+    // A key the file's engine does not read is not valid there, though the other engine reads it.
+    [Theory]
+    [InlineData("mssql", "-- type-override: int4 = long")]
+    [InlineData("mssql", "-- type-override: pg_catalog.text = string")]
+    [InlineData("postgres", "-- type-override: nvarchar = string")]
+    [InlineData("postgres", "-- type-override: rowversion = byte[]")]
+    public void Read_TypeOverrideWithAKeyTheFilesEngineDoesNotRead_IsInvalid(string dialect, string line)
+    {
+        var rules = dialect == "mssql" ? SqlDialectRules.SqlServer : SqlDialectRules.PostgreSql;
+
+        var (scope, errors) = Scope(rules, SqlScopeKind.Query, line);
+
+        errors.Select(static error => error.Kind).ShouldBe([SqlParseErrorKind.InvalidMarkerValue]);
+        scope.Level.ShouldBeSameAs(SettingsLevel.None);
+    }
+
+    // A key in brackets is not read, and the error shows the forms that are.
+    [Fact]
+    public void Read_TypeOverrideWithAKeyInBrackets_IsInvalidWithTheFormsThatAreRead()
+    {
+        const string Line = "-- type-override: [dbo].[Email]=MyApp.Email";
+        const int Start = 18;
+
+        var (_, errors) = Scope(SqlDialectRules.SqlServer, SqlScopeKind.Query, Line);
+
+        errors.ShouldBe([
+            SqlParseError.Create(
+                SqlParseErrorKind.InvalidMarkerValue,
+                new Microsoft.CodeAnalysis.Text.TextSpan(Start, Line.Length - Start),
+                "type-override: [dbo].[Email]=MyApp.Email",
+                ".  A key is not written in brackets: write dbo.Email, or \"dbo\".\"Email\" to match its case exactly"
+            ),
+        ]);
+    }
+
     // A value that is not valid is another error, and is not what is asked here.
     private static bool IsTaken(string line, SqlScopeKind kind)
     {
@@ -212,12 +281,19 @@ public sealed class SqlMarkerScopeTests
     }
 
     // A scope over the lines, each a marker, read in order.
-    private static (SqlMarkerScope Scope, List<SqlParseError> Errors) Scope(SqlScopeKind kind, params string[] lines)
+    private static (SqlMarkerScope Scope, List<SqlParseError> Errors) Scope(SqlScopeKind kind, params string[] lines) =>
+        Scope(SqlDialectRules.Ansi, kind, lines);
+
+    private static (SqlMarkerScope Scope, List<SqlParseError> Errors) Scope(
+        SqlDialectRules rules,
+        SqlScopeKind kind,
+        params string[] lines
+    )
     {
         var text = string.Join("\n", lines);
         var errors = new List<SqlParseError>();
-        var scope = new SqlMarkerScope(text, SqlDialectRules.Ansi, kind, errors);
-        foreach (var lexeme in SqlLexer.Lex(text, SqlDialectRules.Ansi).Lexemes)
+        var scope = new SqlMarkerScope(text, rules, kind, errors);
+        foreach (var lexeme in SqlLexer.Lex(text, rules).Lexemes)
         {
             if (SqlMarkerReader.Read(text, lexeme) is { } marker)
             {

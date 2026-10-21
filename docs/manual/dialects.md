@@ -143,7 +143,7 @@ Every dialect is read, and every `.sql` file gets its constants and token method
 A query that must be described and whose dialect cannot be is reported by the tool and by the build:
 
 - **[SQLSRC209](diagnostics.md#sqlsrc209)** for a dialect that has no database to ask: every row marked No.  The default output is `codegen`, so a project that sets neither the dialect nor the output gets it for every file.
-- **[SQLSRC216](diagnostics.md#sqlsrc216)** from the tool for `mssql`, and [SQLSRC243](diagnostics.md#sqlsrc243) in the build, until SQL Server queries can be described.
+- **[SQLSRC216](diagnostics.md#sqlsrc216)** from the tool for `mssql`, until SQL Server queries can be described, and [SQLSRC241](diagnostics.md#sqlsrc241) in the build, since such a query has no entry in its file's sidecar.
 
 Each goes away when the query's output is `sql`, which asks for the SQL alone and needs no database: see [the output setting](settings.md#setting-output).  The query's constant or method is generated either way.
 

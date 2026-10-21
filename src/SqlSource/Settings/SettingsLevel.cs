@@ -46,10 +46,16 @@ internal sealed record SettingsLevel
     public CollectionKind? CollectionType { get; init; }
 
     /// <summary>
-    /// The entries of the type override, sorted by key as <see cref="TypeOverrideMap" /> keeps them, entries of
-    /// <c>default</c> included.  Merged per key, not taken whole.
+    /// The entries of the type override whose keys PostgreSQL reads, keyed by its rules, sorted by key as
+    /// <see cref="TypeOverrideMap" /> keeps them, entries of <c>default</c> included.  Merged per key, not taken whole.
     /// </summary>
     public EquatableArray<TypeOverride>? TypeOverrides { get; init; }
+
+    /// <summary>
+    /// The entries of the type override whose keys SQL Server reads, keyed by its rules, kept as
+    /// <see cref="TypeOverrides" /> is.  An MSBuild value fills both, and a marker the one of its file's engine.
+    /// </summary>
+    public EquatableArray<TypeOverride>? SqlServerTypeOverrides { get; init; }
 
     /// <summary>
     /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement.  Only the
@@ -62,7 +68,8 @@ internal sealed record SettingsLevel
 
     /// <summary>
     /// This level over <paramref name="other" />: each member from this level when it has one, and from
-    /// <paramref name="other" /> when it has not.  The type override is merged per key, this level's entry winning.
+    /// <paramref name="other" /> when it has not.  The type override of each engine is merged per key, this level's
+    /// entry winning.
     /// </summary>
     public SettingsLevel Over(SettingsLevel other)
     {
@@ -88,6 +95,7 @@ internal sealed record SettingsLevel
             OutputModelType = OutputModelType ?? other.OutputModelType,
             CollectionType = CollectionType ?? other.CollectionType,
             TypeOverrides = TypeOverrideMap.Over(TypeOverrides, other.TypeOverrides),
+            SqlServerTypeOverrides = TypeOverrideMap.Over(SqlServerTypeOverrides, other.SqlServerTypeOverrides),
             NestedClass = NestedClass ?? other.NestedClass,
         };
     }

@@ -201,13 +201,16 @@ public sealed class NpgsqlProbeTests
         var driver = NpgsqlReferences.Synthetic(version, slimBuilder, cube);
 
         var sql = Run(OutputKind.Sql, [driver], Users, Orders);
-        var mssql = Run(OutputKind.Models, [driver], "mssql", Users);
+        var mssql = Run(
+            OutputKind.Models,
+            [driver],
+            "mssql",
+            Users,
+            Sidecars.Current(Users, SqlDialect.SqlServer, "GetUser")
+        );
 
         sql.Diagnostics.ShouldBeEmpty();
-        mssql.Diagnostics.ShouldBe([
-            $"SQLSRC243 {GeneratorHarness.UsersPath}(1,10)-(1,17): This version of SqlSource has no type map for the "
-                + "dialect 'mssql', so no query of this file can have models.  Set the output to 'sql'.",
-        ]);
+        mssql.Diagnostics.ShouldBeEmpty();
     }
 
     // A driver merged into an assembly of another name: its types are found, and its version is not known.  An old

@@ -41,9 +41,16 @@ internal static class MappedTypeNames
         return names.Count == 0 ? EquatableArray<string>.Empty : new EquatableArray<string>(names.ToImmutableArray());
     }
 
+    // The types of both engines' entries: an entry of an MSBuild value is in each, and names its type once in the set.
     private static void Add(SortedSet<string> names, SettingsLevel level)
     {
-        if (level.TypeOverrides is not { } entries)
+        Add(names, level.TypeOverrides);
+        Add(names, level.SqlServerTypeOverrides);
+    }
+
+    private static void Add(SortedSet<string> names, EquatableArray<TypeOverride>? overrides)
+    {
+        if (overrides is not { } entries)
         {
             return;
         }

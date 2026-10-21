@@ -315,6 +315,122 @@ public sealed partial class TypeKeysTests
     public void IsExtension_AnyOtherType_IsNotOne(string internalName) =>
         TypeKeys.IsExtension(internalName).ShouldBeFalse();
 
+    // SQL Server reads a name or one of its aliases ignoring case, as PostgreSQL does its own.
+    [Theory]
+    [InlineData("int", "int")]
+    [InlineData("INT", "int")]
+    [InlineData("integer", "int")]
+    [InlineData("character", "char")]
+    [InlineData("dec", "decimal")]
+    [InlineData("rowversion", "timestamp")]
+    [InlineData("timestamp", "timestamp")]
+    [InlineData("nvarchar", "nvarchar")]
+    [InlineData("sysname", "sysname")]
+    [InlineData("hierarchyid", "hierarchyid")]
+    [InlineData("json", "json")]
+    [InlineData("vector", "vector")]
+    [InlineData("\"int\"", "int")]
+    public void TryNormalizeSqlServer_NameOrAlias_IsTheName(string key, string expected) =>
+        ShouldNormalizeSqlServer(key, expected);
+
+    // sys is SQL Server's schema of its types, as pg_catalog is PostgreSQL's: taken off, with a name the map knows in
+    // lower case and any other as written.
+    [Theory]
+    [InlineData("sys.int", "int")]
+    [InlineData("SYS.INT", "int")]
+    [InlineData("sys.\"int\"", "int")]
+    [InlineData("\"sys\".int", "int")]
+    [InlineData("sys.integer", "integer")]
+    [InlineData("sys.newtype", "newtype")]
+    [InlineData("sys.\"Odd\"", "\"Odd\"")]
+    [InlineData("sys.U&\"st\\0061tus\"", "\"status\"")]
+    public void TryNormalizeSqlServer_KeyOfTheSystemSchema_IsTheNameWithoutIt(string key, string expected) =>
+        ShouldNormalizeSqlServer(key, expected);
+
+    // Any other schema is a user's, and its key is the one PostgreSQL reads.
+    [Theory]
+    [InlineData("dbo.Email", "dbo.Email")]
+    [InlineData("\"dbo\".\"Email\"", "\"dbo\".\"Email\"")]
+    [InlineData("dbo.U&\"Em\\0061il\"", "dbo.\"Email\"")]
+    [InlineData("\"SYS\".int", "\"SYS\".int")]
+    public void TryNormalizeSqlServer_KeyOfAUsersSchema_IsPostgreSqlsKey(string key, string expected)
+    {
+        ShouldNormalizeSqlServer(key, expected);
+        ShouldNormalize(key, expected);
+    }
+
+    [Theory]
+    [InlineData("\"Int\"")]
+    [InlineData("\"integer\"")]
+    [InlineData("int4")]
+    [InlineData("_int4")]
+    [InlineData("int[]")]
+    [InlineData("dbo.Email[]")]
+    [InlineData("pg_catalog.text")]
+    [InlineData("\"pg_catalog\".text")]
+    [InlineData("[dbo].[Email]")]
+    [InlineData("double precision")]
+    [InlineData("nosuch")]
+    [InlineData("")]
+    public void TryNormalizeSqlServer_AnythingElse_IsNotAKey(string key)
+    {
+        TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized).ShouldBeFalse();
+        normalized.ShouldBeEmpty();
+    }
+
+    // PostgreSQL reads a key as it did before SQL Server's names were known.
+    [Theory]
+    [InlineData("nvarchar")]
+    [InlineData("rowversion")]
+    public void TryNormalize_NameOfSqlServerAlone_IsNotAKey(string key) =>
+        TypeKeys.TryNormalize(key.AsSpan(), out _).ShouldBeFalse();
+
+    [Fact]
+    public void TryNormalize_SysSchema_IsAUsersSchema() => ShouldNormalize("sys.int", "sys.int");
+
+    // TryNormalizeEach gives what each engine's own reading gives, null for an engine that does not read the key.
+    [Theory]
+    [InlineData("int", "int4", "int")]
+    [InlineData("int4", "int4", null)]
+    [InlineData("nvarchar", null, "nvarchar")]
+    [InlineData("sys.int", "sys.int", "int")]
+    [InlineData("pg_catalog.text", "text", null)]
+    [InlineData("\"sys\".\"int\"", "\"sys\".\"int\"", "int")]
+    [InlineData("dbo.Email", "dbo.Email", "dbo.Email")]
+    [InlineData("dbo.U&\"Em\\0061il\"", "dbo.\"Email\"", "dbo.\"Email\"")]
+    [InlineData("dbo.Email[]", "dbo.Email[]", null)]
+    [InlineData("_int4", "int4[]", null)]
+    public void TryNormalizeEach_Key_IsWhatEachEnginesReadingGives(string key, string? postgreSql, string? sqlServer)
+    {
+        TypeKeys.TryNormalizeEach(key.AsSpan(), out var first, out var second).ShouldBeTrue();
+
+        first.ShouldBe(postgreSql);
+        second.ShouldBe(sqlServer);
+        (TypeKeys.TryNormalize(key.AsSpan(), out var alone) ? alone : null).ShouldBe(postgreSql);
+        (TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var sqlServerAlone) ? sqlServerAlone : null).ShouldBe(
+            sqlServer
+        );
+    }
+
+    [Theory]
+    [InlineData("nosuch")]
+    [InlineData("[dbo].[Email]")]
+    [InlineData("")]
+    public void TryNormalizeEach_KeyThatNeitherEngineReads_IsFalse(string key)
+    {
+        TypeKeys.TryNormalizeEach(key.AsSpan(), out var postgreSql, out var sqlServer).ShouldBeFalse();
+
+        postgreSql.ShouldBeNull();
+        sqlServer.ShouldBeNull();
+    }
+
+    private static void ShouldNormalizeSqlServer(string key, string expected)
+    {
+        TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized).ShouldBeTrue();
+
+        normalized.ShouldBe(expected);
+    }
+
     private static void ShouldNormalize(string key, string expected)
     {
         TypeKeys.TryNormalize(key.AsSpan(), out var normalized).ShouldBeTrue();

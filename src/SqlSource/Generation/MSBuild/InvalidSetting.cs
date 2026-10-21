@@ -1,3 +1,6 @@
+using System;
+using SqlSource.Settings;
+
 namespace SqlSource.Generation.MSBuild;
 
 /// <summary>
@@ -9,4 +12,13 @@ namespace SqlSource.Generation.MSBuild;
 /// <see cref="MSBuildSettings" />.
 /// </param>
 /// <param name="Value">The value, or the part of it that is not valid, as written.</param>
-internal sealed record InvalidSetting(string Name, string Value);
+internal sealed record InvalidSetting(string Name, string Value)
+{
+    /// <summary>
+    /// The help that ends the message of <c>SQLSRC014</c>: empty, but for an entry of the type override whose key is
+    /// written in brackets, which <see cref="TypeOverrideGrammar.BracketHelp" /> gives.  It follows from the value, so
+    /// it is no part of what makes two settings one.
+    /// </summary>
+    public string Help =>
+        Name == MSBuildSettings.TypeOverridesName ? TypeOverrideGrammar.BracketHelp(Value.AsSpan()) : string.Empty;
+}

@@ -719,7 +719,12 @@ public sealed class SqlFileParserTests
     public void Parse_DialectMarkerWithoutAValidValue_IsAnErrorAtTheValue(string text, string value) =>
         Errors(text)
             .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "dialect: " + value),
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(text, value),
+                    "dialect: " + value,
+                    ""
+                ),
             ]);
 
     [Fact]
@@ -976,7 +981,7 @@ public sealed class SqlFileParserTests
 
         Errors(text)
             .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "token: " + value),
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "token: " + value, ""),
             ]);
     }
 
@@ -1098,7 +1103,7 @@ public sealed class SqlFileParserTests
 
         Errors(text)
             .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "param: " + value),
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "param: " + value, ""),
             ]);
     }
 
@@ -1198,7 +1203,8 @@ public sealed class SqlFileParserTests
                 SqlParseError.Create(
                     SqlParseErrorKind.InvalidMarkerValue,
                     SpanOf(text, value),
-                    "token-ignore: " + value
+                    "token-ignore: " + value,
+                    ""
                 ),
             ]);
     }
@@ -1246,7 +1252,9 @@ public sealed class SqlFileParserTests
         var text = "-- name: " + value + "\nSELECT 1\n";
 
         Errors(text)
-            .ShouldBe([SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, at), "name: " + value)]);
+            .ShouldBe([
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, at), "name: " + value, ""),
+            ]);
     }
 
     [Fact]
@@ -1310,7 +1318,12 @@ public sealed class SqlFileParserTests
 
         Errors(text)
             .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), word + ": " + value),
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(text, value),
+                    word + ": " + value,
+                    ""
+                ),
             ]);
     }
 
@@ -1334,7 +1347,8 @@ public sealed class SqlFileParserTests
                 SqlParseError.Create(
                     SqlParseErrorKind.InvalidMarkerValue,
                     SpanOf(text, "-- " + word + ":"),
-                    word + ":"
+                    word + ":",
+                    ""
                 ),
             ]);
     }
@@ -1383,6 +1397,70 @@ public sealed class SqlFileParserTests
             .ShouldHaveSingleItem()
             .Markers.TypeOverrides.ShouldNotBeNull()
             .ShouldBe([new TypeOverride("int4", "long", SettingPlace.Query)]);
+
+    // An mssql file's entries are read by SQL Server's rules, the file's dialect marker deciding as the project's does.
+    [Fact]
+    public void Parse_TypeOverridesOfAnMssqlFile_AreSqlServersEntries()
+    {
+        var block = Blocks(
+                "-- dialect: mssql\n-- type-override: rowversion = byte[]\n"
+                    + "-- name: Q\n-- type-override: nvarchar = string\nSELECT 1\n"
+            )
+            .ShouldHaveSingleItem();
+
+        block.Markers.TypeOverrides.ShouldBeNull();
+        block
+            .Markers.SqlServerTypeOverrides.ShouldNotBeNull()
+            .ShouldBe([
+                new TypeOverride("nvarchar", "string", SettingPlace.Query),
+                new TypeOverride("timestamp", "byte[]", SettingPlace.FileHeader),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TypeOverrideOfIntAndOfIntegerInOneScopeOfAnMssqlFile_Conflict() =>
+        Errors(
+                "-- name: Q\n-- type-override: int = long\n-- type-override: integer = short\nSELECT 1\n",
+                dialect: new SqlDialectChoice(SqlDialect.SqlServer, SqlDialectOptions.None)
+            )
+            .Select(static error => error.Kind)
+            .ShouldBe([SqlParseErrorKind.ConflictingSettings]);
+
+    [Theory]
+    [InlineData("SqlServer", "int4 = long")]
+    [InlineData("PostgreSql", "nvarchar = string")]
+    public void Parse_TypeOverrideWithAKeyTheFilesEngineDoesNotRead_IsInvalid(string dialect, string value)
+    {
+        var text = "-- name: Q\n-- type-override: " + value + "\nSELECT 1\n";
+
+        Errors(text, dialect: new SqlDialectChoice(Enum.Parse<SqlDialect>(dialect), SqlDialectOptions.None))
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(text, value),
+                    "type-override: " + value,
+                    ""
+                ),
+            ]);
+    }
+
+    [Fact]
+    public void Parse_TypeOverrideWithAKeyInBrackets_IsInvalidWithTheFormsThatAreRead()
+    {
+        const string Value = "[dbo].[Email]=MyApp.Email";
+        const string Text = "-- dialect: mssql\n-- name: Q\n-- type-override: " + Value + "\nSELECT 1\n";
+
+        Errors(Text)
+            .ShouldBe([
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(Text, Value),
+                    "type-override: " + Value,
+                    ".  A key is not written in brackets: write dbo.Email, or \"dbo\".\"Email\" to match its case "
+                        + "exactly"
+                ),
+            ]);
+    }
 
     [Fact]
     public void Parse_PreambleSettings_AreOneLevelSharedByTheQueriesThatHaveNoMarkersOfTheirOwn()
@@ -1500,7 +1578,12 @@ public sealed class SqlFileParserTests
 
         Errors(text)
             .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), word + ": " + value),
+                SqlParseError.Create(
+                    SqlParseErrorKind.InvalidMarkerValue,
+                    SpanOf(text, value),
+                    word + ": " + value,
+                    ""
+                ),
             ]);
     }
 
@@ -1631,7 +1714,7 @@ public sealed class SqlFileParserTests
 
         Errors(text)
             .ShouldBe([
-                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "column: " + value),
+                SqlParseError.Create(SqlParseErrorKind.InvalidMarkerValue, SpanOf(text, value), "column: " + value, ""),
             ]);
     }
 

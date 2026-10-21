@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using SqlSource.Diagnostics;
 using SqlSource.Generation.MSBuild;
+using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
 
@@ -11,13 +12,15 @@ namespace SqlSource.Generation.Types;
 
 /// <summary>
 /// Gives each parameter and column of a file's usable entries its C# type: the type override's, from the most specific
-/// level that names its key, or else the base map's, under the column of the project's driver.
+/// level that names its key, or else the base map of its engine's, under the column of the project's driver of that
+/// engine.
 /// </summary>
 /// <remarks>
 /// A query's parameters are typed before its columns, each in order, and its first failure is its one error, at its
-/// name: the query then has no types.  The map of a query's type override is merged once for each distinct level of
-/// markers, since the queries without markers of their own share their file header's.  An empty map, as in a project
-/// without the override, is not asked at all.
+/// name: the query then has no types.  A type of PostgreSQL goes to <see cref="PostgresTypeMap" />, one of SQL Server
+/// to <see cref="SqlServerTypeMap" />.  The map of a query's type override is the entries of its file's engine, merged
+/// once for each distinct level of markers, since the queries without markers of their own share their file header's.
+/// An empty map, as in a project without the override, is not asked at all.
 /// </remarks>
 internal static class QueryTyper
 {
@@ -47,7 +50,8 @@ internal static class QueryTyper
 
         var queries = ImmutableArray.CreateBuilder<QueryTypes>(check.UsableEntries.Count);
         var diagnostics = ImmutableArray.CreateBuilder<DiagnosticInfo>();
-        var lookups = new List<(SettingsLevel Markers, OverrideOf? Lookup)>();
+        var engine = SqlDescribableDialects.EngineOf(file.Dialect);
+        var lookups = new List<(SettingsLevel Markers, OverrideLookup? Lookup)>();
         var next = 0;
         foreach (var entry in check.UsableEntries)
         {
@@ -62,7 +66,8 @@ internal static class QueryTyper
             var query = file.Queries[at];
             var typing = new Typing(
                 input.Probe.Column,
-                LookupOf(query.Markers, input, lookups),
+                input.SqlClientProbe.Column,
+                LookupOf(query.Markers, input, engine, lookups),
                 query.NameLocation,
                 diagnostics
             );
@@ -116,25 +121,36 @@ internal static class QueryTyper
         );
     }
 
-    // The property type of one parameter or column, or null after its error is added.  A type that is not of
-    // PostgreSQL, or a parameter's that is null, is only in a sidecar edited by hand, and describing again mends it.
+    // The property type of one parameter or column, by the map of its type's engine, or null after its error is
+    // added.  A type of an engine this version does not know, or a parameter's that is null, is only in a sidecar
+    // edited by hand, and describing again mends it.
     private static PropertyType? TypeOf(SidecarType? type, string owner, string name, Typing typing)
     {
-        if (type is not PostgresType postgres)
+        TypeMapping mapping;
+        DatabaseEngine engine;
+        switch (type)
         {
-            typing.Diagnostics.Add(
-                DiagnosticInfo.Create(
-                    SqlDiagnostics.TypeHasNoCSharpType,
-                    typing.Location,
-                    MessageSubject.Of(owner, name),
-                    type?.Name ?? "null",
-                    Describe
-                )
-            );
-            return null;
+            case PostgresType postgres:
+                mapping = PostgresTypeMap.Map(postgres, typing.Column, typing.Lookup?.OfPostgres);
+                engine = DatabaseEngine.PostgreSql;
+                break;
+            case SqlServerType sqlServer:
+                mapping = SqlServerTypeMap.Map(sqlServer, typing.SqlClientColumn, typing.Lookup?.OfSqlServer);
+                engine = DatabaseEngine.SqlServer;
+                break;
+            default:
+                typing.Diagnostics.Add(
+                    DiagnosticInfo.Create(
+                        SqlDiagnostics.TypeHasNoCSharpType,
+                        typing.Location,
+                        MessageSubject.Of(owner, name),
+                        type?.Name ?? "null",
+                        Describe
+                    )
+                );
+                return null;
         }
 
-        var mapping = PostgresTypeMap.Map(postgres, typing.Column, typing.Lookup);
         if (mapping is { Kind: TypeMappingKind.Mapped, Text: { } text })
         {
             return new PropertyType(
@@ -148,17 +164,21 @@ internal static class QueryTyper
         }
 
         typing.Diagnostics.Add(
-            Diagnose(mapping, MessageSubject.Of(owner, name), postgres.Name, typing.Location, typing.Column)
+            Diagnose(mapping, MessageSubject.Of(owner, name), type.Name, typing.Location, typing.Column, engine)
         );
         return null;
     }
 
+    // The failure's diagnostic.  NeedsDriver and Unreadable occur for both engines, and their helps name the engine's
+    // driver and system schema; NeedsSqlServerTypes is SQL Server's alone, and NotWrittenByTheTool and the type
+    // override's failures read the same for both.  Every other kind is PostgreSQL's alone.
     private static DiagnosticInfo Diagnose(
         TypeMapping failure,
         string subject,
         string typeName,
         LocationInfo at,
-        DriverColumn column
+        DriverColumn column,
+        DatabaseEngine engine
     )
     {
         var key = failure.Key;
@@ -196,12 +216,30 @@ internal static class QueryTyper
                     + key
                     + "=NpgsqlTypes.NpgsqlRange<T> with the data source's EnableUnmappedTypes()"
             ),
+            TypeMappingKind.NeedsDriver when engine == DatabaseEngine.SqlServer => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeNeedsSqlClient,
+                at,
+                subject,
+                typeName,
+                "Reference Microsoft.Data.SqlClient"
+            ),
             TypeMappingKind.NeedsDriver => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeNeedsNpgsql,
                 at,
                 subject,
                 typeName,
                 "Reference Npgsql"
+            ),
+            // A type of the package, which SqlClient reads only when the application references it.
+            TypeMappingKind.NeedsSqlServerTypes => DiagnosticInfo.Create(
+                SqlDiagnostics.TypeHasNoCSharpType,
+                at,
+                subject,
+                typeName,
+                "Reference the package Microsoft.SqlServer.Types and map it with the type override, as "
+                    + key
+                    + "="
+                    + failure.Detail
             ),
             TypeMappingKind.DiffersByDriver => DiagnosticInfo.Create(
                 SqlDiagnostics.TypeNeedsNpgsql,
@@ -246,20 +284,36 @@ internal static class QueryTyper
                 at,
                 subject,
                 typeName,
-                "Map it with the type override, as " + AsAKey(key) + "=<a C# type>"
+                "Map it with the type override, as " + AsAKey(key, engine) + "=<a C# type>"
             ),
         };
     }
 
-    // The key as an entry names it: the key of a type of pg_catalog is its bare name, which a key may be only for a
-    // name the map knows, so a catalog table's row type, pg_class, is written pg_catalog.pg_class.  The key of any
-    // other type has its schema already, which is found by splitting the key, as a dot inside quotes is no schema's.
-    private static string AsAKey(string key) =>
-        !TypeKeys.TrySplit(key.AsSpan(), out var schema, out _, out _)
-        || !schema.IsEmpty
-        || TypeKeys.TryNormalize(key.AsSpan(), out _)
-            ? key
-            : "pg_catalog." + key;
+    // The key as an entry names it: the key of a type of the engine's system schema, pg_catalog or sys, is its bare
+    // name, which a key may be only for a name the engine's map knows, so a catalog table's row type, pg_class, is
+    // written pg_catalog.pg_class, and a type of a newer server, sys.newtype, as is one of SQL Server whose bare name
+    // is an alias of another, sys.rowversion.  The key of any other type has its
+    // schema already, which is found by splitting the key, as a dot inside quotes is no schema's.
+    private static string AsAKey(string key, DatabaseEngine engine)
+    {
+        if (!TypeKeys.TrySplit(key.AsSpan(), out var schema, out _, out _) || !schema.IsEmpty)
+        {
+            return key;
+        }
+
+        if (engine == DatabaseEngine.SqlServer)
+        {
+            // A bare key that SQL Server reads as another name, as rowversion is read as timestamp, names that type
+            // and not this one, which sys. names as it is.
+            return
+                TypeKeys.TryNormalizeSqlServer(key.AsSpan(), out var normalized)
+                && string.Equals(normalized, key, StringComparison.Ordinal)
+                ? key
+                : "sys." + key;
+        }
+
+        return TypeKeys.TryNormalize(key.AsSpan(), out _) ? key : "pg_catalog." + key;
+    }
 
     // A failure of a mapped type keeps the type the override names in its text, which the message gives as a user
     // writes it, and the place that wrote the entry in its detail.  SQLSRC251 adds its case and help after them.
@@ -276,13 +330,15 @@ internal static class QueryTyper
             [subject, failure.Key, PostgresTypeMap.AsWritten(failure.Text ?? ""), failure.Detail ?? "", .. more]
         );
 
-    // The lookup of the type override for the markers, made once for each distinct level of markers, by reference:
-    // a query without markers of its own holds its file header's level.  None for an empty map.  A map of defaults
-    // alone is asked, since a default of an array's own key maps nothing and is reported.
-    private static OverrideOf? LookupOf(
+    // The lookup of the type override for the markers, of the file's engine's entries, made once for each distinct
+    // level of markers, by reference: a query without markers of its own holds its file header's level.  None for an
+    // empty map.  A map of defaults alone is asked, since a default of an array's own key maps nothing and is
+    // reported.
+    private static OverrideLookup? LookupOf(
         SettingsLevel markers,
         FileTypesInput input,
-        List<(SettingsLevel Markers, OverrideOf? Lookup)> lookups
+        DatabaseEngine engine,
+        List<(SettingsLevel Markers, OverrideLookup? Lookup)> lookups
     )
     {
         foreach (var (level, lookup) in lookups)
@@ -293,8 +349,8 @@ internal static class QueryTyper
             }
         }
 
-        var map = QuerySettings.ResolveTypeOverrides(markers, input.Metadata, input.Property);
-        OverrideOf? made = map.Count > 0 ? new OverrideLookup(map, input.MappedTypes).Find : null;
+        var map = QuerySettings.ResolveTypeOverrides(markers, input.Metadata, input.Property, engine);
+        var made = map.Count > 0 ? new OverrideLookup(map, input.MappedTypes, engine) : null;
         lookups.Add((markers, made));
         return made;
     }
@@ -315,17 +371,19 @@ internal static class QueryTyper
     // What the typing of one query reads, and where its error goes.
     private readonly record struct Typing(
         DriverColumn Column,
-        OverrideOf? Lookup,
+        SqlClientColumn SqlClientColumn,
+        OverrideLookup? Lookup,
         LocationInfo Location,
         ImmutableArray<DiagnosticInfo>.Builder Diagnostics
     );
 
     /// <summary>
-    /// The type override's answer for a type, at one level of the map's walk: for an array, the entry of its
-    /// element's key with <c>[]</c>, and for any other type, the entry of its key, each then, for a type of an
-    /// extension outside <c>pg_catalog</c>, of its bare name.  A key whose winning entry is <c>default</c> has none,
-    /// so the walk goes on as for a key without an entry.  An entry's type is the one the compilation resolved, or
-    /// the failure of its status.
+    /// The type override's answer for a type, at one level of the map's walk.  For a type of PostgreSQL: for an array,
+    /// the entry of its element's key with <c>[]</c>, and for any other type, the entry of its key, each then, for a
+    /// type of an extension outside <c>pg_catalog</c>, of its bare name.  For a type of SQL Server: the entry of the
+    /// key the map asks, with no rule for an array or an extension, which SQL Server has none of.  A key whose
+    /// winning entry is <c>default</c> has none, so the walk goes on as for a key without an entry.  An entry's type
+    /// is the one the compilation resolved, or the failure of its status.
     /// </summary>
     /// <remarks>
     /// An array is found by its element's key with <c>[]</c> alone, in every schema, and never by its own key, its
@@ -336,8 +394,36 @@ internal static class QueryTyper
     /// <c>default</c> included, is the array's failure, <see cref="TypeMappingKind.ArrayNamedByItsOwnKey" />, which
     /// names the key to write.  An array without its element has no key to write, and is left to the base map.
     /// </remarks>
-    private sealed class OverrideLookup(EquatableArray<TypeOverride> map, EquatableArray<MappedType> mappedTypes)
+    private sealed class OverrideLookup
     {
+        private readonly EquatableArray<TypeOverride> _map;
+        private readonly EquatableArray<MappedType> _mappedTypes;
+
+        // The map is of one engine's entries, so the lookup makes the delegate of that engine alone, once.
+        public OverrideLookup(
+            EquatableArray<TypeOverride> map,
+            EquatableArray<MappedType> mappedTypes,
+            DatabaseEngine engine
+        )
+        {
+            _map = map;
+            _mappedTypes = mappedTypes;
+            if (engine == DatabaseEngine.SqlServer)
+            {
+                OfSqlServer = Find;
+            }
+            else
+            {
+                OfPostgres = Find;
+            }
+        }
+
+        /// <summary>The lookup of a PostgreSQL file's types, or null in a SQL Server file.</summary>
+        public OverrideOf? OfPostgres { get; }
+
+        /// <summary>The lookup of a SQL Server file's types, or null in a PostgreSQL file.</summary>
+        public SqlServerOverrideOf? OfSqlServer { get; }
+
         public TypeMapping? Find(PostgresType type)
         {
             if (!type.Kind.Equals(SidecarValues.Kind.Array, StringComparison.Ordinal))
@@ -350,7 +436,7 @@ internal static class QueryTyper
                 return null;
             }
 
-            if (TypeOverrideMap.Winner(map, PostgresTypeMap.KeyOf(type)) is { } own)
+            if (TypeOverrideMap.Winner(_map, PostgresTypeMap.KeyOf(type)) is { } own)
             {
                 return new TypeMapping(
                     TypeMappingKind.ArrayNamedByItsOwnKey,
@@ -366,14 +452,17 @@ internal static class QueryTyper
             return EntryOf(element, "[]") is { } ofElement ? MappingOf(ofElement) : null;
         }
 
+        public TypeMapping? Find(string sqlServerKey) =>
+            TypeOverrideMap.Find(_map, sqlServerKey) is { } entry ? MappingOf(entry) : null;
+
         // The entry of the type's key with the suffix, or for a type of an extension, of its bare name with it:
         // citext[] as well as public.citext[].  A key longer than the name is qualified.
         private TypeOverride? EntryOf(PostgresType type, string suffix)
         {
             var key = PostgresTypeMap.KeyOf(type);
             var bare = TypeKeys.WritePart(type.InternalName);
-            return TypeOverrideMap.Find(map, key + suffix)
-                ?? (key.Length > bare.Length && IsExtension(type) ? TypeOverrideMap.Find(map, bare + suffix) : null);
+            return TypeOverrideMap.Find(_map, key + suffix)
+                ?? (key.Length > bare.Length && IsExtension(type) ? TypeOverrideMap.Find(_map, bare + suffix) : null);
         }
 
         private static bool IsExtension(PostgresType type) =>
@@ -387,7 +476,7 @@ internal static class QueryTyper
                 return null;
             }
 
-            var mapped = MappedTypeResolver.Find(mappedTypes, name);
+            var mapped = MappedTypeResolver.Find(_mappedTypes, name);
             var kind = (mapped?.Status ?? MappedTypeStatus.NotFound) switch
             {
                 MappedTypeStatus.Found => TypeMappingKind.Mapped,

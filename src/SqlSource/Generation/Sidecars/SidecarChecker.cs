@@ -125,8 +125,9 @@ internal static class SidecarChecker
         return true;
     }
 
-    // The dialects whose types this version can map.  Phase 6 adds mssql.
-    private static bool HasTypeMap(SqlDialect dialect) => dialect == SqlDialect.PostgreSql;
+    // The dialects whose types this version can map: both engines it describes.  SQLSRC243 waits for an engine whose
+    // describer lands before its map, and no dialect of this release reports it.
+    private static bool HasTypeMap(SqlDialect dialect) => dialect is SqlDialect.PostgreSql or SqlDialect.SqlServer;
 
     // One error for each token without a default of a query that needs an entry, at the query, in file order: no
     // sqlsource describe can give the query an entry until it has one.  An empty default is one.  Gives the names of

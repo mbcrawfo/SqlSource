@@ -5,7 +5,10 @@ namespace SqlSource.Settings;
 /// <summary>
 /// One entry of the type override: the C# type a database type maps to.
 /// </summary>
-/// <param name="Key">The type's key, as <see cref="TypeKeys.TryNormalize" /> gives it.</param>
+/// <param name="Key">
+/// The type's key, as one engine reads it: <see cref="TypeKeys.TryNormalize" /> or
+/// <see cref="TypeKeys.TryNormalizeSqlServer" /> gives it.
+/// </param>
 /// <param name="Type">
 /// The C# type as <see cref="ClrTypeName.Text" /> writes it, or null for <c>default</c>, which takes the key out of
 /// the map.
