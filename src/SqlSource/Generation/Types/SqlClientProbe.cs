@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using System.Globalization;
 using Microsoft.CodeAnalysis;
 
@@ -56,25 +57,32 @@ internal sealed record SqlClientProbe(bool Referenced, bool AtLeast61, bool AtLe
     public string VersionText => Version ?? "of an unknown version";
 
     /// <summary>
-    /// Reads the probe from <paramref name="compilation" />: three type lookups and the identities of its references.
-    /// Of two references named <c>Microsoft.Data.SqlClient</c>, the newer gives the version.  Never throws.
+    /// Reads the probe from <paramref name="compilation" />: three type lookups, and the assembly of the driver's
+    /// connection type for its version.  Of two such assemblies named <c>Microsoft.Data.SqlClient</c>, the newer gives
+    /// the version.  Never throws.
     /// </summary>
-    public static SqlClientProbe Read(Compilation compilation) =>
-        new(
-            Has(compilation, "Microsoft.Data.SqlClient.SqlConnection"),
+    public static SqlClientProbe Read(Compilation compilation)
+    {
+        var connections = compilation.GetTypesByMetadataName("Microsoft.Data.SqlClient.SqlConnection");
+        return new(
+            !connections.IsEmpty,
             Has(compilation, "Microsoft.Data.SqlTypes.SqlVector`1"),
             Has(compilation, "Microsoft.Data.SqlClient.SspiContextProvider"),
-            ReadVersion(compilation)
+            connections.IsEmpty ? null : ReadVersion(connections)
         );
+    }
 
-    private static string? ReadVersion(Compilation compilation)
+    // The assembly that defines the connection type is the driver's, unless it is another name: a driver merged into
+    // an assembly of its own has no version of its own.  A name is checked before anything of an assembly is read.
+    private static string? ReadVersion(ImmutableArray<INamedTypeSymbol> connections)
     {
-        // The module's references are already bound, so a name is checked before anything of an assembly is read.
         IAssemblySymbol? newest = null;
-        foreach (var assembly in compilation.SourceModule.ReferencedAssemblySymbols)
+        for (var i = 0; i < connections.Length; i++)
         {
+            var assembly = connections[i].ContainingAssembly;
             if (
-                string.Equals(assembly.Identity.Name, AssemblyName, StringComparison.OrdinalIgnoreCase)
+                assembly is not null
+                && string.Equals(assembly.Identity.Name, AssemblyName, StringComparison.OrdinalIgnoreCase)
                 && (newest is null || assembly.Identity.Version > newest.Identity.Version)
             )
             {
