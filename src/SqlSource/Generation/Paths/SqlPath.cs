@@ -147,31 +147,7 @@ internal static class SqlPath
     /// when there is none.
     /// </summary>
     public static int IndexOf<T>(EquatableArray<T> sortedItems, string normalizedPath, Func<T, string> getPath)
-        where T : IEquatable<T>
-    {
-        var low = 0;
-        var high = sortedItems.Count - 1;
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var order = Comparer.Compare(getPath(sortedItems[middle]), normalizedPath);
-            if (order == 0)
-            {
-                return middle;
-            }
-
-            if (order < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return -1;
-    }
+        where T : IEquatable<T> => SortedSearch.IndexOf(sortedItems, normalizedPath, getPath, Comparer);
 
     /// <summary>
     /// The paths of <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, that are files of
