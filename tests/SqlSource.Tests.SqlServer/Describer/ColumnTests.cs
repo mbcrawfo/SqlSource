@@ -16,7 +16,8 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
 {
     // Every row of the spike's table of columns, and of its table of statements with OUTPUT, that answers columns, but
     // the view, the system tables, the rows with no result set and the table with a trigger, which have tests of their
-    // own.  Each expression has a name of its own, but in "SELECT 1, id".
+    // own.  Each expression is aliased, but in "SELECT 1, id", which has a column with no name, "SELECT u.id, o.id",
+    // which has two named id, and "FOR JSON PATH", whose column the server names.
     public static TheoryData<string, string[]> SpikeRows =>
         new()
         {
@@ -287,13 +288,7 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
     [Fact]
     public async Task ColumnsAsync_OutputFromTableWithTrigger_AnswersErrorRows334Then11501()
     {
-        var token = TestContext.Current.CancellationToken;
-        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
-
-        var answer = await new SqlServerLive(session.Connection).ColumnsAsync(
-            new SqlServerColumnsRequest("INSERT INTO dbo.trig (id, v) OUTPUT inserted.id VALUES (1, 1)", null),
-            token
-        );
+        var answer = await AnswerAsync("INSERT INTO dbo.trig (id, v) OUTPUT inserted.id VALUES (1, 1)");
 
         answer.Rows.ShouldBeNull();
         answer.Error.ShouldBeNull();
@@ -315,6 +310,7 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
     public async Task ColumnsAsync_JsonAndVector_On2025()
     {
         sqlServer.SkipBelow(17, "json and vector are new in SQL Server 2025");
+        await sqlServer.ExecuteAsync("DROP TABLE IF EXISTS dbo.json_vector");
         await sqlServer.ExecuteAsync("CREATE TABLE dbo.json_vector (id int PRIMARY KEY, j json, v vector(3))");
         try
         {
@@ -328,19 +324,26 @@ public sealed class ColumnTests(SqlServerContainer sqlServer)
         }
     }
 
+    // The answer of "columns" for the SQL, with no declarations, in a session of its own.
+    private async Task<SqlServerColumnsAnswer> AnswerAsync(string sql)
+    {
+        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+        return await new SqlServerLive(session.Connection).ColumnsAsync(
+            new SqlServerColumnsRequest(sql, null),
+            TestContext.Current.CancellationToken
+        );
+    }
+
+    // The rows of a describe that must answer them.
     private async Task<IReadOnlyList<SqlServerColumnRow>> ColumnsAsync(string sql)
     {
-        var token = TestContext.Current.CancellationToken;
-        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+        var answer = await AnswerAsync(sql);
 
-        var answer = await new SqlServerLive(session.Connection).ColumnsAsync(
-            new SqlServerColumnsRequest(sql, null),
-            token
+        answer.Error.ShouldBeNull(
+            string.Join("; ", answer.Error?.Errors.Select(error => $"Msg {error.Number}: {error.Message}") ?? [])
         );
-
-        answer.Error.ShouldBeNull();
         answer.Errors.ShouldBeNull(
-            string.Join("; ", answer.Errors?.Select(error => $"{error.Number}: {error.Message}") ?? [])
+            string.Join("; ", answer.Errors?.Select(error => $"Msg {error.Number}: {error.Message}") ?? [])
         );
         return answer.Rows.ShouldNotBeNull();
     }
