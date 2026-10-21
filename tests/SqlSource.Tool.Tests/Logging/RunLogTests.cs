@@ -7,6 +7,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
+using SqlSource.Tool.Describing;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Testing;
 using Xunit;
@@ -326,6 +327,57 @@ public sealed class RunLogTests : IDisposable
         _ = await _scene.DescribeAsync("--log", "run.log");
         ActionOf(SidecarFormat.PathFor(_users)).ShouldBe("deleted");
         File.Exists(SidecarFormat.PathFor(_users)).ShouldBeFalse();
+    }
+
+    // The log's "action" and the "--verbose" line of each action.  A sidecar that was to be written or deleted and
+    // could not be is "failed", never "written" or "deleted".
+    [Theory]
+    [InlineData("Write", false, "written", "written")]
+    [InlineData("Write", true, "failed", "could not be changed")]
+    [InlineData("Delete", false, "deleted", "deleted")]
+    [InlineData("Delete", true, "failed", "could not be changed")]
+    [InlineData("Unreadable", false, "failed", "could not be changed")]
+    [InlineData("Unreadable", true, "failed", "could not be changed")]
+    [InlineData("HeldBack", false, "held-back", "left as it was")]
+    [InlineData("Unchanged", false, "unchanged", "unchanged")]
+    public void Sidecar_EachAction_IsItsWord(string action, bool failed, string logged, string said)
+    {
+        var log = new RecordingLog();
+        using var output = new StringWriter { NewLine = "\n" };
+
+        RunEvents.Sidecar(new RunTrace(log, output), "/p/Users.sql.json", Enum.Parse<FileAction>(action), failed);
+
+        var (name, members) = log.Events.ShouldHaveSingleItem();
+        name.ShouldBe("sidecar");
+        members.ShouldBe([new LogMember("path", "/p/Users.sql.json"), new LogMember("action", logged)]);
+        output.ToString().ShouldBe($"sqlsource: sidecar '/p/Users.sql.json': {said}\n");
+    }
+
+    // None (0) says nothing, so it has no event; 99 is no action at all.
+    [Theory]
+    [InlineData(0)]
+    [InlineData(99)]
+    public void Sidecar_ActionThatHasNoEvent_Throws(int action)
+    {
+        _ = Should.Throw<InvalidOperationException>(() =>
+            RunEvents.Sidecar(new RunTrace(NullRunLog.Instance, TextWriter.Null), "p", (FileAction)action, false)
+        );
+    }
+
+    [Theory]
+    [InlineData(true, "differs", "different")]
+    [InlineData(false, "same", "the same")]
+    public void SidecarChecked_EachResult_IsItsWord(bool differs, string logged, string said)
+    {
+        var log = new RecordingLog();
+        using var output = new StringWriter { NewLine = "\n" };
+
+        RunEvents.SidecarChecked(new RunTrace(log, output), "/p/Users.sql.json", differs);
+
+        var (name, members) = log.Events.ShouldHaveSingleItem();
+        name.ShouldBe("sidecar");
+        members.ShouldBe([new LogMember("path", "/p/Users.sql.json"), new LogMember("action", logged)]);
+        output.ToString().ShouldBe($"sqlsource: sidecar '/p/Users.sql.json': {said}\n");
     }
 
     // "written" would say what did not happen.

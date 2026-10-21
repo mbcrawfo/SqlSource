@@ -300,6 +300,18 @@ public sealed class SidecarStoreTests : IDisposable
         _error.ToString().ShouldBeEmpty();
     }
 
+    // The generator takes a sidecar in any case, so the sweep of a run on the whole does too.
+    [Fact]
+    public void Apply_RunOnTheWhole_RemovesTheTemporaryFileOfASidecarInCapitals()
+    {
+        var inCapitals = Leftover(TimeSpan.FromDays(3), "Q.SQL.JSON.0123456789abcdef0123456789abcdef.tmp");
+
+        Apply(onTheWhole: true, Outcome(FileAction.None));
+
+        File.Exists(inCapitals).ShouldBeFalse();
+        _error.ToString().ShouldBeEmpty();
+    }
+
     [Fact]
     public void Apply_RunOnTheWhole_LeavesATemporaryFileThatIsNew()
     {

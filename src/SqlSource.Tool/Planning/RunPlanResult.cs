@@ -7,4 +7,11 @@ namespace SqlSource.Tool.Planning;
 /// </summary>
 /// <param name="Plan">The plan.  A file or a query with an error is in it, marked.</param>
 /// <param name="Errors">The errors, in the order they are to be reported.</param>
-internal sealed record RunPlanResult(RunPlan Plan, EquatableArray<ToolDiagnostic> Errors);
+/// <param name="Unclaimed">
+/// For each manifest, in the order given, the number of its listed <c>.sql</c> files that no type of it claims.
+/// </param>
+internal sealed record RunPlanResult(
+    RunPlan Plan,
+    EquatableArray<ToolDiagnostic> Errors,
+    EquatableArray<int> Unclaimed
+);

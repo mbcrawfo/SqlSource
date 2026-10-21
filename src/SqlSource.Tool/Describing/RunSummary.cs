@@ -75,11 +75,15 @@ internal static class RunSummary
             );
         }
 
-        foreach (var name in named.Where(candidate => !selected.Any(database => Same(database.Name, candidate.Text))))
+        foreach (
+            var name in named.Where(candidate =>
+                !selected.Any(database => DatabaseName.Comparer.Equals(database.Name, candidate.Text))
+            )
+        )
         {
             // With its engine when the plan knows the database, though no query of it is selected.
             lines.Add(
-                planned.FirstOrDefault(database => Same(database.Name, name.Text)) is { } known
+                planned.FirstOrDefault(database => DatabaseName.Comparer.Equals(database.Name, name.Text)) is { } known
                     ? $"{Label(known)}: {zeros}"
                     : $"{Named(name, planned)}: {zeros}"
             );
@@ -161,9 +165,7 @@ internal static class RunSummary
         files
             .SelectMany(static file => file.Queries)
             .Where(query =>
-                query.Planned is { NeedsEntry: true, IsSelected: true, Database: { } name } && Same(name, database)
+                query.Planned is { NeedsEntry: true, IsSelected: true, Database: { } name }
+                && DatabaseName.Comparer.Equals(name, database)
             );
-
-    private static bool Same(string left, string right) =>
-        string.Equals(left, right, StringComparison.OrdinalIgnoreCase);
 }

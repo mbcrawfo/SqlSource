@@ -49,4 +49,15 @@ public sealed class SqlTextTests
     [InlineData("", 0, '\0')]
     public void CharAt_Index_GivesTheCharacterOrNulPastTheEnd(string text, int index, char expected) =>
         SqlText.CharAt(text, index).ShouldBe(expected);
+
+    [Theory]
+    [InlineData('\r', true)]
+    [InlineData('\n', true)]
+    [InlineData(' ', false)]
+    [InlineData('\t', false)]
+    [InlineData('\u0085', false)]
+    [InlineData('\u2028', false)]
+    [InlineData('\f', false)]
+    public void IsLineTerminator_Character_IsTrueForCarriageReturnAndLineFeedOnly(char character, bool expected) =>
+        SqlText.IsLineTerminator(character).ShouldBe(expected);
 }

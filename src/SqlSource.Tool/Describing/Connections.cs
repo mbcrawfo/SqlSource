@@ -88,7 +88,7 @@ internal sealed class Connections
         Func<string, string?> getEnvironmentVariable
     )
     {
-        var onCommandLine = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var onCommandLine = new Dictionary<string, string>(DatabaseName.Comparer);
         foreach (var argument in given)
         {
             onCommandLine[argument.Name] = argument.Value;
@@ -96,7 +96,7 @@ internal sealed class Connections
 
         var unnamed = NullIfBlank(getEnvironmentVariable(ConnectionVariables.Unnamed));
         var variables = selected.Select(ConnectionVariables.For).ToArray();
-        var byDatabase = new Dictionary<string, DatabaseConnection>(StringComparer.OrdinalIgnoreCase);
+        var byDatabase = new Dictionary<string, DatabaseConnection>(DatabaseName.Comparer);
         for (var index = 0; index < selected.Count; index++)
         {
             var name = selected[index];
@@ -139,7 +139,7 @@ internal sealed class Connections
         databases.Any(database => NearName.IsNear(name, database, ignoreCase: true));
 
     private static bool IsTheOnly(IReadOnlyList<string> describable, string name) =>
-        describable.Count == 1 && string.Equals(describable[0], name, StringComparison.OrdinalIgnoreCase);
+        describable.Count == 1 && DatabaseName.Comparer.Equals(describable[0], name);
 
     // The first other selected database with the same variable, when the variable would be read for either.
     private static string? SharerOf(

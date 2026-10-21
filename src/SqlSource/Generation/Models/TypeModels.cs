@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Immutable;
-using System.Globalization;
 using System.Linq;
 using System.Text;
 using SqlSource.Generation.Emitting;
@@ -177,29 +176,22 @@ internal static class TypeModels
     private static EquatableArray<ModelProperty> Sort(EquatableArray<ModelProperty> properties) =>
         new(properties.OrderBy(static property => property.Name, StringComparer.Ordinal).ToImmutableArray());
 
-    // The claiming type as a sort key and as a message names it: the namespace and each type's name, as values, with a
-    // generic type's arity after a hyphen, "App.Outer.Repository-1", as HintName.Create writes them, so that
-    // Repository and Repository<T> are told apart, or with its type parameters, "App.Outer.Repository<T>".
+    // The claiming type as a sort key and as a message names it.  The key is HintName.NameOf, the namespace and each
+    // type's name, as values, with a generic type's arity after a hyphen, "App.Outer.Repository-1", so that Repository
+    // and Repository<T> are told apart.  The name has the type parameters instead, "App.Outer.Repository<T>".
     private static (string Key, string Name) ClaimingTypeOf(TargetType target)
     {
-        var key = new StringBuilder(target.NamespaceValue);
         var name = new StringBuilder(target.NamespaceValue);
         foreach (var declaration in target.Types)
         {
-            if (key.Length > 0)
+            if (name.Length > 0)
             {
-                _ = key.Append('.');
                 _ = name.Append('.');
             }
 
-            _ = key.Append(declaration.ValueName);
             _ = name.Append(declaration.ValueName).Append(declaration.TypeParameters);
-            if (declaration.Arity > 0)
-            {
-                _ = key.Append('-').Append(declaration.Arity.ToString(CultureInfo.InvariantCulture));
-            }
         }
 
-        return (key.ToString(), name.ToString());
+        return (HintName.NameOf(target), name.ToString());
     }
 }

@@ -176,6 +176,29 @@ public sealed class FilterRunTests : IDisposable
         );
     }
 
+    // Outside Windows a backslash is no separator to Path.GetFullPath, so the path climbs above the root and names no
+    // file.  It selects nothing, as if it were not there, but the run is still one on a part.
+    [Fact]
+    public async Task Run_SqlPathThatNamesNoFile_KeepsTheSidecarOfAFileThatNeedsNoEntry()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Path.GetFullPath resolves a backslash's .. on Windows.");
+        await File.WriteAllTextAsync(
+            SidecarFormat.PathFor(_plain),
+            "of a query that needed an entry once",
+            TestContext.Current.CancellationToken
+        );
+
+        var result = await _scene.DescribeAsync(
+            "App.csproj",
+            "a" + string.Concat(Enumerable.Repeat(@"\..", 64)) + @"\q.sql"
+        );
+
+        result.Out.ShouldContain("postgres (postgres): 1 described, 0 skipped, 0 failed\n");
+        (await File.ReadAllTextAsync(SidecarFormat.PathFor(_plain), TestContext.Current.CancellationToken)).ShouldBe(
+            "of a query that needed an entry once"
+        );
+    }
+
     [Fact]
     public async Task Run_FileThatNeedsNoEntry_LosesItsSidecarInARunWithNoFilter()
     {

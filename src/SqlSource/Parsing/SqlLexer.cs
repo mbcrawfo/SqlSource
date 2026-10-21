@@ -170,7 +170,7 @@ internal sealed class SqlLexer(string text, SqlDialectRules rules)
                 return;
             }
 
-            _gapHasLineBreak |= value is '\r' or '\n';
+            _gapHasLineBreak |= SqlText.IsLineTerminator(value);
         }
 
         _gapStart = end;

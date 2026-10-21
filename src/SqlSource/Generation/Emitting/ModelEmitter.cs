@@ -152,15 +152,8 @@ internal static class ModelEmitter
         builder
             .Append(indent)
             .Append(model.IsPublic ? "public " : "internal ")
-            .Append(
-                model.Kind switch
-                {
-                    ModelKind.Record => "record ",
-                    ModelKind.SealedRecord => "sealed record ",
-                    ModelKind.Class => "class ",
-                    ModelKind.SealedClass or _ => "sealed class ",
-                }
-            )
+            .Append(ModelKinds.Keyword(model.Kind))
+            .Append(' ')
             .Append(model.Name);
 
     // T? is Nullable<T> for a value type and the annotation for a reference type: the same text for both.

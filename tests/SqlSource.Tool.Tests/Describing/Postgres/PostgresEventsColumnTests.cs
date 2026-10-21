@@ -108,7 +108,8 @@ public sealed class PostgresEventsColumnTests
             );
 
         var tables = log.Events[2].Members;
-        NamesOf(tables).ShouldBe(["oids", "tables", "durationMs"]);
+        NamesOf(tables).ShouldBe(["query", "oids", "tables", "durationMs"]);
+        Member(tables, "query").ShouldBe((LogValue)"ListUsers");
         Member(tables, "oids").ShouldBe(LogValue.ListOf([PostgresTables.Users.Oid]));
         var users = Member(tables, "tables")
             .ShouldBeOfType<LogValue.Items>()
@@ -282,7 +283,7 @@ public sealed class PostgresEventsColumnTests
         await DescribeAsync(script, log, Listing);
 
         log.Events.Select(written => written.Name).ShouldBe(["prepare", "columns", "tables", "deallocate"]);
-        NamesOf(log.Events[2].Members).ShouldBe(["oids", "error", "durationMs"]);
+        NamesOf(log.Events[2].Members).ShouldBe(["query", "oids", "error", "durationMs"]);
     }
 
     // The describe ends at the first column of a pseudo-type: the columns before it have their events, and it and

@@ -160,6 +160,26 @@ public sealed class QuerySettingsTests
     public void ResolveTypeOverrides_NoLevelSetsOne_IsEmpty() =>
         QuerySettings.ResolveTypeOverrides(SettingsLevel.None, SettingsLevel.None, SettingsLevel.None).ShouldBeEmpty();
 
+    [Theory]
+    [InlineData("a", "b", "c", "a")]
+    [InlineData(null, "b", "c", "b")]
+    [InlineData(null, null, "c", "c")]
+    [InlineData(null, null, null, "postgres")]
+    public void ResolveDatabase_EachLevel_WinsOverTheLevelsBelowIt(
+        string? markers,
+        string? metadata,
+        string? property,
+        string expected
+    ) =>
+        QuerySettings
+            .ResolveDatabase(
+                new SettingsLevel { Database = markers },
+                new SettingsLevel { Database = metadata },
+                new SettingsLevel { Database = property },
+                "postgres"
+            )
+            .ShouldBe(expected);
+
     [Fact]
     public void Over_TypeOverrides_MergePerKey()
     {

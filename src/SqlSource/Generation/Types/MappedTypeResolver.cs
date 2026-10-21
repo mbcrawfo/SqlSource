@@ -109,27 +109,8 @@ internal static class MappedTypeResolver
     /// </summary>
     public static MappedType? Find(EquatableArray<MappedType> types, string name)
     {
-        var (low, high) = (0, types.Count - 1);
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var order = string.CompareOrdinal(types[middle].Name, name);
-            if (order == 0)
-            {
-                return types[middle];
-            }
-
-            if (order < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return null;
+        var at = SortedSearch.IndexOf(types, name, static type => type.Name, StringComparer.Ordinal);
+        return at < 0 ? null : types[at];
     }
 
     // The resolution of the name, after the ids of the warnings a use of each of its types gives are added to

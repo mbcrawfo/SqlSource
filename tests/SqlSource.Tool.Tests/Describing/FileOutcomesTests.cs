@@ -15,7 +15,7 @@ namespace SqlSource.Tool.Tests.Describing;
 // Step 4 of the run: what happens to each file's sidecar, and what the sidecar is to hold.  Nothing is written here.
 public sealed class FileOutcomesTests : IDisposable
 {
-    private static readonly RunFilters OnlyBilling = new([], ["billing"]);
+    private static readonly RunFilters OnlyBilling = new([], [new UsageValue(null, "billing", 1)]);
 
     private readonly TempFolder _folder = new();
     private readonly TestProject _project;

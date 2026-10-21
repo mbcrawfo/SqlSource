@@ -41,6 +41,5 @@ internal sealed record SidecarEntry(
     /// compared ignoring case: two names that differ only in case read one connection variable.
     /// </summary>
     public bool IsCurrentFor(string hash, string database) =>
-        string.Equals(Hash, hash, StringComparison.Ordinal)
-        && string.Equals(Database, database, StringComparison.OrdinalIgnoreCase);
+        string.Equals(Hash, hash, StringComparison.Ordinal) && DatabaseName.Comparer.Equals(Database, database);
 }
