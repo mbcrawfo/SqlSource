@@ -2,7 +2,7 @@
 
 Problems that were identified and not resolved, and intentional choices known to be sub-optimal.  Each active item is fully documented in its own file, linked from the ID column.  When an item is resolved, its row is removed and its file deleted in the same PR as the fix.
 
-Next id: `TD-0069`
+Next id: `TD-0070`
 
 ## Active items
 
@@ -44,6 +44,7 @@ Next id: `TD-0069`
 | [TD-0066](TD-0066-type-name-with-a-line-break-has-no-key.md) | Open | 2026-10-20 | Low | A type whose schema or name holds a line break has no key of the type override, since an MSBuild value makes one space of it and a marker ends at it, and the help of its `SQLSRC246` suggests an entry that cannot be written |
 | [TD-0067](TD-0067-nullability-inside-a-mapped-type-argument-is-not-checked.md) | Open | 2026-10-20 | Low | The nullability inside a type argument of a C# type that the type override names is not checked against the constraints of its type parameter, so a mapping such as `List<string?>` for a parameter constrained to `IEnumerable<string>` gives its model a warning |
 | [TD-0068](TD-0068-sql-path-that-climbs-above-the-root-is-ignored.md) | Open | 2026-10-20 | Low | A `.sql` path that climbs above the root with backslashes, on Linux or macOS, has no normalised path, so it selects nothing and is reported nowhere, and a run with no other filter describes every query |
+| [TD-0069](TD-0069-change-to-any-model-runs-every-files-model-node-again.md) | Open | 2026-10-21 | Low | A change to any model runs the model node of every claimed file again, a search and a compare each, which at 500 files allocates about 230 KB more per run than emitting from the sorted models did, though it writes the same one model |
 
 ## Columns
 
