@@ -96,7 +96,22 @@ internal sealed record SqlServerParameterRow(
     string? SuggestedUserTypeSchema,
     string? SuggestedUserTypeName,
     string? SuggestedAssemblyQualifiedTypeName
-);
+) : ISqlServerTypeRow
+{
+    string? ISqlServerTypeRow.SystemTypeName => SuggestedSystemTypeName;
+
+    int? ISqlServerTypeRow.MaxLength => SuggestedMaxLength;
+
+    int? ISqlServerTypeRow.Precision => SuggestedPrecision;
+
+    int? ISqlServerTypeRow.Scale => SuggestedScale;
+
+    string? ISqlServerTypeRow.UserTypeSchema => SuggestedUserTypeSchema;
+
+    string? ISqlServerTypeRow.UserTypeName => SuggestedUserTypeName;
+
+    string? ISqlServerTypeRow.AssemblyQualifiedTypeName => SuggestedAssemblyQualifiedTypeName;
+}
 
 /// <summary>
 /// The request of <c>probe</c>: whether the SQL binds with every copy and parameter declared, one copy at
@@ -156,7 +171,7 @@ internal sealed record SqlServerDeclaredRow(
     string? UserTypeSchema,
     string? UserTypeName,
     string? AssemblyQualifiedTypeName
-);
+) : ISqlServerTypeRow;
 
 /// <summary>
 /// An error row of <c>sys.dm_exec_describe_first_result_set</c>: the function answers what it could not describe
@@ -246,4 +261,34 @@ internal sealed record SqlServerColumnRow(
     string? SourceColumn,
     bool? IsIdentityColumn,
     bool? IsComputedColumn
-);
+) : ISqlServerTypeRow;
+
+/// <summary>
+/// The type a row of either procedure gives, under the names of <c>sys.dm_exec_describe_first_result_set</c>, which
+/// <see cref="SqlServerTypes" /> reads.  It adds no member to a record: a row of
+/// <c>sp_describe_undeclared_parameters</c> gives its <c>suggested_</c> columns through an explicit implementation,
+/// which a capture does not write.
+/// </summary>
+internal interface ISqlServerTypeRow
+{
+    /// <summary>The system type with its facets, or null.</summary>
+    string? SystemTypeName { get; }
+
+    /// <summary>The length in bytes, <c>-1</c> for <c>max</c>.</summary>
+    int? MaxLength { get; }
+
+    /// <summary>The precision, 0 for a type that has none.</summary>
+    int? Precision { get; }
+
+    /// <summary>The scale, 0 for a type that has none.</summary>
+    int? Scale { get; }
+
+    /// <summary>The schema of an alias or CLR type, or null.</summary>
+    string? UserTypeSchema { get; }
+
+    /// <summary>The name of an alias or CLR type, or null.</summary>
+    string? UserTypeName { get; }
+
+    /// <summary>The assembly-qualified name of a CLR type, or null.</summary>
+    string? AssemblyQualifiedTypeName { get; }
+}

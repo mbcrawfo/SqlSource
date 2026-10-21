@@ -79,28 +79,20 @@ internal static class SqlServerColumns
     /// <param name="database">The session's database, or null when <c>open</c> did not say it.</param>
     public static (SidecarOrigin? Origin, string? Reason) OriginOf(SqlServerColumnRow row, string? database)
     {
-        if (
-            row is
-            { SourceServer: null, SourceDatabase: null, SourceSchema: null, SourceTable: null, SourceColumn: null }
-        )
-        {
-            return (null, Expression);
-        }
-
         if (row.SourceServer is not null)
         {
             return (null, AnotherServer);
         }
 
-        // Ordinally, as the server gave both: a database of a name that differs in case alone is another one.
-        if (database is null || !string.Equals(row.SourceDatabase, database, StringComparison.Ordinal))
+        if (row is not { SourceSchema: { } schema, SourceTable: { } table, SourceColumn: { } column })
         {
-            return (null, AnotherDatabase);
+            return (null, Expression);
         }
 
-        return row is { SourceSchema: { } schema, SourceTable: { } table, SourceColumn: { } column }
+        // Ordinally, as the server gave both: a database of a name that differs in case alone is another one.
+        return database is not null && string.Equals(row.SourceDatabase, database, StringComparison.Ordinal)
             ? (new SidecarOrigin(schema, table, column), null)
-            : (null, Expression);
+            : (null, AnotherDatabase);
     }
 }
 

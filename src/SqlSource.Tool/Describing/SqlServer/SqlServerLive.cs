@@ -175,15 +175,9 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                 var errors = new List<SqlServerDescribeError>();
                 while (await reader.ReadAsync(token))
                 {
-                    if (IntOf(reader, "error_number") is { } number)
+                    if (ErrorOf(reader) is { } error)
                     {
-                        errors.Add(
-                            new SqlServerDescribeError(
-                                number,
-                                IntOf(reader, "error_type") ?? 0,
-                                StringOf(reader, "error_message") ?? string.Empty
-                            )
-                        );
+                        errors.Add(error);
                         continue;
                     }
 
@@ -257,15 +251,9 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                 var errors = new List<SqlServerDescribeError>();
                 while (await reader.ReadAsync(token))
                 {
-                    if (IntOf(reader, "error_number") is { } number)
+                    if (ErrorOf(reader) is { } error)
                     {
-                        errors.Add(
-                            new SqlServerDescribeError(
-                                number,
-                                IntOf(reader, "error_type") ?? 0,
-                                StringOf(reader, "error_message") ?? string.Empty
-                            )
-                        );
+                        errors.Add(error);
                         continue;
                     }
 
@@ -327,6 +315,16 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             // A result set after the first is read for its errors alone.
         }
     }
+
+    // The error of a row of sys.dm_exec_describe_first_result_set, or null for a row that describes a column.
+    private static SqlServerDescribeError? ErrorOf(SqlDataReader reader) =>
+        IntOf(reader, "error_number") is { } number
+            ? new SqlServerDescribeError(
+                number,
+                IntOf(reader, "error_type") ?? 0,
+                StringOf(reader, "error_message") ?? string.Empty
+            )
+            : null;
 
     private static string? StringOf(SqlDataReader reader, string column)
     {

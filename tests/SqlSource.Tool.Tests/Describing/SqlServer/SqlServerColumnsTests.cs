@@ -215,13 +215,25 @@ public sealed class SqlServerColumnsTests
     public void OriginOf_DatabaseNamedInAnotherCase_IsNone() =>
         SqlServerColumns.OriginOf(Id with { SourceDatabase = "APP" }, Database).ShouldBe((null, "another database"));
 
+    // A source named in part is no base column, whether or not the server named its database.
     [Theory]
-    [InlineData(null, "users", "id")]
-    [InlineData("dbo", null, "id")]
-    [InlineData("dbo", "users", null)]
-    public void OriginOf_PartlyGiven_IsNone(string? schema, string? table, string? column) =>
+    [InlineData(Database, null, "users", "id")]
+    [InlineData(Database, "dbo", null, "id")]
+    [InlineData(Database, "dbo", "users", null)]
+    [InlineData(null, "dbo", "users", null)]
+    [InlineData(null, null, null, "id")]
+    public void OriginOf_PartlyGiven_IsNone(string? database, string? schema, string? table, string? column) =>
         SqlServerColumns
-            .OriginOf(Id with { SourceSchema = schema, SourceTable = table, SourceColumn = column }, Database)
+            .OriginOf(
+                Id with
+                {
+                    SourceDatabase = database,
+                    SourceSchema = schema,
+                    SourceTable = table,
+                    SourceColumn = column,
+                },
+                Database
+            )
             .ShouldBe((null, "expression"));
 
     // A capture recorded before open asked the database: no column is known to be of the session's database.
