@@ -1,6 +1,5 @@
 // Shared: tests/SqlSource.Tests.RoslynFloor compiles this file again, on Roslyn 4.8.0.  See AGENTS.md beside it.
 
-using System;
 using System.Linq;
 using Shouldly;
 using SqlSource.Parsing;
@@ -38,14 +37,10 @@ public sealed class ModelRunsTests
     }
 
     [Fact]
-    public void ModelFiles_Run_AreTheModelsHintNamesInOrder()
+    public void ModelFiles_Run_AreTheModelsHintNames()
     {
         var run = Run(Users, Entry(Users, "GetUser", [Parameter("id")], [Column("id")]));
 
-        var files = ModelFiles(run);
-
-        files.Length.ShouldBe(2);
-        files.ShouldAllBe(name => name.Contains("-Model."));
-        files.ShouldBe([.. files.OrderBy(name => name, StringComparer.Ordinal)]);
+        ModelFiles(run).ShouldBe(["App.GetUserDto-Model.g.cs", "App.GetUserParams-Model.g.cs"]);
     }
 }

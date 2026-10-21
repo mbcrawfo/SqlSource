@@ -352,7 +352,7 @@ public sealed class CliTests : IDisposable
     // Windows ends the process when the handler of a closed console or of a shutdown returns, so the handler
     // returns only when the run has ended.  A second signal waits for nothing: the process is to end now.
     [Fact]
-    public void Terminate_FirstThenSecondTime_WaitsForTheRunThenLetsTheProcessEndAtOnce()
+    public void Terminate_FirstThenSecondTime_CancelsAndWaitsForTheRunThenLetsTheProcessEndAtOnce()
     {
         using var interrupt = new CancellationTokenSource();
         var signals = 0;

@@ -14,8 +14,8 @@ using Xunit;
 
 namespace SqlSource.Tests.Postgres.Describer;
 
-// A session of the PostgreSQL describer as a run opens one, for a test: the live exchange unless the test brings
-// one, the machine's clock, and no log unless the test brings one.
+// Sessions of the PostgreSQL describer for a container test, on the database fixtures unless given, opened through
+// Describers.OpenAsync.
 internal static class Sessions
 {
     public static Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(

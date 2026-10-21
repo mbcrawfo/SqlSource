@@ -14,7 +14,8 @@ using Xunit;
 namespace SqlSource.Tool.Testing;
 
 // Runs the whole command in process, as Cli.Run does, with a host of the test's own: writers that are strings, a
-// working directory that is a temporary folder, and an environment that is a dictionary.
+// working directory that is a temporary folder, and an environment that is a dictionary.  A run made by Real runs on
+// the real host instead.
 internal sealed class CliRun : IDisposable
 {
     private readonly string? _realWorkingDirectory;

@@ -1204,21 +1204,6 @@ public sealed class SqlFileParserTests
     }
 
     [Fact]
-    public void Parse_TokenIgnoreMarkerWithoutAName_IsInvalidAtTheMarker()
-    {
-        const string Text = "-- name: Q\n-- token-ignore:\nSELECT 1\n";
-
-        Errors(Text)
-            .ShouldBe([
-                SqlParseError.Create(
-                    SqlParseErrorKind.InvalidMarkerValue,
-                    SpanOf(Text, "-- token-ignore:"),
-                    "token-ignore:"
-                ),
-            ]);
-    }
-
-    [Fact]
     public void Parse_TokenIgnoreAsAGeneratorParameter_IsNotKnown()
     {
         const string Text = "-- name: Q\n-- generator: token-ignore=a\nSELECT {{a}}\n";
@@ -1338,6 +1323,7 @@ public sealed class SqlFileParserTests
     [InlineData("token", true)]
     [InlineData("param", true)]
     [InlineData("column", true)]
+    [InlineData("token-ignore", true)]
     [InlineData("dialect", false)]
     public void Parse_MarkerWithoutAValue_IsInvalidAtTheMarker(string word, bool inAQuery)
     {
@@ -1478,7 +1464,7 @@ public sealed class SqlFileParserTests
             ]);
     }
 
-    // The markers of a query, given before the first query of a file that has one.
+    // A marker of a query, given before the file's first name marker, is not allowed there.
     [Theory]
     [InlineData("-- token: {{a:x}}", "token", "SELECT {{a}}")]
     [InlineData("-- param: @a int", "param", "SELECT @a")]

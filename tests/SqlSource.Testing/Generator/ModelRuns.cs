@@ -32,8 +32,10 @@ internal static class ModelRuns
     // A model's file ends in -Model.g.cs, with a hash before .g.cs when its name is made unique.
     private const string ModelMark = "-Model.";
 
+    // The type integer, which a parameter or column has unless another is given.
     public static readonly PostgresType Int4 = TestSidecars.Postgres(name: "integer", internalName: "int4");
 
+    // The type text.
     public static readonly PostgresType Text = TestSidecars.Postgres(name: "text", internalName: "text");
 
     // The source and files at Models under postgres, on Npgsql 10 unless the references are given.
@@ -82,9 +84,11 @@ internal static class ModelRuns
             columns: columns?.Select((column, ordinal) => column with { Ordinal = ordinal }).ToArray()
         );
 
+    // A parameter of the name, of int4 unless a type is given, and with its nullability unsaid unless given.
     public static SidecarParameter Parameter(string name, PostgresType? type = null, bool? nullable = null) =>
         TestSidecars.Parameter(0, name, type ?? Int4, nullable);
 
+    // A column of the name, of int4 and not null unless a type or nullability is given.
     public static SidecarColumn Column(
         string name,
         PostgresType? type = null,

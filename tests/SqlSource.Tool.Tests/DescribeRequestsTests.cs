@@ -1,5 +1,6 @@
 using System.Linq;
 using Shouldly;
+using SqlSource.Parsing;
 using Xunit;
 using static SqlSource.Tool.Testing.DescribeRequests;
 
@@ -18,13 +19,22 @@ public sealed class DescribeRequestsTests
         request.Parameters.ShouldAllBe(parameter => !parameter.IsDeclared);
     }
 
+    // A bracketed name is quoted under the rules of SQL Server, and plain text under those of PostgreSQL.
+    [Fact]
+    public void Of_SqlServerRules_ReadNoParameterInABracketedName()
+    {
+        const string Sql = "SELECT [@a], @b";
+
+        Of(SqlDialectRules.SqlServer, Sql).Parameters.ShouldBe([Inferred("b")]);
+        Of(SqlDialectRules.PostgreSql, Sql).Parameters.ShouldBe([Inferred("a"), Inferred("b")]);
+    }
+
     [Fact]
     public void Of_DeclaredParameterTheSqlLacks_IsListedAfterTheSqlsOwn()
     {
         var request = Of("SELECT @a", ("z", "int4"));
 
-        request.Parameters.Select(parameter => parameter.Name).ShouldBe(["a", "z"]);
-        request.Parameters[1].ShouldBe(Declared("z", "int4"));
+        request.Parameters.ShouldBe([Inferred("a"), Declared("z", "int4")]);
     }
 
     [Fact]
@@ -40,6 +50,8 @@ public sealed class DescribeRequestsTests
     {
         var request = Listed("SELECT 1", Declared("x", "int4"), Inferred("y"));
 
-        request.Parameters.Select(parameter => parameter.Name).ShouldBe(["x", "y"]);
+        request.Name.ShouldBe("Q");
+        request.Sql.ShouldBe("SELECT 1");
+        request.Parameters.ShouldBe([Declared("x", "int4"), Inferred("y")]);
     }
 }
