@@ -105,6 +105,6 @@ internal static class SqlMarkerReader
             index--;
         }
 
-        return index < 0 || text[index] is '\n' or '\r';
+        return index < 0 || SqlText.IsLineTerminator(text[index]);
     }
 }

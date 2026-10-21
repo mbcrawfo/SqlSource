@@ -162,12 +162,7 @@ public sealed class DescriberTests
     [Fact]
     public void ToString_OpenRequest_LeavesTheConnectionOut()
     {
-        var request = new OpenRequest(
-            "billing",
-            Secrets.ConnectionWithWord,
-            LiveExchange.Instance,
-            TimeProvider.System
-        );
+        var request = new OpenRequest("billing", Secrets.ConnectionWithWord, LiveExchange.Instance, new TestClock());
 
         request.ToString().ShouldBe("OpenRequest { Database = billing }");
     }

@@ -13,43 +13,8 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class NpgsqlCheckTests(PostgresContainer postgres)
 {
-    // The longest name a type can have: PostgreSQL keeps 63 bytes of a name.
-    private const string LongTypeName = "check_enum_with_a_name_of_exactly_sixty_three_characters_long00";
-
-    // The name the server gives its array: "_" and the type's name, cut to 63 bytes.
+    // The name the server gives the array of ScratchSchema.LongTypeName: "_" and its name, cut to 63 bytes.
     private const string LongArrayName = "_check_enum_with_a_name_of_exactly_sixty_three_characters_long0";
-
-    // What these tests need and the fixture schema lacks: a type in a schema whose name needs quotes, a domain
-    // over a domain, a composite type, an enum whose name is as long as a name can be, and a table that a
-    // describe must leave as it is.  Each statement can be run again.
-    private const string OwnObjects = $$"""
-        CREATE SCHEMA IF NOT EXISTS "My Schema";
-        DO $do$
-        BEGIN
-            CREATE TYPE "My Schema"."Status" AS ENUM ('a', 'b');
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END
-        $do$;
-        DO $do$
-        BEGIN
-            CREATE DOMAIN check_d2 AS email_t;
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END
-        $do$;
-        DO $do$
-        BEGIN
-            CREATE TYPE check_pair AS (a int, b int);
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END
-        $do$;
-        DO $do$
-        BEGIN
-            CREATE TYPE {{LongTypeName}} AS ENUM ('a', 'b');
-        EXCEPTION WHEN duplicate_object THEN NULL;
-        END
-        $do$;
-        CREATE TABLE IF NOT EXISTS check_canary (id int);
-        """;
 
     private Task<Outcome<QueryDescription, DescribeFailure>> DescribeAsync(
         string sql,
@@ -139,10 +104,10 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData("bit(3)", "bit")]
     [InlineData("check_d2", "character varying")]
     [InlineData("\"char\"", "char")]
-    [InlineData(LongTypeName + "[]", "public." + LongArrayName)]
+    [InlineData(ScratchSchema.LongTypeName + "[]", "public." + LongArrayName)]
     public async Task DescribeAsync_ParameterOfEachKindOfType_IsBoundByItsBindName(string type, string bindName)
     {
-        await postgres.ExecuteAsync(OwnObjects);
+        await postgres.ExecuteAsync(ScratchSchema.CheckTypes);
 
         var described = await DescribeAsync("SELECT @p AS p", ("p", type));
 
@@ -169,7 +134,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
         string written
     )
     {
-        await postgres.ExecuteAsync(OwnObjects);
+        await postgres.ExecuteAsync(ScratchSchema.CheckTypes);
 
         var described = declared is null ? await DescribeAsync(sql) : await DescribeAsync(sql, ("p", declared));
 
@@ -186,7 +151,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_DeclaredOnlyParameterNpgsqlCannotBind_IsSqlsrc232NamingIt()
     {
-        await postgres.ExecuteAsync(OwnObjects);
+        await postgres.ExecuteAsync(ScratchSchema.CheckTypes);
 
         var described = await DescribeAsync("SELECT id FROM users WHERE id = @id", ("unused", "check_pair"));
 
@@ -285,7 +250,7 @@ public sealed class NpgsqlCheckTests(PostgresContainer postgres)
     [InlineData(false)]
     public async Task CheckAsync_TextNpgsqlWouldSplit_AnswersAnErrorAndRunsNothing(bool withAParameter)
     {
-        await postgres.ExecuteAsync(OwnObjects);
+        await postgres.ExecuteAsync(ScratchSchema.CheckTypes);
         await using var session = await Sessions.OpenSessionAsync(postgres.ConnectionString);
         var live = new PostgresLive(session.Connection);
 

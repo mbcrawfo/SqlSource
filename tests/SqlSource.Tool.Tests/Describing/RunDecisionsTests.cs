@@ -16,7 +16,7 @@ namespace SqlSource.Tool.Tests.Describing;
 // Steps 1 and 2 of the run: the sidecars that are there, and what each query needs of the run.
 public sealed class RunDecisionsTests : IDisposable
 {
-    private static readonly RunFilters OnlyBilling = new([], ["billing"]);
+    private static readonly RunFilters OnlyBilling = new([], [new UsageValue(null, "billing", 1)]);
 
     private readonly TempFolder _folder = new();
     private readonly TestProject _project;

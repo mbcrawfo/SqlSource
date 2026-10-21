@@ -23,7 +23,7 @@ internal static class HintName
     /// hold: the names are the identifiers' values, without the <c>@</c> or the Unicode escapes they may be written
     /// with.
     /// </summary>
-    public static string Create(TargetType type)
+    public static string NameOf(TargetType type)
     {
         var name = new StringBuilder(type.NamespaceValue);
         foreach (var declaration in type.Types)
@@ -40,8 +40,13 @@ internal static class HintName
             }
         }
 
-        return name.Append(Extension).ToString();
+        return name.ToString();
     }
+
+    /// <summary>
+    /// The name of a type's file: <see cref="NameOf" /> then <c>.g.cs</c>.
+    /// </summary>
+    public static string Create(TargetType type) => NameOf(type) + Extension;
 
     /// <summary>
     /// The name of a model's file: its full name, the namespace's value and the name joined with a dot, then

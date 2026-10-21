@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Testing.Fixtures;
 using Xunit;
@@ -46,12 +47,12 @@ public sealed class ManifestTargetTests : IDisposable
             .Split(';');
 
     [Fact]
-    public void WriteManifest_ProjectWithOneFramework_HoldsWhatTheCompilerIsGiven()
+    public async Task WriteManifest_ProjectWithOneFramework_HoldsWhatTheCompilerIsGiven()
     {
         var project = _fixtures.Copy("Single");
         var folder = Path.GetDirectoryName(project)!;
 
-        var lines = _fixtures.WriteManifest(project);
+        var lines = await _fixtures.WriteManifestAsync(project);
 
         lines
             .Where(line => !line.StartsWith("DefineConstants=", StringComparison.Ordinal))
@@ -72,9 +73,9 @@ public sealed class ManifestTargetTests : IDisposable
     // that step, AddImplicitDefineConstants.  Without them the tool would not find an attribute under
     // "#if NET8_0_OR_GREATER".
     [Fact]
-    public void WriteManifest_ProjectWithOneFramework_HasTheConstantsOfItsFramework()
+    public async Task WriteManifest_ProjectWithOneFramework_HasTheConstantsOfItsFramework()
     {
-        var constants = Constants(_fixtures.WriteManifest(_fixtures.Copy("Single")));
+        var constants = Constants(await _fixtures.WriteManifestAsync(_fixtures.Copy("Single")));
 
         // Not DEBUG: MSBuild reads the environment for its properties, and a machine that has a variable named
         // Configuration, as the workflow of this repository has, evaluates the project in that configuration.
@@ -87,9 +88,9 @@ public sealed class ManifestTargetTests : IDisposable
     // A line break inside a value would end its line of the manifest, and the next line would have no key.  The
     // trims of the package do not reach a property of the SDK.
     [Fact]
-    public void WriteManifest_ConstantsWrittenOverSeveralLines_AreOnOneLine()
+    public async Task WriteManifest_ConstantsWrittenOverSeveralLines_AreOnOneLine()
     {
-        var lines = _fixtures.WriteManifest(_fixtures.Copy("Constants"));
+        var lines = await _fixtures.WriteManifestAsync(_fixtures.Copy("Constants"));
 
         lines.ShouldAllBe(line => line.Contains('='));
         var constants = lines.Single(line => line.StartsWith("DefineConstants=", StringComparison.Ordinal));
@@ -99,12 +100,12 @@ public sealed class ManifestTargetTests : IDisposable
     }
 
     [Fact]
-    public void WriteManifest_NoFileNamed_WritesOneUnderObj()
+    public async Task WriteManifest_NoFileNamed_WritesOneUnderObj()
     {
         var project = _fixtures.Copy("Single");
         var obj = Path.Combine(Path.GetDirectoryName(project)!, "obj");
 
-        var (exitCode, output) = FixtureProjects.RunMSBuild(project, ["-t:SqlSourceWriteManifest"]);
+        var (exitCode, output) = await FixtureProjects.RunMSBuildAsync(project, ["-t:SqlSourceWriteManifest"]);
 
         exitCode.ShouldBe(0, output);
         // In the folder of the configuration and the framework, whichever configuration the machine evaluates in.
@@ -112,15 +113,15 @@ public sealed class ManifestTargetTests : IDisposable
             .GetFiles(obj, "App.csproj.SqlSource.manifest", SearchOption.AllDirectories)
             .ShouldHaveSingleItem();
         Path.GetFileName(Path.GetDirectoryName(file)).ShouldBe("net10.0");
-        File.ReadLines(file).First().ShouldBe("SqlSourceManifest=1");
+        (await File.ReadAllLinesAsync(file, TestContext.Current.CancellationToken))[0].ShouldBe("SqlSourceManifest=1");
     }
 
     [Fact]
-    public void WriteManifest_FileNamed_WritesNothingIntoTheProject()
+    public async Task WriteManifest_FileNamed_WritesNothingIntoTheProject()
     {
         var project = _fixtures.Copy("Single");
 
-        _ = _fixtures.WriteManifest(project);
+        _ = await _fixtures.WriteManifestAsync(project);
 
         Directory.Exists(Path.Combine(Path.GetDirectoryName(project)!, "obj")).ShouldBeFalse();
         Directory.Exists(Path.Combine(Path.GetDirectoryName(project)!, "bin")).ShouldBeFalse();
@@ -128,9 +129,12 @@ public sealed class ManifestTargetTests : IDisposable
 
     // A project with several frameworks has no target of the package until it is given one of them.
     [Fact]
-    public void WriteManifest_SeveralFrameworksAndNoneGiven_Fails()
+    public async Task WriteManifest_SeveralFrameworksAndNoneGiven_Fails()
     {
-        var (exitCode, output) = FixtureProjects.RunMSBuild(_fixtures.Copy("Multi"), ["-t:SqlSourceWriteManifest"]);
+        var (exitCode, output) = await FixtureProjects.RunMSBuildAsync(
+            _fixtures.Copy("Multi"),
+            ["-t:SqlSourceWriteManifest"]
+        );
 
         exitCode.ShouldNotBe(0);
         output.ShouldContain("MSB4057");
@@ -138,12 +142,12 @@ public sealed class ManifestTargetTests : IDisposable
 
     // TD-0026: the manifest is the first framework's.  What the project lists for another alone is not in it.
     [Fact]
-    public void WriteManifest_SeveralFrameworksAndTheFirstGiven_IsTheManifestOfThatFramework()
+    public async Task WriteManifest_SeveralFrameworksAndTheFirstGiven_IsTheManifestOfThatFramework()
     {
         var project = _fixtures.Copy("Multi");
         var folder = Path.GetDirectoryName(project)!;
 
-        var lines = _fixtures.WriteManifest(project, "TargetFramework=net8.0");
+        var lines = await _fixtures.WriteManifestAsync(project, "TargetFramework=net8.0");
 
         lines.ShouldContain("TargetFramework=net8.0");
         Constants(lines).ShouldContain("NET8_0");
@@ -157,12 +161,12 @@ public sealed class ManifestTargetTests : IDisposable
     }
 
     [Fact]
-    public void WriteManifest_FileAddedByATargetThatHooksTheTrim_IsListedWithTrimmedMetadata()
+    public async Task WriteManifest_FileAddedByATargetThatHooksTheTrim_IsListedWithTrimmedMetadata()
     {
         var project = _fixtures.Copy("LateFile");
         var folder = Path.GetDirectoryName(project)!;
 
-        var lines = _fixtures.WriteManifest(project);
+        var lines = await _fixtures.WriteManifestAsync(project);
 
         var late = FileLines(Path.Combine(folder, "Generated", "Late.sql"), ("SqlSourceDialect", "mssql"));
         var at = Array.IndexOf(lines, late[0]);
@@ -173,12 +177,12 @@ public sealed class ManifestTargetTests : IDisposable
 
     // TD-0025: the target runs no hook of a build.
     [Fact]
-    public void WriteManifest_FileAddedByATargetThatHooksTheBuild_IsNotListed()
+    public async Task WriteManifest_FileAddedByATargetThatHooksTheBuild_IsNotListed()
     {
         var project = _fixtures.Copy("BuildHookFile");
         var folder = Path.GetDirectoryName(project)!;
 
-        var lines = _fixtures.WriteManifest(project);
+        var lines = await _fixtures.WriteManifestAsync(project);
 
         lines
             .Where(line => line.StartsWith("File=", StringComparison.Ordinal))
@@ -186,12 +190,12 @@ public sealed class ManifestTargetTests : IDisposable
     }
 
     [Fact]
-    public void WriteManifest_ProjectThatListsItsOwnFiles_HoldsTheFilesItLists()
+    public async Task WriteManifest_ProjectThatListsItsOwnFiles_HoldsTheFilesItLists()
     {
         var project = _fixtures.Copy("OwnFiles");
         var folder = Path.GetDirectoryName(project)!;
 
-        var lines = _fixtures.WriteManifest(project);
+        var lines = await _fixtures.WriteManifestAsync(project);
 
         lines
             .Where(line => line.StartsWith("File=", StringComparison.Ordinal))
@@ -203,24 +207,24 @@ public sealed class ManifestTargetTests : IDisposable
 
     // MSBuild splits a list at a semicolon and reads "%41" as "A".  A path is none of its lists.
     [Fact]
-    public void WriteManifest_PathsWithCharactersThatMSBuildReads_AreListedWhole()
+    public async Task WriteManifest_PathsWithCharactersThatMSBuildReads_AreListedWhole()
     {
         const string Odd = "q;=%41 'é";
         var project = _fixtures.Copy("OddPaths");
         var folder = Path.Combine(Path.GetDirectoryName(project)!, Odd);
 
-        var lines = _fixtures.WriteManifest(project);
+        var lines = await _fixtures.WriteManifestAsync(project);
 
         lines.ShouldContain("File=" + Path.Combine(folder, "a;b=c%41 'é.sql"));
         lines.ShouldContain("Compile=" + Path.Combine(folder, "a;b=c%41 'é.cs"));
     }
 
     [Fact]
-    public void WriteManifest_ValuesThatHoldASemicolon_AreEachOneLine()
+    public async Task WriteManifest_ValuesThatHoldASemicolon_AreEachOneLine()
     {
         var project = _fixtures.Copy("Single");
 
-        var lines = _fixtures.WriteManifest(
+        var lines = await _fixtures.WriteManifestAsync(
             project,
             "SqlSourceGeneratorParameters=a%3Bb",
             "SqlSourceModelNamespace=A=B"

@@ -12,10 +12,6 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class ExpressionTests(PostgresContainer postgres)
 {
-    // A table whose NOT NULL column is a domain, a type that no signature of the tables takes.
-    private const string AmountsTable =
-        "CREATE TABLE IF NOT EXISTS expression_amounts (id integer NOT NULL PRIMARY KEY, amount money_t NOT NULL)";
-
     private async Task<(bool? Nullable, string? Source)[]> AnswersAsync(string sql, string? connection = null)
     {
         var description = await Sessions.ShouldDescribeAsync(connection ?? postgres.ConnectionString, sql);
@@ -117,11 +113,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_ExpressionUnderAnAntiJoinOfAView_StaysUnknown()
     {
-        await postgres.ExecuteAsync(
-            "CREATE OR REPLACE VIEW expression_lonely AS SELECT u.id, s.k FROM users u "
-                + "LEFT JOIN (SELECT o.user_id, 'x'::text AS k FROM orders o) s ON s.user_id = u.id "
-                + "WHERE s.user_id IS NULL"
-        );
+        await postgres.ExecuteAsync(ScratchSchema.LonelyView);
 
         (
             await AnswersAsync(
@@ -220,7 +212,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_FormsOutsideTheTables_KeepNoOrigin()
     {
-        await postgres.ExecuteAsync(AmountsTable);
+        await postgres.ExecuteAsync(ScratchSchema.Amounts);
 
         (
             await AnswersAsync(
@@ -257,7 +249,7 @@ public sealed class ExpressionTests(PostgresContainer postgres)
     [Fact]
     public async Task DescribeAsync_AggregatesOfTypesOutsideTheTables_KeepNoOrigin()
     {
-        await postgres.ExecuteAsync(AmountsTable);
+        await postgres.ExecuteAsync(ScratchSchema.Amounts);
 
         (
             await AnswersAsync(

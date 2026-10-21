@@ -113,11 +113,7 @@ internal static class DatabaseRuns
         // either, and an outcome that holds neither is a fault.
         if (opened.Value is not { } session)
         {
-            var failure = Redaction.Of(
-                guard.Call(() => opened.Failure ?? throw new InvalidOperationException(Guard.Nothing)),
-                secret
-            );
-            reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, first, database, server: null), secret));
+            var failure = ReportFailure(guard, () => opened.Failure, first, database, server: null, reporter);
             RunEvents.NotOpened(trace, database, failure.Descriptor.Id);
             Fail(queries, failure.Descriptor.Id, trace);
             return;
@@ -174,15 +170,31 @@ internal static class DatabaseRuns
             }
             else
             {
-                var failure = Redaction.Of(
-                    guard.Call(() => result.Failure ?? throw new InvalidOperationException(Guard.Nothing)),
-                    secret
-                );
-                run.Reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), secret));
+                var failure = ReportFailure(guard, () => result.Failure, planned, database, server, run.Reporter);
                 query.State = QueryState.Failed;
                 RunEvents.Query(run.Trace, query, error: failure.Descriptor.Id);
             }
         }
+    }
+
+    // A failure a describer gave is read under the guard, where a null is the describer's fault, and redacted before
+    // it is printed.  It is returned redacted, for the events the caller writes.
+    private static DescribeFailure ReportFailure(
+        Guard guard,
+        Func<DescribeFailure?> failureOf,
+        PlannedQuery planned,
+        PlannedDatabase database,
+        ServerInfo? server,
+        Reporter reporter
+    )
+    {
+        var secret = guard.Secret;
+        var failure = Redaction.Of(
+            guard.Call(() => failureOf() ?? throw new InvalidOperationException(Guard.Nothing)),
+            secret
+        );
+        reporter.Report(Redaction.Of(DescribeErrors.Failure(failure, planned, database, server), secret));
+        return failure;
     }
 
     // What a describer gave goes into a sidecar, which is committed: a value in it is a bug of the describer.
@@ -212,7 +224,7 @@ internal static class DatabaseRuns
                 .SelectMany(static file => file.Queries)
                 .Where(query =>
                     query.State == QueryState.ToDescribe
-                    && string.Equals(query.Planned.Database, database, StringComparison.OrdinalIgnoreCase)
+                    && DatabaseName.Comparer.Equals(query.Planned.Database, database)
                 ),
         ];
 

@@ -29,7 +29,7 @@ internal static class SidecarComparer
     public static SidecarDifference? FindDifference(SidecarEntry committed, SidecarEntry described) =>
         Text(SidecarKeys.Hash, committed.Hash, described.Hash)
         ?? Text(SidecarKeys.Engine, committed.Engine, described.Engine)
-        ?? Text(SidecarKeys.Database, committed.Database, described.Database, StringComparison.OrdinalIgnoreCase)
+        ?? Text(SidecarKeys.Database, committed.Database, described.Database, DatabaseName.Comparer)
         ?? Text(SidecarKeys.ResultKind, ResultKind(committed.ResultKind), ResultKind(described.ResultKind))
         ?? Table(committed.MatchesTable, described.MatchesTable)
         ?? Parameters(committed.Parameters, described.Parameters)
@@ -205,9 +205,9 @@ internal static class SidecarComparer
         string path,
         string? committed,
         string? described,
-        StringComparison comparison = StringComparison.Ordinal
+        StringComparer? comparer = null
     ) =>
-        string.Equals(committed, described, comparison)
+        (comparer ?? StringComparer.Ordinal).Equals(committed, described)
             ? null
             : new SidecarDifference(path, Json(committed), Json(described));
 

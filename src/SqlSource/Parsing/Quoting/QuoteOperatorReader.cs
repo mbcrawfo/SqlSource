@@ -13,7 +13,12 @@ internal sealed class QuoteOperatorReader : QuoteReader
     public override int FindEnd(string text, int start)
     {
         var open = start + 1;
-        if (!HasPrefix(text, start) || open >= text.Length || text[open] is ' ' or '\t' or '\r' or '\n')
+        if (
+            !HasPrefix(text, start)
+            || open >= text.Length
+            || text[open] is ' ' or '\t'
+            || SqlText.IsLineTerminator(text[open])
+        )
         {
             return FindDoubledEnd(text, start);
         }

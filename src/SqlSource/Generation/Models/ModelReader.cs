@@ -27,10 +27,6 @@ namespace SqlSource.Generation.Models;
 /// </remarks>
 internal static class ModelReader
 {
-    private const string ParameterOwner = "parameter";
-
-    private const string ColumnOwner = "column";
-
     // PostgreSQL's name for a column that has none.
     private const string NoName = "?column?";
 
@@ -237,7 +233,7 @@ internal static class ModelReader
                     types[index],
                     parameter.Nullable == true,
                     ParameterDocumentation(parameter, reading.Text),
-                    Subject(ParameterOwner, parameter.Name),
+                    MessageSubject.Of(MessageSubject.Parameter, parameter.Name),
                     false
                 )
             );
@@ -283,7 +279,7 @@ internal static class ModelReader
                     types[index],
                     IsNullable(column, query.ColumnMarkers),
                     ColumnDocumentation(column, reading.Text),
-                    Subject(ColumnOwner, column.Name),
+                    MessageSubject.Of(MessageSubject.Column, column.Name),
                     IsArrayType(column.Type)
                 )
             );
@@ -305,14 +301,14 @@ internal static class ModelReader
     // is not.  A name that is an identifier is remembered for the model, for SQLSRC255, even when it is reserved.
     private static bool IsUsable(string name, string written, int index, bool isColumn, SqlQuery query, Reading reading)
     {
-        var owner = isColumn ? ColumnOwner : ParameterOwner;
+        var owner = isColumn ? MessageSubject.Column : MessageSubject.Parameter;
         if (!PropertyNames.IsIdentifier(name))
         {
             reading.Diagnostics.Add(
                 DiagnosticInfo.Create(
                     SqlDiagnostics.PropertyNameNotIdentifier,
                     query.NameLocation,
-                    Subject(owner, written),
+                    MessageSubject.Of(owner, written),
                     name,
                     isColumn ? AliasIt : RenameIt
                 )
@@ -326,8 +322,8 @@ internal static class ModelReader
                 DiagnosticInfo.Create(
                     SqlDiagnostics.PropertyNameRepeated,
                     query.NameLocation,
-                    Subject(owner, earlier.Written) + " at position " + PositionOf(earlier.Index),
-                    Subject(owner, written) + " at position " + PositionOf(index),
+                    MessageSubject.Of(owner, earlier.Written) + " at position " + PositionOf(earlier.Index),
+                    MessageSubject.Of(owner, written) + " at position " + PositionOf(index),
                     earlier.Name,
                     isColumn ? AliasOne : RenameOne
                 )
@@ -342,7 +338,7 @@ internal static class ModelReader
                 DiagnosticInfo.Create(
                     SqlDiagnostics.PropertyNameTaken,
                     query.NameLocation,
-                    Subject(owner, written),
+                    MessageSubject.Of(owner, written),
                     name,
                     TakenByARecord,
                     isColumn ? AliasIt : RenameIt
@@ -424,9 +420,6 @@ internal static class ModelReader
             .Append(XmlDocWriter.Escape(parameter.Type?.Name ?? string.Empty))
             .Append("</c>.")
             .ToString();
-
-    // "column 'id'", as a message names a parameter or column.
-    private static string Subject(string owner, string name) => owner + " '" + name + "'";
 
     // The 1-based position of the index.
     private static string PositionOf(int index) => (index + 1).ToString(CultureInfo.InvariantCulture);

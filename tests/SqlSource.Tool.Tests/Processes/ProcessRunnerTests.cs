@@ -58,7 +58,10 @@ public sealed class ProcessRunnerTests
     [Fact]
     public async Task Run_Dotnet_GivesItsExitCodeAndItsOutput()
     {
-        var result = await Runner.RunAsync(Request("dotnet", "--version"), TestContext.Current.CancellationToken);
+        var result = await Runner.RunAsync(
+            Request(Programs.Dotnet, "--version"),
+            TestContext.Current.CancellationToken
+        );
 
         result.ExitCode.ShouldBe(0, result.Error);
         result.Output.Trim().ShouldNotBeEmpty();
@@ -69,7 +72,7 @@ public sealed class ProcessRunnerTests
     public async Task Run_ProgramThatFails_GivesItsExitCodeAndItsErrorOutput()
     {
         var result = await Runner.RunAsync(
-            Request("dotnet", "sqlsource-no-such-command"),
+            Request(Programs.Dotnet, "sqlsource-no-such-command"),
             TestContext.Current.CancellationToken
         );
 
@@ -134,36 +137,17 @@ public sealed class ProcessRunnerTests
         await cancel.CancelAsync();
 
         _ = await Should.ThrowAsync<OperationCanceledException>(run);
-        (await EndsAsync(parent)).ShouldBeTrue("the program is still running");
-        (await EndsAsync(child)).ShouldBeTrue("the program that the program started is still running");
+        await Eventually.TrueAsync(() => !IsRunning(parent), "the program is still running");
+        await Eventually.TrueAsync(() => !IsRunning(child), "the program that the program started is still running");
     }
 
     // The id that a script wrote to a file, once it has.  PowerShell takes seconds to start on a machine that has
     // not run it.
-    private static async Task<int> ReadIdAsync(string file)
-    {
-        for (var attempt = 0; attempt < 600; attempt++)
-        {
-            if (File.Exists(file) && int.TryParse(await File.ReadAllTextAsync(file), out var id))
-            {
-                return id;
-            }
-
-            await Task.Delay(50, TestContext.Current.CancellationToken);
-        }
-
-        throw new TimeoutException($"Nothing wrote an id to '{file}'.");
-    }
-
-    private static async Task<bool> EndsAsync(int id)
-    {
-        for (var attempt = 0; attempt < 100 && IsRunning(id); attempt++)
-        {
-            await Task.Delay(50, TestContext.Current.CancellationToken);
-        }
-
-        return !IsRunning(id);
-    }
+    private static async Task<int> ReadIdAsync(string file) =>
+        await Eventually.ValueAsync<int>(
+            async () => File.Exists(file) && int.TryParse(await File.ReadAllTextAsync(file), out var id) ? id : null,
+            $"Nothing wrote an id to '{file}'."
+        );
 
     private static bool IsRunning(int id)
     {

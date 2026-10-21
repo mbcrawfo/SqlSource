@@ -8,6 +8,7 @@ using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Parsing;
 using SqlSource.Parsing.Markers;
+using SqlSource.Testing;
 using Xunit;
 
 namespace SqlSource.Tests.Diagnostics;
@@ -25,7 +26,7 @@ public sealed class DiagnosticsDocumentTests
     ];
 
     private static readonly string[] Lines = File.ReadAllLines(
-        Path.Combine(AppContext.BaseDirectory, "docs", "manual", "diagnostics.md")
+        Path.Combine(RepositoryRoot.Folder, "docs", "manual", "diagnostics.md")
     );
 
     [Fact]

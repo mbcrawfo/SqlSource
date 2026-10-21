@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
+using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Paths;
 
@@ -12,12 +13,13 @@ namespace SqlSource.Generation.Paths;
 /// </summary>
 internal static class SqlPath
 {
-    private const string SqlExtension = ".sql";
+    /// <summary>The end of the path of a query file.</summary>
+    public const string SqlExtension = ".sql";
 
-    private const string SidecarExtension = ".sql.json";
-
-    // What a sidecar's path has after the path of its .sql file.
-    private const string JsonExtension = ".json";
+    /// <summary>
+    /// The end of the path of a sidecar: that of a query file and <see cref="SidecarFormat.Extension" />.
+    /// </summary>
+    public const string SidecarExtension = SqlExtension + SidecarFormat.Extension;
 
     private const char Separator = '/';
 
@@ -40,7 +42,7 @@ internal static class SqlPath
     /// </summary>
     public static string? SqlPathOfSidecar(string sidecarPath) =>
         Normalize(sidecarPath) is { } normalized && IsSidecarFile(normalized)
-            ? normalized.Substring(0, normalized.Length - JsonExtension.Length)
+            ? normalized.Substring(0, normalized.Length - SidecarFormat.Extension.Length)
             : null;
 
     /// <summary>
@@ -50,9 +52,9 @@ internal static class SqlPath
     /// </summary>
     public static bool IsSidecarPathOf(string sidecarPath, string normalizedSqlPath) =>
         Normalize(sidecarPath) is { } normalized
-        && normalized.Length == normalizedSqlPath.Length + JsonExtension.Length
+        && normalized.Length == normalizedSqlPath.Length + SidecarFormat.Extension.Length
         && normalized.StartsWith(normalizedSqlPath, StringComparison.Ordinal)
-        && normalized.EndsWith(JsonExtension, StringComparison.Ordinal);
+        && normalized.EndsWith(SidecarFormat.Extension, StringComparison.Ordinal);
 
     /// <summary>
     /// The paths, each once ignoring case and in the order of <see cref="Comparer" />, which is also the order of a
@@ -145,31 +147,7 @@ internal static class SqlPath
     /// when there is none.
     /// </summary>
     public static int IndexOf<T>(EquatableArray<T> sortedItems, string normalizedPath, Func<T, string> getPath)
-        where T : IEquatable<T>
-    {
-        var low = 0;
-        var high = sortedItems.Count - 1;
-        while (low <= high)
-        {
-            var middle = low + ((high - low) / 2);
-            var order = Comparer.Compare(getPath(sortedItems[middle]), normalizedPath);
-            if (order == 0)
-            {
-                return middle;
-            }
-
-            if (order < 0)
-            {
-                low = middle + 1;
-            }
-            else
-            {
-                high = middle - 1;
-            }
-        }
-
-        return -1;
-    }
+        where T : IEquatable<T> => SortedSearch.IndexOf(sortedItems, normalizedPath, getPath, Comparer);
 
     /// <summary>
     /// The paths of <paramref name="sortedPaths" />, which is ordered by <see cref="Comparer" />, that are files of

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis.Text;
 
 namespace SqlSource.Parsing;
@@ -10,6 +11,13 @@ internal static class SqlText
 {
     // What ends a line of SQL.  A C# documentation comment has more of them, and XmlDocWriter holds its own list.
     private static readonly char[] LineTerminators = ['\r', '\n'];
+
+    /// <summary>
+    /// Whether <paramref name="character" /> ends a line of SQL: <c>\r</c> or <c>\n</c>.  The test for one character,
+    /// where <see cref="FindLineEnd" /> searches a range.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static bool IsLineTerminator(char character) => character is '\r' or '\n';
 
     /// <summary>
     /// The span from <paramref name="start" /> up to <paramref name="end" /> without the white space at either

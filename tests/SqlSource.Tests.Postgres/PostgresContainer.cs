@@ -16,15 +16,6 @@ namespace SqlSource.Tests.Postgres;
 // Testcontainers removes the container when the tests end, and its reaper does when the process is killed.
 public sealed class PostgresContainer : IAsyncLifetime
 {
-    // The one place that the tests and the scripts read the image from: tools/record-fixtures.sh,
-    // tools/describe-end-to-end.sh and AppContainer of tests/SqlSource.Tests.Postgres.Npgsql8 read it from this line,
-    // by its shape.
-    // examples/PostgresExamples/docker-compose.yml repeats the tag, which rule 5 of AGENTS.md keeps in step.  It names
-    // a major and a minor, as every image of the tests does: the recorded fixtures carry the version they were recorded
-    // against, and a moving tag would run another.
-    // See tests/SqlSource.Tests.Postgres/README.md.
-    public const string DefaultImage = "postgres:18.6";
-
     // Names another image: CI runs the tests again on the oldest PostgreSQL that is supported.
     public const string ImageVariable = "SQLSOURCE_TESTS_POSTGRES_IMAGE";
 
@@ -54,7 +45,7 @@ public sealed class PostgresContainer : IAsyncLifetime
     public static IReadOnlyList<int> RecordedMajors { get; } = [14, 18];
 
     public static string Image =>
-        Environment.GetEnvironmentVariable(ImageVariable) is { Length: > 0 } image ? image : DefaultImage;
+        Environment.GetEnvironmentVariable(ImageVariable) is { Length: > 0 } image ? image : DefaultImages.Postgres;
 
     // The tag of an image, which for a pinned image is the server's version: "postgres:18.6" is "18.6".
     public static string TagOf(string image) => image[(image.LastIndexOf(':') + 1)..];

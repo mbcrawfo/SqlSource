@@ -3,7 +3,6 @@ using System.Diagnostics;
 using System.Globalization;
 using System.IO;
 using System.Security;
-using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Tool.Testing;
@@ -19,6 +18,9 @@ public sealed class TerminationTests : IDisposable
 {
     // The folders that a run makes in the temporary directory for its manifests.
     private const string RunFolders = "sqlsource-*";
+
+    // How soon the run ends once its console is closed.
+    private static readonly TimeSpan Soon = TimeSpan.FromSeconds(60);
 
     private readonly FixtureProjects _fixtures = new();
 
@@ -38,36 +40,26 @@ public sealed class TerminationTests : IDisposable
         var project = ProjectThatWaits(waiting);
         var temp = Directory.CreateDirectory(_fixtures.PathOf("tmp")).FullName;
 
-        using var tool = Programs.StartTool(_fixtures.Root, temp, "describe", project);
-        try
-        {
-            var output = tool.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
-            var error = tool.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-
-            // The target of the project has begun its wait: the run has its folder, and an MSBuild that has
-            // started a program of its own.
-            await AppearsAsync(() => File.Exists(waiting), $"Nothing wrote '{waiting}'.");
-            using (var kill = Process.Start("kill", [signal, tool.Id.ToString(CultureInfo.InvariantCulture)]))
+        var result = await Programs.RunAsync(
+            Programs.ToolStart(_fixtures.Root, temp, "describe", project),
+            Eventually.Patience,
+            async tool =>
             {
-                await kill.WaitForExitAsync(TestContext.Current.CancellationToken);
+                // The target of the project has begun its wait: the run has its folder, and an MSBuild that has
+                // started a program of its own.
+                await Eventually.TrueAsync(() => File.Exists(waiting), $"Nothing wrote '{waiting}'.");
+                var kill = new ProcessStartInfo("kill", [signal, tool.Id.ToString(CultureInfo.InvariantCulture)]);
+                var sent = await Programs.RunAsync(kill, Eventually.Patience);
+                sent.ExitCode.ShouldBe(0, sent.Error);
             }
+        );
 
-            await tool.WaitForExitAsync(TestContext.Current.CancellationToken);
-
-            // A run that was cancelled prints nothing more.
-            (await error).ShouldBeEmpty();
-            (await output).ShouldBeEmpty();
-            tool.ExitCode.ShouldBe(1);
-            // An MSBuild that was killed leaves the pipes of its runtime there, which are none of the tool's.
-            Directory.EnumerateDirectories(temp, RunFolders).ShouldBeEmpty();
-        }
-        finally
-        {
-            if (!tool.HasExited)
-            {
-                tool.Kill(entireProcessTree: true);
-            }
-        }
+        // A run that was cancelled prints nothing more.
+        result.Error.ShouldBeEmpty();
+        result.Output.ShouldBeEmpty();
+        result.ExitCode.ShouldBe(1);
+        // An MSBuild that was killed leaves the pipes of its runtime there, which are none of the tool's.
+        Directory.EnumerateDirectories(temp, RunFolders).ShouldBeEmpty();
     }
 
     // A console that is closed is the SIGHUP of Windows, and the system ends the process when the handler of it
@@ -91,44 +83,39 @@ public sealed class TerminationTests : IDisposable
             WorkingDirectory = _fixtures.Root,
             CreateNoWindow = true,
             Arguments =
-                $"/c start \"{title}\" /wait dotnet --roll-forward LatestMajor "
+                $"/c start \"{title}\" /wait \"{Programs.Dotnet}\" --roll-forward LatestMajor "
                 + $"\"{Programs.ToolPath}\" describe \"{project}\"",
         };
         Programs.SetToolEnvironment(start, temp);
-        using var shell = Process.Start(start)!;
-        try
-        {
-            // The target of the project has begun its wait.  A wait that failed would end the run by itself, and
-            // the test would take that for the close: so the run is seen to go on for a while first.  Nothing
-            // here says what the tool wrote, which went to its console.
-            await AppearsAsync(() => File.Exists(waiting), $"Nothing wrote '{waiting}'.");
-            await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
-            shell.HasExited.ShouldBeFalse("the run ended by itself, before its console was closed");
-            _ = Directory.EnumerateDirectories(temp, RunFolders).ShouldHaveSingleItem();
-
-            var closed = await CloseConsoleAsync(title);
-
-            // Left alone, the run would wait for its MSBuild for two minutes.
-            using var soon = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
-            soon.CancelAfter(TimeSpan.FromSeconds(60));
-            try
+        var closed = "";
+        _ = await Programs.RunAsync(
+            start,
+            Eventually.Patience,
+            async shell =>
             {
-                await shell.WaitForExitAsync(soon.Token);
-            }
-            catch (OperationCanceledException) when (!TestContext.Current.CancellationToken.IsCancellationRequested)
-            {
-                Assert.Fail($"The run did not end when its console was closed.  taskkill said: {closed}");
-            }
+                // The target of the project has begun its wait.  A wait that failed would end the run by itself, and
+                // the test would take that for the close: so the run is seen to go on for a while first.  Nothing
+                // here says what the tool wrote, which went to its console.
+                await Eventually.TrueAsync(() => File.Exists(waiting), $"Nothing wrote '{waiting}'.");
+                await Task.Delay(TimeSpan.FromSeconds(3), TestContext.Current.CancellationToken);
+                shell.HasExited.ShouldBeFalse("the run ended by itself, before its console was closed");
+                _ = Directory.EnumerateDirectories(temp, RunFolders).ShouldHaveSingleItem();
 
-            Directory.EnumerateDirectories(temp, RunFolders).ShouldBeEmpty(closed);
-        }
-        finally
-        {
-            if (!shell.HasExited)
-            {
-                shell.Kill(entireProcessTree: true);
+                closed = await CloseConsoleAsync(title);
+
+                // Left alone, the run would wait for its MSBuild for two minutes.
+                try
+                {
+                    await shell.WaitForExitAsync(TestContext.Current.CancellationToken).WaitAsync(Soon);
+                }
+                catch (TimeoutException)
+                {
+                    Assert.Fail($"The run did not end when its console was closed.  taskkill said: {closed}");
+                }
             }
-        }
+        );
+
+        Directory.EnumerateDirectories(temp, RunFolders).ShouldBeEmpty(closed);
     }
 
     // A copy of a fixture whose manifest target writes the file given and then waits for two minutes, so that a
@@ -155,29 +142,10 @@ public sealed class TerminationTests : IDisposable
     // Closes the console whose window has the title, and gives what "taskkill" said, for a test that fails.
     private static async Task<string> CloseConsoleAsync(string title)
     {
-        var start = new ProcessStartInfo("taskkill") { RedirectStandardOutput = true, RedirectStandardError = true };
+        var start = new ProcessStartInfo("taskkill");
         start.ArgumentList.Add("/FI");
         start.ArgumentList.Add($"WINDOWTITLE eq {title}*");
-        using var taskkill = Process.Start(start)!;
-        var error = taskkill.StandardError.ReadToEndAsync(TestContext.Current.CancellationToken);
-        var output = await taskkill.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);
-        await taskkill.WaitForExitAsync(TestContext.Current.CancellationToken);
-        return $"{output.Trim()} {(await error).Trim()} (exit code {taskkill.ExitCode})";
-    }
-
-    // Waits for what a program of the test does, which with a first run of MSBuild on a machine takes a while.
-    private static async Task AppearsAsync(Func<bool> isThere, string otherwise)
-    {
-        for (var attempt = 0; attempt < 12000; attempt++)
-        {
-            if (isThere())
-            {
-                return;
-            }
-
-            await Task.Delay(10, TestContext.Current.CancellationToken);
-        }
-
-        throw new TimeoutException(otherwise);
+        var taskkill = await Programs.RunAsync(start, Eventually.Patience);
+        return $"{taskkill.Output.Trim()} {taskkill.Error.Trim()} (exit code {taskkill.ExitCode})";
     }
 }

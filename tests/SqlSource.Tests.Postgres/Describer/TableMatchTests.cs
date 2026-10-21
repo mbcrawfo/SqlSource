@@ -12,13 +12,6 @@ namespace SqlSource.Tests.Postgres.Describer;
 [Collection(UsesPostgres.Name)]
 public sealed class TableMatchTests(PostgresContainer postgres)
 {
-    // A table of these tests alone, whose second attribute is dropped.  It is made by SQL that can be run again,
-    // and left: the container is thrown away, and the fixtures are recorded in one of their own.
-    private const string DroppedColumnTable = """
-        CREATE TABLE IF NOT EXISTS match_dropped (id integer PRIMARY KEY, gone text, kept text);
-        ALTER TABLE match_dropped DROP COLUMN IF EXISTS gone;
-        """;
-
     private Task<QueryDescription> ShouldDescribeAsync(string sql) =>
         Sessions.ShouldDescribeAsync(postgres.ConnectionString, sql);
 
@@ -56,7 +49,7 @@ public sealed class TableMatchTests(PostgresContainer postgres)
     {
         var token = TestContext.Current.CancellationToken;
         await using var source = NpgsqlDataSource.Create(postgres.ConnectionString);
-        await using (var create = source.CreateCommand(DroppedColumnTable))
+        await using (var create = source.CreateCommand(ScratchSchema.DroppedColumn))
         {
             _ = await create.ExecuteNonQueryAsync(token);
         }

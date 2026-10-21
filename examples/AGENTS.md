@@ -16,7 +16,7 @@ The rules for changing the example projects, `examples/<Engine>Examples`.
 2. **The sidecars are written by `tools/describe-end-to-end.sh`, never by hand.**  Run it after a change to a query or to a project's `schema.sql`, and read its diff.
 3. **The project sets no `SqlSourceDatabase`.**  Its queries belong to the default logical database, `postgres`, so a run has one database: the README's `SQLSOURCE_CONNECTION` and the connection `postgres=` in `tools/describe-end-to-end.sh` both depend on it.
 4. **`schema.sql` names no owner, role or database.**  The Compose file runs it as its own user in its own database, and the script as `postgres` in a database of its own, and both must give the sidecars the same answer.
-5. **The Compose file's image is the tests' default image**, `PostgresContainer.DefaultImage`, and moves with it by rule 5 of the root `AGENTS.md`.
+5. **The Compose file's image is the tests' default image**, `DefaultImages.Postgres` of `tests/SqlSource.Testing/DefaultImages.cs`, and moves with it by rule 5 of the root `AGENTS.md`.
 6. **The README lists the versions of Dapper and Npgsql** that `Directory.Packages.props` pins.  A change to either updates it.
 7. **The README's links to the manual are relative.**  It is not a packed readme.
 

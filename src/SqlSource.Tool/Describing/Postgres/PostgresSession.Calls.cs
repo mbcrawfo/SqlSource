@@ -62,6 +62,7 @@ internal sealed partial class PostgresSession
         );
 
     private Task<PostgresTablesAnswer> TablesAsync(
+        string query,
         PostgresTablesRequest request,
         CancellationToken cancellationToken
     ) =>
@@ -69,20 +70,25 @@ internal sealed partial class PostgresSession
             PostgresCallNames.Tables,
             request,
             _live.TablesAsync,
-            (asked, answer, durationMs) => PostgresEvents.Tables(_log, asked, answer, durationMs),
+            (asked, answer, durationMs) => PostgresEvents.Tables(_log, query, asked, answer, durationMs),
             cancellationToken
         );
 
-    private Task<PostgresTypesAnswer> TypesAsync(PostgresTypesRequest request, CancellationToken cancellationToken) =>
+    private Task<PostgresTypesAnswer> TypesAsync(
+        string query,
+        PostgresTypesRequest request,
+        CancellationToken cancellationToken
+    ) =>
         AskAsync(
             PostgresCallNames.Types,
             request,
             _live.TypesAsync,
-            (asked, answer, durationMs) => PostgresEvents.Types(_log, asked, answer, durationMs),
+            (asked, answer, durationMs) => PostgresEvents.Types(_log, query, asked, answer, durationMs),
             cancellationToken
         );
 
     private Task<PostgresSpellingsAnswer> SpellingsAsync(
+        string query,
         PostgresSpellingsRequest request,
         CancellationToken cancellationToken
     ) =>
@@ -90,7 +96,7 @@ internal sealed partial class PostgresSession
             PostgresCallNames.Spellings,
             request,
             _live.SpellingsAsync,
-            (asked, answer, durationMs) => PostgresEvents.Spellings(_log, asked, answer, durationMs),
+            (asked, answer, durationMs) => PostgresEvents.Spellings(_log, query, asked, answer, durationMs),
             cancellationToken
         );
 
@@ -135,6 +141,7 @@ internal sealed partial class PostgresSession
 
     // The error of the call is logged and never reported.
     private Task<PostgresDeallocateAnswer> DeallocateAsync(
+        string query,
         PostgresDeallocateRequest request,
         CancellationToken cancellationToken
     ) =>
@@ -142,7 +149,7 @@ internal sealed partial class PostgresSession
             PostgresCallNames.Deallocate,
             request,
             _live.DeallocateAsync,
-            (asked, answer, durationMs) => PostgresEvents.Deallocate(_log, asked, answer, durationMs),
+            (asked, answer, durationMs) => PostgresEvents.Deallocate(_log, query, asked, answer, durationMs),
             cancellationToken
         );
 }
