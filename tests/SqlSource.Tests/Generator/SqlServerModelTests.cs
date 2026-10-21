@@ -15,6 +15,11 @@ namespace SqlSource.Tests.Generator;
 // schema.  Every model must compile without a warning.
 public sealed class SqlServerModelTests
 {
+    // The database and the version of the server that the entry says it was described against.
+    private const string Database = "main";
+
+    private const string ServerVersion = "17.0";
+
     private static readonly SqlFile Orders = new(
         GeneratorHarness.UsersPath,
         "-- name: GetOrder\nSELECT id, note, placed_at, paid FROM dbo.orders WHERE id = @id;\n"
@@ -73,8 +78,8 @@ public sealed class SqlServerModelTests
             "GetOrder",
             Sidecars.HashOf(file, "GetOrder", SqlDialect.SqlServer),
             "mssql",
-            "main",
-            "17.0",
+            Database,
+            ServerVersion,
             matchesTable: new SidecarTable(schema, table),
             parameters: [TestSidecars.Parameter(0, "id", TestSidecars.SqlServer("int"), false)],
             columns:

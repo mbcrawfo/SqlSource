@@ -66,9 +66,9 @@ internal static class PropertyNames
     /// its schema before it unless the schema is the engine's default, <c>public</c> on PostgreSQL and <c>dbo</c> on
     /// SQL Server, compared ordinally.  <c>users</c> is <c>Users</c> and <c>billing.invoices</c> is
     /// <c>BillingInvoices</c> on both, while <c>dbo.orders</c> is <c>Orders</c> on SQL Server and <c>DboOrders</c> on
-    /// PostgreSQL.  Null when the schema or the table is unknown, when the
-    /// PascalCase of a part is no identifier, as for the quoted <c>"order-lines"</c>, or when a part ends in <c>!</c>
-    /// or <c>?</c>, which <see cref="PascalCase" /> would drop as a column's nullability: the table then gives no name.
+    /// PostgreSQL.  Null when the schema or the table is unknown, when the PascalCase of a part is no identifier, as
+    /// for the quoted <c>"order-lines"</c>, or when a part ends in <c>!</c> or <c>?</c>, which
+    /// <see cref="PascalCase" /> would drop as a column's nullability: the table then gives no name.
     /// </summary>
     public static string? FromTable(SidecarTable table, DatabaseEngine engine)
     {

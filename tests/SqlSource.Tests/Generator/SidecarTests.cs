@@ -211,7 +211,8 @@ public sealed class SidecarTests
         UsableEntries(wrongEngine).ShouldBeEmpty();
     }
 
-    // SQLSRC243 is kept for an engine whose describer lands before its map, and this release has none.
+    // SQLSRC243 is kept for an engine whose describer lands before its map, and this release has none: the file of
+    // each describable dialect is checked against its sidecar, which it lacks here.
     [Fact]
     public void Run_EachDescribableDialect_IsNeverSqlsrc243()
     {
@@ -219,10 +220,10 @@ public sealed class SidecarTests
         {
             var run = Run(OutputKind.Models, [Users], SqlDialectName.Canonical(dialect));
 
-            run.Diagnostics.ShouldNotBeEmpty();
-            run.Diagnostics.ShouldNotContain(diagnostic =>
-                diagnostic.StartsWith("SQLSRC243 ", StringComparison.Ordinal)
-            );
+            run.Diagnostics.ShouldBe([
+                $"SQLSRC241 {GetUserName}: The query 'GetUser' has no entry in the sidecar of its file, and its output "
+                    + "'models' needs one.  Run 'sqlsource describe'.",
+            ]);
         }
     }
 
