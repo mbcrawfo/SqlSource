@@ -3,7 +3,7 @@
 -- it through SqlServerScripts, which runs each batch between the lines that hold GO alone as one command of SqlClient.
 -- SqlClient runs with QUOTED_IDENTIFIER on, which the persisted computed column of dbo.users needs.  A statement that
 -- must start a batch, CREATE SCHEMA, CREATE TRIGGER or CREATE VIEW, has a GO before it and after it.  A change here
--- can change what the describer answers: record every case again with tools/record-fixtures.sh.
+-- can change what the describer answers: record every case again with tools/record-fixtures.sh mssql.
 
 CREATE TYPE dbo.Email FROM nvarchar(320) NOT NULL;
 

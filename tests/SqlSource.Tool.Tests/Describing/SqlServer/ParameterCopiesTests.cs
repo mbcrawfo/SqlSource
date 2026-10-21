@@ -191,7 +191,6 @@ public sealed class ParameterCopiesTests
     [InlineData(125)]
     [InlineData(126)]
     [InlineData(127)]
-    [InlineData(200)]
     public void Rename_LongName_EveryCopyFitsAnIdentifier(int length)
     {
         var name = new string('p', length);
@@ -202,6 +201,22 @@ public sealed class ParameterCopiesTests
         copies.Count.ShouldBe(12);
         copies.ShouldAllBe(copy => copy.Length <= ParameterCopies.MaximumCopyLength);
         copies.ShouldBeUnique();
+    }
+
+    // A name that is itself too long for an identifier is not cut, so the server refuses its copies with the error it
+    // gives the name used once, which quotes the same start of the name.
+    [Theory]
+    [InlineData(128)]
+    [InlineData(200)]
+    public void Rename_NameLongerThanAnIdentifier_IsNotCut(int length)
+    {
+        var name = new string('p', length);
+        var sql = $"SELECT @{name}, @{name}";
+
+        var copied = Rename(sql);
+
+        copied.Reused[0].Copies.ShouldBe([name + "_1", name + "_2"]);
+        copied.Sql.ShouldBe($"SELECT @{name}_1, @{name}_2");
     }
 
     // A DECLAREd variable is in no list, so it is never reused, however often it is used.

@@ -196,6 +196,53 @@ public sealed class SqlServerErrorsTests
         failure.Help.ShouldBe(SqlServerErrors.NotATypeHelp);
     }
 
+    // A declared parameter's name too long for an identifier is refused as the same name undeclared is, by the error
+    // that parameters raises for it: SQLSRC225.
+    [Fact]
+    public void Declared_NameTooLong_IsSqlsrc225AtResolveType()
+    {
+        var name = new string('p', 128);
+        var query = Of(SqlDialectRules.SqlServer, $"SELECT id FROM dbo.users WHERE id = @{name}", (name, "int"));
+        var tooLong = $"The identifier that starts with '@{name[..127]}' is too long. Maximum length is 128.";
+
+        var failure = SqlServerErrors.Declared(
+            query,
+            query.Parameters[0],
+            DescribeErrors(
+                (103, tooLong),
+                (103, tooLong),
+                (11501, "The batch could not be analyzed because of compile errors.")
+            )
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe([Query, tooLong]);
+        failure.Step.ShouldBe(DescribeStep.ResolveType);
+        failure.ServerLines.ShouldBe([
+            $"Msg 103: {tooLong}",
+            $"Msg 103: {tooLong}",
+            "Msg 11501: The batch could not be analyzed because of compile errors.",
+        ]);
+        failure.Help.ShouldBeNull();
+    }
+
+    // The same error for a name that fits is of the type, such as a name of a type too long.
+    [Fact]
+    public void Declared_IdentifierTooLongForANameThatFits_IsSqlsrc228ItIsNotAType()
+    {
+        var type = "dbo." + new string('t', 200);
+        var query = Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users WHERE id = @p", ("p", type));
+
+        var failure = SqlServerErrors.Declared(
+            query,
+            query.Parameters[0],
+            DescribeErrors((103, "The identifier that starts with 'ttt' is too long. Maximum length is 128."))
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC228");
+        failure.Arguments.ShouldBe([type, "@p", Query, "it is not a type"]);
+    }
+
     // The grammar's refusal is the tool's own, before anything is sent: no server line.
     [Fact]
     public void TypeRefused_Reason_IsSqlsrc228WithTheReasonAndNoServerLine()

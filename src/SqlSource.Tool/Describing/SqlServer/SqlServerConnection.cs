@@ -31,21 +31,8 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
     /// <summary>
     /// The password of a connection string, as SqlClient reads it, or none when it gives none or cannot read it.
     /// </summary>
-    public static IReadOnlyList<string> SecretsOf(string connection)
-    {
-        SqlConnectionStringBuilder builder;
-        try
-        {
-            builder = [with(connection)];
-        }
-        catch (Exception exception) when (IsUnreadable(exception))
-        {
-            // SqlClient's word for a string it cannot read, which opening the session reports in its own place.
-            return [];
-        }
-
-        return builder.Password is { Length: > 0 } password ? [password] : [];
-    }
+    public static IReadOnlyList<string> SecretsOf(string connection) =>
+        Read(connection)?.Password is { Length: > 0 } password ? [password] : [];
 
     /// <summary>The version of the driver, its informational version without the commit after <c>+</c>.</summary>
     public static string? DriverVersion { get; } =
@@ -83,10 +70,14 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
     /// <list type="bullet">
     /// <item>
     /// <description>
-    /// A keyword it does not know, a value not of its keyword's kind, a text that is no list of keywords and values:
-    /// the <see cref="SqlConnectionStringBuilder" />'s constructor throws an <see cref="ArgumentException" />.  A
-    /// <see cref="FormatException" /> and a <see cref="KeyNotFoundException" /> are taken the same way.  The answer
-    /// is <see cref="ConnectionErrors.UnreadableConnectionString" />.
+    /// A value that the <see cref="SqlConnectionStringBuilder" />'s constructor refuses.  It throws an
+    /// <see cref="ArgumentException" /> for a keyword it does not know, a value not of its keyword's kind or out of its
+    /// range, and a text that is no list of keywords and values; an <see cref="OverflowException" /> for a number too
+    /// large for an <see cref="int" /> (<c>Connect Timeout=99999999999</c>); an
+    /// <see cref="InvalidOperationException" /> for <c>Context Connection=true</c>; and a
+    /// <see cref="NotSupportedException" /> for <c>Network Library</c>.  The constructor reads the text and nothing
+    /// else, so any exception it throws is taken the same way, by <see cref="SecretsOf" /> too, which never throws.
+    /// The answer is <see cref="ConnectionErrors.UnreadableConnectionString" />.
     /// </description>
     /// </item>
     /// <item>
@@ -108,6 +99,24 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
     /// </item>
     /// <item>
     /// <description>
+    /// An <c>Authentication</c> that signs in with a user and a password, <c>Sql Password</c>,
+    /// <c>Active Directory Password</c> or <c>Active Directory Service Principal</c>, in a value that lacks a
+    /// <c>User ID</c> or a <c>Password</c>, or gives one empty: <c>SqlConnection.OpenAsync</c> throws an
+    /// <see cref="InvalidOperationException" />, "Either Credential or both 'User ID' and 'Password' ... must be
+    /// specified", before it reaches the server.  It is refused before anything is opened
+    /// (<see cref="LacksCredentials" />), as <see cref="ConnectionErrors.MissingCredentials" />.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// A server that SqlClient cannot connect to on this operating system: a LocalDB instance,
+    /// <c>Data Source=(localdb)\MSSQLLocalDB</c>, anywhere but on Windows, for which <c>SqlConnection.OpenAsync</c>
+    /// throws a <see cref="PlatformNotSupportedException" />.  Only <c>OpenAsync</c>'s is caught, by its type, and the
+    /// answer is <see cref="ConnectionErrors.UnsupportedOnThisPlatform" />.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
     /// An <c>Authentication</c> of Microsoft Entra ID (<c>Active Directory ...</c>) without the package
     /// <c>Microsoft.Data.SqlClient.Extensions.Azure</c>, which the tool does not carry: when the server asks for a
     /// federated token, <c>SqlConnectionInternal.GetFedAuthToken</c> finds no provider and throws the
@@ -123,7 +132,8 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
     /// <description>
     /// A server that cannot be reached, a login or a database it refuses, a timeout, and a certificate it presents
     /// that is not trusted are each a <see cref="SqlException" />, which <see cref="ConnectionErrors.AtOpen" />
-    /// answers.  Anything else, an <see cref="InvalidOperationException" /> included, is a bug: <c>SQLSRC200</c>.
+    /// answers.  Anything else that <c>OpenAsync</c> throws, an <see cref="InvalidOperationException" /> other than
+    /// that of the missing credentials above, which is refused before it can be thrown, is a bug: <c>SQLSRC200</c>.
     /// </description>
     /// </item>
     /// </list>
@@ -137,16 +147,8 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
                 : throw new UnusableException(ConnectionErrors.LostConnection);
         }
 
-        SqlConnectionStringBuilder builder;
-        try
-        {
-            builder = [with(connectionString)];
-        }
-        catch (Exception exception) when (IsUnreadable(exception))
-        {
-            throw new UnusableException(ConnectionErrors.UnreadableConnectionString);
-        }
-
+        var builder =
+            Read(connectionString) ?? throw new UnusableException(ConnectionErrors.UnreadableConnectionString);
         if (builder.ConnectionString.Length == 0)
         {
             throw new UnusableException(ConnectionErrors.EmptyConnectionString);
@@ -160,6 +162,13 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
         catch (ArgumentException)
         {
             throw new UnusableException(ConnectionErrors.ConflictingSettings);
+        }
+
+        // Checked after the constructor, so that settings SqlClient refuses together are reported first, as it does.
+        if (LacksCredentials(builder))
+        {
+            await connection.DisposeAsync();
+            throw new UnusableException(ConnectionErrors.MissingCredentials);
         }
 
         try
@@ -184,19 +193,48 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
     /// <summary>
     /// The describer's own text for what <c>SqlConnection.OpenAsync</c> threw for a value it read, or null for
     /// anything else: an <see cref="ArgumentException" /> for a value whose <c>Authentication</c> needs a provider that
-    /// SqlClient does not have.  See <see cref="OpenAsync" />.
+    /// SqlClient does not have, and a <see cref="PlatformNotSupportedException" />.  See <see cref="OpenAsync" />.
     /// </summary>
     internal static string? OwnTextAtOpen(Exception exception, SqlConnectionStringBuilder builder) =>
-        exception is ArgumentException
-        && builder.Authentication is not (SqlAuthenticationMethod.NotSpecified or SqlAuthenticationMethod.SqlPassword)
-        && SqlAuthenticationProvider.GetProvider(builder.Authentication) is null
-            ? ConnectionErrors.NoAuthenticationProvider
-            : null;
+        exception switch
+        {
+            PlatformNotSupportedException => ConnectionErrors.UnsupportedOnThisPlatform,
+            ArgumentException
+                when builder.Authentication
+                    is not (SqlAuthenticationMethod.NotSpecified or SqlAuthenticationMethod.SqlPassword)
+                    && SqlAuthenticationProvider.GetProvider(builder.Authentication) is null =>
+                ConnectionErrors.NoAuthenticationProvider,
+            _ => null,
+        };
 
-    // What SqlClient throws for a connection string it cannot read: a keyword it does not know, a value that is not
-    // of the keyword's kind, a string that is no list of keywords and values.
-    private static bool IsUnreadable(Exception exception) =>
-        exception is ArgumentException or FormatException or KeyNotFoundException;
+    /// <summary>
+    /// Whether the value's <c>Authentication</c> signs in with a user and a password and the value lacks either, which
+    /// <c>SqlConnection.OpenAsync</c> refuses with an <see cref="InvalidOperationException" /> that names the method.
+    /// See <see cref="OpenAsync" />.
+    /// </summary>
+    internal static bool LacksCredentials(SqlConnectionStringBuilder builder) =>
+#pragma warning disable CS0618 // SqlClient marks ActiveDirectoryPassword obsolete, and still reads and refuses it.
+        builder.Authentication
+            is SqlAuthenticationMethod.SqlPassword
+                or SqlAuthenticationMethod.ActiveDirectoryPassword
+                or SqlAuthenticationMethod.ActiveDirectoryServicePrincipal
+#pragma warning restore CS0618
+        && (builder.UserID.Length == 0 || builder.Password.Length == 0);
+
+    // The value as SqlClient reads it, or null when SqlClient cannot read it.  The builder's constructor reads the text
+    // and nothing else, so whatever it throws is about the value, as the remarks of OpenAsync list, but for an
+    // OutOfMemoryException, which is the process's.
+    private static SqlConnectionStringBuilder? Read(string connection)
+    {
+        try
+        {
+            return [with(connection)];
+        }
+        catch (Exception exception) when (exception is not OutOfMemoryException)
+        {
+            return null;
+        }
+    }
 
     public async ValueTask DisposeAsync()
     {

@@ -69,7 +69,7 @@ internal static class DeclaredTypeText
         }
 
         position++;
-        if (position == text.Length || text[position] is ' ' or '\t' or '.')
+        if (position == text.Length || (text[position] is ' ' or '\t' or '.'))
         {
             return Parts;
         }
@@ -227,9 +227,9 @@ internal static class DeclaredTypeText
     }
 
     // A plain identifier of T-SQL, kept to ASCII: a name with any other character is written in brackets.
-    private static bool IsFirst(char value) => char.IsAsciiLetter(value) || value is '_' or '#' or '@';
+    private static bool IsFirst(char value) => char.IsAsciiLetter(value) || (value is '_' or '#' or '@');
 
-    private static bool IsNext(char value) => char.IsAsciiLetterOrDigit(value) || value is '_' or '#' or '@' or '$';
+    private static bool IsNext(char value) => char.IsAsciiLetterOrDigit(value) || (value is '_' or '#' or '@' or '$');
 
     // A line break of any kind a reader may take for one: a type name stays on its line, quoted or not.
     private static bool IsLineBreak(char value) => value is '\r' or '\n' or '\u0085' or '\u2028' or '\u2029';
@@ -239,7 +239,7 @@ internal static class DeclaredTypeText
 
     private static void SkipSpaces(string text, ref int position)
     {
-        while (position < text.Length && text[position] is ' ' or '\t')
+        while (position < text.Length && (text[position] is ' ' or '\t'))
         {
             position++;
         }

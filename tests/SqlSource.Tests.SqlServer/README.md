@@ -1,6 +1,6 @@
 # SqlSource.Tests.SqlServer
 
-This project runs the tests of SQL Server against a real server, which Testcontainers starts in Docker.  Today it proves the container itself: that the image the run names is pinned to its update and runs the build that is recorded for it, and that the fixture schema applies.  The tests of the SQL Server describer are added here as the describer is built, and its fixture cases are described against the server here.
+This project runs the tests of SQL Server against a real server, which Testcontainers starts in Docker.  It proves the container itself: that the image the run names is pinned to its update and runs the build that is recorded for it, and that the fixture schema applies.  `Describer/` holds the tests of the SQL Server describer that only a server can answer: opening a session and what each refusal of it reports (`SessionTests`), the types the server gives a query's parameters, its errors and the canaries that prove a text runs nothing (`ParameterTests`), and the describer's fixture cases, described against the server and held to the build they were recorded on (`FixtureCasesTests`, `FixtureVersionTests`).
 
 ## Running
 

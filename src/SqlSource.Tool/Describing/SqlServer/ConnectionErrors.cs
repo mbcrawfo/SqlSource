@@ -75,19 +75,35 @@ internal static class ConnectionErrors
         "SqlClient has no provider for the Authentication of the connection string";
 
     /// <summary>
+    /// A connection string whose <c>Authentication</c> signs in with a user and a password, <c>Sql Password</c>,
+    /// <c>Active Directory Password</c> or <c>Active Directory Service Principal</c>, and that lacks a
+    /// <c>User ID</c> or a <c>Password</c>.
+    /// </summary>
+    public const string MissingCredentials =
+        "the Authentication of the connection string needs both a User ID and a Password";
+
+    /// <summary>
+    /// A connection string that names a server SqlClient cannot connect to on this operating system, such as a LocalDB
+    /// instance anywhere but on Windows.
+    /// </summary>
+    public const string UnsupportedOnThisPlatform = "SqlClient does not support this server on this platform";
+
+    /// <summary>
     /// An error at <c>open</c> with an <see cref="AuthenticationException" /> in its chain: the TLS handshake failed,
     /// most often because the server's certificate is not trusted.
     /// </summary>
     public const string CertificateRefused = "the server's certificate is not trusted, or the TLS handshake failed";
 
-    // The numbers of the errors that open reads.
-    private const int Timeout = -2;
+    /// <summary>SqlClient's number of a connect or a command that timed out.</summary>
+    public const int Timeout = -2;
+
+    /// <summary>The class from which an error ends the connection.</summary>
+    public const int FatalClass = 20;
+
+    // The numbers of the other errors that open reads.
     private const int LoginFailed = 18456;
     private const int CannotOpenDatabase = 4060;
     private const int CannotOpenDefaultDatabase = 4064;
-
-    // The class from which an error ends the connection.
-    private const int FatalClass = 20;
 
     /// <summary>What <c>open</c> answers for what SqlClient threw: each error's numbers, with a fixed text.</summary>
     public static SqlServerServerError AtOpen(SqlException exception)

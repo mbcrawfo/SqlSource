@@ -137,7 +137,9 @@ public sealed class RedactionTests : IDisposable
     }
 
     // The events of the SQL Server describer hold the SQL, the declarations and the messages of the server, so the
-    // value is searched in each: the fake describer writes them through its log as the real one does.
+    // value is searched in each: the fake describer writes them through its log as the real one does.  The scene's fake
+    // describer is PostgreSQL's, so the events of these three tests are named postgres.parameters, postgres.probe and
+    // postgres.declared.
     [Fact]
     public async Task Run_DescriberThatLogsAParametersEventWithItsConnection_HasTheMarkInEachString()
     {

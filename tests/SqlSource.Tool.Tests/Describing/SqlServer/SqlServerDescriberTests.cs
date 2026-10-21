@@ -25,10 +25,15 @@ public sealed class SqlServerDescriberTests
     public void SecretsOf_ValueWithoutAPassword_GivesNone() =>
         new SqlServerDescriber().SecretsOf("Data Source=x;Integrated Security=true").ShouldBeEmpty();
 
-    // A value SqlClient cannot read has no parts it knows, and opening it fails in its own place.
+    // A value SqlClient cannot read has no parts it knows, and opening it fails in its own place.  The builder throws
+    // an ArgumentException for the first two, an OverflowException, an InvalidOperationException and a
+    // NotSupportedException for the last three.
     [Theory]
     [InlineData("Data Source=x;Nonsense=1")]
     [InlineData("=;")]
+    [InlineData("Data Source=x;Password=Sesame123;Connect Timeout=99999999999")]
+    [InlineData("Data Source=x;Password=Sesame123;Context Connection=true")]
+    [InlineData("Data Source=x;Password=Sesame123;Network Library=dbmssocn")]
     public void SecretsOf_ValueSqlClientCannotRead_GivesNoneAndDoesNotThrow(string connection) =>
         new SqlServerDescriber().SecretsOf(connection).ShouldBeEmpty();
 
@@ -40,6 +45,38 @@ public sealed class SqlServerDescriberTests
     [InlineData(
         "Data Source=127.0.0.1,1;Connect Timeout=" + Secrets.Marker,
         "SqlClient cannot read the connection string"
+    )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Password=" + Secrets.Marker + ";Connect Timeout=99999999999",
+        "SqlClient cannot read the connection string"
+    )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Password=" + Secrets.Marker + ";Context Connection=true",
+        "SqlClient cannot read the connection string"
+    )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Password=" + Secrets.Marker + ";Network Library=dbmssocn",
+        "SqlClient cannot read the connection string"
+    )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Authentication=Sql Password;Password=" + Secrets.Marker,
+        "the Authentication of the connection string needs both a User ID and a Password"
+    )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Authentication=Sql Password;User ID=" + Secrets.Marker,
+        "the Authentication of the connection string needs both a User ID and a Password"
+    )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Authentication=Sql Password;User ID=" + Secrets.Marker + ";Password=",
+        "the Authentication of the connection string needs both a User ID and a Password"
+    )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Authentication=Active Directory Password;User ID=" + Secrets.Marker,
+        "the Authentication of the connection string needs both a User ID and a Password"
+    )]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Authentication=Active Directory Service Principal;Password=" + Secrets.Marker,
+        "the Authentication of the connection string needs both a User ID and a Password"
     )]
     [InlineData(
         "Data Source=127.0.0.1,1;Authentication=Active Directory Integrated;Password=" + Secrets.Marker,
@@ -60,6 +97,27 @@ public sealed class SqlServerDescriberTests
         var failure = opened.Failure.ShouldNotBeNull();
         failure.Descriptor.Id.ShouldBe("SQLSRC224");
         failure.ServerLines.ShouldBe([line]);
+        failure
+            .Arguments.Concat(failure.ServerLines)
+            .ShouldAllBe(text => !text.Contains(Secrets.Marker, StringComparison.Ordinal));
+    }
+
+    // SqlClient supports LocalDB on Windows alone, and elsewhere throws a PlatformNotSupportedException as it opens.
+    [Fact]
+    public async Task OpenAsync_LocalDbOffWindows_IsSqlsrc224WithTheFixedLine()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "SqlClient supports LocalDB on Windows.");
+
+        var opened = await new SqlServerDescriber().OpenAsync(
+            "app",
+            @"Data Source=(localdb)\MSSQLLocalDB;Password=" + Secrets.Marker,
+            LiveExchange.Instance
+        );
+
+        opened.Value.ShouldBeNull();
+        var failure = opened.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC224");
+        failure.ServerLines.ShouldBe(["SqlClient does not support this server on this platform"]);
         failure
             .Arguments.Concat(failure.ServerLines)
             .ShouldAllBe(text => !text.Contains(Secrets.Marker, StringComparison.Ordinal));

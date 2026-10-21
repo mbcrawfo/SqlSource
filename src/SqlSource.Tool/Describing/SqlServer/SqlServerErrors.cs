@@ -65,6 +65,9 @@ internal static class SqlServerErrors
     private const int TypeNotFound = 2715;
     private const int InvalidDataType = 2724;
 
+    // The error of an identifier longer than SQL Server allows.
+    private const int IdentifierTooLong = 103;
+
     /// <summary>
     /// <c>SQLSRC224</c>: no session.  Every failure of <c>open</c> is this one, whatever its numbers: a refused login
     /// and a missing database are not the server rejecting a query.
@@ -131,7 +134,9 @@ internal static class SqlServerErrors
     /// <summary>
     /// <c>SQLSRC228</c> for the error rows that <c>declared</c> answered: <c>2715</c> or <c>2724</c> among them is a
     /// type the database lacks, and anything else, such as <c>102</c>, a declaration the server does not read as a
-    /// type.  Every row is a line, in the server's order.
+    /// type.  A parameter whose own name is longer than SQL Server allows is no fault of its type: <c>103</c> among
+    /// the rows for it is <c>SQLSRC225</c>, as it is when the parameter is not declared and <c>parameters</c> raises
+    /// it.  Every row is a line, in the server's order.
     /// </summary>
     /// <param name="query">The query.</param>
     /// <param name="parameter">The declared parameter that was asked.</param>
@@ -148,6 +153,20 @@ internal static class SqlServerErrors
                 string.Create(CultureInfo.InvariantCulture, $"Msg {row.Number}: {row.Message}")
             ),
         ]);
+        if (
+            parameter.Name.Length > ParameterCopies.MaximumCopyLength
+            && errors.Any(static row => row.Number == IdentifierTooLong)
+        )
+        {
+            return new DescribeFailure(
+                ToolDiagnostics.ServerRejectedQuery,
+                new EquatableArray<string>([query.Name, errors[0].Message]),
+                DescribeStep.ResolveType,
+                lines,
+                null
+            );
+        }
+
         return errors.Any(static row => row.Number is TypeNotFound or InvalidDataType)
             ? DeclaredType(query, parameter, NoSuchType, lines, NoSuchTypeHelp)
             : DeclaredType(query, parameter, NotAType, lines, NotATypeHelp);

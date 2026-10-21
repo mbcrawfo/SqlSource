@@ -1,6 +1,6 @@
 -- The schema every fixture case of the PostgreSQL describer is recorded against, and every container test of
 -- tests/SqlSource.Tests.Postgres runs against.  A change to it can move the OIDs of its types, which the captures
--- hold: record every case again with tools/record-fixtures.sh.
+-- hold: record every case again with tools/record-fixtures.sh postgres.
 
 CREATE SCHEMA billing;
 

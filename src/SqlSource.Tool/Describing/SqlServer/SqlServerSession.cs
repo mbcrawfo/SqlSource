@@ -397,6 +397,13 @@ internal sealed partial class SqlServerSession : IDescribeSession
         Dictionary<string, SqlServerParameterRow> rowOf
     )
     {
+        // Each declared parameter's declaration, as DeclaredTypeText read it, by its name.
+        private readonly Dictionary<string, string> _declarationOf = declarations.ToDictionary(
+            static declaration => declaration.Parameter.Name,
+            static declaration => declaration.Type,
+            StringComparer.OrdinalIgnoreCase
+        );
+
         public SqlServerProbeRequest Request(string probed, string type)
         {
             var declared = new List<(string Name, string Type)>();
@@ -404,7 +411,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
             {
                 if (parameter.Type is not null)
                 {
-                    declared.Add((parameter.Name, declarations.Find(found => found.Parameter == parameter).Type));
+                    declared.Add((parameter.Name, _declarationOf[parameter.Name]));
                     continue;
                 }
 

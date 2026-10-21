@@ -149,7 +149,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 
 Ids below 100 are about the type that carries `[SqlSourceGenerate]`, or about the project.  Ids from 101 to 119 are about the contents of a `.sql` file.  Ids from 200 to 236, and 262, are the errors of the `sqlsource` tool: it prints each with a line under it that starts with `see:` and links to its section here, and exits with the code 1, or with 2 when it reported nothing but `SQLSRC219`.  The build reports two of them as well, at the same places: [SQLSRC209](#sqlsrc209) and [SQLSRC210](#sqlsrc210), for a query that must be described and cannot be.  The tool also reports `SQLSRC011`, `SQLSRC014` and the errors of a `.sql` file, the ids from 101 to 119, under the generator's ids: what is wrong is the same, and so is the fix.  It gives `SQLSRC011` and `SQLSRC014` the project file as their place, and reports them for the dialect, `SqlSourceOutput` and `SqlSourceDatabase` alone.
 
-The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262`, are the errors of describing a query against its database, PostgreSQL or SQL Server, and each section says which database gives it and for what.  This version of the tool describes the `postgres` dialect, and reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
+The ids from `SQLSRC224` to `SQLSRC236`, and `SQLSRC262`, are the errors of describing a query against its database, PostgreSQL or SQL Server.  A section that names a database says which gives it and for what, and a section that names none is PostgreSQL's.  This version of the tool describes the `postgres` dialect, and reports [SQLSRC216](#sqlsrc216) for a query of a dialect it cannot describe yet.
 
 The ids from `SQLSRC237` to `SQLSRC245` are reported by the build, about the sidecar of a `.sql` file that a type uses.  A query whose output is `models` or `codegen` needs a current entry in its file's sidecar, which `dotnet sqlsource describe` writes; one whose output is `sql` needs none.  The default output is `codegen`, so under the `postgres` dialect every query needs an entry unless the project, the type or the file sets the output to `sql`.  A query that no entry can be written for gets [SQLSRC209](#sqlsrc209), [SQLSRC210](#sqlsrc210) or [SQLSRC243](#sqlsrc243) instead.  A sidecar that exists is checked even when no query of its file needs an entry.  While a `.sql` file has an error of its own, an id from 101 to 119, it has no queries to check, so the build checks only the sidecar itself, [SQLSRC237](#sqlsrc237) to [SQLSRC240](#sqlsrc240), and reports no entry of it as one that names no query.
 
@@ -1182,14 +1182,16 @@ For SQL Server, the line starts with `Msg <number>, Level <level>, State <state>
 | The text of the `server:` line | What it means |
 |----|----|
 | `the server refused the login` | The login or its password is wrong, or the login may not connect (`Msg 18456`) |
-| `the server cannot open the database for the login` | The database that the connection string names is not on the server, or the login may not open it (`Msg 4060`), or the login's default database cannot be opened (`Msg 4064`) |
+| `the server cannot open the database for the login` | The database that the connection string names is not on the server, or the login may not open it (`Msg 4060`), or the login's default database cannot be opened (`Msg 4064`).  The server follows a `Msg 4060` line with a `Msg 18456` line, `the server refused the login`, which adds nothing to it |
 | `the connection to the server timed out` | Nothing answered at the address in time: the address drops what is sent to it, a firewall between drops the connection, or the server is too slow to answer |
 | `SqlClient could not reach the server: ConnectionRefused` | The connection could not be made.  The word after the colon is the system's reason, such as `ConnectionRefused` when nothing listens at the port, or `HostNotFound` for a host name that is not found |
 | `the server's certificate is not trusted, or the TLS handshake failed` | The server's certificate is not one this machine trusts.  Install the certificate's authority, or, for a server of your own such as a container, add `TrustServerCertificate=True` to the connection string |
 | `the server refused to open a session` | Any other error while the session was opened: its number says which |
-| `SqlClient cannot read the connection string` | The string is not written as SqlClient wants one: `Server=localhost;Database=app;User ID=app;Password=...` |
+| `SqlClient cannot read the connection string` | The string is not written as SqlClient wants one: `Server=localhost;Database=app;User ID=app;Password=...`.  It has a keyword that SqlClient does not know or does not support, such as `Network Library` or `Context Connection`, or a value that is not of its keyword's kind or is out of its range, such as a `Connect Timeout` too large |
 | `SqlClient does not accept these settings of the connection string together` | Two settings that SqlClient reads one by one and refuses together, such as `Integrated Security` with an `Authentication` |
 | `the connection string is empty` | The value sets nothing, such as `;` |
+| `the Authentication of the connection string needs both a User ID and a Password` | An `Authentication` of `Sql Password`, `Active Directory Password` or `Active Directory Service Principal` signs in with a user and a password, and the connection string lacks one of them or leaves it empty.  Give both |
+| `SqlClient does not support this server on this platform` | The connection string names a server that cannot be used from this operating system: a LocalDB instance, such as `(localdb)\MSSQLLocalDB`, can be used on Windows alone.  Describe against a SQL Server that listens on a port, such as one in a container |
 | `SqlClient has no provider for the Authentication of the connection string` | An `Authentication` of Microsoft Entra ID, `Active Directory ...`, which the tool cannot sign in with.  Use a login and a password |
 
 See: [Connecting](postgresql.md#connecting)
@@ -1254,6 +1256,7 @@ For SQL Server, each error the server gave is a `server:` line, `Msg <number>, L
 ```
 
 - **A type that a `-- param:` marker declares** is checked against every use of the parameter, so `-- param: @p xml` with `WHERE id = @p` is this error, `Msg 206`, `Operand type clash: xml is incompatible with int`.  A type that the query's own text names and the database lacks, `CAST(@p AS dbo.Nope)`, is this error too.
+- **A parameter whose name, with its `@`, is longer than 128 characters** is this error, `Msg 103`, `The identifier that starts with '...' is too long`, whether it is used once, used more than once or declared with `-- param:`; a declared one gives it at the step `resolve type`.  Give the parameter a shorter name.
 - **A statement whose result SQL Server cannot work out**, such as `CREATE PROCEDURE`, is `Msg 11527`, `... does not support metadata discovery`.  Give the query `-- output: sql`.
 - **A connection that was lost** has the line `the connection to the server was lost`, or `the server did not answer in time` when SqlClient stopped waiting for its answer, after the error's number.  Every query of that database after it has the line `the connection to the server was lost`: start the run again.  At the step `resolve type`, the server could not be asked about a declared type for the same reasons.
 
@@ -1285,7 +1288,7 @@ SQL Server gives the error for a parameter whose uses fix no type, `SELECT @p AS
 
 Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter whose only use is `@p IS NULL` is not this error: SQL Server gives it the type `int`.
 
-The same error with no `server:` line is for a parameter used more than once whose uses SQL Server gives different types, or a use no type.  The uses that say nothing of the type, such as `@p IS NULL`, are then left out, as [SQLSRC262](#sqlsrc262) says, and the error is given when every use is left out that way, or when a use that is left has no type.  When every use gets the same type, the parameter has that type and this error is not given.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
+The same error with no `server:` line is for a parameter used more than once whose uses SQL Server gives different types, or gives one of its uses no type.  The uses that say nothing of the type, such as `@p IS NULL`, are then left out, as [SQLSRC262](#sqlsrc262) says, and the error is given when every use is left out that way, or when a use that is left has no type.  When every use gets the same type, the parameter has that type and this error is not given.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
 
 See: [Parameters](postgresql.md#parameters)
 
@@ -2065,6 +2068,6 @@ SQL Server gives a parameter a type at each place the query uses it, and SqlSour
     help: declare the parameter's type with -- param:
 ```
 
-Declare the parameter's type with a `-- param:` marker, `-- param: @p nvarchar(100)`: SQL Server then checks every use against the type you chose.  Or use two parameters, one for each type.  The optional filter, `(@name IS NULL OR name = @name)`, is not this error: its first use fixes no type, and the parameter takes the type of the column.
+Declare the parameter's type with a `-- param:` marker, `-- param: @p nvarchar(100)`: SQL Server then checks every use against the type you chose.  Or use two parameters, one for each type.  The optional filter, `(@name IS NULL OR name = @name)`, is not this error: its use in `@name IS NULL` fixes no type, and the parameter takes the type of the column.
 
 See: [SQL Server](sqlserver.md)

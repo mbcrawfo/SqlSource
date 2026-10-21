@@ -267,6 +267,25 @@ public sealed class ParameterTests(SqlServerContainer sqlServer)
         ]);
     }
 
+    // A name too long for an identifier is refused by the server with error 103, once, reused and declared alike, and
+    // the message, which quotes the start of the name, is the same.
+    [Fact]
+    public async Task DescribeAsync_NameTooLong_IsSqlsrc225WhetherUsedOnceReusedOrDeclared()
+    {
+        var name = new string('p', 127) + "q";
+        var sql = $"SELECT id FROM dbo.users WHERE id = @{name}";
+
+        var once = await ShouldFailAsync(Of(SqlDialectRules.SqlServer, sql), "SQLSRC225");
+        var reused = await ShouldFailAsync(Of(SqlDialectRules.SqlServer, $"{sql} OR @{name} IS NULL"), "SQLSRC225");
+        var declared = await ShouldFailAsync(Of(SqlDialectRules.SqlServer, sql, (name, "int")), "SQLSRC225");
+
+        once.ServerLines[0].ShouldStartWith("Msg 103, ");
+        reused.Arguments.ShouldBe(once.Arguments);
+        declared.Arguments.ShouldBe(once.Arguments);
+        declared.Step.ShouldBe(DescribeStep.ResolveType);
+        declared.ServerLines[0].ShouldStartWith("Msg 103: ");
+    }
+
     // SQL Server describes no statement that creates a procedure, so the server's error comes before the lists are
     // compared: 11527, the query is SQLSRC225.
     [Fact]

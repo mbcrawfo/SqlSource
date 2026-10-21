@@ -54,11 +54,6 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
         ORDER BY column_ordinal
         """;
 
-    // The class from which an error ends the connection, and SqlClient's number of a command that timed out: a probe
-    // that fails so says nothing of the batch.
-    private const int FatalClass = 20;
-    private const int Timeout = -2;
-
     public Task<SqlServerOpenAnswer> OpenAsync(CancellationToken token) =>
         AnswerAsync(
             async () =>
@@ -139,7 +134,7 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
                 {
                     _ = await command.ExecuteNonQueryAsync(token);
                 }
-                catch (SqlException exception) when (!token.IsCancellationRequested && IsTheBatchs(exception))
+                catch (SqlException exception) when (!token.IsCancellationRequested && RefusesTheBatch(exception))
                 {
                     return new SqlServerProbeAnswer(false, null);
                 }
@@ -251,10 +246,13 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
             : Convert.ToInt32(reader.GetValue(ordinal), CultureInfo.InvariantCulture);
     }
 
-    // An error of the batch, which the server raises when the declarations do not bind: every error of it below the
-    // class that ends the connection, and none a timeout of SqlClient's.
-    private static bool IsTheBatchs(SqlException exception) =>
-        exception.Errors.Cast<SqlError>().All(static error => error.Class < FatalClass && error.Number != Timeout);
+    // Whether the server refused the batch, which it does when the declarations do not bind: every error is below the
+    // class that ends the connection, and none is SqlClient's timeout.  A probe that fails otherwise says nothing of
+    // the batch.
+    private static bool RefusesTheBatch(SqlException exception) =>
+        exception
+            .Errors.Cast<SqlError>()
+            .All(static error => error.Class < ConnectionErrors.FatalClass && error.Number != ConnectionErrors.Timeout);
 
     private static string OnOrOff(int value) => value == 1 ? "ON" : "OFF";
 
