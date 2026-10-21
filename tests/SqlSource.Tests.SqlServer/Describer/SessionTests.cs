@@ -1,9 +1,11 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using Shouldly;
+using SqlSource.Parsing;
 using SqlSource.Tool;
 using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
@@ -108,12 +110,40 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         CaptureJson.Write(capture).ShouldNotContain(Secrets.Marker);
     }
 
-    // A run that is cancelled while it opens a session ends as a cancellation, never as an answer of "open".
+    // A run that is cancelled while it opens a session ends as a cancellation, never as an answer of "open", and the
+    // exchange is given the run's own token.
     [Fact]
-    public async Task OpenAsync_TokenCancelled_ThrowsOperationCanceled() =>
-        await Should.ThrowAsync<OperationCanceledException>(
-            Sessions.OpenAsync(sqlServer.ConnectionString, new CancellingExchange())
+    public async Task OpenAsync_TokenCancelled_ThrowsOperationCanceled()
+    {
+        var exchange = new TokenExchange();
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        await cancel.CancelAsync();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(
+            Sessions.OpenAsync(sqlServer.ConnectionString, exchange, cancellationToken: cancel.Token)
         );
+
+        exchange.Tokens.ShouldBe([cancel.Token]);
+    }
+
+    // A describe that is cancelled ends as a cancellation, and its call is given the describe's own token.
+    [Fact]
+    public async Task DescribeAsync_TokenCancelled_ThrowsOperationCanceledWithTheTokenOfTheDescribe()
+    {
+        var exchange = new TokenExchange();
+        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString, exchange);
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        await cancel.CancelAsync();
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(
+            session.DescribeAsync(
+                DescribeRequests.Of(SqlDialectRules.SqlServer, "UPDATE dbo.users SET name = @name WHERE id = @id"),
+                cancel.Token
+            )
+        );
+
+        exchange.Tokens.ShouldBe([TestContext.Current.CancellationToken, cancel.Token]);
+    }
 
     // SqlClient reports a command that is cancelled while the server runs it as a SqlException: it is the cancellation
     // all the same, and no answer.  The command waits for longer than the test, so it is the token that ends it.
@@ -182,19 +212,20 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         return failure;
     }
 
-    // Asks the server under a token that is already cancelled, as a run that was cancelled while it opened does.
-    private sealed class CancellingExchange : IDescribeExchange
+    // Asks the server as the live exchange does, and keeps the token each call was given, in order.
+    private sealed class TokenExchange : IDescribeExchange
     {
-        public async Task<TAnswer> AskAsync<TRequest, TAnswer>(
+        public List<CancellationToken> Tokens { get; } = [];
+
+        public Task<TAnswer> AskAsync<TRequest, TAnswer>(
             string method,
             TRequest request,
             Func<TRequest, CancellationToken, Task<TAnswer>> live,
             CancellationToken cancellationToken
         )
         {
-            using var cancelled = new CancellationTokenSource();
-            await cancelled.CancelAsync();
-            return await live(request, cancelled.Token);
+            Tokens.Add(cancellationToken);
+            return live(request, cancellationToken);
         }
     }
 }

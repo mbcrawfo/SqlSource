@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Snapshot;
@@ -21,8 +22,9 @@ internal static class Sessions
         string connection,
         IDescribeExchange? exchange = null,
         IRunLog? log = null,
-        string database = SqlServerContainer.Database
-    ) => new SqlServerDescriber().OpenAsync(database, connection, exchange, log);
+        string database = SqlServerContainer.Database,
+        CancellationToken? cancellationToken = null
+    ) => new SqlServerDescriber().OpenAsync(database, connection, exchange, log, cancellationToken: cancellationToken);
 
     // A session that must open, as the describer's own type.
     public static async Task<SqlServerSession> OpenSessionAsync(
