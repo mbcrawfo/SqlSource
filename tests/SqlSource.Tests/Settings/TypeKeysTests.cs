@@ -1,12 +1,13 @@
 using System;
 using System.Linq;
+using System.Text.RegularExpressions;
 using Shouldly;
 using SqlSource.Settings;
 using Xunit;
 
 namespace SqlSource.Tests.Settings;
 
-public sealed class TypeKeysTests
+public sealed partial class TypeKeysTests
 {
     [Theory]
     [InlineData("integer", "int4")]
@@ -129,6 +130,7 @@ public sealed class TypeKeysTests
     [InlineData("pg_catalog.\"int4\"[]", "int4[]")]
     [InlineData("pg_catalog.\"_int4\"[]", "_int4[]")]
     [InlineData("pg_catalog.\"_x\"[]", "\"_x\"[]")]
+    [InlineData("pg_catalog.\"_a\tb\"", "U&\"a\\0009b\"[]")]
     public void TryNormalize_QuotedCatalogName_IsItsKey(string key, string expected) => ShouldNormalize(key, expected);
 
     // An escaped part is read to its text, and given in the quoted form of that text.
@@ -279,6 +281,8 @@ public sealed class TypeKeysTests
     {
         var part = TypeKeys.WritePart(text);
 
+        MyRegex().Replace(part, " ").ShouldBe(part);
+        part.Split(';')[0].Split('#')[0].ShouldBe(part);
         part.Where(char.IsWhiteSpace).ShouldAllBe(character => character == ' ');
         part.ShouldNotContain("  ");
         part.ShouldNotContain(";");
@@ -286,6 +290,11 @@ public sealed class TypeKeysTests
         part.Any(char.IsControl).ShouldBeFalse();
         TypeKeys.TextOf(part.AsSpan()).ToString().ShouldBe(text);
     }
+
+    // A NUL stays in the written part, which the escaped form cannot write, and is read back.
+    [Fact]
+    public void WritePart_TextWithANul_IsReadBackAsItsText() =>
+        TypeKeys.TextOf(TypeKeys.WritePart("a\0\nb").AsSpan()).ToString().ShouldBe("a\0\nb");
 
     [Theory]
     [InlineData("citext")]
@@ -312,4 +321,7 @@ public sealed class TypeKeysTests
 
         normalized.ShouldBe(expected);
     }
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex MyRegex();
 }

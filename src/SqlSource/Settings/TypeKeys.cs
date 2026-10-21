@@ -340,10 +340,10 @@ internal static class TypeKeys
     /// digits, <c>_</c> and <c>$</c>, none of them upper case, since a plain part is read in lower case; otherwise in
     /// double quotes with each <c>"</c> doubled, or in the escaped form when the quotes would not keep it.  A value
     /// written in MSBuild is trimmed, and the compiler cuts it at <c>;</c> and <c>#</c>, and a marker is one line, so
-    /// a text with a control character, a white space other than a lone space, a <c>;</c> or a <c>#</c> is written
-    /// <c>U&amp;"a\000Ab"</c>, with <c>\XXXX</c> for each such character, <c>\\</c> for a <c>\</c> and
-    /// <c>""</c> for a <c>"</c>.  A NUL stays as it is: a PostgreSQL name cannot hold it, and <c>\0000</c> is no
-    /// escape.
+    /// a text with a control character other than NUL, a white space other than a lone space, a <c>;</c> or a
+    /// <c>#</c> is written <c>U&amp;"a\000Ab"</c>, with <c>\XXXX</c> for each such character, <c>\\</c> for a
+    /// <c>\</c> and <c>""</c> for a <c>"</c>.  A NUL stays as it is: a PostgreSQL name cannot hold it, and
+    /// <c>\0000</c> is no escape.
     /// </summary>
     public static string WritePart(string text)
     {
@@ -394,7 +394,8 @@ internal static class TypeKeys
     }
 
     // A character that a quoted part would not keep: the trim reads any white space but U+0020 as a space and a run
-    // of them as one, the compiler cuts at ; and #, and a control character may end the line.
+    // of them as one, the compiler cuts at ; and #, and a control character may end the line, but a NUL, which no
+    // PostgreSQL name holds and \0000 cannot write.
     private static bool MustEscape(string text, int index)
     {
         var character = text[index];

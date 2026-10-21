@@ -410,6 +410,17 @@ public sealed class TypeOverrideGrammarTests
         invalid.ShouldBeEmpty();
     }
 
+    [Fact]
+    public void ReadList_TwoEscapedSpellingsOfOneText_TheLastWins()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("s.U&\"a\\000Ab\"=int s.U&\"a\\000ab\"=long", SettingPlace.Property, invalid)
+            .ShouldBe([new TypeOverride("s.U&\"a\\000Ab\"", "long", SettingPlace.Property)]);
+        invalid.ShouldBeEmpty();
+    }
+
     [Theory]
     [InlineData("")]
     [InlineData(" \n\t ")]
