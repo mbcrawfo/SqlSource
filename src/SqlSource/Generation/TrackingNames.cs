@@ -13,6 +13,8 @@ internal static class TrackingNames
 
     public const string CaseCollisions = nameof(CaseCollisions);
 
+    public const string RepeatedPaths = nameof(RepeatedPaths);
+
     public const string SupportedFramework = nameof(SupportedFramework);
 
     public const string UnsupportedLanguageVersion = nameof(UnsupportedLanguageVersion);
@@ -84,6 +86,10 @@ internal static class TrackingNames
     public const string TakenModelNames = nameof(TakenModelNames);
 
     public const string Models = nameof(Models);
+
+    public const string ModelsByFile = nameof(ModelsByFile);
+
+    public const string FileModelSlots = nameof(FileModelSlots);
 
     public const string ModelOutput = nameof(ModelOutput);
 }

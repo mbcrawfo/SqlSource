@@ -46,20 +46,26 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             claims.ClaimedPaths
         );
         ReportInvalidSettings(context, settings.ProjectSettings, settings.FilesSettings, claims.ClaimedPaths);
-        var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles, settings.FilesSettings);
-        var sidecars = CheckSidecars(context, claims.ClaimedPaths, typeQueries, settings.ProjectLevel, parsedFiles);
+        var typeQueries = SelectTypeQueries(claims.ClaimingTypes, parsedFiles.Sorted, settings.FilesSettings);
+        var sidecars = CheckSidecars(
+            context,
+            claims.ClaimedPaths,
+            typeQueries,
+            settings.ProjectLevel,
+            parsedFiles.Sorted
+        );
         var typing = TypeFiles(
             context,
             sidecars.Checks,
-            parsedFiles,
+            parsedFiles.Sorted,
             settings.FilesSettings,
             settings.ProjectSettings,
             settings.ProjectLevel
         );
         var models = CollectModels(context, typing.Files, typeQueries, settings.ProjectLevel);
-        ReportDriver(context, typing.NpgsqlProbe, sidecars.Needs, parsedFiles);
+        ReportDriver(context, typing.NpgsqlProbe, sidecars.Needs, parsedFiles.Sorted);
         ReportProblems(context, sidecars.Checks, typing.FileTypes, models.FileModels, models.Models);
-        RegisterModelSources(context, models.Models);
+        RegisterModelSources(context, models.Models, parsedFiles.EachFile, claims.RepeatedPaths);
         RegisterTypeSources(context, typeQueries, settings.ProjectLevel);
     }
 
@@ -116,6 +122,13 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .Select(static (input, _) => PathCollision.Find(input.Left, input.Right))
             .WithTrackingName(TrackingNames.CaseCollisions);
 
+        // The paths that the project lists more than once, under one spelling or two.  Almost always none, so this
+        // value almost never changes.
+        var repeatedPaths = listedPaths
+            .Combine(sqlPaths)
+            .Select(static (input, _) => SqlPath.FindRepeated(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.RepeatedPaths);
+
         var isSupportedFramework = context
             .CompilationProvider.Select(
                 static (compilation, _) =>
@@ -169,7 +182,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
-        return new ClaimedFiles(sqlFiles, typeFiles, claimedPaths, commentPaths);
+        return new ClaimedFiles(sqlFiles, typeFiles, claimedPaths, commentPaths, repeatedPaths);
     }
 
     // What the project's properties and each file's metadata say.
@@ -204,8 +217,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         return new ProjectAndFileSettings(projectDialect, project.Settings, project.Level, fileMetadata, filesSettings);
     }
 
-    // Each claimed file parsed, sorted by path, with its parse errors and the dialects that are not valid reported.
-    private static IncrementalValueProvider<EquatableArray<ParsedSqlFile>> ParseFiles(
+    // Each claimed file parsed, by itself and sorted by path, with its parse errors and the dialects that are not valid
+    // reported.
+    private static ParsedFiles ParseFiles(
         IncrementalGeneratorInitializationContext context,
         IncrementalValuesProvider<FileMetadata> fileMetadata,
         IncrementalValueProvider<DialectSetting> projectDialect,
@@ -230,7 +244,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             .WithTrackingName(TrackingNames.FileParseInput);
 
         // A file that no type claims is never read.
-        var parsedFiles = fileInputs
+        var parsedFile = fileInputs
             .Combine(claimedPaths)
             .Select(
                 static (input, cancellationToken) =>
@@ -239,7 +253,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
                         : null
             )
             .WhereNotNull()
-            .WithTrackingName(TrackingNames.ParsedFile)
+            .WithTrackingName(TrackingNames.ParsedFile);
+
+        var parsedFiles = parsedFile
             .Collect()
             .Select(static (files, _) => ToSorted(files, static file => file.NormalizedPath))
             .WithTrackingName(TrackingNames.ParsedFiles);
@@ -263,7 +279,7 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
 
-        return parsedFiles;
+        return new ParsedFiles(parsedFile, parsedFiles);
     }
 
     // Each setting and value that is not valid, once and with no position, of the project and the claimed files alone.
@@ -553,23 +569,45 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(models.Select(static (set, _) => set.Diagnostics), ReportAll);
     }
 
-    // The file of each model.
+    // The file of each model, from the node of the file whose query gave it.
     private static void RegisterModelSources(
         IncrementalGeneratorInitializationContext context,
-        IncrementalValueProvider<ModelSet> models
+        IncrementalValueProvider<ModelSet> models,
+        IncrementalValuesProvider<ParsedSqlFile> parsedFile,
+        IncrementalValueProvider<EquatableArray<string>> repeatedPaths
     )
     {
-        // One node for each model, compared by position, so that an edit writes again only the models whose record
-        // changed, and those after a model that was added or removed.
-        var modelOutputs = models
-            .SelectMany(static (set, _) => set.Models)
+        var modelsByFile = models
+            .Combine(repeatedPaths)
+            .Select(static (input, _) => ModelsByFile.Arrange(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.ModelsByFile);
+
+        // The compiler matches the nodes after a SelectMany by their place, so each model is emitted from a node that
+        // does not move when a model of another file or slot is added or removed.  A file's node stays with its
+        // additional text: the compiler appends a text added, drops one removed and keeps the place of one replaced.
+        // Inside it, a slot stays with its query and role.  So an edit writes the models whose record changed, and a
+        // model added or removed writes itself and the models after it in its slot, those of the types sorted after
+        // its own.
+        var fileModelOutputs = parsedFile
+            .Select(static (file, _) => file.NormalizedPath)
+            .Combine(modelsByFile)
+            .Select(static (input, _) => ModelsByFile.SlotsOf(input.Left, input.Right))
+            .WithTrackingName(TrackingNames.FileModelSlots)
+            .SelectMany(static (slots, _) => slots)
+            .SelectMany(static (slot, _) => slot)
             .Select(static (model, _) => (model.HintName, Source: ModelEmitter.Emit(model)))
             .WithTrackingName(TrackingNames.ModelOutput);
 
-        context.RegisterSourceOutput(
-            modelOutputs,
-            static (output, model) => output.AddSource(model.HintName, SourceText.From(model.Source, Encoding.UTF8))
-        );
+        // A path the project lists twice has a node for each listing, and the two would add one file twice, which
+        // throws and costs every type its code.  Its models are emitted from the arrangement instead, whose nodes are
+        // matched by their place in its list, a cost that a project with no path listed twice never pays.
+        var repeatedPathOutputs = modelsByFile
+            .SelectMany(static (byFile, _) => byFile.OfRepeatedPaths)
+            .Select(static (model, _) => (model.HintName, Source: ModelEmitter.Emit(model)))
+            .WithTrackingName(TrackingNames.ModelOutput);
+
+        context.RegisterSourceOutput(fileModelOutputs, AddModel);
+        context.RegisterSourceOutput(repeatedPathOutputs, AddModel);
     }
 
     // The file of each type, and its diagnostics.
@@ -597,6 +635,9 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
             }
         );
     }
+
+    private static void AddModel(SourceProductionContext output, (string HintName, string Source) model) =>
+        output.AddSource(model.HintName, SourceText.From(model.Source, Encoding.UTF8));
 
     private static void ReportAll(SourceProductionContext output, EquatableArray<DiagnosticInfo> diagnostics)
     {
@@ -720,12 +761,21 @@ public sealed class SqlSourceGenerator : IIncrementalGenerator
         IncrementalValueProvider<SettingsLevel> Level
     );
 
-    // The project's .sql files, each type with the files it claims, every claimed path, and those that keep comments.
+    // The project's .sql files, each type with the files it claims, every claimed path, those that keep comments, and
+    // the paths the project lists more than once.
     private readonly record struct ClaimedFiles(
         IncrementalValuesProvider<AdditionalText> SqlFiles,
         IncrementalValuesProvider<TypeFiles> ClaimingTypes,
         IncrementalValueProvider<EquatableArray<string>> ClaimedPaths,
-        IncrementalValueProvider<EquatableArray<string>> CommentPaths
+        IncrementalValueProvider<EquatableArray<string>> CommentPaths,
+        IncrementalValueProvider<EquatableArray<string>> RepeatedPaths
+    );
+
+    // Each claimed file parsed, a node for each item of the project's list, and the files collected, one for each path
+    // and sorted by it.
+    private readonly record struct ParsedFiles(
+        IncrementalValuesProvider<ParsedSqlFile> EachFile,
+        IncrementalValueProvider<EquatableArray<ParsedSqlFile>> Sorted
     );
 
     // What the project's properties say, and the metadata of each file and of the files that have settings.

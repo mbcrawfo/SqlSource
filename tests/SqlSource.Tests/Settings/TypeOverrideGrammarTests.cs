@@ -91,6 +91,36 @@ public sealed class TypeOverrideGrammarTests
         entry.ShouldBe(new TypeOverride("\"my schema\".\"x y\"", "int", SettingPlace.Query));
     }
 
+    [Fact]
+    public void TryReadEntry_EscapedKeyInAMarker_IsItsQuotedForm()
+    {
+        TypeOverrideGrammar
+            .TryReadEntry(
+                "public.U&\"st\\0061tus\" = int".AsSpan(),
+                spacesAroundEquals: true,
+                SettingPlace.Query,
+                out var entry
+            )
+            .ShouldBeTrue();
+
+        entry.ShouldBe(new TypeOverride("public.\"status\"", "int", SettingPlace.Query));
+    }
+
+    [Fact]
+    public void TryReadEntry_EscapedKeyInAMarker_IsItsWrittenForm()
+    {
+        TypeOverrideGrammar
+            .TryReadEntry(
+                "public.U&\"a\\000ab\" = MyApp.Tag".AsSpan(),
+                spacesAroundEquals: true,
+                SettingPlace.Query,
+                out var entry
+            )
+            .ShouldBeTrue();
+
+        entry.ShouldBe(new TypeOverride("public.U&\"a\\000Ab\"", "global::MyApp.Tag", SettingPlace.Query));
+    }
+
     [Theory]
     [InlineData("numeric = System.Double")]
     [InlineData("numeric= System.Double")]
@@ -350,6 +380,44 @@ public sealed class TypeOverrideGrammarTests
         TypeOverrideGrammar
             .ReadList("public.status=MyApp.A public.\"status\"=MyApp.B", SettingPlace.Property, invalid)
             .ShouldBe([new TypeOverride("public.\"status\"", "global::MyApp.B", SettingPlace.Property)]);
+        invalid.ShouldBeEmpty();
+    }
+
+    // The escaped form keeps "" for a quote, so the quotes of a key still pair, and an equals or a space inside it
+    // is part of the key.
+    [Fact]
+    public void ReadList_EscapedKey_IsOneEntryAndTheRestApply()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("s.U&\"a=b\\0022 c\"=int int4=long s.U&\"\\00\"=int", SettingPlace.Property, invalid)
+            .ShouldBe([
+                new TypeOverride("int4", "long", SettingPlace.Property),
+                new TypeOverride("s.\"a=b\"\" c\"", "int", SettingPlace.Property),
+            ]);
+        invalid.ShouldBe(["s.U&\"\\00\"=int"]);
+    }
+
+    [Fact]
+    public void ReadList_TwoSpellingsOfOneEscapedText_TheLastWins()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("s.U&\"st\\0061tus\"=int s.\"status\"=long", SettingPlace.Property, invalid)
+            .ShouldBe([new TypeOverride("s.\"status\"", "long", SettingPlace.Property)]);
+        invalid.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadList_TwoEscapedSpellingsOfOneText_TheLastWins()
+    {
+        var invalid = new List<string>();
+
+        TypeOverrideGrammar
+            .ReadList("s.U&\"a\\000Ab\"=int s.U&\"a\\000ab\"=long", SettingPlace.Property, invalid)
+            .ShouldBe([new TypeOverride("s.U&\"a\\000Ab\"", "long", SettingPlace.Property)]);
         invalid.ShouldBeEmpty();
     }
 

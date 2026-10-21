@@ -340,6 +340,55 @@ public sealed class QueryTypesTests
         ]);
     }
 
+    // A line break is written as an escape, since a "..." key would hold it, which a property or a marker cannot.
+    [Fact]
+    public void Run_CompositeWhoseNameHoldsALineBreak_HelpEscapesIt()
+    {
+        var item = TestSidecars.Postgres(
+            name: "Order\nItem",
+            kind: SidecarValues.Kind.Composite,
+            schema: "my schema",
+            internalName: "Order\nItem"
+        );
+
+        var run = Run([NpgsqlReferences.Npgsql10], Users, Entry(Users, "GetUser", [], [Column("item", item)]));
+
+        run.Diagnostics.ShouldBe([
+            $"SQLSRC246 {GetUserName}: The column 'item' has the type 'Order\nItem', which SqlSource cannot give a C# "
+                + "type.  Map it with the type override, as \"my schema\".U&\"Order\\000AItem\"=<a C# type>.",
+        ]);
+    }
+
+    [Fact]
+    public void Run_CompositeWhoseNameHoldsALineBreak_IsMappedByTheEscapedKey()
+    {
+        var item = TestSidecars.Postgres(
+            name: "Order\nItem",
+            kind: SidecarValues.Kind.Composite,
+            schema: "my schema",
+            internalName: "Order\nItem"
+        );
+        var mapped = new SqlFile(
+            GeneratorHarness.UsersPath,
+            "-- type-override: \"my schema\".U&\"Order\\000AItem\"=MyApp.Tag\n-- name: GetUser\nSELECT 1;\n"
+        );
+
+        var run = Run([NpgsqlReferences.Npgsql10], mapped, Entry(mapped, "GetUser", [], [Column("item", item)]));
+
+        run.Diagnostics.ShouldBeEmpty();
+        ColumnsOf(run)
+            .ShouldBe([
+                new PropertyType(
+                    "global::MyApp.Tag",
+                    false,
+                    true,
+                    NoWarnings,
+                    "\"my schema\".U&\"Order\\000AItem\"",
+                    "a -- type-override: marker in the file header"
+                ),
+            ]);
+    }
+
     // The first failure stops the query, and the parameters are typed before the columns: the column of cube, which
     // Npgsql 8 cannot read either, is not reported.  The other query of the file is typed.
     [Fact]
