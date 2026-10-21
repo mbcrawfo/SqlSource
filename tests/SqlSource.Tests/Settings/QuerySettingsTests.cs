@@ -180,6 +180,31 @@ public sealed class QuerySettingsTests
             )
             .ShouldBe(expected);
 
+    [Theory]
+    [InlineData("Statements", "Queries", "Statements")]
+    [InlineData(null, "Queries", "Queries")]
+    [InlineData(null, null, "Sql")]
+    public void ResolveNestedClass_TheAttribute_WinsOverTheProperty(
+        string? attribute,
+        string? property,
+        string expected
+    ) =>
+        QuerySettings
+            .ResolveNestedClass(
+                new SettingsLevel { NestedClass = attribute },
+                new SettingsLevel { NestedClass = property }
+            )
+            .ShouldBe(expected);
+
+    [Fact]
+    public void Over_NestedClass_ComesFromThisLevelWhenItHasOne()
+    {
+        new SettingsLevel { NestedClass = "A" }
+            .Over(new SettingsLevel { NestedClass = "B" })
+            .NestedClass.ShouldBe("A");
+        Keep.Over(new SettingsLevel { NestedClass = "B" }).NestedClass.ShouldBe("B");
+    }
+
     [Fact]
     public void Over_TypeOverrides_MergePerKey()
     {

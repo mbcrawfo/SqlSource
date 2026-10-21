@@ -151,6 +151,42 @@ public sealed class MSBuildSettingsTests
             .ShouldBeNull();
 
     [Fact]
+    public void ReadProject_NestedClass_IsReadAsATypeName()
+    {
+        var settings = ProjectSettings.Read(Provider("SqlSourceNestedClass", "Queries").GlobalOptions);
+
+        settings.Level.ShouldBe(new SettingsLevel { NestedClass = "Queries" });
+        settings.Invalid.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ReadProject_NestedClassThatIsNotATypeName_IsInvalidAndNotSet()
+    {
+        var settings = ProjectSettings.Read(Provider("SqlSourceNestedClass", "App.Sql").GlobalOptions);
+
+        settings.Level.ShouldBeSameAs(SettingsLevel.None);
+        settings.Invalid.ShouldBe([new InvalidSetting("SqlSourceNestedClass", "App.Sql")]);
+    }
+
+    // The nested class belongs to a type, whose queries can come from several files, so it is never metadata.
+    [Fact]
+    public void ReadFile_NestedClass_IsNotRead() =>
+        ReadFileMetadata(new Dictionary<string, string> { ["SqlSourceNestedClass"] = "not a name" }).ShouldBeNull();
+
+    // The tool does not read the nested class, which changes nothing that is described.
+    [Fact]
+    public void ReadProject_NestedClassUnderTheKeysOfAManifest_IsNotRead()
+    {
+        var settings = ProjectSettings.Read(
+            Provider("SqlSourceNestedClass", "not a name").GlobalOptions,
+            MSBuildSettings.ManifestProperty
+        );
+
+        settings.Level.ShouldBeSameAs(SettingsLevel.None);
+        settings.Invalid.ShouldBeEmpty();
+    }
+
+    [Fact]
     public void ReadProject_NothingSet_IsTheSharedEmptyLevel()
     {
         var settings = ProjectSettings.Read(new TestOptionsProvider(null, null).GlobalOptions);

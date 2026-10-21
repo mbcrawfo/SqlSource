@@ -51,6 +51,12 @@ internal sealed record SettingsLevel
     /// </summary>
     public EquatableArray<TypeOverride>? TypeOverrides { get; init; }
 
+    /// <summary>
+    /// The name of the class that holds a type's members in <see cref="MemberPlacement.Nested" /> placement.  Only the
+    /// attribute and the property give it, since a type's queries can come from several files.
+    /// </summary>
+    public string? NestedClass { get; init; }
+
     /// <summary>Whether the level gives a list that has <c>keep-comments</c>.</summary>
     public bool KeepsComments => Parameters is { } list && (list & GeneratorParameters.KeepComments) != 0;
 
@@ -82,6 +88,7 @@ internal sealed record SettingsLevel
             OutputModelType = OutputModelType ?? other.OutputModelType,
             CollectionType = CollectionType ?? other.CollectionType,
             TypeOverrides = TypeOverrideMap.Over(TypeOverrides, other.TypeOverrides),
+            NestedClass = NestedClass ?? other.NestedClass,
         };
     }
 }

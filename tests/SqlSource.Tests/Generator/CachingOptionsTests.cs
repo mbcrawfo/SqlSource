@@ -67,6 +67,35 @@ public sealed class CachingOptionsTests
             .ShouldNotContain("Throw");
     }
 
+    // The class is named again for each type, and each type is emitted again, but no file is read again.
+    [Fact]
+    public void Run_NestedClassPropertyChanged_EmitsEveryTypeAgainAndParsesNoFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+
+        var result = Run(
+            driver.WithUpdatedAnalyzerConfigOptions(
+                new TestOptionsProvider(
+                    OutputKind.Sql,
+                    null,
+                    properties: new Dictionary<string, string?> { ["SqlSourceNestedClass"] = "Queries" }
+                )
+            ),
+            compilation
+        );
+
+        AllReasons(result, TrackingNames.NestedClassCheck)
+            .ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Cached]);
+        AllReasons(result, TrackingNames.ParsedFile).ShouldAllBe(reason => reason == IncrementalStepRunReason.Cached);
+        AllReasons(result, TrackingNames.TypeOutput).ShouldAllBe(reason => reason == IncrementalStepRunReason.Modified);
+        result
+            .GeneratedTrees.Single(tree => tree.FilePath.EndsWith("UserQueries.g.cs", StringComparison.Ordinal))
+            .ToString()
+            .ShouldContain("private static class Queries\n");
+    }
+
     [Fact]
     public void Run_OptionsReplacedWithoutChangingTheProperty_EmitsNothingAgain()
     {

@@ -4,7 +4,7 @@ How `src/SqlSource` turns a project's `.sql` files into C#: the incremental pipe
 
 ## The pipeline
 
-[`SqlSourceGenerator`](../../src/SqlSource/SqlSourceGenerator.cs) is an `IIncrementalGenerator`, and its `Initialize` only wires the steps, through one method for each stage, called in the order of the source outputs: `RegisterAttribute`, `ClaimFiles`, `ReadSettings`, `ParseFiles`, `ReportInvalidSettings`, `SelectTypeQueries`, `CheckSidecars`, `TypeFiles`, `CollectModels`, `ReportDriver`, `ReportProblems`, `RegisterModelSources` and `RegisterTypeSources`.  A stage that hands several providers on returns a record struct of them.  Beyond the wiring it holds a few helpers, which sort, join and search collected values, and `ReportAll`, which reports an array of diagnostics.  A step that drops the null values of a provider uses `WhereNotNull`, from [`IncrementalValuesProviderExtensions`](../../src/SqlSource/Generation/IncrementalValuesProviderExtensions.cs).  The steps and their records are at the root of [`Generation/`](../../src/SqlSource/Generation), the path rules in `Paths/`, the readers of MSBuild properties and metadata in `MSBuild/`, the reading and checking of sidecars in `Sidecars/`, the C# types of a query in `Types/`, the models in `Models/`, and what writes a type's file and a model's in `Emitting/`.
+[`SqlSourceGenerator`](../../src/SqlSource/SqlSourceGenerator.cs) is an `IIncrementalGenerator`, and its `Initialize` only wires the steps, through one method for each stage, called in the order of the source outputs: `RegisterAttribute`, `ReadProjectSettings`, `ClaimFiles`, `ReadSettings`, `ParseFiles`, `ReportInvalidSettings`, `SelectTypeQueries`, `CheckSidecars`, `TypeFiles`, `CollectModels`, `ReportDriver`, `ReportProblems`, `RegisterModelSources` and `RegisterTypeSources`.  A stage that hands several providers on returns a record struct of them.  Beyond the wiring it holds a few helpers, which sort, join and search collected values, and `ReportAll`, which reports an array of diagnostics.  A step that drops the null values of a provider uses `WhereNotNull`, from [`IncrementalValuesProviderExtensions`](../../src/SqlSource/Generation/IncrementalValuesProviderExtensions.cs).  The steps and their records are at the root of [`Generation/`](../../src/SqlSource/Generation), the path rules in `Paths/`, the readers of MSBuild properties and metadata in `MSBuild/`, the reading and checking of sidecars in `Sidecars/`, the C# types of a query in `Types/`, the models in `Models/`, and what writes a type's file and a model's in `Emitting/`.
 
 Before any step runs, a post-initialization output adds `AttributeSource.Text` to the compilation as `SqlSourceGenerateAttribute.g.cs`.  It holds `[SqlSourceGenerate]` and the enums its properties take.
 
@@ -19,7 +19,9 @@ flowchart TD
     SqlPaths --> CaseCollisions
     compilation["Compilation"] --> SupportedFramework
     parse["Parse options"] --> UnsupportedLanguageVersion
-    TargetTypes --> TypeFiles
+    TargetTypes --> NestedClassCheck
+    ProjectSettings --> NestedClassCheck
+    NestedClassCheck --> TypeFiles
     SqlPaths --> TypeFiles
     SupportedFramework --> TypeFiles
     UnsupportedLanguageVersion --> TypeFiles
@@ -103,7 +105,8 @@ flowchart TD
 
 What each step gives:
 
-- **`TargetTypes`**: a `TargetType` for each attributed declaration, read by [`TargetTypeReader`](../../src/SqlSource/Generation/TargetTypeReader.cs).  Only the declaration that carries a type's first attribute gives one, so a type with the attribute on two partial declarations gets one file.
+- **`TargetTypes`**: a [`DeclaredType`](../../src/SqlSource/Generation/DeclaredType.cs) for each attributed declaration, read by [`TargetTypeReader`](../../src/SqlSource/Generation/TargetTypeReader.cs): the `TargetType`, and under `SqlLocation.Nested` the names its nested class cannot take, those of the type, its members and its type parameters.  Only the declaration that carries a type's first attribute gives one, so a type with the attribute on two partial declarations gets one file.
+- **`NestedClassCheck`**: the `TargetType` with its nested class named, from the attribute's `NestedClass`, else the project's `SqlSourceNestedClass`, else `Sql`, by [`NestedClassCheck.Apply`](../../src/SqlSource/Generation/NestedClassCheck.cs), which adds `SQLSRC007` when the type has taken the name.  The taken names stop here, so an edit that adds a member to a type runs nothing after this step unless the member takes the name.
 - **`SqlPaths`**: the normalised paths of the project's `.sql` files, distinct ignoring case and sorted, from `SqlPath.ToSortedSet`.
 - **`CaseCollisions`**: the files whose path differs only by case from an earlier one, from `PathCollision.Find`.
 - **`SupportedFramework`**: whether the compilation has `System.ArgumentException.ThrowIfNullOrWhiteSpace`, which first appeared in .NET 8 and which a generated method calls.  **`UnsupportedLanguageVersion`**: the project's language version when it is older than C# 12, from `LanguageSupport.FindUnsupportedVersion`.
@@ -273,9 +276,9 @@ Resolving a query's settings has two stages, and only the first is an input of t
 
 Stage one is [`FileParseInput`](../../src/SqlSource/Generation/FileParseInput.cs), the step of the same name: what must be known before a file is parsed.  That is the file's dialect, described [below](#how-the-dialect-reaches-the-parse), and `CommentsWanted`, whether a level the parser cannot see may ask for `keep-comments`.  It is true when the list of generator parameters in the file's metadata has `keep-comments`, or, when the metadata gives no list, the property's list has it, or when the file is in `CommentPaths`.  It may be true where no query ends up keeping its comments, and is never false where one does.  The one exception is two paths that differ only by case with the metadata on the later one, which is `SQLSRC013`, and the emitter then falls back to the form without comments.
 
-Stage two is everything else.  `ProjectSettings` reads the properties, `FileSettings` the metadata of each file's item and `TargetTypeReader` the attribute, and these join after a type's queries are selected: the file settings in `TypeQueries` and the project's level in `TypeOutput`, `TypeNeeds` and `TypeModels`.  The type override joins after a file's check instead, in `FileTypesInput`, which the [types](#types) read.  `TypeEmitter` then resolves each query's settings with `QuerySettings.Resolve`, from the query's markers, the attribute, the file's metadata and the property, and `SidecarNeeds` and `TypeModels` resolve them the same way.
+Stage two is everything else.  `ProjectSettings` reads the properties, `FileSettings` the metadata of each file's item and `TargetTypeReader` the attribute, and these join after a type's queries are selected: the file settings in `TypeQueries` and the project's level in `TypeOutput`, `TypeNeeds` and `TypeModels`.  The nested class is the exception, since it belongs to the type: the project's level joins it before the type's files are resolved, in `NestedClassCheck`, with `QuerySettings.ResolveNestedClass`.  The type override joins after a file's check instead, in `FileTypesInput`, which the [types](#types) read.  `TypeEmitter` then resolves each query's settings with `QuerySettings.Resolve`, from the query's markers, the attribute, the file's metadata and the property, and `SidecarNeeds` and `TypeModels` resolve them the same way.
 
-So a property that is not an input of the parse changes only the `TypeOutput`, the `TypeNeeds` and the `TypeModels` of each type, and the parse of every file is taken from the last run.
+So a property that is not an input of the parse changes only the `NestedClassCheck`, the `TypeOutput`, the `TypeNeeds` and the `TypeModels` of each type, and the parse of every file is taken from the last run.
 
 Of the resolved settings, `TypeEmitter` uses two: whether the query keeps its comments, and whether its method checks its arguments.  `SidecarNeeds` uses one, the output, which decides whether the query [needs an entry](#sidecars) in its file's sidecar.  `TypeModels` uses the output, the two suffixes, the model namespace, the two model types, and the generator parameters `sort-input`, `sort-output` and `no-table-models`, which [models](#models) describes.
 

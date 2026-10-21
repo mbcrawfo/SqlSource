@@ -35,7 +35,7 @@ internal static class TargetTypeReader
     /// Reads the type.  Returns null for every declaration but the one that carries the type's first attribute, so
     /// that a type with the attribute on two partial declarations, which the compiler rejects, gets one file.
     /// </summary>
-    public static TargetType? Read(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
+    public static DeclaredType? Read(GeneratorAttributeSyntaxContext context, CancellationToken cancellationToken)
     {
         var declaration = (TypeDeclarationSyntax)context.TargetNode;
         var symbol = (INamedTypeSymbol)context.TargetSymbol;
@@ -50,12 +50,7 @@ internal static class TargetTypeReader
         var source = new AttributeSettings(attribute, attributeLocation, diagnostics);
         var types = ReadDeclarations(declaration, diagnostics);
         var placement = source.Choice<MemberPlacement>(AttributeSource.LocationProperty) ?? MemberPlacement.Nested;
-        if (placement == MemberPlacement.Nested && IsNestedClassNameTaken(symbol))
-        {
-            diagnostics.Add(DiagnosticInfo.Create(SqlDiagnostics.SqlMemberExists, attributeLocation, symbol.Name));
-        }
-
-        return new TargetType(
+        var type = new TargetType(
             symbol.ContainingNamespace.IsGlobalNamespace
                 ? string.Empty
                 : symbol.ContainingNamespace.ToDisplayString(NamespaceFormat),
@@ -68,6 +63,10 @@ internal static class TargetTypeReader
             reference.SyntaxTree.FilePath,
             attributeLocation,
             new EquatableArray<DiagnosticInfo>(diagnostics.ToImmutable())
+        );
+        return new DeclaredType(
+            type,
+            placement == MemberPlacement.Nested ? GetTakenNames(symbol) : EquatableArray<string>.Empty
         );
     }
 
@@ -87,11 +86,18 @@ internal static class TargetTypeReader
     }
 
     // A nested class cannot share its name with a member of the type, with the type itself or with one of the
-    // type's parameters.  Each is a compiler error in generated code unless it is reported here first.
-    private static bool IsNestedClassNameTaken(INamedTypeSymbol symbol) =>
-        symbol.Name == TypeEmitter.NestedClassName
-        || symbol.TypeParameters.Any(static parameter => parameter.Name == TypeEmitter.NestedClassName)
-        || !symbol.GetMembers(TypeEmitter.NestedClassName).IsEmpty;
+    // type's parameters.  The name is not known until the project's property joins, so every one of them is kept,
+    // sorted, for NestedClassCheck.  MemberNames leaves out the nested types.
+    private static EquatableArray<string> GetTakenNames(INamedTypeSymbol symbol) =>
+        new(
+            symbol
+                .MemberNames.Concat(symbol.GetTypeMembers().Select(static type => type.Name))
+                .Concat(symbol.TypeParameters.Select(static parameter => parameter.Name))
+                .Append(symbol.Name)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static name => name, StringComparer.Ordinal)
+                .ToImmutableArray()
+        );
 
     private static bool IsFirstAttributeOfType(INamedTypeSymbol symbol, AttributeData attribute)
     {
@@ -237,6 +243,7 @@ internal static class TargetTypeReader
                 SettingId.CollectionType => AttributeSource.CollectionTypeProperty,
                 // The type override has no attribute level.
                 SettingId.TypeOverrides => null,
+                SettingId.NestedClass => AttributeSource.NestedClassProperty,
                 _ => null,
             };
     }

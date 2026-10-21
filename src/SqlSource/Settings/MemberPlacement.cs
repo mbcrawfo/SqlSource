@@ -5,7 +5,7 @@ namespace SqlSource.Settings;
 /// </summary>
 internal enum MemberPlacement
 {
-    /// <summary>In a private static class named <c>Sql</c>, nested in the type.</summary>
+    /// <summary>In a private static class nested in the type, named <c>Sql</c> unless a setting names it.</summary>
     Nested,
 
     /// <summary>On the type itself.</summary>

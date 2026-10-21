@@ -33,6 +33,12 @@ internal sealed record TargetType(
 )
 {
     /// <summary>
+    /// The name of the class that holds the members in <see cref="MemberPlacement.Nested" /> placement.  The reader
+    /// leaves the default, and <see cref="NestedClassCheck" /> sets it once the project's property is known.
+    /// </summary>
+    public string NestedClass { get; init; } = QuerySettings.DefaultNestedClass;
+
+    /// <summary>
     /// The name of the type itself, as a value: without the <c>@</c> of an escaped keyword.
     /// </summary>
     public string Name => Types[Types.Count - 1].ValueName;

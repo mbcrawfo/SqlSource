@@ -100,6 +100,21 @@ public sealed class SettingValueTests
     public void IsSuffix_CharactersThatCanFollowTheFirstOfAnIdentifier_IsASuffix(string value, bool expected) =>
         SettingValue.IsSuffix(value.AsSpan()).ShouldBe(expected);
 
+    [Theory]
+    [InlineData("Sql", true)]
+    [InlineData("Queries", true)]
+    [InlineData("_queries2", true)]
+    [InlineData("where", true)]
+    [InlineData("", false)]
+    [InlineData("class", false)]
+    [InlineData("App.Sql", false)]
+    [InlineData("My-Sql", false)]
+    [InlineData("1Sql", false)]
+    [InlineData("@Sql", false)]
+    [InlineData("Sql\u200B", false)]
+    public void IsTypeName_OneIdentifierThatIsNotAReservedKeyword_IsAName(string value, bool expected) =>
+        SettingValue.IsTypeName(value.AsSpan()).ShouldBe(expected);
+
     // The rule of a namespace and of a type's name, which is one identifier or a full name.
     [Theory]
     [InlineData("App", true)]

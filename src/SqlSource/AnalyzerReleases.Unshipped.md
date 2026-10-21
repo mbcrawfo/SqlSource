@@ -11,7 +11,7 @@ SQLSRC003 | SqlSource | Error | Target framework is not supported
 SQLSRC004 | SqlSource | Error | Path matches no SQL file
 SQLSRC005 | SqlSource | Error | Folder has no SQL file
 SQLSRC006 | SqlSource | Error | Attribute value is not valid
-SQLSRC007 | SqlSource | Error | Type has a member named Sql
+SQLSRC007 | SqlSource | Error | Type has a member named like its nested class
 SQLSRC008 | SqlSource | Error | Query name is used in two files
 SQLSRC009 | SqlSource | Error | Query is named like its containing type
 SQLSRC011 | SqlSource | Error | SqlSourceDialect is not valid
