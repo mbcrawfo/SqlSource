@@ -130,8 +130,65 @@ public sealed class TypeKeysTests
     [InlineData("pg_catalog.\"_x\"[]", "\"_x\"[]")]
     public void TryNormalize_QuotedCatalogName_IsItsKey(string key, string expected) => ShouldNormalize(key, expected);
 
+    // An escaped part is read to its text, and given in the quoted form of that text.
+    [Theory]
+    [InlineData("public.U&\"st\\0061tus\"", "public.\"status\"")]
+    [InlineData("public.u&\"St\\+000061tus\"", "public.\"Status\"")]
+    [InlineData("U&\"my schema\".x", "\"my schema\".x")]
+    [InlineData("s.U&\"a\\\\b\"", "s.\"a\\b\"")]
+    [InlineData("s.U&\"a\\0022b\"", "s.\"a\"\"b\"")]
+    [InlineData("s.U&\"a\"\"b\"", "s.\"a\"\"b\"")]
+    [InlineData("s.U&\"x\"[]", "s.\"x\"[]")]
+    [InlineData("U&\"int4\"", "int4")]
+    [InlineData("U&\"_int4\"", "int4[]")]
+    [InlineData("pg_catalog.U&\"_int4\"", "int4[]")]
+    [InlineData("pg_catalog.U&\"New Type\"", "\"New Type\"")]
+    [InlineData("U&\"pg_catalog\".int4", "int4")]
+    public void TryNormalize_EscapedPart_IsItsQuotedForm(string key, string expected) => ShouldNormalize(key, expected);
+
+    [Theory]
+    [InlineData("U&\"Int4\"")]
+    [InlineData("U&\"\"")]
+    [InlineData("s.U&\"\"")]
+    [InlineData("s.U&\"\\0000\"")]
+    [InlineData("s.U&\"\\00\"")]
+    [InlineData("s.U&\"\\00G1\"")]
+    [InlineData("s.U&\"a\\\"")]
+    [InlineData("s.U&\"\\x\"")]
+    [InlineData("s.U&\"\\+11FFFF\"")]
+    [InlineData("s.U&\"\\+00006\"")]
+    [InlineData("s.U&\"\\D800\"")]
+    [InlineData("s.U&\"\\DE00\\D83D\"")]
+    [InlineData("s.U&\"\\D83Dx\"")]
+    [InlineData("s.U&x")]
+    [InlineData("s.U& \"x\"")]
+    [InlineData("s.U&\"x\" UESCAPE '!'")]
+    [InlineData("s.U&\"unclosed")]
+    public void TryNormalize_EscapedPartThatIsNotValid_IsNotAKey(string key) =>
+        TypeKeys.TryNormalize(key.AsSpan(), out _).ShouldBeFalse();
+
+    [Theory]
+    [InlineData("U&\"a\\000Ab\"", "a\nb")]
+    [InlineData("u&\"\\\\\"", "\\")]
+    [InlineData("U&\"\\+01F600\"", "\U0001F600")]
+    [InlineData("U&\"\\D83D\\DE00\"", "\U0001F600")]
+    [InlineData("U&\"\\D83D\\+00DE00\"", "\U0001F600")]
+    [InlineData("U&\"a\"\"b\"", "a\"b")]
+    [InlineData("U&\"plain\"", "plain")]
+    public void TextOf_EscapedPart_IsItsTextDecoded(string part, string expected) =>
+        TypeKeys.TextOf(part.AsSpan()).ToString().ShouldBe(expected);
+
+    // TextOf is given only parts TrySplit read, but nothing a user writes may make the generator throw.
+    [Theory]
+    [InlineData("U&\"\\\"")]
+    [InlineData("U&\"\\+12\"")]
+    [InlineData("U&\"\\D800\"")]
+    public void TextOf_EscapedPartThatIsNotWellFormed_DoesNotThrow(string part) =>
+        Should.NotThrow(() => TypeKeys.TextOf(part.AsSpan()).ToString());
+
     [Theory]
     [InlineData("\"a.b\".c[]", "\"a.b\"", "c", true)]
+    [InlineData("U&\"a.b\".c[]", "U&\"a.b\"", "c", true)]
     [InlineData("int4", "", "int4", false)]
     [InlineData("s.\"x[]\"", "s", "\"x[]\"", false)]
     [InlineData("s.\"\"\"\"", "s", "\"\"\"\"", false)]
@@ -162,6 +219,8 @@ public sealed class TypeKeysTests
 
     [Theory]
     [InlineData("\"x\"", true)]
+    [InlineData("U&\"x\"", true)]
+    [InlineData("u&\"x\"", true)]
     [InlineData("x", false)]
     public void IsQuoted_Part_IsWhetherItHasQuotes(string part, bool expected) =>
         TypeKeys.IsQuoted(part.AsSpan()).ShouldBe(expected);
