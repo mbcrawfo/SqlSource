@@ -108,6 +108,7 @@ public sealed class CachingParseTests
             TrackingNames.ProjectDialect,
             TrackingNames.ProjectSettings,
             TrackingNames.FileParseInput,
+            TrackingNames.FileClaim,
             TrackingNames.ParsedFile,
             TrackingNames.ParsedFiles,
             TrackingNames.FileSettings,
@@ -275,5 +276,72 @@ public sealed class CachingParseTests
             );
         Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)["Users.sql"]
             .ShouldBe(IncrementalStepRunReason.Cached);
+    }
+
+    // A file added to a folder a type claims changes the claimed paths.  Every file's claim is worked out again, and
+    // only the added file's is new, so it alone is read.
+    [Fact]
+    public void Run_SqlFileAddedToAClaimedFolder_ReadsOnlyThatFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+        var count = new InMemoryAdditionalText("/app/Orders/Count.sql", "SELECT 3;\n");
+
+        var result = Run(driver.AddAdditionalTexts([count]), compilation);
+
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Modified]);
+        Claims(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_scene.Users.Path] = IncrementalStepRunReason.Unchanged,
+                    [_scene.Orders.Path] = IncrementalStepRunReason.Unchanged,
+                    [count.Path] = IncrementalStepRunReason.New,
+                },
+                ignoreOrder: true
+            );
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["Users.sql"] = IncrementalStepRunReason.Cached,
+                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
+                    ["Count.sql"] = IncrementalStepRunReason.New,
+                },
+                ignoreOrder: true
+            );
+    }
+
+    // UserQueries comes to claim Orders.sql in place of its folder, so Users.sql leaves the claimed paths.  Its claim
+    // alone changes, and it is no longer read.  Orders.sql stays claimed, so its claim is equal and it is not read
+    // again.
+    [Fact]
+    public void Run_SqlFileLeavesTheClaimedPaths_ReadsNoOtherFile()
+    {
+        var compilation = GeneratorHarness.CreateCompilation(Sources);
+        var driver = _scene.FirstRun(OutputKind.Sql, compilation);
+
+        var result = Run(driver, WithArgumentsOnUserQueries(compilation, "Path = \"../Orders/Orders.sql\""));
+
+        AllReasons(result, TrackingNames.ClaimedPaths).ShouldBe([IncrementalStepRunReason.Modified]);
+        Claims(result)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    [_scene.Users.Path] = IncrementalStepRunReason.Modified,
+                    [_scene.Orders.Path] = IncrementalStepRunReason.Unchanged,
+                },
+                ignoreOrder: true
+            );
+        Reasons<ParsedSqlFile>(result, TrackingNames.ParsedFile, file => file.FileName)
+            .ShouldBe(
+                new Dictionary<string, IncrementalStepRunReason>
+                {
+                    ["Users.sql"] = IncrementalStepRunReason.Removed,
+                    ["Orders.sql"] = IncrementalStepRunReason.Cached,
+                },
+                ignoreOrder: true
+            );
+        result.Diagnostics.ShouldBeEmpty();
     }
 }

@@ -160,12 +160,14 @@ internal sealed class CachingScene
             properties: new Dictionary<string, string?> { ["SqlSourceTypeOverrides"] = overrides }
         );
 
-    // A current sidecar whose entry has one column, of the type of pg_catalog, and these parameters when given.
+    // A current sidecar whose entry has one column, of the type of pg_catalog, named value unless another name is
+    // given, and these parameters when given.
     public static InMemoryAdditionalText TypedSidecar(
         InMemoryAdditionalText sqlFile,
         string queryName,
         string internalName,
-        SidecarParameter[]? parameters = null
+        SidecarParameter[]? parameters = null,
+        string columnName = "value"
     )
     {
         var file = ToSqlFile(sqlFile);
@@ -180,7 +182,7 @@ internal sealed class CachingScene
                 parameters: parameters,
                 columns:
                 [
-                    TestSidecars.Column(0, "value", TestSidecars.Postgres(internalName, internalName: internalName)),
+                    TestSidecars.Column(0, columnName, TestSidecars.Postgres(internalName, internalName: internalName)),
                 ]
             )
         );

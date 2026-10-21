@@ -31,6 +31,8 @@ internal static class TrackingNames
 
     public const string FileParseInput = nameof(FileParseInput);
 
+    public const string FileClaim = nameof(FileClaim);
+
     public const string ParsedFile = nameof(ParsedFile);
 
     public const string ParsedFiles = nameof(ParsedFiles);

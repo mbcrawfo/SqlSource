@@ -77,11 +77,16 @@ internal static class StepReasons
             .SelectMany(run => run.Outputs)
             .ToDictionary(output => key((T)output.Value), output => output.Reason);
 
-    // Why the input of each file's read is what it is, by the file's path.  The read is the step before the one named
-    // ParsedFile, which reports a file that was read again and gave an equal value as Cached.  So that a file was not
-    // read is shown by its input here, and by ClaimedPaths, the other input of every read: neither is Modified or New.
+    // Why the input of each file's claim is what it is, by the file's path.  A file's claim is the step after this one,
+    // and it is read only when the claim is new or has changed.  So that a file was not read is shown by its claim,
+    // which is neither Modified nor New (Claims), or by its input here and ClaimedPaths, neither of which is.
     public static Dictionary<string, IncrementalStepRunReason> ParseInputs(GeneratorDriverRunResult result) =>
         Reasons<FileParseInput>(result, TrackingNames.FileParseInput, file => file.File.Path);
+
+    // Why the claim of each file ran, by the file's path.  A file is read when its claim is Modified or New, and only
+    // then: ParsedFile alone cannot show it, since it reports a file that was read again and came out equal as Cached.
+    public static Dictionary<string, IncrementalStepRunReason> Claims(GeneratorDriverRunResult result) =>
+        Reasons<FileClaim>(result, TrackingNames.FileClaim, claim => claim.Input.File.Path);
 
     // A step that is not among the tracked steps fails the test: it has lost its name.  The exceptions are the steps
     // that give nothing, and so are not tracked, in a run without what they read: FileSettings where no file has
