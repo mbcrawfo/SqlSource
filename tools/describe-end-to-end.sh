@@ -15,6 +15,7 @@
 set -euo pipefail
 
 PROJECT='tests/SqlSource.Tests.Postgres'
+IMAGES='tests/SqlSource.Testing/DefaultImages.cs'
 END_TO_END="$PROJECT/EndToEnd"
 REALISTIC="$PROJECT/Realistic"
 DATABASES=(realistic app billing)
@@ -31,7 +32,11 @@ repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
 # The default image is read from the tests' line that names it, and not repeated here.
-image="$(sed -n 's/.*DefaultImage = "\(.*\)";.*/\1/p' "$PROJECT/PostgresContainer.cs")"
+image="$(sed -n 's/.*const string Postgres = "\(.*\)";.*/\1/p' "$IMAGES")"
+if [[ -z "$image" ]]; then
+    echo "$IMAGES has no line that declares Postgres as a string." >&2
+    exit 1
+fi
 
 printf 'Starting %s ... ' "$image"
 container="$(docker run -d -e "POSTGRES_PASSWORD=$PASSWORD" -p 127.0.0.1::5432 "$image")"

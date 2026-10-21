@@ -16,7 +16,7 @@ The project copies two fixture projects to its output, with the package's MSBuil
 
 ## The image
 
-The image is `postgres:18.6`, named for the tests and the scripts in one place, `PostgresContainer.DefaultImage`, and repeated in `examples/PostgresExamples/docker-compose.yml`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported, which CI runs as `postgres:14.24`:
+The image is `postgres:18.6`, named for the tests and the scripts in one place, `DefaultImages.Postgres` in `tests/SqlSource.Testing/DefaultImages.cs`, and repeated in `examples/PostgresExamples/docker-compose.yml`; the variable `SQLSOURCE_TESTS_POSTGRES_IMAGE` names another, and PostgreSQL 14 is the oldest that is supported, which CI runs as `postgres:14.24`:
 
 ```bash
 SQLSOURCE_TESTS_POSTGRES_IMAGE=postgres:14.24 dotnet test --project tests/SqlSource.Tests.Postgres

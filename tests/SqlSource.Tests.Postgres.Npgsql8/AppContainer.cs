@@ -1,6 +1,3 @@
-using System;
-using System.IO;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Npgsql;
 using SqlSource.Testing;
@@ -10,13 +7,12 @@ using Xunit;
 namespace SqlSource.Tests.Postgres.Npgsql8;
 
 // A PostgreSQL with the end-to-end database "app": the default image of the end-to-end project, its schema and its
-// seed.  The image is read from the line of PostgresContainer.cs that tools/record-fixtures.sh reads, so that it is
-// named once.
-public sealed partial class AppContainer : IAsyncLifetime
+// seed.  The image is the default image of DefaultImages, so that it is named once.
+public sealed class AppContainer : IAsyncLifetime
 {
     private const string Database = "app";
 
-    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(DefaultImage())
+    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder(DefaultImages.Postgres)
         .WithDatabase("postgres")
         .Build();
 
@@ -42,19 +38,4 @@ public sealed partial class AppContainer : IAsyncLifetime
     }
 
     public ValueTask DisposeAsync() => _container.DisposeAsync();
-
-    // The image on the line that declares DefaultImage, which fails the run when the line has changed its shape.
-    private static string DefaultImage()
-    {
-        var path = Path.Combine(RepositoryRoot.Folder, "tests", "SqlSource.Tests.Postgres", "PostgresContainer.cs");
-        var match = DefaultImageLine().Match(File.ReadAllText(path));
-        return match.Success
-            ? match.Groups["image"].Value
-            : throw new InvalidOperationException(
-                $"{path} has no line that declares DefaultImage as a string, which these tests and tools/ read."
-            );
-    }
-
-    [GeneratedRegex("""DefaultImage = "(?<image>[^"]*)";""")]
-    private static partial Regex DefaultImageLine();
 }
