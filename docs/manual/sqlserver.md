@@ -37,7 +37,7 @@ The build gives these types to each query whose output is `models` or `codegen` 
 Microsoft.Data.SqlClient 6.1 and 7 read every type as the same C# type, so the types are those of the table below whatever version of 6.1 or later the project references, directly or through another package:
 
 - **Microsoft.Data.SqlClient 6.1 or 7** gets the table's types.
-- **Microsoft.Data.SqlClient older than 6.1** is [SQLSRC267](diagnostics.md#sqlsrc267), an error, and the queries still get the table's types and their models.  Update it to 6.1 or later.  EF Core 8 and 9 bring an older one: see [known issues](#known-issues).
+- **Microsoft.Data.SqlClient older than 6.1** is [SQLSRC267](diagnostics.md#sqlsrc267), an error.  Update it to 6.1 or later.  EF Core 8 and 9 bring an older one: see [known issues](#known-issues).
 - **Microsoft.Data.SqlClient 8 or later** gets the types of Microsoft.Data.SqlClient 7, with the information [SQLSRC268](diagnostics.md#sqlsrc268), since this version of SqlSource does not know a newer one.
 - **No Microsoft.Data.SqlClient**, as in a library that holds the queries and leaves the driver to the application, gets the table's types too, but for `vector`, whose C# type is Microsoft.Data.SqlClient's own: it is [SQLSRC269](diagnostics.md#sqlsrc269) until the project references Microsoft.Data.SqlClient.  The older `System.Data.SqlClient` package is not Microsoft.Data.SqlClient, and a project that references it alone has no Microsoft.Data.SqlClient.
 
@@ -45,7 +45,7 @@ Microsoft.Data.SqlClient 6.1 and 7 read every type as the same C# type, so the t
 
 ### The types
 
-The names are SQL Server's, which are the [type override's](settings.md#setting-type-overrides) keys, with the other names SQL Server accepts in parentheses.  A type's length, precision or scale does not change its C# type: `nvarchar(50)` and `nvarchar(max)` are both `string`, and `decimal(12,2)` is a `decimal`.
+The names are SQL Server's, which are the [type override's](settings.md#setting-type-overrides) keys, with, in parentheses, the other one-word names that are also keys.  A type's length, precision or scale does not change its C# type: `nvarchar(50)` and `nvarchar(max)` are both `string`, and `decimal(12,2)` is a `decimal`.
 
 | SQL Server type | C# type |
 |----|----|
@@ -79,7 +79,7 @@ A type that the table does not name gets its C# type by what it is:
 ### What to know about some types
 
 - **`timestamp`** is SQL Server's row version, which it also calls `rowversion`, and not a time, so it is a `byte[]`.  PostgreSQL's `timestamp` is a time: see [type overrides](settings.md#setting-type-overrides) for an entry in a project with both.
-- **`date` and `time`** are a `System.DateTime` and a `System.TimeSpan`, and never a `System.DateOnly` or a `System.TimeOnly`, on every version of Microsoft.Data.SqlClient.
+- **`date` and `time`** are a `System.DateTime` and a `System.TimeSpan`, and never a `System.DateOnly` or a `System.TimeOnly`, on Microsoft.Data.SqlClient 6.1 and 7.
 - **`float(1)` to `float(24)`** are a `real` to SQL Server, so they are a `float` in C#.  `float(25)` to `float(53)`, and `float` without a length, are a `double`.
 - **`sql_variant`** is an `object`, whose value is the C# type of the value the row holds: an `int` for an `int`, a `string` for an `nvarchar`.
 - **`json`**, SQL Server 2025's type, is a `string`.

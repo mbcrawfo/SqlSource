@@ -1554,7 +1554,7 @@ The query's output is `models` or `codegen`, which needs a description of the qu
 /work/App/Queries/Users.sql(1,10): error SQLSRC241: The query 'GetUser' has no entry in the sidecar of its file, and its output 'codegen' needs one.  Run 'sqlsource describe'.
 ```
 
-Run `dotnet sqlsource describe` and commit the sidecar it writes.  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>` for the project, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a query, however many types use its file, and the query's constant or method is still generated.
+Run `dotnet sqlsource describe` and commit the sidecar it writes.  Under `mssql`, which this version of the tool cannot describe, set the output to `sql` instead: see [SQLSRC216](#sqlsrc216).  The default output is `codegen`, so a project that only wants each query's SQL as a constant sets the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>` for the project, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a query, however many types use its file, and the query's constant or method is still generated.
 
 See: [Output](settings.md#setting-output)
 
