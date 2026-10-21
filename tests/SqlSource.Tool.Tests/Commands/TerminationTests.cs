@@ -49,7 +49,8 @@ public sealed class TerminationTests : IDisposable
                 // started a program of its own.
                 await Eventually.TrueAsync(() => File.Exists(waiting), $"Nothing wrote '{waiting}'.");
                 var kill = new ProcessStartInfo("kill", [signal, tool.Id.ToString(CultureInfo.InvariantCulture)]);
-                _ = await Programs.RunAsync(kill, Eventually.Patience);
+                var sent = await Programs.RunAsync(kill, Eventually.Patience);
+                sent.ExitCode.ShouldBe(0, sent.Error);
             }
         );
 
