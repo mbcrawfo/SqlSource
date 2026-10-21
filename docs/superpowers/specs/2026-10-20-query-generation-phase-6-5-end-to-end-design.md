@@ -71,7 +71,7 @@ The types Dapper cannot send are listed as PostgreSQL's `WriteSideLeftOut` lists
 ### The three kinds of test
 
 1. `CheckTests`: `describe --check` through `CliRun.Real` on the project with a connection for each database, asserting each database's line.  On 2017 the 2025-only queries are left out by the positional filters, as PostgreSQL's 14 run leaves out the cases of a later major.
-2. A Dapper test for each query class, asserting the values of at least one row and the `NULL`s of another; the type table's test, read and written, by the row expectations; `DapperRecipeTests` for the manual's SQL Server recipe.
+2. A Dapper test for each query class, asserting the values of at least one row and the `NULL`s of another; the type table's test, read and written, by the row expectations; `DapperRecipeTests` for the manual's SQL Server recipe.  A test that runs a 2025-only query, the `json` and `vector` table's, skips below major 17, by the same `SkipBelow` the container class gives, so that the floor's run neither runs it nor fails on it.
 3. `ErrorPathTests`, on a copy of `ErrorPaths`: a query edited after it was described is out of date; a column added to a table after is out of date; a query the server refuses is reported and writes no sidecar.
 
 ### The floor of SqlClient

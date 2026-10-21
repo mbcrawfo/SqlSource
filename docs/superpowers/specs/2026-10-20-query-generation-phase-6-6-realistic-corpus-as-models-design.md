@@ -35,6 +35,7 @@ As of 6.5: the project builds with the generator and has its end-to-end sidecars
 
 As 5.6 and 5.7 have it, with SQL Server's majors and with these differences:
 
+- The database is 6.3's `realistic`, which `SqlServerContainer` creates from `Realistic/schema.sql` and `Realistic/seed.sql`; `tools/describe-end-to-end.sh`'s SQL Server part creates it from the same files in the same order and gives the tool `--connection realistic=...`, as PostgreSQL's part does for its corpus.
 - The corpus's `AdditionalFiles` metadata sets `SqlSourceDatabase` `realistic` and, if the project overrides a type at its own level, returns that key to the base map, as PostgreSQL's corpus returns `timestamptz`.
 - The Dapper run binds the samples by the SQL's parameter names, as PostgreSQL's does, `D-0004` being the reason an input model cannot be passed; a sample's literal is turned into a value by asking the server for it.
 - The comparison whole sets `NameSpan`, `ServerVersion` and `Database` equal on both sides, as `DescribeCommandTests` does.
