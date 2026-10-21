@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using SqlSource.Diagnostics;
+using SqlSource.Generation.Paths;
 using SqlSource.Tool.Logging;
 using SqlSource.Tool.Reporting;
 
@@ -32,9 +33,6 @@ internal static class SidecarStore
     private const string Deleted = "deleted";
 
     private const string TemporaryExtension = ".tmp";
-
-    // What the name of every sidecar ends with: SidecarFormat.PathFor adds ".json" to the path of a .sql file.
-    private const string SidecarSuffix = ".sql.json";
 
     // How many digits a Guid has in the format "N".
     private const int IdLength = 32;
@@ -78,17 +76,17 @@ internal static class SidecarStore
                         outcome.Text ?? throw new InvalidOperationException("A file to write has no text."),
                         reporter
                     );
-                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, written ? Written : "failed");
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, FileAction.Write, failed: !written);
                     break;
                 case FileAction.Delete:
                     var deleted = Delete(outcome.SidecarPath, reporter);
-                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, deleted ? Deleted : "failed");
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, FileAction.Delete, failed: !deleted);
                     break;
                 case FileAction.Unreadable:
                     reporter.Report(
                         outcome.Failure ?? throw new InvalidOperationException("A file left unread has no error.")
                     );
-                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, "failed");
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, FileAction.Unreadable, failed: false);
                     break;
                 case FileAction.HeldBack:
                     if (outcome.HasDescribed)
@@ -96,10 +94,10 @@ internal static class SidecarStore
                         reporter.Report(NotWritten(outcome));
                     }
 
-                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, "held-back");
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, FileAction.HeldBack, failed: false);
                     break;
                 case FileAction.Unchanged:
-                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, "unchanged");
+                    RunEvents.Sidecar(reporter.Trace, outcome.SidecarPath, FileAction.Unchanged, failed: false);
                     break;
                 case FileAction.None:
                     // The run did not look at this sidecar: nothing is changed, and nothing is said.
@@ -130,7 +128,7 @@ internal static class SidecarStore
         foreach (var folder in folders)
         {
             Func<string, bool> isWanted = onTheWhole
-                ? IsSidecarName
+                ? SqlPath.IsSidecarFile
                 : folder.ToHashSet(StringComparer.Ordinal).Contains;
             RemoveLeftovers(folder.Key, isWanted, before, cancellationToken);
         }
@@ -183,9 +181,6 @@ internal static class SidecarStore
             ? fileName[..sidecarLength]
             : null;
     }
-
-    // Whether the name is a sidecar's: that of a .sql file, which the generator takes in any case, and ".json".
-    private static bool IsSidecarName(string name) => name.EndsWith(SidecarSuffix, StringComparison.OrdinalIgnoreCase);
 
     private static bool Write(string path, string text, Reporter reporter)
     {

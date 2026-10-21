@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using SqlSource.Diagnostics;
+using SqlSource.Generation.Paths;
 using SqlSource.Tool.Reporting;
 
 namespace SqlSource.Tool.Logging;
@@ -37,7 +38,14 @@ internal sealed class RunLogFile : IRunLog, IDisposable
     public const int MaxStringBytes = 1024 * 1024;
 
     // The files a run reads or writes: a log given one of these names would empty it.
-    private static readonly string[] FilesOfTheRun = [".sql", ".sql.json", ".csproj", ".sln", ".slnx"];
+    private static readonly string[] FilesOfTheRun =
+    [
+        SqlPath.SqlExtension,
+        SqlPath.SidecarExtension,
+        ".csproj",
+        ".sln",
+        ".slnx",
+    ];
 
     private const string TimeFormat = "yyyy-MM-dd'T'HH:mm:ss.fff'Z'";
 

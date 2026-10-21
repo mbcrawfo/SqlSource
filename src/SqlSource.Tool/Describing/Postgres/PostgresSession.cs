@@ -170,7 +170,11 @@ internal sealed partial class PostgresSession : IDescribeSession
             // With the describe's own token: a cancelled describe leaves the statement to die with its session,
             // because a cancelled run must not wait on a server, and the run closes the session next.  The error of
             // the call is never reported.
-            _ = await DeallocateAsync(new PostgresDeallocateRequest(prepare.Statement), cancellationToken);
+            _ = await DeallocateAsync(
+                request.Name,
+                new PostgresDeallocateRequest(prepare.Statement),
+                cancellationToken
+            );
         }
     }
 
@@ -207,7 +211,7 @@ internal sealed partial class PostgresSession : IDescribeSession
             answer.Columns
             ?? throw new InvalidOperationException("The answer to 'columns' holds no columns and no error.");
 
-        var tables = await TablesOfAsync(columns, cancellationToken);
+        var tables = await TablesOfAsync(request.Name, columns, cancellationToken);
         if (!tables.Succeeded)
         {
             return Failed(PostgresErrors.Tables(tables.Failure, request));
@@ -226,6 +230,7 @@ internal sealed partial class PostgresSession : IDescribeSession
         // After "tables": the type of an origin attribute is where a domain is found, so the one request of "types"
         // needs the catalog's answer.
         var rows = await RowsOfAsync(
+            request.Name,
             [
                 .. parameterOids,
                 .. columns.Select(static column => column.TypeOid),
@@ -244,7 +249,14 @@ internal sealed partial class PostgresSession : IDescribeSession
             return Failed(PostgresErrors.SchemaChanged(request, DescribeStep.ResolveType, types.Failure));
         }
 
-        var spellings = await SpellingsOfAsync(parameterOids, columns, origins, types.Value, cancellationToken);
+        var spellings = await SpellingsOfAsync(
+            request.Name,
+            parameterOids,
+            columns,
+            origins,
+            types.Value,
+            cancellationToken
+        );
         if (!spellings.Succeeded)
         {
             return Failed(PostgresErrors.Types(spellings.Failure, request));
@@ -431,6 +443,7 @@ internal sealed partial class PostgresSession : IDescribeSession
     // The rows of every type asked for, by OID.  The request is sorted and holds each OID once, so that it is the
     // same however a query orders what it names.  Nothing is asked when there is no type to ask for.
     private async Task<Outcome<IReadOnlyDictionary<long, PostgresTypeRow>, PostgresServerError>> RowsOfAsync(
+        string query,
         IReadOnlyList<long> oids,
         CancellationToken cancellationToken
     )
@@ -442,20 +455,20 @@ internal sealed partial class PostgresSession : IDescribeSession
             );
         }
 
-        var answer = await TypesAsync(new PostgresTypesRequest([.. oids.Distinct().Order()]), cancellationToken);
-        return answer.Error is { } error
-            ? Outcome<IReadOnlyDictionary<long, PostgresTypeRow>, PostgresServerError>.Failed(error)
-            : Outcome<IReadOnlyDictionary<long, PostgresTypeRow>, PostgresServerError>.Of(
-                (
-                    answer.Rows
-                    ?? throw new InvalidOperationException("The answer to 'types' holds no rows and no error.")
-                ).ToDictionary(static row => row.Oid)
-            );
+        var answer = await TypesAsync(query, new PostgresTypesRequest([.. oids.Distinct().Order()]), cancellationToken);
+        return Answered(
+            answer.Error,
+            answer.Rows,
+            "types",
+            "rows",
+            static rows => (IReadOnlyDictionary<long, PostgresTypeRow>)rows.ToDictionary(static row => row.Oid)
+        );
     }
 
     // The tables the columns name, by OID.  The request is sorted and holds each table once.  Nothing is asked when
     // no column names a table.
     private async Task<Outcome<IReadOnlyDictionary<long, PostgresTableRow>, PostgresServerError>> TablesOfAsync(
+        string query,
         IReadOnlyList<PostgresColumnRow> columns,
         CancellationToken cancellationToken
     )
@@ -471,15 +484,14 @@ internal sealed partial class PostgresSession : IDescribeSession
             );
         }
 
-        var answer = await TablesAsync(new PostgresTablesRequest(oids), cancellationToken);
-        return answer.Error is { } error
-            ? Outcome<IReadOnlyDictionary<long, PostgresTableRow>, PostgresServerError>.Failed(error)
-            : Outcome<IReadOnlyDictionary<long, PostgresTableRow>, PostgresServerError>.Of(
-                (
-                    answer.Tables
-                    ?? throw new InvalidOperationException("The answer to 'tables' holds no tables and no error.")
-                ).ToDictionary(static table => table.Oid)
-            );
+        var answer = await TablesAsync(query, new PostgresTablesRequest(oids), cancellationToken);
+        return Answered(
+            answer.Error,
+            answer.Tables,
+            "tables",
+            "tables",
+            static tables => (IReadOnlyDictionary<long, PostgresTableRow>)tables.ToDictionary(static table => table.Oid)
+        );
     }
 
     // The server's spelling of every pair of a type and a modifier that the parameters and the columns will be built
@@ -487,6 +499,7 @@ internal sealed partial class PostgresSession : IDescribeSession
     // is sorted and holds each pair once.  Nothing is asked when there is no pair, as for a capture recorded before
     // the modifier was read, whose columns hold none.
     private async Task<Outcome<TypeSpellings, PostgresServerError>> SpellingsOfAsync(
+        string query,
         IReadOnlyList<long> parameterOids,
         IReadOnlyList<PostgresColumnRow> columns,
         ColumnOrigin?[] origins,
@@ -516,16 +529,29 @@ internal sealed partial class PostgresSession : IDescribeSession
             return Outcome<TypeSpellings, PostgresServerError>.Of(TypeSpellings.None);
         }
 
-        var answer = await SpellingsAsync(new PostgresSpellingsRequest(pairs), cancellationToken);
-        return answer.Error is { } error
-            ? Outcome<TypeSpellings, PostgresServerError>.Failed(error)
-            : Outcome<TypeSpellings, PostgresServerError>.Of(
-                TypeSpellings.From(
-                    answer.Rows
-                        ?? throw new InvalidOperationException("The answer to 'spellings' holds no rows and no error.")
+        var answer = await SpellingsAsync(query, new PostgresSpellingsRequest(pairs), cancellationToken);
+        return Answered(answer.Error, answer.Rows, "spellings", "rows", TypeSpellings.From);
+    }
+
+    // The outcome of an answer: the server's error when it gave one, otherwise what the answer holds, read.  An
+    // answer that holds neither is a fault of the call.
+    private static Outcome<TValue, PostgresServerError> Answered<TRow, TValue>(
+        PostgresServerError? error,
+        IReadOnlyList<TRow>? rows,
+        string call,
+        string member,
+        Func<IReadOnlyList<TRow>, TValue> read
+    ) =>
+        error is not null
+            ? Outcome<TValue, PostgresServerError>.Failed(error)
+            : Outcome<TValue, PostgresServerError>.Of(
+                read(
+                    rows
+                        ?? throw new InvalidOperationException(
+                            $"The answer to '{call}' holds no {member} and no error."
+                        )
                 )
             );
-    }
 
     // The columns in order.  The first of a pseudo-type ends the describe: no value has such a type.  A domain is
     // never over one, so the type the protocol reported is the one to ask.

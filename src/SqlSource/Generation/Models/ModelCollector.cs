@@ -9,7 +9,6 @@ using SqlSource.Diagnostics;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Paths;
 using SqlSource.Generation.Types;
-using SqlSource.Settings;
 using SqlSource.Snapshot;
 
 namespace SqlSource.Generation.Models;
@@ -191,7 +190,11 @@ internal static class ModelCollector
 
         if (first.Kind != later.Kind)
         {
-            return "it is a '" + KindOf(later.Kind) + "' here and a '" + KindOf(first.Kind) + "' there";
+            return "it is a '"
+                + ModelKinds.Keyword(later.Kind)
+                + "' here and a '"
+                + ModelKinds.Keyword(first.Kind)
+                + "' there";
         }
 
         if (first.IsSorted != later.IsSorted)
@@ -327,16 +330,6 @@ internal static class ModelCollector
     }
 
     private static string RoleOf(ModelRole role) => role == ModelRole.Input ? "input" : "output";
-
-    // A kind as a user writes it.
-    private static string KindOf(ModelKind kind) =>
-        kind switch
-        {
-            ModelKind.Record => "record",
-            ModelKind.SealedRecord => "sealed record",
-            ModelKind.Class => "class",
-            ModelKind.SealedClass or _ => "sealed class",
-        };
 
     // "'GetUser' in Users.sql", and its type too when the later request is of the same query.
     private static string QueryOf(ModelSource first, ModelSource later) =>

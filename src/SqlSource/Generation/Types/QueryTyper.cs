@@ -21,10 +21,6 @@ namespace SqlSource.Generation.Types;
 /// </remarks>
 internal static class QueryTyper
 {
-    private const string ParameterOwner = "parameter";
-
-    private const string ColumnOwner = "column";
-
     // The help of a type that only a sidecar edited by hand, or written by a newer tool, has.  Each help is given
     // without its period.
     private const string Describe = "Run 'sqlsource describe'";
@@ -89,7 +85,7 @@ internal static class QueryTyper
         var parameters = ImmutableArray.CreateBuilder<PropertyType>(entry.Parameters.Count);
         foreach (var parameter in entry.Parameters)
         {
-            if (TypeOf(parameter.Type, ParameterOwner, parameter.Name, typing) is not { } type)
+            if (TypeOf(parameter.Type, MessageSubject.Parameter, parameter.Name, typing) is not { } type)
             {
                 return null;
             }
@@ -105,7 +101,7 @@ internal static class QueryTyper
         var columns = ImmutableArray.CreateBuilder<PropertyType>(entryColumns.Count);
         foreach (var column in entryColumns)
         {
-            if (TypeOf(column.Type, ColumnOwner, column.Name, typing) is not { } type)
+            if (TypeOf(column.Type, MessageSubject.Column, column.Name, typing) is not { } type)
             {
                 return null;
             }
@@ -130,7 +126,7 @@ internal static class QueryTyper
                 DiagnosticInfo.Create(
                     SqlDiagnostics.TypeHasNoCSharpType,
                     typing.Location,
-                    Subject(owner, name),
+                    MessageSubject.Of(owner, name),
                     type?.Name ?? "null",
                     Describe
                 )
@@ -151,7 +147,9 @@ internal static class QueryTyper
             );
         }
 
-        typing.Diagnostics.Add(Diagnose(mapping, Subject(owner, name), postgres.Name, typing.Location, typing.Column));
+        typing.Diagnostics.Add(
+            Diagnose(mapping, MessageSubject.Of(owner, name), postgres.Name, typing.Location, typing.Column)
+        );
         return null;
     }
 
@@ -277,9 +275,6 @@ internal static class QueryTyper
             at,
             [subject, failure.Key, PostgresTypeMap.AsWritten(failure.Text ?? ""), failure.Detail ?? "", .. more]
         );
-
-    // "column 'id'", as a message names a parameter or column.
-    private static string Subject(string owner, string name) => owner + " '" + name + "'";
 
     // The lookup of the type override for the markers, made once for each distinct level of markers, by reference:
     // a query without markers of its own holds its file header's level.  None for an empty map.  A map of defaults

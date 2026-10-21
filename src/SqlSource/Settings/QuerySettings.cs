@@ -100,4 +100,16 @@ internal readonly record struct QuerySettings(
             markers.TypeOverrides,
             TypeOverrideMap.Over(metadata.TypeOverrides, property.TypeOverrides)
         ) ?? EquatableArray<TypeOverride>.Empty;
+
+    /// <summary>
+    /// The database of a query: the markers', then the metadata's, then the property's, else the name of the dialect,
+    /// which the caller gives since <c>Settings/</c> does not use <c>Parsing/</c>.  The attribute has no level for
+    /// it, so it is kept apart from <see cref="Resolve" />, as <see cref="ResolveTypeOverrides" /> is.
+    /// </summary>
+    public static string ResolveDatabase(
+        SettingsLevel markers,
+        SettingsLevel metadata,
+        SettingsLevel property,
+        string dialectName
+    ) => markers.Database ?? metadata.Database ?? property.Database ?? dialectName;
 }

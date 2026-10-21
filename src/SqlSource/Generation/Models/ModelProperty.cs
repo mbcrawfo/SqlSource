@@ -1,4 +1,3 @@
-using System;
 using SqlSource.Generation.Types;
 
 namespace SqlSource.Generation.Models;
@@ -13,7 +12,7 @@ namespace SqlSource.Generation.Models;
 /// <param name="Subject">The parameter or the column as a message names it: <c>column 'id'</c>.</param>
 /// <param name="IsArray">
 /// Whether the column's PostgreSQL type is an array, or a domain whose base type is one.  Always false for a parameter.
-/// It changes no property's C#, so <see cref="IsSameShape" /> does not compare it.
+/// It changes no property's C#, so <c>ModelCollector.FindDifference</c> does not compare it.
 /// </param>
 internal sealed record ModelProperty(
     string Name,
@@ -22,14 +21,4 @@ internal sealed record ModelProperty(
     string Documentation,
     string Subject,
     bool IsArray
-)
-{
-    /// <summary>
-    /// Whether the two properties give one C# property: the same name and the same type, compared ordinally, and the
-    /// same nullability.  Their documentation and the database's facets change no C#.
-    /// </summary>
-    public bool IsSameShape(ModelProperty other) =>
-        string.Equals(Name, other.Name, StringComparison.Ordinal)
-        && string.Equals(Type.Text, other.Type.Text, StringComparison.Ordinal)
-        && IsNullable == other.IsNullable;
-}
+);

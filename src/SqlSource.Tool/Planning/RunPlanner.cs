@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
@@ -21,7 +20,8 @@ namespace SqlSource.Tool.Planning;
 /// <remarks>
 /// The plan must agree with the generator on which type claims which file with which output, so every rule here is
 /// the generator's own code: <c>PathResolver</c>, <c>MSBuildSettings</c>, <c>DialectSetting</c>,
-/// <c>FileParseInput</c>, <c>SqlFileReader</c>, <c>QuerySettings</c> and <c>SqlQueryHash</c>.
+/// <c>FileParseInput</c>, <c>SqlFileReader</c>, <c>QuerySettings</c> and <c>SqlQueryHash</c>.  The order of the
+/// errors for values that are not valid is the generator's too: both sides take it from <c>InvalidValues</c>.
 /// <c>GeneratorParityTests</c> holds the two together.
 /// </remarks>
 internal static class RunPlanner
@@ -33,13 +33,16 @@ internal static class RunPlanner
     )
     {
         var errors = ImmutableArray.CreateBuilder<ToolDiagnostic>();
+        var unclaimed = ImmutableArray.CreateBuilder<int>(manifests.Length);
 
         // A file that two projects claim is planned once, under the first.
         var works = new List<FileWork>();
         var byPath = new Dictionary<string, FileWork>(SqlPath.Comparer);
         foreach (var manifest in manifests)
         {
-            foreach (var claimed in ReadProject(manifest, errors, cancellationToken))
+            var (claimedFiles, unclaimedCount) = ReadProject(manifest, errors, cancellationToken);
+            unclaimed.Add(unclaimedCount);
+            foreach (var claimed in claimedFiles)
             {
                 if (byPath.TryGetValue(claimed.NormalizedPath, out var work))
                 {
@@ -64,14 +67,16 @@ internal static class RunPlanner
         Select(files, filters, errors);
 
         return new RunPlanResult(
-            new RunPlan(new EquatableArray<PlannedFile>([.. files]), databases),
-            new EquatableArray<ToolDiagnostic>(errors.ToImmutable())
+            new RunPlan(new EquatableArray<PlannedFile>([.. files]), databases, filters),
+            new EquatableArray<ToolDiagnostic>(errors.ToImmutable()),
+            new EquatableArray<int>(unclaimed.MoveToImmutable())
         );
     }
 
-    // The claimed files of one project, in the order of their paths, each with the settings of this project.  The
-    // errors of the project are added: SQLSRC208, then SQLSRC011, then SQLSRC014.
-    private static List<ClaimedFile> ReadProject(
+    // The claimed files of one project, in the order of their paths, each with the settings of this project, and the
+    // number of its listed files that no type of it claims.  The errors of the project are added: SQLSRC208, then
+    // SQLSRC011, then SQLSRC014.
+    private static (List<ClaimedFile> Claimed, int Unclaimed) ReadProject(
         ProjectManifest manifest,
         ImmutableArray<ToolDiagnostic>.Builder errors,
         CancellationToken cancellationToken
@@ -85,8 +90,8 @@ internal static class RunPlanner
         // The keys of a manifest: they have the database, which the keys of the compiler do not.
         var settings = ProjectSettings.Read(options, MSBuildSettings.ManifestProperty);
         var invalid = new InvalidValues();
-        invalid.Add(dialect);
-        invalid.Add(settings.Invalid);
+        invalid.AddDialect(dialect.InvalidValue);
+        AddSettings(invalid, settings.Invalid);
 
         var listed = ListedFiles.Read(manifest);
         var claimsOf = ClaimsByFile(claims.Claims, listed);
@@ -113,8 +118,8 @@ internal static class RunPlanner
             );
         }
 
-        invalid.AddTo(errors, manifest.ProjectPath);
-        return claimed;
+        AddInvalid(errors, manifest.ProjectPath, invalid);
+        return (claimed, listed.Paths.Count - claimed.Count);
     }
 
     // The claims of each claimed file, by its path.  What a claim of a file says is its Output, and nothing else.
@@ -148,10 +153,10 @@ internal static class RunPlanner
             ManifestOptions.ForFile(file),
             MSBuildSettings.ManifestMetadata
         );
-        invalid.Add(metadata.Dialect);
+        invalid.AddDialect(metadata.Dialect.InvalidValue);
         if (metadata.Settings is { } settings)
         {
-            invalid.Add(settings.Invalid);
+            AddSettings(invalid, settings.Invalid);
         }
 
         return metadata;
@@ -254,10 +259,12 @@ internal static class RunPlanner
         return new PlannedQuery(
             query,
             NeedsEntry: true,
-            query.Markers.Database
-                ?? owner.Metadata.Settings?.Level.Database
-                ?? owner.Property.Database
-                ?? SqlDialectName.Canonical(dialect),
+            QuerySettings.ResolveDatabase(
+                query.Markers,
+                owner.Metadata.Settings?.Level ?? SettingsLevel.None,
+                owner.Property,
+                SqlDialectName.Canonical(dialect)
+            ),
             SqlQueryHash.Compute(dialect, query.Segments, query.Tokens, query.Parameters),
             problems
         );
@@ -327,7 +334,7 @@ internal static class RunPlanner
     )
     {
         var names = new List<string>();
-        var known = new Dictionary<string, DatabaseWork>(StringComparer.OrdinalIgnoreCase);
+        var known = new Dictionary<string, DatabaseWork>(DatabaseName.Comparer);
         foreach (var file in files)
         {
             foreach (var query in file.Queries)
@@ -374,7 +381,7 @@ internal static class RunPlanner
                 )
                 {
                     problems |= QueryProblems.DatabaseDialectConflict;
-                    if ((reported ??= [with(StringComparer.OrdinalIgnoreCase)]).Add(name))
+                    if ((reported ??= [with(DatabaseName.Comparer)]).Add(name))
                     {
                         errors.Add(
                             ToolDiagnostic.At(
@@ -445,8 +452,34 @@ internal static class RunPlanner
     }
 
     private static bool IsNamed(PlannedQuery query, RunFilters filters) =>
-        filters.Databases.IsEmpty
-        || (query.Database is { } database && filters.Databases.Contains(database, StringComparer.OrdinalIgnoreCase));
+        filters.Databases.IsEmpty || (query.Database is { } database && filters.NamesDatabase(database));
+
+    // The generator's reader gives every setting that is not valid.  The tool reports the ones it reads: the build
+    // reports the rest.  The database is the tool's alone: the generator does not read it.
+    private static void AddSettings(InvalidValues invalid, IEnumerable<InvalidSetting> settings) =>
+        invalid.AddSettings(
+            settings.Where(static setting => setting.Name is MSBuildSettings.OutputName or MSBuildSettings.DatabaseName)
+        );
+
+    // SQLSRC011 for each dialect that is not valid, then SQLSRC014 for each setting, in the order of InvalidValues.
+    private static void AddInvalid(
+        ImmutableArray<ToolDiagnostic>.Builder errors,
+        string projectPath,
+        InvalidValues invalid
+    )
+    {
+        foreach (var value in invalid.Dialects)
+        {
+            errors.Add(ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, projectPath, value));
+        }
+
+        foreach (var setting in invalid.Settings)
+        {
+            errors.Add(
+                ToolDiagnostic.AtFile(SqlDiagnostics.InvalidSettingValue, projectPath, setting.Value, setting.Name)
+            );
+        }
+    }
 
     // The claims of one file in one project: what each says, and the type that says it, in the order they came.
     private sealed class FileClaims
@@ -454,49 +487,6 @@ internal static class RunPlanner
         public List<SettingsLevel> Levels { get; } = [];
 
         public List<TypeClaim> Types { get; } = [];
-    }
-
-    // What is not valid in one project, each value once, as the generator reports them: the dialects in ordinal
-    // order, then the settings the tool reads, by name and then by value.
-    private sealed class InvalidValues
-    {
-        private readonly SortedSet<string> _dialects = [with(StringComparer.Ordinal)];
-
-        private readonly HashSet<InvalidSetting> _settings = [];
-
-        public void Add(DialectSetting dialect)
-        {
-            if (dialect.InvalidValue is { } value)
-            {
-                _ = _dialects.Add(value);
-            }
-        }
-
-        public void Add(IEnumerable<InvalidSetting> settings) => _settings.UnionWith(settings.Where(IsRead));
-
-        // The generator's reader gives every setting that is not valid.  The tool reports the ones it reads: the
-        // build reports the rest.  The database is the tool's alone: the generator does not read it.
-        private static bool IsRead(InvalidSetting setting) =>
-            setting.Name is MSBuildSettings.OutputName or MSBuildSettings.DatabaseName;
-
-        public void AddTo(ImmutableArray<ToolDiagnostic>.Builder errors, string projectPath)
-        {
-            foreach (var value in _dialects)
-            {
-                errors.Add(ToolDiagnostic.AtFile(SqlDiagnostics.InvalidDialect, projectPath, value));
-            }
-
-            foreach (
-                var setting in _settings
-                    .OrderBy(static setting => setting.Name, StringComparer.Ordinal)
-                    .ThenBy(static setting => setting.Value, StringComparer.Ordinal)
-            )
-            {
-                errors.Add(
-                    ToolDiagnostic.AtFile(SqlDiagnostics.InvalidSettingValue, projectPath, setting.Value, setting.Name)
-                );
-            }
-        }
     }
 
     // One claimed file as one project sees it.

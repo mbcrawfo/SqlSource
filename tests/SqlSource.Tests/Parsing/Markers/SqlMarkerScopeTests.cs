@@ -36,6 +36,32 @@ public sealed class SqlMarkerScopeTests
         IsTaken(line, SqlScopeKind.WholeFile).ShouldBeTrue();
     }
 
+    // The keyword list, the two allowed lists and the scope's reading are four lists of the same kinds.  The kinds the
+    // parser reads itself are the ones no scope allows; every other kind has a keyword that reads back as it and is
+    // read by the scope without a throw, whatever its value.  A row gives the name of the kind, as an internal enum
+    // cannot be the parameter of a public test method.
+    [Theory]
+    [MemberData(nameof(MarkerKindNames))]
+    public void Marker_OfEveryKind_HasAKeywordAndAScope(string kindName)
+    {
+        var kind = Enum.Parse<SqlMarkerKind>(kindName);
+        var word = SqlMarkerReader.WordOf(kind);
+        word.ShouldNotBeEmpty();
+
+        var line = "-- " + word + ": x";
+        var marker = SqlMarkerReader.Read(line, SqlLexer.Lex(line, SqlDialectRules.Ansi).Lexemes[0]);
+        marker.ShouldNotBeNull().Kind.ShouldBe(kind);
+
+        var isAllowed = SqlMarkerScope.IsAllowedInQuery(kind) || SqlMarkerScope.IsAllowedInPreamble(kind);
+        isAllowed.ShouldBe(kind is not (SqlMarkerKind.Name or SqlMarkerKind.Summary or SqlMarkerKind.Dialect));
+        if (isAllowed)
+        {
+            _ = Should.NotThrow(() => Scope(SqlScopeKind.WholeFile, line));
+        }
+    }
+
+    public static TheoryData<string> MarkerKindNames => [.. Enum.GetNames<SqlMarkerKind>()];
+
     // A kind that is none of the three takes nothing: the scope does not guess what it is.
     [Fact]
     public void Read_ScopeOfAnUnknownKind_TakesNoMarker() =>
