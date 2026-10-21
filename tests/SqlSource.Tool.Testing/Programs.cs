@@ -89,14 +89,9 @@ internal static class Programs
             program.StandardInput.Close();
             if (whileRunning is not null)
             {
-                // The callback may still hold the program when it is disposed, which a kill has made harmless.
-#pragma warning disable CA2025
-                var running = whileRunning(program);
-#pragma warning restore CA2025
-
-                // It may still run when the program is killed, and its failure then is no one's to see.
-                _ = running.ContinueWith(task => task.Exception, TaskScheduler.Default);
-                await running.WaitAsync(limit.Token);
+                // A callback that outlives the limit is abandoned when the program is killed, and a later failure of it
+                // goes unobserved.
+                await whileRunning(program).WaitAsync(limit.Token);
             }
 
             await program.WaitForExitAsync(limit.Token);
