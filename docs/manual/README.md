@@ -29,10 +29,10 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Know what the tool needs of my PostgreSQL database | [PostgreSQL](postgresql.md#connecting) |
 | Know why a column is recorded as possibly null | [Which columns can be null](postgresql.md#nullability) |
 | Know which queries the tool cannot describe | [What can be described](postgresql.md#what-can-be-described) |
-| Know which C# type a PostgreSQL type gets, or choose another | [Types](postgresql.md#type-map), [type overrides](settings.md#setting-type-overrides) |
+| Know which C# type a PostgreSQL or SQL Server type gets, or choose another | Types of [PostgreSQL](postgresql.md#type-map) and [SQL Server](sqlserver.md#types), [type overrides](settings.md#setting-type-overrides) |
 | See a whole project that uses SqlSource, with its database | [The PostgreSQL example](../../examples/PostgresExamples/README.md) |
 | Look up a build error or a tool error | [Diagnostics](diagnostics.md) |
-| Find a problem that is not an error | The known issues of [`.sql` files](sql-files.md#known-issues), [settings](settings.md#known-issues), [parameters and tokens](parameters-and-tokens.md#known-issues), [dialects](dialects.md#known-issues), [the generator](generator.md#known-issues), [the tool](tool.md#known-issues) and [PostgreSQL](postgresql.md#known-issues) |
+| Find a problem that is not an error | The known issues of [`.sql` files](sql-files.md#known-issues), [settings](settings.md#known-issues), [parameters and tokens](parameters-and-tokens.md#known-issues), [dialects](dialects.md#known-issues), [the generator](generator.md#known-issues), [the tool](tool.md#known-issues), [PostgreSQL](postgresql.md#known-issues) and [SQL Server](sqlserver.md#known-issues) |
 
 <a id="what-works-today"></a>
 

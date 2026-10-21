@@ -105,7 +105,7 @@ Every problem SqlSource finds is an error, and none can be turned off or made a 
 | [SQLSRC244](#sqlsrc244) | Entry is stale |
 | [SQLSRC245](#sqlsrc245) | Entry names no query |
 
-**The C# types of a PostgreSQL query**
+**The C# types of a query**
 
 | Id | Title |
 |----|----|
@@ -890,7 +890,7 @@ internal static partial class Queries;
 /work/App/Queries.cs(3,27): error SQLSRC208: 'Path' of [SqlSourceGenerate] is read from the source by 'sqlsource', which needs a literal here
 ```
 
-Write the value where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead, and under `mssql` [SQLSRC243](#sqlsrc243).
+Write the value where the attribute is: `Path = "Queries"`, `Output = GeneratorOutput.Models`.  A constant, `nameof`, a concatenation, an interpolated string and a cast of a number are all this error, though the compiler accepts them.  The tool describes nothing for the type until it is mended, so the build reports [SQLSRC241](#sqlsrc241) for each of the type's queries that needs an entry in its sidecar and has none.  Under a dialect that has no database to ask, such as `ansi`, the build reports [SQLSRC209](#sqlsrc209) instead.
 
 See: [Known issues](generator.md#known-issues)
 
@@ -898,13 +898,13 @@ See: [Known issues](generator.md#known-issues)
 
 **Output needs a dialect that can be described**
 
-A query whose output is `models` or `codegen` is described by a database, and the dialect the tool can describe today is `postgres`.  The dialect `mssql` passes this check, since describing SQL Server queries comes in a later release, and its queries get [SQLSRC216](#sqlsrc216) from the tool, and the file [SQLSRC243](#sqlsrc243) in the build, until then.  This file has a query with such an output and another dialect.  The build reports this error, and so does the tool.  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
+A query whose output is `models` or `codegen` is described by a database, and the dialect the tool can describe today is `postgres`.  The dialect `mssql` passes this check, since describing SQL Server queries comes in a later release, and its queries get [SQLSRC216](#sqlsrc216) from the tool until then, and [SQLSRC241](#sqlsrc241) in the build, since they have no entry in their sidecar.  This file has a query with such an output and another dialect.  The build reports this error, and so does the tool.  The default output is `codegen` and the default dialect is `ansi`, so a project that sets neither gets this error for every file.
 
 ```console
 /work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'codegen' needs each query described by its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
 ```
 
-For PostgreSQL files, set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` at the top of the file.  **For SQL Server files, set the output to `sql`**, though the message names `mssql`, which gives SQLSRC216 and SQLSRC243 until SQL Server queries can be described.  For any other database, and for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; the file's constants and methods are generated as before.
+For PostgreSQL files, set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` at the top of the file.  **For SQL Server files, set the output to `sql`**, though the message names `mssql`, which gives SQLSRC216 and SQLSRC241 until SQL Server queries can be described.  For any other database, and for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; the file's constants and methods are generated as before.
 
 See: [Database support](dialects.md#database-support)
 
@@ -1635,7 +1635,7 @@ What to do depends on the type:
 
 When the message says to map the type, it names the key of the type with its schema: `public.address`, or `pg_catalog.pg_class` for the row type of a catalog table, or `sys.newtype` for a type of SQL Server, since a key without a schema must be a type that SqlSource knows.  A schema or a name that needs quotes is in them, `"my schema"."Order Item"`, and one with a line break, a tab or any other white space but a single space, a control character, two spaces in a row, a `;` or a `#` is written with escapes, `"my schema".U&"Order\000AItem"`, so that the key can be written in a marker and in a project file alike, with its `&` written `&amp;` there.  A name with a capital letter is quoted too, `public."Status"`, so an entry for it maps that type alone, and not one whose name differs only by case.  For an array or a domain, the key is of the element or base that has no C# type, and an entry for it maps the array or domain too.  The query's constant or method is still generated.
 
-See: [Types](postgresql.md#type-map)
+See: [PostgreSQL types](postgresql.md#type-map), [SQL Server types](sqlserver.md#types)
 
 ## SQLSRC247
 
@@ -1990,7 +1990,7 @@ CSC : error SQLSRC267: This project references Microsoft.Data.SqlClient 6.0.5, a
 
 Update the `Microsoft.Data.SqlClient` package to 6.1 or later.  When another package brings the older version, reference `Microsoft.Data.SqlClient` from the project itself, at the version you want.  EF Core 8 and 9 bring Microsoft.Data.SqlClient 5.1, so a project that uses either references Microsoft.Data.SqlClient 6.1 or later directly, beside the EF Core packages.  The error has no file and line, because it is about the project's references, and it is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.
 
-See: [SQL Server](sqlserver.md)
+See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
 
 ## SQLSRC268
 
@@ -2012,7 +2012,7 @@ Update the `SqlSource` package when a version that knows the driver is released.
 
 It has no file and line, and is reported once for the project, only while a query's output is `models` or `codegen` under the `mssql` dialect.  As information, it is not in the output of `dotnet build`: see [SQLSRC248](#sqlsrc248) for where to find it.
 
-See: [SQL Server](sqlserver.md)
+See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)
 
 ## SQLSRC269
 
@@ -2026,4 +2026,4 @@ The project does not reference Microsoft.Data.SqlClient, and a column or a param
 
 Reference the `Microsoft.Data.SqlClient` package from the project, at 6.1 or later.  Every other type that Microsoft.Data.SqlClient reads without another package has a C# type of .NET itself, and needs no reference.  The error is reported at the query's name, once for the query, and the query's constant or method is still generated.
 
-See: [SQL Server](sqlserver.md)
+See: [Which version of Microsoft.Data.SqlClient](sqlserver.md#which-sqlclient)

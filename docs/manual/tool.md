@@ -48,7 +48,7 @@ TRUNCATE TABLE audit_log;
 A query is described through its [dialect](concepts.md#dialect).  The tool can ask PostgreSQL today, which is the dialect `postgres`; the [database support table](dialects.md#database-support) lists every dialect.  A query that must be described and whose dialect cannot be is reported by the tool, and by the build:
 
 - A file of a dialect the tool does not describe, every row marked No in [database support](dialects.md#database-support), such as `ansi`, `mysql` or `sqlite`, is [SQLSRC209](diagnostics.md#sqlsrc209).  The default dialect is `ansi`, so a project that sets neither the dialect nor the output gets it for every file.
-- A file of `mssql` passes that check, since SQL Server queries will be described, and each of its queries that must be described is [SQLSRC216](diagnostics.md#sqlsrc216) until then.  The build reports such a file as [SQLSRC243](diagnostics.md#sqlsrc243).  See [SQL Server](sqlserver.md).
+- A file of `mssql` passes that check, since SQL Server queries will be described, and each of its queries that must be described is [SQLSRC216](diagnostics.md#sqlsrc216) until then.  The build reports each such query as [SQLSRC241](diagnostics.md#sqlsrc241), since it has no entry in its file's sidecar.  See [SQL Server](sqlserver.md).
 
 Either way, set the output of those queries to `sql`, as [the output setting](settings.md#setting-output) says; for SQL Server files too, though SQLSRC209's message also names `mssql`.  For SQLSRC209 you can instead set the dialect, when the files are PostgreSQL.
 
