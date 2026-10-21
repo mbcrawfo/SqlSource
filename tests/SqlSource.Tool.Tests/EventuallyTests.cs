@@ -31,5 +31,27 @@ public sealed class EventuallyTests
     }
 
     [Fact]
+    public async Task TrueAsync_ConditionThatStaysFalse_ThrowsTheTimeoutWithItsMessage()
+    {
+        var thrown = await Should.ThrowAsync<TimeoutException>(() =>
+            Eventually.TrueAsync(() => Task.FromResult(false), "never true", TimeSpan.FromMilliseconds(200))
+        );
+
+        thrown.Message.ShouldBe("never true");
+    }
+
+    [Fact]
+    public async Task ValueAsync_AttemptThatHangs_ThrowsTheTimeout()
+    {
+        var hangs = new TaskCompletionSource<int?>();
+
+        var thrown = await Should.ThrowAsync<TimeoutException>(() =>
+            Eventually.ValueAsync(() => hangs.Task, "no value", TimeSpan.FromMilliseconds(200))
+        );
+
+        thrown.Message.ShouldBe("no value");
+    }
+
+    [Fact]
     public void Patience_IsTwoMinutes() => Eventually.Patience.ShouldBe(TimeSpan.FromMinutes(2));
 }

@@ -280,8 +280,7 @@ internal static class ProjectEvaluator
         );
     }
 
-    // The dotnet that started the tool, when it said which; else the one on the path.  The tests start the programs
-    // they run by the same rule.
+    // The dotnet that started the tool, when it said which; else the one on the path.
     internal static string DotnetOf(Func<string, string?> getEnvironmentVariable) =>
         getEnvironmentVariable("DOTNET_HOST_PATH") is { Length: > 0 } path ? path : "dotnet";
 

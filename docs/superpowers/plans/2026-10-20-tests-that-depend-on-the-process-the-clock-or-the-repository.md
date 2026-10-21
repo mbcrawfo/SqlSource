@@ -31,7 +31,7 @@
 ## Review Focus
 
 1. A program that never ends (MSBuild waiting on a lock, a tool that hangs): `RunAsync` kills the whole tree and throws `TimeoutException` naming the program and the limit, with what it printed — `ProgramsTests.RunAsync_ProgramThatOutlivesThePatience_IsKilledAndThrows`.
-2. A test cancelled while its program runs: the tree is killed and `OperationCanceledException` is thrown, not `TimeoutException` — `ProgramsTests.RunAsync_Cancelled_KillsTheProgramAndThrowsTheCancellation`.
+2. A test cancelled while its program runs: the tree is killed and `OperationCanceledException` is thrown, not `TimeoutException` — `ProgramsTests.RunAsync_WhileRunningThatIsCancelled_KillsTheProgramAndThrowsTheCancellation`.
 3. A program that writes more than a pipe's buffer to both streams: no deadlock, both read whole — `ProgramsTests.RunAsync_ProgramThatWritesBothStreams_GivesBothWhole`.
 4. `DOTNET_HOST_PATH` set to an empty string: `dotnet` from the path, as the tool does — `ProgramsTests.Dotnet_HostPathEmpty_IsDotnet` (in `ChangesTheEnvironment`).
 5. A container test class that runs first on a fresh server, or after every other: passes either way — the order runs of Task 5.
@@ -67,7 +67,7 @@
 - `RunAsync_Dotnet_GivesItsExitCodeAndOutput`: `new ProcessStartInfo(Programs.Dotnet, ["--version"])`; `ExitCode` 0, `Output.Trim()` not empty, `Error` empty.
 - `RunAsync_ProgramThatWritesBothStreams_GivesBothWhole`: with `sh -c` (skip unless on path, `Assert.SkipWhen(OperatingSystem.IsWindows(), …)`), write 200 000 `o` to standard output and 200 000 `e` to standard error; both lengths, after trimming the line end, are 200 000.
 - `RunAsync_ProgramThatOutlivesThePatience_IsKilledAndThrows`: `sleep 30` (or `ping -n 30 127.0.0.1` on Windows, skip unless on path), patience 200 ms; throws `TimeoutException` whose message contains `"did not end within"`, within 10 s of wall time.
-- `RunAsync_Cancelled_KillsTheProgramAndThrowsTheCancellation`: the same program, with `whileRunning` that throws `OperationCanceledException`; `Should.ThrowAsync<OperationCanceledException>` and the process given to `whileRunning` has exited afterwards.
+- `RunAsync_WhileRunningThatIsCancelled_KillsTheProgramAndThrowsTheCancellation`: the same program, with `whileRunning` that throws `OperationCanceledException`; `Should.ThrowAsync<OperationCanceledException>` and the process given to `whileRunning` has exited afterwards.
 - `RunAsync_WhileRunningThatFails_KillsTheProgramAndThrowsItsException`: `whileRunning` throws `InvalidOperationException("seen")`; that exception is thrown and the program has exited.
 
 `EventuallyTests`:

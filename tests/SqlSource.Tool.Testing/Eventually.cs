@@ -18,21 +18,29 @@ internal static class Eventually
     public static Task TrueAsync(Func<bool> condition, string otherwise) =>
         TrueAsync(() => Task.FromResult(condition()), otherwise);
 
-    public static async Task TrueAsync(Func<Task<bool>> condition, string otherwise) =>
-        _ = await ValueAsync<bool>(async () => await condition() ? true : null, otherwise);
+    public static Task TrueAsync(Func<Task<bool>> condition, string otherwise) =>
+        TrueAsync(condition, otherwise, Patience);
 
     // The first value that the attempt gives, which is not null.
-    public static async Task<T> ValueAsync<T>(Func<Task<T?>> attempt, string otherwise)
+    public static Task<T> ValueAsync<T>(Func<Task<T?>> attempt, string otherwise)
+        where T : struct => ValueAsync(attempt, otherwise, Patience);
+
+    // The waits above with a patience of their own, which a test of the timeout cannot spend two minutes on.
+    internal static async Task TrueAsync(Func<Task<bool>> condition, string otherwise, TimeSpan patience) =>
+        _ = await ValueAsync<bool>(async () => await condition() ? true : null, otherwise, patience);
+
+    internal static async Task<T> ValueAsync<T>(Func<Task<T?>> attempt, string otherwise, TimeSpan patience)
         where T : struct
     {
         var test = TestContext.Current.CancellationToken;
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(test);
-        limit.CancelAfter(Patience);
+        limit.CancelAfter(patience);
         try
         {
             while (true)
             {
-                if (await attempt() is { } value)
+                // An attempt that hangs is no longer than the patience either.
+                if (await attempt().WaitAsync(limit.Token) is { } value)
                 {
                     return value;
                 }

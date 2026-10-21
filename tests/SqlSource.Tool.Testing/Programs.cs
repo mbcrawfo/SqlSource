@@ -1,4 +1,5 @@
 using System;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -79,16 +80,23 @@ internal static class Programs
         using var limit = CancellationTokenSource.CreateLinkedTokenSource(test);
         limit.CancelAfter(patience);
         using var program = Process.Start(start)!;
-        program.StandardInput.Close();
 
         // Not on a token: a program that is killed ends its streams, and these end with them.
         var output = program.StandardOutput.ReadToEndAsync();
         var error = program.StandardError.ReadToEndAsync();
         try
         {
+            program.StandardInput.Close();
             if (whileRunning is not null)
             {
-                await whileRunning(program).WaitAsync(limit.Token);
+                // The callback may still hold the program when it is disposed, which a kill has made harmless.
+#pragma warning disable CA2025
+                var running = whileRunning(program);
+#pragma warning restore CA2025
+
+                // It may still run when the program is killed, and its failure then is no one's to see.
+                _ = running.ContinueWith(task => task.Exception, TaskScheduler.Default);
+                await running.WaitAsync(limit.Token);
             }
 
             await program.WaitForExitAsync(limit.Token);
@@ -105,10 +113,7 @@ internal static class Programs
                 && !test.IsCancellationRequested
             )
             {
-                var written = await Task.WhenAll(output, error).WaitAsync(KillWait);
-                throw new TimeoutException(
-                    $"'{start.FileName}' did not end within {patience}.  It wrote: {written[0]}{written[1]}"
-                );
+                throw await DidNotEndAsync(start, patience, output, error);
             }
 
             throw;
@@ -125,6 +130,26 @@ internal static class Programs
         start.Environment["DOTNET_NOLOGO"] = "true";
     }
 
+    // What it wrote is left out when a program that escaped the kill still holds a stream.
+    private static async Task<TimeoutException> DidNotEndAsync(
+        ProcessStartInfo start,
+        TimeSpan patience,
+        Task<string> output,
+        Task<string> error
+    )
+    {
+        var message = $"'{start.FileName}' did not end within {patience}.";
+        try
+        {
+            var written = await Task.WhenAll(output, error).WaitAsync(KillWait);
+            return new TimeoutException($"{message}  It wrote: {written[0]}{written[1]}");
+        }
+        catch (TimeoutException)
+        {
+            return new TimeoutException(message);
+        }
+    }
+
     // The whole tree, since a shell or the SDK starts programs of its own that hold the streams open.  A program that
     // has just ended is no failure.
     private static async Task KillAsync(Process program)
@@ -133,9 +158,10 @@ internal static class Programs
         {
             program.Kill(entireProcessTree: true);
         }
-        catch (InvalidOperationException)
+        catch (Exception exception)
+            when (exception is InvalidOperationException or Win32Exception or AggregateException)
         {
-            // It ended between the failure and the kill.
+            // It ended between the failure and the kill, or the system would not end it or one that it started.
         }
 
         await program.WaitForExitAsync(CancellationToken.None).WaitAsync(KillWait);

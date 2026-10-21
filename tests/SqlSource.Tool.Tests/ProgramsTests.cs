@@ -77,18 +77,31 @@ public sealed class ProgramsTests
     public async Task RunAsync_ProgramThatOutlivesThePatience_IsKilledAndThrows()
     {
         var start = Sleeper();
+        var seen = 0;
         var wall = Stopwatch.StartNew();
 
         var thrown = await Should.ThrowAsync<TimeoutException>(() =>
-            Programs.RunAsync(start, TimeSpan.FromMilliseconds(200))
+            Programs.RunAsync(
+                start,
+                TimeSpan.FromMilliseconds(200),
+                program =>
+                {
+                    seen = program.Id;
+                    return Task.CompletedTask;
+                }
+            )
         );
 
         thrown.Message.ShouldContain("did not end within");
+        thrown.Message.ShouldContain(start.FileName);
         wall.Elapsed.ShouldBeLessThan(TimeSpan.FromSeconds(10));
+        ShouldHaveExited(seen);
     }
 
+    // The cancellation is whileRunning's own, with neither token cancelled: a test cannot cancel its own token from
+    // inside itself, and this one is thrown as it is.
     [Fact]
-    public async Task RunAsync_Cancelled_KillsTheProgramAndThrowsTheCancellation()
+    public async Task RunAsync_WhileRunningThatIsCancelled_KillsTheProgramAndThrowsTheCancellation()
     {
         var seen = 0;
 
