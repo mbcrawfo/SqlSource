@@ -129,8 +129,7 @@ internal sealed class CachingScene
         return driver;
     }
 
-    // Both types at Models under mssql, and each file with its current sidecar.  Until the generator has a type map
-    // for mssql, each file reports SQLSRC243, so the run is not held to be free of diagnostics.
+    // Both types at Models under mssql, and each file with its current sidecar.
     public GeneratorDriver FirstRunWithSqlServerSidecars(Compilation compilation)
     {
         var driver = GeneratorHarness
@@ -144,6 +143,7 @@ internal sealed class CachingScene
                 new TestOptionsProvider(OutputKind.Models, null, "mssql")
             )
             .RunGenerators(compilation, TestContext.Current.CancellationToken);
+        driver.GetRunResult().Diagnostics.ShouldBeEmpty();
         return driver;
     }
 

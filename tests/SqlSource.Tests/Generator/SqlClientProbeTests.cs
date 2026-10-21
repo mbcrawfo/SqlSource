@@ -16,9 +16,7 @@ namespace SqlSource.Tests.Generator;
 
 // The probe of the Microsoft.Data.SqlClient a project references, against the drivers themselves and against
 // assemblies made to look like one, and the diagnostics of the driver.  Each run is of a query at Models in an mssql
-// file whose entry is current.  The probe and the report of the driver do not depend on there being a type map for
-// mssql, and until there is one the file also reports SQLSRC243, which these tests leave out by asking for the ids of
-// the driver alone.
+// file whose entry is current.  The tests ask for the ids of the driver alone.
 public sealed class SqlClientProbeTests
 {
     private const string Source = """

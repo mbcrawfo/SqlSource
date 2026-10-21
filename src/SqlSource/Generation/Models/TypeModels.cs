@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using SqlSource.Generation.Emitting;
 using SqlSource.Generation.Paths;
+using SqlSource.Parsing;
 using SqlSource.Settings;
 using SqlSource.Snapshot;
 
@@ -122,7 +123,7 @@ internal static class TypeModels
                 && marker is null
                 && (settings.Parameters & GeneratorParameters.NoTableModels) == 0
                 && query.Table is { } matched
-                && PropertyNames.FromTable(matched) is { } fromTable
+                && PropertyNames.FromTable(matched, SqlDescribableDialects.EngineOf(file.Dialect)) is { } fromTable
             )
             {
                 tableName = fromTable;
