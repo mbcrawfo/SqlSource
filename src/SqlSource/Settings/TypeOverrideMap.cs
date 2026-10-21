@@ -160,7 +160,7 @@ internal static class TypeOverrideMap
     // The index of the first entry that is not less than key, in the order of the map or, with ignoringCaseOnly, in
     // the order of the keys ignoring case.  Generic over the list, so that a map, which is a struct, is searched
     // without being boxed.  It is a search of its own because it is a lower bound over a ref struct key, which
-    // SortedSearch cannot take.
+    // SortedSearch cannot take (TD-0063).
     private static int LowerBound<TList>(TList entries, in KeyParts key, bool ignoringCaseOnly)
         where TList : IReadOnlyList<TypeOverride>
     {
