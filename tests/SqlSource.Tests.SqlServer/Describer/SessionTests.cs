@@ -75,6 +75,24 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
             .ShouldEndWith(": SqlClient could not reach the server: ConnectionRefused");
     }
 
+    // The container's certificate is its own and signed by no authority this machine trusts, so a string that asks for
+    // encryption and does not trust the certificate fails the TLS handshake.
+    [Fact]
+    public async Task OpenAsync_CertificateNotTrusted_IsSqlsrc224WithNoPartOfTheValue()
+    {
+        var connection = new SqlConnectionStringBuilder(sqlServer.ConnectionString)
+        {
+            Encrypt = SqlConnectionEncryptOption.Mandatory,
+            TrustServerCertificate = false,
+        };
+
+        var failure = await ShouldNotOpenAsync(connection);
+
+        failure
+            .ServerLines.ShouldHaveSingleItem()
+            .ShouldEndWith(": the server's certificate is not trusted, or the TLS handshake failed");
+    }
+
     // SqlClient's text for a keyword it does not know quotes the keyword, and for some values the value.
     [Fact]
     public async Task OpenAsync_UnreadableConnectionString_IsSqlsrc224WithTheFixedLine()
@@ -94,6 +112,31 @@ public sealed class SessionTests(SqlServerContainer sqlServer)
         await Should.ThrowAsync<OperationCanceledException>(
             Sessions.OpenAsync(sqlServer.ConnectionString, new CancellingExchange())
         );
+
+    // SqlClient reports a command that is cancelled while the server runs it as a SqlException: it is the cancellation
+    // all the same, and no answer.  The command waits for longer than the test, so it is the token that ends it.
+    [Fact]
+    public async Task AnswerAsync_CommandCancelledWhileTheServerRunsIt_ThrowsOperationCanceled()
+    {
+        await using var session = await Sessions.OpenSessionAsync(sqlServer.ConnectionString);
+        using var cancel = CancellationTokenSource.CreateLinkedTokenSource(TestContext.Current.CancellationToken);
+        var token = cancel.Token;
+        cancel.CancelAfter(TimeSpan.FromMilliseconds(200));
+
+        var answered = SqlServerLive.AnswerAsync<SqlServerServerError?>(
+            async () =>
+            {
+                await using var command = await session.Connection.CommandAsync("WAITFOR DELAY '00:00:30'", token);
+                _ = await command.ExecuteNonQueryAsync(token);
+                return null;
+            },
+            ConnectionErrors.Of,
+            static error => error,
+            token
+        );
+
+        _ = await Should.ThrowAsync<OperationCanceledException>(answered);
+    }
 
     // No session, SQLSRC224 at no step for the database, and nothing of the value in any text of the failure or in
     // the capture: not the password, the host, or the database's name when it is not the logical name, which the run

@@ -65,9 +65,19 @@ internal sealed class SqlServerLive(SqlServerConnection connection)
 
     private static string OnOrOff(int value) => value == 1 ? "ON" : "OFF";
 
-    // Runs a call and gives its answer, or the answer of the error the server, SqlClient or the connection gave.
-    // errorOf is ConnectionErrors.AtOpen for "open" and ConnectionErrors.Of for every other call.
-    private static async Task<TAnswer> AnswerAsync<TAnswer>(
+    /// <summary>
+    /// Runs a call and gives its answer, or the answer of the error the server, SqlClient or the connection gave.  A
+    /// <see cref="SqlException" /> thrown once the token is cancelled is the cancellation.  Internal for a container
+    /// test, which cancels a command that the server is running.
+    /// </summary>
+    /// <param name="call">What the call runs.</param>
+    /// <param name="errorOf">
+    /// <see cref="ConnectionErrors.AtOpen" /> for <c>open</c> and <see cref="ConnectionErrors.Of" /> for every other
+    /// call.
+    /// </param>
+    /// <param name="failed">The call's answer that holds an error.</param>
+    /// <param name="token">The token the call runs under.</param>
+    internal static async Task<TAnswer> AnswerAsync<TAnswer>(
         Func<Task<TAnswer>> call,
         Func<SqlException, SqlServerServerError> errorOf,
         Func<SqlServerServerError, TAnswer> failed,

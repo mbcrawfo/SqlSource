@@ -135,7 +135,7 @@ public sealed class SecretTests : IDisposable
         _scene.Run.Describers.Clear();
         _scene.Run.Describers.Add(new SqlServerDescriber());
         _scene.Run.Environment["SQLSOURCE_CONNECTION_MSSQL"] =
-            "Data Source=127.0.0.1,1;Connect Timeout=5;Encrypt=False;Password=" + Secrets.Marker;
+            "Data Source=127.0.0.1,1;Connect Timeout=1;Encrypt=False;Password=" + Secrets.Marker;
 
         var result = await _scene.DescribeAsync("--database", "mssql", "--log", "run.log");
 

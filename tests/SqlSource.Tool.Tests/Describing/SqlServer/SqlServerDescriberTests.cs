@@ -1,6 +1,11 @@
+using System;
+using System.Linq;
+using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
+using SqlSource.Tool.Testing;
 using Xunit;
 
 namespace SqlSource.Tool.Tests.Describing.SqlServer;
@@ -26,4 +31,29 @@ public sealed class SqlServerDescriberTests
     [InlineData("=;")]
     public void SecretsOf_ValueSqlClientCannotRead_GivesNoneAndDoesNotThrow(string connection) =>
         new SqlServerDescriber().SecretsOf(connection).ShouldBeEmpty();
+
+    // Each is refused before anything is opened, with the describer's own line and nothing of SqlClient's text.
+    [Theory]
+    [InlineData(";", "the connection string is empty")]
+    [InlineData("  ", "the connection string is empty")]
+    [InlineData("Data Source=127.0.0.1,1;Nonsense=" + Secrets.Marker, "SqlClient cannot read the connection string")]
+    [InlineData(
+        "Data Source=127.0.0.1,1;Connect Timeout=" + Secrets.Marker,
+        "SqlClient cannot read the connection string"
+    )]
+    public async Task OpenAsync_ConnectionStringRefusedBeforeOpening_IsSqlsrc224WithTheFixedLine(
+        string connection,
+        string line
+    )
+    {
+        var opened = await new SqlServerDescriber().OpenAsync("app", connection, LiveExchange.Instance);
+
+        opened.Value.ShouldBeNull();
+        var failure = opened.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC224");
+        failure.ServerLines.ShouldBe([line]);
+        failure
+            .Arguments.Concat(failure.ServerLines)
+            .ShouldAllBe(text => !text.Contains(Secrets.Marker, StringComparison.Ordinal));
+    }
 }

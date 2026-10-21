@@ -57,7 +57,8 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
     /// <summary>A text command on the session's connection.  Its caller disposes it.</summary>
     /// <exception cref="SqlException">The server could not be reached or refused.</exception>
     /// <exception cref="UnusableException">
-    /// SqlClient cannot read the connection string, or the connection was open and is so no longer.
+    /// The connection string is one the describer refuses (<see cref="OpenAsync" />), or the connection was open and
+    /// is so no longer.
     /// </exception>
     public async Task<SqlCommand> CommandAsync(string text, CancellationToken cancellationToken) =>
         new(text, await OpenAsync(cancellationToken));
@@ -65,14 +66,59 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
     /// <summary>A command on the session's connection that calls a stored procedure.  Its caller disposes it.</summary>
     /// <exception cref="SqlException">The server could not be reached or refused.</exception>
     /// <exception cref="UnusableException">
-    /// SqlClient cannot read the connection string, or the connection was open and is so no longer.
+    /// The connection string is one the describer refuses (<see cref="OpenAsync" />), or the connection was open and
+    /// is so no longer.
     /// </exception>
     public async Task<SqlCommand> ProcedureAsync(string name, CancellationToken cancellationToken) =>
         new(name, await OpenAsync(cancellationToken)) { CommandType = CommandType.StoredProcedure };
 
-    // The session's connection, opened by the first call.  The value is read here, so that a string SqlClient cannot
-    // read is the answer of the call that needed it, with the describer's own text: SqlClient's quotes the keyword, and
-    // for some keywords the value.
+    /// <summary>The session's connection, opened by the first call.</summary>
+    /// <remarks>
+    /// <para>
+    /// The value is read here, so that what a user can write wrong is the answer of the call that needed the
+    /// connection, with the describer's own text and never SqlClient's, which quotes a keyword and for some keywords
+    /// the value.  What SqlClient 7.1.1 throws for what a user can write, and what the describer makes of it, each
+    /// provoked on <c>net10.0</c> unless it says otherwise:
+    /// </para>
+    /// <list type="bullet">
+    /// <item>
+    /// <description>
+    /// A keyword it does not know, a value not of its keyword's kind, a text that is no list of keywords and values:
+    /// the <see cref="SqlConnectionStringBuilder" />'s constructor throws an <see cref="ArgumentException" />.  A
+    /// <see cref="FormatException" /> and a <see cref="KeyNotFoundException" /> are taken the same way.  The answer
+    /// is <see cref="ConnectionErrors.UnreadableConnectionString" />.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// A value that sets nothing, <c>;</c> or white space: the builder reads it, and <c>SqlConnection.OpenAsync</c>
+    /// throws an <see cref="InvalidOperationException" />, "The ConnectionString property has not been initialized"
+    /// (<c>SqlConnection.PermissionDemand</c>).  It is refused before anything is opened, as
+    /// <see cref="ConnectionErrors.EmptyConnectionString" />.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// An <c>Authentication</c> of Microsoft Entra ID (<c>Active Directory ...</c>) without the package
+    /// <c>Microsoft.Data.SqlClient.Extensions.Azure</c>, which the tool does not carry: when the server asks for a
+    /// federated token, <c>SqlConnectionInternal.GetFedAuthToken</c> finds no provider and throws the
+    /// <see cref="ArgumentException" /> of <c>SQL.CannotFindAuthProvider</c>, inside <c>OpenAsync</c>.  Only Azure asks
+    /// for one, so this was read in the assembly and not provoked; a SQL Server that does not answers the login as
+    /// <c>18456</c>, which was.  The exception is caught only when the value names such a method and
+    /// <see cref="SqlAuthenticationProvider.GetProvider" /> has none for it, and the answer is
+    /// <see cref="ConnectionErrors.NoAuthenticationProvider" />.  Any other <see cref="ArgumentException" /> of
+    /// <c>OpenAsync</c> is a bug and stays one.
+    /// </description>
+    /// </item>
+    /// <item>
+    /// <description>
+    /// A server that cannot be reached, a login or a database it refuses, a timeout, and a certificate it presents
+    /// that is not trusted are each a <see cref="SqlException" />, which <see cref="ConnectionErrors.AtOpen" />
+    /// answers.  Anything else, an <see cref="InvalidOperationException" /> included, is a bug: <c>SQLSRC200</c>.
+    /// </description>
+    /// </item>
+    /// </list>
+    /// </remarks>
     private async Task<SqlConnection> OpenAsync(CancellationToken cancellationToken)
     {
         if (_connection is not null)
@@ -82,19 +128,30 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
                 : throw new UnusableException(ConnectionErrors.LostConnection);
         }
 
-        SqlConnection connection;
+        SqlConnectionStringBuilder builder;
         try
         {
-            connection = new SqlConnection(new SqlConnectionStringBuilder(connectionString).ConnectionString);
+            builder = [with(connectionString)];
         }
         catch (Exception exception) when (IsUnreadable(exception))
         {
             throw new UnusableException(ConnectionErrors.UnreadableConnectionString);
         }
 
+        if (builder.ConnectionString.Length == 0)
+        {
+            throw new UnusableException(ConnectionErrors.EmptyConnectionString);
+        }
+
+        var connection = new SqlConnection(builder.ConnectionString);
         try
         {
             await connection.OpenAsync(cancellationToken);
+        }
+        catch (Exception exception) when (OwnTextAtOpen(exception, builder) is { } text)
+        {
+            await connection.DisposeAsync();
+            throw new UnusableException(text);
         }
         catch
         {
@@ -105,6 +162,18 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
         _connection = connection;
         return connection;
     }
+
+    /// <summary>
+    /// The describer's own text for what <c>SqlConnection.OpenAsync</c> threw for a value it read, or null for
+    /// anything else: an <see cref="ArgumentException" /> for a value whose <c>Authentication</c> needs a provider that
+    /// SqlClient does not have.  See <see cref="OpenAsync" />.
+    /// </summary>
+    internal static string? OwnTextAtOpen(Exception exception, SqlConnectionStringBuilder builder) =>
+        exception is ArgumentException
+        && builder.Authentication is not (SqlAuthenticationMethod.NotSpecified or SqlAuthenticationMethod.SqlPassword)
+        && SqlAuthenticationProvider.GetProvider(builder.Authentication) is null
+            ? ConnectionErrors.NoAuthenticationProvider
+            : null;
 
     // What SqlClient throws for a connection string it cannot read: a keyword it does not know, a value that is not
     // of the keyword's kind, a string that is no list of keywords and values.

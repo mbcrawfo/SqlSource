@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Sockets;
+using System.Security.Authentication;
 using Microsoft.Data.SqlClient;
 
 namespace SqlSource.Tool.Describing.SqlServer;
@@ -56,6 +57,22 @@ internal static class ConnectionErrors
     /// </summary>
     public const string UnreadableConnectionString = "SqlClient cannot read the connection string";
 
+    /// <summary>A connection string that sets nothing, such as <c>;</c>.</summary>
+    public const string EmptyConnectionString = "the connection string is empty";
+
+    /// <summary>
+    /// A connection string whose <c>Authentication</c> is a method of Microsoft Entra ID, for which SqlClient has no
+    /// provider: the tool does not carry <c>Microsoft.Data.SqlClient.Extensions.Azure</c>.
+    /// </summary>
+    public const string NoAuthenticationProvider =
+        "SqlClient has no provider for the Authentication of the connection string";
+
+    /// <summary>
+    /// An error at <c>open</c> with an <see cref="AuthenticationException" /> in its chain: the TLS handshake failed,
+    /// most often because the server's certificate is not trusted.
+    /// </summary>
+    public const string CertificateRefused = "the server's certificate is not trusted, or the TLS handshake failed";
+
     // The numbers of the errors that open reads.
     private const int Timeout = -2;
     private const int LoginFailed = 18456;
@@ -69,9 +86,7 @@ internal static class ConnectionErrors
     public static SqlServerServerError AtOpen(SqlException exception)
     {
         var timedOut = InChain<TimeoutException>(exception) is not null;
-        var unreachable = InChain<SocketException>(exception) is { } socket
-            ? UnreachablePrefix + ": " + socket.SocketErrorCode.ToString()
-            : null;
+        var other = OtherAtOpen(exception);
         return RowsOf(
             exception,
             error =>
@@ -81,7 +96,7 @@ internal static class ConnectionErrors
                     CannotOpenDatabase or CannotOpenDefaultDatabase => DatabaseRefused,
                     Timeout => ConnectTimedOut,
                     _ when timedOut => ConnectTimedOut,
-                    _ => unreachable ?? SessionRefused,
+                    _ => other,
                 },
             SessionRefused
         );
@@ -103,6 +118,21 @@ internal static class ConnectionErrors
                 },
             LostConnection
         );
+
+    // The text at open of an error that is no refused login, database or timeout: a TLS handshake that failed, a server
+    // that could not be reached, or anything else.  An AuthenticationException comes inside a SqlException whose chain
+    // holds no socket's error, so the order of the two is for clarity alone.
+    private static string OtherAtOpen(SqlException exception)
+    {
+        if (InChain<AuthenticationException>(exception) is not null)
+        {
+            return CertificateRefused;
+        }
+
+        return InChain<SocketException>(exception) is { } socket
+            ? UnreachablePrefix + ": " + socket.SocketErrorCode.ToString()
+            : SessionRefused;
+    }
 
     /// <summary>An error of the describer's own: the text, and 0 for each number.</summary>
     public static SqlServerServerError Own(string text) => new([new SqlServerErrorRow(0, 0, 0, text)]);
