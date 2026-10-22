@@ -1326,7 +1326,7 @@ SQL Server gives the error for a parameter whose uses fix no type, `SELECT @p AS
     help: add a CAST around a use of the parameter, or declare its type with -- param:
 ```
 
-Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter whose only use is `@p IS NULL` is not this error: SQL Server gives it the type `int`.
+Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter whose every use is like `@p IS NULL` is not this error: SQL Server gives it the type `int`.
 
 The same error with no `server:` line is for a parameter used more than once whose uses SQL Server gives different types, or gives one of its uses no type.  The uses that say nothing of the type, such as `@p IS NULL`, are then left out, as [SQLSRC262](#sqlsrc262) says, and this error is given when every use is left out that way, or when a use that is left has no type.  When the uses that are left have two types, the error is [SQLSRC262](#sqlsrc262) instead, and when every use gets the same type, the parameter has that type and no error is given.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
 

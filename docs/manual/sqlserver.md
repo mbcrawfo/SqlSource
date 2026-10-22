@@ -13,7 +13,7 @@ $ dotnet sqlsource describe --connection mssql="Server=localhost,1433;Database=a
 mssql (mssql): 12 described, 0 skipped, 0 failed
 ```
 
-The connection is given for the query's [logical database](tool.md#connections), which is `mssql` when you name none, so its variable is `SQLSOURCE_CONNECTION_MSSQL`.  The summary names that database first, and its dialect in parentheses.
+The connection is given for the query's [logical database](tool.md#connections), which is `mssql` when you name none, so its variable is `SQLSOURCE_CONNECTION_MSSQL`, or `SQLSOURCE_CONNECTION` when it is the run's only database.  The summary names that database first, and its dialect in parentheses.
 
 Under `mssql`, a name that a query declares with `DECLARE @name` is a local variable and not a [query parameter](concepts.md#query-parameter): see [variables declared with `DECLARE`](parameters-and-tokens.md#declared-variables).  The rest of what the dialect changes is on [the dialects page](dialects.md#what-a-dialect-changes).
 
@@ -45,8 +45,8 @@ WHERE (@name IS NULL OR name = @name);
 
 SQL Server gives each [query parameter](concepts.md#query-parameter) a type from the way the query uses it: in `WHERE id = @id`, `@id` takes the type of `id`.  A [`-- param:` marker](parameters-and-tokens.md#param-marker) gives a parameter a type of your own instead, in SQL Server's words, `nvarchar(100)` or an alias type such as `dbo.Email`, which SQL Server checks against every use.
 
-- **A parameter used more than once** is typed at each use, and the uses must agree.  A use that says nothing of the type, such as `@name IS NULL`, is left out, so the optional filter above needs no marker: `@name` takes the type of `name`.  Two uses that give two types, `WHERE id = @p OR name = @p`, are [SQLSRC262](diagnostics.md#sqlsrc262): declare the parameter's type, or use two parameters.
-- **A parameter used once, alone where nothing gives it a type**, as in `WHERE @p IS NULL`, is an `int`, since SQL Server gives it that type.  Declare its type when you mean another: `-- param: @p nvarchar(100)`.
+- **A parameter used more than once** is typed at each use, and the uses must agree.  When they disagree, a use that says nothing of the type, such as `@name IS NULL`, is left out, so the optional filter above needs no marker: `@name` takes the type of `name`.  Two uses that give two types, `WHERE id = @p OR name = @p`, are [SQLSRC262](diagnostics.md#sqlsrc262): declare the parameter's type, or use two parameters.
+- **A parameter whose every use is alone where nothing gives it a type**, as in `WHERE @p IS NULL` or `@p IS NULL OR @p IS NOT NULL`, is an `int`, since SQL Server gives it that type.  Declare its type when you mean another: `-- param: @p nvarchar(100)`.
 - **A use that fixes no type**, `SELECT @p AS x`, `COALESCE(@p, name)` or `@a + @b` with nothing else, is [SQLSRC226](diagnostics.md#sqlsrc226).  Write `CAST(@p AS int)` where the parameter is used, or declare its type.
 - **A declared type the database does not have** is [SQLSRC228](diagnostics.md#sqlsrc228).
 

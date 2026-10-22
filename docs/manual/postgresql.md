@@ -13,7 +13,7 @@ $ dotnet sqlsource describe --connection postgres="Host=localhost;Database=app;U
 postgres (postgres): 12 described, 0 skipped, 0 failed
 ```
 
-The connection is given for the query's [logical database](tool.md#connections), which is `postgres` when you name none, so its variable is `SQLSOURCE_CONNECTION_POSTGRES`.  The summary names that database first, and its dialect in parentheses.
+The connection is given for the query's [logical database](tool.md#connections), which is `postgres` when you name none, so its variable is `SQLSOURCE_CONNECTION_POSTGRES`, or `SQLSOURCE_CONNECTION` when it is the run's only database.  The summary names that database first, and its dialect in parentheses.
 
 <a id="connecting"></a>
 

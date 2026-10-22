@@ -25,7 +25,7 @@ dotnet add package Dapper --version 2.1.89
 dotnet add package Microsoft.Data.SqlClient --version 7.1.1
 ```
 
-SqlSource supports Microsoft.Data.SqlClient 6.1 and later: see [SQL Server](../../docs/manual/sqlserver.md).  The rest of the project file, nullable reference types, the dialect and the type override, is what your project sets too: see [the settings](../../docs/manual/settings.md#all-settings).  It also keeps [SQLSRC240](../../docs/manual/diagnostics.md#sqlsrc240) a warning, which only this repository needs, so that it builds while its version moves ahead of the committed sidecars.
+SqlSource supports Microsoft.Data.SqlClient 6.1 and later: see [which version of Microsoft.Data.SqlClient](../../docs/manual/sqlserver.md#which-sqlclient).  The rest of the project file, nullable reference types, the dialect and the type override, is what your project sets too: see [the settings](../../docs/manual/settings.md#all-settings).  It also keeps [SQLSRC240](../../docs/manual/diagnostics.md#sqlsrc240) a warning, which only this repository needs, so that it builds while its version moves ahead of the committed sidecars.
 
 ## Start the database
 
@@ -36,7 +36,7 @@ docker compose up -d
 docker compose wait schema
 ```
 
-The first command starts SQL Server and, once it answers, a second service that creates the database `examples` and applies `schema.sql` to it.  The second command returns when that service has finished; run the tool after it.  The image is built for x64 alone, so on Apple silicon Docker runs it under emulation, and the first start, while the image is pulled, is slow.
+The first command starts SQL Server and, once it answers, a second service that creates the database `examples` and applies `schema.sql` to it.  The second command, which needs Docker Compose 2.20 or later, returns when that service has finished, and prints its exit code; run the tool after it.  An exit code other than 0 means the schema was not applied: `docker compose logs schema` shows why, and `docker compose down -v` starts again from nothing.  The image is built for x64 alone, so on Apple silicon Docker runs it under emulation, and the first start, while the image is pulled, is slow.
 
 SQL Server listens on `localhost,51433`, with the user `sa` and the password `Examples-Passw0rd`.  They are for this example alone.  If the port is taken, change `51433` under `ports` in `docker-compose.yml`, and the port in the connection strings below.  The schema is applied only when the database is created, so a second `up` keeps your data; after a change to `schema.sql`, start again from nothing:
 

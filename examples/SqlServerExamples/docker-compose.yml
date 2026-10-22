@@ -37,7 +37,8 @@ services:
   # The image has no folder of scripts to run on a first start, so this service, on the same image, applies the schema
   # once the server answers, and exits.  schema.sql names no database, so it is run with -d examples, or it would land
   # in master.  It creates the database and applies the schema only when the database is missing, so a second "up"
-  # leaves the tables as they are.  -I sets QUOTED_IDENTIFIER on, as SqlClient has it, and -b stops at the first error.
+  # leaves the tables as they are, and drops the database again when the schema fails, so that the next "up" applies
+  # it from nothing.  -I sets QUOTED_IDENTIFIER on, as SqlClient has it, and -b stops at the first error.
   schema:
     image: mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04
     platform: linux/amd64
@@ -59,7 +60,11 @@ services:
             exit 0
         fi
         "$${sqlcmd[@]}" -Q "CREATE DATABASE examples"
-        "$${sqlcmd[@]}" -d examples -f 65001 -i /schema.sql
+        if ! "$${sqlcmd[@]}" -d examples -f 65001 -i /schema.sql; then
+            "$${sqlcmd[@]}" -Q "DROP DATABASE examples"
+            echo "schema.sql failed, so the database examples is dropped." >&2
+            exit 1
+        fi
         echo "The database examples is created and schema.sql applied."
 
 volumes:
