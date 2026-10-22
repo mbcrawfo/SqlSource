@@ -64,9 +64,9 @@ jobs:
       - name: Build
         run: dotnet build "$SOLUTION" --configuration "$CONFIGURATION" --no-restore
 
-      # Each project but tests/SqlSource.Tests.Postgres, tests/SqlSource.Tests.Postgres.Npgsql8 and
-      # tests/SqlSource.Tests.SqlServer, whose containers these runners cannot start.  Every project runs even when an
-      # earlier one failed.
+      # Each project but tests/SqlSource.Tests.Postgres, tests/SqlSource.Tests.Postgres.Npgsql8,
+      # tests/SqlSource.Tests.SqlServer and tests/SqlSource.Tests.SqlServer.SqlClient61, whose containers these runners
+      # cannot start.  Every project runs even when an earlier one failed.
       - name: Test
         run: |
           status=0

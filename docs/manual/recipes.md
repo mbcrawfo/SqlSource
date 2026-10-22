@@ -221,7 +221,7 @@ public partial class OrderRepository(DbConnection connection)
 DefaultTypeMap.MatchNamesWithUnderscores = true;
 ```
 
-The input model is the parameter object, and the output model is the type of a row.  What makes Dapper read them:
+The input model is the parameter object, and the output model is the type of a row.  What makes Dapper read them, with either database:
 
 - **Columns in snake_case need `DefaultTypeMap.MatchNamesWithUnderscores`**, as above: Dapper matches `customer_name` to `CustomerName` only with it.
 - **Write the query's parameters in camelCase**, `@orderId` and not `@order_id`, since Dapper binds a property of the input model only to a parameter of its name, ignoring case.  A query that keeps `@order_id` gives Dapper its parameters by hand: `new { order_id = orderId }`.
@@ -234,7 +234,7 @@ The input model is the parameter object, and the output model is the type of a r
   </PropertyGroup>
   ```
 
-- **Set a column's nullability with a `-- column:` marker, not with `!` or `?` at the end of its alias.**  A mark stays in the name of the column, `note_count!`, and Dapper does not match it to the property `NoteCount`.  The marker leaves the name alone:
+- **Set a column's nullability with a `-- column:` marker, not with `!` or `?` at the end of its alias.**  A mark stays in the name of the column, `note_count!`, and Dapper does not match it to the property `NoteCount`: it throws `InvalidOperationException` for a record that it cannot make without the column, and leaves the property of a class as it was made, with no error.  The marker leaves the name alone:
 
   ```sql postgres
   -- name: GetOrderNoteCount
@@ -245,6 +245,14 @@ The input model is the parameter object, and the output model is the type of a r
   WHERE o.id = @orderId
   GROUP BY o.id;
   ```
+
+Each database needs more, below: [PostgreSQL](#dapper-with-postgresql) and [SQL Server](#dapper-with-sql-server).
+
+Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker), [shape of a model](settings.md#setting-model-type), [the type override](settings.md#setting-type-overrides), and [known issues](generator.md#known-issues) for parameters in snake_case.
+
+<a id="dapper-with-postgresql"></a>
+
+### With PostgreSQL
 
 - **A type override to a type that Npgsql does not give needs a Dapper type handler.**  Dapper fills a property with the type Npgsql gives for its column, or through a handler.  `timestamptz=System.DateTimeOffset` makes a property a `DateTimeOffset` where Npgsql gives a `DateTime`.  A domain mapped to a struct of your own is the same: Npgsql gives the domain's base type, a `string` for a domain over `text`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
 
@@ -306,7 +314,108 @@ The input model is the parameter object, and the output model is the type of a r
   connection.QueryAsync<FindSessionsDto>(Sql.FindSessions, new { address = new TypedParameter("inet", address) });
   ```
 
-Rules: [models](generator.md#models), [property names](generator.md#property-names), [the order of the properties](generator.md#property-order), [which properties can be null](generator.md#model-nullability), [the `-- column:` marker](generator.md#column-marker), [shape of a model](settings.md#setting-model-type), [the type override](settings.md#setting-type-overrides), and [known issues](generator.md#known-issues) for parameters in snake_case.
+<a id="dapper-with-sql-server"></a>
+
+### With SQL Server
+
+```sql mssql
+-- name: ListCustomerOrdersSince
+SELECT id, placed_at, total
+FROM dbo.orders
+WHERE customer_id = @customerId AND placed_at >= @since;
+```
+
+```csharp
+connection.QueryAsync<ListCustomerOrdersSinceDto>(
+    Sql.ListCustomerOrdersSince,
+    new { customerId, since = new TypedParameter(SqlDbType.DateTime2, since) }
+);
+```
+
+- **Send a `datetime2` parameter as a `datetime2`.**  Dapper sends a `DateTime` as a `datetime`, which holds a time to 1/300 of a second.  So `13:45:30.1234567` is written to a `datetime2(7)` column as `13:45:30.1233333`, and compared with one, it is another value: `WHERE placed_at = @placedAt` finds no row of the time you gave.  Send it as above, with `TypedParameter` from the next point, or add it with its `DbType` over the other parameters, where the one added takes the place of the one of the same name:
+
+  ```csharp
+  var parameters = new DynamicParameters(new { customerId, since });
+  parameters.Add("since", since, DbType.DateTime2);
+  ```
+
+- **Some parameters Dapper cannot send.**  Dapper sends a parameter of these types as another type, or refuses it, or the column refuses it:
+  - `datetime2`, which Dapper sends as a `datetime`, as above;
+  - `rowversion`, which SQL Server fills and refuses a value for: leave it out of the columns of an `INSERT`;
+  - `vector`, whose `SqlVector<float>` Dapper refuses with `NotSupportedException`.
+
+  For `datetime2` and `vector`, give Dapper the parameters by hand, and that one as a `SqlMapper.ICustomQueryParameter` that adds a `SqlParameter` with its `SqlDbType`:
+
+  ```csharp
+  using System;
+  using System.Data;
+  using Dapper;
+  using Microsoft.Data.SqlClient;
+
+  public sealed class TypedParameter(SqlDbType sqlDbType, object? value) : SqlMapper.ICustomQueryParameter
+  {
+      public void AddParameter(IDbCommand command, string name) =>
+          command.Parameters.Add(
+              new SqlParameter
+              {
+                  ParameterName = name,
+                  SqlDbType = sqlDbType,
+                  Value = value ?? DBNull.Value,
+              }
+          );
+  }
+  ```
+
+  ```csharp
+  connection.ExecuteAsync(
+      Sql.SaveEmbedding,
+      new { id, embedding = new TypedParameter(SqlDbType.Vector, new SqlVector<float>(elements)) }
+  );
+  ```
+
+  A `string` for a `json` column needs nothing: SQL Server converts Dapper's text to `json`.
+- **A type override to a type that SqlClient does not give needs a Dapper type handler.**  Dapper fills a record with the type SqlClient gives for each column, or through a handler.  `date=System.DateOnly` makes a property a `DateOnly` where SqlClient gives a `DateTime`, and `time=System.TimeOnly` a `TimeOnly` where it gives a `TimeSpan`.  An alias type mapped to a struct of your own is the same: SqlClient gives the alias type's base type, a `string` for one over `nvarchar`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
+
+  ```csharp
+  using System.Data;
+  using Dapper;
+
+  public sealed class DateOnlyHandler : SqlMapper.TypeHandler<DateOnly>
+  {
+      public override DateOnly Parse(object value) => DateOnly.FromDateTime((DateTime)value);
+
+      public override void SetValue(IDbDataParameter parameter, DateOnly value)
+      {
+          parameter.DbType = DbType.Date;
+          parameter.Value = value;
+      }
+  }
+
+  public sealed class TimeOnlyHandler : SqlMapper.TypeHandler<TimeOnly>
+  {
+      public override TimeOnly Parse(object value) => TimeOnly.FromTimeSpan((TimeSpan)value);
+
+      public override void SetValue(IDbDataParameter parameter, TimeOnly value)
+      {
+          parameter.DbType = DbType.Time;
+          parameter.Value = value;
+      }
+  }
+  ```
+
+  ```csharp
+  SqlMapper.AddTypeHandler(new DateOnlyHandler());
+  SqlMapper.AddTypeHandler(new TimeOnlyHandler());
+  ```
+
+  A `DateOnly` parameter is then sent as a `date`, and a `TimeOnly` as a `time`.
+- **On a connection with a transaction open, give every call the transaction.**  SqlClient refuses a command without it, with `InvalidOperationException`:
+
+  ```csharp
+  await using var transaction = await connection.BeginTransactionAsync();
+  var note = await connection.QuerySingleAsync<AddNoteDto>(Sql.AddNote, args, transaction);
+  await transaction.CommitAsync();
+  ```
 
 <a id="table-name-at-run-time"></a>
 
