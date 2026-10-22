@@ -12,7 +12,9 @@
 # - SQL Server: the .sql.json files of the realistic cases under tests/SqlSource.Tests.SqlServer/Realistic/Cases and of
 #   the end-to-end queries under tests/SqlSource.Tests.SqlServer/EndToEnd/Queries, against the databases "realistic",
 #   "app" and "billing", each made from the schema.sql and seed.sql of Realistic/, EndToEnd/app/ and EndToEnd/billing/,
-#   with EndToEnd/app/new-types.sql after the seed of "app".
+#   with EndToEnd/app/new-types.sql after the seed of "app".  It then writes the sidecars of examples/SqlServerExamples
+#   the same way, against a database "examples" made from its schema.sql, and runs after a change to a query or to the
+#   schema of those examples too.
 # It runs the tool as a project, where the other recording scripts run a test: a test project does not build until its
 # sidecars are current.  Each image is the default image of its engine's tests, which the sidecars are recorded on, so
 # SQLSOURCE_TESTS_POSTGRES_IMAGE and SQLSOURCE_TESTS_SQLSERVER_IMAGE are ignored.  It needs Docker.
@@ -26,13 +28,15 @@ POSTGRES_END_TO_END="$POSTGRES_PROJECT/EndToEnd"
 POSTGRES_REALISTIC="$POSTGRES_PROJECT/Realistic"
 POSTGRES_DATABASES=(realistic app billing)
 POSTGRES_PASSWORD='postgres'
-EXAMPLES='examples/PostgresExamples'
+POSTGRES_EXAMPLES='examples/PostgresExamples'
+# The database of each engine's examples.
 EXAMPLES_DATABASE='examples'
 
 SQLSERVER_PROJECT='tests/SqlSource.Tests.SqlServer'
 SQLSERVER_END_TO_END="$SQLSERVER_PROJECT/EndToEnd"
 SQLSERVER_REALISTIC="$SQLSERVER_PROJECT/Realistic"
 SQLSERVER_DATABASES=(realistic app billing)
+SQLSERVER_EXAMPLES='examples/SqlServerExamples'
 # The password of sa, which SQL Server refuses unless it has three kinds of character and eight of them.
 SQLSERVER_PASSWORD='Describe-End-To-End-1'
 # The image's sqlcmd: -C trusts the server's own certificate, -I sets QUOTED_IDENTIFIER on, as SqlClient does, and -b
@@ -123,14 +127,14 @@ describe_postgres() {
     docker exec "$postgres_container" psql -v ON_ERROR_STOP=1 -q -U postgres -c "CREATE DATABASE $EXAMPLES_DATABASE" \
         >/dev/null
     docker exec -i "$postgres_container" psql -v ON_ERROR_STOP=1 -q -U postgres -d "$EXAMPLES_DATABASE" \
-        <"$EXAMPLES/schema.sql" >/dev/null
+        <"$POSTGRES_EXAMPLES/schema.sql" >/dev/null
     echo 'done'
 
-    find "$EXAMPLES" -name '*.sql.json' -type f -delete
+    find "$POSTGRES_EXAMPLES" -name '*.sql.json' -type f -delete
 
     connection="Host=127.0.0.1;Port=$port;Username=postgres;Password=$POSTGRES_PASSWORD;Database=$EXAMPLES_DATABASE"
     dotnet run --project src/SqlSource.Tool -- \
-        describe --force "$EXAMPLES/PostgresExamples.csproj" --connection "postgres=$connection"
+        describe --force "$POSTGRES_EXAMPLES/PostgresExamples.csproj" --connection "postgres=$connection"
 
     docker rm -f "$postgres_container" >/dev/null
     postgres_container=''
@@ -185,6 +189,21 @@ describe_sqlserver() {
 
     dotnet run --project src/SqlSource.Tool -- \
         describe --force "$SQLSERVER_PROJECT/SqlSource.Tests.SqlServer.csproj" "${connections[@]}"
+
+    # The examples: their schema on a database of their own, and their project described with that connection, under
+    # the logical database that its queries belong to, named after their dialect.
+    printf 'Creating the database %s ... ' "$EXAMPLES_DATABASE"
+    docker exec "$sqlserver_container" "${SQLCMD[@]}" -Q "CREATE DATABASE [$EXAMPLES_DATABASE]" >/dev/null
+    docker exec -i "$sqlserver_container" "${SQLCMD[@]}" -d "$EXAMPLES_DATABASE" -f 65001 -i /dev/stdin \
+        <"$SQLSERVER_EXAMPLES/schema.sql" >/dev/null
+    echo 'done'
+
+    find "$SQLSERVER_EXAMPLES" -name '*.sql.json' -type f -delete
+
+    connection="Server=127.0.0.1,$port;User ID=sa;Password=$SQLSERVER_PASSWORD;TrustServerCertificate=True"
+    dotnet run --project src/SqlSource.Tool -- \
+        describe --force "$SQLSERVER_EXAMPLES/SqlServerExamples.csproj" \
+        --connection "mssql=$connection;Database=$EXAMPLES_DATABASE"
 
     docker rm -f "$sqlserver_container" >/dev/null
     sqlserver_container=''
