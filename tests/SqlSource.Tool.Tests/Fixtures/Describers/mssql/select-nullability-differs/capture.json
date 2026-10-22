@@ -1,0 +1,272 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null,
+        "database": "fixtures"
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "SELECT o.id, o.user_id, o.total, o.note\nFROM dbo.users AS u\nLEFT JOIN dbo.orders AS o ON o.user_id = u.id;",
+        "params": null
+      },
+      "answer": {
+        "rows": [],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "sql": "SELECT o.id, o.user_id, o.total, o.note\nFROM dbo.users AS u\nLEFT JOIN dbo.orders AS o ON o.user_id = u.id;",
+        "params": null
+      },
+      "answer": {
+        "rows": [
+          {
+            "isHidden": false,
+            "columnOrdinal": 1,
+            "name": "id",
+            "isNullable": true,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "id",
+            "isIdentityColumn": true,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": false,
+            "columnOrdinal": 2,
+            "name": "user_id",
+            "isNullable": true,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "user_id",
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": false,
+            "columnOrdinal": 3,
+            "name": "total",
+            "isNullable": true,
+            "systemTypeName": "decimal(18,2)",
+            "maxLength": 9,
+            "precision": 18,
+            "scale": 2,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "total",
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": false,
+            "columnOrdinal": 4,
+            "name": "note",
+            "isNullable": true,
+            "systemTypeName": "varchar(200)",
+            "maxLength": 200,
+            "precision": 0,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "note",
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": true,
+            "columnOrdinal": 5,
+            "name": "ROWSTAT\u0000",
+            "isNullable": false,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": null,
+            "sourceSchema": null,
+            "sourceTable": null,
+            "sourceColumn": null,
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          }
+        ],
+        "errors": null,
+        "error": null
+      }
+    },
+    {
+      "method": "table",
+      "request": {
+        "schema": "dbo",
+        "table": "orders"
+      },
+      "answer": {
+        "rows": [
+          {
+            "isHidden": false,
+            "columnOrdinal": 1,
+            "name": "id",
+            "isNullable": false,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "id",
+            "isIdentityColumn": true,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": false,
+            "columnOrdinal": 2,
+            "name": "user_id",
+            "isNullable": false,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "user_id",
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": false,
+            "columnOrdinal": 3,
+            "name": "total",
+            "isNullable": false,
+            "systemTypeName": "decimal(18,2)",
+            "maxLength": 9,
+            "precision": 18,
+            "scale": 2,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "total",
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": false,
+            "columnOrdinal": 4,
+            "name": "note",
+            "isNullable": true,
+            "systemTypeName": "varchar(200)",
+            "maxLength": 200,
+            "precision": 0,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "fixtures",
+            "sourceSchema": "dbo",
+            "sourceTable": "orders",
+            "sourceColumn": "note",
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": true,
+            "columnOrdinal": 5,
+            "name": "ROWSTAT\u0000",
+            "isNullable": false,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": null,
+            "sourceSchema": null,
+            "sourceTable": null,
+            "sourceColumn": null,
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          }
+        ],
+        "errors": null,
+        "error": null
+      }
+    }
+  ]
+}

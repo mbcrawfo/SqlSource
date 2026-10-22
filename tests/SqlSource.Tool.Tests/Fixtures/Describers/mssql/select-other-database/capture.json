@@ -1,0 +1,119 @@
+{
+  "captureVersion": 1,
+  "engine": "mssql",
+  "calls": [
+    {
+      "method": "open",
+      "request": {},
+      "answer": {
+        "productVersion": "17.0.5015.4",
+        "engineEdition": 3,
+        "driverVersion": "7.1.1",
+        "settings": [
+          {
+            "name": "compatibility_level",
+            "value": "170"
+          },
+          {
+            "name": "ANSI_NULLS",
+            "value": "ON"
+          },
+          {
+            "name": "QUOTED_IDENTIFIER",
+            "value": "ON"
+          },
+          {
+            "name": "collation",
+            "value": "SQL_Latin1_General_CP1_CI_AS"
+          }
+        ],
+        "error": null,
+        "database": "fixtures"
+      }
+    },
+    {
+      "method": "parameters",
+      "request": {
+        "sql": "SELECT j.job_id, d.database_id\nFROM msdb.dbo.sysjobs AS j\nCROSS JOIN master.sys.databases AS d;",
+        "params": null
+      },
+      "answer": {
+        "rows": [],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "sql": "SELECT j.job_id, d.database_id\nFROM msdb.dbo.sysjobs AS j\nCROSS JOIN master.sys.databases AS d;",
+        "params": null
+      },
+      "answer": {
+        "rows": [
+          {
+            "isHidden": false,
+            "columnOrdinal": 1,
+            "name": "job_id",
+            "isNullable": false,
+            "systemTypeName": "uniqueidentifier",
+            "maxLength": 16,
+            "precision": 0,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "msdb",
+            "sourceSchema": "dbo",
+            "sourceTable": "sysjobs",
+            "sourceColumn": "job_id",
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": false,
+            "columnOrdinal": 2,
+            "name": "database_id",
+            "isNullable": false,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": "mssqlsystemresource",
+            "sourceSchema": "sys",
+            "sourceTable": "databases",
+            "sourceColumn": "database_id",
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          },
+          {
+            "isHidden": true,
+            "columnOrdinal": 3,
+            "name": "ROWSTAT\u0000",
+            "isNullable": false,
+            "systemTypeName": "int",
+            "maxLength": 4,
+            "precision": 10,
+            "scale": 0,
+            "userTypeSchema": null,
+            "userTypeName": null,
+            "assemblyQualifiedTypeName": null,
+            "sourceServer": null,
+            "sourceDatabase": null,
+            "sourceSchema": null,
+            "sourceTable": null,
+            "sourceColumn": null,
+            "isIdentityColumn": false,
+            "isComputedColumn": false
+          }
+        ],
+        "errors": null,
+        "error": null
+      }
+    }
+  ]
+}

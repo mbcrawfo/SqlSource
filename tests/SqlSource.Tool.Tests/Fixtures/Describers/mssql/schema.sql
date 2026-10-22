@@ -60,12 +60,12 @@ FROM dbo.users AS u
 LEFT JOIN dbo.orders AS o ON o.user_id = u.id;
 GO
 
--- A system-versioned table, whose period columns the server fills.
+-- A system-versioned table, whose period columns the server fills.  They are HIDDEN, so SELECT * leaves them out.
 CREATE TABLE dbo.prices (
     id int NOT NULL PRIMARY KEY,
     amount decimal(10, 2) NOT NULL,
-    valid_from datetime2 GENERATED ALWAYS AS ROW START NOT NULL,
-    valid_to datetime2 GENERATED ALWAYS AS ROW END NOT NULL,
+    valid_from datetime2 GENERATED ALWAYS AS ROW START HIDDEN NOT NULL,
+    valid_to datetime2 GENERATED ALWAYS AS ROW END HIDDEN NOT NULL,
     PERIOD FOR SYSTEM_TIME (valid_from, valid_to)
 ) WITH (SYSTEM_VERSIONING = ON (HISTORY_TABLE = dbo.prices_history));
 
