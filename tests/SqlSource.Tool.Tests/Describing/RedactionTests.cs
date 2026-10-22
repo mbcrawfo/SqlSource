@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics.Tracing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
@@ -236,6 +237,34 @@ public sealed class RedactionTests : IDisposable
         row.GetProperty("assemblyQualifiedTypeName").GetString().ShouldBe("***");
         events[1].GetProperty("errors")[0].GetProperty("message").GetString().ShouldBe("Cannot find data type ***.");
         events[2].GetProperty("error")[0].GetProperty("message").GetString().ShouldBe("Cannot reach '***'.");
+    }
+
+    // SqlClient's events reach the log through the describer's log too, so a command's text that held the value would
+    // be written with the mark: the listener forwards one as SqlClient writes it.
+    [Fact]
+    public async Task Run_DescriberThatLogsADriverEventWithItsConnection_HasTheMarkInItsCommandText()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            using var listener = SqlClientRunListener.For(log).ShouldNotBeNull();
+            listener.Forward(
+                "BeginExecute",
+                EventLevel.Informational,
+                1,
+                ["objectId", "dataSource", "database", "commandText", "message"],
+                [9, request.Connection, request.Connection, "SELECT '" + request.Connection + "'", request.Connection]
+            );
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        LogReader
+            .Read(Log)
+            .Single(e => e.GetProperty("event").GetString() == "postgres.driver")
+            .GetProperty("commandText")
+            .GetString()
+            .ShouldBe("SELECT '***'");
     }
 
     [Fact]

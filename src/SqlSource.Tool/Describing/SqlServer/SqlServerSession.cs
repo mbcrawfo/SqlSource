@@ -86,7 +86,9 @@ internal sealed partial class SqlServerSession : IDescribeSession
     /// <summary>Asks <c>open</c>, and gives the session of the server that answered.</summary>
     /// <param name="request">The database, its connection, the exchange and the clock.</param>
     /// <param name="log">
-    /// Where the session's events go.  <c>open</c> has none: <c>database.open</c> holds its answer.
+    /// Where the session's events go.  <c>open</c> has none: <c>database.open</c> holds its answer.  When it keeps
+    /// anything, SqlClient's own events go there too while the session lives, and while it fails to open
+    /// (<see cref="SqlServerConnection" />).
     /// </param>
     /// <param name="cancellationToken">Ends the call.</param>
     public static async Task<Outcome<IDescribeSession, DescribeFailure>> OpenAsync(
@@ -95,7 +97,7 @@ internal sealed partial class SqlServerSession : IDescribeSession
         CancellationToken cancellationToken
     )
     {
-        var connection = new SqlServerConnection(request.Connection);
+        var connection = new SqlServerConnection(request.Connection, log);
         var live = new SqlServerLive(connection);
         var kept = false;
         try

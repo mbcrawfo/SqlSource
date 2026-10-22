@@ -5,6 +5,7 @@ using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
+using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 
@@ -24,8 +25,14 @@ namespace SqlSource.Tool.Describing.SqlServer;
 /// </para>
 /// </remarks>
 /// <param name="connectionString">The connection's value.  It goes to the driver and to nothing else.</param>
-internal sealed class SqlServerConnection(string connectionString) : IAsyncDisposable
+/// <param name="log">
+/// The describer's log.  When it keeps anything, SqlClient's own events go there from when this is made, before the
+/// first call opens the connection, until it is disposed: for the session's life, or for that of a session that
+/// failed to open (<see cref="SqlClientRunListener" />).
+/// </param>
+internal sealed class SqlServerConnection(string connectionString, IRunLog log) : IAsyncDisposable
 {
+    private readonly SqlClientRunListener? _listener = SqlClientRunListener.For(log);
     private SqlConnection? _connection;
 
     /// <summary>
@@ -238,9 +245,16 @@ internal sealed class SqlServerConnection(string connectionString) : IAsyncDispo
 
     public async ValueTask DisposeAsync()
     {
-        if (_connection is not null)
+        try
         {
-            await _connection.DisposeAsync();
+            if (_connection is not null)
+            {
+                await _connection.DisposeAsync();
+            }
+        }
+        finally
+        {
+            _listener?.Dispose();
         }
     }
 
