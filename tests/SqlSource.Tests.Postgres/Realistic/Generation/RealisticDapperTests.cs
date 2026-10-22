@@ -7,6 +7,7 @@ using Dapper;
 using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tests.Postgres.EndToEnd;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;

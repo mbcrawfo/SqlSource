@@ -1,0 +1,43 @@
+{
+  "columns": [
+    { "name": "invoice_id", "nullable": false },
+    {
+      "name": "invoice_number",
+      "nullable": true,
+      "why": "the full join keeps payment 4, made in April for invoice 3, which was issued in March, before the period"
+    },
+    {
+      "name": "issued_at",
+      "nullable": true,
+      "why": "the full join keeps payment 4, made in April for invoice 3, which was issued in March, before the period"
+    },
+    {
+      "name": "invoiced",
+      "nullable": true,
+      "why": "the full join keeps payment 4, made in April for invoice 3, which was issued in March, before the period"
+    },
+    {
+      "name": "payment_id",
+      "nullable": true,
+      "why": "the full join keeps invoice 7, issued on 30 June and paid in July, after the period"
+    },
+    {
+      "name": "paid_at",
+      "nullable": true,
+      "why": "the full join keeps invoice 7, issued on 30 June and paid in July, after the period"
+    },
+    {
+      "name": "paid",
+      "nullable": true,
+      "why": "the full join keeps invoice 7, issued on 30 June and paid in July, after the period"
+    },
+    {
+      "name": "method",
+      "nullable": true,
+      "why": "the full join keeps invoice 7, issued on 30 June and paid in July, after the period"
+    }
+  ],
+  "samples": [
+    { "from": "'2024-04-01'", "to": "'2024-07-01'" }
+  ]
+}

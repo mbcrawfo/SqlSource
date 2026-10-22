@@ -1,0 +1,16 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "status", "nullable": false },
+    { "name": "line_count", "nullable": false },
+    {
+      "name": "skus",
+      "nullable": true,
+      "why": "the left join finds no line for Ana's draft order 15, and STRING_AGG of only NULLs is NULL"
+    }
+  ],
+  "samples": [
+    { "customer_id": "1" }
+  ]
+}

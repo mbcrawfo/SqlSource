@@ -1,0 +1,14 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    {
+      "name": "parent_id",
+      "nullable": true,
+      "why": "dbo.categories.parent_id is nullable, and is NULL at each root: 1, 5 and 6"
+    },
+    { "name": "name", "nullable": false },
+    { "name": "path", "nullable": false },
+    { "name": "depth", "nullable": false },
+    { "name": "product_count", "nullable": false }
+  ]
+}

@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using SqlSource.Generation;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Generation;

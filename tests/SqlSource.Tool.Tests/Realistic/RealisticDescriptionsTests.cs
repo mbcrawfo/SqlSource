@@ -1,23 +1,21 @@
-using System;
-using System.Collections.Generic;
 using Shouldly;
 using SqlSource.Diagnostics;
 using SqlSource.Snapshot;
-using SqlSource.Tool;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 using Xunit.Sdk;
 
-namespace SqlSource.Tests.Postgres.Realistic.Describer;
+namespace SqlSource.Tool.Tests.Realistic;
 
-// The rules of describing a case that need no server: that a description has the columns of the truth, and the text
-// a failure is shown as.  A case described against the server is in RealisticDescriptionTests.
-public sealed class RealisticDescribeTests
+// The rules of a case's description that need no server: that a description has the columns of the truth, and the
+// text a failure is shown as.
+public sealed class RealisticDescriptionsTests
 {
     [Fact]
     public void ColumnsOf_ColumnNamedOtherwiseThanItsTruth_FailsNamingTheCaseAndThePosition()
     {
-        var found = Case() with
+        var found = RealisticTestCases.Keyed() with
         {
             Columns = [new TruthColumn("id", false, null, null), new TruthColumn("id", false, null, null)],
         };
@@ -32,14 +30,14 @@ public sealed class RealisticDescribeTests
             )
         );
 
-        var thrown = Should.Throw<FailException>(() => RealisticDescribe.ColumnsOf(found, described));
+        var thrown = Should.Throw<FailException>(() => RealisticDescriptions.ColumnsOf(found, described));
 
         thrown.Message.ShouldStartWith("realistic/keyed column 1 is described as account_id");
     }
 
     [Fact]
     public void RenderFailure_RefusalWithHelp_WritesTheHelpBetweenItsArgumentsAndTheServer() =>
-        RealisticDescribe
+        RealisticDescriptions
             .RenderFailure(
                 new DescribeFailure(
                     ToolDiagnostics.ServerRejectedQuery,
@@ -60,9 +58,6 @@ public sealed class RealisticDescribeTests
 
     private static PostgresType Type(string name, string internalName) =>
         new(name, SidecarValues.Kind.Base, "pg_catalog", internalName, null, null, null, null, null, null, null);
-
-    private static RealisticCase Case() =>
-        new("keyed", "keyed", null, null, [], [new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)]);
 
     private static SidecarColumn Column(int ordinal, string name) =>
         new(ordinal, name, Type("integer", "int4"), null, null, null, null, null);

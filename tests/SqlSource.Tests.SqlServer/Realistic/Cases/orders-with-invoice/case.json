@@ -1,0 +1,23 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "status", "nullable": false },
+    {
+      "name": "ship_city",
+      "nullable": true,
+      "why": "dbo.orders.ship_city is nullable; Ben's order 8, a gift card sent by email, has none"
+    },
+    { "name": "invoice_number", "nullable": true, "why": "the left join finds no invoice for Ben's order 14" },
+    { "name": "issued_at", "nullable": true, "why": "the left join finds no invoice for Ben's order 14" },
+    {
+      "name": "due_at",
+      "nullable": true,
+      "why": "billing.invoices.due_at is nullable, and invoice 8, of Ben's order 8, has none; no invoice joins order 14"
+    },
+    { "name": "amount", "nullable": true, "why": "the left join finds no invoice for Ben's order 14" }
+  ],
+  "samples": [
+    { "customer_id": "2" }
+  ]
+}

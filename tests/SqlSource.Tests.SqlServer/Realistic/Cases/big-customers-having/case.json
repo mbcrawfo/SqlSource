@@ -1,0 +1,17 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "company",
+      "nullable": true,
+      "why": "dbo.customers.company is nullable; Ben, Dana and Gus, each over the minimum, have none"
+    },
+    { "name": "order_count", "nullable": false },
+    { "name": "total_spent", "nullable": false },
+    { "name": "last_ordered_at", "nullable": false }
+  ],
+  "samples": [
+    { "min_total": "1000.00" }
+  ]
+}

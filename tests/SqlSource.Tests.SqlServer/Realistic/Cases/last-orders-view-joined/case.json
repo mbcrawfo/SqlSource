@@ -1,0 +1,36 @@
+{
+  "columns": [
+    { "name": "customer_id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "email",
+      "nullable": true,
+      "why": "dbo.customers.email is nullable, of the alias type dbo.Email; Chen and Fatima have none"
+    },
+    {
+      "name": "order_id",
+      "nullable": true,
+      "why": "the view's left join finds no order for Eli and Fatima"
+    },
+    {
+      "name": "last_ordered_at",
+      "nullable": true,
+      "why": "the view's left join finds no order for Eli and Fatima"
+    },
+    {
+      "name": "last_order_status",
+      "nullable": true,
+      "why": "the view's left join finds no order for Eli and Fatima"
+    },
+    {
+      "name": "invoice_number",
+      "nullable": true,
+      "why": "no invoice joins Ana's last order 15 or Ben's last order 14, and Eli and Fatima have no order"
+    },
+    {
+      "name": "invoice_amount",
+      "nullable": true,
+      "why": "no invoice joins Ana's last order 15 or Ben's last order 14, and Eli and Fatima have no order"
+    }
+  ]
+}

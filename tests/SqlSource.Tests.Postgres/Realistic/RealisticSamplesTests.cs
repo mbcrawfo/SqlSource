@@ -1,12 +1,12 @@
 using System;
 using System.Collections.Generic;
 using Shouldly;
-using SqlSource.Parsing;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic;
 
-// The sample values of a case: their substitution into its SQL and their checks against the query's parameters.
+// The sample values of a case put in its SQL.  Their checks against the query's parameters are tested with
+// RealisticSampleChecks in tests/SqlSource.Tool.Tests/Realistic.
 public sealed class RealisticSamplesTests
 {
     [Fact]
@@ -37,51 +37,6 @@ public sealed class RealisticSamplesTests
             )
             .Message.ShouldContain("@c");
 
-    [Fact]
-    public void CheckKeys_KeyThatNamesNoParameter_ThrowsNamingTheCaseAndTheKey()
-    {
-        var found = Case(Values(("from", "'2024-01-01'"), ("tto", "'2025-01-01'")));
-
-        var thrown = Should.Throw<InvalidOperationException>(() => RealisticSamples.CheckKeys(found, ["from", "to"]));
-
-        thrown.Message.ShouldContain("realistic/keyed");
-        thrown.Message.ShouldContain("@tto");
-    }
-
-    [Fact]
-    public void CheckKeys_KeyThatDiffersInCaseAlone_DoesNotThrow() =>
-        Should.NotThrow(() => RealisticSamples.CheckKeys(Case(Values(("From", "'2024-01-01'"))), ["from", "to"]));
-
-    // A run never sends NULL for a parameter that its marker does not say is null, so a sample does not either.
-    [Theory]
-    [InlineData("NULL")]
-    [InlineData(" null ")]
-    public void CheckNulls_NullForAParameterNotMarkedNull_ThrowsNamingTheCaseAndTheParameter(string value)
-    {
-        var found = Case(Values(("Status", value)));
-
-        var thrown = Should.Throw<InvalidOperationException>(() =>
-            RealisticSamples.CheckNulls(found, [Parameter("status", null), Parameter("q", true)])
-        );
-
-        thrown.Message.ShouldContain("realistic/keyed");
-        thrown.Message.ShouldContain("@Status");
-    }
-
-    [Fact]
-    public void CheckNulls_NullForAParameterNotNullByItsMarker_Throws() =>
-        Should.Throw<InvalidOperationException>(() =>
-            RealisticSamples.CheckNulls(Case(Values(("status", "NULL"))), [Parameter("status", false)])
-        );
-
-    [Theory]
-    [InlineData("NULL", true)]
-    [InlineData("'NULL'", false)]
-    public void CheckNulls_NullForAParameterMarkedNullOrNoNull_DoesNotThrow(string value, bool? nullable) =>
-        Should.NotThrow(() =>
-            RealisticSamples.CheckNulls(Case(Values(("status", value))), [Parameter("status", nullable)])
-        );
-
     private static Dictionary<string, string> Values(params (string Name, string Value)[] values)
     {
         var found = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -92,16 +47,4 @@ public sealed class RealisticSamplesTests
 
         return found;
     }
-
-    private static SqlQueryParameter Parameter(string name, bool? nullable) => new(name, null, nullable, true);
-
-    private static RealisticCase Case(Dictionary<string, string> sample) =>
-        new(
-            "keyed",
-            "keyed",
-            null,
-            null,
-            [],
-            [new Dictionary<string, string>(sample, StringComparer.OrdinalIgnoreCase)]
-        );
 }

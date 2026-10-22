@@ -1,0 +1,13 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "status", "nullable": false },
+    {
+      "name": "last_paid_at",
+      "nullable": true,
+      "why": "the subquery's MAX over no payment is NULL; Eli and Fatima have no order, so no payment"
+    },
+    { "name": "order_count", "nullable": false }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "parent_id",
+      "nullable": true,
+      "why": "dbo.categories.parent_id is nullable; the roots 1, 5 and 6 have none"
+    },
+    {
+      "name": "parent_name",
+      "nullable": true,
+      "why": "the self left join finds no parent for the roots 1, 5 and 6"
+    },
+    { "name": "breadcrumb", "nullable": false }
+  ]
+}

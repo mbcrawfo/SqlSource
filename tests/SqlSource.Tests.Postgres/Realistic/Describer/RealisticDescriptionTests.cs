@@ -3,6 +3,7 @@ using Shouldly;
 using SqlSource.Snapshot;
 using SqlSource.Tests.Postgres.Realistic.Generation;
 using SqlSource.Tool.Describing.Describers;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Describer;
@@ -36,7 +37,7 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
             return;
         }
 
-        _ = RealisticDescribe.ColumnsOf(found, described);
+        _ = RealisticDescriptions.ColumnsOf(found, described);
     }
 
     // The entry of each case with models is the one its sidecar holds, whole: what --check compares, and the
@@ -57,7 +58,7 @@ public sealed class RealisticDescriptionTests(PostgresContainer postgres)
 
         var described = await RealisticDescribe.DescribeOnceAsync(found, postgres.RealisticConnectionString);
 
-        _ = RealisticDescribe.ColumnsOf(found, described);
+        _ = RealisticDescriptions.ColumnsOf(found, described);
         TextOf(RealisticDescribe.EntryOf(found, AnyServer, described.Value!))
             .ShouldBe(
                 TextOf(committed with { ServerVersion = AnyVersion }),

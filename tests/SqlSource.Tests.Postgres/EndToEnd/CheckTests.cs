@@ -7,6 +7,7 @@ using SqlSource.Snapshot.Reading;
 using SqlSource.Tests.Postgres.Realistic;
 using SqlSource.Tool.Describing.Postgres;
 using SqlSource.Tool.Testing;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.EndToEnd;

@@ -1,0 +1,18 @@
+{
+  "columns": [
+    { "name": "dimension", "nullable": false },
+    {
+      "name": "status",
+      "nullable": true,
+      "why": "the rows of the set (ship_city) have NULL for the status, which they do not group by"
+    },
+    {
+      "name": "ship_city",
+      "nullable": true,
+      "why": "the rows of the set (status) have NULL for it; orders 8, 10 and 15 have no ship_city either"
+    },
+    { "name": "order_count", "nullable": false },
+    { "name": "shipped_count", "nullable": false },
+    { "name": "last_placed_at", "nullable": false }
+  ]
+}

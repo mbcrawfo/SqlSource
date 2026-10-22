@@ -1,0 +1,17 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "email",
+      "nullable": true,
+      "why": "dbo.customers.email is nullable, of the alias type dbo.Email; Chen and Fatima have none"
+    },
+    { "name": "phone", "nullable": true, "why": "dbo.customers.phone is nullable; Dana, Eli and Fatima have none" },
+    { "name": "status", "nullable": false }
+  ],
+  "samples": [
+    { "q": "N'%a%'", "status": "NULL", "skip": "0", "take": "10" },
+    { "q": "N'%a%'", "status": "'active'", "skip": "1", "take": "2" }
+  ]
+}

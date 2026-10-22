@@ -1,0 +1,26 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "status", "nullable": false },
+    {
+      "name": "previous_placed_at",
+      "nullable": true,
+      "why": "LAG has no row before the customer's first order; Ana's first is order 1"
+    },
+    {
+      "name": "next_placed_at",
+      "nullable": true,
+      "why": "LEAD has no row after the customer's last order; Ana's last is order 15"
+    },
+    {
+      "name": "days_since_previous",
+      "nullable": true,
+      "why": "DATEDIFF of the NULL that LAG gives at the first order is NULL; Ana's first is order 1"
+    },
+    { "name": "previous_status", "nullable": false }
+  ],
+  "samples": [
+    { "customer_id": "1" }
+  ]
+}

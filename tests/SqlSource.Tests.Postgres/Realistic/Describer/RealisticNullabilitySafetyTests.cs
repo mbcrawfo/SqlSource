@@ -1,6 +1,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
+using SqlSource.Tool.Testing.Realistic;
 using Xunit;
 
 namespace SqlSource.Tests.Postgres.Realistic.Describer;
@@ -36,8 +37,8 @@ public sealed class RealisticNullabilitySafetyTests(PostgresContainer postgres)
         var found = RealisticDescribe.Start(name, postgres.Major);
         var (columns, parameters) = await RealisticDescribe.DescribedAsync(found, postgres.RealisticConnectionString);
         var request = RealisticDescribe.RequestOf(found);
-        RealisticSamples.CheckKeys(found, parameters.Select(static parameter => parameter.Name));
-        RealisticSamples.CheckNulls(found, request.Parameters);
+        RealisticSampleChecks.CheckKeys(found, parameters.Select(static parameter => parameter.Name));
+        RealisticSampleChecks.CheckNulls(found, request.Parameters);
         var sql = request.Sql;
         var types = parameters
             .Where(static parameter => parameter.Type is not null)

@@ -20,3 +20,6 @@ tests/SqlSource.Tool.Tests/Fixtures/Describers/** text eol=lf
 
 # A realistic case's query is described from its file at LF, as its committed sidecar was
 tests/SqlSource.Tests.Postgres/Realistic/Cases/** text eol=lf
+
+# A realistic case of SQL Server is described and executed from its file at LF, as PostgreSQL's is
+tests/SqlSource.Tests.SqlServer/Realistic/Cases/** text eol=lf

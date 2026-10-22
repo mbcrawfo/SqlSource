@@ -1,0 +1,25 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "email", "nullable": false },
+    { "name": "display_name", "nullable": false },
+    {
+      "name": "reach_at",
+      "nullable": true,
+      "why": "COALESCE of two nullable columns is NULL when both are; Fatima has no email and no phone"
+    },
+    {
+      "name": "phone",
+      "nullable": true,
+      "why": "dbo.customers.phone is nullable, and NULLIF keeps a NULL; Dana, Eli and Fatima have none"
+    },
+    {
+      "name": "company",
+      "nullable": true,
+      "why": "dbo.customers.company is nullable, and NULLIF keeps a NULL; Ben, Dana, Fatima and Gus have none"
+    },
+    { "name": "preferred_channel", "nullable": false },
+    { "name": "time_zone", "nullable": false }
+  ]
+}

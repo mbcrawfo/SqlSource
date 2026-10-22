@@ -1,0 +1,24 @@
+{
+  "columns": [
+    { "name": "customer_id", "nullable": false },
+    { "name": "customer_name", "nullable": false },
+    { "name": "order_id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "status", "nullable": false },
+    {
+      "name": "ship_city",
+      "nullable": true,
+      "why": "dbo.orders.ship_city is nullable; Ana's latest order 15, a draft, and Chen's latest, 10, have none"
+    },
+    {
+      "name": "shipped_at",
+      "nullable": true,
+      "why": "dbo.orders.shipped_at is nullable; Ana's latest order 15 and Ben's latest, 14, are pending"
+    },
+    {
+      "name": "invoice_number",
+      "nullable": true,
+      "why": "the left join finds no invoice for Ana's latest order 15 or Ben's latest order 14"
+    }
+  ]
+}

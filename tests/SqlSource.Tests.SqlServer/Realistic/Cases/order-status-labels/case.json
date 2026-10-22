@@ -1,0 +1,20 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "placed_at", "nullable": false },
+    { "name": "status", "nullable": false },
+    { "name": "status_label", "nullable": false },
+    {
+      "name": "action_hint",
+      "nullable": true,
+      "why": "the CASE has no ELSE, and no branch matches a delivered or cancelled order; order 1 is delivered"
+    },
+    {
+      "name": "days_to_ship",
+      "nullable": true,
+      "why": "the CASE has no ELSE, and no branch matches an order never shipped; order 8, a gift card, was not"
+    },
+    { "name": "ship_to", "nullable": false },
+    { "name": "is_open", "nullable": false }
+  ]
+}

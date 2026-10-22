@@ -1,0 +1,24 @@
+{
+  "columns": [
+    { "name": "order_count", "nullable": false },
+    {
+      "name": "first_ordered_at",
+      "nullable": true,
+      "why": "with no GROUP BY, MIN over no rows gives a row with NULL; Eli (5) has no order"
+    },
+    {
+      "name": "last_ordered_at",
+      "nullable": true,
+      "why": "with no GROUP BY, MAX over no rows gives a row with NULL; Eli (5) has no order"
+    },
+    {
+      "name": "unshipped_count",
+      "nullable": true,
+      "why": "with no GROUP BY, SUM over no rows gives a row with NULL; Eli (5) has no order"
+    }
+  ],
+  "samples": [
+    { "customer_id": "2" },
+    { "customer_id": "5" }
+  ]
+}

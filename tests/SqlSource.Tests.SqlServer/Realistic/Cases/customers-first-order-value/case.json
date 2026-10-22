@@ -1,0 +1,27 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "order_count", "nullable": false },
+    {
+      "name": "first_order_id",
+      "nullable": true,
+      "why": "the left join finds no order for Eli and Fatima, so their one row's first value is NULL"
+    },
+    {
+      "name": "first_ordered_at",
+      "nullable": true,
+      "why": "the left join finds no order for Eli and Fatima, so their one row's first value is NULL"
+    },
+    {
+      "name": "first_order_value",
+      "nullable": true,
+      "why": "the left join finds no order for Eli and Fatima, so their one row's first value is NULL"
+    },
+    {
+      "name": "first_ship_city",
+      "nullable": true,
+      "why": "Chen's first order that counts, 10, has no ship_city; Eli and Fatima have no order"
+    }
+  ]
+}
