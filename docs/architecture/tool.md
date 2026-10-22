@@ -8,7 +8,9 @@ How `src/SqlSource.Tool` runs `sqlsource describe`: how a command line is read a
 
 ### The host
 
-[`ToolHost`](../../src/SqlSource.Tool/ToolHost.cs) is a record of everything the tool takes from outside itself: standard output and standard error, the working directory, the environment, the runner of processes, the temporary directory, the number of processors, the describers by [dialect](README.md#dialect), the exchange of each database, the clock, a `TimeProvider`, and `CreateFile`, which makes a file for writing, or empties the one that is there, and gives its stream.  `ToolHost.Create` makes the host of a real run from the console, the current directory and the machine, with a `DescriberRegistry` that holds `PostgresDescriber` alone, the one describer the released tool registers, an exchange that is `LiveExchange` for every database, and, for `CreateFile`, `ToolHost.NewFile`, a `FileStream` made with `FileMode.Create`, opened for writing and shared for reading, which the hosts of the tests give too.  `Cli.OpenLog` gives `CreateFile` to `RunLogFile.Open`, so a test gives a log a stream of its own, one that fails included.  How a describer calls through its exchange is [the describer contract](postgres-describer.md#the-describer-contract).
+[`ToolHost`](../../src/SqlSource.Tool/ToolHost.cs) is a record of everything the tool takes from outside itself: standard output and standard error, the working directory, the environment, the runner of processes, the temporary directory, the number of processors, the describers by [dialect](README.md#dialect), the exchange of each database, the clock, a `TimeProvider`, and `CreateFile`, which makes a file for writing, or empties the one that is there, and gives its stream.  `ToolHost.Create` makes the host of a real run from the console, the current directory and the machine, with a `DescriberRegistry` that holds `PostgresDescriber` and `SqlServerDescriber`, the describers of `postgres` and `mssql` that the released tool registers, an exchange that is `LiveExchange` for every database, and, for `CreateFile`, `ToolHost.NewFile`, a `FileStream` made with `FileMode.Create`, opened for writing and shared for reading, which the hosts of the tests give too.  `Cli.OpenLog` gives `CreateFile` to `RunLogFile.Open`, so a test gives a log a stream of its own, one that fails included.  How a describer calls through its exchange is [the describer contract](postgres-describer.md#the-describer-contract).
+
+Every dialect that `SqlDescribableDialects` lists has a describer in the released host, so no query of the released tool is `SQLSRC216` ([describing](#describing)); a test that gives its host a `DescriberRegistry` without a dialect's describer reaches it.  [The SQL Server describer](sqlserver-describer.md) carries Microsoft.Data.SqlClient into the tool's package, whose copy for each platform is under `runtimes/`, beside a copy outside it that throws on any use; `tools/check-tool-install.sh` describes an `mssql` query with the installed tool against a port that refuses, so that the copy for the machine's platform is shown to load ([tools](../../tools/README.md)).
 
 `ToolHost.Create` asks for the current directory, which throws when it was deleted.  `Cli.Run` catches that, writes the `SQLSRC200` to standard error with a reporter of its own, and returns `1`, since there is no host to report to.
 
@@ -230,10 +232,6 @@ A value of an event is a [`LogValue`](../../src/SqlSource.Tool/Logging/LogValue.
 A write that the system refuses keeps its exception as `RunLogFile.Failure`, and the writer writes nothing more.  `Cli.End` reports it as `SQLSRC218` and the exit code is `1`.  What a user should know of a log before sharing it is in the manual's [logs](../manual/tool.md#logs).
 
 ## Not built yet
-
-### The SQL Server describer
-
-> **Not built yet.**  How the host registers the describer of `mssql` queries, which [the SQL Server describer](sqlserver-describer.md) explains.  Delivered by phase 6 of the [query generation epic](../superpowers/specs/2026-10-07-query-generation-epic-design.md).
 
 ### Build integration options
 

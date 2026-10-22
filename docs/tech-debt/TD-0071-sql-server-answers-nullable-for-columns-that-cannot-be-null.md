@@ -27,7 +27,7 @@ The rule is to rely on the server where it is accurate and to correct it only wh
 
 ## Impact
 
-Medium.  Nothing is wrong, but of the corpus's columns that cannot be `NULL`, 39 of the 193 of the cases that run on 2017 and 44 of the 209 of those that run on 2025, about a fifth, are answered nullable, and once the describer is registered each is a property with a `?` that a user meets as a `!` or a check added by hand, as TD-0051 is for PostgreSQL.  `COUNT`, `SUM` and a window function are among the commonest forms of SQL, and the count grows with every case of a kind above.
+Medium.  Nothing is wrong, but of the corpus's columns that cannot be `NULL`, 39 of the 193 of the cases that run on 2017 and 44 of the 209 of those that run on 2025, about a fifth, are answered nullable, and each is a property with a `?` that a user meets as a `!` or a check added by hand, as TD-0051 is for PostgreSQL; the manual's [SQL Server known issues](../manual/sqlserver.md#known-issues) say what a user can do.  `COUNT`, `SUM` and a window function are among the commonest forms of SQL, and the count grows with every case of a kind above.
 
 ## Proposed fix
 

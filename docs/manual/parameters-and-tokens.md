@@ -89,7 +89,7 @@ SqlSource finds parameters by how the SQL is written, and not by what the databa
 |----|----|----|----|
 | PostgreSQL | `@x`, written for the absolute value of `x` | As the parameter `x`.  Npgsql reads it the same way | Write `abs(x)`, or `@ x` with a space |
 | MySQL, MariaDB | A user variable, `SET @n := 1` | As a parameter, at each place it is written | Nothing yet says that a name is a variable.  It changes no generated code today |
-| SQL Server | The parameter of a procedure that the SQL creates, `CREATE PROCEDURE p @id int AS ...` | As a parameter of the query | Nothing yet says otherwise.  It changes no generated code today |
+| SQL Server | The parameter of a procedure that the SQL creates, `CREATE PROCEDURE p @id int AS ...` | As a parameter of the query | Give the query `-- output: sql`: SQL Server does not describe a statement that creates a procedure ([SQLSRC225](diagnostics.md#sqlsrc225)), and with that output the parameter changes no generated code |
 
 Under `mssql`, the opposite can happen too: a name is taken for a variable when it is a parameter.  See [known issues](#known-issues).
 
