@@ -56,23 +56,26 @@ public sealed class TableMatchTests(SqlServerContainer sqlServer)
     // note, in one way, and the last in three, and says the first check that failed.  Under FOR SYSTEM_TIME the server
     // gives no column an origin, and a column of another database has none.
     [Theory]
-    [InlineData("SELECT id, user_id, total, note, total + 1 AS more FROM dbo.orders", "no-origin")]
-    [InlineData("SELECT id, amount FROM dbo.prices FOR SYSTEM_TIME ALL", "no-origin")]
-    [InlineData("SELECT database_id, name FROM master.sys.databases", "no-origin")]
+    [InlineData(
+        "SELECT id, user_id, total, note, total + 1 AS more FROM dbo.orders",
+        SidecarValues.TableMatch.NoOrigin
+    )]
+    [InlineData("SELECT id, amount FROM dbo.prices FOR SYSTEM_TIME ALL", SidecarValues.TableMatch.NoOrigin)]
+    [InlineData("SELECT database_id, name FROM master.sys.databases", SidecarValues.TableMatch.NoOrigin)]
     [InlineData(
         "SELECT o.id, o.user_id, o.total, u.name FROM dbo.orders AS o JOIN dbo.users AS u ON u.id = o.user_id",
-        "several-tables"
+        SidecarValues.TableMatch.SeveralTables
     )]
-    [InlineData("SELECT id, user_id AS owner_id, total, note FROM dbo.orders", "names-differ")]
-    [InlineData("SELECT id, user_id, total, note AS [note!] FROM dbo.orders", "names-differ")]
-    [InlineData("SELECT id, user_id, total FROM dbo.orders", "columns-differ")]
-    [InlineData("SELECT id, id, user_id, total, note FROM dbo.orders", "columns-differ")]
-    [InlineData("SELECT user_id, id, total, note FROM dbo.orders", "order-differs")]
+    [InlineData("SELECT id, user_id AS owner_id, total, note FROM dbo.orders", SidecarValues.TableMatch.NamesDiffer)]
+    [InlineData("SELECT id, user_id, total, note AS [note!] FROM dbo.orders", SidecarValues.TableMatch.NamesDiffer)]
+    [InlineData("SELECT id, user_id, total FROM dbo.orders", SidecarValues.TableMatch.ColumnsDiffer)]
+    [InlineData("SELECT id, id, user_id, total, note FROM dbo.orders", SidecarValues.TableMatch.ColumnsDiffer)]
+    [InlineData("SELECT user_id, id, total, note FROM dbo.orders", SidecarValues.TableMatch.OrderDiffers)]
     [InlineData(
         "SELECT o.id, o.user_id, o.total, o.note FROM dbo.users AS u LEFT JOIN dbo.orders AS o ON o.user_id = u.id",
-        "nullability-differs"
+        SidecarValues.TableMatch.NullabilityDiffers
     )]
-    [InlineData("SELECT user_id AS owner_id, id FROM dbo.orders", "names-differ")]
+    [InlineData("SELECT user_id AS owner_id, id FROM dbo.orders", SidecarValues.TableMatch.NamesDiffer)]
     public async Task DescribeAsync_ResultThatIsNotATable_MatchesNothingAndSaysTheFirstCheckThatFailed(
         string sql,
         string expected

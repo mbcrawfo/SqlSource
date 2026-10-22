@@ -70,9 +70,11 @@ By `error_type`, never by message:
 | 10, `TEMPORARY_TABLE` | A temporary table in a batch of several statements | `SQLSRC265`, with `help:` to make the query one statement or use a table variable |
 | 8, `UNDECLARED_PARAMETER` | Unreachable: every parameter is declared | `SQLSRC225`, so that it is seen and reported |
 | 3, 4 or 10 in the answer of the `columns` asked after `parameters` failed with 11501 | `sp_describe_undeclared_parameters` reports a temporary table of a batch of several statements as 208 and 11501, where this procedure gives its cause | That row's id; any other answer leaves the failure `SQLSRC225` with `parameters`' lines |
-| Any other | The query is not valid against this schema: 334, an `OUTPUT` on a table with a trigger; 207, an unknown column; 102, a `GO` inside the query; 2812, a word read as a procedure | `SQLSRC225` with every error row as a `server:` line, in the server's order |
+| Any other | The query is not valid against this schema: 207, an unknown column; 102, a `GO` inside the query; 2812, a word read as a procedure | `SQLSRC225` with every error row as a `server:` line, in the server's order |
 
 The step is `describe columns`, or `table match` for `table`.
+
+An `OUTPUT` with no `INTO` on a table with a trigger, 334, is reached at `describe parameters` and not here: `parameters` raises 334 then 11501, the `columns` asked after that 11501 answers 334 and 11501 as rows, neither of a type that gives a cause, and so the query is `SQLSRC225` with `parameters`' lines.
 
 ### Driver logging
 

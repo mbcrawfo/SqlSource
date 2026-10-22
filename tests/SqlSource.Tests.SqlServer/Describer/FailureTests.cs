@@ -1,8 +1,10 @@
 using System;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Shouldly;
 using SqlSource.Parsing;
+using SqlSource.Tool.Describing.Capture;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
 using Xunit;
@@ -80,20 +82,28 @@ public sealed class FailureTests(SqlServerContainer sqlServer)
     }
 
     // An OUTPUT with no INTO on a table with a trigger is no shape the user mends by a diagnostic of its own.
-    // "parameters" refuses it with 334 and 11501, and "columns", asked after, answers 334 too, which gives no cause by
-    // its type, so the failure is that of "parameters".
+    // "parameters" refuses it with 334 and 11501, and "columns", asked after, answers 334 and 11501 as rows, neither of
+    // a type that gives a cause, so the failure is that of "parameters", with its lines.
     [Fact]
     public async Task DescribeAsync_OutputOnATableWithATrigger_IsSqlsrc225Naming334()
     {
-        var failure = await ShouldFailAsync(
-            Of(SqlDialectRules.SqlServer, "INSERT INTO dbo.trig (id, v) OUTPUT inserted.id VALUES (@id, @v)"),
-            "SQLSRC225"
+        var (described, capture) = await Sessions.DescribeCapturedAsync(
+            sqlServer.ConnectionString,
+            Of(SqlDialectRules.SqlServer, "INSERT INTO dbo.trig (id, v) OUTPUT inserted.id VALUES (@id, @v)")
         );
 
+        var failure = described.Failure.ShouldNotBeNull();
+        failure.Descriptor.Id.ShouldBe("SQLSRC225", string.Join("; ", failure.ServerLines));
         failure.Arguments[0].ShouldBe(Query);
         failure.ServerLines[0].ShouldStartWith("Msg 334, ");
         failure.ServerLines[^1].ShouldStartWith("Msg 11501, ");
         failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        capture.Calls.Select(static call => call.Method).ShouldBe(["open", "parameters", "columns"]);
+        var columns = capture
+            .Calls[^1]
+            .Answer.Deserialize<SqlServerColumnsAnswer>(CaptureJson.Options)
+            .ShouldNotBeNull();
+        columns.Errors.ShouldNotBeNull().Select(static error => error.Number).ShouldBe([334, 11501]);
     }
 
     private async Task<DescribeFailure> ShouldFailAsync(DescribeRequest request, string id)
