@@ -157,7 +157,8 @@ describe_sqlserver() {
 
     # The schemas and seeds are the files that SqlServerContainer applies, in the same order: those of "app", with
     # new-types.sql after them, since the default image is SQL Server 2025, then those of "billing".  sqlcmd splits
-    # each at its lines of GO, and -f 65001 reads it as UTF-8, which the text of its char and varchar values needs.
+    # each at its lines of GO, and -f 65001 names the files' code page, UTF-8, rather than leaving it to sqlcmd's
+    # default.
     for database in "${SQLSERVER_DATABASES[@]}"; do
         printf 'Creating the database %s ... ' "$database"
         docker exec "$sqlserver_container" "${SQLCMD[@]}" -Q "CREATE DATABASE [$database]" >/dev/null

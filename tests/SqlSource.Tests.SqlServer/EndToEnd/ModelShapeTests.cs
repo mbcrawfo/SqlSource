@@ -119,6 +119,17 @@ public sealed class ModelShapeTests
         );
 
     [Fact]
+    public void Build_Datetimeoffset_IsADateTimeOffset() =>
+        ShouldBeModel(
+            typeof(ListClosedBeforeDto),
+            $"{Namespace}.ListClosedBeforeDto",
+            Shape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("Name", typeof(string), false),
+            ("ClosedAt", typeof(DateTimeOffset?), true)
+        );
+
+    [Fact]
     public void Build_ParamMarkersWithTypes_GiveTheDeclaredTypes()
     {
         ShouldBeModel(
@@ -176,6 +187,12 @@ public sealed class ModelShapeTests
             ("Name", typeof(string), false)
         );
         ShouldBeModel(
+            typeof(Reporting.GetAccountNameArgs),
+            $"{ReportingNamespace}.GetAccountNameArgs",
+            Shape.Record,
+            ("AccountId", typeof(int), false)
+        );
+        ShouldBeModel(
             typeof(Reporting.FindAccountNameArgs),
             $"{ReportingNamespace}.FindAccountNameArgs",
             Shape.Record,
@@ -186,6 +203,14 @@ public sealed class ModelShapeTests
             $"{ReportingNamespace}.ListClosedBeforeArgs",
             Shape.Record,
             ("ClosedBefore", typeof(DateTimeOffset?), true)
+        );
+        ShouldBeModel(
+            typeof(Reporting.ListClosedBeforeDto),
+            $"{ReportingNamespace}.ListClosedBeforeDto",
+            Shape.SealedRecord,
+            ("Id", typeof(int), false),
+            ("Name", typeof(string), false),
+            ("ClosedAt", typeof(DateTimeOffset?), true)
         );
         ShouldBeModel(
             typeof(Reporting.ListOpenedWithinArgs),
