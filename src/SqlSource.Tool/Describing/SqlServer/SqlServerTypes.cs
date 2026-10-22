@@ -22,29 +22,15 @@ internal static class SqlServerTypes
     /// <exception cref="InvalidOperationException">
     /// The row has no type name or lacks a facet: the server typed the parameter, or it would have raised an error.
     /// </exception>
-    public static SqlServerType FromParameter(SqlServerParameterRow row) =>
-        Build(
-            row.SuggestedSystemTypeName,
-            row.SuggestedMaxLength,
-            row.SuggestedPrecision,
-            row.SuggestedScale,
-            row.SuggestedUserTypeSchema,
-            row.SuggestedUserTypeName,
-            row.SuggestedAssemblyQualifiedTypeName
-        );
+    public static SqlServerType FromParameter(SqlServerParameterRow row) => Build(row);
 
     /// <summary>The type the server gives a declared parameter.</summary>
     /// <exception cref="InvalidOperationException">The row has no type name or lacks a facet.</exception>
-    public static SqlServerType FromDeclared(SqlServerDeclaredRow row) =>
-        Build(
-            row.SystemTypeName,
-            row.MaxLength,
-            row.Precision,
-            row.Scale,
-            row.UserTypeSchema,
-            row.UserTypeName,
-            row.AssemblyQualifiedTypeName
-        );
+    public static SqlServerType FromDeclared(SqlServerDeclaredRow row) => Build(row);
+
+    /// <summary>The type the server gives a column of a result set.</summary>
+    /// <exception cref="InvalidOperationException">The row has no type name or lacks a facet.</exception>
+    public static SqlServerType FromColumn(SqlServerColumnRow row) => Build(row);
 
     /// <summary>
     /// The type as a message names it: <c>schema.name</c> of a user type that is not of <c>sys</c>, as
@@ -63,24 +49,42 @@ internal static class SqlServerTypes
         return user.Schema is null ? name : user.Schema + "." + name;
     }
 
-    private static SqlServerType Build(
-        string? name,
-        int? maxLength,
-        int? precision,
-        int? scale,
-        string? userSchema,
-        string? userName,
-        string? assemblyQualifiedName
-    )
+    /// <summary>
+    /// The type as a declaration of <c>@params</c> writes it: <c>[schema].[name]</c> of a user type that is not of
+    /// <c>sys</c>, each name in brackets with a <c>]</c> written twice, so that a name that is a keyword or holds a
+    /// space, <c>[dbo].[User]</c>, declares; and the system type name otherwise, so <c>sysname</c> is
+    /// <c>nvarchar(128)</c> and <c>hierarchyid</c> is <c>hierarchyid</c>.  <see cref="Spelled" /> is for messages.
+    /// </summary>
+    public static string Declared(SqlServerType type)
     {
-        if (name is null || maxLength is null || precision is null || scale is null)
+        if (
+            type.UserType is not { Name: { } name } user
+            || string.Equals(user.Schema, SystemSchema, StringComparison.OrdinalIgnoreCase)
+        )
+        {
+            return type.Name;
+        }
+
+        return user.Schema is null
+            ? SqlServerLive.Bracketed(name)
+            : SqlServerLive.Bracketed(user.Schema) + "." + SqlServerLive.Bracketed(name);
+    }
+
+    private static SqlServerType Build(ISqlServerTypeRow row)
+    {
+        if (
+            row
+            is not { SystemTypeName: { } name, MaxLength: { } maxLength, Precision: { } precision, Scale: { } scale }
+        )
         {
             throw new InvalidOperationException(
                 "A row of the server's types has no type name or lacks a facet, and the server typed it."
             );
         }
 
-        var userType = userName is null ? null : new SqlServerUserType(userSchema, userName, assemblyQualifiedName);
-        return new SqlServerType(name, maxLength.Value, precision.Value, scale.Value, userType);
+        var userType = row.UserTypeName is null
+            ? null
+            : new SqlServerUserType(row.UserTypeSchema, row.UserTypeName, row.AssemblyQualifiedTypeName);
+        return new SqlServerType(name, maxLength, precision, scale, userType);
     }
 }

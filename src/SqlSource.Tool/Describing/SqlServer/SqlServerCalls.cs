@@ -24,12 +24,17 @@ internal sealed record SqlServerOpenRequest
 /// <param name="DriverVersion">The version of the Microsoft.Data.SqlClient that asked.</param>
 /// <param name="Settings">The settings of the database and the session that change a description.</param>
 /// <param name="Error">Why no session was opened, or null.</param>
+/// <param name="Database">
+/// <c>DB_NAME()</c>: the session's database, the one whose columns have an origin.  Null with an error, and in a
+/// capture recorded before <c>open</c> asked it.
+/// </param>
 internal sealed record SqlServerOpenAnswer(
     string? ProductVersion,
     int? EngineEdition,
     string? DriverVersion,
     IReadOnlyList<SqlServerSetting>? Settings,
-    SqlServerServerError? Error
+    SqlServerServerError? Error,
+    string? Database
 );
 
 /// <summary>
@@ -91,7 +96,22 @@ internal sealed record SqlServerParameterRow(
     string? SuggestedUserTypeSchema,
     string? SuggestedUserTypeName,
     string? SuggestedAssemblyQualifiedTypeName
-);
+) : ISqlServerTypeRow
+{
+    string? ISqlServerTypeRow.SystemTypeName => SuggestedSystemTypeName;
+
+    int? ISqlServerTypeRow.MaxLength => SuggestedMaxLength;
+
+    int? ISqlServerTypeRow.Precision => SuggestedPrecision;
+
+    int? ISqlServerTypeRow.Scale => SuggestedScale;
+
+    string? ISqlServerTypeRow.UserTypeSchema => SuggestedUserTypeSchema;
+
+    string? ISqlServerTypeRow.UserTypeName => SuggestedUserTypeName;
+
+    string? ISqlServerTypeRow.AssemblyQualifiedTypeName => SuggestedAssemblyQualifiedTypeName;
+}
 
 /// <summary>
 /// The request of <c>probe</c>: whether the SQL binds with every copy and parameter declared, one copy at
@@ -151,7 +171,7 @@ internal sealed record SqlServerDeclaredRow(
     string? UserTypeSchema,
     string? UserTypeName,
     string? AssemblyQualifiedTypeName
-);
+) : ISqlServerTypeRow;
 
 /// <summary>
 /// An error row of <c>sys.dm_exec_describe_first_result_set</c>: the function answers what it could not describe
@@ -161,3 +181,121 @@ internal sealed record SqlServerDeclaredRow(
 /// <param name="Type">The row's <c>error_type</c>.</param>
 /// <param name="Message">The row's <c>error_message</c>.</param>
 internal sealed record SqlServerDescribeError(int Number, int Type, string Message);
+
+/// <summary>
+/// The request of <c>columns</c>: <c>sys.dm_exec_describe_first_result_set</c> of the query's SQL in browse mode 2,
+/// under the declarations of every parameter of its list.
+/// </summary>
+/// <param name="Sql">The SQL as written.</param>
+/// <param name="Params">
+/// The declarations of the parameters, each at its described type, <c>@a int, @b nvarchar(50)</c>, or null.
+/// </param>
+internal sealed record SqlServerColumnsRequest(string Sql, string? Params);
+
+/// <summary>
+/// The request of <c>table</c>: <c>sys.dm_exec_describe_first_result_set</c> of <c>SELECT *</c> from one origin's
+/// table or view, in browse mode 2, which gives its column list and each column's nullability read whole.
+/// </summary>
+/// <param name="Schema">The origin's schema, as the server named it.</param>
+/// <param name="Table">The origin's table or view, as the server named it.</param>
+internal sealed record SqlServerTableRequest(string Schema, string Table);
+
+/// <summary>
+/// The columns of the first result set that <c>columns</c> or <c>table</c> described, or what the server found wrong
+/// with its text.
+/// </summary>
+/// <param name="Rows">
+/// Every row of the describe, the hidden ones included, in the order of their ordinals, when the server found no
+/// error; or null.  No row is a statement with no result set.
+/// </param>
+/// <param name="Errors">The error rows of the describe, in their order, or null when it has none.</param>
+/// <param name="Error">Why the server could not be asked, or null.</param>
+internal sealed record SqlServerColumnsAnswer(
+    IReadOnlyList<SqlServerColumnRow>? Rows,
+    IReadOnlyList<SqlServerDescribeError>? Errors,
+    SqlServerServerError? Error
+);
+
+/// <summary>
+/// A row of <c>sys.dm_exec_describe_first_result_set</c> in browse mode 2: one column of a result set.  The members
+/// are named as the function names its columns, but <see cref="SourceType" />, which is the tool's own.
+/// </summary>
+/// <param name="IsHidden">
+/// Whether the browse mode added the column: mode 2 adds one, <c>ROWSTAT</c>, which no query returns.
+/// </param>
+/// <param name="ColumnOrdinal">The column's place, counted from one.</param>
+/// <param name="Name">The column's name as the server returned it, or null for a column with none.</param>
+/// <param name="IsNullable">Whether the column may be null, or null when the server cannot say.</param>
+/// <param name="SystemTypeName">The system type with its facets, <c>nvarchar(320)</c>, or null.</param>
+/// <param name="MaxLength">The length in bytes, <c>-1</c> for <c>max</c>.</param>
+/// <param name="Precision">The precision, 0 for a type that has none.</param>
+/// <param name="Scale">The scale, 0 for a type that has none.</param>
+/// <param name="UserTypeSchema">The schema of an alias or CLR type, or null.</param>
+/// <param name="UserTypeName">The name of an alias or CLR type, or null.</param>
+/// <param name="AssemblyQualifiedTypeName">The assembly-qualified name of a CLR type, or null.</param>
+/// <param name="SourceServer">The linked server of the source column, or null for the session's own.</param>
+/// <param name="SourceDatabase">
+/// The database of the source column, or null: <c>mssqlsystemresource</c> for a system view.
+/// </param>
+/// <param name="SourceSchema">The schema of the source column, or null.</param>
+/// <param name="SourceTable">The table or view of the source column, or null.</param>
+/// <param name="SourceColumn">The source column, or null for an expression.</param>
+/// <param name="IsIdentityColumn">Whether the source column is an identity column, or null.</param>
+/// <param name="IsComputedColumn">Whether the source column is computed, or null.</param>
+/// <param name="SourceType">
+/// The tool's own column, which the function does not have: the <c>OBJECTPROPERTYEX</c> <c>BaseType</c> of the source
+/// table, <c>U</c> for a table, <c>V</c> for a view, <c>IF</c> or <c>TF</c> for a table-valued function; or null
+/// when the source is of a linked server or not in the session's database, or the row names none.  A capture recorded
+/// before it has no <c>columns</c> call at all.
+/// </param>
+internal sealed record SqlServerColumnRow(
+    bool IsHidden,
+    int ColumnOrdinal,
+    string? Name,
+    bool? IsNullable,
+    string? SystemTypeName,
+    int? MaxLength,
+    int? Precision,
+    int? Scale,
+    string? UserTypeSchema,
+    string? UserTypeName,
+    string? AssemblyQualifiedTypeName,
+    string? SourceServer,
+    string? SourceDatabase,
+    string? SourceSchema,
+    string? SourceTable,
+    string? SourceColumn,
+    bool? IsIdentityColumn,
+    bool? IsComputedColumn,
+    string? SourceType
+) : ISqlServerTypeRow;
+
+/// <summary>
+/// The type a row of either procedure gives, under the names of <c>sys.dm_exec_describe_first_result_set</c>, which
+/// <see cref="SqlServerTypes" /> reads.  It adds no member to a record: a row of
+/// <c>sp_describe_undeclared_parameters</c> gives its <c>suggested_</c> columns through an explicit implementation,
+/// which a capture does not write.
+/// </summary>
+internal interface ISqlServerTypeRow
+{
+    /// <summary>The system type with its facets, or null.</summary>
+    string? SystemTypeName { get; }
+
+    /// <summary>The length in bytes, <c>-1</c> for <c>max</c>.</summary>
+    int? MaxLength { get; }
+
+    /// <summary>The precision, 0 for a type that has none.</summary>
+    int? Precision { get; }
+
+    /// <summary>The scale, 0 for a type that has none.</summary>
+    int? Scale { get; }
+
+    /// <summary>The schema of an alias or CLR type, or null.</summary>
+    string? UserTypeSchema { get; }
+
+    /// <summary>The name of an alias or CLR type, or null.</summary>
+    string? UserTypeName { get; }
+
+    /// <summary>The assembly-qualified name of a CLR type, or null.</summary>
+    string? AssemblyQualifiedTypeName { get; }
+}

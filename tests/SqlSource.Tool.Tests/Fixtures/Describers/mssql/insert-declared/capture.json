@@ -27,7 +27,8 @@
             "value": "SQL_Latin1_General_CP1_CI_AS"
           }
         ],
-        "error": null
+        "error": null,
+        "database": "fixtures"
       }
     },
     {
@@ -105,6 +106,18 @@
             "suggestedAssemblyQualifiedTypeName": null
           }
         ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "sql": "INSERT INTO dbo.users (name, email, nickname, credit) VALUES (@name, @email, @nickname, @credit);",
+        "params": "@name nvarchar(100), @email dbo.Email, @nickname nvarchar(50), @credit decimal(10,2)"
+      },
+      "answer": {
+        "rows": [],
+        "errors": null,
         "error": null
       }
     }

@@ -27,7 +27,8 @@
             "value": "SQL_Latin1_General_CP1_CI_AS"
           }
         ],
-        "error": null
+        "error": null,
+        "database": "fixtures"
       }
     },
     {
@@ -72,6 +73,18 @@
             "suggestedAssemblyQualifiedTypeName": null
           }
         ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "sql": "DELETE FROM dbo.orders WHERE user_id = @userId AND note IS NOT NULL;",
+        "params": "@userId int, @tenant int"
+      },
+      "answer": {
+        "rows": [],
+        "errors": null,
         "error": null
       }
     }

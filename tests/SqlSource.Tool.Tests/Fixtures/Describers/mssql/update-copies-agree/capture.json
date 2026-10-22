@@ -27,7 +27,8 @@
             "value": "SQL_Latin1_General_CP1_CI_AS"
           }
         ],
-        "error": null
+        "error": null,
+        "database": "fixtures"
       }
     },
     {
@@ -59,6 +60,18 @@
             "suggestedAssemblyQualifiedTypeName": null
           }
         ],
+        "error": null
+      }
+    },
+    {
+      "method": "columns",
+      "request": {
+        "sql": "UPDATE dbo.users SET deleted_at = SYSUTCDATETIME() WHERE created_at < @before OR deleted_at < @before;",
+        "params": "@before datetime2(7)"
+      },
+      "answer": {
+        "rows": [],
+        "errors": null,
         "error": null
       }
     }

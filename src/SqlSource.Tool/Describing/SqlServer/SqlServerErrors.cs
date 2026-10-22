@@ -39,6 +39,20 @@ internal static class SqlServerErrors
         "rewrite the query so that SqlSource and SQL Server read the same parameters, or give a parameter that "
         + "SqlSource reads as a variable a -- param: marker with its type";
 
+    /// <summary>The help of <c>SQLSRC265</c>: a temporary table in a batch of several statements.</summary>
+    public const string TemporaryTableHelp =
+        "make the query one statement, or use a table variable in place of the temporary table";
+
+    /// <summary>The help of <c>SQLSRC266</c>: a column with no name.</summary>
+    public const string ColumnNameHelp = "give the column a name with AS";
+
+    /// <summary>
+    /// The last error of <c>parameters</c> for a query that did not compile, which says only that it did not.  For a
+    /// temporary table of a batch of several statements its cause is <c>208</c>, a missing table, where
+    /// <c>columns</c> gives the cause by its type: <see cref="AfterRefusal" />.
+    /// </summary>
+    public const int RefusedBatch = 11501;
+
     /// <summary>The reason of <c>SQLSRC228</c> for a type the database lacks: <c>2715</c> or <c>2724</c>.</summary>
     public const string NoSuchType = "the database has no such type";
 
@@ -67,6 +81,13 @@ internal static class SqlServerErrors
 
     // The error of an identifier longer than SQL Server allows.
     private const int IdentifierTooLong = 103;
+
+    // The error_type of a row of sys.dm_exec_describe_first_result_set that says why it has no first result set:
+    // CONFLICTING_RESULTS, DYNAMIC_SQL, UNDECLARED_PARAMETER and TEMPORARY_TABLE.
+    private const int ConflictingResultsType = 3;
+    private const int DynamicSqlType = 4;
+    private const int UndeclaredParameterType = 8;
+    private const int TemporaryTableType = 10;
 
     /// <summary>
     /// <c>SQLSRC224</c>: no session.  Every failure of <c>open</c> is this one, whatever its numbers: a refused login
@@ -148,11 +169,7 @@ internal static class SqlServerErrors
     )
     {
         var errors = answer.Errors ?? [];
-        var lines = new EquatableArray<string>([
-            .. errors.Select(static row =>
-                string.Create(CultureInfo.InvariantCulture, $"Msg {row.Number}: {row.Message}")
-            ),
-        ]);
+        var lines = DescribeLines(errors);
         if (
             parameter.Name.Length > ParameterCopies.MaximumCopyLength
             && errors.Any(static row => row.Number == IdentifierTooLong)
@@ -206,6 +223,87 @@ internal static class SqlServerErrors
     }
 
     /// <summary>
+    /// What the error rows of <c>columns</c> or <c>table</c> are reported as, by their <c>error_type</c> and never by
+    /// their message: the first row of type 3, 4 or 10 is <c>SQLSRC263</c>, <c>SQLSRC264</c> or <c>SQLSRC265</c>.
+    /// Anything else is the server rejecting the query, <c>SQLSRC225</c>, whose message ends with the text of the first
+    /// row of type 8, which cannot happen since every parameter is declared, or else of the first row, the cause.
+    /// Every row is a line, in the server's order.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="errors">The error rows that the call answered.</param>
+    /// <param name="step">The step whose call answered them: <c>describe columns</c>, or <c>table match</c>.</param>
+    public static DescribeFailure Columns(
+        DescribeRequest query,
+        IReadOnlyList<SqlServerDescribeError> errors,
+        DescribeStep step
+    )
+    {
+        var lines = DescribeLines(errors);
+        var shape = errors.FirstOrDefault(IsShapeCause);
+        if (shape is not null)
+        {
+            return new DescribeFailure(
+                shape.Type switch
+                {
+                    ConflictingResultsType => ToolDiagnostics.ConflictingResults,
+                    DynamicSqlType => ToolDiagnostics.DynamicSql,
+                    _ => ToolDiagnostics.TemporaryTableInBatch,
+                },
+                new EquatableArray<string>([query.Name]),
+                step,
+                lines,
+                shape.Type == TemporaryTableType ? TemporaryTableHelp : null
+            );
+        }
+
+        var cause =
+            errors.FirstOrDefault(static row => row.Type == UndeclaredParameterType)
+            ?? (errors.Count > 0 ? errors[0] : null);
+        return new DescribeFailure(
+            ToolDiagnostics.ServerRejectedQuery,
+            new EquatableArray<string>([query.Name, cause?.Message ?? string.Empty]),
+            step,
+            lines,
+            null
+        );
+    }
+
+    /// <summary>
+    /// What a query is reported as when <c>parameters</c> failed with <see cref="RefusedBatch" /> and <c>columns</c>
+    /// was asked with the declared parameters alone: error rows of type 3, 4 or 10 give the cause, as
+    /// <see cref="Columns" /> reports it at <c>describe columns</c>, and any other answer leaves the failure of
+    /// <c>parameters</c>, with its lines.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="parameters">What the server said to <c>parameters</c>.</param>
+    /// <param name="copied">The SQL that <c>parameters</c> was sent.</param>
+    /// <param name="columns">The answer of <c>columns</c>.</param>
+    public static DescribeFailure AfterRefusal(
+        DescribeRequest query,
+        SqlServerServerError parameters,
+        CopiedSql copied,
+        SqlServerColumnsAnswer columns
+    ) =>
+        columns.Errors is { } errors && errors.Any(IsShapeCause)
+            ? Columns(query, errors, DescribeStep.DescribeColumns)
+            : Parameters(query, parameters, copied);
+
+    /// <summary>
+    /// <c>SQLSRC266</c>: a column of the query has no name, <c>SELECT 1</c>.  The server raised nothing, so there is
+    /// no server line.
+    /// </summary>
+    /// <param name="query">The query.</param>
+    /// <param name="ordinal">The column's place, counted from one.</param>
+    public static DescribeFailure NoColumnName(DescribeRequest query, int ordinal) =>
+        new(
+            ToolDiagnostics.ColumnHasNoName,
+            new EquatableArray<string>([ordinal.ToString(CultureInfo.InvariantCulture), query.Name]),
+            DescribeStep.DescribeColumns,
+            EquatableArray<string>.Empty,
+            ColumnNameHelp
+        );
+
+    /// <summary>
     /// <c>SQLSRC226</c> for a reused parameter whose copies give it no type: every copy was ignored, or one left has
     /// no type.  The server raised nothing, so there is no server line.
     /// </summary>
@@ -222,7 +320,7 @@ internal static class SqlServerErrors
 
     /// <summary>
     /// <c>SQLSRC262</c>: the copies of a reused parameter that constrain its type have two types, the first two in
-    /// order of use, each named as a declaration would write it (<see cref="SqlServerTypes.Spelled" />).
+    /// order of use, each named as a message names a type (<see cref="SqlServerTypes.Spelled" />).
     /// </summary>
     /// <param name="query">The query.</param>
     /// <param name="parameter">The parameter's name, as the list spells it.</param>
@@ -288,6 +386,20 @@ internal static class SqlServerErrors
             ServerLines(error),
             null
         );
+
+    // The server: lines of the error rows of sys.dm_exec_describe_first_result_set, one for each in its order:
+    // "Msg 207: text", since a row has no level or state.
+    private static EquatableArray<string> DescribeLines(IReadOnlyList<SqlServerDescribeError> errors) =>
+        new([
+            .. errors.Select(static row =>
+                string.Create(CultureInfo.InvariantCulture, $"Msg {row.Number}: {row.Message}")
+            ),
+        ]);
+
+    // An error row whose type says why the query has no first result set to describe, which the user mends by its
+    // own diagnostic.
+    private static bool IsShapeCause(SqlServerDescribeError row) =>
+        row.Type is ConflictingResultsType or DynamicSqlType or TemporaryTableType;
 
     // A parameter as the SQL writes one: "@id".
     private static string Written(string parameter) => SqlDialectRules.SqlServer.ParameterPrefix + parameter;

@@ -115,6 +115,79 @@ public sealed class SqlServerTypesTests
         type.UserType.ShouldBe(new SqlServerUserType("sys", "hierarchyid", name));
     }
 
+    // A column of a result set, as sys.dm_exec_describe_first_result_set describes it.
+    [Theory]
+    [InlineData("bigint", 8, 19, 0)]
+    [InlineData("decimal(18,4)", 9, 18, 4)]
+    [InlineData("nvarchar(50)", 100, 0, 0)]
+    [InlineData("varchar(max)", -1, 0, 0)]
+    [InlineData("timestamp", 8, 0, 0)]
+    public void FromColumn_SystemType_IsTheNameAndFacetsVerbatim(string name, int length, int precision, int scale)
+    {
+        var type = SqlServerTypes.FromColumn(Column(name, length, precision, scale, null, null, null));
+
+        type.ShouldBe(new SqlServerType(name, length, precision, scale, null));
+        type.BindName.ShouldBeNull();
+    }
+
+    [Fact]
+    public void FromColumn_AliasType_HoldsItsSchemaAndName()
+    {
+        var type = SqlServerTypes.FromColumn(Column("nvarchar(320)", 640, 0, 0, "dbo", "Email", null));
+
+        type.ShouldBe(new SqlServerType("nvarchar(320)", 640, 0, 0, new SqlServerUserType("dbo", "Email", null)));
+        SqlServerTypes.Spelled(type).ShouldBe("dbo.Email");
+    }
+
+    [Fact]
+    public void FromColumn_ClrType_HoldsItsAssemblyQualifiedName()
+    {
+        var name = "Microsoft.SqlServer.Types.SqlHierarchyId, " + TypesAssembly;
+
+        var type = SqlServerTypes.FromColumn(Column("hierarchyid", 892, 0, 0, "sys", "hierarchyid", name));
+
+        type.ShouldBe(new SqlServerType("hierarchyid", 892, 0, 0, new SqlServerUserType("sys", "hierarchyid", name)));
+        SqlServerTypes.Spelled(type).ShouldBe("hierarchyid");
+    }
+
+    // A user type that is not of sys is declared by its schema and name, each in brackets: dbo.User does not declare,
+    // since User is a keyword, and the server refuses it with 156.
+    [Theory]
+    [InlineData("dbo", "User", "[dbo].[User]")]
+    [InlineData("dbo", "Email", "[dbo].[Email]")]
+    [InlineData("my schema", "odd ]type", "[my schema].[odd ]]type]")]
+    public void Declared_UserTypeNotOfSys_IsItsSchemaAndNameInBrackets(string schema, string name, string declared)
+    {
+        var type = new SqlServerType("nvarchar(50)", 100, 0, 0, new SqlServerUserType(schema, name, null));
+
+        SqlServerTypes.Declared(type).ShouldBe(declared);
+        SqlServerTypes.Spelled(type).ShouldBe(schema + "." + name);
+    }
+
+    // sysname and hierarchyid are user types of sys, declared by their system type names.
+    [Fact]
+    public void Declared_UserTypesOfSys_AreTheirSystemTypeNames()
+    {
+        var name = "Microsoft.SqlServer.Types.SqlHierarchyId, " + TypesAssembly;
+
+        SqlServerTypes
+            .Declared(new SqlServerType("nvarchar(128)", 256, 0, 0, new SqlServerUserType("sys", "sysname", null)))
+            .ShouldBe("nvarchar(128)");
+        SqlServerTypes
+            .Declared(new SqlServerType("hierarchyid", 892, 0, 0, new SqlServerUserType("sys", "hierarchyid", name)))
+            .ShouldBe("hierarchyid");
+    }
+
+    [Fact]
+    public void Declared_SystemType_IsItsName() =>
+        SqlServerTypes.Declared(new SqlServerType("decimal(18,4)", 9, 18, 4, null)).ShouldBe("decimal(18,4)");
+
+    [Fact]
+    public void FromColumn_RowWithoutAName_ThrowsInvalidOperationException() =>
+        Should.Throw<InvalidOperationException>(() =>
+            SqlServerTypes.FromColumn(Column(null, 4, 10, 0, null, null, null))
+        );
+
     [Fact]
     public void FromParameter_RowWithoutAName_ThrowsInvalidOperationException() =>
         Should.Throw<InvalidOperationException>(() =>
@@ -138,5 +211,37 @@ public sealed class SqlServerTypesTests
     public void FromDeclared_RowWithoutAFacet_ThrowsInvalidOperationException() =>
         Should.Throw<InvalidOperationException>(() =>
             SqlServerTypes.FromDeclared(new SqlServerDeclaredRow(1, "int", null, 10, 0, null, null, null))
+        );
+
+    // A visible column of an expression with the type the test gives.
+    private static SqlServerColumnRow Column(
+        string? name,
+        int length,
+        int precision,
+        int scale,
+        string? userSchema,
+        string? userName,
+        string? assemblyQualifiedName
+    ) =>
+        new(
+            false,
+            1,
+            "c",
+            true,
+            name,
+            length,
+            precision,
+            scale,
+            userSchema,
+            userName,
+            assemblyQualifiedName,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null
         );
 }

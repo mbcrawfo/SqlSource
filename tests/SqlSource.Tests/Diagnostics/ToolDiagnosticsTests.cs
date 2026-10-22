@@ -79,12 +79,14 @@ public sealed class ToolDiagnosticsTests
             ToolDiagnostics.FileNotInRun,
             ToolDiagnostics.DirectoryCannotBeRead,
         };
-        // SQLSRC231 starts with the name of the reader, and its own test formats it.
+        // SQLSRC231 starts with the name of the reader and SQLSRC266 with a column's position, and their own tests
+        // format them.
         foreach (
             var descriptor in ToolDiagnostics
                 .All.Remove(ToolDiagnostics.UnexpectedFailure)
                 .Remove(ToolDiagnostics.UnnamedConnectionNotUsed)
                 .Remove(ToolDiagnostics.ParametersReadDifferently)
+                .Remove(ToolDiagnostics.ColumnHasNoName)
         )
         {
             // The later arguments are for the ones that have more than one place: a format ignores an argument it

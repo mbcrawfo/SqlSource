@@ -6,7 +6,7 @@ The [query generation epic](../superpowers/specs/2026-10-07-query-generation-epi
 
 ## Delivered instead
 
-[Sub-phase 6.2](../superpowers/specs/2026-10-20-query-generation-phase-6-2-columns-and-table-match-design.md) describes a SQL Server query by its first result set, as the server does, and the manual's SQL Server page says that only the first result set of a query is described and read into its model.
+[Sub-phase 6.2](../superpowers/specs/2026-10-20-query-generation-phase-6-2-columns-and-table-match-design.md) describes a SQL Server query by its first result set, as the server does: the `columns` call of [`SqlServerSession`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerSession.cs) asks `sys.dm_exec_describe_first_result_set`, which describes the first result set of a batch and says nothing of the others, and the fixture `select-first-result-set` holds it.  The manual's SQL Server page will say that only a query's first result set is described and read into its model; that sentence comes with the page, which sub-phase 6.3 writes when it registers the describer.
 
 ## Why deferred
 

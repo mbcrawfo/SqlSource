@@ -76,4 +76,30 @@ internal sealed partial class SqlServerSession
             (asked, answer, durationMs) => SqlServerEvents.Declared(_log, query, asked, answer, durationMs),
             cancellationToken
         );
+
+    private Task<SqlServerColumnsAnswer> ColumnsAsync(
+        string query,
+        SqlServerColumnsRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        AskAsync(
+            SqlServerCallNames.Columns,
+            request,
+            _live.ColumnsAsync,
+            (asked, answer, durationMs) => SqlServerEvents.Columns(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
+
+    private Task<SqlServerColumnsAnswer> TableAsync(
+        string query,
+        SqlServerTableRequest request,
+        CancellationToken cancellationToken
+    ) =>
+        AskAsync(
+            SqlServerCallNames.Table,
+            request,
+            _live.TableAsync,
+            (asked, answer, durationMs) => SqlServerEvents.Table(_log, query, asked, answer, durationMs),
+            cancellationToken
+        );
 }

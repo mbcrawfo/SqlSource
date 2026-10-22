@@ -1,10 +1,13 @@
 using System;
+using System.Diagnostics.Tracing;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Shouldly;
+using SqlSource.Snapshot;
 using SqlSource.Tool.Describing;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.SqlServer;
@@ -136,10 +139,10 @@ public sealed class RedactionTests : IDisposable
             .ShouldBe("password *** refused, table latest_orders");
     }
 
-    // The events of the SQL Server describer hold the SQL, the declarations and the messages of the server, so the
+    // The events of the SQL Server describer hold the SQL, the declarations, the server's rows and its messages, so the
     // value is searched in each: the fake describer writes them through its log as the real one does.  The scene's fake
-    // describer is PostgreSQL's, so the events of these three tests are named postgres.parameters, postgres.probe and
-    // postgres.declared.
+    // describer is PostgreSQL's, so the events of these tests are named postgres.parameters, postgres.probe,
+    // postgres.declared, postgres.columns, postgres.table, postgres.column and postgres.table-match.
     [Fact]
     public async Task Run_DescriberThatLogsAParametersEventWithItsConnection_HasTheMarkInEachString()
     {
@@ -236,6 +239,189 @@ public sealed class RedactionTests : IDisposable
         row.GetProperty("assemblyQualifiedTypeName").GetString().ShouldBe("***");
         events[1].GetProperty("errors")[0].GetProperty("message").GetString().ShouldBe("Cannot find data type ***.");
         events[2].GetProperty("error")[0].GetProperty("message").GetString().ShouldBe("Cannot reach '***'.");
+    }
+
+    // A row of "columns" or "table" whose every string is the value.
+    private static SqlServerColumnRow ColumnRowOf(string value) =>
+        new(
+            false,
+            1,
+            value,
+            true,
+            value,
+            4,
+            10,
+            0,
+            value,
+            value,
+            value,
+            value,
+            value,
+            value,
+            value,
+            value,
+            false,
+            false,
+            value
+        );
+
+    // The answers of "columns" and "table" in each of their three shapes: rows, the describe's error rows, and the
+    // error of the call.
+    private static SqlServerColumnsAnswer[] ColumnsAnswersOf(string value) =>
+        [
+            new([ColumnRowOf(value)], null, null),
+            new(null, [new SqlServerDescribeError(208, 7, "Invalid object name '" + value + "'.")], null),
+            new(
+                null,
+                null,
+                new SqlServerServerError([new SqlServerErrorRow(53, 20, 0, "Cannot reach '" + value + "'.")])
+            ),
+        ];
+
+    private static void ShouldHaveTheMarkInEachRowString(JsonElement row)
+    {
+        foreach (
+            var name in new[]
+            {
+                "name",
+                "systemTypeName",
+                "userTypeSchema",
+                "userTypeName",
+                "assemblyQualifiedTypeName",
+                "sourceServer",
+                "sourceDatabase",
+                "sourceSchema",
+                "sourceTable",
+                "sourceColumn",
+                "sourceType",
+            }
+        )
+        {
+            row.GetProperty(name).GetString().ShouldBe("***", name);
+        }
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogsAColumnsEventWithItsConnection_HasTheMarkInEachString()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            var sql = "SELECT '" + value + "'";
+            var declarations = "@p nvarchar(10) /* " + value + " */";
+            foreach (var answer in ColumnsAnswersOf(value))
+            {
+                SqlServerEvents.Columns(log, "GetUser", new(sql, declarations), answer, 1);
+            }
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.columns").ToList();
+        events.Count.ShouldBe(3);
+        events[0].GetProperty("sql").GetString().ShouldBe("SELECT '***'");
+        events[0].GetProperty("params").GetString().ShouldBe("@p nvarchar(10) /* *** */");
+        ShouldHaveTheMarkInEachRowString(events[0].GetProperty("rows")[0]);
+        events[1].GetProperty("errors")[0].GetProperty("message").GetString().ShouldBe("Invalid object name '***'.");
+        events[2].GetProperty("error")[0].GetProperty("message").GetString().ShouldBe("Cannot reach '***'.");
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogsATableEventWithItsConnection_HasTheMarkInEachString()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            foreach (var answer in ColumnsAnswersOf(value))
+            {
+                SqlServerEvents.Table(log, "GetUser", new(value, value), answer, 1);
+            }
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.table").ToList();
+        events.Count.ShouldBe(3);
+        events[0].GetProperty("schema").GetString().ShouldBe("***");
+        events[0].GetProperty("table").GetString().ShouldBe("***");
+        ShouldHaveTheMarkInEachRowString(events[0].GetProperty("rows")[0]);
+        events[1].GetProperty("errors")[0].GetProperty("message").GetString().ShouldBe("Invalid object name '***'.");
+        events[2].GetProperty("error")[0].GetProperty("message").GetString().ShouldBe("Cannot reach '***'.");
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogsAColumnEventWithItsConnection_HasTheMarkInEachString()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            var origin = new SidecarOrigin(value, value, value);
+            var withOrigin = new SidecarColumn(0, value, new OtherEngineType(value), true, value, origin, false, false);
+            SqlServerEvents.Column(log, "GetUser", withOrigin, null);
+            SqlServerEvents.Column(log, "GetUser", withOrigin with { Origin = null }, "no origin in " + value);
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var events = LogReader.Read(Log).Where(e => e.GetProperty("event").GetString() == "postgres.column").ToList();
+        events.Count.ShouldBe(2);
+        events[0].GetProperty("name").GetString().ShouldBe("***");
+        events[0].GetProperty("type").GetString().ShouldBe("***");
+        events[0].GetProperty("nullableSource").GetString().ShouldBe("***");
+        var logged = events[0].GetProperty("origin");
+        logged.GetProperty("schema").GetString().ShouldBe("***");
+        logged.GetProperty("table").GetString().ShouldBe("***");
+        logged.GetProperty("column").GetString().ShouldBe("***");
+        events[1].GetProperty("noOrigin").GetString().ShouldBe("no origin in ***");
+    }
+
+    [Fact]
+    public async Task Run_DescriberThatLogsATableMatchEventWithItsConnection_HasTheMarkInEachString()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            var value = request.Connection;
+            SqlServerEvents.TableMatch(log, "GetUser", new SidecarTable(value, value), value);
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        var logged = LogReader.Read(Log).Single(e => e.GetProperty("event").GetString() == "postgres.table-match");
+        logged.GetProperty("tableMatch").GetString().ShouldBe("***");
+        logged.GetProperty("table").GetProperty("schema").GetString().ShouldBe("***");
+        logged.GetProperty("table").GetProperty("table").GetString().ShouldBe("***");
+    }
+
+    // SqlClient's events reach the log through the describer's log too, so a command's text that held the value would
+    // be written with the mark: the listener forwards one as SqlClient writes it.
+    [Fact]
+    public async Task Run_DescriberThatLogsADriverEventWithItsConnection_HasTheMarkInItsCommandText()
+    {
+        _scene.Describer.OnOpen = (log, request) =>
+        {
+            using var listener = SqlClientRunListener.For(log).ShouldNotBeNull();
+            listener.Forward(
+                "BeginExecute",
+                EventLevel.Informational,
+                1,
+                ["objectId", "dataSource", "database", "commandText", "message"],
+                [9, request.Connection, request.Connection, "SELECT '" + request.Connection + "'", request.Connection]
+            );
+        };
+
+        var text = await LoggedWithAsync(Secrets.ConnectionWithMarker);
+
+        text.ShouldNotContain(Secrets.Marker);
+        LogReader
+            .Read(Log)
+            .Single(e => e.GetProperty("event").GetString() == "postgres.driver")
+            .GetProperty("commandText")
+            .GetString()
+            .ShouldBe("SELECT '***'");
     }
 
     [Fact]

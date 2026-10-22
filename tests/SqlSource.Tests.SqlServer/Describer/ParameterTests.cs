@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
@@ -128,7 +129,12 @@ public sealed class ParameterTests(SqlServerContainer sqlServer)
     {
         var description = await ShouldDescribeAsync(Of(SqlDialectRules.SqlServer, sql));
 
-        description.ResultKind.ShouldBe(SidecarResultKind.None);
+        // An INSERT or UPDATE with no OUTPUT has no rows, and every other row of the spike is a query.
+        description.ResultKind.ShouldBe(
+            sql.StartsWith("INSERT", StringComparison.Ordinal) || sql.StartsWith("UPDATE", StringComparison.Ordinal)
+                ? SidecarResultKind.None
+                : SidecarResultKind.Rows
+        );
         description
             .Parameters.Single(described => described.Name == parameter)
             .ShouldBe(
@@ -221,12 +227,13 @@ public sealed class ParameterTests(SqlServerContainer sqlServer)
     }
 
     // The optional filter: the use in "IS NULL" types nothing, and the parameter takes the type of the column, in a
-    // SELECT, in an UPDATE with no rows, and in an IF whose two paths return two shapes.
+    // SELECT, in an UPDATE with no rows, and in an IF of two paths.  The two paths return one shape, since the columns
+    // of an IF whose paths return two are SQLSRC263.
     [Theory]
     [InlineData("SELECT id FROM dbo.users WHERE (@name IS NULL OR name = @name)")]
     [InlineData("UPDATE dbo.users SET nickname = N'x' WHERE (@name IS NULL OR name = @name)")]
     [InlineData(
-        "IF @a = 1 SELECT id FROM dbo.users WHERE (@name IS NULL OR name = @name) ELSE SELECT name FROM dbo.users"
+        "IF @a = 1 SELECT id FROM dbo.users WHERE (@name IS NULL OR name = @name) ELSE SELECT id FROM dbo.users"
     )]
     public async Task DescribeAsync_OptionalFilter_IsTypedFromTheCopyThatConstrains(string sql)
     {

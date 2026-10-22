@@ -358,10 +358,285 @@ public sealed class SqlServerErrorsTests
             )
             .Step.ShouldBe(DescribeStep.ResolveType);
 
+    [Fact]
+    public void Columns_ConflictingResults_Is263()
+    {
+        const string Message =
+            "The metadata could not be determined because the statement 'SELECT id FROM dbo.users' is not "
+            + "compatible with the statement 'SELECT name FROM dbo.users'.";
+
+        var failure = SqlServerErrors.Columns(
+            Of(SqlDialectRules.SqlServer, "IF @a = 1 SELECT id FROM dbo.users ELSE SELECT name FROM dbo.users"),
+            [new SqlServerDescribeError(11509, 3, Message)],
+            DescribeStep.DescribeColumns
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC263");
+        failure.Arguments.ShouldBe([Query]);
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.ShouldBe([$"Msg 11509: {Message}"]);
+        failure.Help.ShouldBeNull();
+        MessageOf(failure).ShouldBe("The query 'Q' returns rows of different shapes on different paths");
+    }
+
+    [Fact]
+    public void Columns_DynamicSql_Is264()
+    {
+        const string Message =
+            "The metadata could not be determined because statement 'EXEC(@s)' contains dynamic SQL.  Consider "
+            + "using the WITH RESULT SETS clause to explicitly describe the result set.";
+
+        var failure = SqlServerErrors.Columns(
+            Of(SqlDialectRules.SqlServer, "DECLARE @s nvarchar(max) = N'SELECT 1 AS a'; EXEC(@s)"),
+            [new SqlServerDescribeError(11513, 4, Message)],
+            DescribeStep.DescribeColumns
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC264");
+        failure.Arguments.ShouldBe([Query]);
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.ShouldBe([$"Msg 11513: {Message}"]);
+        failure.Help.ShouldBeNull();
+        MessageOf(failure).ShouldBe("The query 'Q' runs SQL that the server cannot read until it runs");
+    }
+
+    // The cause is the row of its type, wherever it stands, and every row is still a line.
+    [Fact]
+    public void Columns_TemporaryTable_Is265WithHelp()
+    {
+        const string Message =
+            "The metadata could not be determined because statement 'SELECT a FROM #y' uses a temp table.  Metadata "
+            + "discovery only supports temp tables when analyzing a single-statement batch.";
+
+        var failure = SqlServerErrors.Columns(
+            Of(SqlDialectRules.SqlServer, "CREATE TABLE #y (a int NOT NULL); SELECT a FROM #y"),
+            [
+                new SqlServerDescribeError(208, 2, "Invalid object name '#y'."),
+                new SqlServerDescribeError(11525, 10, Message),
+            ],
+            DescribeStep.DescribeColumns
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC265");
+        failure.Arguments.ShouldBe([Query]);
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.ShouldBe(["Msg 208: Invalid object name '#y'.", $"Msg 11525: {Message}"]);
+        failure.Help.ShouldBe("make the query one statement, or use a table variable in place of the temporary table");
+        MessageOf(failure).ShouldBe("The query 'Q' uses a temporary table in a batch of several statements");
+    }
+
+    // Every parameter is declared, so this cannot happen: it is reported as the server rejecting the query, to be
+    // seen, and the message is the row of its type.
+    [Fact]
+    public void Columns_UndeclaredParameter_Is225()
+    {
+        const string Message =
+            "The metadata could not be determined because statement 'SELECT @p AS p' uses an undeclared parameter "
+            + "in a context that affects its metadata.";
+
+        var failure = SqlServerErrors.Columns(
+            Of(SqlDialectRules.SqlServer, "SELECT @p AS p"),
+            [
+                new SqlServerDescribeError(102, 2, "Incorrect syntax near 'x'."),
+                new SqlServerDescribeError(11521, 8, Message),
+            ],
+            DescribeStep.DescribeColumns
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe([Query, Message]);
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.ShouldBe(["Msg 102: Incorrect syntax near 'x'.", $"Msg 11521: {Message}"]);
+        failure.Help.ShouldBeNull();
+    }
+
+    // An OUTPUT without INTO on a table with a trigger, an unknown column, a GO inside the query and a word read as
+    // a procedure: the cause first and the row that says the query did not compile last, each of the type the server
+    // gives it.
+    [Theory]
+    [InlineData(
+        334,
+        1,
+        "The target table 'dbo.trig' of the DML statement cannot have any enabled triggers if the statement contains "
+            + "an OUTPUT clause without INTO clause.",
+        11501,
+        2,
+        "The batch could not be analyzed because of compile errors."
+    )]
+    [InlineData(
+        207,
+        2,
+        "Invalid column name 'nope'.",
+        11501,
+        2,
+        "The batch could not be analyzed because of compile errors."
+    )]
+    [InlineData(
+        102,
+        2,
+        "Incorrect syntax near 'GO'.",
+        11501,
+        2,
+        "The batch could not be analyzed because of compile errors."
+    )]
+    [InlineData(
+        2812,
+        1,
+        "Could not find stored procedure 'SELEC'.",
+        11529,
+        1,
+        "The metadata could not be determined because every code path results in an error; see previous errors for "
+            + "some of these."
+    )]
+    public void Columns_OtherType_Is225WithEveryLineInOrder(
+        int cause,
+        int causeType,
+        string causeText,
+        int last,
+        int lastType,
+        string lastText
+    )
+    {
+        var failure = SqlServerErrors.Columns(
+            Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users"),
+            [
+                new SqlServerDescribeError(cause, causeType, causeText),
+                new SqlServerDescribeError(last, lastType, lastText),
+            ],
+            DescribeStep.DescribeColumns
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Arguments.ShouldBe([Query, causeText]);
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.ShouldBe([$"Msg {cause}: {causeText}", $"Msg {last}: {lastText}"]);
+        failure.Help.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Columns_TableStep_IsTableMatch() =>
+        SqlServerErrors
+            .Columns(
+                Of(SqlDialectRules.SqlServer, "SELECT id FROM dbo.users"),
+                [new SqlServerDescribeError(208, 2, "Invalid object name 'dbo.users'.")],
+                DescribeStep.TableMatch
+            )
+            .Step.ShouldBe(DescribeStep.TableMatch);
+
+    // The parameters' procedure reports a temporary table of a batch as a missing table, where the columns' gives its
+    // cause.
+    [Fact]
+    public void AfterRefusal_TemporaryTable_Is265()
+    {
+        var query = Of(SqlDialectRules.SqlServer, "CREATE TABLE #y (a int NOT NULL); SELECT a FROM #y WHERE a = @p");
+        const string Message =
+            "The metadata could not be determined because statement 'SELECT a FROM #y WHERE a = @p' uses a temp "
+            + "table.  Metadata discovery only supports temp tables when analyzing a single-statement batch.";
+
+        var failure = SqlServerErrors.AfterRefusal(
+            query,
+            Refused(),
+            Copied(query),
+            new SqlServerColumnsAnswer(null, [new SqlServerDescribeError(11525, 10, Message)], null)
+        );
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC265");
+        failure.Arguments.ShouldBe([Query]);
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.ShouldBe([$"Msg 11525: {Message}"]);
+        failure.Help.ShouldBe(SqlServerErrors.TemporaryTableHelp);
+    }
+
+    // Rows of no shape's cause leave the parameters' failure, with its lines.
+    [Fact]
+    public void AfterRefusal_OtherRows_IsParametersFailure()
+    {
+        var query = Of(SqlDialectRules.SqlServer, "SELECT a FROM #y WHERE a = @p");
+
+        var failure = SqlServerErrors.AfterRefusal(
+            query,
+            Refused(),
+            Copied(query),
+            new SqlServerColumnsAnswer(
+                null,
+                [
+                    new SqlServerDescribeError(208, 2, "Invalid object name '#y'."),
+                    new SqlServerDescribeError(
+                        11529,
+                        1,
+                        "The metadata could not be determined because every code path results in an error; see "
+                            + "previous errors for some of these."
+                    ),
+                ],
+                null
+            )
+        );
+
+        failure.ShouldBe(SqlServerErrors.Parameters(query, Refused(), Copied(query)));
+        failure.Descriptor.Id.ShouldBe("SQLSRC225");
+        failure.Step.ShouldBe(DescribeStep.DescribeParameters);
+        failure.ServerLines.ShouldBe([
+            "Msg 208, Level 16, State 1: Invalid object name '#y'.",
+            "Msg 11501, Level 16, State 1: The batch could not be analyzed because of compile errors.",
+        ]);
+    }
+
+    [Fact]
+    public void AfterRefusal_ColumnsAnswered_IsParametersFailure()
+    {
+        var query = Of(SqlDialectRules.SqlServer, "SELECT a FROM #y WHERE a = @p");
+        var row = new SqlServerColumnRow(
+            false,
+            1,
+            "a",
+            false,
+            "int",
+            4,
+            10,
+            0,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            false,
+            false,
+            null
+        );
+
+        SqlServerErrors
+            .AfterRefusal(query, Refused(), Copied(query), new SqlServerColumnsAnswer([row], null, null))
+            .ShouldBe(SqlServerErrors.Parameters(query, Refused(), Copied(query)));
+    }
+
+    [Fact]
+    public void NoColumnName_Is266()
+    {
+        var failure = SqlServerErrors.NoColumnName(Of(SqlDialectRules.SqlServer, "SELECT id, 1 FROM dbo.users"), 2);
+
+        failure.Descriptor.Id.ShouldBe("SQLSRC266");
+        failure.Arguments.ShouldBe(["2", Query]);
+        failure.Step.ShouldBe(DescribeStep.DescribeColumns);
+        failure.ServerLines.ShouldBeEmpty();
+        failure.Help.ShouldBe("give the column a name with AS");
+        MessageOf(failure).ShouldBe("Column 2 of the query 'Q' has no name");
+    }
+
     private static CopiedSql Copied(DescribeRequest query) => ParameterCopies.Rename(query.Sql, query.Parameters);
 
     private static SqlServerServerError ErrorOf(params (int Number, string Message)[] errors) =>
         new([.. errors.Select(error => new SqlServerErrorRow(error.Number, 16, 1, error.Message))]);
+
+    // What parameters says of a temporary table that a batch creates: the table is missing, and the batch did not
+    // compile.
+    private static SqlServerServerError Refused() =>
+        ErrorOf(
+            (208, "Invalid object name '#y'."),
+            (SqlServerErrors.RefusedBatch, "The batch could not be analyzed because of compile errors.")
+        );
 
     private static SqlServerDeclaredAnswer DescribeErrors(params (int Number, string Message)[] errors) =>
         new(null, [.. errors.Select(error => new SqlServerDescribeError(error.Number, 1, error.Message))], null);

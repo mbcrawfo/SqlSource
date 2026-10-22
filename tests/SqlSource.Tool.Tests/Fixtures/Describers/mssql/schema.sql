@@ -2,10 +2,13 @@
 -- tests/SqlSource.Tests.SqlServer runs against: that project creates the database fixtures and applies this file to
 -- it through SqlServerScripts, which runs each batch between the lines that hold GO alone as one command of SqlClient.
 -- SqlClient runs with QUOTED_IDENTIFIER on, which the persisted computed column of dbo.users needs.  A statement that
--- must start a batch, CREATE SCHEMA, CREATE TRIGGER or CREATE VIEW, has a GO before it and after it.  A change here
--- can change what the describer answers: record every case again with tools/record-fixtures.sh mssql.
+-- must start a batch, CREATE SCHEMA, CREATE TRIGGER, CREATE VIEW or CREATE FUNCTION, has a GO before it and after it.
+-- A change here can change what the describer answers: record every case again with tools/record-fixtures.sh mssql.
 
 CREATE TYPE dbo.Email FROM nvarchar(320) NOT NULL;
+
+-- An alias type named by a keyword, which a declaration must put in brackets.
+CREATE TYPE dbo.[User] FROM nvarchar(50) NOT NULL;
 
 CREATE TYPE dbo.IdList AS TABLE (id int NOT NULL);
 GO
@@ -43,6 +46,12 @@ CREATE TABLE billing.invoices (
 -- The canary of the tests that prove a text of the user's runs nothing: a statement that drops it fails them.
 CREATE TABLE dbo.victim (id int);
 
+-- A table of a column of the alias type named by a keyword.
+CREATE TABLE dbo.accounts (
+    id int NOT NULL PRIMARY KEY,
+    owner dbo.[User] NOT NULL
+);
+
 -- A table with an AFTER trigger, for the result sets of sub-phase 6.2.
 CREATE TABLE dbo.trig (
     id int NOT NULL PRIMARY KEY,
@@ -60,12 +69,26 @@ FROM dbo.users AS u
 LEFT JOIN dbo.orders AS o ON o.user_id = u.id;
 GO
 
--- A system-versioned table, whose period columns the server fills.
+-- An inline and a multi-statement table-valued function: the server names the function as its columns' source.
+CREATE FUNCTION dbo.orders_of(@user_id int) RETURNS TABLE AS
+RETURN SELECT id, user_id, total, note FROM dbo.orders WHERE user_id = @user_id;
+GO
+
+CREATE FUNCTION dbo.orders_table_of(@user_id int)
+RETURNS @orders TABLE (id int NOT NULL, user_id int NOT NULL, total decimal(18, 2) NOT NULL, note varchar(200) NULL) AS
+BEGIN
+    INSERT INTO @orders (id, user_id, total, note)
+    SELECT id, user_id, total, note FROM dbo.orders WHERE user_id = @user_id;
+    RETURN;
+END;
+GO
+
+-- A system-versioned table, whose period columns the server fills.  They are HIDDEN, so SELECT * leaves them out.
 CREATE TABLE dbo.prices (
     id int NOT NULL PRIMARY KEY,
     amount decimal(10, 2) NOT NULL,
-    valid_from datetime2 GENERATED ALWAYS AS ROW START NOT NULL,
-    valid_to datetime2 GENERATED ALWAYS AS ROW END NOT NULL,
+    valid_from datetime2 GENERATED ALWAYS AS ROW START HIDDEN NOT NULL,
+    valid_to datetime2 GENERATED ALWAYS AS ROW END HIDDEN NOT NULL,
     PERIOD FOR SYSTEM_TIME (valid_from, valid_to)
 ) WITH (SYSTEM_VERSIONING = ON (HISTORY_TABLE = dbo.prices_history));
 

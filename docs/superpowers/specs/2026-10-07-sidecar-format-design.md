@@ -142,7 +142,7 @@ A composite carries no fields in this epic; `fields` is the obvious additive key
 
 | Key | Type | Written | Meaning |
 |----|----|----|----|
-| `name` | string | always | `system_type_name` verbatim: `"nvarchar(50)"`, `"decimal(18,2)"`, `"varchar(max)"`, `"datetime2(7)"`, `"int"`.  `rowversion` is reported, and stored, as `"timestamp"`, and `json` as `"varchar(max)"` or `"nvarchar(max)"` depending on the connection's TDS version, because that is what the server says. |
+| `name` | string | always | `system_type_name` verbatim: `"nvarchar(50)"`, `"decimal(18,2)"`, `"varchar(max)"`, `"datetime2(7)"`, `"int"`.  `rowversion` is reported, and stored, as `"timestamp"`, because that is what the server says.  SQL Server 2025 reports `json` and `vector(n)` as `"json"` and `"vector(n)"`, for example `"vector(3)"`, to Microsoft.Data.SqlClient 6.1 and later, whose TDS knows them, so the tool records them so; `"varchar(max)"` is what an older client, such as `sqlcmd`, sees. |
 | `bindName` | string | never | Not written for SQL Server, as phase 6 decided: the generated code of phase 8 binds a type that `SqlDbType` names by its `SqlDbType` with `maxLength`, `precision` and `scale`, and a CLR type by the `userType` the type already holds, its `assemblyQualifiedName` included.  A table type is outside the epic, so no parameter has one. |
 | `maxLength` | integer | always | `max_length` verbatim: bytes, `-1` for `max`. |
 | `precision` | integer | always | `precision` verbatim. |

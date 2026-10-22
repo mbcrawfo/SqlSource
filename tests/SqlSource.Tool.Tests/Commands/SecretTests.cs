@@ -127,7 +127,8 @@ public sealed class SecretTests : IDisposable
     }
 
     // The describer of SQL Server itself, as PostgreSQL's above: an mssql query, and a value whose port 1 refuses at
-    // once.  The describer's own text is printed, and neither the value nor the host is anywhere.
+    // once.  The describer's own text is printed, and neither the value nor the host is anywhere.  SqlClient's events
+    // are forwarded for the session's life, and a connection that is refused runs no command, so it writes none.
     [Fact]
     public async Task Run_SqlServerDescriberThatCannotOpen_PrintsSqlsrc224AndNothingOfTheValue()
     {
@@ -149,6 +150,7 @@ public sealed class SecretTests : IDisposable
         log.ShouldNotContain(Secrets.Marker);
         log.ShouldNotContain("127.0.0.1");
         log.ShouldContain("\"id\":\"SQLSRC224\"");
+        log.ShouldNotContain("\"event\":\"mssql.driver\"");
         CaptureJson.Write(_scene.Run.Capture).ShouldNotContain(Secrets.Marker);
         CaptureJson.Write(_scene.Run.Capture).ShouldNotContain("127.0.0.1");
     }
