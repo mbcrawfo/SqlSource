@@ -1,0 +1,18 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "paid_at", "nullable": false },
+    { "name": "invoice_number", "nullable": false },
+    { "name": "method", "nullable": false },
+    {
+      "name": "reference",
+      "nullable": true,
+      "why": "billing.payments.reference is nullable; Ben's payment 8, a voucher, has none"
+    },
+    { "name": "amount", "nullable": false },
+    { "name": "paid_to_date", "nullable": false }
+  ],
+  "samples": [
+    { "customer_id": "2" }
+  ]
+}

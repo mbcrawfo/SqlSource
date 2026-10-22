@@ -1,0 +1,34 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "number", "nullable": false },
+    { "name": "customer_name", "nullable": false },
+    { "name": "issued_at", "nullable": false },
+    {
+      "name": "due_at",
+      "nullable": true,
+      "why": "billing.invoices.due_at is nullable; invoice 8, paid at checkout, and 12, due on receipt, have none"
+    },
+    { "name": "amount", "nullable": false },
+    {
+      "name": "last_paid_at",
+      "nullable": true,
+      "why": "the outer apply finds no payment of invoice 13, of Ana's pending order 13"
+    },
+    {
+      "name": "last_paid_amount",
+      "nullable": true,
+      "why": "the outer apply finds no payment of invoice 13, of Ana's pending order 13"
+    },
+    {
+      "name": "last_method",
+      "nullable": true,
+      "why": "the outer apply finds no payment of invoice 13, of Ana's pending order 13"
+    },
+    {
+      "name": "last_reference",
+      "nullable": true,
+      "why": "billing.payments.reference is nullable; payment 8, a voucher, has none; invoice 13 has no payment"
+    }
+  ]
+}

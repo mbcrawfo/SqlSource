@@ -1,0 +1,32 @@
+{
+  "columns": [
+    { "name": "change", "nullable": false },
+    { "name": "product_id", "nullable": false },
+    { "name": "on_hand", "nullable": false },
+    {
+      "name": "reorder_at",
+      "nullable": true,
+      "why": "dbo.stock.reorder_at is nullable and takes @reorder_at, which may be NULL; the first sample's is"
+    },
+    { "name": "updated_at", "nullable": false },
+    {
+      "name": "previous_on_hand",
+      "nullable": true,
+      "why": "deleted holds NULL for a row the MERGE inserts; product 6, the gift card, has no stock row"
+    },
+    {
+      "name": "previous_reorder_at",
+      "nullable": true,
+      "why": "deleted holds NULL for a row the MERGE inserts; product 6, the gift card, has no stock row"
+    },
+    {
+      "name": "previous_updated_at",
+      "nullable": true,
+      "why": "deleted holds NULL for a row the MERGE inserts; product 6, the gift card, has no stock row"
+    }
+  ],
+  "samples": [
+    { "product_id": "6", "on_hand": "25", "reorder_at": "NULL" },
+    { "product_id": "3", "on_hand": "110", "reorder_at": "25" }
+  ]
+}

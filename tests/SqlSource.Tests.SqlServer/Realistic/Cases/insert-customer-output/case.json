@@ -1,0 +1,43 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "email",
+      "nullable": true,
+      "why": "dbo.customers.email is nullable and takes @email, which may be NULL; the first sample's is"
+    },
+    {
+      "name": "phone",
+      "nullable": true,
+      "why": "dbo.customers.phone is nullable and takes @phone, which may be NULL; the first sample's is"
+    },
+    {
+      "name": "company",
+      "nullable": true,
+      "why": "dbo.customers.company is nullable and takes @company, which may be NULL; the first sample's is"
+    },
+    { "name": "status", "nullable": false },
+    {
+      "name": "time_zone",
+      "nullable": true,
+      "why": "dbo.customers.time_zone is nullable and takes @time_zone, which may be NULL; the first sample's is"
+    },
+    { "name": "created_at", "nullable": false },
+    {
+      "name": "closed_at",
+      "nullable": true,
+      "why": "dbo.customers.closed_at is nullable, and the insert sets none, so every new customer has NULL"
+    }
+  ],
+  "samples": [
+    { "name": "N'Hana Sato'", "email": "NULL", "phone": "NULL", "company": "NULL", "time_zone": "NULL" },
+    {
+      "name": "N'Ivan Petrov'",
+      "email": "N'ivan@example.com'",
+      "phone": "'+44 20 7946 0199'",
+      "company": "N'Petrov Freight'",
+      "time_zone": "'GMT Standard Time'"
+    }
+  ]
+}

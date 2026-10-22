@@ -1,0 +1,18 @@
+{
+  "columns": [
+    {
+      "name": "category",
+      "nullable": true,
+      "why": "ROLLUP's grand total row has NULL for it, and no category joins product 6, the gift card of order 8"
+    },
+    {
+      "name": "product",
+      "nullable": true,
+      "why": "ROLLUP's subtotal row of each category, and its grand total row, have NULL for the product"
+    },
+    { "name": "units", "nullable": false },
+    { "name": "revenue", "nullable": false },
+    { "name": "is_grand_total", "nullable": false },
+    { "name": "is_category_total", "nullable": false }
+  ]
+}

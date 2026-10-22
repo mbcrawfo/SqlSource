@@ -1,0 +1,16 @@
+{
+  "columns": [
+    { "name": "cart_id", "nullable": false },
+    { "name": "product_id", "nullable": false },
+    { "name": "quantity", "nullable": false },
+    { "name": "added_at", "nullable": false },
+    {
+      "name": "customer_id",
+      "nullable": true,
+      "why": "dbo.carts.customer_id is nullable; cart ...3303, a guest's, has none and is not checked out"
+    }
+  ],
+  "samples": [
+    { "created_before": "'2024-10-20'" }
+  ]
+}

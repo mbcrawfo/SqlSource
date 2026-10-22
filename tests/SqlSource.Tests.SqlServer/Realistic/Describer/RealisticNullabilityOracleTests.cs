@@ -73,6 +73,7 @@ public sealed class RealisticNullabilityOracleTests(SqlServerContainer sqlServer
 
         var run = await RealisticNullabilityOracle.RunAsync(connection, batch);
 
+        run.Names.ShouldBe(["id", "status"]);
         run.Rows.ShouldBe(active);
         active.ShouldBeLessThan(
             (int)(await RealisticDatabase.ScalarAsync(connection, CountCustomers))!,

@@ -1,0 +1,17 @@
+{
+  "columns": [
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    {
+      "name": "category_name",
+      "nullable": true,
+      "why": "the left join finds no category for product 6, the gift card, which ties product 2 at the sixth place"
+    },
+    { "name": "units_sold", "nullable": false },
+    { "name": "revenue", "nullable": false }
+  ],
+  "samples": [
+    { "top": "6", "since": "'2024-01-01'" }
+  ]
+}

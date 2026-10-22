@@ -1,0 +1,19 @@
+{
+  "columns": [
+    {
+      "name": "category_id",
+      "nullable": true,
+      "why": "the right join keeps product 6, the gift card, which has no category"
+    },
+    {
+      "name": "category_name",
+      "nullable": true,
+      "why": "the right join keeps product 6, the gift card, which has no category"
+    },
+    { "name": "product_id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "product_name", "nullable": false },
+    { "name": "list_price", "nullable": false },
+    { "name": "sale_price", "nullable": false }
+  ]
+}

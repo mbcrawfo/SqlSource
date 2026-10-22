@@ -1,0 +1,20 @@
+{
+  "columns": [
+    {
+      "name": "category_name",
+      "nullable": true,
+      "why": "the left join finds no category for product 6, the gift card"
+    },
+    { "name": "id", "nullable": false },
+    { "name": "sku", "nullable": false },
+    { "name": "name", "nullable": false },
+    { "name": "units_sold", "nullable": false },
+    {
+      "name": "last_sold_at",
+      "nullable": true,
+      "why": "the left join finds no sales for product 7, the laptop sleeve, which is in no order"
+    },
+    { "name": "rank_in_category", "nullable": false },
+    { "name": "sales_tier", "nullable": false }
+  ]
+}
