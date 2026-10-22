@@ -202,7 +202,7 @@ The table's column list and the nullability of each of its columns are the visib
 | Any other error rows of `declared`, such as `102` | `SQLSRC228`, `it is not a type` | `resolve type` |
 | The `error` of `declared` | `SQLSRC225` | `resolve type` |
 | The `error` of `parameters`, whose first error is `11502`, `11503`, `11506` or `11507` | `SQLSRC226` | `describe parameters` |
-| Any other `error` of `parameters`: `11508`, `11527`, a type the query's text names that the database lacks, and the query rejected, the cause first and `11501` last | `SQLSRC225` | `describe parameters` |
+| Any other `error` of `parameters`: `11508`, `11527`, a type the query's text names that the database lacks, and the query rejected, the cause first and `11501` last, when the `columns` asked after the `11501` gives no cause, below | `SQLSRC225` | `describe parameters` |
 | The `error` of `parameters` with `11501` among its errors, when the `columns` asked after it has an error row of type 3, 4 or 10 | That row's id, as for `columns` below | `describe columns` |
 | The `error` of `parameters` with `11501` among its errors, for any other answer of that `columns` | What the rows above give for `parameters`, with its lines | `describe parameters` |
 | The lists differ | `SQLSRC231`, with no server line | `check parameters` |
@@ -237,7 +237,7 @@ Every other text is the tool's own: the read of `open`, the texts of `declared` 
 
 ## Events
 
-[`SqlServerEvents`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerEvents.cs) builds the events of the describer's calls and steps, which the session's log names `mssql.` and the event's name.  A describe writes them in this order, each where its call is made or its step reached, under a replay too, so a describe that fails writes nothing after the step that failed:
+[`SqlServerEvents`](../../src/SqlSource.Tool/Describing/SqlServer/SqlServerEvents.cs) builds the events of the describer's calls and steps, which the session's log names `mssql.` and the event's name.  A describe writes them in this order, each where its call is made or its step reached, under a replay too, so a describe that fails writes nothing after the step that failed.  `mssql.driver`, SqlClient's own, is written around each command that a live call runs, as [driver logging](#driver-logging) says.
 
 | Event | Written | Holds |
 |----|----|----|
@@ -262,7 +262,7 @@ When the run's log writes (`IRunLog.Writes`), SqlClient's own events reach it th
 
 SqlClient 7.1.1 writes these two events alone under `ExecutionTrace`.  Their `dataSource` is the host and the port, their `database` the database's name, and their `message` repeats the rest with the connection's id, so none of the three is written.  `commandText` is always one of the tool's own constant texts or `sys.sp_describe_undeclared_parameters`, since the user's SQL reaches the server only as the value of a parameter.  The other keywords write a free-form `message` alone and are not enabled, so a message that a later SqlClient adds is dropped until someone lists it.  A connection that is refused, or a login that is rejected, runs no command and writes no event.  Every string still passes the session's redaction.
 
-An `EventListener` is the process's: it sees SqlClient's commands on every connection while it lives, which in the tool are the session's alone, since the run describes one database at a time.  So it lives as long as the session's connection.  `SqlServerConnection` makes it, through `SqlClientRunListener.For`, when the connection is made and before it opens, and disposes it in `DisposeAsync`, which runs when `open` fails, when the server is refused and when the session is disposed.  The connection owns it, and not the session, because `CA2000` cannot follow a disposable through the session's `OpenAsync`, which keeps the connection only on success.  A run without a log makes none.  SqlClient writes from the thread that runs a command, and the run's log writes each event under a lock.  `DriverLogTests` holds what is written, that a refused connection and a rejected login write no secret, and that a run without a log enables no listener.
+An `EventListener` is the process's: it sees SqlClient's commands on every connection while it lives, which in the tool are the session's alone, since the run describes one database at a time.  So it lives as long as the session's connection.  `SqlServerConnection` makes it, through `SqlClientRunListener.For`, when `SqlServerSession.OpenAsync` makes the `SqlServerConnection`, before `open` is asked, and disposes it in `DisposeAsync`, which runs when `open` fails, when the server is refused and when the session is disposed.  The connection owns it, and not the session, because `CA2000` cannot follow a disposable through the session's `OpenAsync`, which keeps the connection only on success.  A run without a log makes none.  SqlClient writes from the thread that runs a command, and the run's log writes each event under a lock.  `DriverLogTests` holds what is written, that a refused connection and a rejected login write no secret, and that a run without a log enables no listener.
 
 ## Fixtures
 
