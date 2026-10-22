@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using SqlSource.Tool.Processes;
@@ -22,6 +23,10 @@ internal static class Programs
     // The tool that was built beside the tests.
     public static string ToolPath => Path.Combine(AppContext.BaseDirectory, "SqlSource.Tool.dll");
 
+    // The deps file of the test project that is running, beside the tool.
+    private static string TestsDepsFile =>
+        Path.Combine(AppContext.BaseDirectory, Assembly.GetEntryAssembly()!.GetName().Name + ".deps.json");
+
     // A run of a program in the temporary directory, with the environment of the test process.
     public static ProcessRequest Request(string program, params string[] arguments) =>
         new(program, [.. arguments], Path.GetTempPath(), [], [], []);
@@ -39,9 +44,14 @@ internal static class Programs
         var start = new ProcessStartInfo(Dotnet) { WorkingDirectory = workingDirectory };
 
         // The tool beside the tests has the libraries that the tests were given, which are of the tests' runtime
-        // and not of the older one that the tool asks for.
+        // and not of the older one that the tool asks for.  The tests' deps file names them where they are: the
+        // tool's own names a library with a copy for each platform, as SqlClient, under its runtime's folder of
+        // runtimes/, which the tests' output does not have.
+        start.ArgumentList.Add("exec");
         start.ArgumentList.Add("--roll-forward");
         start.ArgumentList.Add("LatestMajor");
+        start.ArgumentList.Add("--depsfile");
+        start.ArgumentList.Add(TestsDepsFile);
         start.ArgumentList.Add(ToolPath);
         foreach (var argument in arguments)
         {

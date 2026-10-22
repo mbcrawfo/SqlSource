@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using SqlSource.Tool.Describing.Describers;
 using SqlSource.Tool.Describing.Postgres;
+using SqlSource.Tool.Describing.SqlServer;
 using SqlSource.Tool.Processes;
 
 namespace SqlSource.Tool;
@@ -39,7 +40,7 @@ internal sealed record ToolHost(
 {
     /// <summary>
     /// The host of a real run: the console, the current directory, the environment and the processes of the
-    /// machine.  Its describers are PostgreSQL's; SQL Server's comes in phase 6.
+    /// machine.  Its describers are PostgreSQL's and SQL Server's.
     /// </summary>
     public static ToolHost Create() =>
         new(
@@ -50,7 +51,7 @@ internal sealed record ToolHost(
             new ProcessRunner(),
             Path.GetTempPath(),
             Environment.ProcessorCount,
-            new DescriberRegistry([new PostgresDescriber()]),
+            new DescriberRegistry([new PostgresDescriber(), new SqlServerDescriber()]),
             static _ => LiveExchange.Instance,
             TimeProvider.System,
             NewFile

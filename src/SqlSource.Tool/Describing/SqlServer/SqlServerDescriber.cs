@@ -7,7 +7,10 @@ using SqlSource.Tool.Logging;
 
 namespace SqlSource.Tool.Describing.SqlServer;
 
-/// <summary>Asks a SQL Server to describe queries, through Microsoft.Data.SqlClient.</summary>
+/// <summary>
+/// Asks a SQL Server to describe queries, through Microsoft.Data.SqlClient.  The real host registers it, so the
+/// released tool describes the queries of the <c>mssql</c> dialect.
+/// </summary>
 internal sealed class SqlServerDescriber : IQueryDescriber
 {
     public SqlDialect Dialect => SqlDialect.SqlServer;

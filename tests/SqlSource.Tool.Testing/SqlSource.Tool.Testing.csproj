@@ -1,9 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
     <!--
-        The helpers of the tool's tests that tests/SqlSource.Tool.Tests and tests/SqlSource.Tests.Postgres share, the
-        ones that tests/README.md lists.  A library of the tests, never a test project of its own.  It is apart from
-        tests/SqlSource.Testing because it references the tool, which would raise the Roslyn of
-        tests/SqlSource.Tests.RoslynFloor.
+        The helpers of the tool's tests that tests/SqlSource.Tool.Tests, tests/SqlSource.Tests.Postgres and
+        tests/SqlSource.Tests.SqlServer share, the ones that tests/README.md lists.  A library of the tests, never a
+        test project of its own.  It is apart from tests/SqlSource.Testing because it references the tool, which
+        would raise the Roslyn of tests/SqlSource.Tests.RoslynFloor.
     -->
     <PropertyGroup>
         <TargetFramework>net10.0</TargetFramework>
