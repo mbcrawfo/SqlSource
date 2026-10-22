@@ -13,7 +13,7 @@ $ dotnet sqlsource describe --connection postgres="Host=localhost;Database=app;U
 postgres (postgres): 12 described, 0 skipped, 0 failed
 ```
 
-The connection is given for the query's [logical database](tool.md#connections), which is `postgres` when you name none.  The summary names that database first, and its dialect in parentheses.
+The connection is given for the query's [logical database](tool.md#connections), which is `postgres` when you name none, so its variable is `SQLSOURCE_CONNECTION_POSTGRES`.  The summary names that database first, and its dialect in parentheses.
 
 <a id="connecting"></a>
 
@@ -149,7 +149,7 @@ FROM orders
 WHERE id = @id;
 ```
 
-Each column and each parameter of a described query gets a C# type: the type that Npgsql reads a value of its PostgreSQL type as.  If `id` is a `bigint`, `placed_at` a `timestamp with time zone`, `total` a `numeric(12,2)`, `tags` a `text[]` and `born` a `date`, they are `long`, `System.DateTime`, `decimal`, `string[]`, and `System.DateTime` on Npgsql 8 and 9 or `System.DateOnly` on Npgsql 10; `@id` is a `long`.  Whether a column can be null is decided [above](#nullability), not by its type.
+Each column and each parameter of a described PostgreSQL query gets a C# type: the type that Npgsql reads a value of its PostgreSQL type as.  If `id` is a `bigint`, `placed_at` a `timestamp with time zone`, `total` a `numeric(12,2)`, `tags` a `text[]` and `born` a `date`, they are `long`, `System.DateTime`, `decimal`, `string[]`, and `System.DateTime` on Npgsql 8 and 9 or `System.DateOnly` on Npgsql 10; `@id` is a `long`.  Whether a column can be null is decided [above](#nullability), not by its type.
 
 The build gives these types to each query whose output is `models` or `codegen` and whose entry in its sidecar is current, and reports an error for a column or parameter that has none, such as [SQLSRC246](diagnostics.md#sqlsrc246) for a type that Npgsql cannot read.  They are the types of the properties of the query's [models](#models), and a query with such an error has no models.  To give a type another C# type, use the [type override](settings.md#setting-type-overrides): `timestamptz=System.DateTimeOffset`.
 

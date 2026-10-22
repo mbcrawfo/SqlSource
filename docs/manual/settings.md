@@ -155,7 +155,7 @@ SELECT id, kind FROM events;
 `Database` names the [logical database](concepts.md#logical-database) a query belongs to: the one the `sqlsource` tool asks about it, through a connection you give it by that name.  It is not the dialect.  Two logical databases can share a dialect.
 
 - The value is one word of letters, digits, `-`, `_` and `.`.  The rule is narrow because the tool makes the name of an environment variable of it: `billing` is read from `SQLSOURCE_CONNECTION_BILLING`.  Names are compared ignoring case, so `Billing` and `billing` are one database, spelled as the tool first meets it.
-- Without a value, a query belongs to the database named after its file's dialect, `postgres` for a PostgreSQL file.
+- Without a value, a query belongs to the database named after its file's dialect: `postgres` for a PostgreSQL file, `mssql` for a SQL Server file.
 - It can be a marker in the file header or inside a query, item metadata, or an MSBuild property.  It has no attribute property.
 - One name is one database for a whole run, with one connection and one dialect.  Two files that give one name two dialects are [SQLSRC211](diagnostics.md#sqlsrc211).
 - Only the tool reads this setting.  The build does not, so a wrong value in a property or in item metadata is reported by the tool and not by the build.
