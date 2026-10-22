@@ -10,7 +10,8 @@ using Xunit;
 namespace SqlSource.Tests.SqlServer.Realistic.Describer;
 
 // The oracle's runs against the server: a query that writes leaves the seed as it was, a column that held a NULL in a
-// row is seen, a sample is bound to its parameter, and a query that fails throws its own error.
+// row is seen, a sample is bound to its parameter, of an alias type too and as an expression that ends in a comment,
+// and a query that fails throws its own error.
 [Collection(UsesSqlServer.Name)]
 public sealed class RealisticNullabilityOracleTests(SqlServerContainer sqlServer)
 {
@@ -79,6 +80,54 @@ public sealed class RealisticNullabilityOracleTests(SqlServerContainer sqlServer
             (int)(await RealisticDatabase.ScalarAsync(connection, CountCustomers))!,
             "the seed has customers that are not active"
         );
+    }
+
+    [Fact]
+    public async Task RunAsync_AliasTypedParameter_IsDeclaredAsItsTypeAndBound()
+    {
+        // dbo.customers.email is of the alias type dbo.Email, over nvarchar(254), and Ana Ruiz, customer 1, has this
+        // address.
+        const string AnaEmail = "N'ana.ruiz@example.com'";
+        var connection = sqlServer.RealisticConnectionString;
+        var email = new SqlServerType("nvarchar(254)", 508, 0, 0, new SqlServerUserType("dbo", "Email", null));
+        var batch = RealisticSamples.Batch(
+            "SELECT id FROM dbo.customers WHERE email = @email ORDER BY id",
+            Values(("email", AnaEmail)),
+            [new DescribedParameter("email", email, null)]
+        );
+
+        var run = await RealisticNullabilityOracle.RunAsync(connection, batch);
+
+        batch.Text.ShouldStartWith("DECLARE @sample_0 [dbo].[Email] = (");
+        batch.Declarations.ShouldBe("@email [dbo].[Email]");
+        run.Names.ShouldBe(["id"]);
+        run.Rows.ShouldBe(1);
+        (
+            (int)(await RealisticDatabase.ScalarAsync(connection, $"{CountCustomers} WHERE email = {AnaEmail}"))!
+        ).ShouldBe(1, "Ana Ruiz alone has the address");
+    }
+
+    [Fact]
+    public async Task RunAsync_SampleThatIsAnExpressionWithAComment_IsBound()
+    {
+        // Thirty days before 2024-10-14 21:15, when order 15, the seed's latest, was placed: 2024-09-14 21:15.
+        const string Since = """
+            DATEADD(day, -30, CAST('2024-10-14T21:15:00' AS datetime2(0))) -- thirty days before order 15
+            """;
+        const string CountSince = "SELECT COUNT(*) FROM dbo.orders WHERE placed_at >= '2024-09-14T21:15:00'";
+        var connection = sqlServer.RealisticConnectionString;
+        var batch = RealisticSamples.Batch(
+            "SELECT id, placed_at FROM dbo.orders WHERE placed_at >= @since ORDER BY placed_at",
+            Values(("since", Since)),
+            [new DescribedParameter("since", new SqlServerType("datetime2(0)", 6, 19, 0, null), null)]
+        );
+        var expected = (int)(await RealisticDatabase.ScalarAsync(connection, CountSince))!;
+
+        var run = await RealisticNullabilityOracle.RunAsync(connection, batch);
+
+        run.Names.ShouldBe(["id", "placed_at"]);
+        run.Rows.ShouldBe(expected);
+        expected.ShouldBe(4, "orders 12 to 15 were placed on or after 2024-09-14 21:15");
     }
 
     [Fact]
