@@ -180,7 +180,7 @@ The ids `SQLSRC267` and `SQLSRC268` are reported by the build, about the version
 
 The ids from `SQLSRC250` to `SQLSRC252` are about a C# type that the type override names.  Each is reported at a query that has a column or a parameter of the database type the entry maps, and names the column or parameter, the entry and the place that wrote it.  An entry that no query uses is never an error, so a project can set its mappings before it has the queries.
 
-`SQLSRC261` is reported at a query that has a column or a parameter of an array of a type outside `pg_catalog`, or of a domain over such an array, when the type override has an entry for the array's name in the database.  It names the column or parameter, the entry, the place that wrote it and the key to write.  It is reported once for the query, for its first column or parameter that has no C# type, as `SQLSRC246`, `SQLSRC249` to `SQLSRC252` and `SQLSRC269` are, so the query has no models until it is fixed.
+`SQLSRC261` is reported at a query that has a column or a parameter of an array of a type outside `pg_catalog`, or of a domain over such an array, when the type override has an entry for the array's name in the database.  It names the column or parameter, the entry, the place that wrote it and the key to write.  It is reported once for the query, for its first column or parameter that has no C# type, as `SQLSRC246` and `SQLSRC249` to `SQLSRC252` are, so the query has no models until it is fixed.
 
 The ids from `SQLSRC253` to `SQLSRC260` are reported by the build, about the [models](generator.md#models) of a query whose entry in its sidecar is current and whose columns and parameters all have a C# type, except `SQLSRC259` and `SQLSRC260`, which a query with a current entry gets whatever its C# types.  Each property of a model is named by the PascalCase of its column or parameter: `created_at` gives `CreatedAt`.  `SQLSRC253` to `SQLSRC255`, `SQLSRC256` for a name that a record or `object` has, `SQLSRC259` and `SQLSRC260` are about the query's own columns, parameters and markers: each is reported once for the query, however many types claim its file, at the query's name, or at its marker for `SQLSRC259` and `SQLSRC260`, and the query gets no models until it is fixed.  `SQLSRC257` and `SQLSRC258`, `SQLSRC256` for a property named as its model, and `SQLSRC251` for each property whose type is not public in a public model, are about a model, whose name and accessibility come from the types that claim its queries: `SQLSRC257` is reported at the later of two queries whose models differ, at its marker when it has one, and the others at the name of each query of the model, which is not generated until it is fixed.  A query gets every error it has, and its constant or method is still generated.
 
@@ -398,7 +398,7 @@ Correct the value, or remove it to keep the default.  While it is wrong the sett
 ```
 
 - **No space around `=`.**  A space separates entries, so `numeric = double` is three entries, and `timestamp with time zone=...` is four.
-- **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog` is written with its schema, `public.user_status`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.  A value serves PostgreSQL and SQL Server alike, so a name of either one's types, `int4` or `nvarchar`, is not reported.  A schema or a name may be in double quotes, `"my schema"."order-status"`, which must close: `"my schema.status=MyApp.Status` is reported with the rest of the value.  A part may also be in `U&"..."` with escapes, its `&` written `&amp;` in a project file, and an escape that is not valid makes the entry not valid.
+- **The key is a type's one-word name**, `timestamptz` and not `timestamp with time zone`, `float8` and not `double precision`; every built-in type has one.  A type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`: a name without one must be a type SqlSource knows, so `user_status` and the misspelling `timestampz` are reported.  A value serves PostgreSQL and SQL Server alike, so a name of either one's types, `int4` or `nvarchar`, is not reported.  A schema or a name may be in double quotes, `"my schema"."order-status"`, which must close: `"my schema.status=MyApp.Status` is reported with the rest of the value.  A part may also be in `U&"..."` with escapes, its `&` written `&amp;` in a project file, and an escape that is not valid makes the entry not valid.
 - **A key is not written in brackets.**  `[dbo].[Email]=MyApp.Email` is reported, and the message shows the forms that are read: `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
 - **The C# type is a keyword or a full name from its namespace**, `System.DateTimeOffset` and not `DateTimeOffset`, with no `?` at the end: `int4=int` and not `int4=int?`.  Write a generic's `<` and `>` as `&lt;` and `&gt;` in the project file.
 
@@ -576,7 +576,7 @@ A generator parameter has a value it does not take; what follows a name in a `--
 - `-- input-model-type:` and `-- output-model-type:` take `record`, `sealed record`, `class` or `sealed class`.  `-- collection-type:` takes `IEnumerable`, `ICollection`, `IReadOnlyCollection`, `IList`, `IReadOnlyList`, `Array`, `List`, `ImmutableArray`, `ImmutableList` or `IImmutableList`.
 - `-- input-model-suffix:` and `-- output-model-suffix:` take characters that can be part of an identifier, and `-- model-namespace:` takes a namespace such as `App.Models`.
 - `-- input-model:` and `-- output-model:` take the name of a type, or its full name with its namespace: `UserRow` or `App.Models.UserRow`.  Neither is a reserved keyword, and no generic type is named.
-- `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog` is written with its schema, `public.user_status`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword or a full name from its namespace, `System.DateTimeOffset`, with no `?` at the end.  See [type overrides](settings.md#setting-type-overrides).
+- `-- type-override:` takes one entry, `key = type` or `key = default`.  The key is a type's one-word name, `timestamptz` and not `timestamp with time zone`, and a type outside `pg_catalog`, or a SQL Server type outside `sys`, is written with its schema, `public.user_status` or `dbo.Email`.  A schema or a name may be in double quotes, with a quote inside it doubled: `public."Status"`, `"my schema"."order-status"`; or in `U&"..."` with escapes, `public.U&"Order\000AItem"`, where an escape that is not `\\`, `\` and four hex digits, or `\+` and six, for a code from 1 to 10FFFF (a character beyond FFFF is one `\+` escape or the escapes of its two surrogates), is not valid.  The type is a keyword or a full name from its namespace, `System.DateTimeOffset`, with no `?` at the end.  See [type overrides](settings.md#setting-type-overrides).
 - The key of a `-- type-override:` marker is read by its file's dialect.  In an `mssql` file it is a SQL Server type's name, such as `int`, `nvarchar` or `sys.int`, and a name SQL Server does not have, such as `int4` or `pg_catalog.text`, is this error.  In a file of any other dialect a name that SQL Server alone has, such as `nvarchar` or `rowversion`, is this error.  A type of a schema of your own, `dbo.Email`, is read in either.
 - A key is not written in brackets: `-- type-override: [dbo].[Email] = MyApp.Email` is this error, and the message shows the forms that are read, `dbo.Email`, which matches the type's name in any case, and `"dbo"."Email"`, which matches its case exactly.  A key without a schema has the plain form alone, `[INT]` is `INT`, since a quoted name without a schema must be in lower case.  A part that holds anything but letters, digits, `_` and `$`, such as `[my schema]`, has the quoted form alone, `"my schema"`.
 
@@ -919,7 +919,7 @@ A query whose output is `models` or `codegen` is described by a database, and th
 /work/App/Queries/Users.sql(1,10): error SQLSRC209: The output 'codegen' needs each query described by its database, and the dialect 'ansi' has no database to ask.  Set the dialect to 'postgres' or 'mssql', or the output to 'sql'.
 ```
 
-For PostgreSQL or SQL Server files, set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` or `<SqlSourceDialect>mssql</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` at the top of the file.  For any other database, and for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; the file's constants and methods are generated as before.
+For PostgreSQL or SQL Server files, set the dialect: `<SqlSourceDialect>postgres</SqlSourceDialect>` or `<SqlSourceDialect>mssql</SqlSourceDialect>` for the project, the metadata of the same name for a file, or `-- dialect: postgres` or `-- dialect: mssql` at the top of the file.  For any other database, and for queries that only want their SQL, set the output to `sql`: `<SqlSourceOutput>sql</SqlSourceOutput>`, `Output = GeneratorOutput.Sql` on the attribute, or `-- output: sql` in the file.  The error is reported once for a file, at the first query that needs types.  Until it is mended, no query of the file is described, and none gets an error about its entry in the sidecar; the file's constants and methods are generated as before.
 
 See: [Database support](dialects.md#database-support)
 
@@ -1304,7 +1304,7 @@ The same call with an argument, `EXEC dbo.archive_ordrs @before`, is `Msg 2812` 
 
 **Parameter type could not be determined**
 
-The server gives each parameter a type from the way the query uses it, and nothing in this query says what the parameter is: `SELECT @p IS NULL` holds for a value of any type.
+The server gives each parameter a type from the way the query uses it, and nothing in this query says what the parameter is: on PostgreSQL, `SELECT @p IS NULL` holds for a value of any type.
 
 ```console
 /work/App/Queries/Checks.sql(1,10): error SQLSRC226: The type of the parameter '@p' of the query 'IsNull' could not be determined
@@ -1326,7 +1326,7 @@ SQL Server gives the error for a parameter whose uses fix no type, `SELECT @p AS
     help: add a CAST around a use of the parameter, or declare its type with -- param:
 ```
 
-Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter whose only use is `@p IS NULL` is not this error: SQL Server gives it the type `int`.
+Write `CAST(@p AS int)` where the parameter is used, or `-- param: @p int`.  A parameter whose every use is like `@p IS NULL` is not this error: SQL Server gives it the type `int`.
 
 The same error with no `server:` line is for a parameter used more than once whose uses SQL Server gives different types, or gives one of its uses no type.  The uses that say nothing of the type, such as `@p IS NULL`, are then left out, as [SQLSRC262](#sqlsrc262) says, and this error is given when every use is left out that way, or when a use that is left has no type.  When the uses that are left have two types, the error is [SQLSRC262](#sqlsrc262) instead, and when every use gets the same type, the parameter has that type and no error is given.  The fix is the same: a `CAST` at a use, or a `-- param:` marker.
 
@@ -1412,7 +1412,7 @@ See: [What can be described](postgresql.md#what-can-be-described)
 
 **Query holds more than one statement**
 
-A query is one statement.  The tool prepares it on the server to describe it, and it found a second statement in the text.  Nothing of such a query is sent.
+On PostgreSQL a query is one statement.  The tool prepares it on the server to describe it, and it found a second statement in the text.  Nothing of such a query is sent.  A SQL Server query can hold several statements: see [what SQL Server can describe](sqlserver.md#what-can-be-described).
 
 ```console
 /work/App/Queries/Cleanup.sql(1,10): error SQLSRC230: The query 'Cleanup' holds more than one statement
@@ -1511,7 +1511,7 @@ See: [What can be described](postgresql.md#what-can-be-described)
 
 **Statement cannot be described**
 
-The tool describes a query by asking the server to prepare it, and the server prepares only `SELECT` (without `INTO`), `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `VALUES` and `TABLE`, with `WITH` around any of them.  This query starts with a statement of another kind: `CALL`, `CREATE`, `EXPLAIN`, `SHOW`, `SET` and the rest of the commands the server refuses to prepare.  The tool reads the first word of the statement before it sends anything, so the message names that word and the server is not asked.
+The tool describes a PostgreSQL query by asking the server to prepare it, and PostgreSQL prepares only `SELECT` (without `INTO`), `INSERT`, `UPDATE`, `DELETE`, `MERGE`, `VALUES` and `TABLE`, with `WITH` around any of them.  This query starts with a statement of another kind: `CALL`, `CREATE`, `EXPLAIN`, `SHOW`, `SET` and the rest of the commands the server refuses to prepare.  The tool reads the first word of the statement before it sends anything, so the message names that word and the server is not asked.  On SQL Server, a statement whose result the server cannot work out, such as `CREATE PROCEDURE`, is [SQLSRC225](#sqlsrc225), `Msg 11527`.
 
 ```console
 /work/App/Queries/Archive.sql(1,10): error SQLSRC233: The query 'Archive' is a CALL statement, which the tool cannot describe
@@ -1854,7 +1854,7 @@ See: [Type overrides](settings.md#setting-type-overrides)
 
 **Column has no name**
 
-A column of the query has no name, so its property in the output model would have none.  PostgreSQL names a column `?column?` when the query gives it no alias and it is no column of a table or call of a function: an expression such as `price * quantity`, or a literal.  The message gives the column's position, from 1, and the query.
+A column of the query has no name, so its property in the output model would have none.  PostgreSQL names a column `?column?` when the query gives it no alias and it is no column of a table or call of a function: an expression such as `price * quantity`, or a literal.  On SQL Server such a column is [SQLSRC266](#sqlsrc266), which the tool reports when it describes the query.  The message gives the column's position, from 1, and the query.
 
 ```console
 /work/App/Queries/Orders.sql(1,10): error SQLSRC253: The column at position 2 of the query 'GetLines' has no name.  Give it an alias.
@@ -2030,7 +2030,7 @@ See: [Names that cannot be used](generator.md#unusable-model-names)
 
 **Output model on a query without rows**
 
-The query has an `-- output-model:` marker, which names the type of its rows, and its statement returns none, as an `INSERT`, `UPDATE` or `DELETE` without `RETURNING` does.  The error is at the marker.
+The query has an `-- output-model:` marker, which names the type of its rows, and its statement returns none, as an `INSERT`, `UPDATE` or `DELETE` without `RETURNING` does, or on SQL Server one without `OUTPUT`, or whose `OUTPUT` goes `INTO` a table.  The error is at the marker.
 
 ```console
 /work/App/Queries/Users.sql(2,1): error SQLSRC259: The query 'DeleteUser' names an output model, and its statement returns no rows.  Remove the -- output-model: marker.
@@ -2042,7 +2042,7 @@ The query has an `-- output-model:` marker, which names the type of its rows, an
 DELETE FROM users WHERE id = @id;
 ```
 
-Remove the marker.  To read the rows the statement changes instead, add a `RETURNING` clause and run `dotnet sqlsource describe`.  The query's constant or method is still generated.
+Remove the marker.  To read the rows the statement changes instead, add a `RETURNING` clause, or on SQL Server an `OUTPUT` clause, and run `dotnet sqlsource describe`.  The query's constant or method is still generated.
 
 See: [Which queries get models](generator.md#which-models)
 

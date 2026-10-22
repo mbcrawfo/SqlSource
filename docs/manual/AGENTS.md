@@ -93,17 +93,10 @@ Which pages each phase touches, besides those seven steps:
 
 | Phase | Pages |
 |----|----|
-| 6. SQL Server | `sqlserver.md` is a page like `postgresql.md`, with the note that a parameter used once alone where nothing gives it a type, `WHERE @p IS NULL`, is typed `int`, and that only a query's first result set is described and read into its model.  The sentences that said PostgreSQL alone is described were rewritten when SQL Server's queries became describable: `dialects.md`'s database support table; the README's status line, supported environments, step 5 and "Use SQL Server, or another database" row; the same row of the entry page's "Find what you need"; the tool readme's first paragraph; `tool.md`'s "Which queries are described"; `recipes.md`'s "Read one folder with another dialect"; and in `diagnostics.md`, `SQLSRC209`, `SQLSRC216` and the paragraph under the index on the ids of describing.  The close of the phase reads these pages whole, and the phase 6 finder below the table finds the sentences that name either database |
-| 7. Library maps | README: "NodaTime and other libraries", with the call each library needs on the data source.  The Types section of each database page.  `settings.md`: a row for each library's property |
+| 7. Library maps | README: "NodaTime and other libraries", with the call each library needs on the data source.  The Types section of each database page, both of them: in `sqlserver.md` the row of `json`, a `string` today, and those of `hierarchyid`, `geography` and `geometry`, whose help names the type override and Microsoft.SqlServer.Types today, and in `diagnostics.md` the help of `SQLSRC246` where it says the same.  `settings.md`: a row for each library's property.  The examples: a library's map shown in each example project whose database it covers |
 | 8. Query methods | README: the introduction, step 4, and the FAQ on `Async` names.  `generator.md` (Query methods).  `settings.md`: Output's `codegen`, the collection type, `MethodLocation`, `async-method-suffix`.  `sql-files.md` (result shapes), `parameters-and-tokens.md` (query parameters), the Query methods section of each database page, and the "query methods of a later release" in `diagnostics.md`'s `SQLSRC231`, `SQLSRC232` and `SQLSRC234` |
 | 9. Build integration | `tool.md`: running in the build, the `.env` file and what to keep out of git, watch mode, and the new options in the command reference.  `settings.md`: the property that turns it on.  README: step 5 |
 | 10. Bug reports | `tool.md`: making a bundle, what it holds before you share it, and the new commands in the command reference |
-
-The phase 6 finder, kept out of the table because its pipes would split the row:
-
-```bash
-git grep -n -i -E "SQLSRC216|cannot describe|can be described|PostgreSQL" -- README.md src/SqlSource.Tool/README.md docs/manual
-```
 
 A database that becomes describable gets its own page, a row in the support table of `dialects.md`, and the README's supported environments.  A dialect that is added gets its rows in the tables of `dialects.md` and its name in the section of `SQLSRC011` in `diagnostics.md`; `settings.md`'s Dialect row changes only for a dialect with options.
 

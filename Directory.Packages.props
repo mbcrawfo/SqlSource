@@ -5,7 +5,7 @@
     </PropertyGroup>
     <ItemGroup>
         <PackageVersion Include="Bogus" Version="35.6.5" />
-        <!-- examples/PostgresExamples/README.md lists this version. -->
+        <!-- examples/PostgresExamples/README.md and examples/SqlServerExamples/README.md list this version. -->
         <PackageVersion Include="Dapper" Version="2.1.89" />
         <PackageVersion Include="GitHubActionsTestLogger" Version="3.0.5" />
         <!--
@@ -26,7 +26,10 @@
             tests/SqlSource.Tests.RoslynFloor does not, and runs the generator tests on this version.
         -->
         <PackageVersion Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" />
-        <!-- The driver of the SQL Server describer and of tests/SqlSource.Tests.SqlServer. -->
+        <!--
+            The driver of the SQL Server describer and of tests/SqlSource.Tests.SqlServer.
+            examples/SqlServerExamples/README.md lists this version.
+        -->
         <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.1.1" />
         <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.11.2" />
         <!-- Reads .sln and .slnx files for the tool, as the dotnet command does with the same library. -->

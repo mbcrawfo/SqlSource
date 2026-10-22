@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/examples/">
     <Project Path="examples/PostgresExamples/PostgresExamples.csproj" />
+    <Project Path="examples/SqlServerExamples/SqlServerExamples.csproj" />
   </Folder>
   <Folder Name="/src/">
     <Project Path="src/SqlSource.Tool/SqlSource.Tool.csproj" />

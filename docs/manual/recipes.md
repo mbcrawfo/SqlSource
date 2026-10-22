@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18.6
         env:
           POSTGRES_DB: app
           POSTGRES_PASSWORD: ci
@@ -128,6 +128,32 @@ jobs:
         env:
           SQLSOURCE_CONNECTION: Host=localhost;Database=app;Username=postgres;Password=ci
 ```
+
+In a SQL Server project (`SqlSourceDialect` set to `mssql`), the service and the connection change; the steps are the same, and the step that creates your schema creates the database too:
+
+```yaml
+    services:
+      mssql:
+        image: mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04
+        env:
+          ACCEPT_EULA: Y
+          MSSQL_SA_PASSWORD: Ci-Passw0rd
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -b -S localhost -U sa -P Ci-Passw0rd -Q 'SELECT 1'"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+```
+
+```yaml
+      - run: dotnet sqlsource describe --check
+        env:
+          SQLSOURCE_CONNECTION: Server=localhost,1433;Database=app;User ID=sa;Password=Ci-Passw0rd;TrustServerCertificate=True
+```
+
+`TrustServerCertificate=True` is for the job's own server, whose certificate nothing trusts: see [connecting to SQL Server](sqlserver.md#connecting).
+
+Name the server's exact version in the image, a PostgreSQL minor or a SQL Server cumulative update, and move it when you move your database: a tag such as `-latest` moves to a new server without a word, and a new server can describe a query otherwise than the one your sidecars were written on.
 
 Rules: [check in CI](tool.md#check-in-ci), [connections](tool.md#connections) for the variable, [exit codes](tool.md#exit-codes), [SQLSRC219](diagnostics.md#sqlsrc219).
 
@@ -332,7 +358,7 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
 );
 ```
 
-- **Send a `datetime2` parameter as a `datetime2`.**  Dapper sends a `DateTime` as a `datetime`, which holds a time to 1/300 of a second.  So `13:45:30.1234567` is written to a `datetime2(7)` column as `13:45:30.1233333`, and compared with one, it is another value: `WHERE placed_at = @placedAt` finds no row of the time you gave.  Send it as above, with `TypedParameter` from the next point, or give Dapper the input model in `DynamicParameters` and add that parameter with its `DbType`, under the query's name, where it takes the place of the model's property of the same name, whatever its case:
+- **Send a `datetime2` parameter as a `datetime2`.**  Dapper sends a `DateTime` as a `datetime`, which holds a time to 1/300 of a second.  So `13:45:30.1234567` is written to a `datetime2(7)` column as `13:45:30.1233333`, and compared with one, it is another value: `WHERE placed_at = @placedAt` finds no row of the time you gave.  Send it as above, with `TypedParameter` from the next point, or give Dapper the input model in `DynamicParameters` and add that parameter with its `DbType`, under the parameter's name, where it takes the place of the model's property of that name, whatever its case:
 
   ```csharp
   var args = new ListCustomerOrdersSinceParams(customerId, since);
@@ -380,7 +406,7 @@ connection.QueryAsync<ListCustomerOrdersSinceDto>(
   `SqlDbTypeExtensions` is Microsoft.Data.SqlClient's, in the namespace `Microsoft.Data`, so the call builds on .NET 8 and later, where `SqlDbType.Vector` is in .NET 10 alone.
 
   A `string` for a `json` column needs nothing: SQL Server converts Dapper's text to `json`.
-- **A type override to a type that SqlClient does not give needs a Dapper type handler.**  Dapper fills a record with the type SqlClient gives for each column, or through a handler.  `date=System.DateOnly` makes a property a `DateOnly` where SqlClient gives a `DateTime`, and `time=System.TimeOnly` a `TimeOnly` where it gives a `TimeSpan`.  An alias type mapped to a struct of your own is the same: SqlClient gives the alias type's base type, a `string` for one over `nvarchar`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
+- **A type override to a type that SqlClient does not give needs a Dapper type handler.**  Dapper fills a property with the type SqlClient gives for its column, or through a handler.  `date=System.DateOnly` makes a property a `DateOnly` where SqlClient gives a `DateTime`, and `time=System.TimeOnly` a `TimeOnly` where it gives a `TimeSpan`.  An alias type mapped to a struct of your own is the same: SqlClient gives the alias type's base type, a `string` for one over `nvarchar`.  Add a handler for each, once, beside `MatchNamesWithUnderscores`:
 
   ```csharp
   using System;

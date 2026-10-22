@@ -30,7 +30,7 @@ This manual is for a .NET developer who keeps SQL in `.sql` files and uses SqlSo
 | Know why a column is recorded as possibly null | Which columns can be null in [PostgreSQL](postgresql.md#nullability) and [SQL Server](sqlserver.md#nullability) |
 | Know which queries the tool cannot describe | What can be described in [PostgreSQL](postgresql.md#what-can-be-described) and [SQL Server](sqlserver.md#what-can-be-described) |
 | Know which C# type a PostgreSQL or SQL Server type gets, or choose another | Types of [PostgreSQL](postgresql.md#type-map) and [SQL Server](sqlserver.md#types), [type overrides](settings.md#setting-type-overrides) |
-| See a whole project that uses SqlSource, with its database | [The PostgreSQL example](../../examples/PostgresExamples/README.md) |
+| See a whole project that uses SqlSource, with its database | [The PostgreSQL example](../../examples/PostgresExamples/README.md), [the SQL Server example](../../examples/SqlServerExamples/README.md) |
 | Look up a build error or a tool error | [Diagnostics](diagnostics.md) |
 | Find a problem that is not an error | The known issues of [`.sql` files](sql-files.md#known-issues), [settings](settings.md#known-issues), [parameters and tokens](parameters-and-tokens.md#known-issues), [dialects](dialects.md#known-issues), [the generator](generator.md#known-issues), [the tool](tool.md#known-issues), [PostgreSQL](postgresql.md#known-issues) and [SQL Server](sqlserver.md#known-issues) |
 
