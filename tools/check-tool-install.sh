@@ -130,7 +130,8 @@ fi
 # A project of one mssql query, and a connection to the port 1 of this machine, which refuses at once.  The tool loads
 # SqlClient to connect, and its copy for the platform must be the one it loads: the copy outside runtimes/ throws
 # PlatformNotSupportedException at the first use, which the tool reports as SQLSRC224 with another text.  The project
-# imports the package's MSBuild files by path, beside it with the repository's global.json, and is never restored.
+# imports SqlSource.props and .targets, copied from src/SqlSource/build/ with the repository's global.json beside it,
+# and is never restored.
 mssql="$work/mssql"
 mkdir -p "$mssql/build" "$mssql/App"
 cp "$repo_root/global.json" "$mssql/"
