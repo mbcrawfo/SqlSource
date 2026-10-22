@@ -26,13 +26,15 @@ public sealed class RealisticDatabaseTests(SqlServerContainer sqlServer)
         var realistic = sqlServer.RealisticConnectionString;
 
         var tables = await TablesAsync(realistic);
-        var sharedUntouched = await RealisticDatabase.ScalarAsync(
-            sqlServer.ConnectionString,
+        var sharedUntouched = await sqlServer.ScalarAsync(
             "SELECT CAST(CASE WHEN OBJECT_ID(N'dbo.customers') IS NULL THEN 1 ELSE 0 END AS bit)"
         );
 
         tables.ShouldContain("[billing].[invoices]");
         tables.ShouldContain("[dbo].[prices_history]");
+        tables
+            .Contains("[dbo].[product_specs]")
+            .ShouldBe(sqlServer.Major >= 17, "product_specs is made on SQL Server 2025 alone");
         foreach (var table in tables)
         {
             var rows = await RealisticDatabase.ScalarAsync(realistic, $"SELECT COUNT_BIG(*) FROM {table}");
