@@ -109,7 +109,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:18
+        image: postgres:18.6
         env:
           POSTGRES_DB: app
           POSTGRES_PASSWORD: ci
@@ -134,7 +134,7 @@ In a SQL Server project (`SqlSourceDialect` set to `mssql`), the service and the
 ```yaml
     services:
       mssql:
-        image: mcr.microsoft.com/mssql/server:2025-latest
+        image: mcr.microsoft.com/mssql/server:2025-CU9-GDR1-ubuntu-24.04
         env:
           ACCEPT_EULA: Y
           MSSQL_SA_PASSWORD: Ci-Passw0rd
@@ -152,6 +152,8 @@ In a SQL Server project (`SqlSourceDialect` set to `mssql`), the service and the
 ```
 
 `TrustServerCertificate=True` is for the job's own server, whose certificate nothing trusts: see [connecting to SQL Server](sqlserver.md#connecting).
+
+Name the server's exact version in the image, a PostgreSQL minor or a SQL Server cumulative update, and move it when you move your database: a tag such as `-latest` moves to a new server without a word, and a new server can describe a query otherwise than the one your sidecars were written on.
 
 Rules: [check in CI](tool.md#check-in-ci), [connections](tool.md#connections) for the variable, [exit codes](tool.md#exit-codes), [SQLSRC219](diagnostics.md#sqlsrc219).
 
