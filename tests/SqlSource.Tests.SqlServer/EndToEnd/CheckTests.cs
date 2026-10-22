@@ -3,7 +3,7 @@ using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
 using Shouldly;
-using SqlSource.Snapshot.Reading;
+using SqlSource.Testing.EndToEnd;
 using SqlSource.Tool.Testing;
 using Xunit;
 
@@ -19,18 +19,12 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
     private static IEnumerable<string> Sidecars() =>
         Directory.EnumerateFiles(RepositoryPaths.EndToEnd, "*.sql.json", SearchOption.AllDirectories);
 
-    // The number of entries of those sidecars, by the database each was described against.
-    private static int Entries(IEnumerable<string> sidecars, string database) =>
-        sidecars
-            .SelectMany(static path => SidecarReader.Read(File.ReadAllText(path)).Sidecar.ShouldNotBeNull(path).Queries)
-            .Count(entry => entry.Database == database);
-
     [Fact]
     public async Task Check_Project_EveryEntryIsTheSame()
     {
         var sidecars = Sidecars().ToList();
-        var app = Entries(sidecars, SqlServerContainer.AppDatabase);
-        var billing = Entries(sidecars, SqlServerContainer.BillingDatabase);
+        var app = CommittedEntries.Count(sidecars, SqlServerContainer.AppDatabase);
+        var billing = CommittedEntries.Count(sidecars, SqlServerContainer.BillingDatabase);
         app.ShouldBeGreaterThan(0);
         billing.ShouldBeGreaterThan(0);
         string[] connections =
@@ -53,16 +47,21 @@ public sealed class CheckTests(SqlServerContainer sqlServer)
         // A server before major 17 cannot describe NewTypes.sql, whose table is not made there, and a filtered check
         // compares only what it names, so the run names every other query file of EndToEnd/Queries/ by its path and
         // none of the 2025-only file.  A "--database" filter would take the file in with the rest of "app".
-        var newTypes = Entries([RepositoryPaths.NewTypesQueries + ".json"], SqlServerContainer.AppDatabase);
+        var newTypes = CommittedEntries.Count(
+            [RepositoryPaths.NewTypesQueries + ".json"],
+            SqlServerContainer.AppDatabase
+        );
         newTypes.ShouldBeGreaterThan(0);
+        // The named files include Constants.sql, whose only query has no sidecar and counts nothing; NewTypes.sql is
+        // the one file that only 2025 describes.
         var named = Directory
             .EnumerateFiles(RepositoryPaths.EndToEndQueries, "*.sql", SearchOption.AllDirectories)
             .Where(static path => path != RepositoryPaths.NewTypesQueries)
             .Order()
             .ToList();
         var namedSidecars = named.Select(static path => path + ".json").Where(File.Exists).ToList();
-        var checkedApp = Entries(namedSidecars, SqlServerContainer.AppDatabase);
-        var checkedBilling = Entries(namedSidecars, SqlServerContainer.BillingDatabase);
+        var checkedApp = CommittedEntries.Count(namedSidecars, SqlServerContainer.AppDatabase);
+        var checkedBilling = CommittedEntries.Count(namedSidecars, SqlServerContainer.BillingDatabase);
         checkedApp.ShouldBe(app - newTypes);
         checkedBilling.ShouldBe(billing);
 
