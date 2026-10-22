@@ -13,4 +13,4 @@ internal static partial class AllTypesQueries;
     Path = "../SqlSource.Tests.SqlServer/EndToEnd/Queries/NewTypes.sql",
     SqlLocation = SqlLocation.Direct
 )]
-internal static partial class NewTypeQueries;
+internal static partial class NewTypesQueries;

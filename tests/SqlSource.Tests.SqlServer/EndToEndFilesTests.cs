@@ -6,7 +6,7 @@ using Xunit;
 namespace SqlSource.Tests.SqlServer;
 
 // The split of a script of SQL Server into batches, which needs no server.
-public sealed class EndToEndBatchesTests
+public sealed class EndToEndFilesTests
 {
     [Fact]
     public void SqlServerBatches_LineOfGoAlone_SplitsThere() =>

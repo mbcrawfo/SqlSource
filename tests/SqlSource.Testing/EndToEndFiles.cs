@@ -11,9 +11,10 @@ using System.Threading.Tasks;
 namespace SqlSource.Testing;
 
 // The files of the end-to-end databases "app" and "billing", in the repository: a folder for each in the engine's
-// folder, with its schema.sql and its seed.sql, which tools/describe-end-to-end.sh applies in the same order.  The
-// databases of the test projects of both engines are built through it, over a DbDataSource of the project's own, so
-// that it needs no driver.
+// folder, with its schema.sql and its seed.sql, which tools/describe-end-to-end.sh applies in the same order.  Every
+// database of the test projects of both engines is built through it, over a DbDataSource of the project's own, so that
+// it needs no driver: "app" and "billing", and from the files its caller names, "fixtures" and "realistic" of each
+// engine.
 internal static partial class EndToEndFiles
 {
     public static string Schema(EndToEndEngine engine, string database) =>

@@ -17,10 +17,10 @@ namespace SqlSource.Tests.SqlServer.EndToEnd;
 // What the Dapper recipe of docs/manual/recipes.md (#dapper-with-sql-server) says for SQL Server beyond the generated
 // queries, on the connection that the recipe sets up: the type each C# parameter is sent as; a DateTime for a
 // datetime2, written or compared, goes as a TypedParameter, the recipe's sample copied in Types/, or with its DbType
-// in DynamicParameters; a SqlVector<float>, which Dapper refuses, goes as a TypedParameter; a string is written to json
-// as it is; DateOnly, TimeOnly and an alias type mapped to a struct are read through their handlers; a mark in an
-// alias is matched neither by a record nor by a class; and a command on a connection in a transaction is given the
-// transaction.  A test that writes rolls back.
+// in DynamicParameters over the generated input model; a SqlVector<float>, which Dapper refuses, goes as a
+// TypedParameter; a string is written to json as it is; DateOnly, TimeOnly and an alias type mapped to a struct are
+// read through their handlers; a mark in an alias is matched neither by a record nor by a class; and a command on a
+// connection in a transaction is given the transaction.  A test that writes rolls back.
 [Collection(UsesSqlServer.Name)]
 public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
 {
@@ -89,18 +89,36 @@ public sealed class DapperRecipeTests(SqlServerContainer sqlServer)
         written.ShouldBe(full.Datetime2Value);
     }
 
-    // The parameters come from an object as a template, and the one added by the same name with its DbType takes the
-    // template's place.
+    // The parameters come from the generated input model as a template, and the one added with its DbType under the
+    // SQL's name, writtenAt, takes the place of the model's property WrittenAt.  The model alone sends the time as a
+    // datetime, which writes .123 for .124.
     [Fact]
-    public async Task ExecuteScalarAsync_Datetime2ByDbTypeOverTheModel_IsWrittenExactly()
+    public async Task QuerySingleAsync_Datetime2ByDbTypeOverTheInputModel_IsWrittenExactly()
     {
-        var full = await FullRowAsync();
-        var parameters = new DynamicParameters(new { id = WrittenId, value = full.Datetime2Value });
-        parameters.Add("value", full.Datetime2Value, DbType.DateTime2);
+        var token = TestContext.Current.CancellationToken;
+        var writtenAt = new DateTime(2024, 10, 1, 9, 0, 0, 124, DateTimeKind.Unspecified);
+        await using var connection = EndToEndSources.App(sqlServer);
+        await connection.OpenAsync(token);
+        await using var transaction = await connection.BeginTransactionAsync(token);
+        try
+        {
+            var args = new AddNoteArgs(3, "call", "Asked to reopen.", writtenAt);
+            var parameters = new DynamicParameters(args);
+            parameters.Add("writtenAt", args.WrittenAt, DbType.DateTime2);
 
-        var written = await WriteAsync("all_types", "datetime2_value", parameters);
+            var exact = await connection.QuerySingleAsync<AddNoteDto>(WriteQueries.AddNote, parameters, transaction);
+            var alone = await connection.QuerySingleAsync<AddNoteDto>(WriteQueries.AddNote, args, transaction);
+            const string Read = "SELECT written_at FROM dbo.notes WHERE id = @id";
+            var writtenExact = await connection.ExecuteScalarAsync<DateTime>(Read, new { id = exact.Id }, transaction);
+            var writtenAlone = await connection.ExecuteScalarAsync<DateTime>(Read, new { id = alone.Id }, transaction);
 
-        written.ShouldBe(full.Datetime2Value);
+            writtenExact.ShouldBe(writtenAt);
+            writtenAlone.ShouldBe(writtenAt.AddMilliseconds(-1));
+        }
+        finally
+        {
+            await transaction.RollbackAsync(token);
+        }
     }
 
     [Fact]

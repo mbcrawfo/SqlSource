@@ -94,7 +94,7 @@ public sealed class AllTypesQueryTests(AppContainer app) : IClassFixture<AppCont
         await using var source = SqlClientFactory.Instance.CreateDataSource(app.ConnectionString);
         await using var connection = await source.OpenConnectionAsync(TestContext.Current.CancellationToken);
 
-        var rows = (await connection.QueryAsync<NewTypesDto>(NewTypeQueries.ListNewTypes)).ToList();
+        var rows = (await connection.QueryAsync<NewTypesDto>(NewTypesQueries.ListNewTypes)).ToList();
 
         rows.Count.ShouldBe(2);
         SqlServerAllTypesRows.ShouldBeTheFullNewTypesRow(rows[0]);

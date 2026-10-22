@@ -19,7 +19,7 @@ public sealed class NewTypesQueryTests(SqlServerContainer sqlServer)
         await using var connection = EndToEndSources.App(sqlServer);
         await connection.OpenAsync(TestContext.Current.CancellationToken);
 
-        var rows = (await connection.QueryAsync<NewTypesDto>(NewTypeQueries.ListNewTypes)).ToList();
+        var rows = (await connection.QueryAsync<NewTypesDto>(NewTypesQueries.ListNewTypes)).ToList();
 
         rows.Count.ShouldBe(2);
         SqlServerAllTypesRows.ShouldBeTheFullNewTypesRow(rows[0]);
