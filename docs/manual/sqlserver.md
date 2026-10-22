@@ -72,7 +72,7 @@ UPDATE dbo.orders SET shipped_at = SYSUTCDATETIME() WHERE id = @id;
 SELECT id, shipped_at FROM dbo.orders WHERE id = @id;
 ```
 
-The tool describes a query by its first result set: the rows of its first `SELECT`, or of the first `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`.  A query can hold several statements, as above, where the `UPDATE` returns no rows and the `SELECT` gives the query its columns.  A query that returns no rows at all, an `UPDATE` with no `OUTPUT` or an `OUTPUT ... INTO` a table, gets no output model.
+The tool describes a query by its first result set: the rows of its first `SELECT`, or of the first `OUTPUT` of an `INSERT`, `UPDATE`, `DELETE` or `MERGE`.  A query can hold several statements, as above, where the `UPDATE` returns no result set and the `SELECT` gives the query its columns.  A query that returns no result set at all, an `UPDATE` with no `OUTPUT` or an `OUTPUT ... INTO` a table, gets no output model; a `SELECT` that matches no row still has its columns, and gets one.
 
 **Only the first result set is described, and read into the query's model.**  A query that returns two result sets, `SELECT ...; SELECT ...`, gets an output model of the first alone, and nothing is reported of the second: give each `SELECT` a `-- name:` of its own.
 
