@@ -14,4 +14,13 @@ internal static class RepositoryPaths
         Path.Combine(Root, "tests", "SqlSource.Tool.Tests", "Fixtures", "Describers");
 
     public static string SqlServerSchema { get; } = Path.Combine(DescriberFixtures, "mssql", "schema.sql");
+
+    // The database "realistic" of the corpus of realistic queries: its schema, its seed, and the folder of its cases.
+    public static string Realistic { get; } = Path.Combine(Root, "tests", "SqlSource.Tests.SqlServer", "Realistic");
+
+    public static string RealisticSchema { get; } = Path.Combine(Realistic, "schema.sql");
+
+    public static string RealisticSeed { get; } = Path.Combine(Realistic, "seed.sql");
+
+    public static string RealisticCases { get; } = Path.Combine(Realistic, "Cases");
 }

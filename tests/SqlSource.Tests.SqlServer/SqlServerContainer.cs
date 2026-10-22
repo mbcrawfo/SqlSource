@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Data.SqlClient;
 using SqlSource.Testing;
@@ -9,15 +10,19 @@ using Xunit;
 
 namespace SqlSource.Tests.SqlServer;
 
-// One SQL Server for every test of the collection UsesSqlServer: the image, and the database "fixtures" with the
-// fixture schema, made once.  Testcontainers removes the container when the tests end, and its reaper does when the
-// process is killed.
+// One SQL Server for every test of the collection UsesSqlServer: the image, the database "fixtures" with the fixture
+// schema, and the database "realistic" with its schema and seed, each made once.  Testcontainers removes the container
+// when the tests end, and its reaper does when the process is killed.
 public sealed class SqlServerContainer : IAsyncLifetime
 {
     // Names another image: CI runs the tests again on the oldest SQL Server that is supported.
     public const string ImageVariable = "SQLSOURCE_TESTS_SQLSERVER_IMAGE";
 
     public const string Database = "fixtures";
+
+    // The second database, for the corpus of realistic queries: its own schema and seed, so that the fixture schema
+    // and the rows that tests count in it stay as they are.
+    public const string RealisticDatabase = "realistic";
 
     private readonly MsSqlContainer _container = new MsSqlBuilder(Image).Build();
 
@@ -45,6 +50,9 @@ public sealed class SqlServerContainer : IAsyncLifetime
 
     // Of the database "fixtures".
     public string ConnectionString => ConnectionStringOf(Database);
+
+    // Of the database "realistic".
+    public string RealisticConnectionString => ConnectionStringOf(RealisticDatabase);
 
     // Of the named database of the container.  The container's own string trusts the server's certificate.
     public string ConnectionStringOf(string database) =>
@@ -75,6 +83,18 @@ public sealed class SqlServerContainer : IAsyncLifetime
 
     public static void SkipBelow(int server, int major, string reason) => Assert.SkipWhen(server < major, reason);
 
+    // Skips the test on a server whose major is not recorded, where what it pins is not known.
+    public void SkipUnlessRecordedMajor(string what) => SkipUnlessRecordedMajor(Major, what);
+
+    public static void SkipUnlessRecordedMajor(int server, string what) =>
+        Assert.SkipUnless(
+            RecordedMajors.Contains(server),
+            string.Create(
+                CultureInfo.InvariantCulture,
+                $"{what} are pinned for SQL Server {string.Join(" and ", RecordedMajors)} alone."
+            )
+        );
+
     public async ValueTask InitializeAsync()
     {
         var token = TestContext.Current.CancellationToken;
@@ -84,13 +104,24 @@ public sealed class SqlServerContainer : IAsyncLifetime
             await using (var master = new SqlConnection(ConnectionStringOf("master")))
             {
                 await master.OpenAsync(token);
-                await using var create = new SqlCommand($"CREATE DATABASE {Database}", master);
+                await using var create = new SqlCommand(
+                    $"CREATE DATABASE {Database}; CREATE DATABASE {RealisticDatabase};",
+                    master
+                );
                 _ = await create.ExecuteNonQueryAsync(token);
             }
 
             await using var fixtures = new SqlConnection(ConnectionString);
             await fixtures.OpenAsync(token);
             await SqlServerScripts.RunAsync(fixtures, RepositoryPaths.SqlServerSchema, token);
+
+            // The database of the corpus, built after "fixtures" from its schema, then its seed.
+            await using (var realistic = new SqlConnection(RealisticConnectionString))
+            {
+                await realistic.OpenAsync(token);
+                await SqlServerScripts.RunAsync(realistic, RepositoryPaths.RealisticSchema, token);
+                await SqlServerScripts.RunAsync(realistic, RepositoryPaths.RealisticSeed, token);
+            }
 
             await using var major = new SqlCommand(
                 "SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS int)",

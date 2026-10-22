@@ -86,4 +86,16 @@ public sealed class SqlServerContainerTests(SqlServerContainer sqlServer)
         Should.NotThrow(() => sqlServer.SkipBelow(sqlServer.Major, "a reason"));
         _ = Should.Throw<SkipException>(() => sqlServer.SkipBelow(sqlServer.Major + 1, "a reason"));
     }
+
+    [Theory]
+    [InlineData(14)]
+    [InlineData(17)]
+    public void SkipUnlessRecordedMajor_RecordedMajor_DoesNotSkip(int server) =>
+        Should.NotThrow(() => SqlServerContainer.SkipUnlessRecordedMajor(server, "The things"));
+
+    [Fact]
+    public void SkipUnlessRecordedMajor_OtherMajor_SkipsNamingTheRecordedOnes() =>
+        Should
+            .Throw<SkipException>(() => SqlServerContainer.SkipUnlessRecordedMajor(16, "The things"))
+            .Message.ShouldEndWith("The things are pinned for SQL Server 14 and 17 alone.");
 }
