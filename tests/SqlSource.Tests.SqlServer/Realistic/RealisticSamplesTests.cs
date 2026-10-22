@@ -23,7 +23,7 @@ public sealed class RealisticSamplesTests
         );
 
         batch.Text.ShouldBe(
-            "DECLARE @sample_0 int = (1);\nDECLARE @sample_1 [dbo].[Email] = (N'x');\n"
+            "DECLARE @sample_0 int = (\n1\n);\nDECLARE @sample_1 [dbo].[Email] = (\nN'x'\n);\n"
                 + "EXEC sys.sp_executesql @statement, @declarations, @a = @sample_0, @b = @sample_1;"
         );
         batch.Declarations.ShouldBe("@a int, @b [dbo].[Email]");
@@ -45,7 +45,16 @@ public sealed class RealisticSamplesTests
     {
         var batch = RealisticSamples.Batch(Sql, Values(("ACCOUNT", "7")), [Described("account", "int")]);
 
-        batch.Text.ShouldContain("DECLARE @sample_0 int = (7);");
+        batch.Text.ShouldContain("DECLARE @sample_0 int = (\n7\n);");
+    }
+
+    // A sample may end in a comment, which would otherwise run to the end of the line and take the parenthesis.
+    [Fact]
+    public void Batch_SampleEndingInAComment_ClosesOnALineOfItsOwn()
+    {
+        var batch = RealisticSamples.Batch(Sql, Values(("a", "7 -- Ana's account")), [Described("a", "int")]);
+
+        batch.Text.ShouldStartWith("DECLARE @sample_0 int = (\n7 -- Ana's account\n);\n");
     }
 
     [Fact]

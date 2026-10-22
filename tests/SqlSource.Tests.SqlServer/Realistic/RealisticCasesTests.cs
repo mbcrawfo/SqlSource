@@ -14,14 +14,19 @@ public sealed class RealisticCasesTests
     // macOS writes it into a folder that Finder shows, and .gitignore keeps it out of the repository.
     private const string FinderFile = ".DS_Store";
 
+    // A case that the corpus holds, so that a reader that finds no folder fails.
+    private const string KnownCase = "customers-search-paged";
+
     // The cases of the corpus, by the names of their folders alone, so that a case.json that is wrong fails the rows
     // of its own case.  Every theory over the corpus takes them.
     public static TheoryData<string> Cases => [with(RealisticCases.Names)];
 
+    [Fact]
+    public void All_Cases_HoldAKnownCase() => RealisticCases.All.ShouldContain(found => found.Name == KnownCase);
+
     // Each case is checked apart, so that a broken one fails its own row.  Phase 6.6 adds the sidecar of a case that
-    // has models, and with it a third file here.  The corpus has no case yet, so the theory skips without data; the
-    // commit that adds the first case takes the argument away, so that an empty corpus fails again.
-    [Theory(SkipTestWithoutData = true)]
+    // has models, and with it a third file here.
+    [Theory]
     [MemberData(nameof(Cases))]
     public void Folder_Case_HoldsItsQueryAndItsTruthAlone(string name)
     {

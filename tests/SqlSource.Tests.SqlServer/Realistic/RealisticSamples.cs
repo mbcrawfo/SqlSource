@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using SqlSource.Snapshot;
 using SqlSource.Tool.Describing.Describers;
@@ -40,8 +39,10 @@ internal static class RealisticSamples
                 RealisticSampleChecks.Find(sample, parameter.Name)
                 ?? throw new InvalidOperationException($"The sample has no value of @{parameter.Name}.");
             var declared = SqlServerTypes.Declared(type);
-            var variable = string.Create(CultureInfo.InvariantCulture, $"@sample_{index}");
-            lines.Add($"DECLARE {variable} {declared} = ({value});");
+            var variable = $"@sample_{index}";
+
+            // The value on lines of its own, so that a sample that ends in a comment does not take the parenthesis.
+            lines.Add($"DECLARE {variable} {declared} = (\n{value}\n);");
             declarations.Add($"@{parameter.Name} {declared}");
             passed.Add($"@{parameter.Name} = {variable}");
         }
